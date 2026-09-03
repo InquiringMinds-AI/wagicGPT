@@ -7063,14 +7063,27 @@ static const char * punisherVerb(const string& punishers)
     return punishers.find(", ") == string::npos ? " punishes" : " punish";
 }
 
-static string drawPriceRowTag(int cards, int perDraw, const string& punishers)
+//#W54-C (D10, wave-53 ledger MED = R170): the tag has two emitter forms and
+//only the Forced Fruition form finished the arithmetic - 58 of the corpus's 85
+//rows stated a life cost with no resulting total, while the guides now teach
+//"read the number after `you would be at`". Same tail, same rails, same
+//"life < 0 means not supplied" convention as castDrawPriceRowTag.
+static string drawPriceRowTag(int cards, int perDraw, const string& punishers, int life = -1)
 {
     if (cards <= 0 || perDraw <= 0 || punishers.empty())
         return "";
+    int dealt = cards * perDraw;
     std::ostringstream o;
     o << " [DRAW PRICE: this draws " << cards << " card" << (cards == 1 ? "" : "s")
       << ", and the opponent's " << punishers << punisherVerb(punishers)
-      << " every draw, so taking it costs you " << (cards * perDraw) << " life right now]";
+      << " every draw, so taking it costs you " << dealt << " life right now";
+    if (life >= 0)
+    {
+        o << " - you would be at " << (life - dealt);
+        if (life - dealt <= 0)
+            o << "; this KILLS you";
+    }
+    o << "]";
     return o.str();
 }
 
@@ -12543,7 +12556,17 @@ static string stripNarrationDecoration(const string& in)
                 //pricing - true of the board while the window is open, false
                 //the moment the spell resolves.
                 || (in.compare(i, 8, "{kills: ") == 0)
-                || (in.compare(i, 7, "{kills ") == 0);
+                || (in.compare(i, 7, "{kills ") == 0)
+                //#W54-C: D11's removal victim list, D4's player-only summary,
+                //D18's menu-fit clause and D5's per-mode live/dead clause are
+                //all the same species - true of THIS window's offer and false
+                //the moment it closes, so none of them may enter history.
+                || (in.compare(i, 10, "{removes: ") == 0)
+                || (in.compare(i, 19, "{no creature target") == 0)
+                || (in.compare(i, 15, "{taps you out -") == 0)
+                || (in.compare(i, 22, "{modes live right now:") == 0)
+                || (in.compare(i, 27, "{this mode has a legal obje") == 0)
+                || (in.compare(i, 15, "{DEAD right now") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -13569,6 +13592,32 @@ string damagePlaneswalkerVerdict(int dmg, int loyalty)
         o << "SURVIVES (loyalty " << loyalty << ", " << (loyalty - dmg) << " left)}";
     return o.str();
 }
+//#W54-C (D4, wave-53 ledger HIGH, part iii): every CREATURE row of a damage
+//spell's target ask carried a survival verdict and the PLAYER rows carried
+//nothing - `130v162` seq 63 printed SURVIVES on two creatures and left
+//"The opponent (player, life 1)" bare while holding 3 damage, and the pilot
+//aimed the spell at a planeswalker and died 0 to 1 four records later. Same
+//register as damageTargetVerdict; a player's answer is their life total.
+//Pure over (magnitude, life, whose row it is).
+string damagePlayerVerdict(int dmg, int life, bool isMe)
+{
+    std::ostringstream o;
+    o << " {right now: takes " << dmg << " damage - ";
+    if (isMe)
+    {
+        o << "you would be at " << (life - dmg);
+        if (life - dmg <= 0)
+            o << "; this KILLS you";
+    }
+    else
+    {
+        o << "they would be at " << (life - dmg);
+        if (life - dmg <= 0)
+            o << "; THIS WINS THE GAME";
+    }
+    o << "}";
+    return o.str();
+}
 static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth);
 static string toLowerCopy(const string & s);
 
@@ -13582,21 +13631,45 @@ static string toLowerCopy(const string & s);
 //one. So the cast row carries the SUMMARY of the verdicts the target rows
 //compute: which of the legal targets this magnitude actually kills, or the
 //count that survive it. Pure over (killed names, target count, magnitude).
-static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
-                                 const string& magnitude)
+//#W54-C (D4, wave-53 ledger HIGH, parts i+ii): the summary counted CREATURES
+//and called them "legal targets". `130v162` seq 62 enumerated five objects
+//(two creatures, a planeswalker and BOTH players - the enumeration itself was
+//correct, contrary to the ledger's repro B, which is refuted below in the lane
+//report) and summarised them as "kills 0 of the 2 legal targets at 3 damage",
+//at 7 life against an opponent on 1. A true number in a false scope is a lie
+//under the trust doctrine, and the number that WON THE GAME was not on the
+//row at all. Two additive corrections: the denominator says CREATURE, and when
+//a player is on the same enumeration the damage that reaches them is stated
+//with its consequence. Pure over its inputs.
+static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife)
 {
-    if (creatureTargets <= 0 || magnitude.empty())
+    if (dmg <= 0 || !oppTargetable || oppLife < 0)
         return "";
     std::ostringstream o;
+    o << " - and " << dmg << " to the opponent at life " << oppLife;
+    if (oppLife - dmg <= 0)
+        o << " WINS THE GAME";
+    else
+        o << " leaves them at " << (oppLife - dmg);
+    return o.str();
+}
+static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
+                                 const string& magnitude, const string& playerTail = "")
+{
+    if (magnitude.empty())
+        return "";
+    if (creatureTargets <= 0)
+        return playerTail.empty() ? string("") : " {no creature target" + playerTail + "}";
+    std::ostringstream o;
     if (killed.empty())
-        o << " {kills 0 of the " << creatureTargets << " legal target"
-          << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << "}";
+        o << " {kills 0 of the " << creatureTargets << " CREATURE target"
+          << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << playerTail << "}";
     else
     {
         o << " {kills: ";
         for (size_t i = 0; i < killed.size(); i++)
             o << (i ? ", " : "") << killed[i];
-        o << "}";
+        o << playerTail << "}";
     }
     return o.str();
 }
@@ -14010,6 +14083,315 @@ static bool isRemovalDestination(const string& destination)
         return false;
     return d.find("exile") != string::npos || d.find("graveyard") != string::npos
         || d.find("library") != string::npos || d.find("hand") != string::npos;
+}
+//#W54-C (D18, wave-53 ledger MED = R178): a cast menu priced each row ALONE.
+//`162v152` s11 (turn 10, 4 life) offered a 5-mana walker, a 3-mana 5/5 and a
+//{0} 0/6 against four declared attackers; rows 3 and 4 were affordable
+//TOGETHER, the seat took row 2, tapped out, and its own losing reply's plan
+//named the row it had just made impossible. The claim made here is a COUNT
+//claim - the same per-source rule {leaves N of your M} and the strands clause
+//already use - so it is true by construction and says nothing about colour.
+//Pure over (sources left after this row, the rows that need more, how many
+//other rows were priceable at all).
+static string menuFitTag(int leftAfter, const std::vector<int>& lostRows, int otherPricedRows)
+{
+    if (otherPricedRows <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {";
+    if (leftAfter <= 0)
+        o << "taps you out - ";
+    else
+        o << "leaves " << leftAfter << " source" << (leftAfter == 1 ? "" : "s") << " - ";
+    if (lostRows.empty())
+        o << "no other row on this menu needs more than " << leftAfter << "}";
+    else
+    {
+        o << "row" << (lostRows.size() == 1 ? " " : "s ");
+        for (size_t i = 0; i < lostRows.size(); i++)
+        {
+            if (i)
+                o << (i + 1 == lostRows.size() ? " and " : ", ");
+            o << lostRows[i];
+        }
+        o << (lostRows.size() == 1 ? " needs" : " need")
+          << " more mana sources than the " << leftAfter << " this leaves}";
+    }
+    return o.str();
+}
+
+//The pass itself: each priced row is told what its own payment leaves and
+//which OTHER numbered rows on this menu need more than that. Pure over the
+//row list and the per-row source counts, so the numbering is provable.
+static void applyMenuFitTags(std::vector<std::string>& rows, const std::vector<int>& uses,
+                             int untappedSources)
+{
+    int priced = 0;
+    for (size_t i = 0; i < uses.size(); i++)
+        if (uses[i] >= 0)
+            priced++;
+    if (priced < 2 || untappedSources <= 0)
+        return;
+    for (size_t i = 0; i < rows.size() && i < uses.size(); i++)
+    {
+        if (uses[i] < 0)
+            continue;
+        int left = untappedSources - uses[i];
+        if (left < 0)
+            left = 0;
+        std::vector<int> lost;
+        for (size_t j = 0; j < uses.size(); j++)
+            if (j != i && uses[j] >= 0 && uses[j] > left)
+                lost.push_back((int) j + 1);
+        rows[i] += menuFitTag(left, lost, priced - 1);
+    }
+}
+
+//#W54-C (D11, wave-53 ledger MED = R171): 244 of the corpus's 413
+//creature-targeting removal cast rows carried no verdict, because lane O's
+//magnitude test ("kills at N damage") does not apply to a spell that simply
+//destroys or exiles - `125v126` seq 13-23 is eleven consecutive Path to Exile
+//rows each printing a full target list and no verdict. The information is
+//free: the enumeration is already on the row. Conservative by construction -
+//only an INSTANT/SORCERY whose script is ONE unconditional removal payload
+//qualifies; anything conditional, gated, modal, random, sweeping or
+//inline-targeted returns "" and the row renders exactly as before.
+static bool scriptHasWord(const string& low, const char * word)
+{
+    size_t w = 0;
+    string needle(word);
+    while ((w = low.find(needle, w)) != string::npos)
+    {
+        char before = w ? low[w - 1] : ' ';
+        if (!isalnum((unsigned char) before) && before != '_')
+            return true;
+        w += needle.size();
+    }
+    return false;
+}
+static string spellRemovalVerb(MTGCardInstance * src)
+{
+    if (!src || !(src->hasType(Subtypes::TYPE_INSTANT) || src->hasType(Subtypes::TYPE_SORCERY)))
+        return "";
+    string mt = toLowerCopy(src->magicText);
+    if (scriptHasWord(mt, "if") || scriptHasWord(mt, "ifnot") || scriptHasWord(mt, "may")
+        || scriptHasWord(mt, "choice") || scriptHasWord(mt, "rand")
+        || scriptHasWord(mt, "all(") || scriptHasWord(mt, "target(")
+        || scriptHasWord(mt, "restriction{"))
+        return "";
+    string verb;
+    size_t lp = 0;
+    while (lp <= mt.size())
+    {
+        size_t nl = mt.find('\n', lp);
+        string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+        size_t st = line.find_first_not_of(" \t\r");
+        if (st == string::npos)
+            continue;
+        line = line.substr(st);
+        string found;
+        if (line.compare(0, 7, "destroy") == 0
+            && (line.size() == 7 || line[7] == ' ' || line[7] == '\r'))
+            found = "kills";
+        else if (line.compare(0, 7, "moveto(") == 0)
+        {
+            size_t cp = line.find(')');
+            if (cp == string::npos || !isRemovalDestination(line.substr(7, cp - 7)))
+                return "";
+            found = "removes";
+        }
+        else if (line.compare(0, 12, "transforms((") == 0
+                 && line.find("newability[destroy]") != string::npos
+                 && line.find(" oneshot") != string::npos)
+            found = "kills";
+        if (found.empty())
+            continue; //a rider (dynamicability, an ability$ grant) is not removal
+        if (!verb.empty())
+            return ""; //two removal payloads: not the single unconditional shape
+        verb = found;
+    }
+    return verb;
+}
+//The victim list itself. INDESTRUCTIBLE is the one thing a plain `destroy`
+//cannot answer, so it is NAMED rather than silently dropped (the trust
+//doctrine: a silent omission is worse than the true token). Pure.
+static string removalVictimTag(const string& verb, const std::vector<std::string>& victims,
+                               const std::vector<std::string>& immune)
+{
+    if (verb.empty() || (victims.empty() && immune.empty()))
+        return "";
+    std::ostringstream o;
+    if (victims.empty())
+    {
+        o << " {kills nothing: every legal target is INDESTRUCTIBLE (";
+        for (size_t i = 0; i < immune.size(); i++)
+            o << (i ? ", " : "") << immune[i];
+        o << ")}";
+        return o.str();
+    }
+    o << " {" << verb << ": ";
+    for (size_t i = 0; i < victims.size(); i++)
+        o << (i ? ", " : "") << victims[i];
+    if (!immune.empty())
+    {
+        o << " - INDESTRUCTIBLE, destroy does nothing: ";
+        for (size_t i = 0; i < immune.size(); i++)
+            o << (i ? ", " : "") << immune[i];
+    }
+    o << "}";
+    return o.str();
+}
+
+//#W54-C (D5, wave-53 ledger HIGH): all 28 `Cast Silverquill Command` rows in
+//the corpus printed the mana remainder and the card text and NOTHING about
+//which printed mode has a legal object right now; at s240 the reply asserted
+//"my graveyard has no creature cards with mana value 2 or less" with two such
+//creatures named in the log directly above it. The engine must compute the
+//per-mode object set to build the mode sub-menu at all, so the cast row - the
+//REFUSABLE window - can carry the same fact.
+//
+//The parse: `auto=choice name(<label>) <payload>` lines. A payload's OUTER
+//`target(...)` is the mode's own requirement; a payload may also hand a
+//sub-ability to the OPPONENT (`ability$!... notaTarget(creature|mybattlefield)
+//sacrifice!$ opponent`), whose object set lives on the other side of the
+//board, so `mybattlefield` is rewritten to `opponentbattlefield` for it. A
+//mode with neither requirement (a plain draw) is always live. Pure.
+struct GptModalMode
+{
+    string label;
+    string outerSpec;
+    string subSpec;
+};
+static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>& out)
+{
+    out.clear();
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        string low = toLowerCopy(line);
+        size_t st = low.find_first_not_of(" \t\r");
+        if (st == string::npos || low.compare(st, 7, "choice ") != 0)
+            continue;
+        size_t np = low.find("name(", st);
+        if (np == string::npos)
+            return false; //a choice line we cannot name: annotate nothing
+        size_t ne = line.find(')', np + 5);
+        if (ne == string::npos)
+            return false;
+        GptModalMode m;
+        m.label = line.substr(np + 5, ne - (np + 5));
+        string rest = line.substr(ne + 1);
+        string restLow = toLowerCopy(rest);
+        //the sub-ability handed to another controller, if any
+        size_t ab = restLow.find("ability$!");
+        if (ab != string::npos)
+        {
+            size_t abEnd = restLow.find("!$", ab);
+            if (abEnd != string::npos)
+            {
+                string inner = rest.substr(ab + 9, abEnd - (ab + 9));
+                string innerLow = toLowerCopy(inner);
+                size_t tp = innerLow.find("notatarget(");
+                size_t skip = 11;
+                if (tp == string::npos)
+                {
+                    tp = innerLow.find("target(");
+                    skip = 7;
+                }
+                if (tp != string::npos)
+                {
+                    size_t te = inner.find(')', tp + skip);
+                    if (te != string::npos)
+                    {
+                        string spec = inner.substr(tp + skip, te - (tp + skip));
+                        string tail = toLowerCopy(rest.substr(abEnd + 2));
+                        if (tail.find("opponent") != string::npos)
+                        {
+                            size_t mb = toLowerCopy(spec).find("mybattlefield");
+                            if (mb != string::npos)
+                                spec = spec.substr(0, mb) + "opponentbattlefield"
+                                       + spec.substr(mb + 13);
+                        }
+                        m.subSpec = spec;
+                    }
+                }
+                rest = rest.substr(0, ab); //the outer payload only
+                restLow = toLowerCopy(rest);
+            }
+        }
+        size_t op = restLow.find("target(");
+        if (op != string::npos && (op == 0 || !isalnum((unsigned char) restLow[op - 1])))
+        {
+            size_t oe = rest.find(')', op + 7);
+            if (oe != string::npos)
+                m.outerSpec = rest.substr(op + 7, oe - (op + 7));
+        }
+        out.push_back(m);
+    }
+    return out.size() >= 2;
+}
+//The clause. Pure over the two name lists, so the wording is provable.
+static string modalModesTag(const std::vector<std::string>& live,
+                            const std::vector<std::string>& dead)
+{
+    if (live.empty() && dead.empty())
+        return "";
+    std::ostringstream o;
+    o << " {modes live right now: ";
+    if (live.empty())
+        o << "none";
+    for (size_t i = 0; i < live.size(); i++)
+        o << (i ? ", " : "") << live[i];
+    o << "; dead (no legal object right now): ";
+    if (dead.empty())
+        o << "none";
+    for (size_t i = 0; i < dead.size(); i++)
+        o << (i ? ", " : "") << dead[i];
+    o << "}";
+    return o.str();
+}
+//The one impure half: how many objects each spec can see, asked of the engine's
+//own TargetChooser rather than re-derived. -1 = no requirement (always live).
+static int modalSpecObjectCount(GameObserver * observer, MTGCardInstance * card, const string& spec)
+{
+    if (spec.empty())
+        return -1;
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        char c = spec[i];
+        if (!isalnum((unsigned char) c) && !strchr("[]|,-<>=;*_. :+", c))
+            return -1; //an unexpected spec shape is never guessed at
+    }
+    TargetChooserFactory tcf(observer);
+    TargetChooser * tc = tcf.createTargetChooser(spec, card);
+    if (!tc)
+        return -1;
+    int n = tc->countValidTargets();
+    SAFE_DELETE(tc);
+    return n;
+}
+static bool modalModeLiveness(GameObserver * observer, MTGCardInstance * card,
+                              std::vector<std::string>& live, std::vector<std::string>& dead)
+{
+    live.clear();
+    dead.clear();
+    if (!observer || !card)
+        return false;
+    std::vector<GptModalMode> modes;
+    if (!modalChoiceModes(card->magicText, modes))
+        return false;
+    for (size_t i = 0; i < modes.size(); i++)
+    {
+        int outer = modalSpecObjectCount(observer, card, modes[i].outerSpec);
+        int sub = modalSpecObjectCount(observer, card, modes[i].subSpec);
+        bool isLive = (outer != 0) && (sub != 0);
+        (isLive ? live : dead).push_back(modes[i].label);
+    }
+    return !live.empty() || !dead.empty();
 }
 //Damage, destroy, sacrifice, or a removal-class move, anywhere inside the
 //cost/nested/multi wrapping a loyalty or activated ability rides in.
@@ -14470,7 +14852,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 std::ostringstream names;
                 for (size_t ni = 0; ni < theirsP.size(); ni++)
                     names << (ni ? ", " : "") << theirsP[ni];
-                out << drawPriceRowTag(cards, theirsPer, names.str());
+                out << drawPriceRowTag(cards, theirsPer, names.str(), life); //#W54-C (D10)
             }
         }
     }
@@ -17881,6 +18263,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
 
     vector<MTGCardInstance *> candidates;
     vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
+    vector<int> rowUses; //#W54-C (D18): sources this row spends, -1 = unpriceable
     vector<string> opts; //"Cast nothing" is appended LAST (positional
                          //anchoring: the model favors option 1, and
                          //nothing-first likely drove the pass rate)
@@ -17923,6 +18306,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     {
         MTGCardInstance * card = casts[ci].card;
         ManaCost * cost = card->getManaCost();
+        int rowUsed = -1; //#W54-C (D18)
         std::ostringstream o;
         if (!casts[ci].viaAlternative)
         {
@@ -18080,7 +18464,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 used = (int) tapped.size();
             }
             if (payCost)
+            {
                 o << leavesUntappedTag(untappedSources, used);
+                rowUsed = used; //#W54-C (D18): this row's price, for the menu pass
+            }
             //#W52-L (D17): what this cast strands in the hand at INSTANT speed -
             //"Cast Staff of Nin {6} {leaves 1 of your 7}" was taken with Cancel
             //in hand and the next opponent turn resolved three threats with no
@@ -18312,7 +18699,37 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 mag << castDmg << " damage";
                             else
                                 mag << "-" << castDrop << "/-" << castDrop;
-                            o << castKillSummaryTag(killed, creatureTargets, mag.str());
+                            //#W54-C (D4 part ii): the damage that reaches the
+                            //PLAYER on the same enumeration, and what it means.
+                            Player * oppP = this->opponent();
+                            string playerTail = castPlayerDamageTail(
+                                castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1);
+                            o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail);
+                        }
+                        else
+                        {
+                            //#W54-C (D11): unconditional removal has no
+                            //magnitude to test, and a perfectly knowable
+                            //victim list already printed one clause away.
+                            string rverb = spellRemovalVerb(card);
+                            if (!rverb.empty())
+                            {
+                                std::vector<std::string> victims, immune;
+                                for (size_t ki = 0; ki < tgtCards.size(); ki++)
+                                {
+                                    MTGCardInstance * kc = tgtCards[ki];
+                                    if (!kc || !kc->controller() || !kc->controller()->game
+                                        || kc->currentZone != kc->controller()->game->inPlay)
+                                        continue;
+                                    string nm = kc->getDisplayName() + instanceHandle(kc);
+                                    if (rverb == "kills"
+                                        && kc->basicAbilities[Constants::INDESTRUCTIBLE] != 0)
+                                        immune.push_back(nm);
+                                    else
+                                        victims.push_back(nm);
+                                }
+                                o << removalVictimTag(rverb, victims, immune);
+                            }
                         }
                     }
                     if (ownT && !oppT && firstHit)
@@ -18451,6 +18868,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (!ct.empty())
                 o << " {card text: \"" << ct << "\"}";
         }
+        //#W54-C (D5): which printed MODE of a modal spell has a legal object
+        //right now - the fact the engine must already compute to build the
+        //mode sub-menu, carried on the refusable window that precedes it.
+        {
+            std::vector<std::string> liveM, deadM;
+            if (modalModeLiveness(observer, card, liveM, deadM))
+                o << modalModesTag(liveM, deadM);
+        }
         //#W48 D8: and the price of what it DRAWS, when the opponent punishes
         //draws. The summary line on the same screen states the standing rate;
         //the row that incurs it carries the number (deck130 G47-5's general
@@ -18465,7 +18890,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 std::ostringstream pn;
                 for (size_t ni = 0; ni < theirsP.size(); ni++)
                     pn << (ni ? ", " : "") << theirsP[ni];
-                o << drawPriceRowTag(drawn, theirsPer, pn.str());
+                o << drawPriceRowTag(drawn, theirsPer, pn.str(), life); //#W54-C (D10)
             }
         }
         //#W49-U D6 (c): and what CASTING it makes the caster draw, when an
@@ -18505,6 +18930,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         candidates.push_back(card);
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
         opts.push_back(o.str());
+        rowUses.push_back(rowUsed); //#W54-C (D18)
     }
 
     //Nothing castable: only one outcome, no model call.
@@ -18549,6 +18975,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     for (int attempt = 0; ; attempt++)
     {
         vector<string> menu(opts);
+        //#W54-C (D18, wave-53 ledger MED = R178): the MENU pass. Every row
+        //priced itself ALONE, so nothing said which rows fit TOGETHER in this
+        //window - `162v152` s11 had two blockers affordable together against
+        //four declared attackers, took the row that tapped it out, and its own
+        //losing reply's plan named the row it had just made impossible. Run
+        //per ATTEMPT, over the menu copy: a row cannot know its own number
+        //until the suppression filter and any re-ask removal have settled, and
+        //`opts` stays the untagged identity the livelock breaker keys on.
+        applyMenuFitTags(menu, rowUses, untappedSources);
         menu.push_back(castDeclineRow(observer->currentPlayer == this
                                       && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
         //#W53-N (D2): the HOLD row, last of all, on the OPPONENT'S turn only -
@@ -18622,7 +19057,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
                        << (validated == chosen ? ")" : " via combo hint)"));
             mLastCastBoard = boardNow; //livelock breaker: next entry compares
-            mLastCastLine = menu[pick];
+            //#W54-C (D18): the livelock breaker keys on the row's identity
+            //WITHOUT the menu-fit clause - that clause moves with the rest of
+            //the menu, and a suppression key that drifted with it would never
+            //match the next tick's rebuild.
+            mLastCastLine = (pick >= 0 && pick < (int) opts.size()) ? opts[pick] : menu[pick];
             return validated;
         }
 
@@ -18646,6 +19085,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         candidates.erase(candidates.begin() + pick);
         candidateUsesAlt.erase(candidateUsesAlt.begin() + pick);
         opts.erase(opts.begin() + pick);
+        if (pick < (int) rowUses.size())
+            rowUses.erase(rowUses.begin() + pick); //#W54-C (D18): stay index-parallel
         if (lastChance)
         {
             noticeFallback("that cast could not be completed - the heuristic decides", 5.0f);
@@ -19465,9 +19906,31 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //N-152h: a pay-repeat menu (Add N counters) states its partial-pay
         //semantics in the header - the counts themselves are the answer space
         //and stay untouched.
+        //#W54-C (D5): the sub-menu's own rows. Nine corpus records rendered
+        //this header over bare labels with no annotation of any kind. Same
+        //computation as the cast row's clause, matched by label so a row the
+        //parse cannot account for is left exactly as the engine wrote it.
+        //Presentation only: req.optionTexts (the staleness key) and the option
+        //ORDER are untouched, so act.choice still means what applyMenuChoice
+        //thinks it means.
+        vector<string> shownModes = req.optionTexts;
+        {
+            std::vector<std::string> liveM, deadM;
+            if (ctx && modalModeLiveness(observer, ctx, liveM, deadM))
+                for (size_t mi = 0; mi < shownModes.size(); mi++)
+                {
+                    string low = toLowerCopy(shownModes[mi]);
+                    for (size_t li = 0; li < liveM.size(); li++)
+                        if (toLowerCopy(liveM[li]) == low)
+                            shownModes[mi] += " {this mode has a legal object right now}";
+                    for (size_t di = 0; di < deadM.size(); di++)
+                        if (toLowerCopy(deadM[di]) == low)
+                            shownModes[mi] += " {DEAD right now: no legal object for this mode}";
+                }
+        }
         int pick = askModel("Choose one mode for "
                             + (ctx ? ctx->getDisplayName() : string("this spell")) + ":"
-                            + payRepeatModeNote(req.optionTexts), req.optionTexts,
+                            + payRepeatModeNote(req.optionTexts), shownModes,
                             true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
@@ -19812,7 +20275,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             opts[i] += tag;
             int cards = scriptAbilityDrawCount(handScript, label)
                         + scriptAbilityDrawCount(ctx->magicText, label);
-            opts[i] += drawPriceRowTag(cards, theirsPer, pnames.str());
+            opts[i] += drawPriceRowTag(cards, theirsPer, pnames.str(), life); //#W54-C (D10)
         }
     }
     //Dungeon room-BRANCH menu (deck146 N-146b): advancing WITHIN a dungeon offers
@@ -20351,6 +20814,23 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                         if (dtc->isCreature() && dtc->controller() && dtc->controller()->game
                             && dtc->currentZone == dtc->controller()->game->inPlay)
                             tdesc += ptDropTargetVerdict(ptDrop, dtc->toughness, dtc->life);
+                //#W54-C (D4 part iii): the PLAYER rows of the same ask. They
+                //carried nothing while their creature siblings carried a
+                //verdict, and the row that won the game was the bare one.
+                if (dmgAmount > 0)
+                    if (Player * dtp = dynamic_cast<Player *>(t))
+                        tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this);
+                //#W54-C (D4): and a planeswalker's answer is its loyalty - the
+                //helper existed and only the ability path was calling it, so
+                //`130v162` seq 63's Ob Nixilis row was bare too.
+                if (dmgAmount > 0)
+                    if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
+                        if (!dtc->isCreature() && dtc->hasType(Subtypes::TYPE_PLANESWALKER)
+                            && dtc->counters && dtc->counters->hasCounter("loyalty", 0, 0)
+                            && dtc->controller() && dtc->controller()->game
+                            && dtc->currentZone == dtc->controller()->game->inPlay)
+                            tdesc += damagePlaneswalkerVerdict(dmgAmount,
+                                         dtc->counters->hasCounter("loyalty", 0, 0)->nb);
                 opts.push_back(tdesc);
             }
             req = round;
@@ -36617,11 +37097,11 @@ static const char * kW50Y_r94 =
         }
         {
             std::vector<std::string> none;
-            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {kills 0 of the 3 legal targets at -1/-1}",
+            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {kills 0 of the 3 CREATURE targets at -1/-1}", //#W54-C (D4)
                   "#W53-O D5 deck123 vs146 seq 18: Tragic Slip's cast row prices its three survivors");
-            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {kills 0 of the 1 legal target at -1/-1}",
+            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {kills 0 of the 1 CREATURE target at -1/-1}", //#W54-C (D4)
                   "#W53-O D5 one target reads singular");
-            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {kills 0 of the 2 legal targets at 2 damage}",
+            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {kills 0 of the 2 CREATURE targets at 2 damage}", //#W54-C (D4)
                   "#W53-O D5 the damage rows carry the same summary in their own magnitude");
             std::vector<std::string> one;
             one.push_back("Elite Spellbinder");
@@ -36641,7 +37121,7 @@ static const char * kW50Y_r94 =
                            + " - legal targets right now: Nadaar, Selfless Paladin, Triumphant Adventurer, Goblin");
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
-            CHECK(parseChoice("CHOICE: 1 (Cast Tragic Slip {b} {kills 0 of the 3 legal targets at -1/-1})",
+            CHECK(parseChoice("CHOICE: 1 (Cast Tragic Slip {b} {kills 0 of the 3 CREATURE targets at -1/-1})",
                               2, &menu, &stale, &src) == 1 && !stale,
                   "#W53-O D5 echo: a reply parroting the new clause binds to row 1");
             CHECK(stripNarrationDecoration(menu[0]).find("kills 0 of the 3") == string::npos,
@@ -37174,6 +37654,300 @@ static const char * kW50Y_r94 =
               "#W53-V with three printings the nearest FORWARD id wins, not the last one");
         CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
               "#W53-V past every candidate it falls back to the nearest one behind");
+    }
+    cout << "\n[#W54-C] D4 the player on the kill summary and the target ask; D10 the cost"
+            " form's finished subtraction; D11 the removal victim list; D18 the menu fit;"
+            " D5 the modal per-mode live/dead clause\n";
+    {
+        // ================= D4: the player target, on both surfaces =================
+        // `130v162` seq 62 (7 life, opponent at 1, ten untapped sources): the row
+        // enumerated five objects - two creatures, a planeswalker and BOTH players -
+        // and summarised them "kills 0 of the 2 legal targets at 3 damage". The
+        // enumeration was RIGHT (the ledger's repro B is refuted; see wave54/lane-C.md);
+        // the DENOMINATOR was in the wrong scope and the number that wins the game was
+        // nowhere on the row.
+        CHECK(castPlayerDamageTail(3, true, 1) == " - and 3 to the opponent at life 1 WINS THE GAME",
+              "#W54-C D4 the 130v162 seq 62 row: 3 damage at opponent life 1 is the game");
+        CHECK(castPlayerDamageTail(3, true, 3) == " - and 3 to the opponent at life 3 WINS THE GAME",
+              "#W54-C D4 exactly lethal is lethal");
+        CHECK(castPlayerDamageTail(3, true, 14) == " - and 3 to the opponent at life 14 leaves them at 11",
+              "#W54-C D4 NEGATIVE the same row at 14 life states the number and claims no win");
+        CHECK(castPlayerDamageTail(3, false, 1).empty(),
+              "#W54-C D4 NEGATIVE a spell that cannot target a player says nothing about one");
+        CHECK(castPlayerDamageTail(0, true, 1).empty() && castPlayerDamageTail(3, true, -1).empty(),
+              "#W54-C D4 NEGATIVE no magnitude, or no life supplied: nothing is claimed");
+        {
+            std::vector<std::string> none;
+            CHECK(castKillSummaryTag(none, 2, "3 damage", castPlayerDamageTail(3, true, 1))
+                  == " {kills 0 of the 2 CREATURE targets at 3 damage"
+                     " - and 3 to the opponent at life 1 WINS THE GAME}",
+                  "#W54-C D4 the whole seq-62 clause: honest denominator, and the win named");
+            CHECK(castKillSummaryTag(none, 0, "3 damage", castPlayerDamageTail(3, true, 1))
+                  == " {no creature target - and 3 to the opponent at life 1 WINS THE GAME}",
+                  "#W54-C D4 a burn row whose only legal targets are players still prices the win");
+            CHECK(stripNarrationDecoration("Cast Spark Spray {r}"
+                      + castKillSummaryTag(none, 0, "3 damage", castPlayerDamageTail(3, true, 1)))
+                  == "Cast Spark Spray {r}",
+                  "#W54-C D4 echo: the player-only summary leaves no residue in the record");
+            CHECK(castKillSummaryTag(none, 0, "3 damage").empty(),
+                  "#W54-C D4 NEGATIVE no creature target and no player tail: still nothing");
+            CHECK(castKillSummaryTag(none, 2, "3 damage")
+                  == " {kills 0 of the 2 CREATURE targets at 3 damage}",
+                  "#W54-C D4 REGRESSION the four-argument shape with no tail is the three-argument one");
+            std::vector<std::string> one;
+            one.push_back("Rorix Bladewing");
+            CHECK(castKillSummaryTag(one, 2, "3 damage", castPlayerDamageTail(3, true, 1))
+                  == " {kills: Rorix Bladewing - and 3 to the opponent at life 1 WINS THE GAME}",
+                  "#W54-C D4 the named-victim form carries the player tail too");
+        }
+        // the target ask's own player row (the bare row at seq 63)
+        CHECK(damagePlayerVerdict(3, 1, false)
+              == " {right now: takes 3 damage - they would be at -2; THIS WINS THE GAME}",
+              "#W54-C D4 seq 63 row 1 (The opponent, life 1) is the winning row and was bare");
+        CHECK(damagePlayerVerdict(3, 14, false)
+              == " {right now: takes 3 damage - they would be at 11}",
+              "#W54-C D4 NEGATIVE the same row at 14 life carries no win claim");
+        CHECK(damagePlayerVerdict(3, 7, true) == " {right now: takes 3 damage - you would be at 4}",
+              "#W54-C D4 the seat's OWN row states its own remainder");
+        CHECK(damagePlayerVerdict(7, 7, true)
+              == " {right now: takes 7 damage - you would be at 0; this KILLS you}",
+              "#W54-C D4 aiming lethal damage at yourself says so");
+        CHECK(damagePlayerVerdict(3, 7, true).find("WINS") == string::npos
+              && damagePlayerVerdict(3, 1, false).find("KILLS you") == string::npos,
+              "#W54-C D4 NEGATIVE the two sides never borrow each other's verdict");
+        {
+            vector<string> menu;
+            menu.push_back("The opponent (player, life 1)" + damagePlayerVerdict(3, 1, false));
+            menu.push_back("Shield Sphere (0/6) [defender]"
+                           + damageTargetVerdict(3, 6, 6, false, false));
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (The opponent (player, life 1) {right now: takes 3 damage"
+                              " - they would be at -2; THIS WINS THE GAME})", 2, &menu, &stale, &src) == 1
+                  && !stale,
+                  "#W54-C D4 echo: a reply parroting the whole annotated player row binds to row 1");
+            CHECK(stripNarrationDecoration(menu[0]) == "The opponent (player, life 1)",
+                  "#W54-C D4 echo: the verdict leaves no residue in the narrated record");
+        }
+
+        // ================= D10: the cost form's finished subtraction =================
+        {
+            string lethal = drawPriceRowTag(1, 3, "Underworld Dreams", 3);
+            CHECK(lethal == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                            " punishes every draw, so taking it costs you 3 life right now"
+                            " - you would be at 0; this KILLS you]",
+                  "#W54-C D10 the cost form now finishes the arithmetic the guides teach reading");
+            CHECK(drawPriceRowTag(1, 2, "Fate Unraveler", 10).find("- you would be at 8]") != string::npos
+                  && drawPriceRowTag(1, 2, "Fate Unraveler", 10).find("KILLS") == string::npos,
+                  "#W54-C D10 NEGATIVE a survivable price states the total and claims no death");
+            CHECK(drawPriceRowTag(2, 3, "Underworld Dreams", 5)
+                      .find("costs you 6 life right now - you would be at -1; this KILLS you]") != string::npos,
+                  "#W54-C D10 multi-card draws multiply before they subtract");
+            CHECK(drawPriceRowTag(1, 3, "Underworld Dreams")
+                  == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                     " punishes every draw, so taking it costs you 3 life right now]",
+                  "#W54-C D10 REGRESSION the three-argument shape is byte-identical (life not supplied)");
+            CHECK(drawPriceRowTag(0, 3, "Underworld Dreams", 3).empty()
+                  && drawPriceRowTag(1, 0, "Underworld Dreams", 3).empty()
+                  && drawPriceRowTag(1, 3, "", 3).empty(),
+                  "#W54-C D10 NEGATIVE the three gates that already silenced the tag still do");
+            vector<string> menu;
+            menu.push_back("Cycle Barren Moor {2}" + lethal);
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cycle Barren Moor {2}" + lethal + ")", 2, &menu, &stale, &src) == 1
+                  && !stale,
+                  "#W54-C D10 echo: a reply parroting the tailed cost row binds to row 1");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cycle Barren Moor {2}",
+                  "#W54-C D10 echo: the tail leaves no residue in the narrated record");
+        }
+
+        // ================= D11: the removal victim list =================
+        {
+            std::vector<std::string> v, im;
+            v.push_back("Dwarven Blastminer");
+            v.push_back("Triumphant Adventurer");
+            CHECK(removalVictimTag("removes", v, im)
+                  == " {removes: Dwarven Blastminer, Triumphant Adventurer}",
+                  "#W54-C D11 125v126 seq 13-23: eleven Path rows now name what they exile");
+            std::vector<std::string> v1, im1;
+            v1.push_back("Murder target");
+            im1.push_back("Darksteel Colossus");
+            CHECK(removalVictimTag("kills", v1, im1)
+                  == " {kills: Murder target - INDESTRUCTIBLE, destroy does nothing: Darksteel Colossus}",
+                  "#W54-C D11 an indestructible target is NAMED, never silently dropped");
+            std::vector<std::string> nov;
+            CHECK(removalVictimTag("kills", nov, im1)
+                  == " {kills nothing: every legal target is INDESTRUCTIBLE (Darksteel Colossus)}",
+                  "#W54-C D11 a destroy with nothing it can kill says exactly that");
+            CHECK(removalVictimTag("", v, im).empty() && removalVictimTag("kills", nov, nov).empty(),
+                  "#W54-C D11 NEGATIVE no verb, or no targets at all: nothing is claimed");
+            CHECK(stripNarrationDecoration("Cast Path to Exile {w}" + removalVictimTag("removes", v, im))
+                  == "Cast Path to Exile {w}",
+                  "#W54-C D11 echo: the victim list leaves no residue in the narrated record");
+            CHECK(stripNarrationDecoration("Cast Murder {1}{b}{b}" + removalVictimTag("kills", nov, im1))
+                  == "Cast Murder {1}{b}{b}",
+                  "#W54-C D11 echo: the all-indestructible form leaves no residue either");
+        }
+        {
+            // the parse rail spellRemovalVerb rides: a bare `target(` disqualifies a
+            // script, `notaTarget(` must NOT (Path to Exile's land-fetch rider carries
+            // one, and it is the card the whole item is about).
+            CHECK(scriptHasWord("moveto(exile) && ability$!name(search land)"
+                                " notatarget(land[basic]|mylibrary) moveto(mybattlefield)!$"
+                                " targetcontroller", "target(") == false,
+                  "#W54-C D11 NEGATIVE Path to Exile's notaTarget rider is not a bare target(");
+            CHECK(scriptHasWord("damage:3 target(creature)", "target(") == true,
+                  "#W54-C D11 an inline target( IS found, and disqualifies the script");
+            CHECK(scriptHasWord("life:-1 controller", "if") == false
+                  && scriptHasWord("ifnot morbid then -1/-1", "if") == true,
+                  "#W54-C D11 the word test is a WORD test: 'life' is not 'if'");
+        }
+
+        // ================= D18: which rows fit together =================
+        {
+            CHECK(menuFitTag(0, std::vector<int>(), 2)
+                  == " {taps you out - no other row on this menu needs more than 0}",
+                  "#W54-C D18 tapping out is still stated when nothing else was affordable anyway");
+            std::vector<int> lost1; lost1.push_back(2);
+            CHECK(menuFitTag(0, lost1, 2)
+                  == " {taps you out - row 2 needs more mana sources than the 0 this leaves}",
+                  "#W54-C D18 162v152 s11: the row the seat took, and what it cost");
+            std::vector<int> lost2; lost2.push_back(3); lost2.push_back(4);
+            CHECK(menuFitTag(0, lost2, 3)
+                  == " {taps you out - rows 3 and 4 need more mana sources than the 0 this leaves}",
+                  "#W54-C D18 two lost rows join with 'and', plural verb");
+            std::vector<int> lost3; lost3.push_back(2); lost3.push_back(3); lost3.push_back(5);
+            CHECK(menuFitTag(1, lost3, 4)
+                  == " {leaves 1 source - rows 2, 3 and 5 need more mana sources than the 1 this leaves}",
+                  "#W54-C D18 three lost rows use commas then 'and'; one source is singular");
+            CHECK(menuFitTag(5, std::vector<int>(), 2)
+                  == " {leaves 5 sources - no other row on this menu needs more than 5}",
+                  "#W54-C D18 the POSITIVE form: a {0} blocker keeps the whole menu open");
+            CHECK(menuFitTag(3, lost1, 0).empty(),
+                  "#W54-C D18 NEGATIVE a menu with no other priced row makes no fit claim");
+        }
+        {
+            // the pass over the whole menu, on the 162v152 s11 shape: five untapped
+            // sources, a 5-source walker, a 3-source 5/5 and a {0} 0/6.
+            vector<string> rows;
+            rows.push_back("Cast Ob Nixilis, the Hate-Twisted {3}{b}{b}");
+            rows.push_back("Cast Master of the Feast {1}{b}{b} (5/5)");
+            rows.push_back("Cast Shield Sphere {0} (0/6)");
+            std::vector<int> uses; uses.push_back(5); uses.push_back(3); uses.push_back(0);
+            applyMenuFitTags(rows, uses, 5);
+            CHECK(rows[0] == "Cast Ob Nixilis, the Hate-Twisted {3}{b}{b}"
+                             " {taps you out - row 2 needs more mana sources than the 0 this leaves}",
+                  "#W54-C D18 the walker row now says which row it costs the seat");
+            CHECK(rows[1] == "Cast Master of the Feast {1}{b}{b} (5/5)"
+                             " {leaves 2 sources - row 1 needs more mana sources than the 2 this leaves}",
+                  "#W54-C D18 the row the seat took states what it strands");
+            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6)"
+                             " {leaves 5 sources - no other row on this menu needs more than 5}",
+                  "#W54-C D18 the free blocker is marked as costing the seat nothing on this menu");
+            vector<string> one;
+            one.push_back("Cast Shield Sphere {0} (0/6)");
+            std::vector<int> u1; u1.push_back(0);
+            applyMenuFitTags(one, u1, 5);
+            CHECK(one[0] == "Cast Shield Sphere {0} (0/6)",
+                  "#W54-C D18 NEGATIVE a single priced row is never given a fit clause");
+            vector<string> unp;
+            unp.push_back("Cast Fireball {x}{r}");
+            unp.push_back("Cast Shock {r}");
+            std::vector<int> u2; u2.push_back(-1); u2.push_back(1);
+            applyMenuFitTags(unp, u2, 5);
+            CHECK(unp[0] == "Cast Fireball {x}{r}",
+                  "#W54-C D18 NEGATIVE an {X} row has no price yet and is left alone");
+            CHECK(unp[1] == "Cast Shock {r}",
+                  "#W54-C D18 NEGATIVE with only one priced row on the menu nothing is tagged");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 3 (Cast Shield Sphere {0} (0/6) {leaves 5 sources - no other"
+                              " row on this menu needs more than 5})", 3, &rows, &stale, &src) == 3
+                  && !stale,
+                  "#W54-C D18 echo: a reply parroting the fit clause still binds to its row");
+            CHECK(stripNarrationDecoration(rows[2]) == "Cast Shield Sphere {0} (0/6)",
+                  "#W54-C D18 echo: the fit clause leaves no residue in the narrated record");
+            CHECK(stripNarrationDecoration(rows[0]) == "Cast Ob Nixilis, the Hate-Twisted {3}{b}{b}",
+                  "#W54-C D18 echo: the taps-you-out form leaves no residue either");
+        }
+
+        // ================= D5: the modal per-mode live/dead clause =================
+        {
+            // Silverquill Command's nine `auto=choice` lines, verbatim from
+            // Res/sets/primitives/borderline.txt (magicText joins them with '\n').
+            string sqc =
+                "choice name(Creature gains 3/3 and return creature) target(creature)"
+                " transforms((,newability[3/3],flying)) ueot && ability$!name(Return creature)"
+                " name(Return creature) target(creature[manacost<=2]|mygraveyard)"
+                " moveto(mybattlefield)!$ controller\n"
+                "choice name(Creature gains 3/3 and you draw) target(creature)"
+                " transforms((,newability[3/3],flying)) ueot && draw:1 controller && life:-1 controller\n"
+                "choice name(Creature gains 3/3 and sacrifice creature) target(creature)"
+                " transforms((,newability[3/3],flying)) ueot && ability$!name(Sacrifice creature)"
+                " name(Sacrifice creature) notaTarget(creature|mybattlefield) sacrifice!$ opponent\n"
+                "choice name(Return creature and you draw) target(creature[manacost<=2]|mygraveyard)"
+                " moveto(mybattlefield) && draw:1 controller && life:-1 controller\n"
+                "choice name(You draw and sacrifice creature) draw:1 controller && life:-1 controller"
+                " && ability$!name(Sacrifice creature) name(Sacrifice creature)"
+                " notaTarget(creature|mybattlefield) sacrifice!$ opponent";
+            std::vector<GptModalMode> modes;
+            CHECK(modalChoiceModes(sqc, modes) && modes.size() == 5,
+                  "#W54-C D5 every `choice name(...)` line is one printed mode");
+            CHECK(modes[0].label == "Creature gains 3/3 and return creature"
+                  && modes[3].label == "Return creature and you draw",
+                  "#W54-C D5 the labels are the engine's own mode names, unedited");
+            CHECK(modes[0].outerSpec == "creature"
+                  && modes[0].subSpec == "creature[manacost<=2]|mygraveyard",
+                  "#W54-C D5 a mode with a granted sub-ability carries BOTH object sets");
+            CHECK(modes[2].subSpec == "creature|opponentbattlefield",
+                  "#W54-C D5 a sacrifice handed to the OPPONENT looks at THEIR battlefield"
+                  " (s240's reply argued from the wrong side of the board)");
+            CHECK(modes[3].outerSpec == "creature[manacost<=2]|mygraveyard"
+                  && modes[3].subSpec.empty(),
+                  "#W54-C D5 the graveyard-return mode's own requirement is the graveyard");
+            CHECK(modes[4].outerSpec.empty() && modes[4].subSpec == "creature|opponentbattlefield",
+                  "#W54-C D5 a mode with no outer target still carries its sub-ability's set");
+            std::vector<GptModalMode> nope;
+            CHECK(!modalChoiceModes("damage:3", nope)
+                  && !modalChoiceModes("choice name(only one) target(creature)", nope),
+                  "#W54-C D5 NEGATIVE a non-modal script, or a single choice line, is not a modal menu");
+            CHECK(!modalChoiceModes("choice target(creature)\nchoice draw:1 controller", nope),
+                  "#W54-C D5 NEGATIVE an unnamed choice line annotates NOTHING rather than guessing");
+        }
+        {
+            std::vector<std::string> live, dead;
+            live.push_back("Return creature and you draw");
+            dead.push_back("Creature gains 3/3 and sacrifice creature");
+            CHECK(modalModesTag(live, dead)
+                  == " {modes live right now: Return creature and you draw;"
+                     " dead (no legal object right now): Creature gains 3/3 and sacrifice creature}",
+                  "#W54-C D5 the cast row's clause names both halves");
+            std::vector<std::string> nothing;
+            CHECK(modalModesTag(live, nothing)
+                  == " {modes live right now: Return creature and you draw;"
+                     " dead (no legal object right now): none}",
+                  "#W54-C D5 an all-live menu says so rather than dropping the clause");
+            CHECK(modalModesTag(nothing, dead)
+                  == " {modes live right now: none;"
+                     " dead (no legal object right now): Creature gains 3/3 and sacrifice creature}",
+                  "#W54-C D5 an all-dead menu says none, never nothing");
+            CHECK(modalModesTag(nothing, nothing).empty(),
+                  "#W54-C D5 NEGATIVE no parsed modes at all: no clause");
+            vector<string> menu;
+            menu.push_back("Cast Silverquill Command {2}{b}{w}" + modalModesTag(live, dead));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Silverquill Command {2}{b}{w})", 2, &menu, &stale, &src) == 1
+                  && !stale,
+                  "#W54-C D5 echo: the short-name reply still binds past the new clause");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Silverquill Command {2}{b}{w}",
+                  "#W54-C D5 echo: the modes clause leaves no residue in the narrated record");
+            CHECK(stripNarrationDecoration("Return creature and you draw"
+                      " {this mode has a legal object right now}") == "Return creature and you draw"
+                  && stripNarrationDecoration("Creature gains 3/3 and sacrifice creature"
+                      " {DEAD right now: no legal object for this mode}")
+                     == "Creature gains 3/3 and sacrifice creature",
+                  "#W54-C D5 echo: the sub-menu row markers leave no residue either");
+        }
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

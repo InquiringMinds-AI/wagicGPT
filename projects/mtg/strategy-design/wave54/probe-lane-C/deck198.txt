@@ -1,0 +1,10 @@
+#NAME:W54-C probe modal-and-removal
+#DESC:probe deck for wave-54 lane C render items
+Path to Exile *4
+Hammer of Bogardan *4
+Silverquill Command (STX) *4
+Doom Blade *4
+Grizzly Bears *2
+Plains *8
+Swamp *8
+Mountain *8
