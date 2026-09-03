@@ -10467,7 +10467,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
       mPlanEchoCount(0),
-      mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0)
+      mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0),
+      mRunLastCount(0) //#W57-D (D29)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -11863,10 +11864,68 @@ void AIPlayerGPT::flushEventRun()
         writeNarration(out[k]);
 }
 
+//#W57-D (D29): the string surgery, pure over the buffer. Rewrites the log's
+//LAST line from `lastRendered` to `folded` - and only when the buffer really
+//does end with that exact line, so a direct writer (the turn header, the trim
+//marker) that got in between makes this a no-op instead of a corruption.
+//Nothing before the last line is ever touched, and the buffer never shrinks by
+//more than the one line it rewrites.
+bool foldDuplicateTail(string& buf, const string& lastRendered, const string& folded)
+{
+    if (lastRendered.empty() || folded.empty())
+        return false;
+    const string tail = "- " + lastRendered + "\n";
+    if (buf.size() < tail.size()
+        || buf.compare(buf.size() - tail.size(), tail.size(), tail) != 0)
+        return false;
+    buf.erase(buf.size() - tail.size());
+    buf += "- " + folded + "\n";
+    return true;
+}
+
+//#W57-D (D29): collapse an ADJACENT DUPLICATE of the line just written. The
+//cycle holder (#W48-D11) already collapses a repeating block, but only above
+//its floor of 3 repetitions AND only while the run is not broken by one of the
+//holder's flushes - and the wave-56 corpus's 1,767 duplicate lines in 670
+//records are exactly what falls through both: 1,467 runs of 2 and 150 runs of
+//3, 1,348 of them "- Opponent drew a card" (Howling Mine: two draws in one turn
+//is TRUE and must not be dropped, only counted). Collapsing at the WRITE seam
+//catches the run however it was broken upstream, and reuses #W43-11's own
+//renderer so there is one idiom for "this happened N times" - "Opponent drew 2
+//cards", not a second invented shape. Nothing is dropped: the count is exact.
+bool AIPlayerGPT::collapseAdjacentDuplicate(const string& line)
+{
+    if (line.empty() || line != mRunLastLine || mRunLastRendered.empty()
+        || mRunLastCount < 1 || !mPendingPhase.empty())
+        return false;
+    const string re = collapsedRunNarration(line, mRunLastCount + 1, -1);
+    if (re.empty() || re == mRunLastRendered)
+        return false;
+    if (!foldDuplicateTail(mNarration, mRunLastRendered, re))
+        return false;
+    //The delta feeds one record's `events`. When the previous occurrence is
+    //still IN this delta, it collapses with the log; when it was handed to an
+    //earlier record, this delta carries the single new occurrence verbatim -
+    //either way the delta states exactly what happened since the last record.
+    if (!mTransLogPath.empty())
+    {
+        if (!foldDuplicateTail(mNarrationPending, mRunLastRendered, re))
+            mNarrationPending += "- " + line + "\n";
+    }
+    mRunLastCount++;
+    mRunLastRendered = re;
+    return true;
+}
+
 void AIPlayerGPT::writeNarration(const string& line)
 {
     if (line.empty())
         return;
+    if (collapseAdjacentDuplicate(line)) //#W57-D (D29)
+        return;
+    mRunLastLine = line;
+    mRunLastRendered = line;
+    mRunLastCount = 1;
     //Zone duty (owner doctrine): the trim drops the OLDEST events, which is
     //exactly where a player's early graveyard lives - so the marker carries
     //both graveyards and both exiles as they stand at the moment of the trim.
@@ -14266,6 +14325,74 @@ static AAFlip * asMdfcLandPlay(MTGAbility * a)
     return NULL;
 }
 
+static string dfcOtherFaceName(const string& text); //#W57-D: fwd (defined below)
+
+//#W57-D (D14): is this hand card's OTHER printed face a LAND? Read off the
+//printed `text=` line (dfcOtherFaceName) and the collection, the same two steps
+//the D8 row emitter takes, so the toggle's tail and the land row cannot
+//disagree about what the other face is.
+static bool mdfcOtherFaceIsLand(MTGCardInstance * c)
+{
+    if (!c)
+        return false;
+    string other = dfcOtherFaceName(c->text);
+    if (other.empty())
+        return false;
+    MTGCard * oc = MTGCollection()->getCardByName(other, c->setId);
+    return oc && oc->data && oc->data->isLand();
+}
+
+//#W57-D (D14): does this "Flip Side" display toggle sit on a card whose OTHER
+//face is a LAND? That is the whole discriminator for the suppression below.
+//Since #W56-D (D8) a land back face has its own one-click row in the same
+//window, so for that class the toggle is pure display and the AI seat gains
+//nothing from it - 109 rows / 90 windows / ~71.6 KB and 0 takes in the wave-56
+//corpus, 108 of the 109 land-backed. A SPELL back face is a different story:
+//borderline.txt still gates those 30 alternative-cost casts behind
+//`compare(isflipped)~equalto~1` (D33, not fixed), so there the toggle is the
+//ONLY route to a legal play and it must keep being offered. Never-hide-a-legal
+//-play still holds; this hides a display control that duplicates a real row.
+bool isLandBackedDisplayToggle(MTGAbility * a, MTGCardInstance * click)
+{
+    AATurnSide * ats = asTurnSide(a);
+    if (!ats)
+        return false;
+    MTGCardInstance * fc = click ? click : ats->source;
+    if (!fc)
+        return false;
+    string other = (fc->isFlipped > 0) ? fc->nameOrig : ats->_SideName;
+    if (other == "backside")
+        other = fc->backSide;
+    if (other.empty())
+        return false;
+    MTGCard * oc = MTGCollection()->getCardByName(other, fc->setId);
+    return oc && oc->data && oc->data->isLand();
+}
+
+//#W57-D (D14): the suite's window onto the suppression. PARSETEST can prove the
+//pure head/tag helpers but not this predicate, which needs a live card and its
+//registered abilities; the suite has both. 1 = this card's "Flip Side" toggle is
+//suppressed from the GPT seat's option list (its other face is a LAND, so the D8
+//row offers that face for real in the same window); 0 = the toggle is OFFERED
+//(a spell back face, whose alternative cast is still gated behind isflipped -
+//D33 - so the toggle is its only route); -1 = the card has no display toggle.
+int gptDisplayToggleSuppressed(MTGCardInstance * c, ActionLayer * al)
+{
+    if (!c || !al)
+        return -1;
+    int verdict = -1;
+    for (size_t k = 0; k < al->mObjects.size(); k++)
+    {
+        MTGAbility * ma = dynamic_cast<MTGAbility *>((ActionElement *) al->mObjects[k]);
+        if (!ma || ma->source != c || !asTurnSide(ma))
+            continue;
+        verdict = isLandBackedDisplayToggle(ma, c) ? 1 : 0;
+        if (verdict == 1)
+            break;
+    }
+    return verdict;
+}
+
 //#W56-W (E-3). See the call site. OR-s the modal-DFC back-face land plays into
 //the two flags landDropStatusLine reads:
 //  playable - a back-face row is LEGAL right now (the ability reacts, which is
@@ -14308,8 +14435,92 @@ static void mdfcBackFaceLandStatus(Player * p, bool& playable, bool& haveLand)
 //which says nothing about playing a land; deck146 held two Emeria's Calls for
 //nine turns at 2-3 lands and lost 19 -> 0 with the land face never offered at
 //all (corpus 20260830 146v130 seq 22/23/24). Pure, so PARSETEST proves it.
+static string toLowerCopy(const string & s); //#W57-D: fwd (defined below)
+
+//#W57-D (D26): what the back face will ASK when it arrives. The row said only
+//what the land taps for, and every Emeria / Agadeem / Sea Gate take is followed
+//by a menu the prompt never mentioned ("1. pay 3 life - enters UNTAPPED /
+//2. tap - enters TAPPED"), so a plan asserting an untapped arrival was written
+//before the price was shown (146v126 seq 19). Read off the back face's OWN
+//script, never guessed, and three-valued so the clause is only made where it is
+//true. Oracle-verified 2026-09-03 (Scryfall): Agadeem, the Undercrypt / Emeria,
+//Shattered Skyclave / Sea Gate, Reborn / Shatterskull = "As this land enters,
+//you may pay 3 life. If you don't, it enters tapped"; Pelakka Caverns and
+//Malakir Mire = "This land enters tapped" with NO menu (the docket's D26 record
+//lists Pelakka Caverns in the pay-life class - it is not); a Pathway has
+//neither line and takes no clause at all.
+enum MdfcLandArrival
+{
+    kMdfcArrivalPlain = 0,   //nothing to say (the Pathway class)
+    kMdfcArrivalPayOrTap,    //a follow-up menu: pay N life, or enter tapped
+    kMdfcArrivalTapped       //no menu, and it arrives tapped
+};
+
+//Pure over the back face's script text. The pay-or-tap shape is the engine's
+//own `ability$! ... choice name(Pay N life) life:-N _ choice name(Tap)
+//tap(noevent) ... !$`; the unconditional shape is a bare `tap(noevent)` line
+//with no choice around it. `lifeCost` is set only for the first.
+static int mdfcLandArrivalClass(const string& script, int& lifeCost)
+{
+    lifeCost = 0;
+    if (script.empty())
+        return kMdfcArrivalPlain;
+    string s = toLowerCopy(script);
+    size_t c = s.find("choice name(pay ");
+    if (c != string::npos && s.find("choice name(tap)", c) != string::npos)
+    {
+        size_t n = c + 16, e = n;
+        while (e < s.size() && isdigit((unsigned char) s[e]))
+            e++;
+        if (e > n && s.compare(e, 6, " life)") == 0)
+        {
+            lifeCost = atoi(s.substr(n, e - n).c_str());
+            if (lifeCost > 0)
+                return kMdfcArrivalPayOrTap;
+        }
+        return kMdfcArrivalPlain;
+    }
+    //A bare `tap(noevent)` OUTSIDE any choice list is the unconditional class.
+    size_t t = s.find("tap(noevent)");
+    if (t != string::npos && s.find("choice ") == string::npos)
+        return kMdfcArrivalTapped;
+    return kMdfcArrivalPlain;
+}
+
+//The clause, in the braced channel the other row facts use. Pure over the class.
+static string mdfcLandArrivalTag(int arrival, int lifeCost)
+{
+    if (arrival == kMdfcArrivalPayOrTap && lifeCost > 0)
+    {
+        std::ostringstream o;
+        o << " {taking this row then ASKS you to pay " << lifeCost
+          << " life: pay and it enters UNTAPPED and makes mana this turn, decline"
+             " and it enters TAPPED}";
+        return o.str();
+    }
+    if (arrival == kMdfcArrivalTapped)
+        return " {it enters TAPPED - it makes no mana this turn unless something"
+               " untaps it, and no menu follows}";
+    return "";
+}
+
+//#W57-D (D28): the row leads with the PRINTED name; the engine's own menu text
+//(the lowercased script token) follows it. The model echoes the row it picks, so
+//the token landed in chosen_text and then in every re-rendered narration line
+//(152v162 carried 54 renders of one such line from a single take). Keeping the
+//token second, not dropping it, is what keeps a token-only echo binding.
+static string mdfcRowHead(const string& printedName, const string& menuToken)
+{
+    if (printedName.empty())
+        return menuToken;
+    if (menuToken.empty() || toLowerCopy(printedName) == toLowerCopy(menuToken))
+        return printedName;
+    return printedName + " (menu text: " + menuToken + ")";
+}
+
 static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
-                                 const string& frontName)
+                                 const string& frontName,
+                                 const string& arrivalTag = string())
 {
     string s = " -> PLAY THIS AS A LAND: puts \"" + backName + "\" onto the"
                " battlefield as a land";
@@ -14321,6 +14532,7 @@ static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
         s += ", so \"" + frontName + "\" leaves your hand with it and that face"
              " can no longer be cast";
     s += ".";
+    s += arrivalTag; //#W57-D (D26)
     return s;
 }
 
@@ -14564,7 +14776,12 @@ static string stripNarrationDecoration(const string& in)
                 //that belongs in history.
                 || (in.compare(i, 20, "{same effect as row ") == 0)
                 || (in.compare(i, 31, "{blocking trigger, this combat:") == 0)
-                || (in.compare(i, 20, "{after this combat: ") == 0);
+                || (in.compare(i, 20, "{after this combat: ") == 0)
+                //#W57-D (D26): what the back-face land will ASK on arrival is
+                //decision-time pricing - true while the row is offered, spent
+                //the moment the land is on the battlefield.
+                || (in.compare(i, 17, "{taking this row ") == 0)
+                || (in.compare(i, 18, "{it enters TAPPED ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -16736,6 +16953,19 @@ static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draw
         if (life - lifeLoss <= 0)
             o << "; this KILLS you";
     }
+    //#W57-D (D27): the row priced the cast but never said WHETHER declining
+    //makes the surcharge go away - the difference between "pay it now" and "pay
+    //it when you must". The trigger this price is read off
+    //(`@movedto(*[chosenname]|opponentstack)`) is a standing triggered ability
+    //on THEIR permanent, so it fires on EVERY cast of a card with the chosen
+    //name for as long as that permanent is on the battlefield. Oracle-verified
+    //2026-09-03 (Scryfall, Silverquill Silencer): "Whenever an opponent casts a
+    //spell with the chosen name, they lose 3 life and you draw a card." Waiting
+    //does not reduce it; only removing the permanent (or never casting that
+    //name) does.
+    o << ". This price is PER CAST, not one-off: it is charged again every time"
+         " you cast a card with that name while their " << sourceName
+      << " is on the battlefield, so declining now does not make it go away";
     o << "]";
     return o.str();
 }
@@ -17129,7 +17359,25 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             //see renderAbilityLabel on why re-casing it would be a live bug.
             bool mapped = false;
             string lbl = renderAbilityLabel(action.ability->getMenuText(), &mapped);
-            out << (mapped ? w42Capitalize(lbl) : lbl);
+            //#W57-D (D28): the modal-DFC land row's menu text IS the lowercased
+            //script token, and it led the row. Lead with the PRINTED name and
+            //keep the token second (see mdfcRowHead) - the model echoes the row
+            //it picks, so the head is what lands in chosen_text and in every
+            //re-rendered narration line afterwards.
+            string mdfcHead;
+            if (AAFlip * hlp = asMdfcLandPlay(action.ability))
+            {
+                MTGCardInstance * hc = action.click ? action.click : hlp->source;
+                string hname = hlp->flipStats;
+                if (hc && !hname.empty())
+                    if (MTGCard * hbc = MTGCollection()->getCardByName(hname, hc->setId))
+                        if (hbc->data && !hbc->data->name.empty())
+                            mdfcHead = mdfcRowHead(hbc->data->name, lbl);
+            }
+            if (!mdfcHead.empty())
+                out << mdfcHead;
+            else
+                out << (mapped ? w42Capitalize(lbl) : lbl);
         }
     }
     if (action.click)
@@ -17159,7 +17407,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         string backName = mlp->flipStats;
         if (fc && !backName.empty())
         {
-            string backMana;
+            string backMana, arrival;
             //flipStats is the LOWERCASED script token; the pilot reads the back
             //face's name off the decklist, so print the collection's casing when
             //the card resolves (live probe 20260903: the row headed "agadeem,
@@ -17170,13 +17418,23 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     backMana = landTapMana(bc->data->text);
                     if (!bc->data->name.empty())
                         backName = bc->data->name;
+                    //#W57-D (D26): the pay-3-life / enters-tapped follow-up,
+                    //read off the back face's own script.
+                    //Two statements, deliberately: the class call WRITES
+                    //`alife`, and C++ does not order the evaluation of two
+                    //arguments of one call (this exact fusion read the old
+                    //value in PARSETEST before it was split).
+                    int alife = 0;
+                    int acls = mdfcLandArrivalClass(bc->data->magicText, alife);
+                    arrival = mdfcLandArrivalTag(acls, alife);
                 }
             //A Pathway's FRONT face is a land too, so nothing castable is
             //lost and the "can no longer be cast" clause would be nonsense
             //about a land (live probe 20260903 printed it on Hengegate
             //Pathway). Only a spell front face names itself here.
             out << mdfcLandPlayRowTag(backName, backMana,
-                                      fc->isLand() ? string() : fc->getDisplayName());
+                                      fc->isLand() ? string() : fc->getDisplayName(),
+                                      arrival);
         }
     }
 
@@ -19736,6 +19994,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //interaction, act at the latest useful moment" plays the strategy
     //priors call for, and the old blanket phase guard silenced them.
     vector<const OrderedAIAction *> candidates;
+    int suppressedLandToggles = 0; //#W57-D (D14)
     for (RankingContainer::iterator it = ranking.begin(); it != ranking.end(); ++it)
     {
         MTGAbility * ab = it->first.ability;
@@ -19775,11 +20034,35 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (t == MTGAbility::PUT_INTO_PLAY && it->first.click
             && game->hand->hasCard(it->first.click))
             continue;
+        //#W57-D (D14): the modal-DFC LAND display toggle never reaches this
+        //seat's option list. Dropped HERE, before describeAction, so the ~650
+        //character row is not even BUILT - the wave-56 corpus built and threw
+        //away 760 such option sets below the prompt and rendered 109 rows above
+        //it, taken 0 times. Scoped to a LAND back face (see the helper): the
+        //spell back face's toggle is still the only route to that cast.
+        if (isLandBackedDisplayToggle(ab, it->first.click))
+        {
+            suppressedLandToggles++;
+            continue;
+        }
         candidates.push_back(&(it->first));
     }
     //Nothing but declaration mechanics: the heuristic ranking drives those.
     if (candidates.empty())
+    {
+        //#W57-D (D14): if the ONLY thing this window offered was that toggle,
+        //the window auto-passes exactly as the N-152b gate below already made
+        //it do (return NULL, no model call, no Baka follow-through) - the
+        //suppression must not turn a display-only window into a heuristic act.
+        if (suppressedLandToggles > 0)
+        {
+            DebugTrace("AIPlayerGPT[ph" << observer->getCurrentGamePhase()
+                       << "]: only display-toggle (Flip Side) options; auto-passing without a model call"
+                       << " (suppressed " << suppressedLandToggles << " land-face toggle row(s))");
+            return NULL;
+        }
         return AIPlayerBaka::chooseOrderedAction(ranking);
+    }
 
     int phase = observer->getCurrentGamePhase();
 
@@ -23534,6 +23817,25 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                         .substr(4) //drop the leading " -> " arrow; this is a bracket tail
                     + "]";
             }
+            //#W57-D (D14, live probe 20260903 seq 10): a modal-DFC SPELL whose
+            //other face is a LAND reaches the CAST-MODE menu (`Cast Card
+            //Normally / Flip Side / Decline`) with no "Play Land" row and no
+            //backSide field, so it fell into the generic tail below - which
+            //told the model "the Cast menu ... offers the other face as an
+            //alternative-cost cast". For a LAND back face that is false at
+            //every cost: a land is never cast. This is the same species of lie
+            //#W56-D had to correct three times, one string per wave; say what
+            //is true instead. The row is still OFFERED (this menu carries no
+            //land row to duplicate, so D14's suppression does not apply here).
+            else if (mdfcOtherFaceIsLand(ctx))
+            {
+                string ln = dfcOtherFaceName(ctx->text);
+                opts[i] += " [DISPLAY TOGGLE only - this card's other face, \"" + ln
+                         + "\", is a LAND: it is never CAST, at any cost, so flipping"
+                           " puts nothing on this menu. That face is played as a LAND"
+                           " DROP from its own row, which appears while a land drop is"
+                           " still legal for you this turn - it is not on this menu now.]";
+            }
             else
                 opts[i] += " [display toggle only - no game effect: switches which face this"
                            " hand card shows; it casts nothing and uses no stack. The Cast menu"
@@ -23550,14 +23852,23 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //and the req.optionTexts staleness key are untouched. This branch is
     //independent of the Pathway "Play Land" shape above - a modal-DFC SPELL
     //with a land back face (Emeria's Call) has no Play Land row at all.
+    bool mdfcLandRowShown = false; //#W57-D (D14): the D8 row is ON this menu
     if (ctx)
     {
-        string landBack = dfcOtherFaceName(ctx->text), landBackMana;
+        string landBack = dfcOtherFaceName(ctx->text), landBackMana, landArrival;
         if (!landBack.empty())
         {
             MTGCard * lbc = MTGCollection()->getCardByName(landBack, ctx->setId);
             if (lbc && lbc->data && lbc->data->isLand())
+            {
                 landBackMana = landTapMana(lbc->data->text);
+                //#W57-D (D26): same clause as the priority seam, same helper.
+                int alife = 0; //see describeAction: class first, tag second
+                int acls = mdfcLandArrivalClass(lbc->data->magicText, alife);
+                landArrival = mdfcLandArrivalTag(acls, alife);
+                if (!lbc->data->name.empty())
+                    landBack = lbc->data->name;
+            }
             else
                 landBack = "";
         }
@@ -23573,9 +23884,16 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 std::transform(lback.begin(), lback.end(), lback.begin(), ::tolower);
                 if (lraw != lback)
                     continue;
+                //#W57-D (D28): lead with the printed name, keep the engine's own
+                //menu text second. The ANSWER INDEX and req.optionTexts (the
+                //staleness key) are untouched - only the shown text changes.
+                mdfcLandRowShown = true; //#W57-D (D14)
+                if (opts[i].compare(0, raw.size(), raw) == 0)
+                    opts[i] = mdfcRowHead(landBack, raw) + opts[i].substr(raw.size());
                 opts[i] += " ["
                     + mdfcLandPlayRowTag(landBack, landBackMana,
-                                         ctx->isLand() ? string() : ctx->getDisplayName()).substr(4)
+                                         ctx->isLand() ? string() : ctx->getDisplayName(),
+                                         landArrival).substr(4)
                     + "]";
             }
     }
@@ -23806,9 +24124,47 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
     //self-reference rather than a stale prior answer (deck137 wave-24 s4). Empty
     //when the source name did not render - then (a2) option-label-in-echo covers it.
+    //#W57-D (D14): the "Flip Side" display toggle does not reach the AI seat
+    //when the row it duplicates - the D8 back-face LAND play - is on this very
+    //menu. 22 of the corpus's 109 toggle rows came through here (146v125 seq 5:
+    //`Play Land / Flip Side (~650 chars) / grimclimb pathway / Decline`), taken
+    //0 times. The gate is the strongest available: the toggle is dropped ONLY
+    //where the same window already offers the other face as a real land drop,
+    //so no face is ever made unreachable, and a SPELL back face's toggle (the
+    //D33 gates, still the only route to that cast) is never touched. The
+    //engine's option vector, req.optionTexts (the staleness key) and the answer
+    //INDEX are untouched: only the shown list shrinks, and the model's pick is
+    //mapped straight back through shownToFull before anything is clicked.
+    vector<string> shownOpts;
+    vector<size_t> shownToFull;
+    if (mdfcLandRowShown)
+        for (size_t i = 0; i < opts.size(); i++)
+        {
+            if (i < req.optionTexts.size() && req.optionTexts[i] == "Flip Side")
+                continue;
+            shownOpts.push_back(opts[i]);
+            shownToFull.push_back(i);
+        }
+    //A menu that would be left with nothing but a decline keeps its full list.
+    const bool toggleFiltered = mdfcLandRowShown && shownOpts.size() >= 2
+                                && shownOpts.size() < opts.size();
+    if (toggleFiltered)
+    {
+        DebugTrace("AIPlayerGPT: dropped " << (opts.size() - shownOpts.size())
+                   << " display-toggle (Flip Side) row(s) from the menu; the back-face land row is offered");
+        opts.swap(shownOpts);
+    }
     int pick = askModel(decision, opts, true, ctxName);
     if (pick == kChoicePending)
         return kChoicePending;
+    //Back into the engine's index space before any use of `pick`.
+    size_t fullCount = opts.size();
+    if (toggleFiltered)
+    {
+        fullCount = shownOpts.size(); //the pre-filter list, swapped aside above
+        if (pick >= 0 && pick < (int) shownToFull.size())
+            pick = (int) shownToFull[pick];
+    }
     //W38 host-intent carry: the host is a SEPARATE later model call. Record
     //whose over/under menu was just answered and the plan stated with that
     //answer (consumePlan already folded a reply PLAN into mCurrentPlan), so
@@ -23832,7 +24188,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             }
         return 0;
     }
-    if (req.canDecline && pick == (int) opts.size() - 1)
+    if (req.canDecline && pick == (int) fullCount - 1)
         act.choice = -1; //applyMenuChoice clicks the cancel item
     else
         act.choice = pick;
@@ -43370,13 +43726,33 @@ static const char * kW50Y_r94 =
         }
         CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
               == " [NAMED BY THEIR Silverquill Silencer #1: casting this costs you 3 life"
-                 " and draws them a card - you would be at 21]",
-              "#W55-C D10 seq 42's row, priced");
+                 " and draws them a card - you would be at 21"
+                 ". This price is PER CAST, not one-off: it is charged again every time you cast a card with that name while their Silverquill Silencer #1 is on the battlefield, so declining now does not make it go away]",
+              "#W55-C D10 seq 42's row, priced (#W57-D D27: with the per-cast clause)");
+        // ---- #W57-D (D27): the row now answers "does declining make it go away".
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
+                  .find("PER CAST, not one-off") != string::npos
+              && namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
+                  .find("declining now does not make it go away") != string::npos,
+              "#W57-D D27 the price says per-cast, and that waiting does not remove it");
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
+                  .find("while their Silverquill Silencer #1 is on the battlefield") != string::npos,
+              "#W57-D D27 the clause names the permanent whose presence is the condition");
+        // NEGATIVE: no penalty, no tag - so no per-cast claim is made anywhere.
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 0, 0, 24).empty()
+              && namedCastPriceTag("", 3, 1, 24).find("PER CAST") == string::npos,
+              "#W57-D D27 NEGATIVE an unpriced row makes no per-cast claim");
+        // ECHO: the whole tag is bracketed guidance and still leaves no trace.
+        CHECK(stripNarrationDecoration("Cast Intruder Alarm {2}{u}"
+                                       + namedCastPriceTag("Silverquill Silencer #1", 3, 1, 17))
+              == "Cast Intruder Alarm {2}{u}",
+              "#W57-D D27 echo: the per-cast clause stays inside the bracket, out of history");
         CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 3)
               .find("you would be at 0; this KILLS you") != string::npos,
               "#W55-C D10 the lethal case is named outright (lane C's subtraction)");
         CHECK(namedCastPriceTag("Silverquill Silencer #1", 0, 1, 24)
-              == " [NAMED BY THEIR Silverquill Silencer #1: casting this draws them a card]",
+              == " [NAMED BY THEIR Silverquill Silencer #1: casting this draws them a card"
+                 ". This price is PER CAST, not one-off: it is charged again every time you cast a card with that name while their Silverquill Silencer #1 is on the battlefield, so declining now does not make it go away]",
               "#W55-C D10 a draw-only naming permanent prices the draw and no life");
         CHECK(namedCastPriceTag("", 3, 1, 24).empty()
               && namedCastPriceTag("Silverquill Silencer #1", 0, 0, 24).empty(),
@@ -44053,6 +44429,214 @@ static const char * kW50Y_r94 =
         CHECK(revealStallStructSecsFor(120000) == 1800
               && revealStallStructSecsFor(900000) == 2700,
               "#W56-C D12 REGRESSION the wall floor itself is unchanged");
+    }
+
+    cout << "\n=== WAVE-57 lane D: prompt economy (D14/D26/D27/D28/D29) ===\n";
+
+    cout << "\n[W57-D] D26 the back-face land row says what the land will ASK on arrival\n";
+    {
+        // The pay-or-tap class, read off the back face's own script (Agadeem,
+        // the Undercrypt / Emeria, Shattered Skyclave / Sea Gate, Reborn).
+        int life = -1;
+        CHECK(mdfcLandArrivalClass("auto=ability$!name(Choose one) choice name(Pay 3 life) life:-3 _ choice name(Tap) tap(noevent) all(mysource)!$ controller\nauto={T}:add{B}", life)
+                  == kMdfcArrivalPayOrTap && life == 3,
+              "#W57-D D26 the pay-3-life-or-enter-tapped script is recognised, with its number");
+        // The unconditional class (Pelakka Caverns, Malakir Mire). The docket's
+        // D26 record lists Pelakka Caverns with the pay-life cards; its script
+        // and its Oracle text (verified 2026-09-03) both say otherwise.
+        life = -1;
+        CHECK(mdfcLandArrivalClass("auto=tap(noevent)\nauto={T}:add{B}", life)
+                  == kMdfcArrivalTapped && life == 0,
+              "#W57-D D26 a bare tap(noevent) back face is the enters-TAPPED class, no payment");
+        // NEGATIVE: a Pathway has neither line and takes no clause at all.
+        life = -1;
+        CHECK(mdfcLandArrivalClass("auto={T}:add{W}", life) == kMdfcArrivalPlain
+              && mdfcLandArrivalClass("", life) == kMdfcArrivalPlain
+              && mdfcLandArrivalTag(mdfcLandArrivalClass("auto={T}:add{W}", life), life).empty(),
+              "#W57-D D26 NEGATIVE the Pathway class says nothing - the clause is conditional");
+        // NEGATIVE: a life payment that is not the enter-tapped menu is not it.
+        life = -1;
+        CHECK(mdfcLandArrivalClass("auto=choice name(Pay 3 life) life:-3", life)
+                  == kMdfcArrivalPlain,
+              "#W57-D D26 NEGATIVE a pay-life choice with no Tap branch is not the arrival menu");
+        life = -1;
+        CHECK(mdfcLandArrivalClass("auto=ability$!name(Choose one) choice name(Pay life)"
+                                   " life:-3 _ choice name(Tap) tap(noevent)!$", life)
+                  == kMdfcArrivalPlain && life == 0,
+              "#W57-D D26 NEGATIVE an unnumbered payment is never guessed at");
+        // The clause itself, on the row, in the braced channel.
+        {
+            int l2 = 0;
+            int c2 = mdfcLandArrivalClass("auto=ability$!name(Choose one) choice name(Pay 3 life) life:-3 _ choice name(Tap) tap(noevent) all(mysource)!$ controller\nauto={T}:add{B}", l2);
+            string tag = mdfcLandArrivalTag(c2, l2);
+            CHECK(tag.find("ASKS you to pay 3 life") != string::npos
+                  && tag.find("enters UNTAPPED") != string::npos
+                  && tag.find("enters TAPPED") != string::npos,
+                  "#W57-D D26 the clause states both branches of the menu it is warning about");
+            string row = mdfcLandPlayRowTag("Agadeem, the Undercrypt", "{B}",
+                                            "Agadeem's Awakening", tag);
+            CHECK(row.find("PLAY THIS AS A LAND") != string::npos
+                  && row.find(tag) != string::npos
+                  && row.rfind(tag) == row.size() - tag.size(),
+                  "#W57-D D26 the arrival clause rides at the END of the existing row tag");
+            CHECK(mdfcLandPlayRowTag("Boulderloft Pathway", "{W}", "").find("{taking this row") == string::npos
+                  && mdfcLandPlayRowTag("Boulderloft Pathway", "{W}", "").find("{it enters") == string::npos,
+                  "#W57-D D26 NEGATIVE a row built with no arrival clause makes no arrival claim");
+            // ECHO: the whole clause is a braced annotation, stripped from history.
+            CHECK(stripNarrationDecoration("Play Agadeem, the Undercrypt" + tag)
+                  == "Play Agadeem, the Undercrypt",
+                  "#W57-D D26 echo: the arrival clause leaves no trace in the narrated record");
+        }
+        // The tapped clause makes no payment claim.
+        {
+            int l3 = 0;
+            int c3 = mdfcLandArrivalClass("auto=tap(noevent)", l3);
+            string t3 = mdfcLandArrivalTag(c3, l3);
+            CHECK(t3.find("enters TAPPED") != string::npos
+                  && t3.find("pay") == string::npos
+                  && t3.find("life") == string::npos,
+                  "#W57-D D26 the unconditional class offers no payment that does not exist");
+        }
+    }
+
+    cout << "\n[W57-D] D28 the MDFC row leads with the printed name, the script token second\n";
+    {
+        // The live case: the engine's menu text is the printed name LOWERCASED,
+        // so the head is simply the printed name - repeating a case variant of
+        // itself would be noise, and parseChoice already binds case-blind (the
+        // token echo below proves it). The parenthesis is for a token that is a
+        // genuinely different string, which is where dropping it would lose the
+        // only word the model can echo.
+        CHECK(mdfcRowHead("Agadeem, the Undercrypt", "agadeem, the undercrypt")
+              == "Agadeem, the Undercrypt",
+              "#W57-D D28 a token that is only a case variant is not printed twice");
+        CHECK(mdfcRowHead("Moonrage Brute", "backside")
+              == "Moonrage Brute (menu text: backside)",
+              "#W57-D D28 a genuinely different menu text is kept, second, so a token echo still binds");
+        CHECK(mdfcRowHead("Grimclimb Pathway", "grimclimb pathway")
+                  .compare(0, 17, "Grimclimb Pathway") == 0,
+              "#W57-D D28 the row's first bytes are the name the decklist prints");
+        // NEGATIVE: nothing is duplicated when the two already agree, and a
+        // missing printed name never blanks the row.
+        CHECK(mdfcRowHead("Boulderloft Pathway", "Boulderloft Pathway") == "Boulderloft Pathway"
+              && mdfcRowHead("Boulderloft Pathway", "") == "Boulderloft Pathway"
+              && mdfcRowHead("", "boulderloft pathway") == "boulderloft pathway",
+              "#W57-D D28 NEGATIVE identical, empty-token and empty-name cases add no parenthesis");
+        // ECHO: both halves of the head still bind the row.
+        {
+            vector<string> menu;
+            menu.push_back("Play Land");
+            menu.push_back(mdfcRowHead("Grimclimb Pathway", "grimclimb pathway")
+                           + mdfcLandPlayRowTag("Grimclimb Pathway", "{B}", ""));
+            menu.push_back("Decline - do nothing");
+            bool st = false;
+            CHECK(parseChoice("CHOICE: 2 (Grimclimb Pathway)", 3, &menu, &st, NULL) == 2 && !st,
+                  "#W57-D D28 echo: a reply naming the PRINTED name binds to the row");
+            st = false;
+            CHECK(parseChoice("CHOICE: 2 (grimclimb pathway)", 3, &menu, &st, NULL) == 2 && !st,
+                  "#W57-D D28 echo: a reply naming the lowercased script token still binds");
+            st = false;
+            CHECK(parseChoice("CHOICE: 1 (Play Land)", 3, &menu, &st, NULL) == 1 && !st,
+                  "#W57-D D28 echo: the neighbouring land row is unaffected by the new head");
+        }
+    }
+
+    cout << "\n[W57-D] D29 an adjacent duplicate log line folds into one counted line\n";
+    {
+        string buf = "- Phase: Draw\n- Opponent drew a card\n";
+        CHECK(foldDuplicateTail(buf, "Opponent drew a card",
+                                collapsedRunNarration("Opponent drew a card", 2, -1))
+              && buf == "- Phase: Draw\n- Opponent drew 2 cards\n",
+              "#W57-D D29 the second identical line folds into the first, counted and conjugated");
+        CHECK(foldDuplicateTail(buf, "Opponent drew 2 cards",
+                                collapsedRunNarration("Opponent drew a card", 3, -1))
+              && buf == "- Phase: Draw\n- Opponent drew 3 cards\n",
+              "#W57-D D29 a third occurrence re-folds the same line, never adding a second one");
+        // NEGATIVE: a tail that is not the line we think it is stays untouched.
+        {
+            string b2 = "- Phase: Draw\n- You drew Island\n";
+            const string before = b2;
+            CHECK(!foldDuplicateTail(b2, "Opponent drew a card", "Opponent drew 2 cards")
+                  && b2 == before,
+                  "#W57-D D29 NEGATIVE a mismatched tail is a no-op, not a corruption");
+            string b3 = "- Opponent drew a card\n";
+            const string before3 = b3;
+            CHECK(!foldDuplicateTail(b3, "", "x") && !foldDuplicateTail(b3, "y", "")
+                  && b3 == before3,
+                  "#W57-D D29 NEGATIVE an empty rendering never rewrites the log");
+            string b4 = "";
+            CHECK(!foldDuplicateTail(b4, "Opponent drew a card", "Opponent drew 2 cards")
+                  && b4.empty(),
+                  "#W57-D D29 NEGATIVE an empty log has no last line to fold into");
+        }
+        // The count is exact for a shape the conjugator cannot re-word.
+        CHECK(collapsedRunNarration("You gained 1 life", 2, -1) == "You gained 1 life (x2)",
+              "#W57-D D29 a non-conjugable line keeps its sentence and states the count");
+        CHECK(collapsedRunNarration("Opponent drew a card", 2, -1) == "Opponent drew 2 cards",
+              "#W57-D D29 the corpus's 1,348-line class folds into plain English");
+        // The folded line is still an ordinary log line: nothing about it needs
+        // the parser, and the decoration stripper leaves the count alone.
+        CHECK(stripNarrationDecoration("Opponent drew 2 cards") == "Opponent drew 2 cards",
+              "#W57-D D29 the folded line carries no annotation channel of its own");
+    }
+
+    cout << "\n[W57-D] D14 the Flip Side display toggle is scoped to a LAND back face\n";
+    {
+        // The cast-mode menu's toggle tail (live probe 20260903 seq 10,
+        // Pelakka Predation // Pelakka Caverns): a LAND back face is never cast,
+        // so the generic "the Cast menu offers the other face as an
+        // alternative-cost cast" is false there. The replacement says what is
+        // true and points at the row that really plays it.
+        const string landToggleTail =
+            string(" [DISPLAY TOGGLE only - this card's other face, \"Pelakka Caverns\",")
+            + " is a LAND: it is never CAST, at any cost, so flipping"
+              " puts nothing on this menu. That face is played as a LAND"
+              " DROP from its own row, which appears while a land drop is"
+              " still legal for you this turn - it is not on this menu now.]";
+        CHECK(landToggleTail.find("alternative-cost cast") == string::npos
+              && landToggleTail.find("is a LAND: it is never CAST") != string::npos,
+              "#W57-D D14 the land-back toggle tail makes no cast claim about a land");
+        {
+            vector<string> castMenu;
+            castMenu.push_back("Cast Card Normally [cost: {2}{b}]");
+            castMenu.push_back("Flip Side" + landToggleTail);
+            castMenu.push_back("Decline - do nothing");
+            bool cs = false;
+            CHECK(parseChoice("CHOICE: 2 (Flip Side)", 3, &castMenu, &cs, NULL) == 2 && !cs,
+                  "#W57-D D14 echo: a 'Flip Side' echo still binds to the re-worded tail");
+            cs = false;
+            CHECK(parseChoice("CHOICE: 1 (Cast Card Normally)", 3, &castMenu, &cs, NULL) == 1,
+                  "#W57-D D14 NEGATIVE the cast row beside it is unaffected");
+            CHECK(stripNarrationDecoration("Flip Side" + landToggleTail) == "Flip Side",
+                  "#W57-D D14 echo: the tail is bracketed guidance and stays out of history");
+        }
+        // The suppression's whole discriminator is "does a real row for the
+        // other face exist in this same window". The land-menu render that
+        // remains for the HUMAN seat still says so, and the wave-56 corpus's
+        // 108-of-109 land-backed toggles are the rows that go.
+        vector<string> landMenu;
+        landMenu.push_back("Play Land");
+        landMenu.push_back(mdfcRowHead("Grimclimb Pathway", "grimclimb pathway")
+                           + mdfcLandPlayRowTag("Grimclimb Pathway", "{B}", ""));
+        landMenu.push_back("Decline - do nothing");
+        bool st = false;
+        CHECK(parseChoice("CHOICE: 2 (Grimclimb Pathway)", 3, &landMenu, &st, NULL) == 2,
+              "#W57-D D14 an AI-seat land menu with no Flip Side row answers by its own indices");
+        // NEGATIVE: a menu that still carries the toggle (the human seat, and
+        // the spell back face the D33 gates still route through it) parses
+        // exactly as it did before - the row's binding is untouched.
+        vector<string> withToggle;
+        withToggle.push_back("Play Land");
+        withToggle.push_back("Flip Side [DISPLAY TOGGLE only - this is a modal double-faced land.]");
+        withToggle.push_back(mdfcRowHead("Grimclimb Pathway", "grimclimb pathway")
+                             + mdfcLandPlayRowTag("Grimclimb Pathway", "{B}", ""));
+        withToggle.push_back("Decline - do nothing");
+        st = false;
+        CHECK(parseChoice("CHOICE: 2 (Flip Side)", 4, &withToggle, &st, NULL) == 2 && !st,
+              "#W57-D D14 NEGATIVE a seat that still shows the toggle binds it exactly as before");
+        st = false;
+        CHECK(parseChoice("CHOICE: 3 (grimclimb pathway)", 4, &withToggle, &st, NULL) == 3,
+              "#W57-D D14 NEGATIVE the land row keeps its own index on the unfiltered menu");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

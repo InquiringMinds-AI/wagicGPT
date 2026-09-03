@@ -100,6 +100,12 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
 //holder keeps the rest); `flush` empties it. Nothing is ever dropped: a block
 //below the collapse floor is written verbatim, and a collapsed block writes one
 //sentence per DISTINCT line carrying the exact number of times it happened.
+//#W57-D (D14): the suite's probe into the GPT seat's display-toggle
+//suppression. 1 = suppressed (land back face), 0 = offered (spell back
+//face), -1 = this card has no "Flip Side" toggle. See the definition.
+class ActionLayer;
+int gptDisplayToggleSuppressed(MTGCardInstance * c, ActionLayer * al);
+
 struct NarrationCycleHolder
 {
     vector<string> cycle;      //the established repeating block (empty = none)
@@ -462,6 +468,9 @@ private:
     //#W43-11: the raw (pre-collapse) narration write. Everything appendNarration
     //did before the run buffer was put in front of it.
     void writeNarration(const string& line);
+    //#W57-D (D29): the adjacent-duplicate collapse at the write seam.
+    //Returns true when the line was folded into the log's last line.
+    bool collapseAdjacentDuplicate(const string& line);
     //#W43-11: narrate a day/night transition, once, when it actually changes.
     void noteDesignationChange();
     //#W50-X D14: narrate a permanent's chosen name once it is known.
@@ -842,6 +851,12 @@ private:
     //append-only game narration: every noteworthy event plus the model's
     //own consumed decisions, as if narrating the game (bounded, tail kept)
     string mNarration;
+    //#W57-D (D29): the last line WRITTEN, its rendered form as it stands
+    //in the log right now, and how many identical occurrences that form
+    //already carries. Empty/0 whenever the tail is not a countable run.
+    string mRunLastLine;
+    string mRunLastRendered;
+    int mRunLastCount;
     //Phase changes are narrated LAZILY: a phase change only updates this
     //marker (overwriting the last one), and the marker joins the narration
     //when a real event or decision lands in that phase - phases in which

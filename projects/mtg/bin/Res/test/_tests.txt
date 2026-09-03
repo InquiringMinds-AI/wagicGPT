@@ -1339,3 +1339,4 @@ w56Z_interrupt_cancel_button_keeps_window.txt
 w56Z_interrupt_targeted_cast_resolves.txt
 light_paws_attaches_to_lightpaws.txt
 light_paws_normal_aura_choice_free.txt
+w57d_display_toggle_seat_scope.txt

@@ -1035,6 +1035,33 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertdisplaytoggle ") == 0)
+    {
+        //#W57-D (D14): the GPT seat no longer shows the modal-DFC "Flip Side"
+        //display toggle when the card's other face is a LAND - since #W56-D (D8)
+        //that face has its own one-click row in the same window, so the toggle
+        //adds no play and cost 109 rows / ~71.6 KB / 0 takes in the wave-56
+        //corpus, plus 760 whole option sets built and thrown away below the
+        //prompt. The engine's menu is UNCHANGED (the human seat still gets the
+        //toggle, and the answer indices are untouched): only the GPT seat's
+        //shown list drops it. A SPELL back face keeps its toggle - the 30
+        //`otherrestriction ... compare(isflipped)~equalto~1` gates in
+        //borderline.txt (D33) make it the only route to that cast.
+        //Syntax: assertdisplaytoggle <1 suppressed|0 offered> <card name>
+        string rest = action.substr(20);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.c_str());
+        string cname = (sp == string::npos) ? "" : rest.substr(sp + 1);
+        MTGCardInstance * dc = getCard(cname);
+        int got = dc ? gptDisplayToggleSuppressed(dc, observer->mLayers->actionLayer()) : -1;
+        if (!dc || got != expect)
+        {
+            std::cerr << "TESTSUITE assertdisplaytoggle: '" << cname << "' expected "
+                      << expect << " got " << got << (dc ? "" : " (no such card)")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertabilitycount ") == 0)
     {
         //#W54-I: pin HOW MANY entries a click on this card puts in its ability
