@@ -22,6 +22,12 @@
 #define GPT_MKDIR(p) mkdir((p), 0755)
 #endif
 #include <cstring>
+#include <set>
+#include <cstdio>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 //std::lock_guard for the codex auth mutex. Header-only, so safe on Vita too,
 //where GptMutex is a kernel mutex precisely because std::mutex is a no-op
 //there - lock_guard is just RAII over whatever BasicLockable it is given.
@@ -51,6 +57,39 @@ namespace
 
 const char * kObfPrefix = "obf1:";
 const size_t kSaltBytes = 32;
+
+//audit-L (L11): write a secret file (keysalt, the Codex token store, the
+//sign-in document) with mode 0600 FROM CREATION, instead of ofstream (0644
+//under the default umask) followed by chmod - the window between the two is
+//one scheduling gap, and cheap to close. Windows has no POSIX modes; there
+//the stream+chmod form stands. Returns false when nothing was written.
+bool writeSecretFile(const string& path, const string& data)
+{
+#if defined (_WIN32)
+    std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
+    if (!f)
+        return false;
+    f.write(data.data(), (std::streamsize) data.size());
+    f.close();
+    chmod(path.c_str(), 0600);
+    return true;
+#else
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
+        return false;
+    size_t off = 0;
+    while (off < data.size())
+    {
+        ssize_t w = write(fd, data.data() + off, data.size() - off);
+        if (w <= 0)
+            break;
+        off += (size_t) w;
+    }
+    close(fd);
+    chmod(path.c_str(), 0600); //an existing file keeps its old mode otherwise
+    return off == data.size();
+#endif
+}
 
 const char kB64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -168,6 +207,34 @@ string loadOrCreateSalt()
         if (ur.gcount() == (std::streamsize) kSaltBytes)
             salt.assign(buf, kSaltBytes);
     }
+    //audit-L (L11): the platforms with no /dev/urandom (Vita, native Windows)
+    //used to fall to rand() seeded by srand(time(0)) - a copied endpoints.txt
+    //plus the install epoch was a small brute force. Their own entropy first.
+#if defined (VITA)
+    if (salt.empty())
+    {
+        char buf[kSaltBytes];
+        if (sceKernelGetRandomNumber(buf, kSaltBytes) >= 0)
+            salt.assign(buf, kSaltBytes);
+    }
+#elif defined (_WIN32)
+    if (salt.empty())
+    {
+        string s;
+        for (size_t i = 0; i < kSaltBytes; i += sizeof(unsigned int))
+        {
+            unsigned int r = 0;
+            if (rand_s(&r) != 0)
+            {
+                s.clear();
+                break;
+            }
+            s.append((const char *) &r, sizeof(r));
+        }
+        if (s.size() >= kSaltBytes)
+            salt = s.substr(0, kSaltBytes);
+    }
+#endif
     if (salt.empty())
     {
         //Weak fallback; still beats plaintext for the shoulder-surf case.
@@ -182,13 +249,7 @@ string loadOrCreateSalt()
         dir += "/ai"; GPT_MKDIR(dir.c_str());
         dir += "/gpt"; GPT_MKDIR(dir.c_str());
     }
-    std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
-    if (f)
-    {
-        f.write(salt.data(), salt.size());
-        f.close();
-        chmod(path.c_str(), 0600);
-    }
+    writeSecretFile(path, salt); //audit-L (L11): 0600 from creation
     return salt;
 }
 
@@ -256,6 +317,118 @@ void gptLogLine(const string& line)
     std::ofstream f((dir + "/gpt-log.txt").c_str(), std::ios::app);
     if (f)
         f << line << "\n";
+}
+
+//--- audit-L (A49/A24): curl lifetime, worker accounting, once-logs ---------
+namespace
+{
+//Everything below is first-touched on the GAME thread by gptCurlInit() (the
+//AIPlayerGPT ctor and gptSpawnWorker call it before any worker exists), so
+//the function-local static is constructed where the Vita's lockless
+//__cxa_guard is safe - the hazard the old function-local statics inside the
+//worker had (two seats failing at once could double-construct the mutex).
+struct GptWorkerAccounting
+{
+    GptMutex mtx;
+    int inFlight;
+    string lastOnceLine;
+    std::set<string> httpFailuresSeen; //"url\x01code"
+    GptWorkerAccounting() : inFlight(0) {}
+};
+GptWorkerAccounting& workerAccounting()
+{
+    static GptWorkerAccounting a;
+    return a;
+}
+bool gCurlInited = false;
+
+void gptSleepMs(int ms)
+{
+#if defined (VITA)
+    sceKernelDelayThread(ms * 1000);
+#else
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+#endif
+}
+} //namespace
+
+void gptCurlInit()
+{
+    workerAccounting(); //first touch, game thread
+#ifndef WAGIC_NO_CURL
+    if (!gCurlInited)
+    {
+        gCurlInited = true;
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+    }
+#endif
+}
+
+//Called by the spawn seams around every worker run.
+static void gptWorkerStarted()
+{
+    std::lock_guard<GptMutex> g(workerAccounting().mtx);
+    workerAccounting().inFlight++;
+}
+static void gptWorkerFinished()
+{
+    std::lock_guard<GptMutex> g(workerAccounting().mtx);
+    workerAccounting().inFlight--;
+}
+
+int gptWorkersInFlight()
+{
+    std::lock_guard<GptMutex> g(workerAccounting().mtx);
+    return workerAccounting().inFlight;
+}
+
+bool gptShutdownWorkers(long maxWaitMs)
+{
+    long waited = 0;
+    int n = gptWorkersInFlight();
+    while (n > 0 && waited < maxWaitMs)
+    {
+        gptSleepMs(50);
+        waited += 50;
+        n = gptWorkersInFlight();
+    }
+#ifndef WAGIC_NO_CURL
+    //cleanup only when nothing is still inside libcurl - a cleanup under a
+    //live worker is worse than none
+    if (n == 0 && gCurlInited)
+    {
+        gCurlInited = false;
+        curl_global_cleanup();
+    }
+#endif
+    return n == 0;
+}
+
+void gptLogLineOnce(const string& line)
+{
+    {
+        std::lock_guard<GptMutex> g(workerAccounting().mtx);
+        if (line == workerAccounting().lastOnceLine)
+            return;
+        workerAccounting().lastOnceLine = line;
+    }
+    gptLogLine(line);
+}
+
+void gptNoteHttpFailure(const string& url, long code, const string& bodyHead)
+{
+    std::ostringstream key;
+    key << url << "\x01" << code;
+    {
+        std::lock_guard<GptMutex> g(workerAccounting().mtx);
+        if (!workerAccounting().httpFailuresSeen.insert(key.str()).second)
+            return;
+    }
+    std::ostringstream line;
+    line << "http error " << code << " from " << url;
+    if (!bodyHead.empty())
+        line << ": " << bodyHead;
+    gptLogLine(line.str());
 }
 
 string gptReadAsset(const char * filename)
@@ -505,8 +678,13 @@ void gptAndroidCacheClass(JNIEnv * env)
 
 namespace
 {
-string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer)
+string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer,
+                       long * codeOut, string * errBodyOut)
 {
+    if (codeOut)
+        *codeOut = 0; //audit-L (A24): no status until the transport reports one
+    if (errBodyOut)
+        errBodyOut->clear();
     if (!gGptJvm || !gGptActivityClass)
         return "";
 
@@ -600,8 +778,12 @@ namespace
 //Platforms without any wired transport: the request reports failure, which
 //every GPT seam already treats as "fall back to Baka" - the same behavior as
 //an unreachable endpoint.
-string httpRequestImpl(const string&, const string&, long, const string&)
+string httpRequestImpl(const string&, const string&, long, const string&, long * codeOut, string * errBodyOut)
 {
+    if (codeOut)
+        *codeOut = 0;
+    if (errBodyOut)
+        errBodyOut->clear();
     return "";
 }
 #else
@@ -613,8 +795,13 @@ size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * user
     return size * nmemb;
 }
 
-string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer)
+string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer,
+                       long * codeOut, string * errBodyOut)
 {
+    if (codeOut)
+        *codeOut = 0; //audit-L (A24): no status until the transport reports one
+    if (errBodyOut)
+        errBodyOut->clear();
     CURL * curl = curl_easy_init();
     if (!curl)
         return "";
@@ -629,6 +816,11 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    //audit-L (A24): a POST that follows a 301/302/303 used to become a bodiless
+    //GET (the same empty-body class as an unreachable server), and libcurl's
+    //default redirect limit is unbounded.
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, (long) CURL_REDIR_POST_ALL);
 
     if (!bearer.empty())
         headers = curl_slist_append(headers, ("Authorization: Bearer " + bearer).c_str());
@@ -649,8 +841,16 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
         curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
+    //audit-L (A24): the status and the error body's head go out with the
+    //empty return - the code is what tells a wrong key from a dead host.
+    if (codeOut)
+        *codeOut = (res == CURLE_OK) ? httpCode : 0;
     if (res != CURLE_OK || httpCode != 200)
+    {
+        if (errBodyOut && res == CURLE_OK)
+            *errBodyOut = response.substr(0, 160);
         return "";
+    }
     return response;
 }
 #endif //WAGIC_NO_CURL
@@ -658,12 +858,25 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
 
 string gptHttpGet(const string& url, long timeoutMs, const string& bearer)
 {
-    return httpRequestImpl(url, "", timeoutMs, bearer);
+    return httpRequestImpl(url, "", timeoutMs, bearer, NULL, NULL);
 }
 
 string gptHttpPost(const string& url, const string& body, long timeoutMs, const string& bearer)
 {
-    return httpRequestImpl(url, body, timeoutMs, bearer);
+    return httpRequestImpl(url, body, timeoutMs, bearer, NULL, NULL);
+}
+
+//audit-L (A24)
+string gptHttpGet(const string& url, long timeoutMs, const string& bearer,
+                  long * httpCode, string * errBody)
+{
+    return httpRequestImpl(url, "", timeoutMs, bearer, httpCode, errBody);
+}
+
+string gptHttpPost(const string& url, const string& body, long timeoutMs, const string& bearer,
+                   long * httpCode, string * errBody)
+{
+    return httpRequestImpl(url, body, timeoutMs, bearer, httpCode, errBody);
 }
 
 //--- Full-control POST (ChatGPT-subscription transport) ---------------------
@@ -707,6 +920,11 @@ string httpRequestFull(const string& url, const string& postBody, long timeoutMs
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    //audit-L (A24): a POST that follows a 301/302/303 used to become a bodiless
+    //GET (the same empty-body class as an unreachable server), and libcurl's
+    //default redirect limit is unbounded.
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, (long) CURL_REDIR_POST_ALL);
     if (!postBody.empty())
     {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postBody.c_str());
@@ -1016,13 +1234,7 @@ void codexSave(CodexAuth& a)
 {
     if (a.path.empty())
         return;
-    std::ofstream f(a.path.c_str(), std::ios::binary | std::ios::trunc);
-    if (f)
-    {
-        f << a.doc.dump(1) << "\n";
-        f.close();
-        chmod(a.path.c_str(), 0600);
-    }
+    writeSecretFile(a.path, a.doc.dump(1) + "\n"); //audit-L (L11)
 }
 
 //Refresh the access token. Caller holds the mutex. Rotates and persists.
@@ -1339,6 +1551,7 @@ int gptWorkerEntry(SceSize args, void * argp)
     //sceKernelStartThread copied SpawnArgs onto this thread's stack.
     SpawnArgs a = *reinterpret_cast<SpawnArgs *>(argp);
     a.fn(a.ctx);
+    gptWorkerFinished(); //audit-L (A49)
     //Detached semantics: the thread frees itself on exit.
     sceKernelExitDeleteThread(0);
     return 0;
@@ -1349,6 +1562,7 @@ bool gptSpawnWorker(void (*fn)(void *), void * ctx)
 {
     if (getenv("WAGIC_GPT_NOTHREAD"))
         return false;
+    gptCurlInit(); //audit-L (A49): game thread, before the worker exists
     //Priority 0x10000100 = the process default; the worker spends its life
     //blocked in curl I/O, so it does not contend with the render loop.
     //64KB stack: curl + OpenSSL handshake depth, measured generously.
@@ -1358,8 +1572,10 @@ bool gptSpawnWorker(void (*fn)(void *), void * ctx)
     SpawnArgs a;
     a.fn = fn;
     a.ctx = ctx;
+    gptWorkerStarted(); //audit-L (A49): counted before the thread can run
     if (sceKernelStartThread(id, sizeof(a), &a) < 0)
     {
+        gptWorkerFinished();
         sceKernelDeleteThread(id);
         return false;
     }
@@ -1380,19 +1596,41 @@ bool gptSpawnWorker(void (*)(void *), void *)
 
 #include <thread>
 
+namespace
+{
+struct DesktopSpawnArgs
+{
+    void (*fn)(void *);
+    void * ctx;
+};
+//audit-L (A49): the worker body, bracketed by the in-flight accounting the
+//process-exit guard (gptShutdownWorkers) waits on.
+void desktopWorkerEntry(DesktopSpawnArgs a)
+{
+    a.fn(a.ctx);
+    gptWorkerFinished();
+}
+} //namespace
+
 bool gptSpawnWorker(void (*fn)(void *), void * ctx)
 {
     if (getenv("WAGIC_GPT_NOTHREAD"))
         return false;
+    gptCurlInit(); //audit-L (A49): game thread, before the worker exists
+    DesktopSpawnArgs a;
+    a.fn = fn;
+    a.ctx = ctx;
+    gptWorkerStarted();
     try
     {
-        std::thread(fn, ctx).detach();
+        std::thread(desktopWorkerEntry, a).detach();
         return true;
     }
     catch (const std::exception&)
     {
         //Platform refused a thread (resource limits, inactive gthreads
         //layer). The caller degrades to its synchronous path.
+        gptWorkerFinished();
         return false;
     }
 }
@@ -1649,16 +1887,11 @@ void OaiSignInMain(void * p)
         {"minted_at", (long) time(NULL)},
         {"chatgpt_account_id", accountId},
     };
+    if (!writeSecretFile(path, doc.dump(1) + "\n")) //audit-L (L11)
     {
-        std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
-        if (!f)
-        {
-            oaiFail(st, "could not write " + path);
-            return;
-        }
-        f << doc.dump(1) << "\n";
+        oaiFail(st, "could not write " + path);
+        return;
     }
-    chmod(path.c_str(), 0600);
 
     //Drop the in-memory auth cache: it may be remembering "no auth file" (or
     //the OLD login) from before this sign-in, and it is only ever read under
@@ -1765,9 +1998,19 @@ bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, lo
         modelOut = model;
         return true;
     }
-    string body = gptHttpGet(url + "/v1/models", timeoutMs, key);
+    gptCurlInit(); //audit-L (A49): the probes can run before any seat exists
+    //audit-L (A24): a probe the server REJECTED (401 wrong key, 404 wrong
+    //route) names its status in gpt-log - it used to fail exactly like a
+    //server that was not there.
+    long probeCode = 0;
+    string probeErr;
+    string body = gptHttpGet(url + "/v1/models", timeoutMs, key, &probeCode, &probeErr);
     if (body.empty())
+    {
+        if (probeCode != 0 && probeCode != 200)
+            gptNoteHttpFailure(url + "/v1/models", probeCode, probeErr);
         return false;
+    }
     try
     {
         nlohmann::json models = nlohmann::json::parse(body);
@@ -1816,9 +2059,19 @@ bool gptListModels(const string& url, const string& key, vector<string>& out, lo
             out.push_back(roster[i]);
         return true;
     }
-    string body = gptHttpGet(url + "/v1/models", timeoutMs, key);
+    gptCurlInit(); //audit-L (A49): the probes can run before any seat exists
+    //audit-L (A24): a probe the server REJECTED (401 wrong key, 404 wrong
+    //route) names its status in gpt-log - it used to fail exactly like a
+    //server that was not there.
+    long probeCode = 0;
+    string probeErr;
+    string body = gptHttpGet(url + "/v1/models", timeoutMs, key, &probeCode, &probeErr);
     if (body.empty())
+    {
+        if (probeCode != 0 && probeCode != 200)
+            gptNoteHttpFailure(url + "/v1/models", probeCode, probeErr);
         return false;
+    }
     try
     {
         nlohmann::json models = nlohmann::json::parse(body);

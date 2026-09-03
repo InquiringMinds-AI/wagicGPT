@@ -26,6 +26,7 @@
 #include "GptConfig.h"
 #include <memory>
 
+class OptionGptText; //audit-L (L12): the Endpoint row, re-pointed on Reload
 class GptOptionsList: public WGuiList
 {
 public:
@@ -35,6 +36,9 @@ public:
 
     GptSettings cfg;     //working copy the rows bind to
     GptSettings loadedCfg; //snapshot for only-write-when-changed
+    //audit-L (L12): the Endpoint row binds &cfg.urls[0]; `cfg = fresh` on
+    //Reload may reallocate that vector, so the row is re-pointed after it.
+    OptionGptText * mUrlRow;
 
     //Set by the Model row; consumed by GameStateOptions, which owns the
     //modal picker menus (screen-level UI lives at the screen, like the
@@ -108,6 +112,9 @@ public:
     OptionGptText(string * bind, string label, string emptyText = "", bool secret = false);
     virtual void Render();
     virtual void updateValue();
+    //audit-L (L12): re-point the row after the bound string's owner moved it
+    //(a vector element whose vector was reassigned).
+    void rebind(string * bind) { mBind = bind; }
 
 protected:
     string * mBind;

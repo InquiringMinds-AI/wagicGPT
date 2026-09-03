@@ -1233,6 +1233,13 @@ void GameStateDuel::Update(float dt)
                         game->players[1] ? game->players[1]->life : 0,
                         game->turn);
                 fflush(stderr);
+#ifdef WITH_GPT_AI
+                //audit-L (A49): exit() runs the static destructors; a worker
+                //still in libcurl (the losing seat's ask at the lethal swing)
+                //would race them. Bounded wait first - see SDLmain's exit path.
+                extern bool gptShutdownWorkers(long maxWaitMs);
+                gptShutdownWorkers(2000);
+#endif
                 exit(0);
             }
             //the following section will be called only in a classic or demo gamemode and if a tournament or match with more than one game is activ

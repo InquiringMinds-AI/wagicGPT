@@ -30,6 +30,7 @@ GptOptionsList::GptOptionsList()
 {
     modelPickerWanted = false;
     signInWanted = false;
+    mUrlRow = NULL; //audit-L (L12)
     cfg = GptSettings::load();
     if (cfg.urls.empty())
 #if defined(PSP)
@@ -46,7 +47,8 @@ GptOptionsList::GptOptionsList()
     Add(NEW WGuiHeader("Language-Model Opponent"));
     Add(NEW OptionGptBool(&cfg.enabled, "LLM opponent", "Off (heuristic AI)", "On"));
     Add(NEW OptionGptPreset(&cfg));
-    Add(NEW OptionGptText(&cfg.urls[0], "Endpoint URL"));
+    mUrlRow = NEW OptionGptText(&cfg.urls[0], "Endpoint URL");
+    Add(mUrlRow);
     Add(NEW OptionGptModel(this));
     //OpenRouter routing pin: comma-separated provider names, sent as
     //provider:{only:[...],allow_fallbacks:false}. Config-file-only until the
@@ -101,6 +103,12 @@ void GptOptionsList::Reload()
     if (fresh.maxTokens < 0) fresh.maxTokens = 0;
     cfg = fresh;
     loadedCfg = fresh;
+    //audit-L (L12): the copy-assignment above reuses the old buffer only when
+    //the new url list fits its capacity - a config that gained url= lines
+    //between construction and Reload reallocates, and the Endpoint row's bound
+    //pointer would read freed memory every frame. Re-point it.
+    if (mUrlRow && !cfg.urls.empty())
+        mUrlRow->rebind(&cfg.urls[0]);
     WGuiList::Reload();
 }
 

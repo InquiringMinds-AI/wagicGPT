@@ -1044,6 +1044,16 @@ int main(int argc, char* argv[])
 
 	int result = g_SdlApp->OnExecute();
 
+#ifdef WITH_GPT_AI
+	//audit-L (A49): a model-call worker still inside libcurl when main returns
+	//would race OpenSSL's atexit and the GPT TU's static destructors - an
+	//intermittent SIGSEGV after the game is over, which a harness keyed on
+	//exit status records as a crash. Bounded wait, then curl's global cleanup,
+	//before teardown begins. Declared extern to keep the mtg headers out of JGE.
+	extern bool gptShutdownWorkers(long maxWaitMs);
+	gptShutdownWorkers(2000);
+#endif
+
 	if (g_launcher)
 		delete g_launcher;
 

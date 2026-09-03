@@ -48,6 +48,7 @@
 #include <set>
 #include <utility>
 #include <memory>
+#include <fstream> //audit-L (L4): the translog stream
 
 class WEvent;
 class DecisionRequest;
@@ -263,8 +264,12 @@ protected:
     //is gated on THIS, not on observer->turn - the turn counter is still 0
     //through the on-the-play player's whole first turn, so its first land drop
     //was served the opening-hand frame with no board and no mana line.
-    //Set/cleared by PregameAskScope; the asks are re-entered every tick while a
-    //model call is in flight, so the flag is re-armed on each poll.
+    //Set/cleared by PregameAskScope. The pregame asks are driven by the
+    //PreGamePhase poll and re-entered on each poll while a model call is in
+    //flight, so the flag is re-armed per poll. (audit-L L3: this is NOT the
+    //seams' general cost model - the Act-driven seams return at
+    //decisionPending in AIPlayerBaka::Act and are entered once per answer;
+    //two audits were steered to a per-tick model by the old wording.)
     bool mInPregameAsk;
     struct PregameAskScope
     {
@@ -397,6 +402,33 @@ private:
     //the carried plan, then the decision-specific tail (question + options
     //+ reply format).
     string assemblePrompt(const string& tail);
+
+    //--- audit-L (wave-54 audit lane L: GPT seat region 1 + transport) ------
+    //A19: ONE heavy render for both the ask key and the prompt. serialize-
+    //GameStatePair renders the situation once and returns the prompt variant
+    //(the &tail render) while writing the key variant (the optionText == NULL
+    //render) to *keyVariant - byte-identical to two separate calls by
+    //construction, the own-battlefield block being the only difference.
+    //assemblePrompt(tail, &situation) splices a situation the caller already
+    //rendered instead of rendering again. The region-2 seams (lane M) call
+    //these; a seam still calling the one-argument forms is unchanged.
+    string serializeGameStatePair(const string& tail, string * keyVariant);
+    string assemblePrompt(const string& tail, const string * situation);
+    string serializeGameStateImpl(const std::string * optionText, std::string * keyVariant);
+    //A24: HTTP status of the last consumed round trip (0 = no status came
+    //back: transport-level failure or the Codex path; 200 = answered). Read by
+    //noAnswerClass, stamped on the record as http_status, consumed once.
+    long mLastHttpStatus;
+    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                         bool hasReasoning, long httpStatus);
+    //L4: one translog stream per seat, opened on the first record (after the
+    //-vs- rename), flushed per record, closed by the game-end record.
+    std::ofstream mTransLog;
+    void transLogWrite(const string& line);
+    //Dev builds only (defined under _DEBUG || WAGIC_DEVLOGS): the render
+    //byte-diff instrument, WAGIC_GPT_RENDERPROBE=<file>.
+    void renderProbeDump();
+    //--- end audit-L ----------------------------------------------------------
     //Append one line to the game narration (the model's own decisions join
     //the event narrative so the story stays complete without a transcript).
     void narrateDecision(const string& line);
