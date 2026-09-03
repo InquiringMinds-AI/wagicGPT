@@ -13,10 +13,6 @@
 #include "AIPlayerGPT.h"
 #endif
 
-#ifdef AI_CHANGE_TESTING
-#include "AIPlayerBakaB.h"
-#endif
-
 
 int AIPlayer::totalAIDecks = -1;
 
@@ -308,66 +304,6 @@ bool AIPlayer::parseLine(const string& s)
 
     return Player::parseLine(s);
 }
-
-
-#ifdef AI_CHANGE_TESTING
-AIPlayer * AIPlayerFactory::createAIPlayerTest(GameObserver *observer, MTGAllCards * collection, Player * opponent, string _folder)
-{
-    char deckFile[512];
-    string avatarFilename; // default imagename
-    char deckFileSmall[512];
-  
-
-    string folder = _folder.size() ? _folder : "ai/baka/";
-
-    int deckid = 0;
-
-    //random deck
-    int nbdecks = 0;
-    int found = 1;
-    while (found && nbdecks < options[Options::AIDECKS_UNLOCKED].number)
-    {
-        found = 0;
-        char buffer[512];
-        sprintf(buffer, "%sdeck%i.txt", folder.c_str(), nbdecks + 1);
-        if (FileExists(buffer))
-        {
-            found = 1;
-            nbdecks++;
-        }
-    }
-    if (!nbdecks)
-    {
-        if (_folder.size())
-            return createAIPlayerTest(observer, collection, opponent, "");
-        return NULL;
-    }
-    deckid = 1 + WRand() % (nbdecks);
-
-    sprintf(deckFile, "%sdeck%i.txt", folder.c_str(), deckid);
-    DeckMetaData *aiMeta = observer->getDeckManager()->getDeckMetaDataByFilename( deckFile, true);
-    avatarFilename = aiMeta->getAvatarFilename();
-    sprintf(deckFileSmall, "ai_baka_deck%i", deckid);
-
-
-    int deckSetting = EASY;
-    if ( opponent ) 
-    {
-        bool isOpponentAI = opponent->isAI() == 1;
-        DeckMetaData *meta = observer->getDeckManager()->getDeckMetaDataByFilename( opponent->deckFile, isOpponentAI);
-        if ( meta->getVictoryPercentage() >= 65)
-            deckSetting = HARD;
-    }
-    
-    // AIPlayerBaka will delete MTGDeck when it's time
-    AIPlayerBaka * baka = opponent ? 
-        NEW AIPlayerBakaB(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting)) :
-        NEW AIPlayerBaka(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting));
-    baka->deckId = deckid;
-    baka->setObserver(observer);
-    return baka;
-}
-#endif
 
 
 int AIPlayer::getTotalAIDecks() 

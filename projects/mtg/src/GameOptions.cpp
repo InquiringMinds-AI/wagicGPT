@@ -290,12 +290,6 @@ bool GameOption::read(string input)
 }
 string GameOption::menuStr()
 {
-    if (number)
-    {
-        char buf[12];
-        sprintf(buf, "%d", number);
-    }
-
     if (str.size())
         return str;
 

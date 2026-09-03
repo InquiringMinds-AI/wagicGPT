@@ -105,18 +105,9 @@ set(JGE_SOURCES
   JGE/src/JLBFont.cpp
   JGE/src/JLogger.cpp
   JGE/src/JGameObject.cpp
-  JGE/src/JSpline.cpp
-  JGE/src/JAnimator.cpp
-  JGE/src/JResourceManager.cpp
   JGE/src/JFileSystem.cpp
-  JGE/src/JParticle.cpp
-  JGE/src/JParticleEmitter.cpp
-  JGE/src/JParticleEffect.cpp
-  JGE/src/JParticleSystem.cpp
   JGE/src/JSprite.cpp
   JGE/src/Vector2D.cpp
-  JGE/src/JDistortionMesh.cpp
-  JGE/src/JOBJModel.cpp
   JGE/src/Encoding.cpp
   JGE/src/tinyxml/tinystr.cpp
   JGE/src/tinyxml/tinyxml.cpp
@@ -148,7 +139,6 @@ set(MTG_SOURCES
   projects/mtg/src/AIMomirPlayer.cpp
   projects/mtg/src/AIPlayer.cpp
   projects/mtg/src/AIPlayerBaka.cpp
-  projects/mtg/src/AIPlayerBakaB.cpp
   projects/mtg/src/AIStats.cpp
   projects/mtg/src/AllAbilities.cpp
   projects/mtg/src/CardDescriptor.cpp
@@ -156,7 +146,6 @@ set(MTG_SOURCES
   projects/mtg/src/CardGui.cpp
   projects/mtg/src/CardPrimitive.cpp
   projects/mtg/src/CardSelector.cpp
-  projects/mtg/src/CardSelectorSingleton.cpp
   projects/mtg/src/CarouselDeckView.cpp
   projects/mtg/src/Closest.cpp
   projects/mtg/src/Counters.cpp
@@ -189,9 +178,7 @@ set(MTG_SOURCES
   projects/mtg/src/GridDeckView.cpp
   projects/mtg/src/GuiAvatars.cpp
   projects/mtg/src/GuiBackground.cpp
-  projects/mtg/src/GuiCardsController.cpp
   projects/mtg/src/GuiCombat.cpp
-  projects/mtg/src/GuiFrame.cpp
   projects/mtg/src/GuiHand.cpp
   projects/mtg/src/GuiLayers.cpp
   projects/mtg/src/GuiMana.cpp
@@ -213,7 +200,6 @@ set(MTG_SOURCES
   projects/mtg/src/MTGGameZones.cpp
   projects/mtg/src/MTGPack.cpp
   projects/mtg/src/MTGRules.cpp
-  projects/mtg/src/Navigator.cpp
   projects/mtg/src/ObjectAnalytics.cpp
   projects/mtg/src/OptionItem.cpp
   projects/mtg/src/PhaseRing.cpp
@@ -268,8 +254,8 @@ set(MTG_SOURCES
   # The LLM opponent. Compiled here for the same reason the PSP Makefile
   # compiles it: AIPlayerGPT is wired into the player/observer types, and the
   # heuristic AI answers every decision it declines, so a build with no endpoint
-  # configured plays as pure Baka. The transport (JNetwork/JSocket/Downloader)
-  # is deliberately NOT built - same open question as the PSP network leg.
+  # configured plays as pure Baka. The transport (JNetwork/JSocket) is
+  # deliberately NOT built - same open question as the PSP network leg.
   projects/mtg/src/AIPlayerGPT.cpp
   projects/mtg/src/GptConfig.cpp
   projects/mtg/src/qrcodegen.cpp

@@ -2,8 +2,13 @@
 #define _WResourceManager_H_
 
 #include "WResource_Fwd.h"
-#include <JResourceManager.h>
 #include <JSoundSystem.h>
+
+//#W54-P (O3) These two lived in JGE's JResourceManager.h, a dead module deleted
+//with the A50 purge. Every user is in projects/mtg and reaches them through this
+//header, so they move here verbatim rather than keep a dead TU alive for them.
+#define INVALID_ID     -1
+#define ALREADY_EXISTS -2
 
 const std::string kGenericCardID = "back";
 const std::string kGenericCardThumbnailID = "back_thumb";

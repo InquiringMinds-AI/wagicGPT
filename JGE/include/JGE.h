@@ -119,9 +119,7 @@ bool JGEToggleFullscreen();
 #include "Vector2D.h"
 
 class JApp;
-class JResourceManager;
 class JFileSystem;
-class JParticleSystem;
 class JMotionSystem;
 class JMusic;
 

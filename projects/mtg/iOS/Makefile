@@ -75,9 +75,7 @@ wagic_FILES = ../../../JGE/src/iOS/main.m\
     ../src/GridDeckView.cpp\
     ../src/GuiAvatars.cpp\
     ../src/GuiBackground.cpp\
-    ../src/GuiCardsController.cpp\
     ../src/GuiCombat.cpp\
-    ../src/GuiFrame.cpp\
     ../src/GuiHand.cpp\
     ../src/GuiLayers.cpp\
     ../src/GuiMana.cpp\
@@ -137,25 +135,15 @@ wagic_FILES = ../../../JGE/src/iOS/main.m\
     ../src/WGui.cpp\
     ../src/WParsedInt.cpp\
     ../src/WResourceManager.cpp \
-    ../src/AIPlayerBakaB.cpp \
     ../src/TestSuiteAI.cpp\
     ../../../JGE/src/Encoding.cpp\
-    ../../../JGE/src/JAnimator.cpp\
     ../../../JGE/src/JApp.cpp\
-    ../../../JGE/src/JDistortionMesh.cpp\
     ../../../JGE/src/JFileSystem.cpp\
     ../../../JGE/src/JGameObject.cpp\
     ../../../JGE/src/JGE.cpp\
     ../../../JGE/src/JGui.cpp\
     ../../../JGE/src/JLogger.cpp\
     ../../../JGE/src/JLBFont.cpp\
-    ../../../JGE/src/JOBJModel.cpp\
-    ../../../JGE/src/JParticle.cpp\
-    ../../../JGE/src/JParticleEffect.cpp\
-    ../../../JGE/src/JParticleEmitter.cpp\
-    ../../../JGE/src/JParticleSystem.cpp\
-    ../../../JGE/src/JResourceManager.cpp\
-    ../../../JGE/src/JSpline.cpp\
     ../../../JGE/src/JSprite.cpp\
     ../../../JGE/src/Vector2D.cpp\
     ../../../JGE/src/tinyxml/tinystr.cpp\

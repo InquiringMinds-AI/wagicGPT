@@ -127,9 +127,6 @@ class AIPlayerFactory{
   AIPlayer * createAIPlayerFromDeckFile(GameObserver *observer, MTGAllCards * collection, Player * opponent,
                                         const string& deckFile, const string& deckFileSmall,
                                         const string& avatarFilename = "");
-#ifdef AI_CHANGE_TESTING
-  AIPlayer * createAIPlayerTest(GameObserver *observer, MTGAllCards * collection, Player * opponent, string folder);
-#endif
 };
 
 

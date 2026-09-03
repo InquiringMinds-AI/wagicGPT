@@ -43,7 +43,6 @@ CONFIG(graphics, graphics|console){
     SOURCES += \
         ../../JGE/src/qt/filedownloader.cpp\
         ../../JGE/src/qt/corewrapper.cpp\
-        ../../JGE/src/Qtmain.cpp\
         ../../JGE/src/JMD2Model.cpp\
         ../../JGE/src/pc/JSfx.cpp\
         ../../JGE/src/pc/JGfx.cpp
@@ -55,7 +54,6 @@ else:CONFIG(console, graphics|console){
     SOURCES += \
         ../../JGE/src/OutputCapturer.cpp\
         ../../JGE/src/pc/JSfx.cpp\
-        ../../JGE/src/JGfx-fake.cpp\
         ../../JGE/src/Qtconsole.cpp\
 }
 

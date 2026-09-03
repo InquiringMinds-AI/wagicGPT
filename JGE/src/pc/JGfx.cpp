@@ -36,7 +36,6 @@ extern "C" {
 #include <vector>
 #include "../../include/JGE.h"
 #include "../../include/JRenderer.h"
-#include "../../include/JResourceManager.h"
 #include "../../include/JFileSystem.h"
 #include "../../include/JAssert.h"
 

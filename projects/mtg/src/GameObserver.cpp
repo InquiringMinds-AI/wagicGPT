@@ -3076,11 +3076,6 @@ void GameObserver::loadPlayer(int playerId, PlayerType playerType, int decknb, b
         randomGenerator.loadRandValues("");
 
         if (playerId == 1) opponent = players[0];
-#ifdef AI_CHANGE_TESTING
-        if (playerType == PLAYER_TYPE_CPU_TEST)
-            loadPlayer(playerId, playerCreator.createAIPlayerTest(this, MTGCollection(), opponent, playerId == 0 ? "ai/bakaA/" : "ai/bakaB/"));
-        else
-#endif
         {
             loadPlayer(playerId, playerCreator.createAIPlayer(this, MTGCollection(), opponent));
         }

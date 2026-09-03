@@ -106,9 +106,7 @@ SOURCES += \
         src/GridDeckView.cpp\
         src/GuiAvatars.cpp\
         src/GuiBackground.cpp\
-        src/GuiCardsController.cpp\
         src/GuiCombat.cpp\
-        src/GuiFrame.cpp\
         src/GuiHand.cpp\
         src/GuiLayers.cpp\
         src/GuiMana.cpp\
@@ -169,7 +167,6 @@ SOURCES += \
         src/WGui.cpp\
         src/WParsedInt.cpp\
         src/WResourceManager.cpp \
-        src/AIPlayerBakaB.cpp \
         src/TestSuiteAI.cpp
 
 HEADERS  += \
@@ -193,7 +190,6 @@ HEADERS  += \
         include/GptConfig.h\
         include/qrcodegen.hpp\
         include/OptionGpt.h\
-        include/AIPlayerBakaB.h\
         include/DeckEditorMenu.h\
         include/WResourceManagerImpl.h\
         include/DeckMenu.h\
@@ -256,7 +252,6 @@ HEADERS  += \
         include/PreGamePhase.h\
         include/TranslateKeys.h\
         include/config.h\
-        include/GuiCardsController.h\
         include/PlayerData.h\
         include/Trash.h\
         include/Counters.h\
@@ -264,7 +259,6 @@ HEADERS  += \
         include/Player.h\
         include/utils.h\
         include/Credits.h\
-        include/GuiFrame.h\
         include/PlayGuiObjectController.h\
         include/WCachedResource.h\
         include/Damage.h\
@@ -301,24 +295,14 @@ HEADERS  += \
 
 # JGE, could probably be moved outside
 SOURCES += \
-        ../../JGE/src/Downloader.cpp\
         ../../JGE/src/Encoding.cpp\
-        ../../JGE/src/JAnimator.cpp\
         ../../JGE/src/JApp.cpp\
-        ../../JGE/src/JDistortionMesh.cpp\
         ../../JGE/src/JFileSystem.cpp\
         ../../JGE/src/JGameObject.cpp\
         ../../JGE/src/JGE.cpp\
         ../../JGE/src/JGui.cpp\
         ../../JGE/src/JLogger.cpp\
         ../../JGE/src/JLBFont.cpp\
-        ../../JGE/src/JOBJModel.cpp\
-        ../../JGE/src/JParticle.cpp\
-        ../../JGE/src/JParticleEffect.cpp\
-        ../../JGE/src/JParticleEmitter.cpp\
-        ../../JGE/src/JParticleSystem.cpp\
-        ../../JGE/src/JResourceManager.cpp\
-        ../../JGE/src/JSpline.cpp\
         ../../JGE/src/JNetwork.cpp\
         ../../JGE/src/pc/JSocket.cpp\
         ../../JGE/src/JSprite.cpp\
@@ -338,16 +322,13 @@ SOURCES += \
         ../../JGE/src/zipFS/zstream.cpp
 
 HEADERS += \
-        ../../JGE/include/Downloader.h\
         ../../JGE/include/Threading.h\
         ../../JGE/include/decoder_prx.h\
         ../../JGE/include/DebugRoutines.h\
         ../../JGE/include/Encoding.h\
-        ../../JGE/include/JAnimator.h\
         ../../JGE/include/JApp.h\
         ../../JGE/include/JAssert.h\
         ../../JGE/include/JCooleyesMP3.h\
-        ../../JGE/include/JDistortionMesh.h\
         ../../JGE/include/JFileSystem.h\
         ../../JGE/include/JGameLauncher.h\
         ../../JGE/include/JGameObject.h\
@@ -358,16 +339,9 @@ HEADERS += \
         ../../JGE/include/JMD2Model.h\
         ../../JGE/include/JMP3.h\
         ../../JGE/include/JNetwork.h\
-        ../../JGE/include/JOBJModel.h\
-        ../../JGE/include/JParticleEffect.h\
-        ../../JGE/include/JParticleEmitter.h\
-        ../../JGE/include/JParticle.h\
-        ../../JGE/include/JParticleSystem.h\
         ../../JGE/include/JRenderer.h\
-        ../../JGE/include/JResourceManager.h\
         ../../JGE/include/JSocket.h\
         ../../JGE/include/JSoundSystem.h\
-        ../../JGE/include/JSpline.h\
         ../../JGE/include/JSprite.h\
         ../../JGE/include/JTypes.h\
         ../../JGE/include/Vector2D.h\

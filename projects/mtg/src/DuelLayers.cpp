@@ -4,7 +4,6 @@
 #include "CardSelector.h"
 #include "GuiCombat.h"
 #include "GuiBackground.h"
-#include "GuiFrame.h"
 #include "GuiPhaseBar.h"
 #include "GuiAvatars.h"
 #include "GuiHand.h"
@@ -109,7 +108,6 @@ DuelLayers::DuelLayers(GameObserver* go, int playerViewIndex) :
     Add(NEW GuiHandOpponent(go, getRenderedPlayerOpponent()->game->hand));
     Add(NEW GuiPlay(this));
     Add(NEW GuiPhaseBar(this));
-    Add(NEW GuiFrame(go));
     Add(NEW GuiBackground(go));
 }
 

@@ -50,7 +50,6 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/AIMomirPlayer.cpp \
         $(MTG_PATH)/src/AIPlayer.cpp \
         $(MTG_PATH)/src/AIPlayerBaka.cpp \
-        $(MTG_PATH)/src/AIPlayerBakaB.cpp \
         $(MTG_PATH)/src/AIPlayerGPT.cpp \
         $(MTG_PATH)/src/Closest.cpp \
         $(MTG_PATH)/src/DecisionContract.cpp \
@@ -67,7 +66,6 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/CardGui.cpp \
         $(MTG_PATH)/src/CardPrimitive.cpp \
         $(MTG_PATH)/src/CardSelector.cpp \
-        $(MTG_PATH)/src/CardSelectorSingleton.cpp \
         $(MTG_PATH)/src/Counters.cpp \
         $(MTG_PATH)/src/Credits.cpp \
         $(MTG_PATH)/src/Damage.cpp \
@@ -96,9 +94,7 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/GameStateTransitions.cpp \
         $(MTG_PATH)/src/GuiAvatars.cpp \
         $(MTG_PATH)/src/GuiBackground.cpp \
-        $(MTG_PATH)/src/GuiCardsController.cpp \
         $(MTG_PATH)/src/GuiCombat.cpp \
-        $(MTG_PATH)/src/GuiFrame.cpp \
         $(MTG_PATH)/src/GuiHand.cpp \
         $(MTG_PATH)/src/GuiLayers.cpp \
         $(MTG_PATH)/src/GuiMana.cpp \
@@ -164,9 +160,7 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/GridDeckView.cpp \
         $(JGE_PATH)/src/SDLmain.cpp \
         $(JGE_PATH)/src/Encoding.cpp \
-        $(JGE_PATH)/src/JAnimator.cpp \
         $(JGE_PATH)/src/JApp.cpp \
-        $(JGE_PATH)/src/JDistortionMesh.cpp \
         $(JGE_PATH)/src/JFileSystem.cpp \
         $(JGE_PATH)/src/JGameObject.cpp \
         $(JGE_PATH)/src/JGE.cpp \
@@ -174,13 +168,6 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(JGE_PATH)/src/JLogger.cpp \
         $(JGE_PATH)/src/JLBFont.cpp \
         $(JGE_PATH)/src/JMD2Model.cpp \
-        $(JGE_PATH)/src/JOBJModel.cpp \
-        $(JGE_PATH)/src/JParticle.cpp \
-        $(JGE_PATH)/src/JParticleEffect.cpp \
-        $(JGE_PATH)/src/JParticleEmitter.cpp \
-        $(JGE_PATH)/src/JParticleSystem.cpp \
-        $(JGE_PATH)/src/JResourceManager.cpp \
-        $(JGE_PATH)/src/JSpline.cpp \
         $(JGE_PATH)/src/JSprite.cpp \
         $(JGE_PATH)/src/Vector2D.cpp \
         $(JGE_PATH)/src/tinyxml/tinystr.cpp \
