@@ -98,8 +98,9 @@ bool JResourceManager::LoadResource(const string& resourceName)
 	if (!fileSystem->OpenFile(path.c_str())) return false;
 
 	int size = fileSystem->GetFileSize();
-	char *xmlBuffer = new char[size];
-	fileSystem->ReadFile(xmlBuffer, size);
+	char *xmlBuffer = new char[size + 1];
+	int got = fileSystem->ReadFile(xmlBuffer, size);
+	xmlBuffer[got > 0 ? got : 0] = 0;   //#W54-N (A45): TinyXML reads to the NUL - there was none
 
 	TiXmlDocument doc;
 	doc.Parse(xmlBuffer);

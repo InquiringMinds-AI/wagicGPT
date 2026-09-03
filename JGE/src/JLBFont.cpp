@@ -49,9 +49,8 @@ JLBFont::JLBFont(const char *fontname, int lineheight, bool useVideoRAM)
 
     sprintf(filename, "%s.png", fontname);
     mTexture = mRenderer->LoadTexture(filename, useVideoRAM);
+	if (mTexture == NULL) return;   //#W54-N (A46): was dereferenced one line before this check
 	mTextureScale = (float) lineheight/ (mTexture->mHeight/16);
-
-	if (mTexture == NULL) return;
 
     mHeight = (float) lineheight;
 
@@ -247,7 +246,11 @@ float JLBFont::GetStringWidth(const char *string) const
     {
         ch = *p - 32;
         p++;
-        if (ch < 0) continue;
+        //#W54-N (A46): same encoding guard as DrawString. `char` is UNSIGNED
+        //on ARM (Vita/Android/PSP), so a CP1252 byte such as 0xE9 gave
+        //ch = 201 -> mCharWidth[329], 292 bytes past the array (wrong widths,
+        //mis-centred text). The desktop's signed char never reaches it.
+        if (ch < 0 || ch > 127) continue;
         len += (mCharWidth[ch+mBase]*mTextureScale) + mTracking;
     }
     len -= mTracking;

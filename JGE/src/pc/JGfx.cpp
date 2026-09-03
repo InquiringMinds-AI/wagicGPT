@@ -23,6 +23,7 @@ extern "C" {
 
 #define XMD_H
 #include <jpeglib.h>
+#include <setjmp.h>
 
 #ifdef __cplusplus
 }
@@ -58,6 +59,113 @@ static inline bool jgeHeadless()
 {
     static const bool headless = (getenv("WAGIC_HEADLESS") != NULL);
     return headless;
+}
+
+// ---- #W54-N (A2): texture decode policy ---------------------------------------
+// JGE_TEX_NPOT       Upload textures at their real size instead of padding
+//                    each dimension to the next power of two. Vita default:
+//                    vitaGL stores uncompressed textures linear with an 8-pixel
+//                    row alignment (textures.c: VGL_ALIGN(orig_w, 8)) and only
+//                    forces POT on its DXT-compress path, so a 360x514 card
+//                    costs 740 KB of VRAM/RAM and cache budget instead of 2 MB
+//                    (48 MB HUGE_CACHE_LIMIT: ~65 cards, not 24). JQuad UV math
+//                    divides by mTexWidth/mTexHeight, so nothing downstream
+//                    changes. The one hardware caveat is GL_REPEAT on NPOT
+//                    (well-defined only on POT sizes under SGX/ES2 rules) - JGE
+//                    never samples outside a quad, so NPOT uploads clamp to edge.
+//                    -DWAGIC_TEX_POW2_PAD restores the padded path: the device
+//                    A/B is that one flag. Desktop keeps padding (unchanged).
+// JGE_DECODE_SCRATCH The two per-load buffers (raw file bytes, decoded pixels)
+//                    become grow-only statics reused by every LoadJPG/LoadPNG
+//                    instead of a new[]/delete[] pair around each load. Vita
+//                    only: texture loads there run on the main thread
+//                    (UnthreadedCardRetriever) and the 128 MB newlib arena was
+//                    ratcheting ~1.4 MB/game from exactly this 2 MB churn
+//                    interleaved with the game's small long-lived objects.
+//                    Desktop loads are threaded and keep per-load allocation.
+//                    -DWAGIC_NO_DECODE_SCRATCH disables it.
+#if defined(VITA) && !defined(WAGIC_TEX_POW2_PAD) && !defined(JGE_TEX_NPOT)
+#define JGE_TEX_NPOT 1
+#endif
+#if defined(VITA) && !defined(WAGIC_NO_DECODE_SCRATCH) && !defined(JGE_DECODE_SCRATCH)
+#define JGE_DECODE_SCRATCH 1
+#endif
+
+#if defined(JGE_DECODE_SCRATCH)
+namespace
+{
+    struct DecodeScratch
+    {
+        BYTE* raw;  size_t rawCap;   // the file's bytes
+        BYTE* pix;  size_t pixCap;   // the decoded pixels (a JTexture's mBuffer)
+        bool pixBusy;                // pix is owned by a texture until released
+    };
+    DecodeScratch sDecodeScratch = { NULL, 0, NULL, 0, false };
+
+    BYTE* growScratch(BYTE*& buf, size_t& cap, size_t n)
+    {
+        if (n > cap)
+        {
+            BYTE* grown = new (std::nothrow) BYTE[n];
+            if (!grown) return NULL;   // keep the old block; the caller falls back to the heap
+            delete[] buf;
+            buf = grown;
+            cap = n;
+        }
+        return buf;
+    }
+}
+#endif
+
+// A buffer of n bytes for a file's raw contents. `owned` tells the caller
+// whether it must delete[] the block (heap) or leave it alone (scratch).
+static BYTE* decodeRawBuffer(size_t n, bool& owned)
+{
+#if defined(JGE_DECODE_SCRATCH)
+    BYTE* s = growScratch(sDecodeScratch.raw, sDecodeScratch.rawCap, n);
+    if (s)
+    {
+        owned = false;
+        return s;
+    }
+#endif
+    owned = true;
+    return new (std::nothrow) BYTE[n];
+}
+
+// A buffer of n bytes for decoded pixels; it becomes the JTexture's mBuffer.
+// Scratch-backed while the scratch is free, heap otherwise - two textures
+// decoded before either is uploaded can never alias.
+static BYTE* decodePixelBuffer(size_t n)
+{
+#if defined(JGE_DECODE_SCRATCH)
+    if (!sDecodeScratch.pixBusy)
+    {
+        BYTE* s = growScratch(sDecodeScratch.pix, sDecodeScratch.pixCap, n);
+        if (s)
+        {
+            sDecodeScratch.pixBusy = true;
+            return s;
+        }
+    }
+#endif
+    return new (std::nothrow) BYTE[n];
+}
+
+// The one release path for a JTexture::mBuffer / TextureInfo::mBits: hands
+// the scratch back or delete[]s a heap block. Every free of those pointers in
+// this file goes through here (upload, ~JTexture, loader error paths).
+static void releaseDecodedPixels(BYTE* p)
+{
+    if (!p) return;
+#if defined(JGE_DECODE_SCRATCH)
+    if (p == sDecodeScratch.pix)
+    {
+        sDecodeScratch.pixBusy = false;
+        return;
+    }
+#endif
+    delete[] p;
 }
 
 #ifdef _DEBUG
@@ -389,11 +497,8 @@ JTexture::~JTexture()
         glDeleteTextures(1, &mTexId);
     checkGlError();
 
-    if (mBuffer)
-    {
-        delete [] mBuffer;
-        mBuffer = NULL;
-    }
+    releaseDecodedPixels(mBuffer);   //#W54-N (A2b): may be the decode scratch
+    mBuffer = NULL;
 }
 
 
@@ -1964,7 +2069,7 @@ void JRenderer::ScreenShot(const char* filename __attribute__((unused)))
 }
 
 
-static int getNextPower2(int width)
+static inline int getNextPower2(int width)
 {
     int b = width;
     int n;
@@ -1974,40 +2079,125 @@ static int getNextPower2(int width)
     return b;
 }
 
+// #W54-N (A2a): texture dimensions for a width x height image - the real size
+// under JGE_TEX_NPOT, the next power of two otherwise.
+static void textureDims(int width, int height, int& tw, int& th)
+{
+#if defined(JGE_TEX_NPOT)
+    tw = width;
+    th = height;
+#else
+    tw = getNextPower2(width);
+    th = getNextPower2(height);
+#endif
+}
+
+// #W54-N (A2d): the pad column/rows of a pow2-padded image were never written.
+// GL_LINEAR + GL_REPEAT blends the last real texel with that garbage and draws
+// a 1 px fringe on the right/bottom edge of every card and backdrop. Replicate
+// the edge texel into the first pad column/row (what CLAMP_TO_EDGE would
+// sample) and zero the rest. No-op without padding.
+static void fillTexturePadding(BYTE* pixels, int width, int height, int tw, int th, int bpp)
+{
+    if (!pixels || width <= 0 || height <= 0) return;
+    if (tw <= width && th <= height) return;
+    const size_t rowBytes = (size_t)tw * bpp;
+    if (tw > width)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            BYTE* row = pixels + (size_t)y * rowBytes;
+            memcpy(row + (size_t)width * bpp, row + (size_t)(width - 1) * bpp, bpp);
+            if (tw > width + 1)
+                memset(row + (size_t)(width + 1) * bpp, 0, (size_t)(tw - width - 1) * bpp);
+        }
+    }
+    if (th > height)
+    {
+        memcpy(pixels + (size_t)height * rowBytes, pixels + (size_t)(height - 1) * rowBytes, rowBytes);
+        if (th > height + 1)
+            memset(pixels + (size_t)(height + 1) * rowBytes, 0, (size_t)(th - height - 1) * rowBytes);
+    }
+}
+
 
 #if (!defined IOS) && (!defined QT_CONFIG)
+// #W54-N (A2c): libjpeg's stock error_exit() calls exit() - one corrupt or
+// truncated card image took the whole game down (on the Vita: straight back to
+// LiveArea, no dump). Errors longjmp back into LoadJPG, which frees what it
+// holds and returns no texture; the caller draws the no-art frame.
+struct JpgErrorMgr
+{
+    struct jpeg_error_mgr pub;
+    jmp_buf jb;
+};
+
+static void jpg_error_exit(j_common_ptr cinfo)
+{
+    longjmp(((JpgErrorMgr*)cinfo->err)->jb, 1);
+}
+
+// In-memory source. The whole file is already in `rawdata`, so a request for
+// more bytes means the file ended early. The stock idiom feeds a synthetic EOI
+// so the decoder finishes cleanly instead of walking off the buffer (the old
+// fill_input_buffer returned TRUE with no bytes and bytes_in_buffer wrapped to
+// SIZE_MAX: an out-of-bounds read); the flag lets LoadJPG reject the result.
+struct JpgMemSource
+{
+    struct jpeg_source_mgr pub;
+    bool truncated;
+};
+
+static const JOCTET kJpgFakeEOI[2] = { 0xFF, JPEG_EOI };
+
 static void jpg_null(j_decompress_ptr cinfo __attribute__((unused)))
 {
 }
 
-
-static boolean jpg_fill_input_buffer(j_decompress_ptr cinfo __attribute__((unused)))
+static boolean jpg_fill_input_buffer(j_decompress_ptr cinfo)
 {
-    ////    ri.Con_Printf(PRINT_ALL, "Premature end of JPEG data\n");
-    return 1;
+    JpgMemSource* src = (JpgMemSource*)cinfo->src;
+    src->truncated = true;
+    src->pub.next_input_byte = kJpgFakeEOI;
+    src->pub.bytes_in_buffer = 2;
+    return TRUE;
 }
 
 static void jpg_skip_input_data(j_decompress_ptr cinfo, long num_bytes)
 {
-
-    cinfo->src->next_input_byte += (size_t) num_bytes;
-    cinfo->src->bytes_in_buffer -= (size_t) num_bytes;
-
-    //// if (cinfo->src->bytes_in_buffer < 0)
-    ////		ri.Con_Printf(PRINT_ALL, "Premature end of JPEG data\n");
+    if (num_bytes <= 0) return;
+    struct jpeg_source_mgr* src = cinfo->src;
+    if ((size_t)num_bytes >= src->bytes_in_buffer)
+    {
+        // Skipping past the end: drain, and the next fill supplies the EOI.
+        src->next_input_byte += src->bytes_in_buffer;
+        src->bytes_in_buffer = 0;
+        return;
+    }
+    src->next_input_byte += (size_t)num_bytes;
+    src->bytes_in_buffer -= (size_t)num_bytes;
 }
 
-static void jpeg_mem_src(j_decompress_ptr cinfo, byte *mem, int len)
+static void jpgMemSource(j_decompress_ptr cinfo, JpgMemSource* src, const BYTE* mem, int len)
 {
-    cinfo->src = (struct jpeg_source_mgr *)(*cinfo->mem->alloc_small)((j_common_ptr) cinfo, JPOOL_PERMANENT, sizeof(struct jpeg_source_mgr));
-    cinfo->src->init_source = jpg_null;
-    cinfo->src->fill_input_buffer = jpg_fill_input_buffer;
-    cinfo->src->skip_input_data = jpg_skip_input_data;
-    cinfo->src->resync_to_restart = jpeg_resync_to_restart;
-    cinfo->src->term_source = jpg_null;
-    cinfo->src->bytes_in_buffer = len;
-    cinfo->src->next_input_byte = mem;
+    src->pub.init_source = jpg_null;
+    src->pub.fill_input_buffer = jpg_fill_input_buffer;
+    src->pub.skip_input_data = jpg_skip_input_data;
+    src->pub.resync_to_restart = jpeg_resync_to_restart;
+    src->pub.term_source = jpg_null;
+    src->pub.bytes_in_buffer = (size_t)len;
+    src->pub.next_input_byte = mem;
+    src->truncated = false;
+    cinfo->src = &src->pub;
 }
+
+// What LoadJPG holds across its setjmp - reached through a pointer so the
+// error path reads memory, never a register longjmp may have clobbered.
+struct JpgHeld
+{
+    BYTE* rgba;
+    BYTE* scanline;
+};
 
 /*
 ==============
@@ -2025,89 +2215,104 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
 {
     textureInfo.mBits = NULL;
 
-    struct jpeg_decompress_struct	cinfo;
-    struct jpeg_error_mgr jerr;
-    BYTE *rawdata, *rgbadata, *scanline, *p, *q;
-    int	rawsize, i;
-
     JFileSystem* fileSystem = JFileSystem::GetInstance();
     if (!fileSystem->OpenFile(filename))
         return;
 
-    rawsize = fileSystem->GetFileSize();
-
-    rawdata = new (std::nothrow) BYTE[rawsize];
-
+    int rawsize = fileSystem->GetFileSize();
+    if (rawsize <= 0)
+    {
+        fileSystem->CloseFile();
+        return;
+    }
+    bool rawOwned = true;
+    BYTE* rawdata = decodeRawBuffer((size_t)rawsize, rawOwned);
     if (!rawdata)
     {
         fileSystem->CloseFile();
         return;
     }
-
-    fileSystem->ReadFile(rawdata, rawsize);
+    int got = fileSystem->ReadFile(rawdata, rawsize);
     fileSystem->CloseFile();
-
-    // Initialize libJpeg Object
-    cinfo.err = jpeg_std_error(&jerr);
-    jpeg_create_decompress(&cinfo);
-
-    jpeg_mem_src(&cinfo, rawdata, rawsize);
-
-    // Process JPEG header
-    jpeg_read_header(&cinfo, true);
-
-    // Start Decompression
-    jpeg_start_decompress(&cinfo);
-
-    // Check Colour Components
-    if(cinfo.output_components != 3 && cinfo.output_components != 4)
+    if (got != rawsize)
     {
-        ////		ri.Con_Printf(PRINT_ALL, "Invalid JPEG colour components\n");
-        jpeg_destroy_decompress(&cinfo);
-        ////		ri.FS_FreeFile(rawdata);
+        // Short read (a flaky memory card, a zip member that lied about its
+        // size): never decode bytes that were not read.
+        if (rawOwned) delete[] rawdata;
         return;
     }
 
-    int tw = getNextPower2(cinfo.output_width);
-    int th = getNextPower2(cinfo.output_height);
-
-
-    // Allocate Memory for decompressed image
+    int pixelSize = 4;
 #if defined(VITA)
-    int pixelSize = (TextureFormat == GU_PSM_5551) ? 2 : 4;
-    rgbadata = new (std::nothrow) BYTE[tw * th * pixelSize];
-#else
-    rgbadata = new (std::nothrow) BYTE[tw * th * 4];
+    if (TextureFormat == GU_PSM_5551) pixelSize = 2;
 #endif
-    if(!rgbadata)
+
+    struct jpeg_decompress_struct cinfo;
+    JpgErrorMgr jerr;
+    JpgMemSource src;
+    JpgHeld heldStorage = { NULL, NULL };
+    JpgHeld* const held = &heldStorage;
+
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = jpg_error_exit;
+    if (setjmp(jerr.jb))
+    {
+        // libjpeg reported an error (bad header, corrupt entropy data, a
+        // colour space it cannot convert): free everything, no texture.
+        jpeg_destroy_decompress(&cinfo);
+        free(held->scanline);
+        releaseDecodedPixels(held->rgba);
+        if (rawOwned) delete[] rawdata;
+        return;
+    }
+    jpeg_create_decompress(&cinfo);
+    jpgMemSource(&cinfo, &src, rawdata, rawsize);
+    jpeg_read_header(&cinfo, TRUE);
+    // Always decode to 3-byte RGB (greyscale and YCbCr convert; CMYK cannot,
+    // and errors out through the handler above). The old code sized the
+    // scanline for 3 components but accepted 4 - a CMYK file overflowed it.
+    cinfo.out_color_space = JCS_RGB;
+    jpeg_start_decompress(&cinfo);
+    if (cinfo.output_components != 3 || cinfo.output_width == 0 || cinfo.output_height == 0)
     {
         jpeg_destroy_decompress(&cinfo);
-        delete [] rgbadata;
+        if (rawOwned) delete[] rawdata;
         return;
     }
 
-    // Allocate Scanline buffer
-    scanline = (byte *)malloc(cinfo.output_width * 3);
-    if(!scanline)
+    int tw, th;
+    textureDims((int)cinfo.output_width, (int)cinfo.output_height, tw, th);
+
+    held->rgba = decodePixelBuffer((size_t)tw * th * pixelSize);
+    if (!held->rgba)
     {
         jpeg_destroy_decompress(&cinfo);
-        delete [] rgbadata;
+        if (rawOwned) delete[] rawdata;
+        return;
+    }
+    held->scanline = (BYTE*)malloc(cinfo.output_width * 3);
+    if (!held->scanline)
+    {
+        jpeg_destroy_decompress(&cinfo);
+        releaseDecodedPixels(held->rgba);
+        held->rgba = NULL;
+        if (rawOwned) delete[] rawdata;
         return;
     }
 
-    // Read Scanlines, and expand from RGB to RGBA (or RGBA5551 on Vita)
-    BYTE* currRow = rgbadata;
-
-    while(cinfo.output_scanline < cinfo.output_height)
+    // Read scanlines, expanding RGB to RGBA (or RGBA5551 on the Vita)
+    BYTE* currRow = held->rgba;
+    while (cinfo.output_scanline < cinfo.output_height)
     {
-        p = scanline;
-        jpeg_read_scanlines(&cinfo, &scanline, 1);
+        JSAMPROW rows[1] = { held->scanline };
+        jpeg_read_scanlines(&cinfo, rows, 1);
+        BYTE* p = held->scanline;
 
 #if defined(VITA)
         if (TextureFormat == GU_PSM_5551)
         {
             u16* q16 = (u16*)currRow;
-            for(i=0; i<(int)cinfo.output_width; i++)
+            for (int i = 0; i < (int)cinfo.output_width; i++)
             {
                 // GL_UNSIGNED_SHORT_5_5_5_1 layout: RRRRRGGGGGBBBBBA (MSB to LSB)
                 u16 r = p[0] >> 3;
@@ -2122,36 +2327,46 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
         else
 #endif
         {
-            q = currRow;
-            for(i=0; i<(int)cinfo.output_width; i++)
+            BYTE* q = currRow;
+            for (int i = 0; i < (int)cinfo.output_width; i++)
             {
                 q[0] = p[0];
                 q[1] = p[1];
                 q[2] = p[2];
                 q[3] = 255;
 
-                p+=3; q+=4;
+                p += 3;
+                q += 4;
             }
-            currRow += tw*4;
+            currRow += tw * 4;
         }
     }
 
-    // Free the scanline buffer
-    free(scanline);
+    fillTexturePadding(held->rgba, (int)cinfo.output_width, (int)cinfo.output_height, tw, th, pixelSize);
 
-    textureInfo.mBits = rgbadata;
+    // Finish (a corrupt tail can still longjmp here) before deciding.
+    jpeg_finish_decompress(&cinfo);
+    const bool truncated = src.truncated;
+    jpeg_destroy_decompress(&cinfo);
+
+    free(held->scanline);
+    held->scanline = NULL;
+    if (rawOwned) delete[] rawdata;
+
+    if (truncated)
+    {
+        // The file ended early: the bottom of the image is whatever the
+        // decoder padded. Reject it rather than draw and CACHE a half card.
+        releaseDecodedPixels(held->rgba);
+        held->rgba = NULL;
+        return;
+    }
+
+    textureInfo.mBits = held->rgba;
     textureInfo.mWidth = cinfo.output_width;
     textureInfo.mHeight = cinfo.output_height;
     textureInfo.mTexWidth = tw;
     textureInfo.mTexHeight = th;
-
-    // Finish Decompression
-    jpeg_finish_decompress(&cinfo);
-
-    // Destroy JPEG object
-    jpeg_destroy_decompress(&cinfo);
-
-    delete[] rawdata;
 }
 
 
@@ -2254,44 +2469,68 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode,
 #if defined(VITA)
         tex->mTextureFormat = TextureFormat;
 #endif
+#if defined(JGE_DECODE_SCRATCH)
+        // #W54-N (A2b): single-threaded platform with the GL context on this
+        // thread - upload now so the pixel scratch is free for the next load
+        // (the JQuad-time transfer becomes a no-op). Without this, the first
+        // load per frame would use the scratch and the rest fall back to the heap.
+        TransferTextureToGLContext(*tex);
+#endif
     }
 
     return tex;
 }
 
+// What LoadPNG holds across its setjmp (see JpgHeld).
+struct PngHeld
+{
+    DWORD* line;
+    BYTE* buffer;
+};
+
 int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode __attribute__((unused)), int TextureFormat __attribute__((unused)))
 {
     textureInfo.mBits = NULL;
 
-    DWORD* p32;
-
     png_structp png_ptr;
     png_infop info_ptr;
-    unsigned int sig_read = 0;
-    png_uint_32 width, height, tw, th;
+    png_uint_32 width, height;
     int bit_depth, color_type, interlace_type, x, y;
-    DWORD* line;
 
     // Slurp into RAM; JFileSystem isn't safe to read across libpng callbacks.
     JFileSystem* fileSystem = JFileSystem::GetInstance();
     if (!fileSystem->OpenFile(filename))
         return JGE_ERR_CANT_OPEN_FILE;
     int rawsize = fileSystem->GetFileSize();
-    BYTE* rawdata = new (std::nothrow) BYTE[rawsize];
+    if (rawsize <= 0)
+    {
+        fileSystem->CloseFile();
+        return JGE_ERR_CANT_OPEN_FILE;
+    }
+    bool rawOwned = true;
+    BYTE* rawdata = decodeRawBuffer((size_t)rawsize, rawOwned);
     if (!rawdata)
     {
         fileSystem->CloseFile();
         return JGE_ERR_MALLOC_FAILED;
     }
-    fileSystem->ReadFile(rawdata, rawsize);
+    int got = fileSystem->ReadFile(rawdata, rawsize);
     fileSystem->CloseFile();
+    if (got != rawsize)
+    {
+        // #W54-N (A2c): short read - never decode bytes that were not read.
+        if (rawOwned) delete[] rawdata;
+        return JGE_ERR_CANT_OPEN_FILE;
+    }
 
     PngMemCursor cur = { rawdata, (png_size_t)rawsize, 0 };
+    PngHeld heldStorage = { NULL, NULL };
+    PngHeld* const held = &heldStorage;
 
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     if (png_ptr == NULL)
     {
-        delete[] rawdata;
+        if (rawOwned) delete[] rawdata;
         return JGE_ERR_PNG;
     }
 
@@ -2300,18 +2539,23 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     if (info_ptr == NULL)
     {
         png_destroy_read_struct(&png_ptr, NULL, NULL);
-        delete[] rawdata;
+        if (rawOwned) delete[] rawdata;
         return JGE_ERR_PNG;
     }
+    // #W54-N (A2c): this handler used to free only rawdata - a libpng error
+    // after the row buffers existed leaked `line` and the up-to-2 MB pixel
+    // buffer. Both are reachable through `held` now.
     if (setjmp(png_jmpbuf(png_ptr)))
     {
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-        delete[] rawdata;
+        free(held->line);
+        releaseDecodedPixels(held->buffer);
+        if (rawOwned) delete[] rawdata;
         return JGE_ERR_PNG;
     }
     png_set_read_fn(png_ptr, &cur, PNGMemReadFn);
 
-    png_set_sig_bytes(png_ptr, sig_read);
+    png_set_sig_bytes(png_ptr, 0);
     png_read_info(png_ptr, info_ptr);
     png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, &interlace_type, NULL, NULL);
     png_set_strip_16(png_ptr);
@@ -2325,65 +2569,68 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png_ptr);
     png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
 
-    line = (DWORD*) malloc(width * 4);
-    if (!line)
+    if (width == 0 || height == 0)
     {
-        png_destroy_read_struct(&png_ptr, NULL, NULL);
-        delete[] rawdata;
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        if (rawOwned) delete[] rawdata;
+        return JGE_ERR_PNG;
+    }
+
+    held->line = (DWORD*) malloc(width * 4);
+    if (!held->line)
+    {
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        if (rawOwned) delete[] rawdata;
         return JGE_ERR_MALLOC_FAILED;
     }
 
+    int tw, th;
+    textureDims((int)width, (int)height, tw, th);
 
-    tw = getNextPower2(width);
-    th = getNextPower2(height);
-
-    int size = tw * th * 4;			// RGBA
-
-    BYTE* buffer = new (std::nothrow) BYTE[size];
-
-    if (buffer)
+    held->buffer = decodePixelBuffer((size_t)tw * th * 4);   // RGBA
+    if (!held->buffer)
     {
-        p32 = (DWORD*) buffer;
-
-        for (y = 0; y < (int)height; y++)
-        {
-            png_read_row(png_ptr, (BYTE*) line, NULL);
-            for (x = 0; x < (int)width; x++)
-            {
-                DWORD color32 = line[x];
-                int a = (color32 >> 24) & 0xff;
-                int r = color32 & 0xff;
-                int g = (color32 >> 8) & 0xff;
-                int b = (color32 >> 16) & 0xff;
-
-                color32 = r | (g << 8) | (b << 16) | (a << 24);
-                *(p32+x) = color32;
-
-            }
-            p32 += tw;
-
-        }
-
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        free(held->line);
+        held->line = NULL;
+        if (rawOwned) delete[] rawdata;
+        return JGE_ERR_MALLOC_FAILED;
     }
 
+    DWORD* p32 = (DWORD*) held->buffer;
+    for (y = 0; y < (int)height; y++)
+    {
+        png_read_row(png_ptr, (BYTE*) held->line, NULL);
+        for (x = 0; x < (int)width; x++)
+        {
+            DWORD color32 = held->line[x];
+            int a = (color32 >> 24) & 0xff;
+            int r = color32 & 0xff;
+            int g = (color32 >> 8) & 0xff;
+            int b = (color32 >> 16) & 0xff;
 
-    free (line);
+            color32 = r | (g << 8) | (b << 16) | (a << 24);
+            *(p32+x) = color32;
+        }
+        p32 += tw;
+    }
+
+    fillTexturePadding(held->buffer, (int)width, (int)height, tw, th, 4);
 
     png_read_end(png_ptr, info_ptr);
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
-    delete[] rawdata;
+    free(held->line);
+    held->line = NULL;
+    if (rawOwned) delete[] rawdata;
 
-
-    textureInfo.mBits = buffer;
+    textureInfo.mBits = held->buffer;
     textureInfo.mWidth = width;
     textureInfo.mHeight = height;
     textureInfo.mTexWidth = tw;
     textureInfo.mTexHeight = th;
 
     return 1;
-    //return textureInfo;
-
 }
 
 
@@ -2769,7 +3016,7 @@ void JRenderer::TransferTextureToGLContext(JTexture& inTexture)
         {
             //The decoded pixels exist only to feed the GL upload; free them
             //and leave mTexId at -1 so teardown never touches GL either.
-            delete [] inTexture.mBuffer;
+            releaseDecodedPixels(inTexture.mBuffer);
             inTexture.mBuffer = NULL;
             return;
         }
@@ -2809,8 +3056,18 @@ void JRenderer::TransferTextureToGLContext(JTexture& inTexture)
             else									// single texture
             */
             {
+#if defined(JGE_TEX_NPOT)
+                // #W54-N (A2a): unpadded textures clamp - repeat is only
+                // well-defined on POT sizes, and JGE never samples outside a quad.
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#else
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+#endif
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
 #if defined(VITA)
@@ -2821,7 +3078,7 @@ void JRenderer::TransferTextureToGLContext(JTexture& inTexture)
                     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, inTexture.mTexWidth, inTexture.mTexHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, inTexture.mBuffer);
             }
         }
-        delete [] inTexture.mBuffer;
+        releaseDecodedPixels(inTexture.mBuffer);   //#W54-N (A2b): scratch-aware
         inTexture.mBuffer = NULL;
 
         checkGlError();

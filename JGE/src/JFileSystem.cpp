@@ -387,6 +387,12 @@ JFileSystem::~JFileSystem()
 {
     clearZipCache();
     zip_file_system::filesystem::closeTempFiles();
+    //#W54-N (L28): mFile is a member, destroyed AFTER this body - and its
+    //destructor now closes, which on the pooled (PSP) build talks to the
+    //filesystem it was opened on. Close it here while that still exists and
+    //detach it so the member destructor has nothing left to reach.
+    mFile.close();
+    mFile.setFS(NULL);
     SAFE_DELETE(mUserFS);
     SAFE_DELETE(mSystemFS);
 }
@@ -510,34 +516,24 @@ bool JFileSystem::openForWrite(ofstream & File, const string & FilePath, ios_bas
     string filename = mUserFSPath;
     filename.append(FilePath);
 
-    #if defined(ANDROID)
-    DebugTrace("ANDROID");
-    std::vector<string> dirs;
-    string path = filename.substr( 0, filename.find_last_of( '/' ) + 1 );
-
-    // put it into list
-    dirs.push_back(path);
-
-    //make list of directories that need to be created
-    do
+#if !defined(WAGIC_NO_USERDIR_MKDIR)
+    //#W54-N (A42): create the parent directories of a user-FS write on EVERY
+    //platform (it was ANDROID-only). GetResourceFile extracts zip members such
+    //as sound/sfx/*.wav into the user FS before SDL_mixer opens them by path,
+    //and on the Vita those parents do not exist (EnsureUserDirs makes player/
+    //and settings/ only), so every extracted sample silently failed to open.
+    //Walk the RELATIVE path forward: the old backward walk compared against
+    //mUserFSPath and never terminated for a file written to the user root.
+    //MAKEDIR on an existing directory is a harmless EEXIST. Disable flag:
+    //-DWAGIC_NO_USERDIR_MKDIR (no directory creation at all, the old non-
+    //Android behaviour).
+    for (string::size_type slash = FilePath.find('/'); slash != string::npos; slash = FilePath.find('/', slash + 1))
     {
-        path = path.substr( 0, path.find_last_of( '/', path.size() - 2 ) + 1 );
-        dirs.push_back(path);
-    
-    } while (path.compare(mUserFSPath) != 0);
-    
-    // remove mUserFSPath from list
-    dirs.pop_back();
-
-    // create missing directories
-    for (std::vector<string>::reverse_iterator it = dirs.rbegin(); it != dirs.rend(); ++it)
-    {
-        if(!DirExists(*it))
-        {
-            MAKEDIR((*it).c_str());
-        }
+        if (slash == 0) continue;
+        string dir = mUserFSPath + FilePath.substr(0, slash);
+        MAKEDIR(dir.c_str());
     }
-    #endif
+#endif
 
     File.open(filename.c_str(), mode);
 
@@ -628,8 +624,10 @@ int JFileSystem::ReadFile(void *buffer, int size)
             return 0;
         }
         mZipFile.read((char *) buffer, size);
-        //TODO what if can't read
-        return size;
+        //#W54-N (A2c): report what was READ, not what was asked. A short
+        //member (a flaky card, a zip that lied) used to come back as a full
+        //read and the loaders decoded the stale tail of the buffer.
+        return (int)mZipFile.gcount();
     }
 
     if (!mFile)
@@ -637,9 +635,9 @@ int JFileSystem::ReadFile(void *buffer, int size)
 
     assert(!mFile.Zipped() || (size_t)size <= mFile.getUncompSize());
 	mFile.read((char *)buffer, size);
-    if (mFile.eof())
-        return 0;
-    return size;
+    //#W54-N (A2c): bytes actually read (0 on a failed read; the old `eof ->
+    //0` collapsed a partial read to nothing and a short read to everything).
+    return (int)mFile.gcount();
 }
 
 std::vector<std::string>& JFileSystem::scanRealFolder(const std::string& folderName, std::vector<std::string>& results)

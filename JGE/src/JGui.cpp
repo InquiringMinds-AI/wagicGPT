@@ -58,6 +58,7 @@ JGuiController::JGuiController(JGE* jge, int id, JGuiListener* listener) :
 {
     mBg = NULL;
     mShadingBg = NULL;
+    mCursor = NULL;   //#W54-N (A48): was never initialised
 
     mCount = 0;
     mCurr = 0;
@@ -173,7 +174,9 @@ bool JGuiController::CheckUserInput(JButton key)
                 for (int i = 0; i < mCount; i++)
                 {
                     float top, left;
-                    if (mObjects[i]->getTopLeft(top, left))
+                    //#W54-N (A48): NULL rows exist (Add(0, ...) / vpk9); the
+                    //Update/Render loops guard them, this one did not.
+                    if (mObjects[i] != NULL && mObjects[i]->getTopLeft(top, left))
                     {
                         distance2 = (top - y) * (top - y) + (left - x) * (left - x);
                         if (distance2 < minDistance2)
@@ -242,20 +245,26 @@ void JGuiController::Add(JGuiObject* ctrl, bool isButton)
 
 void JGuiController::RemoveAt(int i, bool isButton)
 {
+    //#W54-N (A48): erase() shifts the successor into slot i, so the old
+    //`erase; delete v[i]` freed the WRONG object (the successor - still in
+    //the vector, so a UAF on the next Update and a double delete in the
+    //destructor) and leaked the one asked for. Take the pointer first. No
+    //caller today; the trap is disarmed, not moved.
     if (isButton)
     {
-        if (!mButtons[i]) return;
+        if (i < 0 || (size_t)i >= mButtons.size() || !mButtons[i]) return;
+        JGuiObject* gone = mButtons[i];
         mButtons.erase(mButtons.begin() + i);
-        delete mButtons[i];
-        
+        delete gone;
         return;
     }
-    
-    if (!mObjects[i]) return;
+
+    if (i < 0 || (size_t)i >= mObjects.size() || !mObjects[i]) return;
+    JGuiObject* gone = mObjects[i];
     mObjects.erase(mObjects.begin() + i);
-    delete mObjects[i];
+    delete gone;
     mCount--;
-    if (mCurr == mCount) mCurr = 0;
+    if (mCurr >= mCount) mCurr = 0;
     return;
 }
 

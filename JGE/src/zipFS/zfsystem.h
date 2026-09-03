@@ -66,6 +66,11 @@ class izfstream : public izstream
 public:
 	izfstream(filesystem * pFS = pDefaultFS);
 	izfstream(const char * FilePath, filesystem * pFS = pDefaultFS);
+	//#W54-N (L28): a stream destroyed without close() left its pooled zbuffer
+	//"used" forever (PSP pool: 4 of those and every core.zip read fails) or
+	//dropped a real-file filebuf without unuse. Every game call site closes
+	//today; the destructor makes that a guarantee instead of a convention.
+	virtual ~izfstream() { close(); }
 
 	void open(const char * FilePath, filesystem * pFS = pDefaultFS);
 	void close();
@@ -240,9 +245,11 @@ protected:
 // zip_file_system::izfile Inline Functions
 //////////////////////////////////////////////////////////////////////
 
-inline izfstream::izfstream(filesystem * pFS) : m_pFS(pFS) { }
+//#W54-N (L28): m_Zipped/m_Used (and the size fields) were uninitialised until
+//the first successful Open - close() on a never-opened stream read them.
+inline izfstream::izfstream(filesystem * pFS) : m_pFS(pFS), m_Zipped(false), m_UncompSize(0), m_Offset(0), m_CompSize(0), m_Used(false) { }
 
-inline izfstream::izfstream(const char * FilePath, filesystem * pFS) : m_pFS(pFS) {
+inline izfstream::izfstream(const char * FilePath, filesystem * pFS) : m_pFS(pFS), m_Zipped(false), m_UncompSize(0), m_Offset(0), m_CompSize(0), m_Used(false) {
 	open(FilePath);
 }
 
