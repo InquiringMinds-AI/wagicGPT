@@ -1,0 +1,29 @@
+# W54-Q (D35 / owner decision O4). The option-preserving auto-tap
+# (ManaEngine::refineForOptions, owner spec 2026-09-01) used to BAIL above 14 candidate
+# producers, so on any late board it never applied - the board the owner reported from his
+# Vita offered 16. This is that board's shape, minimal: fourteen Forests and two Plains, a
+# {1}{G} Grizzly Bears to pay and a White Knight {W}{W} in hand.
+# The baseline plan spends a Forest for the {G} pip and an OFF-PIP source for the generic -
+# a Plains - which strands the Knight on one white source. Preserving options spends
+# Forest + Forest and leaves both Plains up.
+# RED with the search's old reach (WAGIC_OPT_SOURCES_CAP=14, the disable flag): picks
+# Forest Plains, pool {G}{W}. GREEN at the shipped cap: picks Forest Forest, pool {G}{G}.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Plains,Plains
+hand:Grizzly Bears,White Knight
+life:20
+[PLAYER2]
+life:20
+[DO]
+autotap grizzly bears
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Forest,Plains,Plains
+hand:Grizzly Bears,White Knight
+tappedinplay:2
+manapool:{G}{G}
+[PLAYER2]
+[END]
