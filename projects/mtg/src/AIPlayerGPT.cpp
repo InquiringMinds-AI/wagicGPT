@@ -13183,6 +13183,42 @@ int AIPlayerGPT::translogTurn(int observerTurn)
 
 //"" for everything below the floor: no annotation, no token cost, no change to
 //any line the pilot sees today.
+//#W54-M: the lane's one disable flag. Every lane-M change is byte-identical
+//by construction (memos of pure per-window facts, a turn-boundary cache drop,
+//bounded digit reads); this flag exists so "was it lane M?" is one env var,
+//not a build swap (fleet rule: every output-affecting change ships a disable).
+static bool auditMOff()
+{
+    static int off = -1;
+    if (off < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_AUDIT_M_OFF");
+        off = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return off == 1;
+}
+
+//#W54-M (L6): the per-turn decline/stuck maps hold a hash of the menu text,
+//not the text (three copies of a 116 KB list per turn on the wide boards).
+static size_t listKeyHash(const string& s)
+{
+    return std::hash<string>()(s);
+}
+
+//#W54-M (L8): identity of a clicked card that survives address reuse - the
+//raw pointers are compared, never dereferenced (see the header), so a card
+//freed by a zone move whose address a new object inherits could dispatch a
+//queued repeat-N plan onto a foreign row. The mtgid is read off the LIVE row's
+//card (safe) and compared with the id captured when the plan was armed.
+static int cardIdOf(MTGCardInstance * c)
+{
+    return c ? c->getMTGId() : -1;
+}
+static bool sameCardId(MTGCardInstance * live, int armedId)
+{
+    return auditMOff() || cardIdOf(live) == armedId;
+}
+
 string AIPlayerGPT::repeatActivationNote(const OrderedAIAction& action)
 {
     ActivatedAbility * aa = asActivatedForCount(action.ability);
@@ -13202,7 +13238,8 @@ string AIPlayerGPT::repeatActivationNote(const OrderedAIAction& action)
     }
     o << "activated this turn " << aa->counters << " times already";
     o << "."
-      << repeatMechanismClause((action.ability == mLoopAbility && action.click == mLoopClick)
+      << repeatMechanismClause((action.ability == mLoopAbility && action.click == mLoopClick
+                                && sameCardId(action.click, mLoopClickId)) //#W54-M (L8)
                                ? mLoopCount : 0)
       << "]";
     return o.str();
@@ -14858,6 +14895,20 @@ static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped,
                                      const string& colorsClause); //#W54-E (D20)
 static string fetchLandColorsClause(const bool adds[5], const bool canMake[5]); //#W54-E (D20)
 static bool isFetchCrackLine(const string& line);
+//#W54-M (A21): the untapped-source count is a BOARD fact, not a row fact -
+//chooseOrderedAction arms this around its describeAction loop so the 432-row
+//window pays potentialColorReach once instead of once per row (it walks every
+//mana object in the action layer). Outside an armed window, the direct call.
+int AIPlayerGPT::windowReach()
+{
+    ManaEngine::FreeProducerPolicy reachPolicy;
+    if (!mWindowReachArmed || auditMOff())
+        return ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+    if (mWindowReach < 0)
+        mWindowReach = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+    return mWindowReach;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -15135,14 +15186,27 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         MTGCardInstance * src = action.click ? action.click : action.ability->source;
         bool beforeAttack = observer->currentPlayer == this
             && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+        //#W54-M (A21): the mana planner runs ONCE per row - the {paying this
+        //taps:} clause and the {strands ...} clause below read the same plan
+        //(identical arguments, no state change between them; it ran twice).
+        vector<MTGAbility*> rowPicks;
+        bool rowPicksDone = false;
+        auto rowAutoTapPicks = [&](MTGCardInstance * s, ManaCost * cost) -> const vector<MTGAbility*>&
+        {
+            if (!rowPicksDone || auditMOff())
+            {
+                rowPicks = ManaEngine::selectAutoTapProducers(this, s, cost, s->has(Constants::ANYTYPEOFMANAABILITY), false);
+                rowPicksDone = true;
+            }
+            return rowPicks;
+        };
         if (src && src->isTapped() && !src->isCreature()
             && out.str().find("becomes ") != string::npos)
             out << tappedSourceAnimateClause();
         if (src && c->getConvertedCost() > 0 && !c->hasX()
             && !getManaPool()->canAfford(c, src->has(Constants::ANYTYPEOFMANAABILITY)))
         {
-            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY), false);
+            const vector<MTGAbility*>& picks = rowAutoTapPicks(src, c); //#W54-M (A21)
             std::set<MTGCardInstance *> seen;
             std::vector<std::string> taps;
             std::vector<int> tapRestrict; //#W53-O (D6): per source, not per row
@@ -15175,12 +15239,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (src && c->getConvertedCost() > 0 && !c->hasX() && !c->hasSpecificX()
             && game && game->hand)
         {
-            ManaEngine::FreeProducerPolicy reachPolicy;
-            int untapped = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+            int untapped = windowReach(); //#W54-M (A21): once per render window
             if (untapped > 0)
             {
-                vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                    this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY), false);
+                const vector<MTGAbility*>& picks = rowAutoTapPicks(src, c); //#W54-M (A21)
                 std::set<MTGCardInstance *> tapped;
                 std::vector<std::string> painNames; //#W52-K D7
                 std::vector<int> painDamage;
@@ -15236,8 +15298,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         MTGCardInstance * fsrc = action.click ? action.click : action.ability->source;
         if (fsrc && fsrc->isLand())
         {
-            ManaEngine::FreeProducerPolicy reachPolicy;
-            int untapped = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+            int untapped = windowReach(); //#W54-M (A21): once per render window
             string low = toLowerCopy(fsrc->magicText);
             bool entersTapped = low.find("tap(noevent)") != string::npos || low.find("tapped") != string::npos;
             //#W54-E (D20): the colours the row's OWN target land makes, and
@@ -17388,13 +17449,14 @@ static string lastOfferClause(bool retiresOnPass)
 //restarts the count honestly rather than inheriting the first one's.
 void AIPlayerGPT::noteLoopTake(MTGAbility * ability, MTGCardInstance * click)
 {
-    if (ability == mLoopAbility && click == mLoopClick)
+    if (ability == mLoopAbility && click == mLoopClick && sameCardId(click, mLoopClickId))
     {
         mLoopCount++;
         return;
     }
     mLoopAbility = ability;
     mLoopClick = click;
+    mLoopClickId = cardIdOf(click); //#W54-M (L8)
     mLoopCount = 1;
 }
 
@@ -17527,8 +17589,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //identical state, and ties (byte-identical lines) are de-duped below
     //anyway. stable_sort keeps this-build ranking order among equal texts.
     vector<std::pair<string, const OrderedAIAction *> > renderOrder;
+    mWindowReach = -1; //#W54-M (A21): one potentialColorReach for the whole window
+    mWindowReachArmed = true;
     for (size_t c = 0; c < candidates.size(); c++)
         renderOrder.push_back(std::make_pair(describeAction(*candidates[c]), candidates[c]));
+    mWindowReachArmed = false;
     std::stable_sort(renderOrder.begin(), renderOrder.end(),
                      [](const std::pair<string, const OrderedAIAction *>& a,
                         const std::pair<string, const OrderedAIAction *>& b)
@@ -17719,7 +17784,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W53-N (D2): where the option list ends and the per-ask facts begin. The
     //prompt-only decline annotation is spliced in here, so it reads with the
     //list it is about and still never enters the ask key.
-    const size_t optionsEnd = tail.str().size();
+    const size_t optionsEnd = (size_t) tail.tellp(); //#W54-M (L5): the put position, not a copy
 
     //#W48-F1: a repeat-N plan the model already answered consumes THIS window
     //with no model call and no prompt assembly. Two exits, both taken here
@@ -17744,7 +17809,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     {
         int found = -1;
         for (int r = 0; r < baseIndex; r++)
-            if (shown[r]->ability == mRepeatAbility && shown[r]->click == mRepeatClick)
+            if (shown[r]->ability == mRepeatAbility && shown[r]->click == mRepeatClick
+                && sameCardId(shown[r]->click, mRepeatClickId)) //#W54-M (L8): address reuse is not the same row
             {
                 found = r;
                 break;
@@ -17890,7 +17956,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W49-S (D8): the casting question of this phase was already put to the
     //model - say so, where it is true.
     if (mCastAskTurn == observer->turn && mCastAskPhase == phase)
-        tail << (tail.str().empty() || tail.str()[tail.str().size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
+    {
+        const string sofar = tail.str(); //#W54-M (L5): one copy, not three
+        tail << (sofar.empty() || sofar[sofar.size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
+    }
     tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
@@ -17914,8 +17983,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     string listKey;
     for (size_t lk = 0; lk < shownLines.size(); lk++)
         listKey += shownLines[lk] + "\n";
-    string declinedNote = declinedListNote(mListDeclineCount.count(listKey)
-                                           ? mListDeclineCount[listKey] : 0);
+    string declinedNote = declinedListNote(mListDeclineCount.count(listKeyHash(listKey))
+                                           ? mListDeclineCount[listKeyHash(listKey)] : 0);
     //#W49-S (D8/D3): the one re-ask for this board state. Appending the
     //correction makes this a DIFFERENT question (its own askKey, a fresh
     //call); the board moving on retires it. It is deliberately NOT cleared on
@@ -17930,11 +17999,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
     if (!mPriorityReaskBoard.empty())
         tail << "\n" << mPriorityReaskLine;
-    string askKey = boardKey + tail.str();
+    const string tailStr = tail.str(); //#W54-M (L5): the option list is copied once
+    string askKey = boardKey + tailStr;
     //#W53-N (D2): the decline annotation goes into the PROMPT only - askKey is
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
-    string userTail = tail.str();
+    string userTail = tailStr;
     if (!declinedNote.empty() && optionsEnd <= userTail.size())
         userTail = userTail.substr(0, optionsEnd) + declinedNote + userTail.substr(optionsEnd);
     string userMsg = assemblePrompt(userTail);
@@ -18300,6 +18370,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             {
                 mRepeatAbility = shown[actRow]->ability;
                 mRepeatClick = shown[actRow]->click;
+                mRepeatClickId = cardIdOf(shown[actRow]->click); //#W54-M (L8)
                 mRepeatTotal = repeatN;
                 mRepeatRemaining = repeatN - 1;
                 mRepeatDone = 1;
@@ -18317,7 +18388,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //#W53-N (D2, second half): a decline of this EXACT list, counted once
         //per real answer (this branch does not run on a cached replay).
         if (choice == 0 || (holdRow > 0 && choice == holdRow))
-            mListDeclineCount[listKey]++;
+            mListDeclineCount[listKeyHash(listKey)]++;
         //A fresh deliberate pass declines every offered line (cached
         //replays of the same window don't re-count - one look, one vote).
         if (choice == 0)
@@ -18448,6 +18519,23 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //so it can never leak onto a later, unrelated ask.
     string promptOnlyNote;
     promptOnlyNote.swap(mNextAskPromptNote);
+    //#W54-M (A19): a caller's already-rendered situation, consumed on EVERY
+    //exit path (the discipline of the two swaps above) so a stale render can
+    //never key a later ask. It is byte-identical to the render this function
+    //would do itself: the caller rendered it in this same call stack with no
+    //engine tick in between (FindCardToPlay's boardNow).
+    string situationPrefill;
+    situationPrefill.swap(mAskSituationPrefill);
+    //#W54-M (A17): the state+question cache can only hit within a turn (the
+    //key embeds the turn header and the board), so the turn boundary is a free
+    //point to drop the dead keys - median 99 KB, max 1.59 MB per seat-game were
+    //held for the whole game on the Vita heap. Same-turn re-polls (the
+    //`latency_ms -1` replay records) stay cached: nothing is cleared mid-turn.
+    if (!auditMOff() && mAskCacheTurn != observer->turn)
+    {
+        mAskCache.clear();
+        mAskCacheTurn = observer->turn;
+    }
     //"Only one valid action": no decision to make, no model call.
     if (optionsIn.empty())
         return -1;
@@ -18528,7 +18616,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     //#W53-N (D2): where the option list ends - the prompt-only decline note is
     //spliced in here, after the list it is about and out of the ask key.
-    const size_t askOptionsEnd = tail.str().size();
+    const size_t askOptionsEnd = (size_t) tail.tellp(); //#W54-M (L5)
     //#W47 (wave-46 E-2): the worked example names THIS window's option 1, not a
     //hard-coded "Cast Example Card" - on cast-free screens (damage order, mode
     //menus) that placeholder was the only affirmative "Cast ..." substring and
@@ -18548,13 +18636,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //narration and the plan (see the header) so that consuming one answer
     //cannot invalidate another already given for this same state - the
     //earlier picks of a multi-target selection re-derive from this cache.
-    string askKey0 = serializeGameState() + tailStr;
+    string askKey0 = ((situationPrefill.empty() || auditMOff()) ? serializeGameState() : situationPrefill) + tailStr;
     //#W49-S (D8): this state+question already earned its one re-ask - the
     //corrected question is THE question from here on (its own cache slot).
     bool reasked = (!mAskReaskKey.empty() && mAskReaskKey == askKey0);
     if (reasked)
         tailStr += "\n" + mAskReaskLine;
-    string askKey = reasked ? serializeGameState() + tailStr : askKey0;
+    string askKey = reasked ? askKey0 + "\n" + mAskReaskLine : askKey0; //#W54-M (A19): same bytes, no second render
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
@@ -19075,7 +19163,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (boardNow == mLastCastBoard)
         {
             DebugTrace("AIPlayerGPT: cast pick made no progress, suppressing: " << mLastCastLine);
-            mStuckCastLines.insert(mLastCastLine);
+            mStuckCastLines.insert(listKeyHash(mLastCastLine)); //#W54-M (L6)
         }
         mLastCastLine.clear(); //progress or suppression: either way, consumed
     }
@@ -19702,7 +19790,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << feedsRowTag(perTurn, variable, perCastFed, conv);
             }
         }
-        if (mStuckCastLines.count(o.str()))
+        if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
@@ -19784,8 +19872,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         string listKey;
         for (size_t lk = 0; lk < menu.size(); lk++)
             listKey += menu[lk] + "\n";
-        mNextAskPromptNote = declinedListNote(mListDeclineCount.count(listKey)
-                                              ? mListDeclineCount[listKey] : 0);
+        mNextAskPromptNote = declinedListNote(mListDeclineCount.count(listKeyHash(listKey))
+                                              ? mListDeclineCount[listKeyHash(listKey)] : 0);
 
         std::ostringstream q;
         q << "Casting decision (" << observer->getCurrentGamePhaseName()
@@ -19800,6 +19888,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //no narration: a cast narrates itself as zone events, "nothing" is a non-action
         mCastAskTurn = observer->turn; //#W49-S (D8): the priority ask after this can say so
         mCastAskPhase = observer->getCurrentGamePhase();
+        if (attempt == 0)
+            mAskSituationPrefill = boardNow; //#W54-M (A19): the situation this call already rendered
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
@@ -19808,14 +19898,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
         {
             DebugTrace("AIPlayerGPT: chose to cast nothing");
-            mListDeclineCount[listKey]++; //#W53-N (D2, second half)
+            mListDeclineCount[listKeyHash(listKey)]++; //#W53-N (D2, second half)
             return NULL;
         }
         //#W53-N (D2): the model closed this turn's casting question itself.
         if (holdRow >= 0 && pick == holdRow)
         {
             takeHold("cast", boardNow, menu);
-            mListDeclineCount[listKey]++;
+            mListDeclineCount[listKeyHash(listKey)]++;
             return NULL;
         }
 
@@ -19858,7 +19948,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                       lastChance ? "validation_reject_reask_exhausted"
                                  : "validation_reject_reask");
         if (lastChance)
-            mStuckCastLines.insert(opts[pick]); //no replay of a conceded window
+            mStuckCastLines.insert(listKeyHash(opts[pick])); //no replay of a conceded window (#W54-M L6: hashed)
         candidates.erase(candidates.begin() + pick);
         candidateUsesAlt.erase(candidateUsesAlt.begin() + pick);
         opts.erase(opts.begin() + pick);
@@ -19988,12 +20078,22 @@ int AIPlayerGPT::computeActions()
             //option it took for it and on which menu, so a reviewer reading
             //the stderr can tell "not asked" from "asked and answered".
             int doThis = AIPlayerBaka::selectMenuOption();
-            fprintf(stderr, "AIPlayerGPT: menu on %s could not be put to the model"
-                            " (no answerable shape - e.g. the announced X is no longer"
-                            " affordable); the heuristic took option %d\n",
-                    object->currentActionCard ? object->currentActionCard->getDisplayName().c_str()
-                                              : "(unnamed)",
-                    doThis);
+            //#W54-M (A33): the release channel for "not asked" is the translog
+            //(the corpus reviewer's surface - a `defer` record with its own
+            //class); the stderr line is a development diagnostic and compiles
+            //out of release builds (owner rule: compile diagnostics out).
+            {
+                string menuCard = object->currentActionCard ? object->currentActionCard->getDisplayName()
+                                                            : string("(unnamed)");
+                std::ostringstream why;
+                why << "menu on " << menuCard << " could not be put to the model (no answerable"
+                       " shape - e.g. the announced X is no longer affordable); the heuristic"
+                       " took option " << doThis;
+                writeTransLog("defer", "", why.str(), doThis, 0, menuCard, "menu_not_askable");
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                fprintf(stderr, "AIPlayerGPT: %s\n", why.str().c_str());
+#endif
+            }
             if (doThis >= 0)
             {
                 if (object->abilitiesMenu->isMultipleChoice)
@@ -22186,6 +22286,29 @@ static string stripAnswerLabelPrefix(const string& seg)
 //significant-word split already discards the '#N' and '(P/T)' as sub-4-char
 //tokens, so the name match is unaffected; this recovers the ordinal the split
 //throws away, to break a same-name tie the parser would otherwise drop.
+//#W54-M (L7): one bounded digit-run reader for every label parser below. A
+//run longer than the cap SATURATES at the cap (100000: no window has that
+//many rows, no pump is that size), so a reply like "B4294967297:A1" can no
+//longer wrap to B1 and declare a blocker the model never named - every
+//caller's own range check then rejects it exactly as it rejects "B100000".
+//'pos' advances past the whole run whatever its length.
+static int readDigits(const string& s, size_t& pos, size_t end = string::npos)
+{
+    const int cap = 100000;
+    if (end > s.size())
+        end = s.size();
+    int n = 0;
+    while (pos < end && isdigit((unsigned char) s[pos]))
+    {
+        if (n < cap)
+            n = n * 10 + (s[pos] - '0');
+        if (n > cap)
+            n = cap;
+        pos++;
+    }
+    return n;
+}
+
 static int nameOrdinal(const string& seg)
 {
     size_t h = seg.rfind('#');
@@ -22194,14 +22317,9 @@ static int nameOrdinal(const string& seg)
     size_t k = h + 1;
     while (k < seg.size() && (seg[k] == ' ' || seg[k] == '\t'))
         k++;
-    int n = 0;
-    bool any = false;
-    while (k < seg.size() && isdigit((unsigned char) seg[k]))
-    {
-        n = n * 10 + (seg[k++] - '0');
-        any = true;
-    }
-    return any ? n : 0;
+    const size_t k0 = k;
+    int n = readDigits(seg, k); //#W54-M (L7)
+    return k > k0 ? n : 0;
 }
 
 //The listed name whose lowercased form contains ALL the given words, optionally
@@ -22920,6 +23038,36 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
     return s;
 }
 
+//#W54-M (A22): the per-creature combat facts (CombatTradeStat incl. the
+//blocking-trigger life walk) and the per-player converter scan do not depend
+//on the PAIRING, yet the attackers/blockers windows recomputed them per pair
+//(A x B x battlefield walks + script re-parses; 22-row blocker menus, 1,539-
+//creature boards in the corpus). One memo per window, filled on first use,
+//so every pairing reads the identical struct the pair-wise call produced.
+struct CombatWindowCache
+{
+    std::map<MTGCardInstance *, CombatTradeStat> stats;
+    std::map<Player *, bool> converter;
+    CombatTradeStat statOf(MTGCardInstance * c)
+    {
+        if (auditMOff())
+            return combatStatOf(c);
+        std::map<MTGCardInstance *, CombatTradeStat>::iterator it = stats.find(c);
+        if (it == stats.end())
+            it = stats.insert(std::make_pair(c, combatStatOf(c))).first;
+        return it->second;
+    }
+    bool converterOf(Player * p)
+    {
+        if (auditMOff())
+            return playerHasLifeToDamageConverter(p);
+        std::map<Player *, bool>::iterator it = converter.find(p);
+        if (it == converter.end())
+            it = converter.insert(std::make_pair(p, playerHasLifeToDamageConverter(p))).first;
+        return it->second;
+    }
+};
+
 //W41-5: what would happen to COMBAT damage dealt by 'src' to 'tgt', asked of
 //the engine's own machinery rather than re-derived from card text. Two
 //sources, in the order Damage::resolve consults them:
@@ -22974,28 +23122,33 @@ static int combatPreventionKindToPlayer(MTGCardInstance * src, Player * p)
     return k;
 }
 
-static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
+static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocker, MTGCardInstance * attacker)
 {
-    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker),
+    //#W54-M (A22): stats and the converter scan come from the window memo
+    return combatTradePreviewStats(cw.statOf(blocker), cw.statOf(attacker),
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
                                    false, blocker->life,
-                                   playerHasLifeToDamageConverter(blocker->controller()));
+                                   cw.converterOf(blocker->controller()));
 }
 
 //W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
 //the identical order - only the voicing flips - so the attackers window can
 //never disagree with the blockers window about who dies. 'attacker' is the
 //reader's creature; 'blocker' is one of the defender's untapped bodies.
-static string combatAttackOutcome(MTGCardInstance * attacker, MTGCardInstance * blocker)
+//#W54-M (A22): 'blockerOnAttacker' is combatPreventionKind(blocker, attacker),
+//asked once by the caller and shared with its gang/price tests (it was probed
+//three times per pairing).
+static string combatAttackOutcome(CombatWindowCache& cw, MTGCardInstance * attacker, MTGCardInstance * blocker,
+                                  int blockerOnAttacker)
 {
-    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker),
+    return combatTradePreviewStats(cw.statOf(blocker), cw.statOf(attacker),
                                    combatPreventionKind(attacker, blocker),
-                                   combatPreventionKind(blocker, attacker),
+                                   blockerOnAttacker,
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
                                    true, blocker->life,
-                                   playerHasLifeToDamageConverter(blocker->controller()));
+                                   cw.converterOf(blocker->controller()));
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -23032,12 +23185,12 @@ static int becomesBlockedSelfPump(const string& text, int& dp, int& dt)
         return 2;
     size_t p = g + 6;
     int n = 0; bool anyN = false;
-    while (p < sent.size() && isdigit((unsigned char) sent[p])) { n = n * 10 + (sent[p] - '0'); p++; anyN = true; }
+    { const size_t p0 = p; n = readDigits(sent, p); anyN = p > p0; } //#W54-M (L7)
     if (!anyN || p + 1 >= sent.size() || sent[p] != '/' || sent[p + 1] != '+')
         return 2;
     p += 2;
     int m = 0; bool anyM = false;
-    while (p < sent.size() && isdigit((unsigned char) sent[p])) { m = m * 10 + (sent[p] - '0'); p++; anyM = true; }
+    { const size_t p0 = p; m = readDigits(sent, p); anyM = p > p0; } //#W54-M (L7)
     if (!anyM)
         return 2;
     dp = n; dt = m;
@@ -23161,9 +23314,8 @@ static int proseAttackerOrdinal(const string& low, size_t from, size_t clauseEnd
             break;
         if (low[k] == 'a' && isdigit((unsigned char) low[k + 1]))
         {
-            int n = 0; size_t d = k + 1;
-            while (d < low.size() && isdigit((unsigned char) low[d]))
-                n = n * 10 + (low[d++] - '0');
+            size_t d = k + 1;
+            int n = readDigits(low, d); //#W54-M (L7)
             return n;
         }
     }
@@ -23248,9 +23400,8 @@ static int salvageProseAttackers(const string& content, size_t nAttackers, vecto
         {
             if (low[k] == 'a' && isdigit((unsigned char) low[k + 1]))
             {
-                int n = 0; size_t d = k + 1;
-                while (d < clauseEnd && isdigit((unsigned char) low[d]))
-                    n = n * 10 + (low[d++] - '0');
+                size_t d = k + 1;
+                int n = readDigits(low, d, clauseEnd); //#W54-M (L7)
                 if (n >= 1 && n <= (int) nAttackers && !send[n - 1]) { send[n - 1] = true; count++; }
                 k = d - 1;
             }
@@ -23576,9 +23727,8 @@ static int salvageProsePutList(const string& content, size_t n, int need, vector
             {
                 if (isdigit((unsigned char) low[q]))
                 {
-                    int num = 0; size_t d = q;
-                    while (d < low.size() && isdigit((unsigned char) low[d]))
-                        num = num * 10 + (low[d++] - '0');
+                    size_t d = q;
+                    int num = readDigits(low, d); //#W54-M (L7)
                     if (d < low.size() && low[d] == '/') { clean = false; break; } //"2/2" stat
                     if (num < 1 || num > (int) n) { clean = false; break; }
                     nums.insert(num);
@@ -23771,9 +23921,7 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
         if (!aPrefixed && !bareStart)
             continue;
         size_t j = aPrefixed ? i + 1 : i;
-        int n = 0;
-        while (j < scan.size() && isdigit(scan[j]))
-            n = n * 10 + (scan[j++] - '0');
+        int n = readDigits(scan, j); //#W54-M (L7)
         if (j < scan.size() && scan[j] == '/')
             continue; //a "3/3" power echo, not an attacker index
         //#W48 (D2): the A-rows now carry RANGE labels ("A4-A9" is nine identical
@@ -23796,10 +23944,8 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
                     k++;
                 if (k < scan.size() && isdigit((unsigned char) scan[k]))
                 {
-                    int m = 0;
                     size_t e = k;
-                    while (e < scan.size() && isdigit((unsigned char) scan[e]))
-                        m = m * 10 + (scan[e++] - '0');
+                    int m = readDigits(scan, e); //#W54-M (L7)
                     //not a range if the trailing number is a P/T echo's tail
                     if (m > n && (e >= scan.size() || scan[e] != '/'))
                     {
@@ -23906,9 +24052,7 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             if (prev == '#' || prev == '+' || prev == '/' || (isalnum((unsigned char) prev) && prev != 'A' && prev != 'a'))
                 continue;
             size_t j = i;
-            int n = 0;
-            while (j < scan.size() && isdigit((unsigned char) scan[j]))
-                n = n * 10 + (scan[j++] - '0');
+            int n = readDigits(scan, j); //#W54-M (L7)
             if (j < scan.size() && scan[j] == '/')
             {
                 i = j;
@@ -24047,6 +24191,8 @@ int AIPlayerGPT::chooseAttackers()
     bool anyPotentialBlockers = false; //W42-3: at least one trade forecast shown
     bool anyMenaceRestricted = false; //W43-1: at least one set-restricted attacker
     vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
+    CombatWindowCache cw; //#W54-M (A22): per-window memo of the per-creature facts
+    const bool oppLifeLoop = playerHasLifeLoop(opponent()); //#W54-M (A22): a board fact, once per window
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
@@ -24159,22 +24305,25 @@ int AIPlayerGPT::chooseAttackers()
                     if (!c->couldBlockIfItAttacked(attackers[j]))
                         continue;
                     string outcome;
+                    //#W54-M (A22): the blocker's damage-to-attacker verdict is
+                    //asked ONCE per pairing and read by the gang/price tests below.
+                    const int cOnAttacker = combatPreventionKind(c, attackers[j]);
                     if (bbKind == 1)
                     {
                         //A when-blocked self-pump changes the fight before
                         //damage; fold it in exactly as the blockers window does.
-                        CombatTradeStat as = combatStatOf(attackers[j]);
+                        CombatTradeStat as = cw.statOf(attackers[j]);
                         as.power += bbP;
                         as.toughness += bbT;
-                        outcome = combatTradePreviewStats(combatStatOf(c), as,
+                        outcome = combatTradePreviewStats(cw.statOf(c), as,
                                                           combatPreventionKind(attackers[j], c),
-                                                          combatPreventionKind(c, attackers[j]),
+                                                          cOnAttacker,
                                                           combatPreventionKindToPlayer(attackers[j], c->controller()),
                                                           true, c->life,
-                                                          playerHasLifeToDamageConverter(c->controller()));
+                                                          cw.converterOf(c->controller()));
                     }
                     else
-                        outcome = combatAttackOutcome(attackers[j], c);
+                        outcome = combatAttackOutcome(cw, attackers[j], c, cOnAttacker);
                     std::ostringstream e;
                     e << c->name << instanceHandle(c)
                       << " (" << c->power << "/" << c->toughness << ")";
@@ -24184,7 +24333,7 @@ int AIPlayerGPT::chooseAttackers()
                     if (c->basicAbilities[Constants::DEATHTOUCH]
                         || c->basicAbilities[Constants::WITHER]
                         || c->basicAbilities[Constants::INFECT]
-                        || combatPreventionKind(c, attackers[j]) != kPreventNone)
+                        || cOnAttacker != kPreventNone) //#W54-M (A22)
                         gangOk = false;
                     gangPowers.push_back(c->power > 0 ? c->power : 0);
                     //"biggest" is decided by POWER first and toughness as the
@@ -24200,10 +24349,10 @@ int AIPlayerGPT::chooseAttackers()
                     }
                     //#W48-D4: and the most expensive one, by the life it gives.
                     {
-                        CombatTradeStat bstat = combatStatOf(c);
+                        CombatTradeStat bstat = cw.statOf(c); //#W54-M (A22)
                         int price = bstat.blockLife + bstat.blockLifeMay;
                         if (bstat.lifelink && c->power > 0
-                            && combatPreventionKind(c, attackers[j]) == kPreventNone)
+                            && cOnAttacker == kPreventNone)
                             price += c->power;
                         if (price > priciestPrice)
                         {
@@ -24277,7 +24426,7 @@ int AIPlayerGPT::chooseAttackers()
             if (noneCouldBlock && minB < 2)
                 ln << noPotentialBlockersTag();
         }
-        if (playerHasLifeLoop(opponent())) //#W49-U D5
+        if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
             ln << kLifeLoopAttackerRowTag;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
@@ -24609,9 +24758,7 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         size_t j = i + 1;
         if (j >= content.size() || !isdigit(content[j]))
             continue;
-        int b = 0;
-        while (j < content.size() && isdigit(content[j]))
-            b = b * 10 + (content[j++] - '0');
+        int b = readDigits(content, j); //#W54-M (L7)
         //#W48 (D2): R8's B-rows already print RANGE labels ("B4-B9"), and the
         //grammar refused them - "B4-B9:A2" parsed B4, met a 'B' where it wanted
         //an attacker, and dropped the whole pair. A hyphen followed by another
@@ -24623,9 +24770,7 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
             && isdigit(content[j + 2]))
         {
             size_t k = j + 2;
-            int m = 0;
-            while (k < content.size() && isdigit(content[k]))
-                m = m * 10 + (content[k++] - '0');
+            int m = readDigits(content, k); //#W54-M (L7)
             if (m > b)
             {
                 bHi = m;
@@ -24639,9 +24784,8 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         if (j < content.size() && (content[j] == 'A' || content[j] == 'a') && j + 1 < content.size()
             && isdigit(content[j + 1]))
         {
-            a = 0;
-            for (size_t k = j + 1; k < content.size() && isdigit(content[k]); k++)
-                a = a * 10 + (content[k] - '0');
+            size_t k = j + 1;
+            a = readDigits(content, k); //#W54-M (L7)
         }
         else if (content.compare(j, 4, "none") == 0 || content.compare(j, 4, "None") == 0
                  || content.compare(j, 4, "NONE") == 0)
@@ -24893,6 +25037,7 @@ int AIPlayerGPT::chooseBlockers()
     bool anyGangPriced = false;
     tail << "Attackers:\n";
     vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
+    const bool oppLifeLoop = playerHasLifeLoop(opponent()); //#W54-M (A22): a board fact, once per window
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
@@ -25050,7 +25195,7 @@ int AIPlayerGPT::chooseBlockers()
                 }
             }
         }
-        if (playerHasLifeLoop(opponent())) //#W49-U D5
+        if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
             ln << kLifeLoopAttackerRowTag;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
@@ -25091,6 +25236,7 @@ int AIPlayerGPT::chooseBlockers()
     //in a #N handle and all reading the identical trade; blockers was the one
     //decision kind that got both bigger and slower this wave.
     vector<string> rowName, rowHandle, rowRest;
+    CombatWindowCache cw; //#W54-M (A22): per-window memo of the per-creature facts
     for (size_t i = 0; i < blockers.size(); i++)
     {
         std::ostringstream ln;
@@ -25168,19 +25314,19 @@ int AIPlayerGPT::chooseBlockers()
                     }
                     if (bbKind[k] == 1)
                     {
-                        CombatTradeStat as = combatStatOf(attackers[k]);
+                        CombatTradeStat as = cw.statOf(attackers[k]); //#W54-M (A22)
                         as.power += bbP[k];
                         as.toughness += bbT[k];
                         //W41-5: the pumped branch is the same fight, so it asks
                         //the same prevention questions - a self-pump that beats
                         //the blocker's toughness is still irrelevant when the
                         //damage is prevented.
-                        trade = combatTradePreviewStats(combatStatOf(blockers[i]), as,
+                        trade = combatTradePreviewStats(cw.statOf(blockers[i]), as,
                                                         combatPreventionKind(attackers[k], blockers[i]),
                                                         combatPreventionKind(blockers[i], attackers[k]),
                                                         combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()),
                                                         false, blockers[i]->life,
-                                                        playerHasLifeToDamageConverter(blockers[i]->controller()));
+                                                        cw.converterOf(blockers[i]->controller()));
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -25191,7 +25337,7 @@ int AIPlayerGPT::chooseBlockers()
                     }
                     else
                     {
-                        trade = combatBlockOutcome(blockers[i], attackers[k]);
+                        trade = combatBlockOutcome(cw, blockers[i], attackers[k]); //#W54-M (A22)
                         if (bbKind[k] == 2 && !trade.empty())
                             trade += " - PLUS its becomes-blocked trigger, NOT"
                                      " included here: read its text";
@@ -39661,6 +39807,32 @@ static const char * kW50Y_r94 =
         CHECK(AIPlayerGPT::handedToHeuristic(-1, "engine_answered")
               && AIPlayerGPT::handedToHeuristic(-1, "reveal_stall_forced"),
               "#W54-F D7b with a class stamped it earns one - both engine-answered classes");
+    }
+    // ---- #W54-M (L7): bounded digit runs - an overlong index can never wrap into a legal label ----
+    cout << "\n[#W54-M L7] overlong digit runs saturate; every label parser then rejects them\n";
+    {
+        vector<string> bn; bn.push_back("Wall of Omens"); bn.push_back("Grizzly Bears");
+        vector<string> an; an.push_back("Saproling"); an.push_back("Ogre");
+        vector<vector<int> > legal(2);
+        legal[0].push_back(0); legal[0].push_back(1); legal[1].push_back(0); legal[1].push_back(1);
+        vector<int> out;
+        //pre-fix: 4294967297 wrapped to 1 -> "B1:A1" declared a blocker the model never named
+        int pairs = parseBlockAssignments("BLOCKS: B4294967297:A1", 2, 2, out, &bn, &an, &legal);
+        CHECK(pairs == 0, "#W54-M L7 'B4294967297:A1' declares NO block (was B1:A1 by int wrap)");
+        vector<int> out2;
+        int pairs2 = parseBlockAssignments("BLOCKS: B1:A4294967298", 2, 2, out2, &bn, &an, &legal);
+        CHECK(pairs2 == 0, "#W54-M L7 'B1:A4294967298' declares NO block (was B1:A2 by int wrap)");
+        vector<int> out3;
+        int pairs3 = parseBlockAssignments("BLOCKS: B2:A1", 2, 2, out3, &bn, &an, &legal);
+        CHECK(pairs3 == 1 && out3.size() >= 2 && out3[1] == 1, "#W54-M L7 POSITIVE the ordinary 'B2:A1' still parses");
+        vector<bool> send;
+        int r = parseAttackerSet("ATTACK: A4294967297", 2, send, &an);
+        bool anySend = false;
+        for (size_t i = 0; i < send.size(); i++) anySend = anySend || send[i];
+        CHECK(!anySend, "#W54-M L7 'ATTACK: A4294967297' sends NOBODY (was A1 by int wrap)");
+        CHECK(nameOrdinal("Saproling #4294967297") == 0 || nameOrdinal("Saproling #4294967297") >= 100000,
+              "#W54-M L7 '#4294967297' ordinal never reads as #1");
+        CHECK(nameOrdinal("Saproling #2") == 2, "#W54-M L7 POSITIVE '#2' ordinal still reads 2");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

@@ -331,6 +331,16 @@ private:
                  const string& pendingSourceName = string(), bool askEvenIfSingle = false,
                  bool suppressPlanRequest = false);
     std::map<string, int> mAskCache;
+    // audit-M (#W54-M): wave-54 audit lane M members (A17/A19/A21/L8) - see
+    // strategy-design/wave54/lane-M.md. WAGIC_GPT_AUDIT_M_OFF=1 disables every
+    // lane-M behaviour at runtime (the "was it me?" flag).
+    int mAskCacheTurn = -1;          //A17: the turn mAskCache was last cleared on
+    string mAskSituationPrefill;     //A19: a caller's already-rendered situation, consumed by the NEXT askModel
+    int mWindowReach = -1;           //A21: potentialColorReach memo for one render window (-1 = not yet)
+    bool mWindowReachArmed = false;  //A21: armed by chooseOrderedAction around its describeAction loop
+    int windowReach();
+    int mRepeatClickId = -1;         //L8: mtgid of mRepeatClick when the plan was armed (address-reuse guard)
+    int mLoopClickId = -1;           //L8: mtgid of mLoopClick when the loop was noted
 
     //Answer a menu-family DecisionRequest (CHOOSE_MENU / CHOOSE_MODE /
     //ANNOUNCE_X): ask the model over the snapshotted options, fall back to
@@ -629,7 +639,7 @@ private:
     //self-healing when a sibling entry (the legal alternative mode) exists.
     string mLastCastBoard;
     string mLastCastLine;
-    std::set<string> mStuckCastLines;
+    std::set<size_t> mStuckCastLines; //#W54-M (L6): std::hash of the line - equality is all that is tested
     int mStuckCastTurn;
 
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
@@ -1003,7 +1013,7 @@ private:
     //#W53-N (D2, second half): per-turn declines of an EXACT option list,
     //keyed by the joined rows. Rendered as a PROMPT-ONLY annotation (never
     //part of an ask key - see declinedListNote).
-    std::map<string, int> mListDeclineCount;
+    std::map<size_t, int> mListDeclineCount; //#W54-M (L6): keyed by std::hash of the joined rows
     int mListDeclineTurn;
     //#W53-N (D12a): when the carried plan was last WRITTEN by the model -
     //the translog seq (= window) and the turn. mPlanSetSeq < 0 = no plan.
