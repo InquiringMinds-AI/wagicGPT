@@ -1,0 +1,68 @@
+#NAME: Blockers -- the block lands on the attacker pass 3 actually SCORED
+#DESC: Owner Vita play reports 2026-09-02 (vpk12b, his tag "bad blocking"):
+#DESC: transcript-1788388578 (deck1 "Fangbearer Grind") and transcript-1788390984
+#DESC: (deck7 "Relentless Growth"). In both, every free body the AI seat owned ended
+#DESC: up on the SAME attacker - the first one in the attacking player's battlefield
+#DESC: order - while the attacker that was actually killing it went unblocked.
+#DESC:
+#DESC: MECHANISM: a MTG_BLOCK_RULE click does not choose an attacker, it CYCLES the
+#DESC: blocker one step through the attackers it may legally block and then off again
+#DESC: (MTGBlockRule::reactToClick). AIPlayerBaka::chooseBlockers pass 3 scored a
+#DESC: bestAttacker carefully and then committed with ONE blind click, which always
+#DESC: lands on attacker #1. Its per-attacker cap (currentBlockers >= maxBlockers) was
+#DESC: therefore evaluated against a different attacker than the one that got the body,
+#DESC: so nothing stopped the pile-up.
+#DESC:
+#DESC: SCENARIO: Mons's Goblin Raiders (1/1) and Craw Wurm (6/4) attack a defender at
+#DESC: 6 holding three Grizzly Bears (2/2). The Raiders are FIRST on the battlefield.
+#DESC: The Wurm alone is exactly lethal (6 >= 6) and no Bear kills it (2 < 4), so
+#DESC: pass 3's "block to prevent lethal damage, even if we die" branch scores the Wurm
+#DESC: 6 and the Raiders 3 - the Wurm is the pick for every Bear.
+#DESC:
+#DESC: RED on base: all three Bears blind-click onto the Raiders; the Wurm is unblocked;
+#DESC: the survival sweep then finds no free body (all three carry a defenser) and the
+#DESC: defender takes 6 and DIES at 0.
+#DESC: GREEN after: Bear 1 is aimed at the Wurm (it dies, the Wurm lives), Bear 2 then
+#DESC: sees the Wurm capped and takes the Raiders (the Raiders die, the Bear lives),
+#DESC: Bear 3 finds every attacker capped and stays home. Defender ends at 6.
+AICALLS 120
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Mons's Goblin Raiders,Craw Wurm
+life:20
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears
+life:6
+[DO]
+Mons's Goblin Raiders
+Craw Wurm
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Craw Wurm
+graveyard:Mons's Goblin Raiders
+life:20
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears
+graveyard:Grizzly Bears
+life:6
+[END]

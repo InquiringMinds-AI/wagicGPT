@@ -5,8 +5,20 @@
 # `@combat(blocking) source(creature[defender]|mybattlefield):may life:2
 # controller` trigger: THREE identical may-asks in one window, all accepted.
 #
-# EXPECTED: +2 x3 = 20 -> 26, then the two unblocked 1/1s deal 2 -> 24.
-# The arithmetic DISCRIMINATES: one accepted trigger would land 20, two 22.
+# EXPECTED: +2 x3 = 20 -> 26, and NO combat damage.
+# The arithmetic DISCRIMINATES: one accepted trigger would land 22, two 24.
+#
+# W53-Z (2026-09-02) re-baselined the life from 24 to 26. The behaviour under
+# test - three identical `may` triggers in ONE window, all accepted - is
+# unchanged: three defenders still block, three triggers still fire, 20 -> 26.
+# What changed is WHICH attacker each defender lands on. Until wave 53 pass 3 of
+# AIPlayerBaka::chooseBlockers committed with one BLIND MTG_BLOCK_RULE click,
+# which always cycles onto the first attacker in battlefield order - so all three
+# defenders gang-blocked Goblin #1 and the other two 1/1s hit the face for 2.
+# The blocks are now aimed at the attacker pass 3 actually scored, so the three
+# 0/N walls block the three Goblins one apiece and nothing gets through. This is
+# strictly the better block (0 taken instead of 2) and the may-trigger count -
+# the thing this fixture exists to pin - is identical.
 # Nothing dies (1 damage into 0/4 and 0/6 bodies, 0 damage back).
 # This is the batch case for #W41-7's mass accept/deny affordance; the three
 # trigger StackAbilities are all pushed BEFORE the first resolves (verified with
@@ -50,5 +62,5 @@ inplay:Raging Goblin,Raging Goblin,Raging Goblin
 life:20
 [PLAYER2]
 inplay:Perimeter Captain,Fortified Rampart,Fortified Rampart
-life:24
+life:26
 [END]
