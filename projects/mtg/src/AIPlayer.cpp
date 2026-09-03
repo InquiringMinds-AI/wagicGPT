@@ -16,8 +16,10 @@
 
 int AIPlayer::totalAIDecks = -1;
 
+//#W56-B (D2): `playerAbilityTarget` was left INDETERMINATE here, so a plain
+//card action could answer a `playerAbilityTarget ?` test with garbage.
 AIAction::AIAction(AIPlayer * owner, MTGCardInstance * c, MTGCardInstance * t)
-    : owner(owner), ability(NULL), player(NULL), click(c), target(t)
+    : owner(owner), ability(NULL), player(NULL), click(c), target(t), playerAbilityTarget(NULL)
 {
     bool prefetch = options[Options::CARDPREFETCHING].number?true:false;
     if (prefetch && WResourceManager::Instance()->IsThreaded())
@@ -42,6 +44,14 @@ AIAction::AIAction(AIPlayer * owner, MTGCardInstance * c, MTGCardInstance * t)
             }
         }
     }
+}
+
+//#W56-B (D2): see the header - one resolver, both consumers.
+Player * AIAction::targetedSeat() const
+{
+    if (playerAbilityTarget)
+        return dynamic_cast<Player *>(playerAbilityTarget);
+    return player;
 }
 
 int AIAction::Act()

@@ -1293,10 +1293,15 @@ static string highestMvEdictClause(const vector<std::pair<string, int> >& theirs
         o << "they sacrifice " << tied[0] << " (MV " << top << ", their highest)";
         return o.str();
     }
-    o << tied.size() << " tied at MV " << top << " (their highest): ";
+    //#W56-B (D9): the list had no QUANTIFIER, and an enumeration with no
+    //quantifier reads as an effect list - `146v123` s28's plan (and s24's)
+    //said "cast Soul Shatter to sacrifice all 24 Human tokens, wiping their
+    //board" off this exact clause. One card is sacrificed; the list is only
+    //the tie. State the count and the ONE, first, before the names.
+    o << "they sacrifice ONE of these " << tied.size() << ", their choice"
+      << " - all tied at MV " << top << " (their highest): ";
     for (size_t i = 0; i < tied.size(); i++)
         o << (i ? "; " : "") << tied[i];
-    o << " - they choose which one";
     return o.str();
 }
 
@@ -13391,6 +13396,61 @@ static string converterSituationLine(Player * me, Player * opp)
     return converterSummaryText(mineConv, theirsConv, mineMir, theirsMir);
 }
 
+//#W56-B (D6, wave-55 ledger MED = R229; skill #255): no window during the
+//OPPONENT's combat printed the incoming damage total. `125v146` seq 32 and
+//35-41 (turn 13, 10 life) listed three attackers with their live P/T - eleven
+//power - and nothing in the prompt said eleven or said the seat was dead. The
+//seat controlled no creature, so it was never handed a `blockers` ask and its
+//`you would be at N` header; the combat reached it as `priority` windows only.
+//Corpus: 50 non-blockers windows with attackers declared, 0 carrying a total,
+//7 of them at or past lethal. Every other price in this engine is a finished
+//subtraction; this is the one that ends games. Pure over the counts, so both
+//the lethal branch and the blockable split are provable without a board.
+//`unblockedDamage` counts only attackers with no blocker assigned yet, so a
+//block already declared removes its attacker from the total.
+static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
+                                 bool haveBodies, int unblockableAttackers,
+                                 int unblockableDamage)
+{
+    if (attackers <= 0)
+        return "";
+    std::ostringstream o;
+    o << "INCOMING THIS COMBAT: " << attackers << " attacker"
+      << (attackers == 1 ? "" : "s") << ", " << unblockedDamage
+      << " unblocked damage - you would be at " << (myLife - unblockedDamage);
+    if (myLife - unblockedDamage <= 0)
+        o << "; this KILLS you";
+    //The split is claimed only where the seat HAS bodies: with none, "your
+    //creatures cannot block it" is true of every attacker and says nothing.
+    if (haveBodies)
+    {
+        if (unblockableAttackers > 0)
+            o << " (of that, " << unblockableDamage << " from "
+              << unblockableAttackers << " attacker"
+              << (unblockableAttackers == 1 ? "" : "s")
+              << " none of your creatures can block)";
+        else
+            o << " (your creatures may legally block every attacker in that total)";
+    }
+    return o.str();
+}
+
+//#W56-B (D10, wave-55 ledger MED = R234): the opponent's open mana was never a
+//number. Their permanents print with `[tapped]` markers and the pilot counted
+//the unmarked ones by hand to decide whether a counterspell was live - `152v125`
+//lost eight creature spells to counters across turns 25-51, every one cast with
+//5-8 unmarked opponent permanents on screen. Our own side has carried
+//`Mana available: N total (untapped sources ...)` for waves. Same engine call,
+//other seat. Pure over (count, colour set).
+static string opponentOpenManaLine(int sources, const string& colours)
+{
+    std::ostringstream o;
+    o << "Their untapped sources: " << sources;
+    if (sources > 0 && !colours.empty())
+        o << " (colours they could make: " << colours << ")";
+    return o.str();
+}
+
 //#W47 (R7): `optionText` is THIS window's option block (assemblePrompt hands it
 //down; the board-hash callers pass nothing). It is read for one purpose - to
 //tell a permanent that already explains itself on an option row from one that
@@ -13774,6 +13834,43 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                              activeSeat == opp, oppAttacking, oppLands);
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
+        //#W56-B (D10): their open mana as a NUMBER, from the same engine call
+        //that counts ours - one source per card, colours deduped - directly
+        //under the battlefield lines it summarises.
+        {
+            ManaEngine::FreeProducerPolicy oppPolicy;
+            ManaCost * oppPotential = NEW ManaCost();
+            int oppSources = ManaEngine::potentialColorReach(opp, oppPolicy, oppPotential);
+            string oppColors = manaColourSetText(oppPotential);
+            SAFE_DELETE(oppPotential);
+            out << "\n" << opponentOpenManaLine(oppSources, oppColors);
+        }
+        //#W56-B (D6): the incoming total, on EVERY window during their combat -
+        //the seat with no creature is never handed a blockers ask, and that is
+        //exactly the seat that dies to an unread board.
+        if (activeSeat == opp && oppAttacking > 0)
+        {
+            int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
+            for (int ai = 0; ai < opp->game->inPlay->nb_cards; ai++)
+            {
+                MTGCardInstance * ac = opp->game->inPlay->cards[ai];
+                if (!ac || !ac->isAttacker())
+                    continue;
+                inAttackers++;
+                if (!ac->blockers.empty())
+                    continue; //already blocked: its damage is not aimed at the face
+                int pw = ac->power > 0 ? ac->power : 0;
+                inDamage += pw;
+                if (ac->potentialBlockerCount() <= 0)
+                {
+                    inUnblockable++;
+                    inUnblockableDmg += pw;
+                }
+            }
+            out << "\n" << incomingCombatLine(inAttackers, inDamage, life,
+                                              myCreatures > 0, inUnblockable,
+                                              inUnblockableDmg);
+        }
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
         //Artifact counts feed metalcraft/affinity-style decisions and are
@@ -14109,7 +14206,14 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 14, "{visible now: ") == 0)
                 //#W55-C (D7 b): whether the row commits a target is a fact
                 //about THIS window's ask sequence, not about what happened.
-                || (in.compare(i, 32, "{this row does not pick a target") == 0);
+                || (in.compare(i, 32, "{this row does not pick a target") == 0)
+                //#W56-B: D15's duplicate-row comparison and D13's two combat
+                //annotations are the same species - each is true of THIS
+                //window's menu or of a block not yet declared, and says nothing
+                //that belongs in history.
+                || (in.compare(i, 20, "{same effect as row ") == 0)
+                || (in.compare(i, 31, "{blocking trigger, this combat:") == 0)
+                || (in.compare(i, 20, "{after this combat: ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -15906,6 +16010,99 @@ static string menuFitTag(int leftAfter, const std::vector<int>& lostRows, int ot
 //The pass itself: each priced row is told what its own payment leaves and
 //which OTHER numbered rows on this menu need more than that. Pure over the
 //row list and the per-row source counts, so the numbering is provable.
+//#W56-B (D14, wave-55 ledger MED = R246, FIFTH corpus): the equipment cast row
+//is the one recurring cast row in the pool that has never been priced.
+//`123v130` seq 11 offered `Cast Lightning Greaves {2}` on a battlefield line
+//reading "of which 0 are creatures"; it was taken, tapping out, on a turn the
+//seat had no creature to equip. Every sibling rung at that seat closed the
+//moment its ROW got a verdict (edicts at N=0: 0 of 171 rows). Pure over
+//(is it equipment, how many creatures the caster controls, does the card make
+//its own body). A living-weapon-style equipment brings a creature with it, so
+//the "equips nothing" claim is false of it and is not made - the tag is
+//omitted rather than guessed.
+static string equipmentCastPriceTag(bool isEquipment, int ownCreatures, bool makesItsOwnBody)
+{
+    if (!isEquipment || makesItsOwnBody || ownCreatures > 0)
+        return "";
+    return " {right now: you control 0 creatures - this equips nothing}";
+}
+
+//#W56-B (D15, wave-55 ledger MED = R247): two rows naming the SAME card at two
+//prices with identical `{right now:}` verdicts, and no mark on the cheaper one.
+//`123v152` seq 104 offered Damnation at {2}{b}{b} from hand and at {4}{b}{b}
+//from exile with a byte-identical verdict; the pilot answered the dearer row,
+//paid two extra mana, swept its own five-creature board and lost. The X menu
+//already solves this shape with `{X pricing: same kills as X=N, for K less
+//mana}`. Nothing is removed: the dearer row keeps its place and gains the
+//comparison.
+static string duplicateEffectTag(int cheaperRow, int extraMana)
+{
+    if (cheaperRow <= 0 || extraMana <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {same effect as row " << cheaperRow << ", for " << extraMana
+      << " more mana}";
+    return o.str();
+}
+
+//The `{right now: ...}` verdict of a rendered row, brace-balanced (a verdict
+//can contain mana symbols), or "" when the row carries none. Pure.
+static string rowVerdictClause(const string& row)
+{
+    const string open = "{right now:";
+    size_t s = row.find(open);
+    if (s == string::npos)
+        return "";
+    int depth = 0;
+    for (size_t i = s; i < row.size(); i++)
+    {
+        if (row[i] == '{')
+            depth++;
+        else if (row[i] == '}')
+        {
+            depth--;
+            if (!depth)
+                return row.substr(s, i - s + 1);
+        }
+    }
+    return "";
+}
+
+//#W56-B (D15): the MENU pass. `names[i]` is the card the row casts and
+//`costs[i]` the converted cost it would really pay (-1 when unknown: an {X}
+//cost has no number yet). Two rows match when they name one card AND carry the
+//same non-empty verdict clause - the corpus shape, and the only pair for which
+//"same effect" is a fact rather than an inference. The tag goes on the DEARER
+//row and points at the cheapest matching one. Pure over (rows, names, costs).
+static void applyDuplicateEffectTags(std::vector<std::string>& rows,
+                                     const std::vector<std::string>& names,
+                                     const std::vector<int>& costs)
+{
+    for (size_t i = 0; i < rows.size() && i < names.size() && i < costs.size(); i++)
+    {
+        if (costs[i] < 0 || names[i].empty())
+            continue;
+        const string vi = rowVerdictClause(rows[i]);
+        if (vi.empty())
+            continue;
+        int bestRow = -1, bestCost = 0;
+        for (size_t j = 0; j < rows.size() && j < names.size() && j < costs.size(); j++)
+        {
+            if (j == i || costs[j] < 0 || costs[j] >= costs[i] || names[j] != names[i])
+                continue;
+            if (rowVerdictClause(rows[j]) != vi)
+                continue;
+            if (bestRow < 0 || costs[j] < bestCost)
+            {
+                bestRow = (int) j + 1;
+                bestCost = costs[j];
+            }
+        }
+        if (bestRow > 0)
+            rows[i] += duplicateEffectTag(bestRow, costs[i] - bestCost);
+    }
+}
+
 static void applyMenuFitTags(std::vector<std::string>& rows, const std::vector<int>& uses,
                              int untappedSources)
 {
@@ -16630,9 +16827,17 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //#W43-9/#W43-10: WHICH player. "a player" is the owner-tag defect in
         //its purest form on a face-damage/drain activation, and the observing
         //seat's line names the player, so this one had to as well.
-        Player * pt = action.player;
-        if (!pt)
-            pt = dynamic_cast<Player *>(action.playerAbilityTarget);
+        //#W56-B (D2): `pt = action.player` on an ABILITY action read an
+        //INDETERMINATE field (AIAction's player-ability ctor never set it), so
+        //the life total below was computed from whatever the stack slot held -
+        //a constant base of 166 on 238 of the corpus's 248 rows, at every real
+        //opponent life from 34 down to 1, and the seat label above was right
+        //only by luck (garbage != this). Resolve through the one resolver, and
+        //price only a LIVE seat: a pointer that is neither this chair nor the
+        //opponent cannot have a life total this render may print.
+        Player * pt = action.targetedSeat();
+        if (pt != this && pt != opponent())
+            pt = NULL;
         out << " targeting " << (pt ? (pt == this ? "you" : "the opponent")
                                     : string("a player"));
         //#W55-C (D16, third wave carried): the cast row has carried this tail
@@ -20646,6 +20851,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     vector<MTGCardInstance *> candidates;
     vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
     vector<int> rowUses; //#W54-C (D18): sources this row spends, -1 = unpriceable
+    vector<string> rowNames; //#W56-B (D15): the card each row casts
+    vector<int> rowCosts; //#W56-B (D15): the converted cost it would pay, -1 = unknown ({X})
     vector<string> opts; //"Cast nothing" is appended LAST (positional
                          //anchoring: the model favors option 1, and
                          //nothing-first likely drove the pass rate)
@@ -20796,6 +21003,27 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 if (!advText.empty())
                     o << " {adventure spell: " << advText << "}";
             }
+        }
+        //#W56-B (D14): the equipment cast row, priced by the board it would
+        //enter. Counted off this seat's battlefield with the same creature
+        //predicate the board header uses, so the row cannot contradict the
+        //"of which N are creatures" line the pilot reads above it.
+        if (card->hasType(Subtypes::TYPE_EQUIPMENT))
+        {
+            int ownCreatures = 0;
+            for (int ei = 0; game && game->inPlay && ei < game->inPlay->nb_cards; ei++)
+            {
+                MTGCardInstance * ec = game->inPlay->cards[ei];
+                if (!ec || (ec->mutation && !ec->parentCards.empty()))
+                    continue;
+                if (ec->isCreature())
+                    ownCreatures++;
+            }
+            const string lowEq = toLowerCopy(card->magicText) + " " + toLowerCopy(card->text);
+            const bool ownBody = lowEq.find("living weapon") != string::npos
+                                 || lowEq.find("germ") != string::npos
+                                 || lowEq.find("token") != string::npos;
+            o << equipmentCastPriceTag(true, ownCreatures, ownBody);
         }
         //#W55-C (D10): a naming permanent of THEIRS prices this cast. Scanned
         //over their battlefield, matched on the chosen name the tag already
@@ -21354,6 +21582,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
         opts.push_back(o.str());
         rowUses.push_back(rowUsed); //#W54-C (D18)
+        //#W56-B (D15): identity + price of this row, for the menu pass below.
+        rowNames.push_back(card->name);
+        {
+            ManaCost * dupCost = (casts[ci].viaAlternative && cost) ? cost->getAlternative() : cost;
+            rowCosts.push_back((dupCost && !dupCost->hasX() && !dupCost->hasSpecificX())
+                               ? dupCost->getConvertedCost() : -1);
+        }
     }
 
     //Nothing castable: only one outcome, no model call.
@@ -21407,6 +21642,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //until the suppression filter and any re-ask removal have settled, and
         //`opts` stays the untagged identity the livelock breaker keys on.
         applyMenuFitTags(menu, rowUses, untappedSources);
+        //#W56-B (D15): and the same-card/same-verdict comparison, on the same
+        //menu copy and for the same reason - a row cannot know its own number
+        //until the suppression filter and any re-ask removal have settled.
+        applyDuplicateEffectTags(menu, rowNames, rowCosts);
         menu.push_back(castDeclineRow(observer->currentPlayer == this
                                       && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
         //#W53-N (D2, second half) + #W55-A (D2a/D19): the declined-list count,
@@ -21517,6 +21756,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         opts.erase(opts.begin() + pick);
         if (pick < (int) rowUses.size())
             rowUses.erase(rowUses.begin() + pick); //#W54-C (D18): stay index-parallel
+        if (pick < (int) rowNames.size()) //#W56-B (D15): same, for the duplicate pass
+            rowNames.erase(rowNames.begin() + pick);
+        if (pick < (int) rowCosts.size())
+            rowCosts.erase(rowCosts.begin() + pick);
         if (lastChance)
         {
             noticeFallback("that cast could not be completed - the heuristic decides", 5.0f);
@@ -24350,13 +24593,21 @@ static const int kPreventPartial = 2;
 //reader's own gain is a benefit, and the CURRENT SITUATION paragraph already
 //states it. Defaulted false so every existing caller and PARSETEST case is
 //untouched.
+//#W56-B (D13): `outBlockTrigger` and `outBlockerDies` are the D13 seam. With
+//outBlockTrigger non-NULL the blocking-trigger gain is NOT nested inside the
+//survival verdict - it is handed back so the caller can print it as its own
+//annotation - and outBlockerDies reports whether the blocker of this pairing
+//dies, which is the standing cost the caller then prices. Both default NULL,
+//so every existing caller renders byte-identically.
 static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a,
                                       int preventAtoB = kPreventNone,
                                       int preventBtoA = kPreventNone,
                                       int preventAtoFace = kPreventNone,
                                       bool attackerSeat = false,
                                       int bRemaining = -1,
-                                      bool bGainConverted = false)
+                                      bool bGainConverted = false,
+                                      string * outBlockTrigger = NULL,
+                                      bool * outBlockerDies = NULL)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
@@ -24391,6 +24642,8 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     else if (aDiesToFirstStrike)
         aKillsB = false;
 
+    if (outBlockerDies) //#W56-B (D13): the blocker of this pairing does not survive
+        *outBlockerDies = aKillsB;
     std::ostringstream o;
     if (aKillsB && bKillsA)
         o << "both die";
@@ -24568,7 +24821,15 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     if (b.blockLife > 0 || b.blockLifeMay > 0)
     {
         const char * subj = attackerSeat ? "they" : "you";
-        o << " (blocking trigger: ";
+        //#W56-B (D13): the clause is built into its own stream so it can be
+        //handed out as a SIBLING annotation instead of nested inside the
+        //survival verdict - `126v146` seq 6 read "(your blocker dies, attacker
+        //lives (blocking trigger: you gain 3 and may gain 2 more))" and the
+        //losing block read as a priced one. Nothing about the clause changes.
+        std::ostringstream bt;
+        {
+        std::ostringstream & o = bt;
+        o << "blocking trigger" << (outBlockTrigger ? ", this combat" : "") << ": ";
         //#W47-R3: when a converter of that side's is in play the gain and the
         //drain are ONE fact, so they are printed as one clause. The certain and
         //the "may" halves are kept apart exactly as above - a single number is
@@ -24601,7 +24862,12 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
                 o << lone;
             o << (attackerSeat ? " off you" : " off them");
         }
-        o << ")";
+        } //#W56-B (D13): end of the clause's own scope
+        //#W56-B (D13): out to the caller, or nested exactly as before.
+        if (outBlockTrigger)
+            *outBlockTrigger = bt.str();
+        else
+            o << " (" << bt.str() << ")";
     }
     //W41-5, the honest-weaker-claim path. A prevention effect applies but its
     //residue is not exactly computable here, so the verdict above is the NAIVE
@@ -24732,7 +24998,23 @@ static int combatPreventionKindToPlayer(MTGCardInstance * src, Player * p)
     return k;
 }
 
-static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocker, MTGCardInstance * attacker)
+//#W56-B (D13): the standing cost of a block that loses the blocker - the third
+//number `126v146` seq 6 needed and no annotation carried. The seat blocked with
+//both walls at 20 life against a lone 1/1, banked 7 life, and at seq 16 met five
+//attackers with one blocker and lost at -14. Pure over the available-blocker
+//count; claims nothing about next turn's board beyond the body this block loses.
+static string afterCombatBlockerCostText(int availableBlockers)
+{
+    std::ostringstream o;
+    o << "after this combat: you control 1 fewer blocker";
+    if (availableBlockers > 0)
+        o << " - " << availableBlockers << " available now, "
+          << (availableBlockers - 1) << " if this one dies here";
+    return o.str();
+}
+
+static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocker, MTGCardInstance * attacker,
+                                 string * outBlockTrigger = NULL, bool * outBlockerDies = NULL)
 {
     //#W54-M (A22): stats and the converter scan come from the window memo
     return combatTradePreviewStats(cw.statOf(blocker), cw.statOf(attacker),
@@ -24740,7 +25022,8 @@ static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocke
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
                                    false, blocker->life,
-                                   cw.converterOf(blocker->controller()));
+                                   cw.converterOf(blocker->controller()),
+                                   outBlockTrigger, outBlockerDies); //#W56-B (D13)
 }
 
 //W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
@@ -26917,6 +27200,8 @@ int AIPlayerGPT::chooseBlockers()
                 if (attackers[k] == legal[i][j])
                 {
                     std::ostringstream pn;
+                    string blockTrigger; //#W56-B (D13)
+                    bool blockerDies = false; //#W56-B (D13)
                     mbLabels.push_back((int) (k + 1));
                     //The computed trade rides the B#:A# pairing so there is
                     //nothing left to re-derive (block-outcome annotation).
@@ -26947,7 +27232,8 @@ int AIPlayerGPT::chooseBlockers()
                                                         combatPreventionKind(blockers[i], attackers[k]),
                                                         combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()),
                                                         false, blockers[i]->life,
-                                                        cw.converterOf(blockers[i]->controller()));
+                                                        cw.converterOf(blockers[i]->controller()),
+                                                        &blockTrigger, &blockerDies); //#W56-B (D13)
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -26958,13 +27244,23 @@ int AIPlayerGPT::chooseBlockers()
                     }
                     else
                     {
-                        trade = combatBlockOutcome(cw, blockers[i], attackers[k]); //#W54-M (A22)
+                        //#W56-B (D13): same call, with the gain and the death
+                        //taken OUT of the verdict string.
+                        trade = combatBlockOutcome(cw, blockers[i], attackers[k],
+                                                   &blockTrigger, &blockerDies);
                         if (bbKind[k] == 2 && !trade.empty())
                             trade += " - PLUS its becomes-blocked trigger, NOT"
                                      " included here: read its text";
                     }
                     if (!trade.empty())
                         pn << " (" << trade << ")";
+                    //#W56-B (D13): the gain is a SIBLING of the survival verdict,
+                    //never nested inside it, and the block's standing cost - the
+                    //body this seat stops owning - is stated in its own right.
+                    if (!blockTrigger.empty())
+                        pn << " {" << blockTrigger << "}";
+                    if (blockerDies)
+                        pn << " {" << afterCombatBlockerCostText((int) blockers.size()) << "}";
                     mbParens.push_back(pn.str());
                     break;
                 }
@@ -39443,11 +39739,35 @@ static const char * kW50Y_r94 =
         CHECK(highestMvEdictClause(board) == "they sacrifice Sorin, Lord of Innistrad (MV 4, their highest)",
               "#W51-D D10 the single highest-MV permanent (a planeswalker counts) is named with its MV");
         board.push_back(std::make_pair(string("Katilda, Dawnhart Prime"), 4));
+        //#W56-B (D9): the tie clause leads with the QUANTIFIER (see the emitter).
         CHECK(highestMvEdictClause(board)
-              == "2 tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime - they choose which one",
-              "#W51-D D10 at a tie the count and the tied names are given, not a pick the engine does not make");
+              == "they sacrifice ONE of these 2, their choice - all tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime",
+              "#W51-D D10 / #W56-B D9 at a tie the ONE, the count and the tied names are given, not a pick the engine does not make");
         CHECK(highestMvEdictClause(board).find("Elite Spellbinder") == string::npos,
               "#W51-D D10 NEGATIVE a lower-MV creature is not named as a candidate");
+        //#W56-B (D9) NEGATIVE: no unquantified enumeration is left for a plan to
+        //read as "sacrifice all of them" (the `146v123` s24/s28 misread).
+        CHECK(highestMvEdictClause(board).find("2 tied at MV") == string::npos
+              && highestMvEdictClause(board).compare(0, 5, "they ") == 0,
+              "#W56-B D9 NEGATIVE the bare count-first form is gone; the clause opens with the actor and the ONE");
+        {
+            //#W56-B (D9): a 24-way tie is the corpus shape - the count is the
+            //number the plan needed and it is not the number of sacrifices.
+            vector<std::pair<string, int> > many;
+            for (int i = 1; i <= 24; i++)
+            {
+                std::ostringstream nm;
+                nm << "Human #" << i;
+                many.push_back(std::make_pair(nm.str(), 0));
+            }
+            const string wide = highestMvEdictClause(many);
+            CHECK(wide.find("they sacrifice ONE of these 24, their choice -") == 0,
+                  "#W56-B D9 the 24-way tie says ONE of these 24 before it enumerates");
+            CHECK(wide.find("all tied at MV 0 (their highest): Human #1; Human #2") != string::npos,
+                  "#W56-B D9 the tie list itself is unchanged - nothing is deleted");
+            CHECK(wide.find("sacrifice all") == string::npos && wide.find("sacrifice 24") == string::npos,
+                  "#W56-B D9 NEGATIVE no phrasing in the clause claims 24 sacrifices");
+        }
         {
             //echo shape: the clause lives inside {right now: ...} on a cast row and the
             //bare row name still binds when the reply parrots the clause.
@@ -39455,7 +39775,7 @@ static const char * kW50Y_r94 =
             menu.push_back("Cast Soul Shatter {2}{b} {right now: " + highestMvEdictClause(board) + "}");
             menu.push_back("Cast Vampire {1}{b}");
             bool stale = false; string src;
-            int pick = parseChoice("CHOICE: 1 (Cast Soul Shatter {2}{b} {right now: 2 tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime - they choose which one})", 1, &menu, &stale, &src);
+            int pick = parseChoice("CHOICE: 1 (Cast Soul Shatter {2}{b} {right now: they sacrifice ONE of these 2, their choice - all tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime})", 1, &menu, &stale, &src);
             CHECK(pick == 1 && !stale, "#W51-D D10 echo: a reply copying the whole row incl. the clause binds to 1");
             pick = parseChoice("CHOICE: 1 (Cast Soul Shatter)", 1, &menu, &stale, &src);
             CHECK(pick == 1 && !stale, "#W51-D D10 echo: the bare row name binds with the clause on the row");
@@ -42489,6 +42809,277 @@ static const char * kW50Y_r94 =
             CHECK(fetchLandColorsClause(tundra, bwOnly)
                   == ", and it adds {W} or {U} (you cannot make {U} right now)",
                   "#W55-C D17 REGRESSION lane E's clause still renders exactly as the corpus shows it");
+        }
+    }
+
+    // ==================== #W56-B (wave-55 ledger D2/D6/D9/D10/D13/D14/D15) ====================
+    cout << "\n[#W56-B] render prices: the seat's real life, the incoming total,"
+            " the edict count, their open mana, the block's standing cost,"
+            " the equipment row and the duplicate row\n";
+    {
+        // ---- D2: the ability row's life total, pinned against the seat's OWN
+        // life rather than checked for presence. The corpus's 238 false rows all
+        // implied a base of 166; skill #259 says an audited literal carrying a
+        // computed number is checked against the record's field, so this walks
+        // every opponent life the corpus saw (34 down to 1) at both magnitudes.
+        {
+            bool allExact = true, anyConstantBase = false;
+            for (int oppLife = 34; oppLife >= 1; oppLife--)
+                for (int dmg = 1; dmg <= 2; dmg++)
+                {
+                    std::ostringstream want;
+                    want << " {right now: takes " << dmg << " damage - they would be at "
+                         << (oppLife - dmg);
+                    if (oppLife - dmg <= 0)
+                        want << "; THIS WINS THE GAME";
+                    want << "}";
+                    const string got = damagePlayerVerdict(dmg, oppLife, false);
+                    if (got != want.str())
+                        allExact = false;
+                    std::ostringstream base166;
+                    base166 << "they would be at " << (166 - dmg);
+                    if (got.find(base166.str()) != string::npos)
+                        anyConstantBase = true;
+                }
+            CHECK(allExact,
+                  "#W56-B D2 K equals the seat's life minus the magnitude at every life 34..1, both magnitudes");
+            CHECK(!anyConstantBase,
+                  "#W56-B D2 NEGATIVE no row implies the corpus's constant base of 166 (at 164 / at 165)");
+        }
+        CHECK(damagePlayerVerdict(2, 20, false)
+              == " {right now: takes 2 damage - they would be at 18}",
+              "#W56-B D2 `130v152` seq 6's row, at the life its CURRENT SITUATION block printed");
+        CHECK(damagePlayerVerdict(2, 20, false).find("at 164") == string::npos
+              && damagePlayerVerdict(1, 20, false).find("at 165") == string::npos,
+              "#W56-B D2 NEGATIVE the two corpus values are unreachable from a live seat's life");
+        CHECK(damagePlayerVerdict(2, 2, false).find("THIS WINS THE GAME") != string::npos,
+              "#W56-B D2 a lethal FACE row is reachable from an ability menu once the life is real");
+        CHECK(stripNarrationDecoration("Deal 2 damage with Pyrite Spellbomb targeting the opponent"
+                                       + damagePlayerVerdict(2, 20, false))
+              == "Deal 2 damage with Pyrite Spellbomb targeting the opponent",
+              "#W56-B D2 echo: the priced ability row narrates without its decision-time verdict");
+
+        // ---- D6: the incoming-combat total. `125v146` seq 32/35-41.
+        CHECK(incomingCombatLine(3, 11, 10, false, 0, 0)
+              == "INCOMING THIS COMBAT: 3 attackers, 11 unblocked damage - you would be at -1; this KILLS you",
+              "#W56-B D6 the window that killed the creatureless seat, priced");
+        CHECK(incomingCombatLine(1, 2, 20, false, 0, 0)
+              == "INCOMING THIS COMBAT: 1 attacker, 2 unblocked damage - you would be at 18",
+              "#W56-B D6 the singular reads 'attacker' and a survivable total carries no death claim");
+        CHECK(incomingCombatLine(1, 2, 20, false, 0, 0).find("KILLS") == string::npos,
+              "#W56-B D6 NEGATIVE no lethal claim while the subtraction is positive");
+        CHECK(incomingCombatLine(0, 0, 10, true, 0, 0).empty(),
+              "#W56-B D6 NEGATIVE no attackers declared, no line at all");
+        CHECK(incomingCombatLine(3, 11, 10, true, 1, 4)
+              == "INCOMING THIS COMBAT: 3 attackers, 11 unblocked damage - you would be at -1;"
+                 " this KILLS you (of that, 4 from 1 attacker none of your creatures can block)",
+              "#W56-B D6 with bodies, the unblockable half is split out and counted");
+        CHECK(incomingCombatLine(2, 5, 9, true, 0, 0)
+              .find("(your creatures may legally block every attacker in that total)") != string::npos,
+              "#W56-B D6 with bodies and nothing evasive, the split says so rather than staying silent");
+        CHECK(incomingCombatLine(3, 11, 10, false, 0, 0).find('[') == string::npos
+              && incomingCombatLine(3, 11, 10, false, 0, 0).find('{') == string::npos,
+              "#W56-B D6 NEGATIVE the line is a board fact, not a bracketed/braced option annotation");
+
+        // ---- D10: their open mana, as a number. `152v125`'s eight countered spells.
+        CHECK(opponentOpenManaLine(5, "{u}{w}")
+              == "Their untapped sources: 5 (colours they could make: {u}{w})",
+              "#W56-B D10 the count leads and the colour set is a named sub-clause, as our own line does");
+        CHECK(opponentOpenManaLine(0, "") == "Their untapped sources: 0",
+              "#W56-B D10 a tapped-out opponent is stated as 0 - the fact a counterspell window turns on");
+        CHECK(opponentOpenManaLine(0, "{u}").find("colours") == string::npos,
+              "#W56-B D10 NEGATIVE no colour clause is printed for a seat with no untapped source");
+        CHECK(opponentOpenManaLine(5, "").find("(") == string::npos,
+              "#W56-B D10 NEGATIVE an unknown colour set prints no empty parenthesis");
+
+        // ---- D9: the edict tie's quantifier is covered in the #W51-D block above.
+
+        // ---- D13: the blocking-trigger gain leaves the survival verdict, and the
+        // block's standing cost is stated. `126v146` seq 6 / seq 16.
+        {
+            //value-initialized: every field of the aggregate is zeroed before use
+            CombatTradeStat wall = CombatTradeStat(); //Pride Guardian 0/3 + Perimeter Captain's trigger
+            wall.power = 0; wall.toughness = 3; wall.blockLife = 3; wall.blockLifeMay = 2;
+            CombatTradeStat atk = CombatTradeStat(); //a 1/1 first strike + deathtouch
+            atk.power = 1; atk.toughness = 1; atk.deathtouch = true; atk.firststrike = true;
+            const string nested = combatTradePreviewStats(wall, atk);
+            CHECK(nested.find("(blocking trigger: you gain 3 and may gain 2 more)") != string::npos,
+                  "#W56-B D13 the default (no out-params) form is byte-identical to wave 55 - nothing else moves");
+            string trig;
+            bool dies = false;
+            const string split = combatTradePreviewStats(wall, atk, kPreventNone, kPreventNone,
+                                                         kPreventNone, false, -1, false,
+                                                         &trig, &dies);
+            CHECK(split.find("blocking trigger") == string::npos,
+                  "#W56-B D13 the gain is no longer nested inside the survival verdict");
+            CHECK(split.find("your blocker dies, attacker lives") != string::npos && dies,
+                  "#W56-B D13 the verdict itself is unchanged and the blocker's death is reported to the caller");
+            CHECK(trig == "blocking trigger, this combat: you gain 3 and may gain 2 more",
+                  "#W56-B D13 the gain comes back as its own annotation, scoped to this combat");
+            CHECK(afterCombatBlockerCostText(2)
+                  == "after this combat: you control 1 fewer blocker - 2 available now, 1 if this one dies here",
+                  "#W56-B D13 the third number: the body the seat stops owning");
+            CHECK(afterCombatBlockerCostText(0) == "after this combat: you control 1 fewer blocker",
+                  "#W56-B D13 with no counted bodies the claim stays at what is provable");
+            CombatTradeStat plain = CombatTradeStat();
+            plain.power = 2; plain.toughness = 2;
+            string noTrig;
+            bool noDeath = false;
+            combatTradePreviewStats(plain, plain, kPreventNone, kPreventNone, kPreventNone,
+                                    false, -1, false, &noTrig, &noDeath);
+            CHECK(noTrig.empty() && noDeath,
+                  "#W56-B D13 NEGATIVE a blocker with no trigger yields no annotation; a trade still reports the death");
+            CombatTradeStat big = CombatTradeStat();
+            big.power = 5; big.toughness = 5;
+            CombatTradeStat small = CombatTradeStat();
+            small.power = 1; small.toughness = 1;
+            string t2;
+            bool d2 = true;
+            combatTradePreviewStats(big, small, kPreventNone, kPreventNone, kPreventNone,
+                                    false, -1, false, &t2, &d2);
+            CHECK(!d2,
+                  "#W56-B D13 NEGATIVE a surviving blocker is not charged the standing cost");
+            {
+                //echo shape: a B-line carrying both new brace annotations still
+                //parses to the same assignment, and neither annotation reaches history.
+                const string bline = "B1. Pride Guardian (0/3) [defender] - may block A1"
+                                     " (your blocker dies, attacker lives) {" + trig + "} {"
+                                     + afterCombatBlockerCostText(2) + "}";
+                vector<int> outB;
+                int n = parseBlockAssignments("BLOCKS: B1:A1", 1, 1, outB);
+                CHECK(n == 1 && !outB.empty() && outB[0] == 1,
+                      "#W56-B D13 echo: the assignment the annotated B-line offers still parses");
+                //(the [defender] tag is a bracket and has always stripped too)
+                CHECK(stripNarrationDecoration(bline)
+                      == "B1. Pride Guardian (0/3) - may block A1 (your blocker dies, attacker lives)",
+                      "#W56-B D13 echo: both new annotations are decision-time and stay out of history");
+            }
+        }
+
+        // ---- D14: the equipment cast row. `123v130` seq 11, fifth corpus.
+        CHECK(equipmentCastPriceTag(true, 0, false)
+              == " {right now: you control 0 creatures - this equips nothing}",
+              "#W56-B D14 Lightning Greaves at zero own creatures, priced like every sibling rung");
+        CHECK(equipmentCastPriceTag(true, 1, false).empty(),
+              "#W56-B D14 NEGATIVE with a creature to equip the row is untouched");
+        CHECK(equipmentCastPriceTag(false, 0, false).empty(),
+              "#W56-B D14 NEGATIVE a non-equipment cast row is untouched");
+        CHECK(equipmentCastPriceTag(true, 0, true).empty(),
+              "#W56-B D14 NEGATIVE a living-weapon equipment brings its own body: the claim would be false, so it is not made");
+        CHECK(stripNarrationDecoration("Cast Lightning Greaves {2}"
+                                       + equipmentCastPriceTag(true, 0, false))
+              == "Cast Lightning Greaves {2}",
+              "#W56-B D14 echo: the verdict is decision-time and never enters history");
+
+        // ---- D15: two rows, one card, two prices, one verdict. `123v152` seq 104.
+        {
+            CHECK(duplicateEffectTag(1, 2) == " {same effect as row 1, for 2 more mana}",
+                  "#W56-B D15 the dearer row points at the cheaper one and names the difference");
+            CHECK(duplicateEffectTag(0, 2).empty() && duplicateEffectTag(1, 0).empty(),
+                  "#W56-B D15 NEGATIVE no row to point at, or no price difference, no tag");
+            const string verdict = " {right now: destroys 1 of their creature, 5 of yours}";
+            std::vector<string> rows;
+            std::vector<string> names;
+            std::vector<int> costs;
+            rows.push_back("Cast Damnation {2}{b}{b}" + verdict);
+            names.push_back("Damnation");
+            costs.push_back(4);
+            rows.push_back("Cast Cancel {1}{u}{u} {right now: nothing on the stack}");
+            names.push_back("Cancel");
+            costs.push_back(3);
+            rows.push_back("Cast Damnation {4}{b}{b} [from exile]" + verdict);
+            names.push_back("Damnation");
+            costs.push_back(6);
+            applyDuplicateEffectTags(rows, names, costs);
+            CHECK(rows[2] == "Cast Damnation {4}{b}{b} [from exile]" + verdict
+                             + " {same effect as row 1, for 2 more mana}",
+                  "#W56-B D15 seq 104's exile row is marked against the hand row it duplicates");
+            CHECK(rows[0].find("same effect") == string::npos,
+                  "#W56-B D15 NEGATIVE the CHEAPER row is never marked");
+            CHECK(rows[1].find("same effect") == string::npos,
+                  "#W56-B D15 NEGATIVE a row naming a different card is never marked");
+            {
+                //must NOT match: same card, same price -> no comparison to make.
+                std::vector<string> r2;
+                std::vector<string> n2;
+                std::vector<int> c2;
+                r2.push_back("Cast Damnation {2}{b}{b}" + verdict);
+                n2.push_back("Damnation");
+                c2.push_back(4);
+                r2.push_back("Cast Damnation {2}{b}{b}" + verdict);
+                n2.push_back("Damnation");
+                c2.push_back(4);
+                applyDuplicateEffectTags(r2, n2, c2);
+                CHECK(r2[0].find("same effect") == string::npos
+                      && r2[1].find("same effect") == string::npos,
+                      "#W56-B D15 NEGATIVE two rows at the SAME price are not a cheaper/dearer pair");
+            }
+            {
+                //must NOT match: same card and price gap, but the verdicts differ,
+                //so "same effect" would be an inference and is not claimed.
+                std::vector<string> r3;
+                std::vector<string> n3;
+                std::vector<int> c3;
+                r3.push_back("Cast Damnation {2}{b}{b} {right now: destroys 1 of their creature, 5 of yours}");
+                n3.push_back("Damnation");
+                c3.push_back(4);
+                r3.push_back("Cast Damnation {4}{b}{b} {right now: destroys 2 of their creature, 5 of yours}");
+                n3.push_back("Damnation");
+                c3.push_back(6);
+                applyDuplicateEffectTags(r3, n3, c3);
+                CHECK(r3[1].find("same effect") == string::npos,
+                      "#W56-B D15 NEGATIVE different verdicts are not the same effect");
+                //and a row with NO verdict is never compared at all
+                std::vector<string> r4;
+                std::vector<string> n4;
+                std::vector<int> c4;
+                r4.push_back("Cast Damnation {2}{b}{b}");
+                n4.push_back("Damnation");
+                c4.push_back(4);
+                r4.push_back("Cast Damnation {4}{b}{b}");
+                n4.push_back("Damnation");
+                c4.push_back(6);
+                applyDuplicateEffectTags(r4, n4, c4);
+                CHECK(r4[1].find("same effect") == string::npos,
+                      "#W56-B D15 NEGATIVE with no verdict on either row nothing is asserted");
+                //an {X} row's cost is unknown at this seam and is never compared
+                std::vector<string> r5;
+                std::vector<string> n5;
+                std::vector<int> c5;
+                r5.push_back("Cast Fireball {x}{r}" + verdict);
+                n5.push_back("Fireball");
+                c5.push_back(-1);
+                r5.push_back("Cast Fireball {x}{r}{r}" + verdict);
+                n5.push_back("Fireball");
+                c5.push_back(-1);
+                applyDuplicateEffectTags(r5, n5, c5);
+                CHECK(r5[1].find("same effect") == string::npos,
+                      "#W56-B D15 NEGATIVE an unpriceable {X} row is not compared");
+            }
+            CHECK(rowVerdictClause("Cast Damnation {4}{b}{b} {right now: kills {b} things} tail")
+                  == "{right now: kills {b} things}",
+                  "#W56-B D15 the verdict extractor is brace-balanced: a mana symbol inside does not truncate it");
+            CHECK(rowVerdictClause("Cast Cancel {1}{u}{u}").empty(),
+                  "#W56-B D15 NEGATIVE a row with no verdict yields no clause");
+            {
+                //echo shape: the tagged row still binds when the reply parrots it,
+                //and the tag never enters history.
+                std::vector<string> menu;
+                menu.push_back("Cast Damnation {2}{b}{b}" + verdict);
+                menu.push_back("Cast Damnation {4}{b}{b} [from exile]" + verdict
+                               + " {same effect as row 1, for 2 more mana}");
+                bool stale = false;
+                string src;
+                int pick = parseChoice("CHOICE: 2 (Cast Damnation {4}{b}{b} [from exile]"
+                                       + verdict + " {same effect as row 1, for 2 more mana})",
+                                       2, &menu, &stale, &src);
+                CHECK(pick == 2 && !stale,
+                      "#W56-B D15 echo: a reply copying the tagged row binds to it");
+                CHECK(stripNarrationDecoration("Cast Damnation {4}{b}{b}"
+                                               + duplicateEffectTag(1, 2))
+                      == "Cast Damnation {4}{b}{b}",
+                      "#W56-B D15 echo: the comparison is decision-time and stays out of history");
+            }
         }
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

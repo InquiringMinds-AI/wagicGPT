@@ -1198,6 +1198,52 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertabilityseat ") == 0)
+    {
+        //#W56-B (D2, wave-55 ledger HIGH): the ability row's life total was
+        //read off AIAction::player on an action built by the PLAYER-ABILITY
+        //ctor, which never initialized that field - so 238 of the corpus's 248
+        //`they would be at K` rows computed K from whatever the stack slot
+        //held (a constant base of 166, at every real opponent life from 34 down
+        //to 1). This pins the RESOLUTION against a real Player: build the same
+        //action the seam builds and require it to answer with the live seat and
+        //that seat's own life. Syntax: assertabilityseat <life> <card name>.
+        string rest = action.substr(18);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.c_str());
+        string cname = (sp == string::npos) ? "" : rest.substr(sp + 1);
+        MTGCardInstance * ac = getCard(cname);
+        Player * seat = (ac && ac->controller()) ? ac->controller()->opponent() : NULL;
+        if (!ac || !seat)
+        {
+            std::cerr << "TESTSUITE assertabilityseat: no card '" << cname
+                      << "' with a controller and an opponent [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //The ability the row would describe, when the card has one; the
+        //resolution under test does not depend on it, and a card with no
+        //activated ability still exercises the ctor that lost the seat.
+        MTGAbility * chosen = NULL;
+        ActionLayer * al = observer->mLayers->actionLayer();
+        for (size_t i = 1; al && i < al->mObjects.size() && !chosen; i++)
+        {
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility *>((MTGAbility *) al->mObjects[i]);
+            if (aa && aa->source == ac)
+                chosen = aa;
+        }
+        OrderedAIAction probe(NULL, chosen, seat, ac);
+        Player * got = probe.targetedSeat();
+        if (got != seat || probe.player != NULL || got->life != expect)
+        {
+            std::cerr << "TESTSUITE assertabilityseat: '" << cname << "' resolved seat "
+                      << (got == seat ? "OK" : "WRONG") << ", spell-target field "
+                      << (probe.player ? "NOT NULL (indeterminate)" : "NULL")
+                      << ", life expected " << expect << " got "
+                      << (got ? got->life : -1) << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
     {
         //W48: pin the DISPLAY/oracle predicates the human borders read

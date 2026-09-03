@@ -55,10 +55,21 @@ public:
     {
     };
 
+    //#W56-B (D2): `player` was left INDETERMINATE by this ctor - the only one
+    //that builds a player-targeting ABILITY action - so every consumer that
+    //read `player` before `playerAbilityTarget` read garbage. The GPT ability
+    //row did exactly that and printed a life total computed from a constant
+    //base of 166 on 238 of 248 rows (wave-55 ledger D2). Initialize it, and
+    //resolve the seat through targetedSeat() below.
     AIAction(AIPlayer * owner, MTGAbility * a, Player * p, MTGCardInstance * c)//player targeting through abilities.
-        : owner(owner), ability(a), click(c),target(NULL), playerAbilityTarget(p)
+        : owner(owner), ability(a), player(NULL), click(c),target(NULL), playerAbilityTarget(p)
     {
     };
+    //#W56-B (D2): the ONE resolution of "which player is this action aimed at".
+    //An ability action carries it in playerAbilityTarget, a spell action in
+    //player; every consumer (the GPT render, the suite pin) asks here so the
+    //two can never disagree. NULL when the action targets no player.
+    Player * targetedSeat() const;
     int Act();
     int clickMultiAct(vector<Targetable*>&actionTargets);
 };
