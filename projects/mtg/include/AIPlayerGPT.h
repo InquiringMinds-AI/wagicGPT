@@ -1174,7 +1174,15 @@ private:
     //casting Tribute to Hunger as there are no creatures to target."). The
     //pair is a STAMP only - no re-ask, no suppression: whether it should ever
     //narrow a choice is a decision for after the count exists. Pure.
+public:
+    //#W57-C (D8/D12): PUBLIC because the zero-predicate is now the shared
+    //definition of "dead" across three surfaces - the cast row that computes
+    //it, the discard row that re-badges its verdict into the same family, and
+    //the menu-level header that fires only when every cast row carries one.
+    //Two surfaces that disagree about what "dead" means are the exact asymmetry
+    //D8 was filed against, so they read ONE function.
     static bool rowSaysNoOp(const string& row);
+private:
     static bool planArguesAgainstRow(const string& reply, const string& row);
     //#W54-F (D7b): an engine-answered decision (no prompt, no reply, nothing
     //executed) has no class of its own and so was invisible to the recovery
