@@ -31,6 +31,8 @@ static inline bool w54gLegacyBehavior()
     }
     return cached == 1;
 }
+//#W54-H: WAGIC_W54H_LEGACY=1 restores every-tick condition polling (defined in MTGAbility.cpp).
+bool w54hLegacyBehavior();
 #include "GameObserver.h"
 #include "Subtypes.h"
 #include "ThisDescriptor.h"
@@ -3679,23 +3681,35 @@ public:
 
     void Update(float dt)
     {
-        ListMaintainerAbility::Update(dt);
+        //#W54-H (A6b/c): epoch-gated, and a single updateTargets per tick -
+        //SorterFunction runs it; added()/removed() are no-ops for this class,
+        //so the old first call only re-filled the list the second call then
+        //found unchanged.
+        if (w54hLegacyBehavior())
+            ListMaintainerAbility::Update(dt);
+        else if (!conditionEpochDue())
+            return;
         if(!ability->oneShot) {
             SorterFunction();
         }
     }
 
+    //#W54-H (L13): per player, SUM the matches across every zone the chooser
+    //can target. The old loop overwrote Value per zone, so `compare` only ever
+    //counted the LAST zone in the list (the sideboard) - a correctness bug
+    //hiding as dead work. Reset per player: the counts must not accumulate
+    //from player 0 into player 1.
     void findMatchingAmount()
     {
-        int Value = 0;
         for (int i = 0; i < 2; i++)
         {
+            int Value = 0;
             Player * p = game->players[i];
             MTGGameZone * zones[] = { p->game->inPlay, p->game->graveyard, p->game->hand, p->game->library, p->game->exile, p->game->commandzone, p->game->sideboard };
             for (int k = 0; k < 7; k++)
             {
                 MTGGameZone * zone = zones[k];
-                Value = zone->countByCanTarget(tc);
+                Value += zone->countByCanTarget(tc);
             }
             amount[i] = Value;
         }
@@ -4841,6 +4855,8 @@ public:
 
     void Update(float)
     {
+        if (!conditionEpochDue()) //#W54-H (A6b)
+            return;
         resolve();
     }
 
@@ -4937,6 +4953,8 @@ public:
 
     void Update(float)
     {
+        if (!conditionEpochDue()) //#W54-H (A6b)
+            return;
         resolve();
     }
 

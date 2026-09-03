@@ -1,0 +1,18 @@
+# W54-H (L13): negative pin - both libraries above twenty, no pump (4/8).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Isleback Spawn
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[DO]
+assertpt 4/8 Isleback Spawn
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Isleback Spawn
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[END]

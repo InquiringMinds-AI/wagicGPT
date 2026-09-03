@@ -226,6 +226,23 @@ class GameObserver{
   void enchantmentStatus();
   void Affinity();
   bool AffinityNeedsUpdate;
+  //#W54-H (A6b): the change epoch that gates the per-tick condition
+  //machinery (lord/foreach/aslongas list maintainers, this(...) /
+  //thisforeach(...) wrappers). Bumped by every game event except the
+  //per-tick WEventGameStateBasedChecked marker, by every ability add/remove
+  //in the action layer, by every stack push/resolve, by a phase change, by
+  //ActionLayer::stuffHappened (clicks, harness pokes) and by the card
+  //type-change sites that raise mPropertiesChangedSinceLastUpdate. An
+  //ability whose recorded epoch equals this one has nothing new to look at
+  //and skips its re-evaluation (MTGAbility::conditionEpochDue). It also
+  //re-arms the Affinity cost memo (L15), which the GSB-checked event used to
+  //defeat every tick. WAGIC_W54H_LEGACY=1 restores the per-tick polling.
+  unsigned int mAbilityEpoch;
+  void bumpAbilityEpoch()
+  {
+      ++mAbilityEpoch;
+      AffinityNeedsUpdate = true;
+  }
   void addObserver(MTGAbility * observer);
   bool removeObserver(ActionElement * observer);
   //Validate a possibly-stale MTGCardInstance pointer by POINTER COMPARISON

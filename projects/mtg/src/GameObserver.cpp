@@ -79,6 +79,7 @@ void GameObserver::cleanup()
     OpenedDisplay = NULL;
     mSettledPhase = -1; mSettledTurn = -1; mSettledStep = -1; mPhaseTicks = 0; //W53-DELVER
     AffinityNeedsUpdate = false;
+    mAbilityEpoch = 1; //#W54-H (A6b): never equals a fresh ability's 0
 }
 
 GameObserver::~GameObserver()
@@ -867,6 +868,7 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
 void GameObserver::addObserver(MTGAbility * observer)
 {
     mLayers->actionLayer()->Add(observer);
+    bumpAbilityEpoch(); //#W54-H (A6b): a new ability is a state change
 }
 
 //Returns true if the Ability was correctly removed from the game, false otherwise
@@ -1019,6 +1021,8 @@ void GameObserver::Update(float dt)
 #endif
     if(mLayers)
     {
+        if (oldGamePhase != mCurrentGamePhase)
+            bumpAbilityEpoch(); //#W54-H (A6b)
         mLayers->Update(dt, player);
         while (mLayers->actionLayer()->stuffHappened)
         {
@@ -1779,6 +1783,8 @@ void GameObserver::Affinity()
                 }
                 ///////////////////////
                 bool NewAffinityFound = false;
+                //#W54-H (L15): the memo gates everything below; test it first.
+                if (AffinityNeedsUpdate)
                 for (unsigned int na = 0; na < card->cardsAbilities.size(); na++)
                 {
                     if (!card->cardsAbilities[na])
@@ -1791,6 +1797,7 @@ void GameObserver::Affinity()
                 }
                 bool DoReduceIncrease = false;
                 if (
+                    AffinityNeedsUpdate &&
                     (card->has(Constants::AFFINITYARTIFACTS) ||
                     card->has(Constants::AFFINITYENCHANTMENTS) ||
                     card->has(Constants::AFFINITYFOREST) ||
@@ -1814,8 +1821,6 @@ void GameObserver::Affinity()
                     card->getIncreasedManaCost()->getConvertedCost() ||
                     card->getReducedManaCost()->getConvertedCost() ||
                     NewAffinityFound || checkAuraP)
-                    &&
-                    AffinityNeedsUpdate
                     )
                     DoReduceIncrease = true;
                 if (!DoReduceIncrease)
@@ -2406,6 +2411,10 @@ int GameObserver::receiveEvent(WEvent * e)
 {
     if (!e) 
         return 0;
+    //#W54-H (A6b/L15): every event but the per-tick GSB-checked marker is a
+    //state change - bump the epoch (which also re-arms the Affinity memo).
+    if (!dynamic_cast<WEventGameStateBasedChecked *>(e))
+        bumpAbilityEpoch();
     eventsQueue.push(e);
     if (eventsQueue.size() > 1) 
         return -1; //resolving events can generate more events
@@ -2421,7 +2430,8 @@ int GameObserver::receiveEvent(WEvent * e)
         SAFE_DELETE(ev);
         eventsQueue.pop();
     }
-    AffinityNeedsUpdate = true;
+    if (w54hLegacyBehavior())
+        AffinityNeedsUpdate = true; //#W54-H (L15): the old every-event re-arm
     return result;
 }
 

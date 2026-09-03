@@ -3359,17 +3359,27 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             bool maxiFound = false;
             bool compareZone = false;
 
+            //#W54-H (L13): `>=N` / `<=N` were read as atoi("=N") = 0, which turned
+            //Isleback Spawn's `<=20 compare` into "fewer than 0" - never active.
+            //The bounds below are strict (size > mini / size < maxi), so the
+            //inclusive forms widen by one.
             found = s.find(" >");
             if (found != string::npos)
             {
-                mini = atoi(s.substr(found + 2, 3).c_str());
+                if (found + 2 < s.size() && s[found + 2] == '=')
+                    mini = atoi(s.substr(found + 3, 3).c_str()) - 1;
+                else
+                    mini = atoi(s.substr(found + 2, 3).c_str());
                 miniFound = true;
             }
 
             found = s.find(" <");
             if (found != string::npos)
             {
-                maxi = atoi(s.substr(found + 2, 3).c_str());
+                if (found + 2 < s.size() && s[found + 2] == '=')
+                    maxi = atoi(s.substr(found + 3, 3).c_str()) + 1;
+                else
+                    maxi = atoi(s.substr(found + 2, 3).c_str());
                 maxiFound = true;
             }
             
@@ -7744,6 +7754,7 @@ MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
     oneShot = a.oneShot;
     forceDestroy = a.forceDestroy;
     forcedAlive = a.forcedAlive;
+    mConditionEpoch = 0; //#W54-H (A6b): a clone re-evaluates on its first tick
     canBeInterrupted = a.canBeInterrupted;
     clickableWhilePhased = a.clickableWhilePhased;
 
@@ -7781,6 +7792,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * card) :
     forceDestroy = 0;
     clickableWhilePhased = false;
     forcedAlive = 0;
+    mConditionEpoch = 0;
     oneShot = 0;
     canBeInterrupted = true;
     boundToMyTgt = false;
@@ -7798,6 +7810,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * _source
     forceDestroy = 0;
     clickableWhilePhased = false;
     forcedAlive = 0;
+    mConditionEpoch = 0;
     oneShot = 0;
     canBeInterrupted = true;
     boundToMyTgt = false;
@@ -7860,13 +7873,26 @@ int MTGAbility::testDestroy()
         return 0;
     if(forcedAlive == 1)
         return 0;
+    //#W54-H (A6d): exact reorder. The stack scan (linear over every stack
+    //entry of the turn, per ability, per tick) can only turn a 1 into a 0, so
+    //it runs only when the zone tests below would say 1 - the rare case.
+    //target == source is already known to be in play, no dynamic_cast needed.
+    //GameObserver::isInPlay, inlined: MTGGameZone::hasCard is a currentZone
+    //compare, and the three-call chain is a real call on every build (no LTO).
+    MTGGameZone * bf0 = game->players[0]->game->inPlay;
+    MTGGameZone * bf1 = game->players[1]->game->inPlay;
+    bool gone = !(source->currentZone == bf0 || source->currentZone == bf1);
+    if (!gone && target && target != source && !dynamic_cast<Player*>(target))
+    {
+        MTGGameZone * tz = ((MTGCardInstance *) target)->currentZone;
+        if (tz != bf0 && tz != bf1)
+            gone = true;
+    }
+    if (!gone)
+        return 0;
     if(game->mLayers->stackLayer()->has(this)) //Moved here to avoid a random crash (e.g. blasphemous act)
         return 0;
-    if(!game->isInPlay(source))
-        return 1;
-    if(target && !dynamic_cast<Player*>(target) && !game->isInPlay((MTGCardInstance *) target))
-        return 1;
-    return 0;
+    return 1;
 }
 
 int MTGAbility::fireAbility()
@@ -8014,9 +8040,8 @@ int ActivatedAbility::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
     limitPerTurn = 0;
     if(limit.size())
     {
-        WParsedInt * value = NEW WParsedInt(limit.c_str(),NULL,source);
-        limitPerTurn = value->getValue();
-        delete value;
+        WParsedInt value(limit, NULL, source); //#W54-H (A6a): stack, no per-poll heap churn
+        limitPerTurn = value.getValue();
         //only run this check if we have a valid limit string.
         //limits on uses are based on when the ability is used, not when it is resolved
         //incrementing of counters directly after the fireability()
@@ -8643,22 +8668,52 @@ bool ListMaintainerAbility::canTarget(MTGGameZone * zone)
     return false;
 }
 
+#include <algorithm> //#W54-H: std::sort in updateTargets
+//#W54-H: disable flag for the lane's output-affecting changes - the epoch
+//gate on condition re-evaluation (A6b), the single updateTargets per
+//AAsLongAs tick (A6c) and the Affinity memo re-arm (L15). WAGIC_W54H_LEGACY=1
+//(read once) restores every-tick polling. Everything else in the lane is an
+//exact rewrite with no output surface.
+bool w54hLegacyBehavior()
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char * v = getenv("WAGIC_W54H_LEGACY");
+        cached = (v && v[0] && v[0] != '0') ? 1 : 0;
+    }
+    return cached == 1;
+}
+
+bool MTGAbility::conditionEpochDue()
+{
+    if (!game)
+        return true;
+    if (!w54hLegacyBehavior() && mConditionEpoch == game->mAbilityEpoch)
+        return false;
+    mConditionEpoch = game->mAbilityEpoch;
+    return true;
+}
+
 void ListMaintainerAbility::updateTargets()
 {
+    //#W54-H (A6c): the two scratch maps are vectors; iteration order is kept
+    //identical to the map's (pointer order) by walking `cards` in order and
+    //sorting the additions, so added()/removed() fire in the same sequence.
     //remove invalid ones
-    map<MTGCardInstance *, bool> temp;
+    vector<MTGCardInstance *> temp;
     for (map<MTGCardInstance *, bool>::iterator it = cards.begin(); it != cards.end(); ++it)
     {
         MTGCardInstance * card = (*it).first;
         if (!canBeInList(card) || card->mPropertiesChangedSinceLastUpdate)
         {
-            temp[card] = true;
+            temp.push_back(card);
         }
     }
 
-    for (map<MTGCardInstance *, bool>::iterator it = temp.begin(); it != temp.end(); ++it)
+    for (size_t t = 0; t < temp.size(); ++t)
     {
-        MTGCardInstance * card = (*it).first;
+        MTGCardInstance * card = temp[t];
         cards.erase(card);
         if(!card->mutation) // Fix crash on mutating card...
             removed(card);
@@ -8681,7 +8736,7 @@ void ListMaintainerAbility::updateTargets()
                     {
                         if (cards.find(card) == cards.end())
                         {
-                            temp[card] = true;
+                            temp.push_back(card);
                         }
                     }
                 }
@@ -8689,9 +8744,12 @@ void ListMaintainerAbility::updateTargets()
         }
     }
 
-    for (map<MTGCardInstance *, bool>::iterator it = temp.begin(); it != temp.end(); ++it)
+    std::sort(temp.begin(), temp.end());
+    for (size_t t = 0; t < temp.size(); ++t)
     {
-        MTGCardInstance * card = (*it).first;
+        MTGCardInstance * card = temp[t];
+        if (t && temp[t - 1] == card)
+            continue; //a card can only sit in one zone, but stay exact with the map
         cards[card] = true;
         added(card);
     }
@@ -8769,6 +8827,8 @@ void ListMaintainerAbility::checkTargets()
 
 void ListMaintainerAbility::Update(float)
 {
+    if (!conditionEpochDue()) //#W54-H (A6b)
+        return;
     updateTargets();
 }
 

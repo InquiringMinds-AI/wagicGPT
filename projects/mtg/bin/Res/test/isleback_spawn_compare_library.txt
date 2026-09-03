@@ -1,0 +1,20 @@
+# W54-H (L13): AAsLongAs::findMatchingAmount summed only the LAST zone and the
+# parser read "<=20" as 0, so Isleback Spawn's "+4/+8 as long as a library has
+# twenty or fewer cards" never applied. P1 library = 20 -> pumped to 8/16.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Isleback Spawn
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[DO]
+assertpt 8/16 Isleback Spawn
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Isleback Spawn
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+[END]

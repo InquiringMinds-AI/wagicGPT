@@ -757,11 +757,8 @@ ThisVariable::ThisVariable(int comp,string _vWord)
 
 int ThisVariable::match(MTGCardInstance * card)
 {
-    int result = 0;
-    WParsedInt * res = NEW WParsedInt(vWord,NULL,card);
-    result = res->getValue();
-    SAFE_DELETE(res);
-    return matchValue(result);
+    WParsedInt res(vWord, NULL, card); //#W54-H (A26): stack, no per-evaluation heap churn
+    return matchValue(res.getValue());
 }
 
 ThisVariable * ThisVariable::clone() const 
