@@ -4251,9 +4251,10 @@ static string mdfcSpellLandBackNote(const string& curFace, const string& otherNa
     if (!otherMana.empty())
         s += " (taps for " + otherMana + ")";
     s += ". A land is never CAST, so that face will NOT appear in the Cast menu -"
-         " not at any cost and not as an alternative-cost cast. Flipping only"
-         " changes which face is DISPLAYED: it casts nothing, uses no stack, and"
-         " gains you nothing playable. Use the face that is showing.";
+         " not at any cost and not as an alternative-cost cast. You do not need"
+         " this toggle either: a separate row named \"" + otherName + "\" plays"
+         " that face as a land straight from your hand (no mana, no stack, one"
+         " land drop). Flipping only changes which face is DISPLAYED.";
     return s;
 }
 
@@ -13876,6 +13877,48 @@ static AATurnSide * asTurnSide(MTGAbility * a)
     return NULL;
 }
 
+//#W56-D (D8): the `{0}` HAND ability that puts a modal double-faced card's LAND
+//back face onto the battlefield (script `... flip(<back>) forcetype(land)`).
+//Like the Flip Side toggle it reaches the seat wrapped in a cost-bearing
+//GenericActivatedAbility, so unwrap one NestedAbility layer. `forcetype ==
+//"land"` is the engine's OWN discriminator: every other AAFlip (transform,
+//copy, unmorph, back-from-copy) leaves it empty.
+static AAFlip * asMdfcLandPlay(MTGAbility * a)
+{
+    if (!a)
+        return NULL;
+    AAFlip * f = dynamic_cast<AAFlip *>(a);
+    if (!f)
+        if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+            f = dynamic_cast<AAFlip *>(na->ability);
+    if (f && f->forcetype == "land")
+        return f;
+    return NULL;
+}
+
+//#W56-D (D8): what that row DOES, in one place for both emitters (the priority
+//seam's describeAction row and the CHOOSE_MENU option tail) so the two cannot
+//drift - the reason three Flip-Side texts had to be corrected one wave at a
+//time. The engine gives the row only the back face's NAME as its menu text,
+//which says nothing about playing a land; deck146 held two Emeria's Calls for
+//nine turns at 2-3 lands and lost 19 -> 0 with the land face never offered at
+//all (corpus 20260830 146v130 seq 22/23/24). Pure, so PARSETEST proves it.
+static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
+                                 const string& frontName)
+{
+    string s = " -> PLAY THIS AS A LAND: puts \"" + backName + "\" onto the"
+               " battlefield as a land";
+    if (!backMana.empty())
+        s += " (taps for " + backMana + ")";
+    s += ". It costs no mana and uses no stack, and it USES YOUR LAND DROP for"
+         " this turn";
+    if (!frontName.empty())
+        s += ", so \"" + frontName + "\" leaves your hand with it and that face"
+             " can no longer be cast";
+    s += ".";
+    return s;
+}
+
 //#W49-U D6 (b): the cards an ACTIVATION draws for its controller, read off
 //the ability object (an AADrawer, possibly one NestedAbility layer down - a
 //cost-bearing GenericActivatedAbility wraps it). 0 when it is not a drawer,
@@ -16459,6 +16502,38 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         out << " with " << action.click->getDisplayName() << instanceHandle(action.click);
     }
 
+    //#W56-D (D8): the modal-DFC LAND back face, played straight from hand.
+    //The primitives gated this `{0}` hand entry behind
+    //`compare(isflipped)~equalto~1` - a state only the display toggle sets - so
+    //the row did not exist and the land face was unreachable from any seat.
+    //The gate is gone (55 MDFC lands in borderline.txt); annotate the row.
+    if (AAFlip * mlp = asMdfcLandPlay(action.ability))
+    {
+        MTGCardInstance * fc = action.click ? action.click : mlp->source;
+        string backName = mlp->flipStats;
+        if (fc && !backName.empty())
+        {
+            string backMana;
+            //flipStats is the LOWERCASED script token; the pilot reads the back
+            //face's name off the decklist, so print the collection's casing when
+            //the card resolves (live probe 20260903: the row headed "agadeem,
+            //the undercrypt", which matches nothing the decklist prints).
+            if (MTGCard * bc = MTGCollection()->getCardByName(backName, fc->setId))
+                if (bc->data)
+                {
+                    backMana = landTapMana(bc->data->text);
+                    if (!bc->data->name.empty())
+                        backName = bc->data->name;
+                }
+            //A Pathway's FRONT face is a land too, so nothing castable is
+            //lost and the "can no longer be cast" clause would be nonsense
+            //about a land (live probe 20260903 printed it on Hengegate
+            //Pathway). Only a spell front face names itself here.
+            out << mdfcLandPlayRowTag(backName, backMana,
+                                      fc->isLand() ? string() : fc->getDisplayName());
+        }
+    }
+
     //Kaldheim-style modal DFC in hand (R-DFC-FLIP, deck102 wave-22): the
     //engine surfaces a double-faced card ONLY as a repeatable "Flip Side"
     //pseudo-action that toggles which face the hand card presents - it casts
@@ -16493,17 +16568,13 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 {
                     //N-152a: a modal-DFC LAND (Pathway class). The old "you do
                     //not need it, the Cast menu lists every face" text was a LIE
-                    //here (a land has no Cast menu). Name both faces + colors so
-                    //the pilot at least knows the other color exists - but be
-                    //HONEST about the engine limitation: verified live (deck199
-                    //probe) that flipping DOES swap the hand card's displayed
-                    //face, yet the flipped back face then FAILS to enter (the
-                    //land-drop offers "Play <back>" but the put-into-play
-                    //defers - the front-face isflipped==0 play-restriction
-                    //blocks the normal drop once flipped, and the engine's
-                    //autohand play path is not reachable from the AI land seam).
-                    //So flipping gains NOTHING playable; do not send the model
-                    //into a flip-then-fail loop. Display-only, stated plainly.
+                    //here (a land has no Cast menu), and its replacement - "only
+                    //the currently-shown face can actually be played as a land" -
+                    //became a lie in turn once #W56-D (D8) removed the primitives'
+                    //isflipped gate: BOTH faces now have their own row in this
+                    //same window, the front through the normal land drop and the
+                    //back through its `{0}` flip-into-play entry. Say that; the
+                    //toggle is still unnecessary, but it is no longer the reason.
                     string thisMana = landTapMana(fc->text);
                     string otherMana = landTapMana(oc->data->text);
                     out << " -> DISPLAY TOGGLE only (this is a modal double-faced"
@@ -16514,10 +16585,13 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     if (!otherMana.empty())
                         out << " (taps for " << otherMana << ")";
                     out << ". Flipping only changes which face is DISPLAYED - it"
-                           " casts nothing, uses no stack, and gains you nothing"
-                           " playable: in this engine only the currently-shown"
-                           " face can actually be played as a land. Just play the"
-                           " current face.";
+                           " casts nothing and uses no stack, and you do not need"
+                           " it: BOTH faces are offered as their own rows in this"
+                           " same window - the play-land row puts \""
+                        << fc->getDisplayName() << "\" onto the battlefield, and a"
+                           " row named \"" << otherName << "\" puts that face onto"
+                           " the battlefield as a land instead. Either row is one"
+                           " land drop.";
                 }
                 else if (isTransformDfc)
                 {
@@ -22647,12 +22721,12 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //LAND play menu (defaultPlayName is "Play Land" only for a land). deck152
     //N-152a: the old "the Cast menu offers the other face" text was a LIE here
     //(a land has no Cast menu). Name both faces + colors so the pilot knows the
-    //other color exists - but be HONEST: verified live (deck199 probe) that
-    //flipping swaps the DISPLAYED face yet the flipped back face then FAILS to
-    //enter (the land-drop offers "Play <back>" but the put-into-play defers -
-    //the front-face isflipped==0 restriction blocks the normal drop once
-    //flipped). So flipping gains nothing PLAYABLE; do not steer the model into a
-    //flip-then-fail loop. The non-land (spell) DFC keeps the true-no-op text.
+    //other color exists. #W56-D (D8): its successor claim - "only the
+    //currently-shown face can actually be played as a land" - is retired with
+    //the primitives' isflipped gate; the back face now has its OWN row on this
+    //same menu (the `{0}` flip-into-play entry), annotated just below. The
+    //toggle is still unnecessary, but for the opposite reason. The non-land
+    //(spell) DFC keeps the true-no-op text.
     bool landFaceMenu = false;
     for (size_t i = 0; i < opts.size() && !landFaceMenu; i++)
         if (opts[i] == "Play Land")
@@ -22685,9 +22759,10 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 if (!othMana.empty())
                     opts[i] += " (taps for " + othMana + ")";
                 opts[i] += ". Flipping only changes which face is DISPLAYED; it casts"
-                           " nothing and gains nothing playable - in this engine only the"
-                           " currently-shown face can actually be played as a land. Choose"
-                           " Play Land to play the current face.]";
+                           " nothing and uses no stack, and you do not need it: \"Play"
+                           " Land\" plays the face shown and the row named \"" + othFace
+                         + "\" plays that face as a land instead. Either row is one land"
+                           " drop.]";
             }
             //N-152e sibling path (the path-scoped sweep): the CHOOSE_MENU seat
             //carried the SAME false "the Cast menu offers the other face as an
@@ -22711,6 +22786,45 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                            " is where you cast, and it offers the other face as an"
                            " alternative-cost cast - you do not need this.]";
         }
+    //#W56-D (D8): the OTHER row on that same click menu - the `{0}` entry that
+    //puts the card's LAND back face onto the battlefield. The engine labels it
+    //with nothing but the back face's NAME, which reads like a card reference
+    //rather than a land drop; deck146 never took it because it was never
+    //offered at all (the primitives' isflipped gate), and once offered a bare
+    //name is not enough to act on. Same pure tag as the priority seam's row, in
+    //the bracket form every other menu tail uses. Append-only: the answer index
+    //and the req.optionTexts staleness key are untouched. This branch is
+    //independent of the Pathway "Play Land" shape above - a modal-DFC SPELL
+    //with a land back face (Emeria's Call) has no Play Land row at all.
+    if (ctx)
+    {
+        string landBack = dfcOtherFaceName(ctx->text), landBackMana;
+        if (!landBack.empty())
+        {
+            MTGCard * lbc = MTGCollection()->getCardByName(landBack, ctx->setId);
+            if (lbc && lbc->data && lbc->data->isLand())
+                landBackMana = landTapMana(lbc->data->text);
+            else
+                landBack = "";
+        }
+        if (!landBack.empty())
+            for (size_t i = 0; i < opts.size(); i++)
+            {
+                //the engine's menu label for this row is the SCRIPT token, which
+                //is lowercased; dfcOtherFaceName reads the printed `text=` line
+                //and is not. Compare case-insensitively or the tail never fires.
+                string raw = (req.optionTexts.size() > i) ? req.optionTexts[i] : opts[i];
+                string lraw = raw, lback = landBack;
+                std::transform(lraw.begin(), lraw.end(), lraw.begin(), ::tolower);
+                std::transform(lback.begin(), lback.end(), lback.begin(), ::tolower);
+                if (lraw != lback)
+                    continue;
+                opts[i] += " ["
+                    + mdfcLandPlayRowTag(landBack, landBackMana,
+                                         ctx->isLand() ? string() : ctx->getDisplayName()).substr(4)
+                    + "]";
+            }
+    }
     //#W47 R2: the cast-mode menu ("Cast Card Normally" beside one or more
     //alternative/hand paths). Give every row its own cost and its own printed
     //text, read off the card itself - see castModeRowTag above for the two lost
@@ -29499,20 +29613,37 @@ void AIPlayerGPT::runParseSelfTest()
         // to their indices under the exact tail shape the code emits.
         vector<string> landMenu;
         landMenu.push_back("Play Land");
+        //#W56-D (D8): the tail's second half is re-worded - the back face IS
+        //playable now, from its own row - so the fixture carries the CURRENT
+        //string. The echo-binding property under test is unchanged.
         landMenu.push_back("Flip Side [DISPLAY TOGGLE only - this is a modal double-faced land."
                            " It currently shows \"Branchloft Pathway\" (taps for {G}); its other"
                            " face is \"Boulderloft Pathway\" (taps for {W}). Flipping only changes"
-                           " which face is DISPLAYED; it casts nothing and gains nothing playable -"
-                           " in this engine only the currently-shown face can actually be played as"
-                           " a land. Choose Play Land to play the current face.]");
+                           " which face is DISPLAYED; it casts nothing and uses no stack, and you"
+                           " do not need it: \"Play Land\" plays the face shown and the row named"
+                           " \"Boulderloft Pathway\" plays that face as a land instead. Either row"
+                           " is one land drop.]");
+        landMenu.push_back("Boulderloft Pathway ["
+                           + mdfcLandPlayRowTag("Boulderloft Pathway", "{W}",
+                                                "Branchloft Pathway").substr(4) + "]");
         landMenu.push_back("Decline - do nothing");
         bool sfl = false;
-        int cfl = parseChoice("2 (Flip Side)", 3, &landMenu, &sfl, NULL);
+        int cfl = parseChoice("2 (Flip Side)", 4, &landMenu, &sfl, NULL);
         cout << "     land-menu 'Flip Side' echo -> " << cfl << " (must be 2)\n";
         CHECK(cfl == 2 && !sfl, "W31-A land-menu: a 'Flip Side' echo binds to its land-aware annotated option");
         bool spl = false;
-        int cpl = parseChoice("1 (Play Land)", 3, &landMenu, &spl, NULL);
+        int cpl = parseChoice("1 (Play Land)", 4, &landMenu, &spl, NULL);
         CHECK(cpl == 1 && !spl, "W31-A land-menu: 'Play Land' still binds to option 1 alongside the annotated Flip Side");
+        //#W56-D (D8): the new back-face land row is an ANSWER TARGET too - the
+        //model echoes the row's name and the bracket tail must not block it.
+        bool sbl = false;
+        int cbl = parseChoice("3 (Boulderloft Pathway)", 4, &landMenu, &sbl, NULL);
+        CHECK(cbl == 3 && !sbl, "#W56-D (D8) land-menu: the annotated back-face land row binds on a bare-name echo");
+        bool sbl2 = false;
+        int cbl2 = parseChoice("CHOICE: 3 (Boulderloft Pathway [PLAY THIS AS A LAND: puts"
+                               " \"Boulderloft Pathway\" onto the battlefield as a land (taps for {W})])",
+                               4, &landMenu, &sbl2, NULL);
+        CHECK(cbl2 == 3 && !sbl2, "#W56-D (D8) land-menu: an echo that carries part of the bracket tail still binds");
     }
 
     cout << "\n[W23-A2] absent-card bookend: a clean sibling CHOICE line beats a hallucinated middle one\n";
@@ -42489,6 +42620,40 @@ static const char * kW50Y_r94 =
             CHECK(fetchLandColorsClause(tundra, bwOnly)
                   == ", and it adds {W} or {U} (you cannot make {U} right now)",
                   "#W55-C D17 REGRESSION lane E's clause still renders exactly as the corpus shows it");
+        }
+
+        // ---- #W56-D (D8): the modal-DFC LAND back face played from hand.
+        // The primitives gated the `{0}` hand entry behind
+        // compare(isflipped)~equalto~1 (a state only the display toggle sets),
+        // so 0 of 3,171 wave-55 decisions ever saw a land-drop row for either
+        // face of Emeria's Call or Agadeem's Awakening. The gate is gone; the
+        // row exists, and this is the string that tells the pilot what it does.
+        cout << "\n[W56-D] MDFC land back-face row tag\n";
+        {
+            CHECK(mdfcLandPlayRowTag("Emeria, Shattered Skyclave", "{W}", "Emeria's Call")
+                  == " -> PLAY THIS AS A LAND: puts \"Emeria, Shattered Skyclave\" onto"
+                     " the battlefield as a land (taps for {W}). It costs no mana and"
+                     " uses no stack, and it USES YOUR LAND DROP for this turn, so"
+                     " \"Emeria's Call\" leaves your hand with it and that face can no"
+                     " longer be cast.",
+                  "#W56-D (D8) the row tag names the land, its colour, the land drop and the lost face");
+            CHECK(mdfcLandPlayRowTag("Agadeem, the Undercrypt", "", "Agadeem's Awakening")
+                      .find("(taps for") == string::npos,
+                  "#W56-D (D8) NEGATIVE no colour clause when the back face's tap line is unreadable");
+            CHECK(mdfcLandPlayRowTag("Mistgate Pathway", "{U}", "")
+                      .find("leaves your hand") == string::npos,
+                  "#W56-D (D8) NEGATIVE a Pathway (both faces lands) loses no castable face, so no such clause");
+            CHECK(mdfcLandPlayRowTag("Mistgate Pathway", "{U}", "")
+                  == " -> PLAY THIS AS A LAND: puts \"Mistgate Pathway\" onto the"
+                     " battlefield as a land (taps for {U}). It costs no mana and uses"
+                     " no stack, and it USES YOUR LAND DROP for this turn.",
+                  "#W56-D (D8) the Pathway form ends cleanly after the land-drop clause");
+            CHECK(mdfcLandPlayRowTag("Jwari Ruins", "{U}", "Jwari Disruption").substr(0, 4) == " -> ",
+                  "#W56-D (D8) echo shape: the priority-seam form is a ' -> ' tail, and the"
+                  " CHOOSE_MENU emitter brackets the same string from index 4");
+            CHECK(stripNarrationDecoration("Emeria, Shattered Skyclave with Emeria's Call")
+                  == "Emeria, Shattered Skyclave with Emeria's Call",
+                  "#W56-D (D8) NEGATIVE the row's own head carries no brace annotation to strip");
         }
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

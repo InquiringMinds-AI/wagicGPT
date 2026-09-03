@@ -1,0 +1,30 @@
+#W56-D (D8) -- the same fix on the PATHWAY class, where BOTH faces are lands.
+#Hengegate Pathway // Mistgate Pathway. Its front face is a land, so the normal
+#land drop already offered "Play Land" (option 0, unchanged); what did not exist
+#was a row for the OTHER face. deck152's seat took the display toggle instead
+#and the flipped card then could not be dropped at all -- the front face's own
+#restriction=compare(isflipped)~equalto~0 refuses the normal drop once flipped
+#(corpus 20260824 deck152 vs146 s31-33, two deferred_to_heuristic records for
+#one land drop, the drop still unused). Option 2 is the back face's own
+#flip-into-play entry; PRE-FIX that index was the menu's Cancel.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Hengegate Pathway
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+Hengegate Pathway
+choice 2
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Mind Stone,Mistgate Pathway
+life:20
+[PLAYER2]
+life:20
+[END]

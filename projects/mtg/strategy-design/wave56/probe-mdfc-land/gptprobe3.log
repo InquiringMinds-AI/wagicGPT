@@ -1,0 +1,1196 @@
+I R in da native
+Init ResourceManagerImpl : 0x559803a54ef0
+21hgeParticleSystemInfo cache resized to 500000 bytes
+7JSample cache resized to 1500000 bytes
+8JTexture cache resized to 2000000 bytes
+Threaded Version
+8JTexture cache resized to 60000000 bytes
+Texture graphics/background/backdrop1.jpg failed to load
+AttemptNew failed to load (404): background/backdrop1.jpg
+Destroying WCachedResource: background/backdrop1.jpg
+Can't locate 
+background/backdrop1.jpg
+Texture graphics/background/backdrop2.jpg failed to load
+AttemptNew failed to load (404): background/backdrop2.jpg
+Destroying WCachedResource: background/backdrop2.jpg
+Can't locate 
+background/backdrop2.jpg
+Texture graphics/background/backdrop3.jpg failed to load
+AttemptNew failed to load (404): background/backdrop3.jpg
+Destroying WCachedResource: background/backdrop3.jpg
+Can't locate 
+background/backdrop3.jpg
+Texture graphics/background/backdrop4.jpg failed to load
+AttemptNew failed to load (404): background/backdrop4.jpg
+Destroying WCachedResource: background/backdrop4.jpg
+Can't locate 
+background/backdrop4.jpg
+Texture graphics/background/backdrop5.jpg failed to load
+AttemptNew failed to load (404): background/backdrop5.jpg
+Destroying WCachedResource: background/backdrop5.jpg
+Can't locate 
+background/backdrop5.jpg
+Texture graphics/background/backdrop6.jpg failed to load
+AttemptNew failed to load (404): background/backdrop6.jpg
+Destroying WCachedResource: background/backdrop6.jpg
+Can't locate 
+background/backdrop6.jpg
+size of MTGCardInstance: 2648
+size of MTGCard: 32
+size of CardPrimitive: 640
+size of ExtraCost: 72
+size of ManaCost: 176
+entergamestate:menu
+Selected soundtrack is: Track0.mp3
+sound/Track0.mp3
+inserted item ptr 0x559803a439b0 at index 2000000016
+MTGAllCards::load: error loading: sets/primitives/.
+Time elapsed while loading sets/primitives/. : 1 ms
+MTGAllCards::load: error loading: sets/primitives/..
+Time elapsed while loading sets/primitives/.. : 0 ms
+Time elapsed while loading sets/primitives/_macros.txt : 0 ms
+Time elapsed while loading sets/primitives/borderline.txt : 310 ms
+Time elapsed while loading sets/primitives/mtg.txt : 310 ms
+Time elapsed while loading sets/primitives/planeswalkers.txt : 9 ms
+Time elapsed while loading sets/primitives/unsupported.txt : 0 ms
+warning, card id collision! : 446807 -> Nighteyes the Desecrator(Commander Anthology Volume II)
+
+==
+Total MTGCards: 67587
+Total CardPrimitives: 26078
+==
+could not find Card matching name: 17125
+could not find Card matching name: 17141
+could not find Card matching name: 17182
+could not find Card matching name: 17253
+could not find Card matching name: 17320
+could not find Card matching name: 17323
+could not find Card matching name: 17333
+could not find Card matching name: 17344
+could not find Card matching name: 17401
+could not find Card matching name: 17402
+could not find Card matching name: 17448
+could not find Card matching name: 17456
+could not find Card matching name: 17462
+could not find Card matching name: 17485
+could not find Card matching name: 17577
+could not find Card matching name: 17583
+could not find Card matching name: 17598
+could not find Card matching name: 17630
+could not find Card matching name: 17665
+could not find Card matching name: 17678
+could not find Card matching name: 17681
+could not find Card matching name: 17695
+could not find Card matching name: 17709
+could not find Card matching name: 17717
+could not find Card matching name: 17724
+could not find Card matching name: 17759
+8JTexture cache resized to 60000000 bytes
+WAGIC_SELFPLAY: auto-launching AI-vs-AI demo
+leavegamestate:menuentergamestate:transitioninserted item ptr 0x55980698d660 at index 2000000017
+inserted item ptr 0x55980698f760 at index 2000000018
+inserted item ptr 0x55980698f890 at index 2000000019
+inserted item ptr 0x55980698fa30 at index 2000000020
+inserted item ptr 0x55980698fd50 at index 2000000021
+inserted item ptr 0x559805c5b620 at index 2000000022
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+leavegamestate:transitionentergamestate:duelDeleting cache item 0x559803a439b0, cache reduced by 1048576 bytes
+Destroying WCachedResource: menutitle.png
+enterduelphase:choose_deck1WAGIC_SELFPLAY: matchup deck199 vs deck198
+inserted item ptr 0x55980698eab0 at index 2000000024
+AIPlayerGPT: using http://100.116.136.74:8084 (model qwen36-35b-a3b)
+inserted item ptr 0x559807c8a6a0 at index 2000000025
+AIPlayerGPT: using http://100.116.136.74:8084 (model qwen36-35b-a3b)
+leaveduelphase:choose_deck1enterduelphase:playinserted item ptr 0x559807d1cbd0 at index 2000000027
+RULES Init Game
+
+PhasingRing: goToPhase called, current phase is ---
+ZONE SHUFFLE obs=0x55980698f320 isLibrary=1 nb=60
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+ZONE SHUFFLE obs=0x55980698f320 isLibrary=1 nb=60
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+RULES Init Game Done !
+
+PREGAME: starting pre-game phase; starting player = seat 0, opponent = seat 1
+
+Selected soundtrack is: ai_baka_music.mp3
+sound/ai_baka_music.mp3
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 2 of 2
+PREGAME: player 0 (seat 0) KEEPS after 0 mulligan(s); will bottom 0 card(s)
+ZONE SHUFFLE obs=0x55980698f320 isLibrary=1 nb=60
+PREGAME: player 1 (seat 1) takes mulligan #1, redrew 7 cards
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand, and having already taken 1 mulligan you will bottom 1 card on a keep (keeping 6). Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 2 of 2
+ZONE SHUFFLE obs=0x55980698f320 isLibrary=1 nb=60
+PREGAME: player 1 (seat 1) takes mulligan #2, redrew 7 cards
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand, and having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5). Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 2 of 2
+ZONE SHUFFLE obs=0x55980698f320 isLibrary=1 nb=60
+PREGAME: player 1 (seat 1) takes mulligan #3, redrew 7 cards
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand, and having already taken 3 mulligans you will bottom 3 cards on a keep (keeping 4). Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+PREGAME: player 1 (seat 1) KEEPS after 3 mulligan(s); will bottom 3 card(s)
+AIPlayerGPT: bottom prose-reconciled to the final stated set
+PREGAME: player 1 (seat 1) bottoms 'Hengegate Pathway' (1 of 3); library bottom card now 'Hengegate Pathway'
+PREGAME: player 1 (seat 1) bottoms 'Plains' (2 of 3); library bottom card now 'Plains'
+PREGAME: player 1 (seat 1) bottoms 'Plains' (3 of 3); library bottom card now 'Plains'
+PREGAME: pre-game phase complete; turn 1 begins (game opens at the untap step; the starting player skips only its first draw)
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: the model took the hold row at the priority seam on turn 0 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 3 of 3
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 2 of 4
+Should I play Plains?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Plains
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Plains
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): plains.wav
+Destroying WCachedResource: 
+Can't locate 
+plains.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: land-drop ask NOT issued - 4 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t0 ph6 seat=0x559806993cd0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 4 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 4 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 4 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 1
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: model chose 1 of 7
+AIPlayerGPT[ph2]: take action 1/7 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Agadeem's Awakening
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: Agadeem's Awakening)
+inserted item ptr 0x559807dce2e0 at index 2000000034
+AIPlayerGPT: Choose an option for Agadeem, the Undercrypt: -> chose 1 of 2
+ActionLayer::doReactTo 136
+Action added to stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: the model took the hold row at the priority seam on turn 1 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 5 of 5
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: holding priority at the priority seam (the model's own hold row, turn 1; 1 windows held this game)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 3
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t1 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 2
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: model chose 1 of 3
+AIPlayerGPT[ph2]: take action 1/3 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Agadeem's Awakening
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT: Choose an option for Agadeem, the Undercrypt: -> chose 1 of 2
+ActionLayer::doReactTo 136
+Action added to stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 2 of 4
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t2 ph6 seat=0x559806993cd0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 3
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: model chose 1 of 7
+AIPlayerGPT[ph2]: take action 1/7 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Agadeem's Awakening
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Agadeem's Awakening)
+Resolving Action on stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT: Choose an option for Agadeem, the Undercrypt: -> chose 1 of 2
+ActionLayer::doReactTo 138
+Action added to stack: StackAbility.  (Source: )
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT: the model took the hold row at the priority seam on turn 3 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 5 of 5
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: holding priority at the priority seam (the model's own hold row, turn 3; 2 windows held this game)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 3
+Should I play Plains?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Plains
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Plains
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): plains.wav
+Destroying WCachedResource: 
+Can't locate 
+plains.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t3 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 4
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: model chose 1 of 3
+AIPlayerGPT[ph2]: take action 1/3 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Agadeem's Awakening
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT: Choose an option for Agadeem, the Undercrypt: -> chose 1 of 2
+ActionLayer::doReactTo 140
+Action added to stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 4
+Should I play Hengegate Pathway?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hengegate Pathway
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hengegate Pathway
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Choose an option for Hengegate Pathway: -> chose 3 of 3
+ActionLayer::doReactTo 91
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+ no matching ability found. doubleside(mistgate pathway)
+ABILITYFACTORY Error parsing: {0}:doubleside(mistgate pathway)
+ABILITYFACTORY ERROR: Parser returned NULL {t}:add{w}
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t4 ph6 seat=0x559806993cd0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 5
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: the model took the hold row at the priority seam on turn 5 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 5 of 5
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: holding priority at the priority seam (the model's own hold row, turn 5; 3 windows held this game)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: play Swamp now? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 2 of 3
+AIPlayerGPT: chose to cast nothing
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t5 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: Casting decision (Main phase 2, YOUR turn): which card do you cast now, if any? -> chose 2 of 3
+AIPlayerGPT: chose to cast nothing
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 6
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: model chose 1 of 3
+AIPlayerGPT[ph2]: take action 1/3 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Agadeem's Awakening
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: Agadeem's Awakening)
+AIPlayerGPT: Choose an option for Agadeem, the Undercrypt: -> chose 1 of 2
+ActionLayer::doReactTo 142
+Action added to stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 3 of 4
+Should I play Hengegate Pathway?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hengegate Pathway
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hengegate Pathway
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Choose an option for Hengegate Pathway: -> chose 1 of 3
+ActionLayer::doReactTo 89
+ no matching ability found. doubleside(mistgate pathway)
+ABILITYFACTORY Error parsing: {0}:doubleside(mistgate pathway)
+ABILITYFACTORY ERROR: Parser returned NULL {t}:add{w}
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t6 ph6 seat=0x559806993cd0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 3 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 7
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: the model took the hold row at the priority seam on turn 7 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 5 of 5
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: holding priority at the priority seam (the model's own hold row, turn 7; 4 windows held this game)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 2 of 3
+Should I play Hengegate Pathway?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hengegate Pathway
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hengegate Pathway
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Choose an option for Hengegate Pathway: -> chose 1 of 3
+ActionLayer::doReactTo 89
+ no matching ability found. doubleside(mistgate pathway)
+ABILITYFACTORY Error parsing: {0}:doubleside(mistgate pathway)
+ABILITYFACTORY ERROR: Parser returned NULL {t}:add{w}
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t7 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 8
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 4 of 4
+AIPlayerGPT: held the land drop
+AIPlayerGPT: held the land drop
+AIPlayerGPT: model chose 2 of 5
+AIPlayerGPT[ph4]: take action 2/5 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hengegate Pathway
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Hengegate Pathway)
+Resolving Action on stack: StackAbility.  (Source: Hengegate Pathway)
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 3
+Should I play Emeria's Call?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Emeria's Call
+
+AIPlayerGPT: casting Emeria's Call (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Emeria's Call
+-  Cost: {4}{w}{w}{w}
+AIPlayerBaka: Ai had a payment in mind.
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x559807cf13b0 at index 2000000037
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x559807d59050 at index 2000000038
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x559807c5fd40 at index 2000000039
+AIPlayerGPT: Choose an option for Emeria's Call: -> chose 2 of 2
+ActionLayer::doReactTo 89
+ACTIONSTACK Add spell
+Action added to stack: Emeria's Call
+Resolving Action on stack: Emeria's Call
+sound/sfx/sorcery.wav
+AttemptNew failed to load (404): sorcery.wav
+Destroying WCachedResource: 
+Can't locate 
+sorcery.wav
+
+AttemptNew failed to load (404): warrior.wav
+Destroying WCachedResource: 
+Can't locate 
+warrior.wav
+
+AttemptNew failed to load (404): angel.wav
+Destroying WCachedResource: 
+Can't locate 
+angel.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+
+AttemptNew failed to load (404): warrior.wav
+Destroying WCachedResource: 
+Can't locate 
+warrior.wav
+
+AttemptNew failed to load (404): angel.wav
+Destroying WCachedResource: 
+Can't locate 
+angel.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t8 ph6 seat=0x559806993cd0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 2 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 9
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT: the model took the hold row at the priority seam on turn 9 - this turn's remaining priority windows are held until the board changes
+AIPlayerGPT: model chose 3 of 3
+AIPlayerGPT[ph2]: hold priority taken (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: holding priority at the priority seam (the model's own hold row, turn 9; 5 windows held this game)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t9 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 10
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 3
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 3
+Should I play Emeria's Call?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Emeria's Call
+
+AIPlayerGPT: casting Emeria's Call (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Emeria's Call
+-  Cost: {4}{w}{w}{w}
+AIPlayerBaka: Ai had a payment in mind.
+AIPlayerGPT: Choose an option for Emeria's Call: -> chose 1 of 2
+ActionLayer::doReactTo 87
+ACTIONSTACK Add spell
+Action added to stack: Emeria's Call
+Resolving Action on stack: Emeria's Call
+sound/sfx/sorcery.wav
+AttemptNew failed to load (404): sorcery.wav
+Destroying WCachedResource: 
+Can't locate 
+sorcery.wav
+
+AttemptNew failed to load (404): warrior.wav
+Destroying WCachedResource: 
+Can't locate 
+warrior.wav
+
+AttemptNew failed to load (404): angel.wav
+Destroying WCachedResource: 
+Can't locate 
+angel.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+
+AttemptNew failed to load (404): warrior.wav
+Destroying WCachedResource: 
+Can't locate 
+warrior.wav
+
+AttemptNew failed to load (404): angel.wav
+Destroying WCachedResource: 
+Can't locate 
+angel.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (2 of 2) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+[combattrace] t10 ph7 seat=0x559807ccb0e0 combat decision suppressed by unresolved-stack
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+AIPlayerGPT[ph8]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph8]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph8]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 11
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT[ph3]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 3
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT[ph5]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+[combattrace] t11 ph6 seat=0x559807ccb0e0 combat decision suppressed by no-legal-attacker
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph6]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT[ph9]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+AIPlayerGPT: land-drop ask NOT issued - 1 land(s) in hand, none playable right now (restriction or play-restriction); the pilot is not asked a question with no answers
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+AIPlayerGPT[ph10]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+AIPlayerGPT[ph11]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+AIPlayerGPT[ph12]: only display-toggle (Flip Side) options; auto-passing without a model call
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 12
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph2]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayerGPT: Land drop: play Plains now? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn) -> chose 1 of 2
+Should I play Plains?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Plains
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Plains
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): plains.wav
+Destroying WCachedResource: 
+Can't locate 
+plains.wav
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 2 of 3
+AIPlayerGPT: chose to cast nothing
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (4 of 4) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayerGPT: model chose 0 of 4
+AIPlayerGPT[ph7]: pass priority (cached=0)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT[ph7]: only display-toggle (Flip Side) options; auto-passing without a model call
+[combattrace] t12 ph7 seat=0x559807ccb0e0 combat decision suppressed by unresolved-stack
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+AIPlayerGPT[ph8]: only display-toggle (Flip Side) options; auto-passing without a model call
+WAGIC_SELFPLAY_RESULT winner=0 life0=14 life1=-13 turn=12
