@@ -1309,16 +1309,174 @@ namespace
     //Sources of one equivalence class (same producible colours, same option
     //flags) are interchangeable; only the class-prefix configurations are
     //enumerated, which keeps the search tiny on real boards. Boards the search
-    //cannot model (wrapped/variable producers in the plan, more than kMaxOptSources
+    //cannot model (wrapped/variable producers in the plan, more than optSourcesCap()
     //candidates, X costs) keep the baseline untouched - this is a PREFERENCE
     //layer, never a payability change.
-    const size_t kMaxOptSources = 14;
+    //#W54-Q (D35 / owner decision O4): the candidate-source ceiling, 14 -> 32.
+    //14 made the owner's spec a NO-OP on the board he reported (16 producers).
+    //Measured on desktop -O2, this lane's probe: the search's cost does NOT grow
+    //with the source count - it is bound by the work budget below and is if
+    //anything CHEAPER on wide boards (more sources -> payability questions take
+    //the permissive short-cut sooner). 32 covers every board seen in play; above
+    //it the setup legs (the mana-object walk, the class keys, castableForDisplay)
+    //start to dominate and the stack arrays here are sized for 64.
+    //WAGIC_OPT_SOURCES_CAP=14 restores the old reach.
+    size_t optSourcesCap()
+    {
+        static size_t cached = 0;
+        if (!cached)
+        {
+            cached = 32;
+            const char * e = getenv("WAGIC_OPT_SOURCES_CAP");
+            if (e && *e)
+            {
+                int v = atoi(e);
+                if (v > 0 && v < 1024)
+                    cached = (size_t) v;
+            }
+        }
+        return cached;
+    }
+
+    //#W54-Q: the search's WORK budget, in payability questions (one per scored
+    //option per configuration). Measured on desktop -O2: ~0.16 us per question
+    //on a 24-producer board, so 4,000 is ~0.6 ms here and ~6-13 ms at the
+    //audit's x10-20 console factor. It replaces a flat 512-configuration cut-off
+    //that cost 6-15 ms whatever the board offered.
+    //WAGIC_OPT_WORK_BUDGET overrides it.
+    size_t optWorkBudget()
+    {
+        static size_t cached = 0;
+        if (!cached)
+        {
+            cached = 4000;
+            const char * e = getenv("WAGIC_OPT_WORK_BUDGET");
+            if (e && *e)
+            {
+                int v = atoi(e);
+                if (v > 0)
+                    cached = (size_t) v;
+            }
+        }
+        return cached;
+    }
+
     const size_t kMaxAssignments = 64;
+
+    //#W54-Q: the search asks "can this cost still be paid from what is left?"
+    //thousands of times per call, and ManaCost::canAfford allocates two or
+    //three ManaCost objects per question (Diff, its result, the anytype
+    //stand-in) while the enumeration allocated a vector per source. The
+    //arithmetic below is ManaCost::Diff + isPositive on a stack array, so the
+    //hot question costs no allocation. It applies only to the shape the model
+    //already restricts itself to (no hybrid symbols and no X in the cost being
+    //probed); anything else falls back to the real ManaCost path, unchanged.
+    //kPayColors is a COMPILE-TIME bound so the inner adds stay unrolled; it must
+    //cover indices 0..NB_Colors (the X slot). payVecModels refuses the fast path
+    //if the engine's colour count ever outgrows it.
+    const int kPayColors = 12;
+    const size_t kPayMaxAbilities = 8;
+    struct PayVec
+    {
+        int v[kPayColors];
+        PayVec() { for (int i = 0; i < kPayColors; i++) v[i] = 0; }
+    };
+
+    void payVecFrom(ManaCost * mc, PayVec & out)
+    {
+        for (int i = 0; i < kPayColors; i++)
+            out.v[i] = 0;
+        if (!mc)
+            return;
+        for (int i = 0; i <= Constants::NB_Colors && i < kPayColors; i++)
+            out.v[i] = mc->getCost(i);
+    }
+
+    //Mirrors ManaCost::Diff's colour subtraction, its colourless-absorption
+    //special case and isPositive(). Valid only when `cost` carries no hybrid
+    //symbols and no X (Diff's other two branches).
+    void fastDiff(const PayVec & total, const PayVec & cost, int * diff)
+    {
+        for (int i = 0; i < Constants::NB_Colors && i < kPayColors; i++)
+            diff[i] = total.v[i] - cost.v[i];
+        const int ci = Constants::MTG_COLOR_ARTIFACT;
+        if (diff[ci] < 0)
+        {
+            for (int i = 0; i < Constants::NB_Colors && i < kPayColors; i++)
+            {
+                if (diff[i] > 0)
+                {
+                    if (diff[i] + diff[ci] > 0)
+                    {
+                        diff[i] += diff[ci];
+                        diff[ci] = 0;
+                        break;
+                    }
+                    diff[ci] += diff[i];
+                    diff[i] = 0;
+                }
+            }
+        }
+    }
+
+    bool fastCanAfford(const PayVec & total, const PayVec & cost)
+    {
+        int diff[kPayColors];
+        fastDiff(total, cost, diff);
+        for (int i = 0; i < Constants::NB_Colors && i < kPayColors; i++)
+            if (diff[i] < 0)
+                return false;
+        return true;
+    }
+
+    //ManaCost::pay's arithmetic (Diff, then its negative-netting loop and the
+    //defensive floor) on the stack. The X slot is left as the pool had it, as
+    //pay() does.
+    void fastPay(PayVec & pool, const PayVec & cost)
+    {
+        int diff[kPayColors];
+        fastDiff(pool, cost, diff);
+        for (int i = 0; i < Constants::NB_Colors && i < kPayColors; i++)
+            pool.v[i] = diff[i];
+        for (int i = 0; i <= Constants::NB_Colors && i < kPayColors; i++)
+        {
+            if (pool.v[i] < 0)
+            {
+                for (int j = 0; j < Constants::NB_Colors && j < kPayColors; j++)
+                {
+                    if (j != i && pool.v[j] > 0 && pool.v[j] <= abs(pool.v[i]))
+                    {
+                        pool.v[i] += pool.v[j];
+                        pool.v[j] = 0;
+                    }
+                    else if (j != i && pool.v[j] > 0 && pool.v[j] > abs(pool.v[i]))
+                    {
+                        pool.v[j] += pool.v[i];
+                        pool.v[i] = 0;
+                    }
+                }
+            }
+        }
+        for (int i = 0; i <= Constants::NB_Colors && i < kPayColors; i++)
+            if (pool.v[i] < 0)
+                pool.v[i] = 0;
+    }
+
+    //A cost whose payability fastCanAfford can decide.
+    bool payVecModels(ManaCost * cost, int anytype)
+    {
+        if (Constants::NB_Colors + 1 > kPayColors)
+            return false;
+        if (anytype > 0)
+            return true; //the probe replaces the cost with plain generic mana
+        return cost && !cost->getHybridCost(0) && !cost->hasX() && !cost->hasSpecificX();
+    }
 
     struct OptSource
     {
         MTGCardInstance * card;
         std::vector<AManaProducer*> abilities;
+        std::vector<PayVec> outputs;   //#W54-Q: abilities[k]->output as a stack vector
         int colourMask;          //bit c = some ability makes colour c (1..5)
         bool attackOption;       //a creature that could still attack this turn
         bool anyUtility;         //has a non-mana tap ability (affordable or not)
@@ -1343,7 +1501,7 @@ namespace
     //`rem`? Dual sources are tried in every combination up to kMaxAssignments;
     //past that the permissive sum (every ability of every source) is used -
     //an over-estimate, and only on absurd boards.
-    bool payableFrom(ManaCost * cost, int anytype, ManaCost * leftover,
+    bool payableFromSlow(ManaCost * cost, int anytype, ManaCost * leftover,
                      const std::vector<const OptSource*> & rem, MTGCardInstance * payee)
     {
         if (!cost || !cost->getConvertedCost())
@@ -1387,6 +1545,22 @@ namespace
         }
     }
 
+    //#W54-Q: one payability question the search asks, with the per-payee
+    //spend-restriction filter resolved ONCE (it used to be a dynamic_cast and
+    //a TargetChooser build per source per question).
+    struct PayOption
+    {
+        ManaCost * cost;
+        MTGCardInstance * payee;
+        int anytype;
+        bool fast;                            //fastCanAfford can decide this cost
+        bool modelled;                        //no source carries more abilities than kPayMaxAbilities
+        PayVec costVec;                       //the cost fastCanAfford subtracts
+        std::vector<unsigned char> usable;    //[src * kPayMaxAbilities + j] -> ability index
+        std::vector<unsigned char> usableCnt; //[src]
+        PayOption() : cost(NULL), payee(NULL), anytype(0), fast(false), modelled(true) {}
+    };
+
     struct OptContext
     {
         Player * p;
@@ -1394,25 +1568,130 @@ namespace
         std::vector<OptSource> sources;
         std::vector<MTGCardInstance*> handOptions;       //castable-now hand cards, one per name
         std::vector<ActivatedAbility*> abilityOptions;   //non-mana activations the player controls
+        std::vector<PayOption> payOptions;               //#W54-Q: handOptions then abilityOptions
+        bool allFast;                                    //#W54-Q: no option needs the ManaCost path
+        PayVec poolVec;                                  //#W54-Q: the paying player's pool
+        PayVec targetCostVec;                            //#W54-Q: the cost being paid
+        bool targetFast;
+        OptContext() : p(NULL), target(NULL), allFast(false), targetFast(false) {}
     };
 
-    OptScore scoreConfig(OptContext & ctx, const std::vector<bool> & chosen, ManaCost * leftover)
+    //#W54-Q: build a PayOption's precomputed tables. `cost`/`payee` are the
+    //pair payableFromSlow would have been called with.
+    void buildPayOption(const std::vector<OptSource> & sources, ManaCost * cost,
+                        MTGCardInstance * payee, int anytype, PayOption & out)
+    {
+        out.cost = cost;
+        out.payee = payee;
+        out.anytype = anytype;
+        out.fast = payVecModels(cost, anytype);
+        out.modelled = true;
+        if (anytype > 0 && cost)
+            out.costVec.v[Constants::MTG_COLOR_ARTIFACT] = cost->getConvertedCost();
+        else
+            payVecFrom(cost, out.costVec);
+        out.usable.assign(sources.size() * kPayMaxAbilities, 0);
+        out.usableCnt.assign(sources.size(), 0);
+        for (size_t i = 0; i < sources.size(); i++)
+        {
+            if (sources[i].abilities.size() > kPayMaxAbilities)
+            {
+                out.modelled = false;
+                return;
+            }
+            unsigned char n = 0;
+            for (size_t k = 0; k < sources[i].abilities.size(); k++)
+                if (ManaEngine::spendAllowed(sources[i].abilities[k], payee))
+                    out.usable[i * kPayMaxAbilities + n++] = (unsigned char) k;
+            out.usableCnt[i] = n;
+        }
+    }
+
+    //#W54-Q: the allocation-free form of payableFromSlow. Same enumeration,
+    //same kMaxAssignments cut-off, same permissive fallback - integers instead
+    //of ManaCost objects. Falls back to the real path when the option's cost
+    //is outside fastCanAfford's model.
+    bool payableFrom(const OptContext & ctx, size_t optIdx, const PayVec & leftover,
+                     ManaCost * leftoverCost, const size_t * rem, size_t remCount)
+    {
+        const PayOption & q = ctx.payOptions[optIdx];
+        if (!q.cost || !q.cost->getConvertedCost())
+            return true;
+        if (!q.fast || !q.modelled || remCount > 64)
+        {
+            std::vector<const OptSource*> slowRem;
+            slowRem.reserve(remCount);
+            for (size_t i = 0; i < remCount; i++)
+                slowRem.push_back(&ctx.sources[rem[i]]);
+            return payableFromSlow(q.cost, q.anytype, leftoverCost, slowRem, q.payee);
+        }
+        size_t choiceSrc[64];
+        size_t nChoice = 0;
+        size_t combos = 1;
+        for (size_t i = 0; i < remCount; i++)
+        {
+            unsigned char n = q.usableCnt[rem[i]];
+            if (!n)
+                continue;
+            choiceSrc[nChoice++] = rem[i];
+            combos *= n;
+            if (combos > kMaxAssignments)
+                break;
+        }
+        if (combos > kMaxAssignments)
+        {
+            PayVec total = leftover;
+            for (size_t i = 0; i < nChoice; i++)
+            {
+                const OptSource & src = ctx.sources[choiceSrc[i]];
+                for (unsigned char j = 0; j < q.usableCnt[choiceSrc[i]]; j++)
+                {
+                    const PayVec & o = src.outputs[q.usable[choiceSrc[i] * kPayMaxAbilities + j]];
+                    for (int col = 0; col < kPayColors; col++)
+                        total.v[col] += o.v[col];
+                }
+            }
+            return fastCanAfford(total, q.costVec);
+        }
+        unsigned char idx[64];
+        for (size_t i = 0; i < nChoice; i++)
+            idx[i] = 0;
+        for (;;)
+        {
+            PayVec total = leftover;
+            for (size_t i = 0; i < nChoice; i++)
+            {
+                const OptSource & src = ctx.sources[choiceSrc[i]];
+                const PayVec & o = src.outputs[q.usable[choiceSrc[i] * kPayMaxAbilities + idx[i]]];
+                for (int col = 0; col < kPayColors; col++)
+                    total.v[col] += o.v[col];
+            }
+            if (fastCanAfford(total, q.costVec))
+                return true;
+            size_t i = 0;
+            while (i < nChoice && ++idx[i] == q.usableCnt[choiceSrc[i]])
+                idx[i++] = 0;
+            if (i == nChoice)
+                return false;
+        }
+    }
+
+    OptScore scoreConfig(OptContext & ctx, const std::vector<bool> & chosen,
+                         const PayVec & leftVec, ManaCost * leftover)
     {
         OptScore sc;
-        std::vector<const OptSource*> rem;
-        std::set<MTGCardInstance*> chosenCards;
-        for (size_t i = 0; i < ctx.sources.size(); i++)
+        //#W54-Q: the remainder as source INDICES on the stack (was a heap
+        //vector of pointers plus a std::set of chosen cards, rebuilt per call).
+        size_t rem[64];
+        size_t remCount = 0;
+        int mask = 0;
+        for (size_t i = 0; i < ctx.sources.size() && remCount < 64; i++)
         {
             if (chosen[i])
-                chosenCards.insert(ctx.sources[i].card);
-            else
-                rem.push_back(&ctx.sources[i]);
-        }
-        int mask = 0;
-        for (size_t i = 0; i < rem.size(); i++)
-        {
-            mask |= rem[i]->colourMask;
-            if (rem[i]->attackOption)
+                continue;
+            rem[remCount++] = i;
+            mask |= ctx.sources[i].colourMask;
+            if (ctx.sources[i].attackOption)
                 sc.options++;
         }
         for (int c = 0; c < 32; c++)
@@ -1420,30 +1699,39 @@ namespace
                 sc.colours++;
         for (size_t i = 0; i < ctx.handOptions.size(); i++)
         {
-            MTGCardInstance * card = ctx.handOptions[i];
-            if (payableFrom(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA), leftover, rem, card))
+            if (payableFrom(ctx, i, leftVec, leftover, rem, remCount))
                 sc.options++;
         }
         for (size_t i = 0; i < ctx.abilityOptions.size(); i++)
         {
             ActivatedAbility * aa = ctx.abilityOptions[i];
             bool taps = activationTapsSource(aa);
-            if (taps && chosenCards.count(aa->source))
+            bool sourceChosen = false;
+            size_t sourceIdx = ctx.sources.size();
+            for (size_t j = 0; j < ctx.sources.size(); j++)
+                if (ctx.sources[j].card == aa->source)
+                {
+                    sourceIdx = j;
+                    sourceChosen = chosen[j];
+                    break;
+                }
+            if (taps && sourceChosen)
                 continue; //tapped for mana: this activation is gone
-            std::vector<const OptSource*> remLess;
-            const std::vector<const OptSource*> * use = &rem;
+            size_t remLess[64];
+            const size_t * use = rem;
+            size_t useCount = remCount;
             if (taps)
             {
-                for (size_t k = 0; k < rem.size(); k++)
-                    if (rem[k]->card != aa->source)
-                        remLess.push_back(rem[k]);
-                use = &remLess;
+                useCount = 0;
+                for (size_t k = 0; k < remCount; k++)
+                    if (rem[k] != sourceIdx)
+                        remLess[useCount++] = rem[k];
+                use = remLess;
             }
-            bool payable = payableFrom(aa->getCost(), aa->source->has(Constants::ANYTYPEOFMANAABILITY),
-                                       leftover, *use, aa->source);
+            bool payable = payableFrom(ctx, ctx.handOptions.size() + i, leftVec, leftover, use, useCount);
             if (payable)
                 sc.options++;
-            else if (taps && !chosenCards.count(aa->source))
+            else if (taps && !sourceChosen)
                 sc.utilityHeld++;
         }
         return sc;
@@ -1503,8 +1791,16 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
             if (c != Constants::MTG_COLOR_LAND && c != Constants::MTG_COLOR_WASTE && amp->output->hasColor(c))
                 os.colourMask |= (1 << c);
     }
-    if (sources.size() > kMaxOptSources)
+    if (sources.size() > optSourcesCap())
         return baseline;
+
+    //#W54-Q: each producer's output as a stack vector, once.
+    for (size_t i = 0; i < sources.size(); i++)
+    {
+        sources[i].outputs.resize(sources[i].abilities.size());
+        for (size_t k = 0; k < sources[i].abilities.size(); k++)
+            payVecFrom(sources[i].abilities[k]->output, sources[i].outputs[k]);
+    }
 
     //The baseline must be expressible in this model: every pick a candidate
     //source, no source twice.
@@ -1626,18 +1922,46 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
             bool found = false;
             for (size_t n = 0; n < combos; n++)
             {
-                ManaCost total(ctx->p->getManaPool());
+                //#W54-Q: the pool sum and the affordability question on the
+                //stack; the ManaCost objects this loop used to build (one per
+                //assignment, plus canAfford's two and the leftover's one) were
+                //the search's largest allocation source.
+                PayVec totalVec = ctx->poolVec;
                 std::vector<AManaProducer*> picks;
                 for (size_t i = 0; i < ids.size(); i++)
                 {
-                    AManaProducer * amp = ctx->sources[ids[i]].abilities[idx[i]];
-                    picks.push_back(amp);
-                    total.add(amp->output);
+                    const OptSource & src = ctx->sources[ids[i]];
+                    picks.push_back(src.abilities[idx[i]]);
+                    const PayVec & o = src.outputs[idx[i]];
+                    for (int col = 0; col < kPayColors; col++)
+                        totalVec.v[col] += o.v[col];
                 }
-                if (total.canAfford(cost, anytype))
+                bool afford;
+                if (ctx->targetFast)
+                    afford = fastCanAfford(totalVec, ctx->targetCostVec);
+                else
                 {
-                    ManaCost * left = leftoverAfter(total, cost, anytype);
-                    OptScore sc = scoreConfig(*ctx, chosen, left);
+                    ManaCost total(ctx->p->getManaPool());
+                    for (size_t i = 0; i < ids.size(); i++)
+                        total.add(ctx->sources[ids[i]].abilities[idx[i]]->output);
+                    afford = total.canAfford(cost, anytype) != 0;
+                }
+                if (afford)
+                {
+                    PayVec leftVec = totalVec;
+                    ManaCost * left = NULL;
+                    if (ctx->targetFast)
+                        fastPay(leftVec, ctx->targetCostVec);
+                    if (!ctx->targetFast || !ctx->allFast)
+                    {
+                        ManaCost total(ctx->p->getManaPool());
+                        for (size_t i = 0; i < ids.size(); i++)
+                            total.add(ctx->sources[ids[i]].abilities[idx[i]]->output);
+                        left = leftoverAfter(total, cost, anytype);
+                        if (!ctx->targetFast)
+                            payVecFrom(left, leftVec);
+                    }
+                    OptScore sc = scoreConfig(*ctx, chosen, leftVec, left);
                     delete left;
                     if (!found || sc > best)
                     {
@@ -1657,6 +1981,33 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
     eval.cost = cost;
     eval.anytype = anytypeofmana;
 
+    //#W54-Q: one PayOption per scored option, spend-restrictions resolved once.
+    for (size_t i = 0; i < ctx.handOptions.size(); i++)
+    {
+        PayOption po;
+        buildPayOption(ctx.sources, ctx.handOptions[i]->getManaCost(), ctx.handOptions[i],
+                       ctx.handOptions[i]->has(Constants::ANYTYPEOFMANA), po);
+        ctx.payOptions.push_back(po);
+    }
+    for (size_t i = 0; i < ctx.abilityOptions.size(); i++)
+    {
+        ActivatedAbility * aa = ctx.abilityOptions[i];
+        PayOption po;
+        buildPayOption(ctx.sources, aa->getCost(), aa->source,
+                       aa->source->has(Constants::ANYTYPEOFMANAABILITY), po);
+        ctx.payOptions.push_back(po);
+    }
+    payVecFrom(p->getManaPool(), ctx.poolVec);
+    ctx.targetFast = payVecModels(cost, anytypeofmana);
+    if (anytypeofmana > 0)
+        ctx.targetCostVec.v[Constants::MTG_COLOR_ARTIFACT] = cost->getConvertedCost();
+    else
+        payVecFrom(cost, ctx.targetCostVec);
+    ctx.allFast = true;
+    for (size_t i = 0; i < ctx.payOptions.size(); i++)
+        if (!ctx.payOptions[i].fast || !ctx.payOptions[i].modelled)
+            ctx.allFast = false;
+
     std::vector<bool> baseChosen(sources.size(), false);
     for (std::set<MTGCardInstance*>::iterator it = baseCards.begin(); it != baseCards.end(); ++it)
         baseChosen[indexOf[*it]] = true;
@@ -1671,13 +2022,22 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
     std::vector<std::vector<size_t>*> classes;
     for (std::map<std::string, std::vector<size_t> >::iterator it = classMembers.begin(); it != classMembers.end(); ++it)
         classes.push_back(&it->second);
+    //#W54-Q: how many configurations the work budget affords on THIS board.
+    //Never more than the 512 the flat cut-off allowed.
+    size_t scoredOptions = ctx.handOptions.size() + ctx.abilityOptions.size();
+    size_t configBudget = 512;
+    if (scoredOptions)
+        configBudget = optWorkBudget() / scoredOptions;
+    if (configBudget < 64)
+        configBudget = 64;
+    if (configBudget > 512)
+        configBudget = 512;
+
     std::vector<size_t> take(classes.size(), 0);
     size_t evaluated = 0;
+    size_t sum = 0; //#W54-Q: maintained by the odometer, was re-summed per step
     for (;;)
     {
-        size_t sum = 0;
-        for (size_t i = 0; i < take.size(); i++)
-            sum += take[i];
         if (sum == k)
         {
             std::vector<bool> chosen(sources.size(), false);
@@ -1694,15 +2054,19 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
                     bestPicks = picks;
                     improved = true;
                 }
-                if (++evaluated > 512)
+                if (++evaluated > configBudget)
                     break;
             }
         }
         size_t i = 0;
         while (i < take.size() && ++take[i] > classes[i]->size())
+        {
+            sum -= (take[i] - 1); //take[i] was already incremented by the test
             take[i++] = 0;
+        }
         if (i == take.size())
             break;
+        sum++;
     }
     if (!improved)
         return baseline;
