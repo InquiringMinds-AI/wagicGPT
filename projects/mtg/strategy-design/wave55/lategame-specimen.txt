@@ -1,584 +1,421 @@
-# wave-55 lategame specimen: 1788439453-ai_baka_deck152-0x5636d45683a0-vs-ai_baka_deck125.jsonl seq 309, turn 65, Blockers, life 4 vs 18, 29337 chars, options 17
-# reply: "CHOICE: 1 (Deserted Beach #1)\n\nPLAN: I am at 4 life and Emrakul is attacking for 15. I have no blockers that can stop it (it has flying, I have no fliers, and my only creature is tapped). I sacrifice a land to Emrakul's annihilator. Emrakul deals 15 damage, reducing my life to -11. I lose the game. "
-# (per-decision USER message exactly as served; system prompt not included)
+# wave-55 lategame specimen (engine seat PRIMARY recommendation): 1788439453-ai_baka_deck125-0x5636d58a0090-vs-ai_baka_deck152.jsonl seq 69, turn 42, Main phase 1, life 22 vs 33, 21279 chars, options 6
+# reply: "CHOICE: 5 (Cast nothing right now)\nPLAN: Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn."
+# (per-decision USER message exactly as served; system prompt not included). The harvest default (152v125 seq 309) was replaced: it scored 0 on the engine seat's render-vocabulary probe.
 
 GAME LOG (everything that has happened so far):
-(...earlier events trimmed - graveyards at trim: you - Brutal Cathar x2, Briarbridge Tracker, Intrepid Adversary x2, Luminarch Aspirant x2, Teferi, Who Slows the Sunset x2, Katilda, Dawnhart Prime x3, Sigarda, Champion of Light x3, Elite Spellbinder x3, Augur of Autumn; opponent - Supreme Verdict; exiled at trim: you - Luminarch Aspirant, Tovolar's Huntmaster, Brutal Cathar, Lair of the Hydra; opponent - none)
-- You used: Put a card into the graveyard with Teferi, Who Slows the Sunset targeting Teferi, Who Slows the Sunset #1
-- Your Teferi, Who Slows the Sunset was put into your graveyard from the battlefield (that Teferi, Who Slows the Sunset was 1 of 2 copies on your battlefield; the other 1 is still there)
-=== Turn 16 - opponent's turn ===
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Seachrome Coast; Island; Glacial Fortress; Island; Path to Exile; Supreme Verdict; Island
 - Phase: Untap
-- It became Day
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Hengegate Pathway
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Main phase 1
+- You played Island
+=== Turn 3 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent cast Supreme Verdict
-- Your Katilda, Dawnhart Prime died
-- Your Wolf died
-- Your Wolf (token) ceased to exist and left your graveyard
-- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
-=== Turn 17 - YOUR turn ===
+- Opponent played Barkchannel Pathway
+- Phase: Main phase 2
+- Opponent cast Luminarch Aspirant
+- Opponent's Luminarch Aspirant resolved and entered the battlefield
+=== Turn 4 - YOUR turn ===
 - Phase: Draw
-- You drew Overgrown Farmland
+- You drew Supreme Verdict
 - Phase: Main phase 1
-- You played Overgrown Farmland
-- You used: Put a level counter with Ranger Class
-- Paid {1}{g} for Ranger Class with Barkchannel Pathway #1; Hengegate Pathway #1
-- Your Ranger Class got a level counter
-- You used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
-- Your Teferi, Who Slows the Sunset lost a loyalty counter
-- Your Teferi, Who Slows the Sunset lost a loyalty counter
-- You revealed your Lair of the Hydra from your library
-- You revealed your Deserted Beach from your library
-- You revealed your Hengegate Pathway from your library
-- You revealed 3 cards and took Lair of the Hydra (put in hand)
-- You used: Put a card into hand with Teferi, Who Slows the Sunset targeting Lair of the Hydra
-- Your revealed Lair of the Hydra went to your hand
-- Your revealed Hengegate Pathway went to your library
-- Your revealed Deserted Beach went to your library
-=== Turn 18 - opponent's turn ===
+- You played Seachrome Coast
+- Paid {w} for Path to Exile with Seachrome Coast
+- You cast Path to Exile
+- Opponent's Luminarch Aspirant was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hengegate Pathway
+- Phase: Main phase 2
+- Opponent cast Intrepid Adversary
+- Opponent's Intrepid Adversary resolved and entered the battlefield
+- Opponent used: don't add any counter with Intrepid Adversary
+=== Turn 6 - YOUR turn ===
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Deserted Beach
+- Opponent cast Brutal Cathar
+- Paid {1}{u}{u} for Dream Fracture with Island; Seachrome Coast; Glacial Fortress
+- You cast Dream Fracture
+- Opponent's Brutal Cathar was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Dream Fracture
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Phase: Combat damage
+- Opponent's Intrepid Adversary dealt 3 damage to you (now 17)
+- Opponent gained 3 life (now 23)
+=== Turn 8 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Island
+=== Turn 9 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Briarbridge Tracker
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Seachrome Coast
+- You cast Dream Fracture
+- Opponent's Briarbridge Tracker was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Lightmine Field
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Luminarch Aspirant
+- Opponent's Luminarch Aspirant resolved and entered the battlefield
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Intrepid Adversary
+- Opponent's Intrepid Adversary got a +1/+1 counter from Luminarch Aspirant (now 4/2)
+- Phase: Combat damage
+- Opponent's Intrepid Adversary dealt 4 damage to you (now 13)
+- Opponent gained 4 life (now 27)
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Deserted Beach
+- Opponent cast Brutal Cathar
+- Opponent's Brutal Cathar resolved and entered the battlefield
+- It became Day
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Intrepid Adversary
+- Opponent's Intrepid Adversary got a +1/+1 counter from Luminarch Aspirant (now 5/3)
+- Phase: Combat damage
+- Opponent's Luminarch Aspirant dealt 1 damage to you (now 12)
+- Opponent's Intrepid Adversary dealt 5 damage to you (now 7)
+- Opponent gained 5 life (now 32)
+=== Turn 12 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Island
+- Paid {1}{u}{w}{w} for Supreme Verdict with Island #1; Seachrome Coast #1; Glacial Fortress; Island #2
+- You cast Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Brutal Cathar died
+- Opponent's Intrepid Adversary died
+- Opponent's Luminarch Aspirant died
+- Your Supreme Verdict resolved and went to your graveyard
+- Paid {1} for Elixir of Immortality with Island #3
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Katilda, Dawnhart Prime
+- Opponent's Katilda, Dawnhart Prime resolved and entered the battlefield
+- Opponent cast Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset resolved and entered the battlefield
+- Opponent's Teferi, Who Slows the Sunset got 5 loyalty counters (now 5)
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent land with Teferi, Who Slows the Sunset targeting Seachrome Coast #2
+- Opponent used: choose a creature with Teferi, Who Slows the Sunset
+- Opponent used: choose your creature with Teferi, Who Slows the Sunset targeting Katilda, Dawnhart Prime
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Elixir of Immortality
+- Opponent gained 2 life (now 34)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 14 - YOUR turn ===
+- Phase: Upkeep
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #1; Island #2
+- You gained 5 life (now 12)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (4 cards) into your library with Elixir of Immortality
+- Phase: Draw
+- You drew Supreme Verdict
+=== Turn 15 - opponent's turn ===
 - Phase: Untap
 - It became Night
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Island
-=== Turn 19 - YOUR turn ===
-- Phase: Draw
-- You drew Forest
-- Phase: Main phase 1
-- You played Forest
-- You used: Put a level counter with Ranger Class
-- Paid {3}{g} for Ranger Class with Barkchannel Pathway #1; Hengegate Pathway #1; Plains; Hengegate Pathway #2
-- Your Ranger Class got a level counter
+- Opponent played Barkchannel Pathway
+- Phase: Combat damage
+- Opponent's Katilda, Dawnhart Prime dealt 1 damage to you (now 11)
 - Phase: Main phase 2
-- You used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
-- Your Teferi, Who Slows the Sunset lost a loyalty counter
-- Your Teferi, Who Slows the Sunset lost a loyalty counter
-- Your Teferi, Who Slows the Sunset was put into your graveyard from the battlefield
-- You revealed your Brutal Cathar from your library
-- You revealed your Intrepid Adversary from your library
-- You revealed your Sigarda, Champion of Light from your library
-- You revealed 3 cards and took Sigarda, Champion of Light (put in hand)
-- You used: Put a card into hand with Teferi, Who Slows the Sunset targeting Sigarda, Champion of Light
-- Your revealed Sigarda, Champion of Light went to your hand
-- Your revealed Intrepid Adversary went to your library
-- Your revealed Brutal Cathar went to your library
-- Paid {1}{g}{w}{w} for Sigarda, Champion of Light with Deserted Beach #1; Deserted Beach #2; Barkchannel Pathway #2; Forest
-- You cast Sigarda, Champion of Light
-- Opponent cast Essence Scatter
-- Your Sigarda, Champion of Light was COUNTERED by Essence Scatter and went to your graveyard
-- Opponent's Essence Scatter resolved and went to the opponent's graveyard
-=== Turn 20 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 21 - YOUR turn ===
-- Phase: Draw
-- You drew Overgrown Farmland
-- Phase: Main phase 1
-- You played Overgrown Farmland
-=== Turn 22 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Glacial Fortress
-=== Turn 23 - YOUR turn ===
-- Phase: Draw
-- You drew Branchloft Pathway
-- Phase: Main phase 1
-- You chose Play Land for Branchloft Pathway
-- You played Branchloft Pathway
-=== Turn 24 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Plains
-=== Turn 25 - YOUR turn ===
-- Phase: Draw
-- You drew Elite Spellbinder
-- Phase: Main phase 1
-- You played Lair of the Hydra
-- Paid {2}{w} for Elite Spellbinder with Hengegate Pathway #1; Barkchannel Pathway #1; Barkchannel Pathway #2
-- You cast Elite Spellbinder
-- Opponent cast Cancel
-- Your Elite Spellbinder was COUNTERED by Cancel and went to your graveyard
-- Opponent's Cancel resolved and went to the opponent's graveyard
-=== Turn 26 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 27 - YOUR turn ===
-- Phase: Draw
-- You drew Fateful Absence
-=== Turn 28 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 29 - YOUR turn ===
-- Phase: Draw
-- You drew Luminarch Aspirant
-- Phase: Main phase 1
-- Paid {1}{w} for Luminarch Aspirant with Hengegate Pathway #1; Barkchannel Pathway #1
-- You cast Luminarch Aspirant
-- Opponent cast Fall of the Gavel
-- Your Luminarch Aspirant was COUNTERED by Fall of the Gavel and went to your graveyard
-- Opponent gained 5 life (now 16)
-- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
-=== Turn 30 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Seachrome Coast
-=== Turn 31 - YOUR turn ===
-- Phase: Draw
-- You drew Sigarda, Champion of Light
-- Phase: Main phase 1
-- Paid {1}{g}{w}{w} for Sigarda, Champion of Light with Hengegate Pathway #1; Barkchannel Pathway #1; Plains; Hengegate Pathway #2
-- You cast Sigarda, Champion of Light
-- Your Sigarda, Champion of Light resolved and entered the battlefield
-=== Turn 32 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Supreme Verdict
-- Your Sigarda, Champion of Light died
-- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
-=== Turn 33 - YOUR turn ===
-- Phase: Draw
-- You drew Elite Spellbinder
-- Phase: Main phase 1
-- Paid {2}{w} for Elite Spellbinder with Hengegate Pathway #1; Barkchannel Pathway #1; Barkchannel Pathway #2
-- You cast Elite Spellbinder
-- Opponent cast Essence Scatter
-- Your Elite Spellbinder was COUNTERED by Essence Scatter and went to your graveyard
-- Opponent's Essence Scatter resolved and went to the opponent's graveyard
-=== Turn 34 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 35 - YOUR turn ===
-- Phase: Draw
-- You drew Overgrown Farmland
-- Phase: Main phase 1
-- You played Overgrown Farmland
-=== Turn 36 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: End
-- Opponent cast Sphinx's Revelation
-- Opponent gained 3 life (now 19)
-- Opponent drew 3 cards
-- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
-- Phase: Cleanup
-- Opponent discarded Seachrome Coast
-=== Turn 37 - YOUR turn ===
-- Phase: Draw
-- You drew Hengegate Pathway
-- Phase: Main phase 1
-- You chose Play Land for Hengegate Pathway
-- You played Hengegate Pathway
-=== Turn 38 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Island
-=== Turn 39 - YOUR turn ===
-- Phase: Draw
-- You drew Katilda, Dawnhart Prime
-- Phase: Main phase 1
-- Paid {g}{w} for Katilda, Dawnhart Prime with Hengegate Pathway #1; Barkchannel Pathway #1
-- You cast Katilda, Dawnhart Prime
-- Opponent cast Essence Scatter
-- Your Katilda, Dawnhart Prime was COUNTERED by Essence Scatter and went to your graveyard
-- Opponent's Essence Scatter resolved and went to the opponent's graveyard
-=== Turn 40 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Sphinx's Revelation
-- Opponent gained 3 life (now 22)
-- Opponent drew 3 cards
-- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
-- Opponent played Tundra
-- Opponent cast Elixir of Immortality
-- Opponent's Elixir of Immortality resolved and entered the battlefield
-=== Turn 41 - YOUR turn ===
+- Opponent cast Ranger Class
+- Opponent's Ranger Class resolved and entered the battlefield
+- Opponent's Ranger Class got a level counter
+- Opponent's Ranger Class created a 2/2 Wolf token
+- Opponent cast Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset resolved and entered the battlefield
+- Opponent's Teferi, Who Slows the Sunset #2 got 4 loyalty counters (now 4)
+- Opponent used: Put a card into the graveyard with Teferi, Who Slows the Sunset targeting Teferi, Who Slows the Sunset #1
+- Opponent's Teferi, Who Slows the Sunset was put into the opponent's graveyard from the battlefield (that Teferi, Who Slows the Sunset was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+=== Turn 16 - YOUR turn ===
 - Phase: Untap
 - It became Day
 - Phase: Draw
-- You drew Tovolar's Huntmaster
+- You drew Essence Scatter
 - Phase: Main phase 1
-- Paid {4}{g}{g} for Tovolar's Huntmaster with Barkchannel Pathway #1; Barkchannel Pathway #2; Hengegate Pathway #1; Plains; Hengegate Pathway #2; Hengegate Pathway #3
-- You cast Tovolar's Huntmaster
-- Your Tovolar's Huntmaster resolved and entered the battlefield
-- Your Tovolar's Huntmaster created a 2/2 Wolf token
-- Your Tovolar's Huntmaster created a 2/2 Wolf token
-- Phase: Combat begins
-- Opponent cast Path to Exile
-- Your Tovolar's Huntmaster was exiled from the battlefield
-- Opponent's Path to Exile resolved and went to the opponent's graveyard
-- You targeted Plains with Path to Exile's ability (put a card onto the battlefield)
-- You used: Put a card onto the battlefield with Path to Exile targeting Plains
-- Your Plains entered the battlefield from your library
-=== Turn 42 - opponent's turn ===
+- Paid {1}{u}{w}{w} for Supreme Verdict with Island #1; Seachrome Coast #1; Glacial Fortress; Island #2
+- You cast Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Katilda, Dawnhart Prime died
+- Opponent's Wolf died
+- Opponent's Wolf (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+=== Turn 17 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent cast Staff of Nin
-- Opponent's Staff of Nin resolved and entered the battlefield
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 33)
-=== Turn 43 - YOUR turn ===
+- Opponent played Overgrown Farmland
+- Opponent used: Put a level counter with Ranger Class
+- Opponent's Ranger Class got a level counter
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
+- Opponent revealed their Lair of the Hydra from their library
+- Opponent revealed their Deserted Beach from their library
+- Opponent revealed their Hengegate Pathway from their library
+- Opponent used: Put a card into hand with Teferi, Who Slows the Sunset targeting Lair of the Hydra
+- Opponent put the revealed Lair of the Hydra into their hand
+- Opponent put the revealed Hengegate Pathway into their library
+- Opponent put the revealed Deserted Beach into their library
+=== Turn 18 - YOUR turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forest
+- Opponent used: Put a level counter with Ranger Class
+- Opponent's Ranger Class got a level counter
+- Phase: Main phase 2
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent's Teferi, Who Slows the Sunset was put into the opponent's graveyard from the battlefield
+- Opponent used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
+- Opponent revealed their Brutal Cathar from their library
+- Opponent revealed their Intrepid Adversary from their library
+- Opponent revealed their Sigarda, Champion of Light from their library
+- Opponent used: Put a card into hand with Teferi, Who Slows the Sunset targeting Sigarda, Champion of Light
+- Opponent put the revealed Sigarda, Champion of Light into their hand
+- Opponent put the revealed Intrepid Adversary into their library
+- Opponent put the revealed Brutal Cathar into their library
+- Opponent cast Sigarda, Champion of Light
+- Paid {1}{u} for Essence Scatter with Island #1; Island #2
+- You cast Essence Scatter
+- Opponent's Sigarda, Champion of Light was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 20 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+=== Turn 21 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Overgrown Farmland
+=== Turn 22 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 23 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Branchloft Pathway
+=== Turn 24 - YOUR turn ===
 - Phase: Draw
 - You drew Plains
 - Phase: Main phase 1
 - You played Plains
-=== Turn 44 - opponent's turn ===
-- Phase: Untap
-- It became Night
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 32)
+=== Turn 25 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Plains
-- Opponent used: Life with Elixir of Immortality
-- Opponent cast Sphinx's Revelation
-- Opponent gained 3 life (now 25)
-- Opponent drew 3 cards
-- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
-- Opponent gained 5 life (now 30)
-- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
-- Opponent shuffled their graveyard (12 cards) into their library with Elixir of Immortality
+- Opponent played Lair of the Hydra
+- Opponent cast Elite Spellbinder
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains
+- You cast Cancel
+- Opponent's Elite Spellbinder was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 26 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 27 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 28 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+=== Turn 29 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Luminarch Aspirant
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel
+- Opponent's Luminarch Aspirant was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 16)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 30 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 31 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light resolved and entered the battlefield
+=== Turn 32 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- Paid {1}{u}{w}{w} for Supreme Verdict with Island #1; Plains; Seachrome Coast #3; Island #2
+- You cast Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Sigarda, Champion of Light died
+- Your Supreme Verdict resolved and went to your graveyard
+=== Turn 33 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elite Spellbinder
+- Paid {1}{u} for Essence Scatter with Island #3; Island #4
+- You cast Essence Scatter
+- Opponent's Elite Spellbinder was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 34 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 35 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Overgrown Farmland
+=== Turn 36 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: End
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Seachrome Coast #1; Glacial Fortress #1; Island #2; Seachrome Coast #2; Island #3; Island #4; Glacial Fortress #2; Plains; Seachrome Coast #3
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 19)
+- You drew Seachrome Coast
+- You drew Fall of the Gavel
+- You drew Island
+- Your Sphinx's Revelation resolved and went to your graveyard
 - Phase: Cleanup
-- Opponent discarded Lightmine Field
-- Opponent discarded Plains
-=== Turn 45 - YOUR turn ===
-- Phase: Draw
-- You drew Branchloft Pathway
-- Phase: Main phase 1
-- You chose Play Land for Branchloft Pathway
-- You played Branchloft Pathway
-- Phase: Attackers
-- You declared attackers: Wolf, Wolf
-- Phase: Blockers
-- You targeted Wolf #1 (2/2) with Ranger Class's ability (put a +1/+1 counter)
-- You used: Put a +1/+1 counter with Ranger Class targeting Wolf #1
-- Your Wolf #1 got a +1/+1 counter from Ranger Class (now 3/3)
-- Phase: Combat damage
-- Your Wolf dealt 2 damage to the opponent (now 28)
-- Your Wolf dealt 3 damage to the opponent (now 25)
-=== Turn 46 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 31)
+- Cleanup discard (hand 8, limit 7): you chose Seachrome Coast
+- You discarded Seachrome Coast
+=== Turn 37 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent cast Supreme Verdict
-- Your Wolf died (that Wolf was 1 of 2 copies on your battlefield; the other 1 is still there)
-- Your Wolf (token) ceased to exist and left your graveyard
-- Your Wolf died
-- Your Wolf (token) ceased to exist and left your graveyard
-- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
-- Phase: Cleanup
-- Opponent discarded Emrakul, the Aeons Torn
-- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
-- Opponent shuffled their graveyard (4 cards) into their library with Emrakul, the Aeons Torn
-=== Turn 47 - YOUR turn ===
+- Opponent played Hengegate Pathway
+=== Turn 38 - YOUR turn ===
 - Phase: Draw
-- You drew Elite Spellbinder
+- You drew Essence Scatter
 - Phase: Main phase 1
-- Paid {2}{w} for Elite Spellbinder with Hengegate Pathway #1; Barkchannel Pathway #1; Barkchannel Pathway #2
-- You cast Elite Spellbinder
-- Opponent cast Cancel
-- Your Elite Spellbinder was COUNTERED by Cancel and went to your graveyard
-- Opponent's Cancel resolved and went to the opponent's graveyard
-=== Turn 48 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 30)
+- You played Island
+=== Turn 39 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Tundra
-=== Turn 49 - YOUR turn ===
+- Opponent cast Katilda, Dawnhart Prime
+- Paid {1}{u} for Essence Scatter with Island #1; Plains
+- You cast Essence Scatter
+- Opponent's Katilda, Dawnhart Prime was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 40 - YOUR turn ===
 - Phase: Draw
-- You drew Overgrown Farmland
+- You drew Sphinx's Revelation
 - Phase: Main phase 1
-- You played Overgrown Farmland
-- Phase: Main phase 2
-- You used: becomes a 1/1 hydra with Lair of the Hydra
-- Paid {1}{g} for Lair of the Hydra with Barkchannel Pathway #1; Hengegate Pathway #1
-=== Turn 50 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 29)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Plains
-- Phase: Cleanup
-- Opponent discarded Fall of the Gavel
-=== Turn 51 - YOUR turn ===
-- Phase: Draw
-- You drew Katilda, Dawnhart Prime
-- Phase: Main phase 1
-- Paid {g}{w} for Katilda, Dawnhart Prime with Hengegate Pathway #1; Barkchannel Pathway #1
-- You cast Katilda, Dawnhart Prime
-- Opponent cast Dream Fracture
-- Your Katilda, Dawnhart Prime was COUNTERED by Dream Fracture and went to your graveyard
-- Opponent drew a card
-- You drew Augur of Autumn
-- Opponent's Dream Fracture resolved and went to the opponent's graveyard
-- Paid {1}{g}{g} for Augur of Autumn with Barkchannel Pathway #2; Forest; Plains #1
-- You cast Augur of Autumn
-- Opponent cast Dream Fracture
-- Your Augur of Autumn was COUNTERED by Dream Fracture and went to your graveyard
-- Opponent drew a card
-- You drew Sigarda, Champion of Light
-- Opponent's Dream Fracture resolved and went to the opponent's graveyard
-- Paid {1}{g}{w}{w} for Sigarda, Champion of Light with Hengegate Pathway #2; Branchloft Pathway #1; Hengegate Pathway #3; Plains #2
-- You cast Sigarda, Champion of Light
-- Opponent cast Cancel
-- Your Sigarda, Champion of Light was COUNTERED by Cancel and went to your graveyard
-- Opponent's Cancel resolved and went to the opponent's graveyard
-=== Turn 52 - opponent's turn ===
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Seachrome Coast #1; Glacial Fortress #1; Island #2; Seachrome Coast #2; Island #3; Island #4; Glacial Fortress #2; Plains; Seachrome Coast #3; Island #5
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 22)
+- You drew Elixir of Immortality
+- You drew Sphinx's Revelation
+- You drew Tundra
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Tundra
+- Paid {1} for Elixir of Immortality from mana already floating
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 41 - opponent's turn ===
 - Phase: Untap
 - It became Day
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 28)
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent cast Sphinx's Revelation
-- Opponent gained 3 life (now 28)
-- Opponent drew 3 cards
-- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
-- Opponent played Island
-- Phase: Cleanup
-- Opponent discarded Final Judgment
-- Opponent discarded Final Judgment
-=== Turn 53 - YOUR turn ===
-- Phase: Draw
-- You drew Brutal Cathar
-- Phase: Main phase 1
-- Paid {2}{w} for Brutal Cathar with Hengegate Pathway #1; Barkchannel Pathway #1; Barkchannel Pathway #2
-- You cast Brutal Cathar
-- Your Brutal Cathar resolved and entered the battlefield
-- You used: becomes a 1/1 hydra with Lair of the Hydra
-- Paid {1}{g} for Lair of the Hydra with Forest; Plains #1
-- Phase: Attackers
-- You declared attackers: Lair of the Hydra
-- Phase: Blockers
-- You used: Put a +1/+1 counter with Ranger Class targeting Lair of the Hydra
-- Your Lair of the Hydra got a +1/+1 counter from Ranger Class (now 2/2)
-- Phase: Combat damage
-- Your Lair of the Hydra dealt 2 damage to the opponent (now 26)
-=== Turn 54 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 27)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Seachrome Coast
-- Opponent cast Path to Exile
-- Your Brutal Cathar was exiled from the battlefield
-- Opponent's Path to Exile resolved and went to the opponent's graveyard
-=== Turn 55 - YOUR turn ===
-- Phase: Draw
-- You drew Intrepid Adversary
-- Phase: Main phase 1
-- Paid {1}{w} for Intrepid Adversary with Hengegate Pathway #1; Barkchannel Pathway #1
-- You cast Intrepid Adversary
-- Opponent cast Essence Scatter
-- Your Intrepid Adversary was COUNTERED by Essence Scatter and went to your graveyard
-- Opponent's Essence Scatter resolved and went to the opponent's graveyard
-- You used: becomes a 1/1 hydra with Lair of the Hydra
-- Paid {1}{g} for Lair of the Hydra with Barkchannel Pathway #2; Plains #1
-- Phase: Attackers
-- You declared attackers: Lair of the Hydra
-- Phase: Blockers
-- You used: Put a +1/+1 counter with Ranger Class targeting Lair of the Hydra
-- Your Lair of the Hydra got a +1/+1 counter from Ranger Class (now 3/3)
-- Phase: Combat damage
-- Your Lair of the Hydra dealt 3 damage to the opponent (now 23)
-=== Turn 56 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 26)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Cleanup
-- Opponent discarded Supreme Verdict
-=== Turn 57 - YOUR turn ===
-- Phase: Untap
-- It became Night
-- Phase: Draw
-- You drew Fateful Absence
-- Phase: Main phase 1
-- You used: becomes a 1/1 hydra with Lair of the Hydra
-- Paid {1}{g} for Lair of the Hydra with Barkchannel Pathway #1; Hengegate Pathway #1
+- Opponent cast Tovolar's Huntmaster
+- Opponent's Tovolar's Huntmaster resolved and entered the battlefield
+- Opponent's Tovolar's Huntmaster created a 2/2 Wolf token
+- Opponent's Tovolar's Huntmaster created a 2/2 Wolf token
 - Phase: Combat begins
-- Opponent cast Path to Exile
-- Your Lair of the Hydra was exiled from the battlefield
-- Opponent's Path to Exile resolved and went to the opponent's graveyard
-=== Turn 58 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 25)
+- Paid {w} for Path to Exile with Tundra
+- You targeted Tovolar's Huntmaster (6/6) with Path to Exile
+- You cast Path to Exile
+- Opponent's Tovolar's Huntmaster was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 42 - YOUR turn ===
 - Phase: Draw
-- Opponent drew a card
+- You drew Staff of Nin
 - Phase: Main phase 1
-- Opponent cast Elixir of Immortality
-- Opponent's Elixir of Immortality resolved and entered the battlefield
-- Opponent used: Life with Elixir of Immortality
-- Opponent gained 5 life (now 28)
-- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
-- Opponent shuffled their graveyard (12 cards) into their library with Elixir of Immortality
-=== Turn 59 - YOUR turn ===
-- Phase: Draw
-- You drew Ranger Class
-- Phase: Main phase 1
-- Paid {1}{g} for Ranger Class with Barkchannel Pathway #1; Hengegate Pathway #1
-- You cast Ranger Class
-- Your Ranger Class resolved and entered the battlefield
-- Your Ranger Class #2 got a level counter
-- Your Ranger Class created a 2/2 Wolf token
-- You used: Put a level counter with Ranger Class #2
-- Paid {1}{g} for Ranger Class with Barkchannel Pathway #2; Plains #1
-- Your Ranger Class #2 got a level counter
-- You used: Put a level counter with Ranger Class #2
-- Paid {3}{g} for Ranger Class with Forest; Hengegate Pathway #2; Hengegate Pathway #3; Plains #2
-- Your Ranger Class #2 got a level counter
-=== Turn 60 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 24)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Plains
-- Phase: Cleanup
-- Opponent discarded Supreme Verdict
-=== Turn 61 - YOUR turn ===
-- Phase: Draw
-- You drew Branchloft Pathway
-- Phase: Main phase 1
-- You chose Play Land for Branchloft Pathway
-- You played Branchloft Pathway
-- Phase: Attackers
-- You declared attackers: Wolf
-- Phase: Blockers
-- You used: Put a +1/+1 counter with Ranger Class #2 targeting Wolf
-- Your Wolf got a +1/+1 counter from Ranger Class (now 3/3)
-- You used: Put a +1/+1 counter with Ranger Class #1 targeting Wolf
-- Your Wolf got a +1/+1 counter from Ranger Class (now 4/4)
-- Phase: Combat damage
-- Your Wolf dealt 4 damage to the opponent (now 24)
-=== Turn 62 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 23)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Emrakul, the Aeons Torn
-- Opponent's Emrakul, the Aeons Torn resolved and entered the battlefield
-- Phase: Cleanup
-- Opponent discarded Supreme Verdict
-=== Turn 63 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 22)
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Plains
-- Opponent cast Staff of Nin
-- Opponent's Staff of Nin resolved and entered the battlefield
-- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 21)
-- Phase: Blockers
-- You targeted Hengegate Pathway #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You targeted Barkchannel Pathway #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You targeted Plains #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You targeted Hengegate Pathway #2 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You targeted Barkchannel Pathway #2 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You targeted Plains #2 with Emrakul, the Aeons Torn's ability (Sacrifice)
-- You used: Sacrifice with Emrakul, the Aeons Torn targeting Hengegate Pathway #1, Barkchannel Pathway #1, Plains #1, Hengegate Pathway #2, Barkchannel Pathway #2, Plains #2
-- Your Hengegate Pathway was put into your graveyard from the battlefield (that Hengegate Pathway was 1 of 3 copies on your battlefield; the other 2 are still there)
-- Your Barkchannel Pathway was put into your graveyard from the battlefield (that Barkchannel Pathway was 1 of 2 copies on your battlefield; the other 1 is still there)
-- Your Plains was put into your graveyard from the battlefield (that Plains was 1 of 3 copies on your battlefield; the other 2 are still there)
-- Your Hengegate Pathway was put into your graveyard from the battlefield (that Hengegate Pathway was 1 of 2 copies on your battlefield; the other 1 is still there)
-- Your Barkchannel Pathway was put into your graveyard from the battlefield
-- Your Plains was put into your graveyard from the battlefield (that Plains was 1 of 2 copies on your battlefield; the other 1 is still there)
-- Phase: Combat damage
-- Opponent's Emrakul, the Aeons Torn dealt 15 damage to you (now 6)
-=== Turn 64 - YOUR turn ===
-- Phase: Draw
-- You drew Branchloft Pathway
-- Phase: Main phase 1
-- You chose Play Land for Branchloft Pathway
-- You played Branchloft Pathway
-- Phase: Attackers
-- You declared attackers: Wolf
-- Phase: Blockers
-- You used: Put a +1/+1 counter with Ranger Class #2 targeting Wolf
-- Your Wolf got a +1/+1 counter from Ranger Class (now 5/5)
-- You used: Put a +1/+1 counter with Ranger Class #1 targeting Wolf
-- Your Wolf got a +1/+1 counter from Ranger Class (now 6/6)
-- Phase: Combat damage
-- Your Wolf dealt 6 damage to the opponent (now 18)
-=== Turn 65 - opponent's turn ===
-- Phase: Upkeep
-- Opponent drew a card
-- Opponent used: Deal 1 damage with Staff of Nin #1 targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 5)
-- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
-- Opponent's Staff of Nin dealt 1 damage to you (now 4)
-- Opponent drew a card
-- Phase: Draw
-- Opponent drew a card
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Island #4; Island #5; Plains
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 33)
 
 --- CURRENT SITUATION ---
-Phase: Blockers | It is the opponent's turn.
-It is currently Night.
-Your life: 4 | Opponent life: 18
-Mana available: 13 total (untapped sources, tapped automatically when you cast; colours you can make: {g}{u}{w} (sources that can make each: {W} 8, {U} 2, {G} 9 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
-  Those sources, one per untapped card: Deserted Beach #1 {w} or {u}; Deserted Beach #2 {w} or {u}; Overgrown Farmland #1 {g} or {w}; Forest {g}; Overgrown Farmland #2 {g} or {w}; Branchloft Pathway #1 {g}; Overgrown Farmland #3 {g} or {w}; Hengegate Pathway {w}; Plains {w}; Branchloft Pathway #2 {g}; Overgrown Farmland #4 {g} or {w}; Branchloft Pathway #3 {g}; Branchloft Pathway #4 {g}
-Your hand (2 cards): Fateful Absence (copy 1 of 2 in your hand) {1}{w} [instant]; Fateful Absence (copy 2 of 2 in your hand) {1}{w} [instant]
-Your battlefield (16 permanents listed, of which 1 is a creature, 1 of them without a restriction against attacking, and 13 are lands): Branchloft Pathway #1-#4 x4; Deserted Beach #1; Deserted Beach #2; Forest; Hengegate Pathway; Overgrown Farmland #1-#4 x4; Plains; Ranger Class #1 {1}{g} [enchantment] [counters: 3x level]; Ranger Class #2 {1}{g} [enchantment] [counters: 3x level]; Wolf (6/6) (printed 2/2) [counters: 4x +1/+1] [tapped - cannot attack or block this turn]
-Opponent battlefield (22 permanents listed, of which 1 is a creature, 1 of them is attacking right now, 0 more able to attack right now, and 19 are lands): Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, protection from colored spells] [tapped - attacking] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Glacial Fortress #1; Glacial Fortress #2; Island #1-#6 x6; Plains #1-#5 x5; Seachrome Coast #1-#4 x4; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1; Tundra #2
-Opponent hand size: 10 | Opponent library: 26 cards
-Artifacts in play: you 0 | opponent 2
-Your library: 14 cards
+Phase: Main phase 1 | It is your turn.
+It is currently Day.
+Your life: 22 | Opponent life: 33
+Mana available: 6 total (six untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 6, {U} 6 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Seachrome Coast #1 {w} or {u}; Glacial Fortress #1 {w} or {u}; Seachrome Coast #2 {w} or {u}; Glacial Fortress #2 {w} or {u}; Seachrome Coast #3 {w} or {u}; Tundra {w} or {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (6 cards): Emrakul, the Aeons Torn {15} (15/15) [creature]; Lightmine Field {2}{w}{w} [enchantment]; Supreme Verdict {1}{u}{w}{w} [sorcery]; Final Judgment {4}{w}{w} [sorcery]; Fall of the Gavel {3}{u}{w} [instant]; Sphinx's Revelation {u}{u}{w}{x} [instant]
+Your battlefield (14 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 12 are lands): Elixir of Immortality {1} [artifact] {effect: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}; Glacial Fortress #1; Glacial Fortress #2; Island #1-#5 [tapped] x5; Plains [tapped]; Seachrome Coast #1-#3 x3; Staff of Nin {6} [artifact] [tapped] {effect: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra
+Opponent battlefield (18 permanents listed, of which 2 are creatures, 2 of them without a restriction against attacking, and 15 are lands): Barkchannel Pathway #1 [tapped]; Barkchannel Pathway #2 [tapped]; Branchloft Pathway; Deserted Beach #1; Deserted Beach #2; Forest; Hengegate Pathway #1-#3 [tapped] x3; Lair of the Hydra; Overgrown Farmland #1-#3 x3; Plains #1 [tapped]; Plains #2 [tapped]; Ranger Class {1}{g} [enchantment] [counters: 3x level] {effect: "(Gain the next level as a sorcery to add... -- When Ranger Class enters, create a 2/2... -- {1}{G}: Level 2 -- Whenever you attack, put a +1/+1 counter... -- {3}{G}: Level 3 -- You may look at the top card of your library... -- You may cast creature spells from the top of your library."}; Wolf #1 (2/2); Wolf #2 (2/2)
+Opponent hand size: 1 | Opponent library: 27 cards
+Artifacts in play: you 2 | opponent 0
+Your library: 29 cards
 
-YOUR PLAN (as you last stated it, 1 window ago on turn 65): Emrakul is attacking and I cannot block it (it has flying and I have no fliers). I will take the 15 damage, dropping to 0 life, and lose the game. There is no legal way to counter Emrakul (protection from colored spells) or remove it before combat damage. My only hope was a counter-spell or removal, but I have none. The game is lost.
+YOUR PLAN (as you last stated it, 1 window ago on turn 42): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
 
-FORCED sacrifice OF YOUR OWN CARDS: the opponent's effect (Emrakul, the Aeons Torn) forces YOU to sacrifice one of your OWN cards from the list below - each option is a card YOU will LOSE, not something you affect or attack. Pick the card you can best AFFORD TO LOSE (usually your LEAST valuable: pitch a spare land or a redundant/dead card, and KEEP your best spells, answers, and threats). Choose card 1 of exactly 6 from the list below, and answer with the chosen card's name.
-1. Deserted Beach #1 [land] [your battlefield] - "Deserted Beach enters tapped unless you control two or more other lands. -- {T}: Add {W} or {U}."
-2. Deserted Beach #2 [land] [your battlefield] - "Deserted Beach enters tapped unless you control two or more other lands. -- {T}: Add {W} or {U}."
-3-6. Overgrown Farmland #1-#4 [land] [your battlefield] - "Overgrown Farmland enters tapped unless you control two or more other lands. -- {T}: Add {G} or {W}." x4
-7. Forest [land] [your battlefield] - "G"
-8-11. Branchloft Pathway #1-#4 [land] [your battlefield] - "{T}: Add {G}. // Boulderloft Pathway" x4
-12. Hengegate Pathway [land] [your battlefield] - "{T}: Add {W}. // Mistgate Pathway"
-13. Plains [land] [your battlefield] - "W"
-14. Wolf (6/6) [your battlefield] [tapped]
-15. Night [your battlefield] - "As it becomes night, transform all daybound permanents. -- Permanents enter the battlefield nightbound. -- If..."
-16. Ranger Class #1 [enchantment] [your battlefield] - "(Gain the next level as a sorcery to add its ability.) -- When Ranger Class enters, create a 2/2 green Wolf..."
-17. Ranger Class #2 [enchantment] [your battlefield] - "(Gain the next level as a sorcery to add its ability.) -- When Ranger Class enters, create a 2/2 green Wolf..."
-An option whose number is a RANGE ("5-430.") is that many SEPARATE options whose text was identical apart from the instance ordinal, printed once. Every number in the range is a real, separately choosable option: 5 is the option for the first instance of the printed #N range, 6 the next, and so on to the last. When the collapsed row carries NO #N ordinal, the options in the range are interchangeable copies of the same thing and any number in the range picks one of them. A range whose row reads "(copies 3-6 of 6 in this list)" is the same thing in that list's own copy notation: each number in the range is one of those copies, in order. A line reading "The same 4 options as 8-11, with <source> #2 as the source instead of #1" is that many SEPARATE options that pair up ONE FOR ONE with the options in the range it names: its first number is the same choice as the first number of that range, its second the same as the second, and so on - the only difference is which copy of the source does it. Nothing is hidden: read the option you want off the range it names. Answer with ONE number from inside the range exactly as you would any other option number.
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+1. Cast Lightmine Field {2}{w}{w} {right now: they control 2 creatures able to attack - deals 2 to each if all 2 attack} {leaves 2 of your 6 untapped mana sources untapped} {spends 4 of your 6 untapped mana sources this turn; Sphinx's Revelation {u}{u}{w}{x} in your hand needs 3} {card text: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."} {leaves 2 sources - rows 2 and 3 need more mana sources than the 2 this leaves}
+2. Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 2 of their creatures (2 without a restriction against attacking), 0 of yours} {leaves 2 of your 6 untapped mana sources untapped} {spends 4 of your 6 untapped mana sources this turn; Sphinx's Revelation {u}{u}{w}{x} in your hand needs 3} {card text: "Supreme Verdict can't be countered. -- Destroy all creatures."} {leaves 2 sources - rows 1 and 3 need more mana sources than the 2 this leaves}
+3. Cast Final Judgment {4}{w}{w} {right now: exiles 2 of their creatures (2 without a restriction against attacking), 0 of yours} {leaves 0 of your 6 untapped mana sources untapped - casting this taps you out} {spends 6 of your 6 untapped mana sources this turn; Sphinx's Revelation {u}{u}{w}{x} in your hand needs 3} {card text: "Exile all creatures."} {taps you out - rows 1 and 2 need more mana sources than the 0 this leaves}
+4. Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=3 (6 mana total); each point of X gains you 1 life and draws you 1 card} {card text: "You gain X life and draw X cards."}
+5. Cast nothing right now (combat comes next this turn)
+6. Hold priority for the rest of this turn: pass now, and do not ask me again unless the board changes (any change re-opens this window; you give up no cast) {taking this row skips the rest of this turn's identical windows}
 
-On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Deserted Beach #1 - "Deserted Beach enters tappe)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+[you declined this exact list 10 times already this turn]
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Lightmine Field)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
