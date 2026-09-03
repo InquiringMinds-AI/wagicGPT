@@ -298,6 +298,13 @@ int TestSuiteAI::Act(float)
             mNarrationLog.push_back(el);
             mLastExileRegister = el;
         }
+        //#W54-D (D3/D6): the own-card chooser's framing header.
+        string ol = ownCardChooserRegister(observer, this);
+        if (!ol.empty() && ol != mLastOwnChooserRegister)
+        {
+            mNarrationLog.push_back(ol);
+            mLastOwnChooserRegister = ol;
+        }
     }
 #endif
 

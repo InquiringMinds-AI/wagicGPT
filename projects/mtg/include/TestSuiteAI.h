@@ -184,6 +184,7 @@ public:
     //stack line that survives twenty ticks is recorded once.
     string mLastStackRegister;
     string mLastExileRegister;
+    string mLastOwnChooserRegister; //#W54-D (D3/D6)
     MTGCardInstance * mCounteredMark;
     string mCounteredMarkBy;
     virtual int receiveEvent(WEvent * event);

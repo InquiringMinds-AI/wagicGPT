@@ -4589,8 +4589,10 @@ const char * kOptionRangeNote =
     " whose text was identical apart from the instance ordinal, printed once."
     " Every number in the range is a real, separately choosable option: 5 is the"
     " option for the first instance of the printed #N range, 6 the next, and so on"
-    " to the last. Answer with ONE number from inside the range exactly as you"
-    " would any other option number.\n";
+    " to the last. When the collapsed row carries NO #N ordinal, the options in"
+    " the range are interchangeable copies of the same thing and any number in"
+    " the range picks one of them. Answer with ONE number from inside the range"
+    " exactly as you would any other option number.\n";
 
 //#W48 (D2 + D12's lesson): the numbered lists are ordered by the engine, and
 //that order is LEXICOGRAPHIC on the target name - "Vampire #1, #10, #100, #101,
@@ -4622,6 +4624,20 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
             rank[i] = r;
             count[key[i]]++;
         }
+        //#W54-D (D3/D8a): a row with NO instance ordinal cannot be keyed on a
+        //handle, and a library-search / damage-order menu is made ENTIRELY of
+        //such rows - 17 byte-identical `Mountain [land] [your library] - "R"`
+        //at 130v125 seq 69, twelve identical `Vampire (2/2) [flying, ...]` at
+        //152v123 s23. Key those on the ROW itself, in their own namespace, so
+        //the gather reaches them as well; joinNumberedRows prints the run as a
+        //label range with no "#a-#b" tail (there is no ordinal to print).
+        //Nothing is deleted: every member keeps its own option number.
+        else
+        {
+            key[i] = string("\x03") + rows[i];
+            rank[i] = 0;
+            count[key[i]]++;
+        }
     }
     bool worth = false;
     for (std::map<string, int>::const_iterator it = count.begin(); it != count.end() && !worth; ++it)
@@ -4634,7 +4650,7 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
     out.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); i++)
     {
-        if (rank[i] <= 0 || count[key[i]] < (int) kBattlefieldCollapseFloor)
+        if (key[i].empty() || count[key[i]] < (int) kBattlefieldCollapseFloor)
         {
             out.push_back(i);
             continue;
@@ -4643,7 +4659,9 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
             continue; //already gathered at its first member
         vector<std::pair<int, size_t> > members;
         for (size_t j = i; j < rows.size(); j++)
-            if (rank[j] > 0 && key[j] == key[i])
+            if (key[j] == key[i])
+                //#W54-D (D8a): handle-less members all carry rank 0, so the sort
+                //below falls through to the row index and keeps their list order.
                 members.push_back(std::make_pair(rank[j], j));
         std::sort(members.begin(), members.end());
         for (size_t m = 0; m < members.size(); m++)
@@ -4671,8 +4689,23 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
             while (j < rows.size() && rank[j] == rank[i] + (int) (j - i)
                    && head[j] == head[i] && tail[j] == tail[i])
                 j++;
+        else
+            //#W54-D (D8a): a run of BYTE-IDENTICAL rows carrying no instance
+            //ordinal. The 17 library Mountains had nothing to collapse on and
+            //printed 17 times.
+            while (j < rows.size() && rank[j] <= 0 && rows[j] == rows[i])
+                j++;
         size_t run = j - i;
-        if (rank[i] > 0 && run >= kBattlefieldCollapseFloor)
+        if (rank[i] <= 0 && run >= kBattlefieldCollapseFloor)
+        {
+            //#W54-D (D8a): the label range only - no "#a-#b", because these
+            //rows carry no ordinal; kOptionRangeNote says what such a range is.
+            o << (i + 1) << "-" << j << ". " << rows[i] << " x" << run << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else if (rank[i] > 0 && run >= kBattlefieldCollapseFloor)
         {
             o << (i + 1) << "-" << j << ". " << head[i]
               << " #" << rank[i] << "-#" << (rank[i] + (int) run - 1)
@@ -4688,6 +4721,30 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
         }
     }
     return o.str();
+}
+
+//#W54-D (D8b): every row of this option list is BYTE-IDENTICAL and none of
+//them carries an instance ordinal, so the de-duplicated list has length ONE
+//and the render itself says the members are interchangeable. This is the
+//existing "one option = no decision" rule (askModel returns 0 without a model
+//call) applied to N indistinguishable outcomes rather than one: 16 asks / 147
+//rows / 2.9 min of the wave-53 corpus were this shape, and one of them
+//(152v123 s29) answered out of range and burned a fallback. The ordinal test is
+//what keeps it honest - if the engine prints anything that TELLS the rows
+//apart, this returns false and the model keeps the ask. Pure, so the boundary
+//is provable.
+bool identicalInterchangeableRows(const vector<string>& rows)
+{
+    if (rows.size() < 2)
+        return false;
+    string head, tail;
+    int rank = 0;
+    if (splitRowHandle(rows[0], head, tail, rank))
+        return false; //an instance ordinal distinguishes what the render prints
+    for (size_t i = 1; i < rows.size(); i++)
+        if (rows[i] != rows[0])
+            return false;
+    return true;
 }
 
 //#W47 (R7): does THIS window's option block already speak for the permanent
@@ -9130,7 +9187,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -9706,6 +9763,9 @@ void AIPlayerGPT::logGameEnd()
         //#W53-N (D2): windows the model's own HOLD row closed. Not a window
         //removed - a window the model answered once and did not want re-put.
         {"hold_windows_skipped", mHoldWindowsSkipped},
+        //#W54-D (D8b): asks whose whole option list rendered as one
+        //interchangeable row and were resolved without a model call.
+        {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
     };
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
@@ -17313,6 +17373,21 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //and taking it silently is the very silence #W41-1 forbids.
     if (optionsIn.size() == 1 && !askEvenIfSingle)
         return 0;
+    //#W54-D (D8b), gated on D8a having shown the choice vacuous: the rows are
+    //byte-identical and ordinal-free, so every number answers the same
+    //question with the same consequence. Not a cap on a legal choice - the
+    //choice has ONE distinguishable outcome, and the model is spared a 20 KB
+    //prompt to pick between copies of it. Counted onto the gameend record the
+    //way mana_only_windows_skipped is, so a corpus can still see the window.
+    if (!askEvenIfSingle && identicalInterchangeableRows(optionsIn))
+    {
+        mIdenticalOptionAsksResolved++;
+        DebugTrace("AIPlayerGPT: ask resolved internally - " << optionsIn.size()
+                   << " interchangeable identical options: " << optionsIn[0]);
+        if (narrateChoice && !askNarration.empty() && !askNarration[0].empty())
+            narrateDecision(askNarration[0]);
+        return 0;
+    }
     if (mEndpoint.empty())
         return -1; //no endpoint: caller falls back to the heuristic
 
@@ -20076,14 +20151,72 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
     return cands[pick];
 }
 
+//#W54-D (D3): the AAMover buried inside the ability that is waiting for this
+//chooser's answer. A granted search rides wrappers (TargetAbility, the `and!()`
+//MultiAbility), so the direct dynamic_cast at the call site finds nothing; walk
+//the nesting the way unwrapDamagerAbility does. Two movers = ambiguous, so no
+//answer (a wrong destination would be worse than none). Depth-capped.
+static AAMover * unwrapMoverAbility(MTGAbility * a, int depth)
+{
+    if (!a || depth > 5)
+        return NULL;
+    if (AAMover * mv = dynamic_cast<AAMover *>(a))
+        return mv;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return unwrapMoverAbility(na->ability, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+    {
+        AAMover * found = NULL;
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (AAMover * mv = unwrapMoverAbility(ma->abilities[i], depth + 1))
+            {
+                if (found)
+                    return NULL; //two movers: destination ambiguous
+                found = mv;
+            }
+        return found;
+    }
+    return NULL;
+}
+
+//#W54-D (D3): the script's own `moveTo(...)` argument, read as a GAIN
+//destination for the player who is choosing. Returns "battlefield" / "hand"
+//when the chosen card ends up under the CHOOSER's control, "" for a loss
+//destination (exile, graveyard, library) or an opponent-side one. Pure over the
+//string the parser stored, so the branch is provable and never dereferences a
+//zone with a NULL target.
+static string moverGainDestination(const string& dest)
+{
+    string d;
+    for (size_t i = 0; i < dest.size(); i++)
+        d += (char) tolower((unsigned char) dest[i]);
+    if (d.find("opponent") != string::npos || d.find("targetedplayer") != string::npos)
+        return "";
+    if (d.find("battlefield") != string::npos || d.find("inplay") != string::npos)
+        return "battlefield";
+    if (d.find("hand") != string::npos)
+        return "hand";
+    return "";
+}
+
 //N-139b: map a lowercased "what the engine will do" string (built from the chooser
 //source name AND the acting ability's menu verb) to the human verb for a
 //remove-from-your-own-cards ask. Returns "" when no remove/lose verb is present.
 //Sets relocate=true for a keep-the-card relocation (put back into library) as
 //opposed to an outright loss. Pure helper for a deterministic proof.
-static string handRemovalVerb(const string& lc, bool& relocate)
+//#W54-D (D3, R163): `gainDest` is the DESTINATION the chosen card is headed
+//for. Path to Exile's granted search reads `moveTo(mybattlefield)` and the
+//chosen basic land is PUT ONTO THE BATTLEFIELD - but the detection string
+//carries the source card's own name, "path to exile" contains "exile", and the
+//verb was decided by the NAME before anything read the destination: 8 of 8
+//renders told the beneficiary of a compensation search to pick the card it
+//could best afford to LOSE. A gain destination is not a removal at all, so the
+//verb table answers "" and the caller frames the ask as the gain it is.
+static string handRemovalVerb(const string& lc, bool& relocate, const string& gainDest = "")
 {
     relocate = false;
+    if (!gainDest.empty())
+        return "";
     if (lc.find("discard") != string::npos) return "discard";
     if (lc.find("exploit") != string::npos) return "sacrifice";
     if (lc.find("sacrifice") != string::npos) return "sacrifice";
@@ -20145,6 +20278,111 @@ static string buildHandRemovalAsk(const string& verb, bool byOpponent, bool relo
     }
     q << " from the list below, and answer with the chosen card's name.";
     return q.str();
+}
+
+//#W54-D (D3): the ask for a search/move whose chosen card the DECIDING player
+//GAINS. Same "these are your own cards, this is not a target you attack" frame
+//as the loss ask - and the OPPOSITE value ordering, because the right pick is
+//the card you most need rather than the one you can best spare. Pure helper so
+//the emitted strings are provable.
+static string buildHandGainAsk(const string& where, const string& effectName,
+                               bool multi, bool unlimited, bool targetMin,
+                               int maxtargets, size_t pickIndex)
+{
+    bool toHand = (where == "hand");
+    std::ostringstream q;
+    q << (toHand ? "CHOOSE A CARD TO PUT INTO YOUR HAND: "
+                 : "CHOOSE A CARD TO PUT ONTO THE BATTLEFIELD: ")
+      << effectName << "'s effect puts a card you choose from the list below "
+      << (toHand ? "into YOUR hand" : "onto YOUR battlefield")
+      << " - each option is a card you GAIN, NOT a card you lose and NOT a target"
+         " you attack or affect. Pick the card you MOST NEED right now (with"
+         " basic lands, the colour your hand and your board are shortest of). ";
+    if (!multi)
+        q << (toHand ? "Choose the ONE card to put into your hand"
+                     : "Choose the ONE card to put onto the battlefield");
+    else
+    {
+        q << "Choose card " << (pickIndex + 1);
+        if (!unlimited)
+            q << " of " << (targetMin ? "exactly " : "up to ") << maxtargets;
+    }
+    q << " from the list below, and answer with the chosen card's name.";
+    return q.str();
+}
+
+//#W54-D (D25, R185): cheapest-first rank for a FORCED-loss list. The 23-row
+//annihilator menu at 126v125 seq 111 arrived in battlefield order with the
+//seat's only lifelink Vampire LAST, under a header telling the pilot to pick
+//its least valuable card - and row 23 is what it picked. Lands rank below
+//everything (they are the header's own example of the right pick), then
+//ascending mana value; the sort is STABLE, so battlefield order survives inside
+//each tier. Representation only - no option removed, no option merged.
+static int sacrificeCostRank(Targetable * t)
+{
+    MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t);
+    if (!c)
+        return 1000; //a player or other targetable is never the cheap pick
+    if (c->hasType(Subtypes::TYPE_LAND))
+        return -1;
+    ManaCost * mc = c->getManaCost();
+    return mc ? mc->getConvertedCost() : 0;
+}
+
+//#W54-D (D3/D6): the third register hook. The own-card chooser's FRAMING - the
+//verb, the destination, and whose effect is forcing it - is a render surface
+//the suite cannot otherwise see: the zones are identical whether the header
+//says "pick the card you can best afford to LOSE" or "pick the card you MOST
+//NEED", and identical whether it says "your own effect" or "the opponent's
+//effect". Runs the PRODUCTION builders over the live chooser, so a red here is
+//a red render. Emits nothing unless the chooser is a removal/move over the
+//seat's own cards, so every other fixture pays one scan and logs nothing.
+string ownCardChooserRegister(GameObserver * observer, Player * seat)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return "";
+    TargetChooser * tc = observer->getCurrentTargetChooser();
+    if (!tc || !tc->source || tc->Owner != seat)
+        return "";
+    MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+    string effectName;
+    if (waiting)
+        effectName = resolveOwningCardName(waiting->source);
+    if (effectName.empty())
+        effectName = resolveOwningCardName(tc->source);
+    if (effectName.empty())
+        effectName = "this effect";
+    string lc = effectName;
+    if (AAMover * mv = dynamic_cast<AAMover *>(waiting))
+    {
+        lc += " ";
+        lc += mv->getMenuText(tc);
+    }
+    else if (waiting)
+    {
+        lc += " ";
+        lc += waiting->getMenuText();
+    }
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    string gainDest;
+    if (AAMover * mvd = unwrapMoverAbility(waiting, 0))
+        gainDest = moverGainDestination(mvd->destination);
+    bool relocate = false, relocateIgnored = false;
+    string lossVerb = handRemovalVerb(lc, relocate, gainDest);
+    bool wouldBeLoss = !handRemovalVerb(lc, relocateIgnored).empty();
+    MTGCardInstance * granter = tc->source;
+    if (granter && granter->getDisplayName().empty() && granter->storedSourceCard)
+        granter = granter->storedSourceCard;
+    bool selfInflicted = granter && granter->controller() == seat;
+    if (!lossVerb.empty())
+        return "own-card chooser: "
+             + buildHandRemovalAsk(lossVerb, !selfInflicted, relocate, effectName,
+                                   false, false, false, 1, 0);
+    if (wouldBeLoss && !gainDest.empty())
+        return "own-card chooser: "
+             + buildHandGainAsk(gainDest, effectName, false, false, false, 1, 0);
+    return "";
 }
 
 //N-139a: role-named ask for the mutate-HOST target step (placement 1=over,
@@ -20434,6 +20672,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //self-inflicted (your own loot) vs opponent-forced (the validated deck140
         //path, kept byte-identical) vs a keep-the-card relocation (put back).
         bool forcedSelfLoss = false;
+        //#W54-D (D3): the same shape with a GAIN destination - a compensation
+        //search whose chosen card comes to the chooser, not away from it.
+        bool forcedSelfGain = false;
+        string gainDest;
         bool relocateNotLoss = false;
         bool selfInflicted = false;
         string lossVerb;
@@ -20453,8 +20695,17 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 lc += waiting->getMenuText();
             }
             for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
-            lossVerb = handRemovalVerb(lc, relocateNotLoss);
-            if (!lossVerb.empty() && !targets.empty())
+            //#W54-D (D3): read the DESTINATION off the move this chooser feeds,
+            //before the verb table gets to decide from the source card's name.
+            if (AAMover * mvd = unwrapMoverAbility(waiting, 0))
+                gainDest = moverGainDestination(mvd->destination);
+            lossVerb = handRemovalVerb(lc, relocateNotLoss, gainDest);
+            bool relocateIgnored = false;
+            //#W54-D (D3): the shape is still the removal shape (own cards, a
+            //move verb) - only the direction is inverted. Gate the GAIN framing
+            //on the loss detection having fired, so nothing else re-frames.
+            bool wouldBeLoss = !handRemovalVerb(lc, relocateIgnored).empty();
+            if ((!lossVerb.empty() || (wouldBeLoss && !gainDest.empty())) && !targets.empty())
             {
                 bool allMine = true;
                 for (size_t i = 0; i < targets.size(); i++)
@@ -20463,12 +20714,54 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     MTGCardInstance * mc = dynamic_cast<MTGCardInstance *>(targets[i]);
                     if (!mc || mc->controller() != this) { allMine = false; break; }
                 }
-                forcedSelfLoss = allMine;
+                if (!lossVerb.empty())
+                    forcedSelfLoss = allMine;
+                else
+                    forcedSelfGain = allMine;
                 //Self-inflicted (a loot, a sacrifice-as-cost of MY OWN spell) vs an
                 //OPPONENT forcing the loss: only my own source flips to the self
                 //wording; anything else keeps the validated opponent framing.
-                selfInflicted = tc->source && tc->source->controller() == this;
+                //#W54-D (D6, R166): an ability GRANTED to a player is parsed onto
+                //a NAMELESS dummy card controlled by the victim, so the raw
+                //controller test read TRUE for the OPPONENT's annihilator and 18
+                //of the corpus's 26 renders told this seat that Emrakul was "your
+                //own effect". The real granter hangs off storedSourceCard - the
+                //same indirection the stack line, token creation and mana
+                //production inside that keyword already take.
+                MTGCardInstance * granter = tc->source;
+                if (granter && granter->getDisplayName().empty() && granter->storedSourceCard)
+                    granter = granter->storedSourceCard;
+                selfInflicted = granter && granter->controller() == this;
             }
+        }
+
+        //#W54-D (D25, R185): the forced-loss list is ordered cheapest-first, so
+        //the header's own advice ("usually your LEAST valuable: a spare land")
+        //and the list agree. targets / opts / narrOpts stay index-parallel and
+        //the trailing "Done" row (if any) stays last; picks are pointers, so the
+        //apply path is untouched by the reordering.
+        if (forcedSelfLoss && targets.size() >= 2 && narrOpts.size() == targets.size()
+            && opts.size() >= targets.size())
+        {
+            vector<size_t> ord(targets.size());
+            for (size_t i = 0; i < ord.size(); i++)
+                ord[i] = i;
+            std::stable_sort(ord.begin(), ord.end(), [&targets](size_t a, size_t b) {
+                return sacrificeCostRank(targets[a]) < sacrificeCostRank(targets[b]);
+            });
+            vector<Targetable *> t2;
+            vector<string> o2, n2;
+            for (size_t k = 0; k < ord.size(); k++)
+            {
+                t2.push_back(targets[ord[k]]);
+                o2.push_back(opts[ord[k]]);
+                n2.push_back(narrOpts[ord[k]]);
+            }
+            for (size_t k = ord.size(); k < opts.size(); k++)
+                o2.push_back(opts[k]); //the "Done - no further targets" escape
+            targets.swap(t2);
+            opts.swap(o2);
+            narrOpts.swap(n2);
         }
 
         //Dungeon SELECTION (N-146c): the first venture reaches this target seam
@@ -20523,6 +20816,11 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             q << buildHandRemovalAsk(lossVerb, !selfInflicted, relocateNotLoss,
                                      effectName, multi, unlimited, tc->targetMin,
                                      tc->maxtargets, picks.size());
+        }
+        else if (forcedSelfGain)
+        {
+            q << buildHandGainAsk(gainDest, effectName, multi, unlimited,
+                                  tc->targetMin, tc->maxtargets, picks.size());
         }
         else if (mutatePlacement)
         {
@@ -37174,6 +37472,143 @@ static const char * kW50Y_r94 =
               "#W53-V with three printings the nearest FORWARD id wins, not the last one");
         CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
               "#W53-V past every candidate it falls back to the nearest one behind");
+    }
+    {
+        //#W54-D (D3): the destination gate. The verb table is pure, so both
+        //directions of the Path shape are provable off one string.
+        cout << "\n[W54-D] D3 own-card chooser framing (destination, not source name)\n";
+        bool rel = false;
+        CHECK(handRemovalVerb("path to exile search land", rel) == "exile" && !rel,
+              "#W54-D D3 with no destination the source NAME still decides - the pre-fix answer");
+        CHECK(handRemovalVerb("path to exile search land", rel, "battlefield").empty(),
+              "#W54-D D3 a battlefield destination is a GAIN, so the verb table answers nothing");
+        CHECK(handRemovalVerb("path to exile search land", rel, "hand").empty(),
+              "#W54-D D3 a hand destination is a gain too");
+        CHECK(handRemovalVerb("archon of cruelty discard", rel) == "discard"
+              && handRemovalVerb("archon of cruelty discard", rel, "").empty() == false,
+              "#W54-D D3 NEGATIVE an empty destination leaves every wave-29 verb byte-identical");
+        CHECK(moverGainDestination("mybattlefield") == "battlefield"
+              && moverGainDestination("previousbattlefield") == "battlefield"
+              && moverGainDestination("inplay") == "battlefield",
+              "#W54-D D3 moveTo(mybattlefield) is the gain destination Path to Exile names");
+        CHECK(moverGainDestination("hand") == "hand" && moverGainDestination("ownerhand") == "hand",
+              "#W54-D D3 a hand destination reads as a gain");
+        CHECK(moverGainDestination("exile").empty() && moverGainDestination("graveyard").empty()
+              && moverGainDestination("mylibrary").empty() && moverGainDestination("").empty(),
+              "#W54-D D3 NEGATIVE a loss destination is never a gain");
+        CHECK(moverGainDestination("opponentbattlefield").empty()
+              && moverGainDestination("opponenthand").empty(),
+              "#W54-D D3 NEGATIVE a card handed to the OPPONENT is not this seat's gain");
+        string gain = buildHandGainAsk("battlefield", "Path to Exile", false, false, false, 1, 0);
+        cout << "     D3 gain ask: " << gain << "\n";
+        CHECK(gain.find("CHOOSE A CARD TO PUT ONTO THE BATTLEFIELD: Path to Exile's effect puts a"
+                        " card you choose from the list below onto YOUR battlefield") == 0,
+              "#W54-D D3 the 130v125 seq 69 header now names what actually happens");
+        CHECK(gain.find("Pick the card you MOST NEED right now") != string::npos,
+              "#W54-D D3 the value ordering is inverted with the direction");
+        CHECK(gain.find("AFFORD TO LOSE") == string::npos && gain.find("YOU will LOSE") == string::npos,
+              "#W54-D D3 NEGATIVE the loss wording may not survive on a gain ask");
+        CHECK(gain.size() > 35
+              && gain.compare(gain.size() - 35, 35, "answer with the chosen card's name.") == 0,
+              "#W54-D D3 echo shape: the answer instruction is the loss ask's, unchanged");
+        CHECK(buildHandGainAsk("hand", "Spellseeker", false, false, false, 1, 0)
+              .find("CHOOSE A CARD TO PUT INTO YOUR HAND:") == 0,
+              "#W54-D D3 the hand-destination header names the hand");
+        CHECK(buildHandGainAsk("battlefield", "X", true, false, true, 2, 1)
+              .find("Choose card 2 of exactly 2") != string::npos,
+              "#W54-D D3 the multi-pick counter matches the loss ask's form");
+        //REGRESSION: the three wave-29 loss framings are byte-identical.
+        string oppAsk = buildHandRemovalAsk("sacrifice", true, false, "Emrakul, the Aeons Torn",
+                                            true, false, true, 6, 0);
+        CHECK(oppAsk.find("FORCED sacrifice OF YOUR OWN CARDS: the opponent's effect"
+                          " (Emrakul, the Aeons Torn) forces YOU to sacrifice") == 0,
+              "#W54-D D6 the branch the annihilator should have taken, unchanged");
+        CHECK(buildHandRemovalAsk("exile", false, false, "Path to Exile", false, false, false, 1, 0)
+              .find("EXILE ONE OF YOUR OWN CARDS") == 0,
+              "#W54-D D3 NEGATIVE the loss builder itself is untouched - only the gate moved");
+    }
+    {
+        //#W54-D (D8a): the collapse reaches rows with NO instance ordinal.
+        cout << "\n[W54-D] D8a identical ordinal-free rows collapse\n";
+        vector<string> lib;
+        for (int i = 0; i < 4; i++)
+            lib.push_back("Mountain [land] [your library] - \"R\"");
+        bool rg = false;
+        string rows = joinNumberedRows(lib, &rg);
+        cout << "     " << rows;
+        CHECK(rg && rows == "1-4. Mountain [land] [your library] - \"R\" x4\n",
+              "#W54-D D8a the 130v125 seq 69 shape prints once with its label range");
+        CHECK(rows.find('#') == string::npos,
+              "#W54-D D8a NEGATIVE no '#a-#b' is invented for rows that carry no ordinal");
+        vector<string> two;
+        two.push_back("Mountain [land] [your library] - \"R\"");
+        two.push_back("Mountain [land] [your library] - \"R\"");
+        bool rg2 = false;
+        CHECK(joinNumberedRows(two, &rg2) == "1. " + two[0] + "\n2. " + two[1] + "\n" && !rg2,
+              "#W54-D D8a NEGATIVE a run under the collapse floor stays one row per option");
+        vector<string> mixed;
+        mixed.push_back("Mountain [land] [your library] - \"R\"");
+        mixed.push_back("Forest [land] [your library] - \"G\"");
+        mixed.push_back("Mountain [land] [your library] - \"R\"");
+        mixed.push_back("Mountain [land] [your library] - \"R\"");
+        vector<size_t> ord;
+        groupNumberedRows(mixed, ord);
+        vector<string> perm;
+        for (size_t k = 0; k < ord.size(); k++)
+            perm.push_back(mixed[ord[k]]);
+        CHECK(ord.size() == 4 && ord[0] == 0 && ord[1] == 2 && ord[2] == 3 && ord[3] == 1,
+              "#W54-D D8a the scattered identical rows gather at the first member, the unique row keeps last place");
+        bool rg3 = false;
+        string joined = joinNumberedRows(perm, &rg3);
+        cout << "     " << joined;
+        CHECK(rg3 && joined.find("1-3. Mountain [land] [your library] - \"R\" x3\n") == 0
+              && joined.find("4. Forest") != string::npos,
+              "#W54-D D8a gathering lets them collapse; the distinct row keeps its own number");
+        bool stale = false;
+        int c2 = parseChoice("CHOICE: 2 (Mountain)", (int) perm.size(), &perm, &stale);
+        CHECK(c2 == 2 && !stale,
+              "#W54-D D8a echo shape: a number from INSIDE the printed range parses as that row");
+        int c3 = parseChoice("CHOICE: 3 (Mountain)", (int) perm.size(), &perm, &stale);
+        CHECK(c3 == 3, "#W54-D D8a echo shape: the last handle in the range is accepted too");
+        //NEGATIVE: rows that DO carry ordinals keep the wave-48 "#a-#b" form.
+        vector<string> handled;
+        for (int i = 1; i <= 3; i++)
+        {
+            std::ostringstream o;
+            o << "Deal 1 damage with Staff of Nin targeting Vampire #" << i << " [cost: Tap]";
+            handled.push_back(o.str());
+        }
+        bool rg4 = false;
+        CHECK(joinNumberedRows(handled, &rg4).find("Vampire #1-#3 [cost: Tap] x3") != string::npos,
+              "#W54-D D8a NEGATIVE an ordinal-bearing run still prints its #a-#b range");
+        CHECK(string(kOptionRangeNote).find("carries NO #N ordinal") != string::npos,
+              "#W54-D D8a the range note explains the ordinal-free form it now prints");
+    }
+    {
+        //#W54-D (D8b): a de-duplicated option list of length ONE.
+        cout << "\n[W54-D] D8b interchangeable-option resolution\n";
+        vector<string> same;
+        for (int i = 0; i < 6; i++)
+            same.push_back("Vampire (2/2) [flying, doesn't untap during its controller's untap step]");
+        CHECK(identicalInterchangeableRows(same),
+              "#W54-D D8b the 152v123 s23-s37 damage-order menu has one distinguishable outcome");
+        vector<string> one(1, same[0]);
+        CHECK(!identicalInterchangeableRows(one),
+              "#W54-D D8b NEGATIVE a single row is the existing one-option rule, not this one");
+        vector<string> ordinals;
+        ordinals.push_back("Vampire #1 [opponent's battlefield]");
+        ordinals.push_back("Vampire #2 [opponent's battlefield]");
+        ordinals.push_back("Vampire #3 [opponent's battlefield]");
+        CHECK(!identicalInterchangeableRows(ordinals),
+              "#W54-D D8b NEGATIVE an instance ordinal tells the rows apart - the model keeps the ask");
+        vector<string> withDone(same);
+        withDone.push_back("Done - no further targets");
+        CHECK(!identicalInterchangeableRows(withDone),
+              "#W54-D D8b NEGATIVE a decline row is a second outcome and is never resolved away");
+        vector<string> nearly(same);
+        nearly[3] = "Vampire (2/2) [flying]";
+        CHECK(!identicalInterchangeableRows(nearly),
+              "#W54-D D8b NEGATIVE one differing row is a real choice");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

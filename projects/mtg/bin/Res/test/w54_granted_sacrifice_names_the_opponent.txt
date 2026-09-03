@@ -1,0 +1,55 @@
+#NAME: An opponent-granted sacrifice says "the opponent's effect" (W54-D D6)
+#DESC: Wave-53 ledger D6 (MED, = R166): 18 of the corpus's 26 "your own effect"
+#DESC: renders were the OPPONENT's Emrakul annihilator telling this seat that
+#DESC: its own effect was making it sacrifice. Cause: an ability GRANTED to a
+#DESC: player (ability$!...!$ opponent) is parsed onto a NAMELESS dummy card
+#DESC: owned by the VICTIM (ATargetedAbilityCreator::resolve), so
+#DESC: "tc->source->controller() == this" read TRUE for the opponent's effect.
+#DESC: The real granter hangs off MTGCardInstance::storedSourceCard - the same
+#DESC: indirection the stack line, token creation and mana production inside
+#DESC: that keyword already take. Innocent Blood is the smallest carrier of the
+#DESC: shape: its own half is genuinely self-inflicted (P1, source = the
+#DESC: sorcery itself) and its granted half is the opponent's (P2, source = the
+#DESC: dummy), so ONE fixture pins both branches from the two chairs.
+#DESC: Identical creatures on each side keep the sacrifice deterministic.
+#DESC: PRE-FIX P2's register reads "your own effect (Innocent Blood)".
+FORCEABILITY
+AICALLS 40
+[INIT]
+firstmain
+[PLAYER1]
+hand:Innocent Blood
+library:Swamp
+manapool:{B}
+inplay:Serra Angel,Serra Angel
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears
+library:Forest
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+library:Swamp
+graveyard:Innocent Blood,Serra Angel
+inplay:Serra Angel
+narration:your own effect (Innocent Blood)
+[PLAYER2]
+life:16
+library:Forest
+graveyard:Grizzly Bears
+inplay:Grizzly Bears
+narration:FORCED sacrifice OF YOUR OWN CARD
+narration:the opponent's effect (Innocent Blood) forces YOU to sacrifice
+nonarration:your own effect (Innocent Blood)
+[END]
