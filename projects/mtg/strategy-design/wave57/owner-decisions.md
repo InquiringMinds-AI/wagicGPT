@@ -15,3 +15,14 @@ land drop, discard, empty-stack pass see the last 2-3 turns; combat + casting ke
 where the harness allows, 21 games per arm minimum) scored on the seat reviewers' misplay counts,
 fallback rate, per-decision inference, and win-rate band — the rare-event A/B power rule applies:
 no single favourable run is a result.
+
+**D42 follow-up — targeting under grouping.** Owner's concern (verbatim): "i am unsure of how this
+interacts with targeting, for instance in a spell like fireball, where you may want to spread its
+damage across several grouped targets. arena, and older mtg games show this visually, with the stack
+having a visual representation with lines drawn from effects to targets. wagic doesnt easily have an
+equivalent for communicating with the user." Mechanism (Claude's proposal, given to lane G, not the
+owner's position): targeting mode EXPANDS — any group with a legal target for the live chooser fans
+out into clickable members and re-collapses on resolve/cancel; a click on a collapsed group during
+targeting expands, never targets; reuse the existing target border + the stack's per-entry target
+thumbnails (one thumbnail x N when all targets come from one group). Same rule for attacker/blocker
+declaration and cost-target prompts. Owner has not ruled on the mechanism.
