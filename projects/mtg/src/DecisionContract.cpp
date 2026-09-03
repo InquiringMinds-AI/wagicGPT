@@ -298,6 +298,7 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;
+    req.nameChoiceMenu = false; //#W55-D (D22)
     //a reused request must not carry a previous menu's may annotations
     req.mayObjectName.clear();
     req.mayObjectOrigin.clear();
@@ -347,6 +348,10 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
 
         for (size_t mk = 0; mk < menu->abilities.size(); mk++)
             req.optionTexts.push_back(menu->abilities[mk]->getMenuText());
+        //#W55-D (D22): the rows of a `chooseaname` menu are AASetNameChosen
+        //options and their menu text is a card NAME. Read off the engine's own
+        //option objects, never guessed from the strings.
+        req.nameChoiceMenu = (dynamic_cast<AASetNameChosen *>(menu->abilities[0]) != NULL);
         req.kind = DecisionRequest::CHOOSE_MODE;
         return true;
     }

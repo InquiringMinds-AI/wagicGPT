@@ -253,7 +253,10 @@ protected:
     //highest-mana-value policy, announced. Called from the base computeActions
     //before the phase advance would discard hand->cards[0] silently.
     virtual int cleanupDiscard(int over);
-    string buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over);
+    //#W55-D (D18): outOrder receives the collapse's stable permutation of the
+    //printed rows; the caller maps the reply's positions back through it.
+    string buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over,
+                                      vector<size_t> * outOrder = NULL);
     //State for the single bundled BOTTOM-N ask per keep.
     std::vector<MTGCardInstance*> mPregameBottomQueue;
     bool mPregameBottomAsked;
