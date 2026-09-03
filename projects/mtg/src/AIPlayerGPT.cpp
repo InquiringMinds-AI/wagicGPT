@@ -10569,7 +10569,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -11142,6 +11142,15 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["events"] = mNarrationPending;
         mNarrationPending.clear();
     }
+    //#W57-H (D43): which log-window arm produced this prompt, which ask class
+    //this window fell in, and how many turns the window elided. On EVERY
+    //record (the arm is "full" by default), so the A/B harvest verifies the arm
+    //from the data instead of trusting the launch environment - and so a record
+    //whose class was never budgeted is distinguishable from one that was.
+    rec["log_window"] = logWindowLabel();
+    rec["log_window_kind"] = string(askWindowKindName(mLogWindowKind));
+    if (mLogWindowElided > 0)
+        rec["log_window_turns_elided"] = mLogWindowElided;
     if (!chosenText.empty())
         rec["chosen_text"] = chosenText;
     else //#W57-A (D4): never ABSENT either. Wave 56 filled the field only while
@@ -11553,6 +11562,320 @@ void AIPlayerGPT::flushOpeningHand()
     mDealDone = true;
 }
 
+
+//---- #W57-H (D43 "measure"; the MECHANISM half of D13) ---------------------
+//THE GAME-LOG WINDOW.
+//
+//The append-only GAME NARRATION is the ONLY memory the model has - there is no
+//chat transcript - so shortening it is a DELETION, and the doctrine forbids a
+//blind one. Hence the shape here: the lever ships DEFAULT OFF (`full` = the
+//wave-56 log, byte for byte, header included), and every elision it does make
+//is ANNOUNCED by one rendered line that carries what the dropped turns held -
+//the cards each side put somewhere that still matters (both graveyards and
+//both exiles, the log's own zone duty), the pregame record (opening-hand size
+//and every mulligan outcome), and the exact COUNT of turns elided. Nothing is
+//silently dropped: a silent omission is worse than a wrong line, because the
+//model confabulates rules into gaps.
+//
+//`WAGIC_GPT_LOGWINDOW`:
+//   full     (default, and what an unset variable means) - no window at all
+//   kind     - the per-ask-kind budget: land drops, cleanup discards,
+//              empty-stack pass windows and display/menu asks get the last K
+//              turns; combat, casting, targeting, blocking, reveal and pregame
+//              asks keep the whole log. K defaults to 3.
+//   kind:K   - the same with an explicit K
+//   N        - a bare positive integer: the last N turns for EVERY ask kind
+//An unparseable value is refused (the window stays OFF) and traced - a typo in
+//an A/B launch must not silently produce a third arm.
+//
+//This is a MEASUREMENT lever for an A/B corpus, not a shipped default: D43's
+//ruling is one word, "measure".
+//(GptAskWindowKind, GptLogWindowMode and the turn-count bounds are declared in
+//the header - the constructor and the translog writer, both above this point in
+//the file, name them.)
+
+//#W57-H (D43): the name of an ask class, for the translog. A record says which
+//arm produced it AND which class this ask fell in, so the harvest verifies the
+//arm from the data instead of trusting the launch environment.
+const char * askWindowKindName(int kind)
+{
+    switch (kind)
+    {
+    case kAskWindowLandDrop:       return "land_drop";
+    case kAskWindowCleanupDiscard: return "cleanup_discard";
+    case kAskWindowEmptyStackPass: return "empty_stack_pass";
+    case kAskWindowDisplayMenu:    return "display_menu";
+    case kAskWindowCast:           return "cast";
+    case kAskWindowCombat:         return "combat";
+    case kAskWindowTargetOrReveal: return "target_or_reveal";
+    case kAskWindowPregame:        return "pregame";
+    default:                       return "unclassified";
+    }
+}
+
+//#W57-H (D43): a positive turn count, all digits, bounded. Pure.
+bool parseLogWindowTurnCount(const string& s, int& out)
+{
+    if (s.empty() || s.size() > 3)
+        return false;
+    int v = 0;
+    for (size_t i = 0; i < s.size(); i++)
+    {
+        if (s[i] < '0' || s[i] > '9')
+            return false;
+        v = v * 10 + (s[i] - '0');
+    }
+    if (v < 1 || v > kLogWindowMaxTurns)
+        return false;
+    out = v;
+    return true;
+}
+
+//#W57-H (D43): the setting, parsed. Pure, so every accepted and every REFUSED
+//spelling is provable in PARSETEST without a game. Returns false only for a
+//value that is none of the three forms; NULL/empty/"full" are the default.
+bool parseLogWindowSetting(const char * raw, int& mode, int& turns)
+{
+    mode = kLogWindowFull;
+    turns = 0;
+    if (!raw)
+        return true;
+    string s(raw);
+    size_t b = s.find_first_not_of(" \t\r\n");
+    if (b == string::npos)
+        return true;
+    size_t e = s.find_last_not_of(" \t\r\n");
+    s = s.substr(b, e - b + 1);
+    if (s == "full")
+        return true;
+    if (s == "kind")
+    {
+        mode = kLogWindowByKind;
+        turns = kLogWindowDefaultTurns;
+        return true;
+    }
+    if (s.size() > 5 && s.compare(0, 5, "kind:") == 0)
+    {
+        int v = 0;
+        if (!parseLogWindowTurnCount(s.substr(5), v))
+            return false;
+        mode = kLogWindowByKind;
+        turns = v;
+        return true;
+    }
+    int v = 0;
+    if (parseLogWindowTurnCount(s, v))
+    {
+        mode = kLogWindowEveryKind;
+        turns = v;
+        return true;
+    }
+    return false;
+}
+
+//#W57-H (D43): does THIS arm budget THIS ask class? Pure.
+bool logWindowKindBudgeted(int mode, int kind)
+{
+    if (mode == kLogWindowFull)
+        return false;
+    if (kind == kAskWindowPregame)
+        return false;   //the pregame frame renders no GAME LOG at all
+    if (mode == kLogWindowEveryKind)
+        return true;
+    return kind == kAskWindowLandDrop || kind == kAskWindowCleanupDiscard
+        || kind == kAskWindowEmptyStackPass || kind == kAskWindowDisplayMenu;
+}
+
+//#W57-H (D43): the label the translog carries for the configured arm. Pure.
+string logWindowSettingLabel(int mode, int turns)
+{
+    if (mode == kLogWindowFull)
+        return "full";
+    std::ostringstream o;
+    if (mode == kLogWindowByKind)
+        o << "kind:" << turns;
+    else
+        o << turns;
+    return o.str();
+}
+
+//#W57-H (D43): a row the pilot cannot DO anything with - the decline, the
+//hold and the display toggle. A menu made only of these is a display/menu ask.
+//Pure over the rendered row text.
+bool logWindowInertRow(const string& row)
+{
+    static const char * const inert[] = {
+        "Cast nothing right now", "Play no land right now", "Hold ",
+        "Flip Side", "Done", "Do nothing", "Pass"
+    };
+    for (size_t i = 0; i < sizeof(inert) / sizeof(inert[0]); i++)
+    {
+        const size_t n = strlen(inert[i]);
+        if (row.size() >= n && row.compare(0, n, inert[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+//#W57-H (D43): the class of an askModel() window, from its question and rows.
+//Only the two classes D13 names are picked out here; everything else stays
+//unclassified and therefore keeps the whole log under `kind`. Pure.
+int askWindowKindForAsk(const string& decision, const vector<string>& options)
+{
+    if (decision.compare(0, 11, "Land drop: ") == 0)
+        return kAskWindowLandDrop;
+    if (options.empty())
+        return kAskWindowUnknown;
+    for (size_t i = 0; i < options.size(); i++)
+        if (!logWindowInertRow(options[i]))
+            return kAskWindowUnknown;
+    return kAskWindowDisplayMenu;
+}
+
+//#W57-H (D43): the class of a PRIORITY window. A window offering a cast is a
+//CASTING ask and keeps the whole log (the brief's rule, narrower than D13's
+//own "any empty stack"); a window with something on the stack is a response
+//window and keeps it too. What is left - empty stack, no cast row - is the
+//empty-stack pass class. Pure over the rows plus the stack predicate.
+int askWindowKindForPriority(const vector<string>& rows, bool stackRespondable)
+{
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].compare(0, 5, "Cast ") == 0 && !logWindowInertRow(rows[i]))
+            return kAskWindowCast;
+    if (stackRespondable)
+        return kAskWindowUnknown;
+    return kAskWindowEmptyStackPass;
+}
+
+//#W57-H (D43): the split. Turn headers ("=== Turn N - ...") at the start of a
+//line are the narration's only stable turn boundary, so the window is cut on
+//one: the kept text always begins at a header and no turn is ever half-shown.
+//Pure - `narration` in, kept tail out, with the elided prefix and its turn
+//count reported. Fewer turns than the budget => the narration is returned
+//BYTE-IDENTICAL and elidedTurns is 0.
+const char * const kLogWindowTurnHeader = "=== Turn ";
+const char * const kLogWindowTrimMarkerHead = "(...earlier events trimmed";
+
+string logWindowSplit(const string& narration, int keepTurns, string& elidedPrefix,
+                      int& elidedTurns, bool& earlierTrimmed)
+{
+    elidedPrefix.clear();
+    elidedTurns = 0;
+    earlierTrimmed = false;
+    if (keepTurns < 1)
+        return narration;
+    vector<size_t> heads;
+    for (size_t pos = 0; pos < narration.size(); )
+    {
+        size_t at = narration.find(kLogWindowTurnHeader, pos);
+        if (at == string::npos)
+            break;
+        if (at == 0 || narration[at - 1] == '\n')
+            heads.push_back(at);
+        pos = at + 1;
+    }
+    if ((int) heads.size() <= keepTurns)
+        return narration;
+    const size_t cut = heads[heads.size() - keepTurns];
+    elidedPrefix = narration.substr(0, cut);
+    elidedTurns = (int) heads.size() - keepTurns;
+    earlierTrimmed = (elidedPrefix.compare(0, strlen(kLogWindowTrimMarkerHead),
+                                           kLogWindowTrimMarkerHead) == 0);
+    return narration.substr(cut);
+}
+
+//#W57-H (D43): the pregame record, lifted out of the elided prefix VERBATIM -
+//opening-hand size and every mulligan outcome, the two facts an earlier turn
+//must not lose that no live zone can answer. The opening-hand line's card list
+//is cut at its colon: the SIZE is the carried fact, the seven card names are
+//not (they are in the log's own later lines wherever they still matter).
+//The opponent forms are recognised too although this seat's log never writes
+//one today (only the seat's own mulligans are narrated) - a future emitter is
+//carried automatically instead of silently dropped, and nothing is invented
+//for a side whose record the log does not hold. Pure.
+string logWindowOpeningDigest(const string& elidedPrefix)
+{
+    static const char * const heads[] = {
+        "Your opening hand (", "You kept your opening hand (", "You mulliganed to ",
+        "Opponent's opening hand (", "Opponent kept their opening hand (",
+        "Opponent mulliganed to "
+    };
+    string out;
+    size_t pos = 0;
+    while (pos < elidedPrefix.size())
+    {
+        size_t nl = elidedPrefix.find('\n', pos);
+        size_t end = (nl == string::npos) ? elidedPrefix.size() : nl;
+        string line = elidedPrefix.substr(pos, end - pos);
+        pos = (nl == string::npos) ? elidedPrefix.size() : nl + 1;
+        if (line.compare(0, 2, "- ") == 0)
+            line = line.substr(2);
+        bool match = false;
+        for (size_t i = 0; i < sizeof(heads) / sizeof(heads[0]) && !match; i++)
+        {
+            const size_t n = strlen(heads[i]);
+            if (line.size() >= n && line.compare(0, n, heads[i]) == 0)
+                match = true;
+        }
+        if (!match)
+            continue;
+        size_t colon = line.find(':');
+        if (colon != string::npos)
+            line = line.substr(0, colon);
+        if (!out.empty())
+            out += "; ";
+        out += line;
+    }
+    return out;
+}
+
+//#W57-H (D43): THE SUMMARY LINE - the one new render literal this lane ships.
+//It is a rendered statement, so it is an instruction: every clause is true at
+//the moment it renders. The zone clauses say "now" because they are the LIVE
+//zones, not a reconstruction of the elided turns; the count is exact (it is
+//the number of turn headers cut); nothing is stated about what those turns
+//contained beyond what the zones and the pregame record actually hold.
+//Deliberately NOT the trim marker's literal - the two coexist in one log and a
+//census must be able to tell an elision from a 24k trim. Pure.
+string logWindowSummaryLine(int elidedTurns, bool earlierTrimmed,
+                            const string& myGrave, const string& oppGrave,
+                            const string& myExile, const string& oppExile,
+                            const string& openingDigest)
+{
+    if (elidedTurns < 1)
+        return "";
+    std::ostringstream o;
+    o << "(...the first " << elidedTurns << (elidedTurns == 1 ? " turn of this game is"
+                                                              : " turns of this game are")
+      << " condensed into this line";
+    if (earlierTrimmed)
+        o << ", and events before them were already trimmed";
+    o << " - graveyards now: you - " << (myGrave.empty() ? "empty" : myGrave)
+      << "; opponent - " << (oppGrave.empty() ? "empty" : oppGrave)
+      << "; exiled now: you - " << (myExile.empty() ? "none" : myExile)
+      << "; opponent - " << (oppExile.empty() ? "none" : oppExile);
+    if (!openingDigest.empty())
+        o << "; from the pregame: " << openingDigest;
+    o << ")";
+    return o.str();
+}
+
+//#W57-H (D43): the GAME LOG header. Under `full` this is the wave-56 string,
+//byte for byte. When a window actually elided something the header must stop
+//claiming the log holds everything - a true statement in the wrong scope is a
+//lie, and "everything that has happened so far" over a windowed log is not
+//even that. Pure.
+string logWindowLogHeader(bool windowed, int keptTurns)
+{
+    if (!windowed)
+        return "GAME LOG (everything that has happened so far):";
+    std::ostringstream o;
+    o << "GAME LOG (the last " << keptTurns << (keptTurns == 1 ? " turn" : " turns")
+      << " in full; everything before them is condensed into the first line):";
+    return o.str();
+}
+//---- end #W57-H (D43) pure block ------------------------------------------
+
 //#W54-A (D12b): forward declaration - the clause builder itself lives with
 //consumePlan's other plan helpers, below.
 static string planMenuDiffClause(const string& absentName);
@@ -11561,6 +11884,105 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     return assemblePrompt(tail, NULL);
 }
+
+//#W57-H (D43): the configured arm, read once. A typo is refused loudly and
+//leaves the window OFF - an A/B whose third arm is a misspelling is not an A/B.
+void AIPlayerGPT::logWindowSetting(int& mode, int& turns)
+{
+    static int cachedMode = -1;
+    static int cachedTurns = 0;
+    if (cachedMode < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_LOGWINDOW");
+        int m = kLogWindowFull, t = 0;
+        if (!parseLogWindowSetting(e, m, t))
+        {
+            DebugTrace("AIPlayerGPT: WAGIC_GPT_LOGWINDOW=\"" << (e ? e : "")
+                       << "\" is not `full`, `kind`, `kind:K` or a positive integer -"
+                       " the game-log window stays OFF (full log)");
+            m = kLogWindowFull;
+            t = 0;
+        }
+        else if (m != kLogWindowFull)
+        {
+            DebugTrace("AIPlayerGPT: game-log window ACTIVE - "
+                       << logWindowSettingLabel(m, t)
+                       << " (the narration is the model's only memory; every elision"
+                          " renders its own summary line)");
+        }
+        cachedMode = m;
+        cachedTurns = t;
+    }
+    mode = cachedMode;
+    turns = cachedTurns;
+}
+
+//#W57-H (D43): is there anything on the stack this seat could respond to? The
+//RULE is not copied - this asks stackObjectIsRespondable, the same predicate
+//serializeGameState's stack block asks; only the walk is separate, so a change
+//to what counts as respondable moves both.
+bool AIPlayerGPT::logWindowStackRespondable()
+{
+    if (!observer || !observer->mLayers)
+        return false;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return false;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
+            continue;
+        if (!stackObjectIsRespondable(it->source != NULL,
+                                      it->source && it->source->hasType(Subtypes::TYPE_EMBLEM)))
+            continue;
+        return true;
+    }
+    return false;
+}
+
+//#W57-H (D43): the window, applied. `full` (and any ask class this arm does
+//not budget, and any log with fewer turns than the budget) returns mNarration
+//BY VALUE, unchanged - the caller then renders the wave-56 header and the
+//prompt is byte-identical to today's.
+string AIPlayerGPT::logWindowApply(const string& narration, int * elidedTurns)
+{
+    if (elidedTurns)
+        *elidedTurns = 0;
+    mLogWindowElided = 0;
+    int mode = kLogWindowFull, turns = 0;
+    logWindowSetting(mode, turns);
+    if (!logWindowKindBudgeted(mode, mLogWindowKind))
+        return narration;
+    string prefix;
+    int cut = 0;
+    bool earlierTrimmed = false;
+    const string kept = logWindowSplit(narration, turns, prefix, cut, earlierTrimmed);
+    if (cut < 1)
+        return narration;
+    const string summary = logWindowSummaryLine(
+        cut, earlierTrimmed,
+        zoneNameDigest(game ? game->graveyard : NULL),
+        zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
+        zoneNameDigest(game ? game->removedFromGame : NULL),
+        zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL),
+        logWindowOpeningDigest(prefix));
+    if (elidedTurns)
+        *elidedTurns = cut;
+    mLogWindowElided = cut;
+    return summary + "\n" + kept;
+}
+
+//#W57-H (D43): the arm label for the translog record.
+string AIPlayerGPT::logWindowLabel()
+{
+    int mode = kLogWindowFull, turns = 0;
+    logWindowSetting(mode, turns);
+    return logWindowSettingLabel(mode, turns);
+}
+
 
 //audit-L (A19): `situation`, when given, is the CURRENT SITUATION block the
 //caller already rendered for this tail (serializeGameStatePair's prompt
@@ -11629,7 +12051,18 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
     //mInPregameAsk is set by the three pregame entry points themselves.
     bool pregame = mInPregameAsk;
     if (!mNarration.empty() && !pregame)
-        u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
+    {
+        //#W57-H (D43): the game-log window. Default `full` -> logWindowApply
+        //returns mNarration unchanged, elided stays 0, and the header keeps its
+        //wave-56 bytes: this whole block is byte-identical to wave 56 with the
+        //lever off. When it DOES elide, the summary line is already the first
+        //line of `body` and the header says so.
+        int elided = 0;
+        int wmode = kLogWindowFull, wturns = 0;
+        logWindowSetting(wmode, wturns);
+        const string body = logWindowApply(mNarration, &elided);
+        u << logWindowLogHeader(elided > 0, wturns) << "\n" << body << "\n";
+    }
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
     //bottoming, leyline) get the HAND and nothing else. The full situation block
     //is a battlefield report - phase, both life totals, the stack, the mana line,
@@ -12934,6 +13367,15 @@ void AIPlayerGPT::renderProbeDump()
       << " assemble " << (assembledPlain == assembledSpliced ? "same" : "DIFFERENT")
       << " skip " << (promptVariant == keyVariant ? "none" : "active") << "\n";
     f << "[pending-bytes] " << mNarrationPending.size() << "\n"; //A18's measure
+    //#W57-H (D43): the ASSEMBLED prompt, not only its parts. The log window
+    //rewrites the GAME LOG section and its header, and neither shows up in the
+    //[narration]/[situation] dumps - so the byte-identity claim for the default
+    //`full` arm (and the shape of every other arm) is checkable by diffing this
+    //block across two runs of the same seeded game. Dev builds only, like the
+    //rest of this probe.
+    f << "[assembled " << (mLogWindowElided > 0 ? "windowed" : "full") << " kind="
+      << askWindowKindName(mLogWindowKind) << " elided=" << mLogWindowElided << "]\n"
+      << assembledPlain << "\n";
     f << "[narration]\n" << mNarration << "[situation]\n" << promptDirect
       << "[key]\n" << keyDirect << "\n";
 }
@@ -20775,6 +21217,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     string userTail = tailStr;
     if (!declinedNote.empty() && optionsEnd <= userTail.size())
         userTail = userTail.substr(0, optionsEnd) + declinedNote + userTail.substr(optionsEnd);
+    //#W57-H (D43): this window's ask class, for the log window and the record.
+    mLogWindowKind = askWindowKindForPriority(shownLines, logWindowStackRespondable());
     string userMsg = assemblePrompt(userTail);
     bool unchanged = (askKey == mLastAskKey);
 
@@ -21460,6 +21904,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     string userTail = tailStr;
     if (!promptOnlyNote.empty() && askOptionsEnd <= userTail.size())
         userTail = userTail.substr(0, askOptionsEnd) + promptOnlyNote + userTail.substr(askOptionsEnd);
+    //#W57-H (D43): this window's ask class, for the log window and the record.
+    mLogWindowKind = askWindowKindForAsk(decision, options);
     string userMsg = assemblePrompt(userTail);
     string content;
     if (pollCompletionRetry(userMsg, content) == kChoicePending)
@@ -27779,6 +28225,7 @@ int AIPlayerGPT::chooseAttackers()
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
             " attack with nobody this turn; then a PLAN: line only if the reply"
             " rules call for one. Write nothing else.";
+    mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -28714,6 +29161,7 @@ int AIPlayerGPT::chooseBlockers()
     //instead of replaying the rejected answer.
     if (mBlockIllegalReaskTurn == observer->turn && mBlocksDoneTurn != observer->turn)
         tail << prunedPairsReaskClause(mBlockIllegalReaskPairs);
+    mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -29379,6 +29827,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     //printed rows. The reply is parsed in PRINTED positions and mapped back
     //through it, so a collapsed list cannot make a number mean another card.
     vector<size_t> revealOrder;
+    mLogWindowKind = kAskWindowTargetOrReveal; //#W57-H (D43): keeps the whole log
     string userMsg = assemblePrompt(
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
                            eligibleForOptionOne, revealSource, pickExactlyOne,
@@ -29678,6 +30127,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             remaining = (int) hand.size();
         if (mSystemPrompt.empty())
             buildSystemPrompt();
+        mLogWindowKind = kAskWindowPregame; //#W57-H (D43): hand-only, no GAME LOG
         string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need, chosenSoFar));
         string content;
         if (pollCompletionRetry(userMsg, content) == kChoicePending)
@@ -30001,6 +30451,7 @@ int AIPlayerGPT::cleanupDiscard(int over)
     {
         if (mSystemPrompt.empty())
             buildSystemPrompt();
+        mLogWindowKind = kAskWindowCleanupDiscard; //#W57-H (D43)
         userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over, &discardOrder));
         if (discardOrder.size() != hand.size())
         {
@@ -45510,6 +45961,227 @@ static const char * kW50Y_r94 =
               "#W57-C D30 echo: the comparison is decision-time and leaves no residue in history");
     }
 
+    cout << "\n[#W57-H] D43 the game-log window: the lever, the split and the summary line\n";
+    {
+        // ---- the setting parses, and a typo is REFUSED (no silent third arm)
+        int m = -1, t = -1;
+        CHECK(parseLogWindowSetting(NULL, m, t) && m == kLogWindowFull && t == 0,
+              "#W57-H D43 an UNSET variable is `full` - the lever is default OFF");
+        CHECK(parseLogWindowSetting("", m, t) && m == kLogWindowFull,
+              "#W57-H D43 an empty value is `full`");
+        CHECK(parseLogWindowSetting("full", m, t) && m == kLogWindowFull && t == 0,
+              "#W57-H D43 `full` is the no-window arm");
+        CHECK(parseLogWindowSetting("kind", m, t) && m == kLogWindowByKind && t == 3,
+              "#W57-H D43 `kind` is the per-ask-kind budget, K defaults to 3");
+        CHECK(parseLogWindowSetting("kind:5", m, t) && m == kLogWindowByKind && t == 5,
+              "#W57-H D43 `kind:K` sets K");
+        CHECK(parseLogWindowSetting("  8 ", m, t) && m == kLogWindowEveryKind && t == 8,
+              "#W57-H D43 a bare integer budgets EVERY ask kind, whitespace tolerated");
+        CHECK(!parseLogWindowSetting("kind:0", m, t) && !parseLogWindowSetting("0", m, t),
+              "#W57-H D43 NEGATIVE zero turns is not a window - it is refused");
+        CHECK(!parseLogWindowSetting("kinds", m, t) && !parseLogWindowSetting("kind:", m, t)
+              && !parseLogWindowSetting("3turns", m, t) && !parseLogWindowSetting("-2", m, t)
+              && !parseLogWindowSetting("FULL", m, t) && !parseLogWindowSetting("1000", m, t),
+              "#W57-H D43 NEGATIVE every misspelling is REFUSED, never rounded to an arm");
+        CHECK(logWindowSettingLabel(kLogWindowFull, 0) == "full"
+              && logWindowSettingLabel(kLogWindowByKind, 3) == "kind:3"
+              && logWindowSettingLabel(kLogWindowEveryKind, 6) == "6",
+              "#W57-H D43 the translog label round-trips the arm");
+
+        // ---- which classes each arm budgets
+        CHECK(!logWindowKindBudgeted(kLogWindowFull, kAskWindowLandDrop)
+              && !logWindowKindBudgeted(kLogWindowFull, kAskWindowEmptyStackPass),
+              "#W57-H D43 the DEFAULT arm budgets nothing at all");
+        CHECK(logWindowKindBudgeted(kLogWindowByKind, kAskWindowLandDrop)
+              && logWindowKindBudgeted(kLogWindowByKind, kAskWindowCleanupDiscard)
+              && logWindowKindBudgeted(kLogWindowByKind, kAskWindowEmptyStackPass)
+              && logWindowKindBudgeted(kLogWindowByKind, kAskWindowDisplayMenu),
+              "#W57-H D43 `kind` budgets exactly the four classes the brief names");
+        CHECK(!logWindowKindBudgeted(kLogWindowByKind, kAskWindowCast)
+              && !logWindowKindBudgeted(kLogWindowByKind, kAskWindowCombat)
+              && !logWindowKindBudgeted(kLogWindowByKind, kAskWindowTargetOrReveal)
+              && !logWindowKindBudgeted(kLogWindowByKind, kAskWindowUnknown),
+              "#W57-H D43 NEGATIVE casting, combat, targeting and anything unclassified"
+              " keep the WHOLE log under `kind`");
+        CHECK(logWindowKindBudgeted(kLogWindowEveryKind, kAskWindowCast)
+              && logWindowKindBudgeted(kLogWindowEveryKind, kAskWindowUnknown)
+              && !logWindowKindBudgeted(kLogWindowEveryKind, kAskWindowPregame),
+              "#W57-H D43 the `N` arm budgets every kind but pregame (which renders no log)");
+
+        // ---- the ask classifiers
+        vector<string> landRows;
+        landRows.push_back("Play Seachrome Coast");
+        landRows.push_back("Play Island");
+        landRows.push_back("Play no land right now");
+        CHECK(askWindowKindForAsk("Land drop: which land do you play now, if any?", landRows)
+              == kAskWindowLandDrop,
+              "#W57-H D43 the land-drop ask is recognised by its own question");
+        CHECK(askWindowKindForAsk("Which card do you discard?", landRows) == kAskWindowUnknown,
+              "#W57-H D43 NEGATIVE a menu with the same rows under another question is not a land drop");
+        {
+            vector<string> inertOnly;
+            inertOnly.push_back("Cast nothing right now");
+            inertOnly.push_back("Flip Side of Agadeem's Awakening");
+            CHECK(askWindowKindForAsk("Which action do you take?", inertOnly) == kAskWindowDisplayMenu,
+                  "#W57-H D43 a menu whose every row is a decline or a display toggle is a display ask");
+            inertOnly.push_back("Cast Supreme Verdict {1}{w}{w}{u}");
+            CHECK(askWindowKindForAsk("Which action do you take?", inertOnly) == kAskWindowUnknown,
+                  "#W57-H D43 NEGATIVE ONE real row anywhere defeats the display-ask class");
+        }
+        {
+            vector<string> pri;
+            pri.push_back("Cast nothing right now");
+            CHECK(askWindowKindForPriority(pri, false) == kAskWindowEmptyStackPass,
+                  "#W57-H D43 an empty stack with no cast row is the pass class");
+            CHECK(askWindowKindForPriority(pri, true) == kAskWindowUnknown,
+                  "#W57-H D43 NEGATIVE something respondable on the stack keeps the whole log");
+            pri.push_back("Cast Path to Exile {w}");
+            CHECK(askWindowKindForPriority(pri, false) == kAskWindowCast
+                  && askWindowKindForPriority(pri, true) == kAskWindowCast,
+                  "#W57-H D43 NEGATIVE a window offering a cast is a CASTING ask, stack or no stack");
+            CHECK(logWindowInertRow("Cast nothing right now (combat comes next this turn)")
+                  && !logWindowInertRow("Cast Damnation {2}{b}{b}"),
+                  "#W57-H D43 'Cast nothing right now' is inert; a real cast row is not");
+        }
+        CHECK(string(askWindowKindName(kAskWindowLandDrop)) == "land_drop"
+              && string(askWindowKindName(kAskWindowUnknown)) == "unclassified",
+              "#W57-H D43 the record's class names");
+
+        // ---- the split: a six-turn log, budget 3
+        string log;
+        for (int k = 1; k <= 6; k++)
+        {
+            std::ostringstream h;
+            h << "=== Turn " << k << " - " << (k % 2 ? "YOUR" : "opponent's") << " turn ===\n";
+            log += h.str();
+            if (k == 1)
+                log += "- Your opening hand (7 cards): Island; Path to Exile; Supreme Verdict\n"
+                       "- You kept your opening hand (7 cards)\n";
+            log += "- You played Island\n";
+        }
+        {
+            string pre; int cut = -1; bool tr = true;
+            string kept = logWindowSplit(log, 3, pre, cut, tr);
+            CHECK(cut == 3 && !tr, "#W57-H D43 six turns at a budget of three elides exactly three");
+            CHECK(kept.compare(0, 14, "=== Turn 4 - o") == 0,
+                  "#W57-H D43 the kept text BEGINS at a turn header - no turn is ever half-shown");
+            CHECK(kept.find("=== Turn 3 ") == string::npos && kept.find("=== Turn 6 ") != string::npos,
+                  "#W57-H D43 the window is the LAST K turns");
+            CHECK(pre + kept == log,
+                  "#W57-H D43 the split is exact - prefix plus kept is the original log, byte for byte");
+        }
+        {
+            // fewer turns than the budget: BYTE-IDENTICAL, nothing elided
+            string pre; int cut = -1; bool tr = true;
+            CHECK(logWindowSplit(log, 6, pre, cut, tr) == log && cut == 0 && pre.empty(),
+                  "#W57-H D43 NEGATIVE a log at the budget is returned byte-identical, 0 elided");
+            CHECK(logWindowSplit(log, 99, pre, cut, tr) == log && cut == 0,
+                  "#W57-H D43 NEGATIVE a log under the budget is returned byte-identical");
+            CHECK(logWindowSplit(log, 0, pre, cut, tr) == log && cut == 0,
+                  "#W57-H D43 NEGATIVE a budget of zero is not a window - the log is untouched");
+            CHECK(logWindowSplit("- You played Island\n", 1, pre, cut, tr) == "- You played Island\n"
+                  && cut == 0,
+                  "#W57-H D43 NEGATIVE a log with no turn header at all is untouched");
+        }
+        {
+            // a header that is NOT at the start of a line is not a boundary
+            string sneaky = "=== Turn 1 - YOUR turn ===\n"
+                            "- Opponent cast Bogus === Turn 9 - fake ===\n"
+                            "=== Turn 2 - opponent's turn ===\n"
+                            "=== Turn 3 - YOUR turn ===\n";
+            string pre; int cut = -1; bool tr = true;
+            string kept = logWindowSplit(sneaky, 2, pre, cut, tr);
+            CHECK(cut == 1 && kept.compare(0, 11, "=== Turn 2 ") == 0,
+                  "#W57-H D43 NEGATIVE a turn-header substring INSIDE an event line is not a boundary");
+        }
+        {
+            // an already-trimmed log says so
+            string trimmed = string(kLogWindowTrimMarkerHead) + " - graveyards at trim: ...)\n" + log;
+            string pre; int cut = -1; bool tr = false;
+            logWindowSplit(trimmed, 2, pre, cut, tr);
+            CHECK(cut == 4 && tr,
+                  "#W57-H D43 a log that already lost events to the 24k trim reports BOTH facts");
+        }
+
+        // ---- the pregame digest, lifted verbatim out of the elided prefix
+        CHECK(logWindowOpeningDigest("- Your opening hand (7 cards): Island; Path to Exile\n"
+                                     "- You mulliganed to 6\n- You kept your opening hand (6 cards)\n"
+                                     "- You played Island\n")
+              == "Your opening hand (7 cards); You mulliganed to 6;"
+                 " You kept your opening hand (6 cards)",
+              "#W57-H D43 the opening-hand SIZE and every mulligan outcome are carried; the card"
+              " list is cut at the colon and ordinary events are not carried");
+        CHECK(logWindowOpeningDigest("- You played Island\n- Opponent drew a card\n").empty(),
+              "#W57-H D43 NEGATIVE a prefix with no pregame record carries no pregame clause");
+        CHECK(logWindowOpeningDigest("- Opponent mulliganed to 6\n") == "Opponent mulliganed to 6",
+              "#W57-H D43 an opponent-side form would be carried too (this seat's log writes none today)");
+
+        // ---- THE SUMMARY LINE (the new render literal)
+        const string sum = logWindowSummaryLine(56, false, "Path to Exile x2, Supreme Verdict",
+                                                "Pyrite Spellbomb", "", "Emrakul, the Aeons Torn",
+                                                "Your opening hand (7 cards); You kept your opening hand (7 cards)");
+        CHECK(sum == "(...the first 56 turns of this game are condensed into this line"
+                     " - graveyards now: you - Path to Exile x2, Supreme Verdict;"
+                     " opponent - Pyrite Spellbomb; exiled now: you - none;"
+                     " opponent - Emrakul, the Aeons Torn;"
+                     " from the pregame: Your opening hand (7 cards); You kept your opening hand (7 cards))",
+              "#W57-H D43 the summary line states the exact count, both graveyards, both exiles"
+              " and the pregame record");
+        CHECK(logWindowSummaryLine(1, false, "", "", "", "", "")
+              == "(...the first 1 turn of this game is condensed into this line"
+                 " - graveyards now: you - empty; opponent - empty;"
+                 " exiled now: you - none; opponent - none)",
+              "#W57-H D43 one turn conjugates singular; empty zones say empty/none, never nothing");
+        CHECK(logWindowSummaryLine(3, true, "", "", "", "", "").find(
+                  ", and events before them were already trimmed") != string::npos,
+              "#W57-H D43 an already-trimmed log's summary says so - the count is turns it can SEE");
+        CHECK(logWindowSummaryLine(0, false, "Bolt", "", "", "", "").empty(),
+              "#W57-H D43 NEGATIVE nothing elided renders NO summary line at all");
+        CHECK(sum.find(kLogWindowTrimMarkerHead) == string::npos
+              && string("(...earlier events trimmed - graveyards at trim: you - Bolt)")
+                     .compare(0, 21, sum.substr(0, 21)) != 0,
+              "#W57-H D43 NEGATIVE the summary line is NOT the 24k trim marker - a census can"
+              " tell an elision from a trim");
+        CHECK(sum.find('\n') == string::npos && sum[0] == '(',
+              "#W57-H D43 the summary is ONE line and is not a '- ' event bullet");
+
+        // ---- the GAME LOG header
+        CHECK(logWindowLogHeader(false, 0) == "GAME LOG (everything that has happened so far):"
+              && logWindowLogHeader(false, 3) == "GAME LOG (everything that has happened so far):",
+              "#W57-H D43 BYTE-IDENTITY the unwindowed header is the wave-56 string, whatever K is");
+        CHECK(logWindowLogHeader(true, 3) == "GAME LOG (the last 3 turns in full; everything"
+                                             " before them is condensed into the first line):",
+              "#W57-H D43 a windowed log stops claiming to hold everything");
+        CHECK(logWindowLogHeader(true, 1).find("the last 1 turn in full") != string::npos,
+              "#W57-H D43 the header conjugates singular too");
+
+        // ---- the ECHO shape: the summary line survives the answer surface untouched.
+        // The window changes the GAME LOG only; the option rows, and therefore every
+        // dedupe/ask/slot key (board state + question, never the prompt), are unchanged.
+        {
+            vector<string> rows(landRows);
+            bool stale = false;
+            string src;
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Play Seachrome Coast)",
+                                           (int) rows.size(), &rows, &stale, &src) == 1 && !stale,
+                  "#W57-H D43 echo: the land-drop answer parses exactly as before - the window"
+                  " never touches the numbered rows the reply addresses");
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Play Seachrome Coast)\nPLAN: the log says "
+                                           + sum + " so I keep hitting land drops.",
+                                           (int) rows.size(), &rows, &stale, &src) == 1 && !stale,
+                  "#W57-H D43 echo: a reply quoting the summary line in its PLAN still resolves"
+                  " to the row it coded - the plan is split off before any choice parsing");
+            CHECK(AIPlayerGPT::parseChoice(sum, (int) rows.size(), &rows, &stale, &src) != 1,
+                  "#W57-H D43 NEGATIVE the summary line on its own is not an answer - its"
+                  " leading digits are a turn count, never an option number");
+            // KNOWN (recorded in lane-H.md, not a defect of this lane): the summary line
+            // opens with '(' like the CHOICE parenthetical, so a reply of the shape
+            // "CHOICE: 1 <the whole summary line>" does NOT bind - the tail-stripper only
+            // strips [..] tails on already-anchored candidates. The reply protocol asks for
+            // the row's SHORT NAME there, and the 24k trim marker has carried the same
+            // "(...", shape for many waves with no observed echo of it.
+        }
+    }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
