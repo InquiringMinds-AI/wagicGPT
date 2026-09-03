@@ -390,17 +390,24 @@ int filesystem::LastOpenErrno()
 
 bool filesystem::FileNotZipped(const char * FilePath) const
 {
-	//return io_facilities::search_iterator(FilePath);
-	// follow new search_iterator implementation
+	//#W54-N (A42): this existence probe ran for every open on every FS (user
+	//then system) - on a miss that was two ifstream constructions per FS
+	//(open + close + a stream buffer allocation) on the render thread. One
+	//stat() answers the same question, and S_ISREG stops a DIRECTORY (the
+	//blank-name sample lookups open "sound/sfx/") from counting as a loose
+	//file only to fail on the first read.
 	errno = 0;
-	std::ifstream File(FilePath);
-
-	if (! File)
+	struct stat st;
+	if (stat(FilePath, &st) != 0)
 	{
 		gLastOpenErrno = errno;
 		return false;
 	}
-
+	if (!S_ISREG(st.st_mode))
+	{
+		gLastOpenErrno = EISDIR;
+		return false;
+	}
 	return true;
 }
 
