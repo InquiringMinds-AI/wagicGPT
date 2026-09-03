@@ -1141,7 +1141,13 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
     }
     else if ((s == "cursedscrollresult" || s == "magusofscrollresult") && (card->controller()->game->hand->nb_cards > 0))//return 1 if the choosen card has to give damage (e.g. Cursed Scroll, Magus od the Scroll).
     {
-        intValue = (card->controller()->game->hand->cards[std::rand() % card->controller()->game->hand->nb_cards]->name == card->name)?1:0;
+        //#W56-E (A35): the per-observer generator, not the process-global
+        //libc stream (same rule as the genrand site above).
+        {
+            RandomGenerator * rg = card->getObserver() ? card->getObserver()->getRandomGenerator() : NULL;
+            const int pick = (rg ? rg->random() : std::rand()) % card->controller()->game->hand->nb_cards;
+            intValue = (card->controller()->game->hand->cards[pick]->name == card->name)?1:0;
+        }
     }
     else if (s == "mypos" || s == "bushidopoints")//hand,exile,grave & library only (library zpos is inverted so the recent one is always the top) -- bushido point
     {

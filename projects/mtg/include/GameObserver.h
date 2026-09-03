@@ -49,7 +49,17 @@ class GameObserver{
   // used when we're loading to know what to load
   list<string> loadingList;
   list<string>::iterator loadingite;
+  //#W56-E: clicks the ENGINE made during a WAGIC_REPLAY that the record
+  //does not contain (equip/activation auto-tap). Parked, not appended to
+  //actionsList; the loader consumes one when the record asks for it.
+  list<string> mReplayEngineActions;
   RandomGenerator randomGenerator;
+  //#W56-E (O8/A35): the heuristic AI's OWN stream. One shared stream fed
+  //shuffles, dice AND the AI's own rolls, so a seat swap, an AI change or
+  //any new AI-side draw shifted every later game value and a transcript
+  //stopped replaying. Seeded from the game seed (derived, so the two
+  //streams never coincide) - deterministic, and invisible to `rvalues:`.
+  RandomGenerator aiRandomGenerator;
   WResourceManager* mResourceManager;
   JGE* mJGE;
   DeckManager* mDeckManager;
@@ -294,10 +304,21 @@ class GameObserver{
   Player* getPlayer(size_t index) { return players[index];};
   bool isStarted() { return (mLayers!=NULL);};
   RandomGenerator* getRandomGenerator() { return &randomGenerator; };
+  //#W56-E: every AIPlayer*/AIHints draw goes here, never through the game
+  //stream the transcript records. WAGIC_SINGLE_RNG=1 restores the single
+  //pre-change stream (the disable flag for this change).
+  RandomGenerator* getAIRandomGenerator()
+  {
+      static const bool singleStream = (getenv("WAGIC_SINGLE_RNG") != NULL);
+      return singleStream ? &randomGenerator : &aiRandomGenerator;
+  };
+  //#W56-E: the AI stream's seed is derived from the game seed so one seed
+  //directive still pins the whole run.
+  static unsigned int aiSeedFrom(unsigned int seed) { return seed ^ 0x9E3779B9u; };
   //Reseed this game's randomness (test suite "seed" directive). The ctor
   //seeds from time(0), so a test's fixed seed must be re-applied after
   //construction to make the run deterministic.
-  void resetSeed(unsigned int seed) { mSeed = seed; randomGenerator.setSeed(seed); };
+  void resetSeed(unsigned int seed) { mSeed = seed; randomGenerator.setSeed(seed); aiRandomGenerator.setSeed(aiSeedFrom(seed)); };
   WResourceManager* getResourceManager() { if(this) return mResourceManager;else return 0;};
   CardSelectorBase* getCardSelector() { return mLayers->getCardSelector();};
   bool operator==(const GameObserver& aGame);

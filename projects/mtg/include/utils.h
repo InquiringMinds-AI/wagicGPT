@@ -102,7 +102,6 @@ public:
     };
 };
 
-int WRand(bool log = false);
 
 #ifdef LINUX
 void dumpStack();

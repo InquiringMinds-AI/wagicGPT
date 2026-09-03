@@ -87,11 +87,6 @@ void RandomGenerator::loadRandValues(string s)
     }
 }
 
-int WRand(bool)
-{
-    return rand();
-}
-
 bool fileExists(const char * filename)
 {
     return JFileSystem::GetInstance()->FileExists(filename);

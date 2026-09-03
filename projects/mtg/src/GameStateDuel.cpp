@@ -3449,6 +3449,12 @@ bool Tournament::isGauntlet(){return mTournamentMode==TOURNAMENTMODES_GAUNTLET;}
 bool Tournament::isEndlessDemo(){return mTournamentMode==TOURNAMENTMODES_ENDLESS;}
 
 
+//#W56-E (A35): the AI-vs-AI filler result used the process-global libc
+//rand() stream. A Tournament has no GameObserver, and a bookkeeping coin
+//flip must not consume a value out of the game stream the transcript
+//records either - so it gets its own generator.
+static RandomGenerator sTournamentRandom((unsigned int)time(0), false);
+
 void Tournament::leaveOutAIvsAIMatches()
 {
     if (isTournament() && Deck[0].isAI() && Deck[1].isAI())
@@ -3458,7 +3464,7 @@ void Tournament::leaveOutAIvsAIMatches()
             endOfMatch = false;
             while(!endOfMatch)
             {
-              bool p0Won=  ((rand() % 100 + 1)<51);
+              bool p0Won=  ((sTournamentRandom.random() % 100 + 1)<51); //#W56-E
               gameFinished(p0Won,!p0Won);
 
             }

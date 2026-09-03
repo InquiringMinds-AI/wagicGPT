@@ -110,7 +110,12 @@ public:
     virtual bool blockersDeclarationDue() { return false; }
 
     void setFastTimerMode(bool mode = true) { mFastTimerMode = mode; };
-    RandomGenerator* getRandomGenerator(){return &randomGenerator;};
+    //#W56-E (O8/A35): every AI seat draws from the game's AI stream
+    //(GameObserver::aiRandomGenerator), not from the game stream the
+    //transcript records and not from a per-seat time-seeded stream. The
+    //member below is only the fallback for an observer-less construction
+    //path. Defined in AIPlayer.cpp - GameObserver is incomplete here.
+    RandomGenerator* getRandomGenerator();
 
     bool parseLine(const string& s);
 

@@ -111,7 +111,7 @@ GameObserver::~GameObserver()
 }
 
 GameObserver::GameObserver(WResourceManager *output, JGE* input)
-    : mSeed((unsigned int)time(0)), randomGenerator(mSeed, true), mResourceManager(output), mJGE(input)
+    : mSeed((unsigned int)time(0)), randomGenerator(mSeed, true), aiRandomGenerator(aiSeedFrom(mSeed), false), mResourceManager(output), mJGE(input)
 
 {
     ExtraRules = new MTGCardInstance[2]();
@@ -2554,6 +2554,7 @@ bool GameObserver::load(const string& ss, bool undo, int controlledPlayerIndex
         {
             mSeed = atoi(s.substr(5).c_str());
             randomGenerator.setSeed(mSeed);
+            aiRandomGenerator.setSeed(aiSeedFrom(mSeed)); //#W56-E
             continue;
         }
         if (s.find("snapshot:postpregame") == 0)
@@ -2792,6 +2793,7 @@ bool GameObserver::processActions(bool undo
     actionsList.clear();
 
     mLoading = true;
+    mReplayEngineActions.clear(); //#W56-E
     float counter = 0.0f;
 
     // To handle undo, we'll remove the last P1 action and all P2 actions after.
@@ -2824,6 +2826,26 @@ bool GameObserver::processActions(bool undo
         const bool lenient = getenv("WAGIC_REPLAY") != NULL;
         size_t nb = 0;
         bool accepted = false;
+        //#W56-E: the engine already made this click itself (auto-tap for an
+        //equip/activation cost). Re-issuing it is either refused for ever or
+        //pays twice - honour the record by consuming the engine's own action.
+        if (lenient && !mReplayEngineActions.empty())
+        {
+            for (list<string>::iterator eit = mReplayEngineActions.begin(); eit != mReplayEngineActions.end(); eit++)
+            {
+                if (transcriptActionKey(*eit) != transcriptActionKey(*loadingite)) continue;
+                DebugTrace("REPLAY: '" << *loadingite << "' was already performed by the engine - consumed");
+                mReplayEngineActions.erase(eit);
+                actionsList.push_back(*loadingite);
+                accepted = true;
+                break;
+            }
+        }
+        if (accepted)
+        {
+            dumpAssert(cmdIndex == (actionsList.size()-1));
+            continue;
+        }
         //A recorded phase request for a phase this replay has already left
         //(the live game's automation ran between two recorded requests) is
         //already satisfied; a request for a later phase is driven there by
@@ -2947,6 +2969,21 @@ void GameObserver::logAction(const string& s)
             DebugTrace("REPLAY MISMATCH expected '" << toCheck << "' got '" << s << "'");
             if (!getenv("WAGIC_REPLAY"))
                 dumpAssert(false);
+            else
+            {
+                //#W56-E (D28 / wave-53 lane AA): the engine ACTS on its own
+                //inside a replay - equipping auto-taps the payment and logs
+                //clicks the record never contained. Two failures came out of
+                //that: the extra entries broke the loader's
+                //cmdIndex == actionsList.size()-1 invariant (dumpAssert abort,
+                //both 2026-09-02 vpk12 dumps with a Bloodforged Battle-Axe),
+                //and when the engine paid FIRST the recorded payment click was
+                //then refused 60x. So an engine-generated click is kept OUT of
+                //actionsList and parked here; the loader consumes a recorded
+                //click that matches one as already done.
+                mReplayEngineActions.push_back(s);
+                return;
+            }
         }
     }
     actionsList.push_back(s);
