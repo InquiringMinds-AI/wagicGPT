@@ -1,0 +1,52 @@
+#W57-S. Owner Vita play report (vpk16 = 4366e8eec, 2026-09-03, verbatim):
+#"in the last match, i softlocked after the opponent canceled my spell."
+#Evidence: psp-work/logs/20260903-vpk15/memlog-vpk16.txt - `untap turn=6`,
+#two slow update frames, and NO `untap turn=7`; the transcript's last recorded
+#action is the AI seat's own phase request. The game stopped advancing inside
+#the AI seat's turn, with the human seat locked out (DuelLayers::CheckUserInput
+#discards every human key while currentlyActing() is not the human seat).
+#
+#This fixture is the NEGATIVE CONTROL for the reported shape, and the first one
+#the suite can express: `aiseat 1` puts ONE seat on the heuristic AI while the
+#other keeps reading the script, so a scripted (non-MODE_AI, i.e. lane Z's
+#"human" branch) seat can respond inside an AI seat's window and be countered.
+#The whole shape - window taken, instant cast, AI counters it - must leave the
+#game advancing to the end of the AI's turn. It does; the softlock is NOT in
+#this path (see strategy-design/wave57/lane-S.md for what was ruled out).
+FORCEABILITY
+AICALLS 200
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Island,Island
+hand:Counterspell
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+hand:Giant Growth
+manapool:{G}
+life:20
+[DO]
+aiseat 1
+yes
+Giant Growth
+Grizzly Bears
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+[ASSERT]
+end
+[PLAYER1]
+inplay:Island,Island
+graveyard:Counterspell
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+graveyard:Giant Growth
+life:20
+[END]

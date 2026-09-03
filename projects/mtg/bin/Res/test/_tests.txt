@@ -1339,3 +1339,5 @@ w56Z_interrupt_cancel_button_keeps_window.txt
 w56Z_interrupt_targeted_cast_resolves.txt
 light_paws_attaches_to_lightpaws.txt
 light_paws_normal_aura_choice_free.txt
+w57S_human_seat_cast_countered_advances.txt
+w57S_human_seat_cast_dissipated_advances.txt
