@@ -1,0 +1,5 @@
+#NAME:W55C Probe Bears
+#DESC:probe deck for wave-55 lane C render items
+Grizzly Bears (*) *8
+Craw Wurm (*) *4
+Forest *28

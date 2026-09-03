@@ -1,0 +1,9 @@
+#NAME:W55C Probe Burn
+#DESC:probe deck for wave-55 lane C render items
+Starstorm (*) *4
+Stone Rain (*) *4
+Devour Flesh (*) *4
+Pyrite Spellbomb (*) *4
+Grizzly Bears (*) *4
+Mountain *12
+Swamp *8

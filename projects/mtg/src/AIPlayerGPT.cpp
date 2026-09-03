@@ -1454,6 +1454,60 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
     return true;
 }
 
+//#W55-C (D7 a): a `target=player` edict enumerates BOTH players on its own cast
+//row and the verdict spoke only of the opponent - 178 of 180 `Cast Devour Flesh`
+//rows read `they control 0 creatures - at 0 this does nothing` while listing
+//`you` among the legal targets, and 76 of those were windows where the seat's
+//OWN side was live. At `123v126` seq 104 (58 Humans, Sanguine Bond + Exquisite
+//Blood out) the model spent ~900 words on whether the row even lets it pick
+//itself and abandoned a genuine win attempt. The TARGETED player sacrifices
+//(`notaTarget(creature|mybattlefield) ... targetedplayer`), so the seat's own
+//half is not a curiosity: it is half of the row's own enumeration. Pure over
+//(count, name, toughness, who gains).
+static string edictSelfClause(int myCreatures, const string& onlyName, int onlyToughness,
+                              bool targetGains)
+{
+    std::ostringstream o;
+    if (myCreatures <= 0)
+        return "; YOU control 0 creatures - targeting yourself does nothing";
+    o << "; YOU control " << myCreatures << " creature" << (myCreatures == 1 ? "" : "s")
+      << " - targeting yourself sacrifices ";
+    if (myCreatures == 1)
+    {
+        o << onlyName;
+        if (targetGains)
+            o << ", and you gain " << onlyToughness;
+    }
+    else
+    {
+        o << "one of them, your choice";
+        if (targetGains)
+            o << ", and you gain its toughness";
+    }
+    return o.str();
+}
+
+//#W55-C (D7 a): is the CASTER a legal target of this spell right now? Asked of
+//the engine's own chooser - the same object the cast row's `legal targets right
+//now:` enumeration is built from - so the clause and the list cannot disagree.
+//No chooser, no claim.
+static bool spellCanTargetSelf(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    GameObserver * obs = card->getObserver();
+    Player * me = card->controller();
+    if (!obs || !me)
+        return false;
+    TargetChooserFactory tcf(obs);
+    TargetChooser * tc = tcf.createTargetChooser(card);
+    if (!tc)
+        return false;
+    bool ok = tc->canTarget(me);
+    SAFE_DELETE(tc);
+    return ok;
+}
+
 static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
 {
     int theirs, theirsAttack, mine;
@@ -1535,9 +1589,25 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
                 }
             }
         }
+        //#W55-C (D7 a): the other half of the row's own enumeration.
+        string selfClause;
+        if (spellCanTargetSelf(card))
+        {
+            MTGCardInstance * myOnly = NULL;
+            Player * meP = card->controller();
+            MTGGameZone * mbf = (meP && meP->game) ? meP->game->inPlay : NULL;
+            for (int mi2 = 0; mbf && mi2 < mbf->nb_cards; mi2++)
+                if (mbf->cards[mi2] && mbf->cards[mi2]->isCreature())
+                    myOnly = mbf->cards[mi2];
+            selfClause = edictSelfClause(mine,
+                            (mine == 1 && myOnly)
+                                ? myOnly->getDisplayName() + instanceHandle(myOnly) : string(),
+                            myOnly ? myOnly->toughness : 0, targetGains);
+        }
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
-                           targetGains, facts, convName, convTakes, myLife);
+                           targetGains, facts, convName, convTakes, myLife)
+             + selfClause;
     }
     if (sweepVerb)
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live);
@@ -8858,6 +8928,50 @@ static int xBestFreeKillX(const std::vector<XDamVictim>& victims, int capX)
     return bestKills > 0 ? bestX : -1;
 }
 
+//#W55-C (D6 a): the SECOND marker. xBestFreeKillX only speaks when some
+//affordable X kills something of THEIRS and NOTHING of yours, and across the
+//wave-54 corpus's 42 logs that held on neither X menu - so the decisive marker
+//rendered ZERO times, while `130v152` s17 answered
+//`X = 1 {kills THEIRS: none; YOURS: Goblin x3}` under a plan naming two of
+//THEIR creatures and the game ended three life later. When no X is free, the
+//honest maximum is the CHEAPEST X whose `kills THEIRS` list is maximal: the
+//kill set only grows with X, so that same row also carries the smallest YOURS
+//of the maximal set - which is exactly what the marker's words claim. Returns
+//-1 when no affordable X kills anything of theirs. Pure over the survey.
+static int xBestTradeX(const std::vector<XDamVictim>& victims, int capX)
+{
+    int bestX = -1, bestKills = 0;
+    for (int x = 0; x <= capX; x++) //ascending: a tie keeps the cheapest X
+    {
+        int theirs = 0;
+        for (size_t i = 0; i < victims.size(); i++)
+            if (!victims[i].isPlayer && !victims[i].mine
+                && victims[i].lethalX > 0 && victims[i].lethalX <= x)
+                theirs++;
+        if (theirs > bestKills)
+        {
+            bestKills = theirs;
+            bestX = x;
+        }
+    }
+    return bestKills > 0 ? bestX : -1;
+}
+
+//#W55-C (D6 b): the row the marker lands on is, by both rules above, the
+//CHEAPEST row of its collapsed run - and the collapse is precisely what took
+//that row's kill list away ("same kills as X=N, for M less mana"; `130v126`
+//s58 took the TOP of a collapsed run for the third corpus running). Rather
+//than re-expanding every row - which is what the collapse exists to avoid -
+//the MARKER restates the two lists for the one row it names. Same lists, same
+//evaluator, same braces-free bracket channel. Pure.
+static string xMarkerRestate(const std::vector<XDamVictim>& victims, int atX)
+{
+    std::ostringstream o;
+    o << " - at X=" << atX << " that is THEIRS: " << xVictimList(victims, atX, false)
+      << "; YOURS: " << xVictimList(victims, atX, true);
+    return o.str();
+}
+
 //The marker itself, once per menu, on the row it names. BRACKETED, like every
 //other decision-time guidance annotation: brackets are dropped wholesale from
 //the narrated record (the owner's ruling - guidance never enters history) and
@@ -8865,6 +8979,35 @@ static int xBestFreeKillX(const std::vector<XDamVictim>& victims, int capX)
 //"CHOICE: 1 (X = 1)" instead of a marker cut off mid-word.
 static const char * kXMostKillsMarker =
     " [<- most kills at any affordable X that costs you nothing]";
+//#W55-C (D6 a): the other two members of the same family. The trade marker is
+//the free marker's fallback; the third states a fact about the WHOLE menu on
+//the row that spends nothing, and is never an instruction to take that row.
+static const char * kXBestTradeMarker =
+    " [<- best trade: the most of THEIRS at the smallest cost to YOURS]";
+static const char * kXNoKillsMarker =
+    " [<- no X on this menu kills anything of THEIRS]";
+
+//#W55-C (D6 a): exactly ONE row is marked, and the mark says what it means.
+//Ranked: a free kill outranks a trade; with no kill of theirs at ANY X the
+//menu says so on the row that spends nothing (X=0). Never returns -1 - the
+//zero-render outcome the corpus measured is unreachable from here. Pure.
+static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut)
+{
+    int freeX = xBestFreeKillX(victims, capX);
+    if (freeX >= 0)
+    {
+        markerOut = kXMostKillsMarker;
+        return freeX;
+    }
+    int tradeX = xBestTradeX(victims, capX);
+    if (tradeX >= 0)
+    {
+        markerOut = kXBestTradeMarker;
+        return tradeX;
+    }
+    markerOut = kXNoKillsMarker;
+    return 0;
+}
 
 //Board-facing wrapper for the ANNOUNCE_X menu. capX comes from the MENU (the
 //option count), never from a second affordability query: the rows being
@@ -8872,10 +9015,13 @@ static const char * kXMostKillsMarker =
 //would put a kill list on an X that is not on offer. Returns false when there
 //is nothing priceable to say (the rows then render exactly as before).
 static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
-                              std::vector<string>& out, int * bestFreeKillX = NULL)
+                              std::vector<string>& out, int * markX = NULL,
+                              string * markerText = NULL)
 {
-    if (bestFreeKillX)
-        *bestFreeKillX = -1;
+    if (markX)
+        *markX = -1;
+    if (markerText)
+        markerText->clear();
     if (capX < 0)
         return false;
     XVictimSurvey sv;
@@ -8905,8 +9051,24 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
     }
     xKillRowAnnotations(sv.victims, capX, sv.sweep, sv.hitsMe, sv.hitsOpp,
                         sv.myLife, sv.oppLife, xCastIsOnlyXDamage(card->magicText), out);
-    if (bestFreeKillX)
-        *bestFreeKillX = xBestFreeKillX(sv.victims, capX); //#W48 D9
+    if (markX && markerText)
+    {
+        //#W55-C (D6): one row, always, and the lists restated on it when the
+        //collapse (or the X=0 special row) left it without a kill list.
+        string mk;
+        int mx = xMenuMarkX(sv.victims, capX, mk);
+        size_t idx = (size_t)(capX - mx);
+        if (idx < out.size()
+            && (out[idx].find("kills THEIRS") == string::npos
+                || out[idx].find("same kills as X=") != string::npos))
+        {
+            if (!mk.empty() && mk[mk.size() - 1] == ']')
+                mk.erase(mk.size() - 1);
+            mk += xMarkerRestate(sv.victims, mx) + "]";
+        }
+        *markX = mx;
+        *markerText = mk;
+    }
     return true;
 }
 
@@ -13814,7 +13976,10 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 8, "{spare: ") == 0)
                 || (in.compare(i, 15, "{dead right now") == 0)
                 || (in.compare(i, 24, "{you already control one") == 0)
-                || (in.compare(i, 14, "{visible now: ") == 0);
+                || (in.compare(i, 14, "{visible now: ") == 0)
+                //#W55-C (D7 b): whether the row commits a target is a fact
+                //about THIS window's ask sequence, not about what happened.
+                || (in.compare(i, 32, "{this row does not pick a target") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -15123,14 +15288,32 @@ static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife)
         o << " leaves them at " << (oppLife - dmg);
     return o.str();
 }
+//#W55-C (D15), same defect on the magnitude emitter: a `{kills: ...}` list that
+//mixes sides reads as a consequence of the cast, not of the pick. `killedMine`
+//empty keeps every wave-54 string byte-identical.
 static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
-                                 const string& magnitude, const string& playerTail = "")
+                                 const string& magnitude, const string& playerTail = "",
+                                 const std::vector<std::string>& killedMine
+                                     = std::vector<std::string>())
 {
     if (magnitude.empty())
         return "";
     if (creatureTargets <= 0)
         return playerTail.empty() ? string("") : " {no creature target" + playerTail + "}";
     std::ostringstream o;
+    if (!killedMine.empty())
+    {
+        o << " {kills whichever you target: THEIRS - ";
+        if (killed.empty())
+            o << "none";
+        for (size_t i = 0; i < killed.size(); i++)
+            o << (i ? ", " : "") << killed[i];
+        o << "; YOURS - ";
+        for (size_t i = 0; i < killedMine.size(); i++)
+            o << (i ? ", " : "") << killedMine[i];
+        o << playerTail << "}";
+        return o.str();
+    }
     if (killed.empty())
         o << " {kills 0 of the " << creatureTargets << " CREATURE target"
           << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << playerTail << "}";
@@ -15639,6 +15822,105 @@ static bool scriptHasWord(const string& low, const char * word)
     }
     return false;
 }
+//#W55-C (D7 b): the model asked, in its own reply, whether taking a cast row
+//lets it pick a target at all - "It doesn't specify target yet... If I cannot
+//target myself with this menu item, I cannot trigger the loop" (`123v126` seq
+//104) - and the prompt answered it nowhere. With two or more legal targets the
+//engine issues the target ask next (the c4 seam); with exactly one it commits
+//without a model call, so the claim is made ONLY for the two-or-more case and
+//the single-target row keeps its existing silence. Pure over the count.
+static string targetCommitClause(int legalTargets)
+{
+    if (legalTargets < 2)
+        return "";
+    std::ostringstream o;
+    o << " {this row does not pick a target yet - taking it asks you next which of the "
+      << legalTargets << " legal targets above}";
+    return o.str();
+}
+
+//#W55-C (D10): a permanent of THEIRS that has NAMED this card taxes the cast,
+//and the price rode nowhere on the row. `126v146` seq 42 (t26, 24 -> 21) and
+//seq 61 (t32, 8 -> 5, opponent on 5) offered `Cast Exquisite Blood {4}{b}
+//{leaves 3 of your 8 untapped mana sources untapped}` beside an opponent
+//battlefield line reading `Silverquill Silencer {b}{w} (3/2) [named: Exquisite
+//Blood]`; the seat paid 6 life to the Silencer and died at -5 against 5. The
+//magnitude and the draw are READ off the naming permanent's own script
+//(`@movedto(*[chosenname]|opponentstack):life:-3 opponent && draw:1
+//controller`), never guessed, and the `[named: ...]` TAG itself is untouched -
+//two seats asked for that in writing; only the row gains a price. Returns false
+//unless the trigger line is that exact shape.
+static bool namedCastPenaltyScan(const string& magicText, int& lifeLoss, int& draws)
+{
+    lifeLoss = 0;
+    draws = 0;
+    string mt = toLowerCopy(magicText);
+    size_t lp = 0;
+    while (lp <= mt.size())
+    {
+        size_t nl = mt.find('\n', lp);
+        string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+        if (line.find("[chosenname]|opponentstack") == string::npos)
+            continue;
+        //":life:-N <who>" - counted only when the payee is the naming player's
+        //opponent, i.e. the seat about to cast.
+        size_t lpos = line.find(":life:-");
+        if (lpos != string::npos)
+        {
+            size_t s = lpos + 7, e = s;
+            while (e < line.size() && isdigit((unsigned char) line[e]))
+                e++;
+            size_t w = line.find_first_not_of(" \t", e);
+            if (e > s && w != string::npos && line.compare(w, 8, "opponent") == 0)
+                lifeLoss = atoi(line.substr(s, e - s).c_str());
+        }
+        //"draw:N <who>" - counted only when the drawer is the naming player.
+        size_t dpos = line.find("draw:");
+        if (dpos != string::npos)
+        {
+            size_t s = dpos + 5, e = s;
+            while (e < line.size() && isdigit((unsigned char) line[e]))
+                e++;
+            size_t w = line.find_first_not_of(" \t", e);
+            if (e > s && w != string::npos && line.compare(w, 10, "controller") == 0)
+                draws = atoi(line.substr(s, e - s).c_str());
+        }
+        return lifeLoss > 0 || draws > 0;
+    }
+    return false;
+}
+
+//The clause itself, in the same bracketed guidance channel the `[named: ...]`
+//tag uses (so it is stripped wholesale from the narrated record), reusing lane
+//C's `- you would be at K` subtraction. Pure over (source, amounts, life).
+static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draws, int life)
+{
+    if (sourceName.empty() || (lifeLoss <= 0 && draws <= 0))
+        return "";
+    std::ostringstream o;
+    o << " [NAMED BY THEIR " << sourceName << ": casting this";
+    if (lifeLoss > 0)
+        o << " costs you " << lifeLoss << " life";
+    if (lifeLoss > 0 && draws > 0)
+        o << " and";
+    if (draws > 0)
+    {
+        if (draws == 1)
+            o << " draws them a card";
+        else
+            o << " draws them " << draws << " cards";
+    }
+    if (lifeLoss > 0 && life >= 0)
+    {
+        o << " - you would be at " << (life - lifeLoss);
+        if (life - lifeLoss <= 0)
+            o << "; this KILLS you";
+    }
+    o << "]";
+    return o.str();
+}
+
 static string spellRemovalVerb(MTGCardInstance * src)
 {
     if (!src || !(src->hasType(Subtypes::TYPE_INSTANT) || src->hasType(Subtypes::TYPE_SORCERY)))
@@ -15686,12 +15968,42 @@ static string spellRemovalVerb(MTGCardInstance * src)
 //The victim list itself. INDESTRUCTIBLE is the one thing a plain `destroy`
 //cannot answer, so it is NAMED rather than silently dropped (the trust
 //doctrine: a silent omission is worse than the true token). Pure.
+//#W55-C (D15): the list is a CONSEQUENCE label, and it named the caster's own
+//permanents with no ownership mark - `130v146` s23 rendered
+//`Cast Stone Rain {2}{r} {kills: Plains #1, Plains #2, Mountain #1 ... #5}` on
+//a seat whose whole plan is land destruction; five of the seven were its own
+//Mountains and the spell destroys exactly one. The target menu one screen later
+//marks every row `[your battlefield]`; this row did not. When nothing of the
+//caster's is on the list the string is BYTE-IDENTICAL to before, so the common
+//case does not move. The cardinality is deliberately NOT asserted ("whichever
+//you target", not "whichever ONE"): the single-payload rail this tag rides does
+//not by itself prove a one-target `target=` line.
 static string removalVictimTag(const string& verb, const std::vector<std::string>& victims,
-                               const std::vector<std::string>& immune)
+                               const std::vector<std::string>& immune,
+                               const std::vector<std::string>& mine = std::vector<std::string>())
 {
-    if (verb.empty() || (victims.empty() && immune.empty()))
+    if (verb.empty() || (victims.empty() && immune.empty() && mine.empty()))
         return "";
     std::ostringstream o;
+    if (!mine.empty())
+    {
+        o << " {" << verb << " whichever you target: THEIRS - ";
+        if (victims.empty())
+            o << "none";
+        for (size_t i = 0; i < victims.size(); i++)
+            o << (i ? ", " : "") << victims[i];
+        o << "; YOURS - ";
+        for (size_t i = 0; i < mine.size(); i++)
+            o << (i ? ", " : "") << mine[i];
+        if (!immune.empty())
+        {
+            o << " - INDESTRUCTIBLE, destroy does nothing: ";
+            for (size_t i = 0; i < immune.size(); i++)
+                o << (i ? ", " : "") << immune[i];
+        }
+        o << "}";
+        return o.str();
+    }
     if (victims.empty())
     {
         o << " {kills nothing: every legal target is INDESTRUCTIBLE (";
@@ -16193,6 +16505,16 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             pt = dynamic_cast<Player *>(action.playerAbilityTarget);
         out << " targeting " << (pt ? (pt == this ? "you" : "the opponent")
                                     : string("a player"));
+        //#W55-C (D16, third wave carried): the cast row has carried this tail
+        //since wave-54 lane C (`130v126` s66: "- and 1 to the opponent at life
+        //24 leaves them at 23"); the ABILITY row printed nothing. 73 rows in
+        //the wave-54 corpus read "Deal 1 damage with Staff of Nin targeting the
+        //opponent" beside a target menu whose player row carried the life
+        //total. Same clause, same helper, other emitter.
+        if (pt && action.ability)
+            if (AADamager * adp = unwrapDamagerAbility(action.ability, 0))
+                if (adp->d.find("rand") == string::npos && adp->getDamage() > 0)
+                    out << damagePlayerVerdict(adp->getDamage(), pt->life, pt == this);
     }
 
     //Localize the cost onto the action itself. The menu text describes the
@@ -20345,6 +20667,26 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " {adventure spell: " << advText << "}";
             }
         }
+        //#W55-C (D10): a naming permanent of THEIRS prices this cast. Scanned
+        //over their battlefield, matched on the chosen name the tag already
+        //renders, priced off that permanent's own trigger line.
+        {
+            Player * oppN = opponent();
+            MTGGameZone * obf = (oppN && oppN->game) ? oppN->game->inPlay : NULL;
+            for (int ni = 0; obf && ni < obf->nb_cards; ni++)
+            {
+                MTGCardInstance * nc = obf->cards[ni];
+                if (!nc || nc->chooseaname.empty()
+                    || toLowerCopy(nc->chooseaname) != toLowerCopy(card->name))
+                    continue;
+                int nLife = 0, nDraw = 0;
+                if (!namedCastPenaltyScan(nc->magicText, nLife, nDraw))
+                    continue;
+                o << namedCastPriceTag(nc->getDisplayName() + instanceHandle(nc),
+                                       nLife, nDraw, life);
+                break;
+            }
+        }
         //#W47 (R14b): what this cast LEAVES UP, from the engine's own auto-tap
         //plan for this exact cost (ManaEngine::selectAutoTapProducers - the
         //producers the payment will really activate, pool-aware, no clicks).
@@ -20606,7 +20948,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         int castDrop = castDmg ? 0 : spellPTDropAmount(observer, card);
                         if (castDmg > 0 || castDrop > 0)
                         {
-                            std::vector<std::string> killed;
+                            std::vector<std::string> killed, killedMine; //#W55-C (D15)
                             int creatureTargets = 0;
                             for (size_t ki = 0; ki < tgtCards.size(); ki++)
                             {
@@ -20622,7 +20964,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                         castDeathtouch)
                                     : ptDropKillsTarget(castDrop, kc->life);
                                 if (dies)
-                                    killed.push_back(kc->getDisplayName() + instanceHandle(kc));
+                                {
+                                    if (kc->controller() == this) //#W55-C (D15)
+                                        killedMine.push_back(kc->getDisplayName() + instanceHandle(kc));
+                                    else
+                                        killed.push_back(kc->getDisplayName() + instanceHandle(kc));
+                                }
                             }
                             std::ostringstream mag;
                             if (castDmg > 0)
@@ -20634,7 +20981,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             Player * oppP = this->opponent();
                             string playerTail = castPlayerDamageTail(
                                 castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1);
-                            o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail);
+                            o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
+                                                    killedMine); //#W55-C (D15)
                         }
                         else
                         {
@@ -20644,7 +20992,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             string rverb = spellRemovalVerb(card);
                             if (!rverb.empty())
                             {
-                                std::vector<std::string> victims, immune;
+                                std::vector<std::string> victims, immune, mineV;
                                 for (size_t ki = 0; ki < tgtCards.size(); ki++)
                                 {
                                     MTGCardInstance * kc = tgtCards[ki];
@@ -20655,10 +21003,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                     if (rverb == "kills"
                                         && kc->basicAbilities[Constants::INDESTRUCTIBLE] != 0)
                                         immune.push_back(nm);
+                                    else if (kc->controller() == this) //#W55-C (D15)
+                                        mineV.push_back(nm);
                                     else
                                         victims.push_back(nm);
                                 }
-                                o << removalVictimTag(rverb, victims, immune);
+                                o << removalVictimTag(rverb, victims, immune, mineV);
                             }
                         }
                     }
@@ -20691,6 +21041,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         //Full list, opponent-first: no "(+N more)" truncation
                         //(see the enumeration comment above).
                         o << " - legal targets right now: " << tNames.str();
+                        //#W55-C (D7 b): scoped to enumerations that include a
+                        //PLAYER row - that is the shape the model asked about
+                        //in writing (`123v126` seq 104), and a clause on every
+                        //multi-target cast row would be prompt weight for a
+                        //question nothing in the corpus asked there.
+                        {
+                            bool playerOnList = false;
+                            for (size_t pci = 0; pci < tgtCards.size(); pci++)
+                                if (!tgtCards[pci])
+                                    playerOnList = true;
+                            if (playerOnList)
+                                o << targetCommitClause(tShown);
+                        }
                         //Owner ruling (2026-07-16): same as the own-side case
                         //above - annotate, never hide. A beneficial cast with
                         //only opponent-side targets is usually futile (deck49
@@ -21803,19 +22166,21 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //annotated rather than something mis-aligned being claimed.
         {
             std::vector<string> xKills;
-            int bestFreeX = -1;
-            if (xAnnounceRowKills(ctx, this, capX, xKills, &bestFreeX)
+            int markX = -1;
+            string markText;
+            if (xAnnounceRowKills(ctx, this, capX, xKills, &markX, &markText)
                 && xKills.size() == shown.size())
             {
                 for (size_t ki = 0; ki < shown.size(); ki++)
                     shown[ki] += xKills[ki];
-                //#W48 D9: mark the maximal row ONCE. shown is largest-X-first,
-                //so the row for X is at index capX - X; the guard is the same
-                //contract rail the annotations ride (nothing is marked if the
-                //menu is ever built with something other than one row per X).
-                if (bestFreeX >= 0 && bestFreeX <= capX
-                    && (size_t)(capX - bestFreeX) < shown.size())
-                    shown[(size_t)(capX - bestFreeX)] += kXMostKillsMarker;
+                //#W48 D9 / #W55-C (D6): mark exactly ONE row. shown is
+                //largest-X-first, so the row for X is at index capX - X; the
+                //guard is the same contract rail the annotations ride (nothing
+                //is marked if the menu is ever built with something other than
+                //one row per X).
+                if (markX >= 0 && markX <= capX && !markText.empty()
+                    && (size_t)(capX - markX) < shown.size())
+                    shown[(size_t)(capX - markX)] += markText;
             }
         }
         //askEvenIfSingle: a zero-slack {X} cast offers exactly one value, and
@@ -41684,6 +42049,266 @@ static const char * kW50Y_r94 =
               "#W55-D D22 echo: the visibility tag echoed whole still binds");
         CHECK(stripNarrationDecoration(menu[0]) == "Essence Scatter",
               "#W55-D D22 echo: the tag leaves no residue in the narrated record");
+    }
+    cout << "\n[#W55-C] D6 the X-menu marker family, D7 the edict's own half + the"
+            " commit clause, D10 the named-cast price, D15 ownership on a kill"
+            " list, D16 the ability row's life arithmetic\n";
+    {
+        // ---- D6 (a): the marker family. The wave-54 corpus rendered the free
+        // marker ZERO times in 42 logs because it speaks only when some X is
+        // free; every X menu now carries exactly one mark that says what it is.
+        // `130v152` s17's shape: three of THEIRS at X=2/3/4, three Goblins of
+        // OURS that all die at X=1, cap 4.
+        std::vector<XDamVictim> lost;
+        {
+            const char * tn[3] = { "Intrepid Adversary", "Elite Spellbinder", "Sigarda" };
+            int tx[3] = { 2, 3, 4 };
+            for (int i = 0; i < 3; i++)
+            {
+                XDamVictim v;
+                v.baseName = tn[i];
+                v.name = tn[i];
+                v.mine = false;
+                v.lethalX = tx[i];
+                lost.push_back(v);
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                XDamVictim v;
+                v.baseName = "Goblin";
+                v.name = "Goblin";
+                v.mine = true;
+                v.lethalX = 1;
+                lost.push_back(v);
+            }
+        }
+        CHECK(xBestFreeKillX(lost, 4) == -1,
+              "#W55-C D6 the corpus shape: no affordable X is free, which is why the old marker was silent");
+        CHECK(xBestTradeX(lost, 4) == 4,
+              "#W55-C D6 the trade X is the CHEAPEST X whose THEIRS list is maximal");
+        {
+            string mk;
+            CHECK(xMenuMarkX(lost, 4, mk) == 4 && mk == string(kXBestTradeMarker),
+                  "#W55-C D6 (a) with nothing free the trade marker lands on X=4");
+            CHECK(mk.find("best trade") != string::npos
+                  && mk.find("costs you nothing") == string::npos,
+                  "#W55-C D6 (a) NEGATIVE the trade marker never claims the row is free");
+        }
+        // A free X outranks the trade: one of THEIRS dies at X=2 and nothing of
+        // ours dies below X=5, so the ORIGINAL marker is the one that prints.
+        std::vector<XDamVictim> freeCase;
+        {
+            XDamVictim t;
+            t.baseName = t.name = "Wall of Omens";
+            t.mine = false;
+            t.lethalX = 2;
+            freeCase.push_back(t);
+            XDamVictim m;
+            m.baseName = m.name = "Rorix Bladewing";
+            m.mine = true;
+            m.lethalX = 5;
+            freeCase.push_back(m);
+        }
+        {
+            string mk;
+            CHECK(xMenuMarkX(freeCase, 3, mk) == 2 && mk == string(kXMostKillsMarker),
+                  "#W55-C D6 (a) a free kill still wins, and the wave-48 marker is byte-identical");
+        }
+        // Nothing of theirs dies at any X: the menu says so on the row that
+        // spends nothing. A fact about the menu, never an instruction.
+        std::vector<XDamVictim> mineOnly;
+        {
+            XDamVictim m;
+            m.baseName = m.name = "Goblin";
+            m.mine = true;
+            m.lethalX = 1;
+            mineOnly.push_back(m);
+        }
+        {
+            string mk;
+            CHECK(xMenuMarkX(mineOnly, 4, mk) == 0 && mk == string(kXNoKillsMarker),
+                  "#W55-C D6 (a) with no kill of theirs at any X the marker states that, on X=0");
+            CHECK(mk.find("no X on this menu kills anything of THEIRS") != string::npos,
+                  "#W55-C D6 (a) and it says what it means");
+        }
+        // ---- D6 (b): the marked row is the CHEAPEST of its run, which is
+        // exactly the row the collapse stripped the kill list from. The marker
+        // restates the two lists for the row it lands on.
+        CHECK(xMarkerRestate(lost, 4)
+              == " - at X=4 that is THEIRS: Intrepid Adversary, Elite Spellbinder, Sigarda;"
+                 " YOURS: Goblin x3",
+              "#W55-C D6 (b) the restatement is the same two lists, same evaluator");
+        {
+            // one victim of theirs at X=2, cap 4 -> rows X=4 and X=3 collapse
+            // onto X=... top-down, so X=2's row is a "same kills as" row and it
+            // is the row the free marker names.
+            std::vector<XDamVictim> run;
+            XDamVictim t;
+            t.baseName = t.name = "Perimeter Captain";
+            t.mine = false;
+            t.lethalX = 2;
+            run.push_back(t);
+            std::vector<string> rows;
+            xKillRowAnnotations(run, 4, true, false, false, 20, 20, true, rows);
+            CHECK(rows.size() == 5 && rows[2].find("same kills as X=") != string::npos
+                  && rows[2].find("kills THEIRS") == string::npos,
+                  "#W55-C D6 (b) the cheapest row of a run carries no kill list of its own");
+            string mk;
+            int mx = xMenuMarkX(run, 4, mk);
+            CHECK(mx == 2, "#W55-C D6 (b) and it is the row the marker names");
+        }
+        // Echo shape: the marker is bracketed, so it leaves no trace in the
+        // narrated record and an answer that copies it still binds.
+        CHECK(stripNarrationDecoration(string("X = 4") + kXBestTradeMarker) == "X = 4"
+              && stripNarrationDecoration(string("X = 0") + kXNoKillsMarker) == "X = 0",
+              "#W55-C D6 echo: neither new marker reaches the append-only log");
+        {
+            std::vector<string> menu;
+            menu.push_back("X = 4");
+            menu.push_back(string("X = 3") + kXBestTradeMarker
+                           + string(" - at X=3 that is THEIRS: Sigarda; YOURS: none"));
+            bool stale = false;
+            CHECK(parseChoice(string("CHOICE: 2 (X = 3") + kXBestTradeMarker + ")", 2, &menu,
+                              &stale) == 2,
+                  "#W55-C D6 echo: a copied marker tail still binds to its row");
+        }
+
+        // ---- D7 (a): the row's OWN half. 178 of 180 Devour Flesh rows priced
+        // only the opponent while enumerating `you` as a legal target.
+        CHECK(edictSelfClause(0, "", 0, true)
+              == "; YOU control 0 creatures - targeting yourself does nothing",
+              "#W55-C D7 (a) the empty self side is stated, not omitted");
+        CHECK(edictSelfClause(1, "Goblin #1", 1, true)
+              == "; YOU control 1 creature - targeting yourself sacrifices Goblin #1, and you gain 1",
+              "#W55-C D7 (a) at one, the victim is determined and named");
+        CHECK(edictSelfClause(58, "", 0, true)
+              == "; YOU control 58 creatures - targeting yourself sacrifices one of them,"
+                 " your choice, and you gain its toughness",
+              "#W55-C D7 (a) the seq-104 shape: 58 Humans, and the choice is the seat's own");
+        CHECK(edictSelfClause(3, "", 0, false).find("gain") == string::npos,
+              "#W55-C D7 (a) NEGATIVE no toughnesslifegain, no gain clause");
+        CHECK((edictClause(0, "", 0, true) + edictSelfClause(58, "", 0, true))
+              == "they control 0 creatures - at 0 this does nothing;"
+                 " YOU control 58 creatures - targeting yourself sacrifices one of them,"
+                 " your choice, and you gain its toughness",
+              "#W55-C D7 (a) composed: both halves of the row's own enumeration");
+        CHECK(edictClause(0, "", 0, true) == "they control 0 creatures - at 0 this does nothing",
+              "#W55-C D7 (a) NEGATIVE the opponent half is byte-identical to wave 49");
+
+        // ---- D7 (b): does the row commit a target, or open a follow-up ask?
+        CHECK(targetCommitClause(2)
+              == " {this row does not pick a target yet - taking it asks you next which of the"
+                 " 2 legal targets above}",
+              "#W55-C D7 (b) the question the model asked in its own reply, answered");
+        CHECK(targetCommitClause(1).empty() && targetCommitClause(0).empty(),
+              "#W55-C D7 (b) NEGATIVE a single legal target commits with no model call: no claim");
+        CHECK(stripNarrationDecoration("Cast Devour Flesh {1}{b}" + targetCommitClause(2))
+              == "Cast Devour Flesh {1}{b}",
+              "#W55-C D7 (b) echo: the clause leaves no trace in the narrated record");
+
+        // ---- D10: the price a naming permanent of THEIRS puts on this cast.
+        {
+            int lf = 0, dw = 0;
+            CHECK(namedCastPenaltyScan("chooseaname transforms((,newability[@movedto("
+                                       "*[chosenname]|opponentstack):life:-3 opponent"
+                                       " && draw:1 controller])) forever chooseend nonland",
+                                       lf, dw)
+                  && lf == 3 && dw == 1,
+                  "#W55-C D10 the Silverquill Silencer payload, read off its own script");
+            lf = dw = 0;
+            CHECK(!namedCastPenaltyScan("@movedto(*|opponentstack):life:-3 opponent", lf, dw)
+                  && lf == 0 && dw == 0,
+                  "#W55-C D10 NEGATIVE no chosen-name trigger, no claim");
+            lf = dw = 0;
+            CHECK(namedCastPenaltyScan("@movedto(*[chosenname]|opponentstack):life:-2 opponent"
+                                       " && draw:1 opponent", lf, dw)
+                  && lf == 2 && dw == 0,
+                  "#W55-C D10 NEGATIVE a draw whose payee is not the naming player is not counted");
+        }
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
+              == " [NAMED BY THEIR Silverquill Silencer #1: casting this costs you 3 life"
+                 " and draws them a card - you would be at 21]",
+              "#W55-C D10 seq 42's row, priced");
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 3)
+              .find("you would be at 0; this KILLS you") != string::npos,
+              "#W55-C D10 the lethal case is named outright (lane C's subtraction)");
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 0, 1, 24)
+              == " [NAMED BY THEIR Silverquill Silencer #1: casting this draws them a card]",
+              "#W55-C D10 a draw-only naming permanent prices the draw and no life");
+        CHECK(namedCastPriceTag("", 3, 1, 24).empty()
+              && namedCastPriceTag("Silverquill Silencer #1", 0, 0, 24).empty(),
+              "#W55-C D10 NEGATIVE no source or no penalty, no tag");
+        CHECK(stripNarrationDecoration("Cast Exquisite Blood {4}{b}"
+                                       + namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24))
+              == "Cast Exquisite Blood {4}{b}",
+              "#W55-C D10 echo: the price is guidance and stays out of history");
+        CHECK(chosenNameTag("Exquisite Blood") == " [named: Exquisite Blood]",
+              "#W55-C D10 NEGATIVE the [named: ...] tag itself is untouched (two seats asked)");
+
+        // ---- D15: ownership on a single-target kill list. `130v146` s23.
+        {
+            std::vector<std::string> theirs, mineL, none;
+            theirs.push_back("Plains #1");
+            theirs.push_back("Plains #2");
+            mineL.push_back("Mountain #1");
+            mineL.push_back("Mountain #2");
+            CHECK(removalVictimTag("kills", theirs, none, mineL)
+                  == " {kills whichever you target: THEIRS - Plains #1, Plains #2;"
+                     " YOURS - Mountain #1, Mountain #2}",
+                  "#W55-C D15 the Stone Rain row, with the ownership the target menu already marks");
+            CHECK(removalVictimTag("kills", none, none, mineL)
+                  == " {kills whichever you target: THEIRS - none; YOURS - Mountain #1, Mountain #2}",
+                  "#W55-C D15 an all-your-own list says THEIRS - none rather than omitting it");
+            CHECK(removalVictimTag("kills", theirs, none)
+                  == " {kills: Plains #1, Plains #2}",
+                  "#W55-C D15 NEGATIVE nothing of yours on the list: byte-identical to wave 54");
+            CHECK(removalVictimTag("kills", theirs, none, none)
+                  == removalVictimTag("kills", theirs, none),
+                  "#W55-C D15 NEGATIVE an empty own-side vector is the same string as none at all");
+            std::vector<std::string> imm;
+            imm.push_back("Darksteel Citadel");
+            CHECK(removalVictimTag("kills", theirs, imm, mineL)
+                  .find("INDESTRUCTIBLE, destroy does nothing: Darksteel Citadel") != string::npos,
+                  "#W55-C D15 the indestructible half still rides the mixed form");
+            CHECK(stripNarrationDecoration("Cast Stone Rain {2}{r}"
+                                           + removalVictimTag("kills", theirs, none, mineL))
+                  == "Cast Stone Rain {2}{r}",
+                  "#W55-C D15 echo: the list is a brace annotation and never enters history");
+            CHECK(castKillSummaryTag(theirs, 4, "3 damage", "", mineL)
+                  == " {kills whichever you target: THEIRS - Plains #1, Plains #2;"
+                     " YOURS - Mountain #1, Mountain #2}",
+                  "#W55-C D15 the magnitude emitter carries the same split");
+            CHECK(castKillSummaryTag(theirs, 4, "3 damage")
+                  == " {kills: Plains #1, Plains #2}",
+                  "#W55-C D15 NEGATIVE the magnitude emitter is byte-identical with no own victims");
+            CHECK(castKillSummaryTag(theirs, 4, "3 damage", " - and 3 to the opponent at life 5"
+                                     " leaves them at 2", mineL)
+                  .find("Mountain #2 - and 3 to the opponent at life 5") != string::npos,
+                  "#W55-C D15 lane C's player tail still rides the split form, in the same place");
+        }
+
+        // ---- D16: the ability row's life arithmetic (third wave carried).
+        CHECK(damagePlayerVerdict(1, 12, false)
+              == " {right now: takes 1 damage - they would be at 11}",
+              "#W55-C D16 the same helper the cast row and the target ask use");
+        CHECK(damagePlayerVerdict(2, 2, false).find("THIS WINS THE GAME") != string::npos
+              && damagePlayerVerdict(2, 2, true).find("this KILLS you") != string::npos,
+              "#W55-C D16 both lethal branches reach the ability row unchanged");
+        CHECK(stripNarrationDecoration("Deal 1 damage with Staff of Nin targeting the opponent"
+                                       + damagePlayerVerdict(1, 12, false))
+              == "Deal 1 damage with Staff of Nin targeting the opponent",
+              "#W55-C D16 echo: the verdict strips off the narrated ability row");
+
+        // ---- D17 is REFUTED on the wave-54 corpus (24 of 24 fetch rows carried
+        // colours; the ledger item carried wave-53's text forward). Pinned here
+        // so a later lane cannot lose the clause silently.
+        {
+            bool tundra[5] = { true, true, false, false, false };
+            bool bwOnly[5] = { true, false, true, false, false };
+            CHECK(fetchLandColorsClause(tundra, bwOnly)
+                  == ", and it adds {W} or {U} (you cannot make {U} right now)",
+                  "#W55-C D17 REGRESSION lane E's clause still renders exactly as the corpus shows it");
+        }
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
