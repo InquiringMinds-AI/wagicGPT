@@ -1,0 +1,45 @@
+#W57-D (D14) -- the modal-DFC "Flip Side" DISPLAY TOGGLE must leave the GPT
+#seat's option list when, and only when, the card's other face is a LAND.
+#
+#Record (wave-56 corpus, matchups-20260903-120952): the toggle rendered 109 rows
+#across 90 windows and was taken 0 times, ~71.6 KB of option text whose whole
+#content is "you do not need this row"; below the prompt it was the ONLY option
+#in 760 priority windows, each of which built a full option set and threw it
+#away. 108 of the 109 rows were land-backed. Since #W56-D (D8) the land back
+#face has its OWN one-click row in the same window, so for that class the toggle
+#adds no play at all.
+#
+#The SCOPE is the item. borderline.txt still gates the 30 modal-DFC SPELL back
+#faces behind `otherrestriction=...,compare(isflipped)~equalto~1` (D33, not
+#fixed), and isflipped is set in exactly one place: this toggle. For a spell
+#back face the toggle is therefore the ONLY route to a legal cast and it must
+#keep being offered -- so the suppression asks the engine's own question, "is
+#the other face a land", and never "is this a toggle".
+#
+#Hengegate Pathway // Mistgate Pathway: other face is a land -> SUPPRESSED (1).
+#Tergrid, God of Fright // Tergrid's Lantern (Legendary Artifact, reached by an
+#alternative cost that is still isflipped-gated) -> OFFERED (0).
+#
+#Nothing here is removed from the ENGINE: the human seat's click menu, the
+#option indices and req.optionTexts are untouched (the wave-56 pathway fixture
+#still answers `choice 2`), which is why this pins the predicate and not a menu.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Hengegate Pathway,Tergrid^ God of Fright
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertdisplaytoggle 1 Hengegate Pathway
+assertdisplaytoggle 0 Tergrid, God of Fright
+[ASSERT]
+firstmain
+[PLAYER1]
+hand:Hengegate Pathway,Tergrid^ God of Fright
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[END]
