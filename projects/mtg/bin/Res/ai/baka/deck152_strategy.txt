@@ -505,15 +505,18 @@ start on curve.
     COUNT FAMILY - "(1 land is not enough for your cheapest spell at mana value 2)",
     "(2 lands are not enough for your cheapest spell at mana value 3)". This is the engine doing
     arithmetic on the land COUNT, and at ONE land it is the whole one-land test.
-    COLOUR FAMILY - "(you have 3 lands; no spell in it is castable off {W}{U} alone)". This is
-    THE FORBIDDEN THOUGHT below, printed by the engine in its own voice. It is a statement about
-    TURN ONE and nothing else: it says your lands make one pair of colours and your spells want
-    another, which is the ordinary two-colour opener from a 25-land deck that splits 14 green and
-    15 white. It is a KEEP at THREE lands, at four, at two - at any land count the floor clears.
+    COLOUR FAMILY - "(you have 3 lands; no spell in it is castable off {W}{U} alone even with
+    every land in this hand in play)", and at ONE land the same clause ends "alone on turn one"
+    instead. This is THE FORBIDDEN THOUGHT below, printed by the engine in its own voice, and the
+    tail says how far the engine looked: "on turn one" prices your first turn only, "even with
+    every land in this hand in play" prices the whole hand. NEITHER IS A SHIP. It says your lands
+    make one pair of colours and your spells want another, which is the ordinary two-colour
+    opener from a 25-land deck that splits 14 green and 15 white. It is a KEEP at THREE lands, at
+    four, at two - at any land count the floor clears.
     The engine is telling you a true fact; the ship is a conclusion you added to it.
   WHAT THIS COST, a fourth corpus running: a SEVEN with THREE lands ({W} 3, {U} 1) holding two
   Teferis and two Katildas was shipped under "(you have 3 lands; no spell in it is castable off
-  {W}{U} alone)", the reply reading "Mulligan for a hand with at least one green mana source to
+  {W}{U} alone ...)", the reply reading "Mulligan for a hand with at least one green mana source to
   cast Katilda on turn 2" - a colour named as the ship reason, on a hand three rungs above the
   floor, in the one game this deck lost.
   WHAT THIS COST, in two corpora running: a seven of two Pathways ({G} 2) plus two Luminarch

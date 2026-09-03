@@ -549,12 +549,14 @@ you cast 47 spells across all of them. Most have NOTHING on the stack, and a win
 under "ON THE STACK" has one right answer: decline it. Your counterspells answer a spell that is ON
 THE STACK; there is nothing to spend them on at an empty End step, and nothing to hold them for
 either - a spell they cast later opens its own window.
-THE LAST ROW OF AN OPPONENT-TURN MENU reads "Pass priority, and do not ask me again this turn
-unless the board changes (any change re-opens this window; you give up no cast)". It is a decline
-row like "Cast nothing right now", and it is safe: a new object on the stack is a board change,
-so taking it never gives up a window on a spell they cast afterwards. Take it or take "Cast
-nothing right now" - both are correct. What is never correct is casting something off one of
-these windows because the window opened.
+THE LAST ROW OF EVERY MENU, on their turn and on your own, reads "Hold priority for the rest of
+this turn: pass now, and do not ask me again unless the board changes (any change re-opens this
+window; you give up no cast) {taking this row skips the rest of this turn's identical windows}".
+When the prompt carries "[you declined this exact list N times already this turn]", THAT ROW IS
+THE ANSWER AND "Cast nothing right now" IS THE WRONG ONE - take it at the FIRST such window of
+the turn, not the fifth. It gives up nothing: a new object on the stack is a board change, any
+change re-opens the window, so taking it never costs you a spell they cast afterwards. What is
+never correct is casting something off one of these windows because the window opened.
 So keep {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture, and spend
 everything ABOVE that on your own turn - a Staff of Nin, an Elixir activation, a Sphinx's Revelation,
 a Lightmine Field. Ending your turn with all your mana unspent is right only when your hand is

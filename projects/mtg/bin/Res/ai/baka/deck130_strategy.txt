@@ -182,8 +182,8 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
                hands the plan back stamped with its age ("as you last stated it, N windows ago
                on turn T"); an X written before this menu existed is older than the menu. An X
                in a plan is a guess; an X on a row comes with the kill list attached.
-       STEP 1. THE MENU MARKS ONE ROW, AND THAT ROW IS THE ANSWER. Last corpus every X menu
-               this deck reached carried a marker - three of three - in one of two forms:
+       STEP 1. THE MENU MARKS ONE ROW, AND THAT ROW IS THE ANSWER. The marker prints in one
+               of two forms:
                  "[<- most kills at any affordable X that costs you nothing - at X=N that is
                   THEIRS: ...; YOURS: none]"   (some X is free)
                  "[<- best trade: the most of THEIRS at the smallest cost to YOURS - at X=N

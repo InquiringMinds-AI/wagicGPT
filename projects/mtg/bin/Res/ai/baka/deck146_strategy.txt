@@ -32,9 +32,12 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   none was on the ship list, and each paid a card for the same land odds.
   THAT LINE NOW PRINTS ITS REASON IN BRACKETS, AND ONLY ONE OF THE TWO REASONS IS A TEST.
   "(1 land is not enough for your cheapest spell at mana value 2)" is the engine's arithmetic on
-  the land COUNT. "(you have 2 lands; no spell in it is castable off {B} alone)" is a COLOUR
-  statement about turn one - it is the sentence COLOUR IS NEVER A REASON TO SHIP forbids, printed
-  by the engine, and it ships nothing at any land count.
+  the land COUNT. The COLOUR reason ends with a scope clause, and that clause is the half that
+  decides: "(you have 1 land; no spell in it is castable off {B} alone on turn one)" prices TURN
+  ONE only, on a hand the land count may still keep; "(you have 4 lands; no spell in it is
+  castable off {W} alone even with every land in this hand in play)" prices the WHOLE hand.
+  NEITHER IS A SHIP: each is the sentence COLOUR IS NEVER A REASON TO SHIP forbids, printed by
+  the engine, and colour ships nothing at any land count.
   At ONE land, the count-family line is
   the engine's own arithmetic and it is the whole one-land test: one land that covers nothing
   is a hand that casts nothing, and a six is not worth keeping for its second turn. ONE land
