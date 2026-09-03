@@ -9613,7 +9613,17 @@ struct AIPlayerGPT::AsyncState
     //4xx/5xx used to come back as an empty body indistinguishable from an
     //unreachable server; the code is what tells a wrong key from a dead host.
     long httpStatus;
-    AsyncState() : status(0), timedOut(false), httpStatus(0) {}
+    //#W57-U: the request GENERATION. A request the GAME THREAD abandons (in
+    //flight past its deadline plus a grace - see reapWedgedRequests) bumps
+    //this, and the worker publishes only under the generation it launched in.
+    //A late answer from a round trip nobody is waiting for is therefore
+    //DISCARDED at the worker, never consumed against a board that has moved
+    //on. The worker holds its own shared_ptr to this state, so that late write
+    //is always into live memory: abandoning frees nothing, which is the whole
+    //requirement on Vita, where the worker is a native sceKernel thread the
+    //game cannot join or cancel.
+    unsigned int gen;
+    AsyncState() : status(0), timedOut(false), httpStatus(0), gen(0) {}
 };
 
 //WAGIC_PADLOG (Android: flag file User/padlog.on): async-lifecycle slice of
@@ -9653,12 +9663,31 @@ struct AIPlayerGPT::WorkerCtx
     string key;
     long timeoutMs;
     bool codex; //ChatGPT-subscription preset: /responses + SSE, not chat completions
-    WorkerCtx() : timeoutMs(0), codex(false) {}
+    unsigned int gen; //#W57-U: the AsyncState generation this round trip launched under
+    WorkerCtx() : timeoutMs(0), codex(false), gen(0) {}
 };
 
 void AIPlayerGPT::WorkerMain(void * p)
 {
     WorkerCtx * ctx = reinterpret_cast<WorkerCtx *>(p);
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W57-U: emulate a transport that NEVER RETURNS - the wedged socket / the
+    //worker that dies without publishing. Returning here leaves status == 1
+    //for ever, which is precisely the state that used to freeze the duel with
+    //no bound (decisionPending re-extends the interrupt offer every tick and
+    //ActionStack::Update exempts an in-flight seat from the stall floor). The
+    //deadline path is NOT this path: curl honours CURLOPT_TIMEOUT, so a server
+    //that accepts the connection and never answers comes back at the wall like
+    //any other empty reply. Same role as WAGIC_GPT_NOTHREAD - a way to reach a
+    //platform failure on the desktop, where it is easiest to test. Development
+    //builds only (owner rule: diagnostics are compiled out of release builds).
+    if (getenv("WAGIC_GPT_WEDGE"))
+    {
+        GPTASYNCLOG("gpt worker wedged (WAGIC_GPT_WEDGE) - publishing nothing\n");
+        delete ctx;
+        return;
+    }
+#endif
     string body;
     long httpCode = 0; //audit-L (A24)
     if (ctx->codex)
@@ -9698,6 +9727,18 @@ void AIPlayerGPT::WorkerMain(void * p)
     }
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
+        //#W57-U: was this round trip abandoned while it ran? The game thread
+        //bumped the generation and has already answered that decision through
+        //the heuristic, so publishing now would hand a stale answer to whatever
+        //asks next. Drop it here rather than downstream: the existing stale-drop
+        //gate keys on prompt equality, and the slot may since have been re-armed
+        //with a prompt this body would falsely match.
+        if (ctx->state->gen != ctx->gen)
+        {
+            GPTASYNCLOG("gpt worker publish discarded - abandoned generation\n");
+            delete ctx;
+            return;
+        }
         ctx->state->httpStatus = httpCode; //audit-L (A24)
         //#W53-Q (D10): the deadline test, on the 95% mark so a wall hit is not
         //missed by scheduling jitter between the client's clock and curl's.
@@ -9991,6 +10032,128 @@ std::string AIPlayerGPT::softlockDiagnostic() const
       << " degraded_ticks=" << mDegradedTicks
       << " notice='" << notice << "'";
     return o.str();
+    }
+//#W57-U (the vpk16 in-flight softlock, 2026-09-03). THE BOUND ON AN IN-FLIGHT
+//CALL. While a request is in flight this seat neither acts nor passes, and
+//decisionPending calls extendInterruptOffer every tick, which the wave-54
+//stall floor honours as progress (`aiDecisionInFlight` exempts the holder from
+//both the 300-tick and the 1,200 s budgets). That exemption is CORRECT for a
+//live call - wave-55 corpora hold legitimate 900 s decisions and cutting one
+//short loses the game's whole opponent-turn surface - but it had no wall at
+//all, so a round trip that never comes back (a wedged socket on the console's
+//network stack, a server that accepts and never answers, a worker thread that
+//dies without publishing) freezes the duel for ever with the turn indicator
+//pinned on the AI: the owner's vpk16 report shape.
+//
+//The bound is DERIVED, never a fixed number: the request already carries its
+//own deadline, so a call still out past that deadline plus a grace is one
+//whose deadline machinery has itself failed. grace = half the deadline,
+//clamped to [1 s, 30 s]: proportional for a short configured deadline, and
+//capped so a 900 s wall does not buy another 450 s of frozen screen.
+//At the shipped default (timeout=600 s) that is 630 s for ONE request; the
+//deadline retry is a SEPARATE request with its own launch time, so a decision
+//that misses the wall honestly and then wedges on the retry is bounded by
+//600 + 630 = 1,230 s. ActionStack::Update carries the same arithmetic as its
+//own backstop, for a seat whose in-flight flag is stuck for any other reason.
+//#W57-U: THE DISABLE FLAG for the in-flight bound (both halves: the request
+//abandonment here and ActionStack's stall-floor backstop, which keeps its own
+//copy - not every platform build compiles both translation units against a
+//shared one). Every output-affecting change here ships one, so "was it the new
+//bound?" is one env var on a shipped binary instead of a build swap - and so
+//the defect it fixes stays reproducible on the SAME binary as a positive
+//control. WAGIC_INFLIGHT_BOUND=0 restores the pre-#W57-U behaviour: an
+//in-flight call holds its window for ever.
+static bool inFlightBoundEnabled()
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char * v = getenv("WAGIC_INFLIGHT_BOUND");
+        cached = (v && (v[0] == '0') && !v[1]) ? 0 : 1;
+    }
+    return cached != 0;
+}
+
+long AIPlayerGPT::inFlightAbandonMsFor(long deadlineMs)
+{
+    if (deadlineMs <= 0)
+        return 0; //no deadline to derive a bound from: nothing is abandoned
+    long grace = deadlineMs / 2;
+    if (grace < 1000) grace = 1000;
+    if (grace > 30000) grace = 30000;
+    return deadlineMs + grace;
+}
+
+long AIPlayerGPT::inFlightAbandonMs() const
+{
+    return inFlightAbandonMsFor(mTimeoutMs);
+}
+
+bool AIPlayerGPT::reapWedgedRequests(const std::shared_ptr<AsyncState>& polled, const char * polledArm)
+{
+    if (mEndpoint.empty() || !inFlightBoundEnabled())
+        return false;
+    const long bound = inFlightAbandonMs();
+    if (bound <= 0)
+        return false;
+    bool polledAbandoned = false;
+    //BOTH arms, not just the one being polled: the launch guard is
+    //`asyncBusy()`, so a wedged LAND-drop request blocks every casting ask too
+    //and would never be looked at by a poll of the casting arm.
+    std::shared_ptr<AsyncState> arms[2] = { mAsyncState, mAsyncLandState };
+    const char * names[2] = { "casting", "land-drop" };
+    for (int i = 0; i < 2; i++)
+    {
+        long elapsedMs = 0;
+        {
+            std::lock_guard<GptMutex> g(arms[i]->mtx);
+            if (arms[i]->status != 1)
+                continue;
+            elapsedMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - arms[i]->started).count();
+            if (elapsedMs < bound)
+                continue;
+            //ABANDONED. The generation bump is what makes this safe: the worker
+            //may still be alive and may still write, and on Vita it cannot be
+            //joined or cancelled - so nothing is freed and nothing is cleared
+            //out from under it. Its publish will find a generation that has
+            //moved and drop the body. The slot itself goes back to IDLE, which
+            //is the same shape the refused-worker path leaves behind.
+            ++arms[i]->gen;
+            arms[i]->status = 0;
+            arms[i]->response.clear();
+            arms[i]->prompt.clear();
+            arms[i]->slotKey.clear();
+            arms[i]->timedOut = false;
+            arms[i]->httpStatus = 0;
+        }
+        const long secs = elapsedMs / 1000;
+        //ONE line per abandonment, in the log the console actually keeps.
+        //Not a once-per-process line: unlike a refused thread this is a
+        //per-call fact, and a match that abandoned four calls read as one.
+        {
+            char buf[192];
+            snprintf(buf, sizeof(buf),
+                     "model call abandoned after %ld s (deadline %ld s):"
+                     " answering this decision with the heuristic AI",
+                     secs, mTimeoutMs / 1000);
+            gptLogLine(string(buf));
+        }
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_TRANSCRIPT_ON)
+        fprintf(stderr, "wagic: %s arm - model call abandoned after %ld s"
+                        " (deadline %ld s, bound %ld s) - the heuristic AI answers this decision\n",
+                names[i], secs, mTimeoutMs / 1000, bound / 1000);
+        fflush(stderr);
+#endif
+        if (arms[i] == polled)
+        {
+            polledAbandoned = true;
+            mAbandonedInFlightSecs = secs; //stamped onto this decision's record
+            setNotice("no reply from the model - playing this one with the built-in AI", 4.0f);
+        }
+    }
+    (void) polledArm;
+    return polledAbandoned;
 }
 
 //THE NO-ANSWER CLASSES ARE NOT ALL THE SAME FAILURE. "empty_reply" has always
@@ -10178,6 +10341,18 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     const bool landArm = asyncLandArm(mPromptTail);
     std::shared_ptr<AsyncState> slot = landArm ? mAsyncLandState : mAsyncState;
     const char * armName = landArm ? "land-drop" : "casting";
+    //#W57-U: before anything else, bound the in-flight exemption. A request
+    //past its own deadline plus the grace with nothing published is abandoned
+    //and THIS decision goes to the heuristic - the same shape, and the same
+    //return, as a worker thread the platform refused.
+    if (reapWedgedRequests(slot, armName))
+    {
+        content.clear();
+        mLastTimeout = false;   //nothing came back at all: not a deadline miss
+        mLastHttpStatus = 0;    //and no round trip was consumed here
+        mLastLatencyMs = -1;
+        return 0;               //empty reply -> the seam's heuristic answers
+    }
     {
         std::lock_guard<GptMutex> g(slot->mtx);
         if (slot->status == 1)
@@ -10434,6 +10609,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     string url = codex ? mEndpoint + "/responses" : mEndpoint + "/v1/chat/completions";
     string key = mApiKey;
     std::shared_ptr<AsyncState> state = slot; //#W57-A (D5): this arm's slot
+    unsigned int genAtLaunch = 0; //#W57-U
     {
         std::lock_guard<GptMutex> g(state->mtx);
         state->status = 1;
@@ -10443,6 +10619,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->timedOut = false; //#W53-Q (D10): the worker decides this one
         state->httpStatus = 0;   //audit-L (A24): likewise
         state->started = std::chrono::steady_clock::now();
+        genAtLaunch = state->gen; //#W57-U
     }
     GPTASYNCLOG("gpt spawn ask prompt=%zu endpoint=%s\n", userMsg.size(), mEndpoint.c_str());
     long timeoutMs = mTimeoutMs;
@@ -10459,6 +10636,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     ctx->key = key;
     ctx->timeoutMs = timeoutMs;
     ctx->codex = codex;
+    ctx->gen = genAtLaunch; //#W57-U
     if (!gptSpawnWorker(WorkerMain, ctx))
     {
         delete ctx;
@@ -10873,7 +11051,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -11482,6 +11660,18 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     }
     if (fallback)
         rec["fallback"] = fallback;
+    //#W57-U: the decision the heuristic answered because the model call was
+    //ABANDONED - in flight past its own deadline plus the grace with nothing
+    //published. This OVERWRITES the caller's class on purpose: the caller only
+    //knows the reply was empty, and empty_reply already means five other
+    //things. The elapsed seconds ride with it so a seat review can tell a
+    //wedged transport from a slow one without reading stderr.
+    if (mAbandonedInFlightSecs >= 0)
+    {
+        rec["fallback"] = "abandoned_in_flight";
+        rec["abandoned_after_s"] = mAbandonedInFlightSecs;
+        mAbandonedInFlightSecs = -1;
+    }
     //#W50-Y D10 (iii): how many consecutive replies re-stated the carried plan
     //verbatim. A REPORT field - nothing in the engine reads it (the wave-49
     //echo-count expiry is retired). Present only when > 0.
@@ -47444,6 +47634,29 @@ static const char * kW50Y_r94 =
               "#W57-F two freshly constructed identical cards compare equal on those fields");
         SAFE_DELETE(fresh);
         SAFE_DELETE(fresh2);
+    }
+
+    cout << "\n[W57-U] the in-flight abandonment bound\n";
+    {
+        //The bound is DERIVED from the request's own deadline and nothing
+        //else. These are the numbers the owner's console actually runs:
+        //timeout=600 is the shipped default, 900 is the corpus setting, and
+        //5 s is the configured floor.
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(600000) == 630000,
+              "#W57-U default 600 s deadline -> abandon one request at 630 s (grace capped at 30 s)");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(900000) == 930000,
+              "#W57-U a 900 s corpus deadline -> 930 s: the cap keeps the grace from scaling with it");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(5000) == 7500,
+              "#W57-U at the 5 s floor the grace is PROPORTIONAL (half), not the 30 s cap");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(1000) == 2000,
+              "#W57-U a tiny deadline still gets a whole second of grace (the floor)");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(0) == 0,
+              "#W57-U NEGATIVE no deadline -> no bound: nothing is ever abandoned on a guess");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(-1) == 0,
+              "#W57-U NEGATIVE a negative deadline is not a bound either");
+        CHECK(AIPlayerGPT::inFlightAbandonMsFor(900000) > 900000,
+              "#W57-U the bound is always STRICTLY past the deadline - a call inside its own"
+              " deadline is never abandoned");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -77,6 +77,12 @@ protected:
     int mAiPendingTicks; //target ActionStack::mHoldTicks, 0 = not freezing
     bool mAiPendingInFlight;
     bool mAiPendingInteractive;
+    //#W57-U: the DEADLINE the latched seat reports (decisionDeadlineMs, ms).
+    //ActionStack's in-flight bound is derived from the seat's own deadline, so
+    //a fixture has to be able to state one - and to state a tiny one, or the
+    //pin would cost the suite the real 20 minutes an LLM seat is allowed.
+    //0 = report no deadline (the pre-#W57-U unbounded exemption).
+    long mAiPendingDeadlineMs;
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);
@@ -228,6 +234,12 @@ public:
     virtual bool aiDecisionInFlight() const
     {
         return suite->mAiPendingSeat == this && suite->mAiPendingInFlight;
+    }
+    //#W57-U: the per-request deadline the in-flight bound is derived from.
+    //Fourth argument of `aipending`; latched like the other two.
+    virtual long decisionDeadlineMs()
+    {
+        return (suite->mAiPendingSeat == this) ? suite->mAiPendingDeadlineMs : 0;
     }
     virtual int displayStack();
     bool parseLine(const string& s);
