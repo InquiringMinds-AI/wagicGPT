@@ -7487,24 +7487,31 @@ int AAMover::resolve()
 
             if(_target->hasSubtype(Subtypes::TYPE_AURA) && (destZone == game->players[0]->game->inPlay || destZone == game->players[1]->game->inPlay))
             {//put into play aura if there is no valid targets then it will be in its current zone
-                MTGAbility *a = NEW AACastCard(game, game->mLayers->actionLayer()->getMaxId(), _target, _target,false,false,false,"","Put in play",false,true);
+                AACastCard *a = NEW AACastCard(game, game->mLayers->actionLayer()->getMaxId(), _target, _target,false,false,false,"","Put in play",false,true);
                 a->oneShot = false;
                 a->canBeInterrupted = false;
+                //#W56-X (owner Vita report 2026-09-03: Light-Paws, Emperor's Voice
+                //"lets me put the tutored aura onto other creatures"). An Aura moved
+                //to the battlefield enters through this AACastCard, which is NOT
+                //one-shot: it arms here and resolves on a later tick, after the
+                //player has answered the Aura's own attach chooser. The old code
+                //tried to apply the and!(...) payload IMMEDIATELY, gated on
+                //`_target->next` - the instance the cast has not created yet - so
+                //`next` was always NULL and the ENTIRE payload was silently dropped.
+                //Every "put it onto the battlefield attached to <X>" card is scripted
+                //as moveto(mybattlefield) + and!( ... rehook target(X) ... )!, so all
+                //of them lost their forced attachment and left the target free to the
+                //player's click (Light-Paws, Runed Crown, Bruna, the Curse movers).
+                //AACastCard already owns an andAbility slot and applies it to the
+                //instance the cast actually produced (resolveSpell(), target = copy),
+                //which is both the correct instance and the correct moment; the clone
+                //is owned and freed by the AACastCard.
+                //Reading _target->next here was also unsafe in its own right: a card
+                //carrying a STALE ->next from an earlier zone move would have had the
+                //payload applied to a dead instance.
+                if(andAbility)
+                    a->andAbility = andAbility->clone();
                 a->addToGame();
-                if(andAbility && _target->next)
-                {//if successful target->next should be valid
-                    MTGAbility * andAbilityClone = andAbility->clone();
-                    andAbilityClone->target = _target->next;
-                    if(andAbility->oneShot)
-                    {
-                        andAbilityClone->resolve();
-                        SAFE_DELETE(andAbilityClone);
-                    }
-                    else
-                    {
-                        andAbilityClone->addToGame();
-                    }
-                }
             }
             else
             {

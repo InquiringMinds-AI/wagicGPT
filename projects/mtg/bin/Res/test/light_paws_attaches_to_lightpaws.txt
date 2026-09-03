@@ -1,0 +1,38 @@
+#NAME: Light-Paws, Emperor's Voice - the fetched Aura enters attached to LIGHT-PAWS
+#DESC: Owner Vita play report (2026-09-03, vpk15): "found another bug with light paws.
+#DESC: it lets me put the tutored aura onto other creatures." Transcript
+#DESC: 20260903-vpk15 showed the tutored Aura on Starfield Mystic, not on Light-Paws.
+#DESC: Oracle (Scryfall): "...put that card onto the battlefield attached to Light-Paws,
+#DESC: Emperor's Voice, then shuffle." The attachment is NOT a choice.
+#DESC: Repro shape: Light-Paws + Grizzly Bears in play, Pacifism (MV 2) cast on the
+#DESC: BEARS to fire the trigger, Holy Strength (MV 1, +1/+2) fetched from the library.
+#DESC: The script deliberately clicks Grizzly Bears at every prompt after the fetch -
+#DESC: whatever the player clicks, Holy Strength must end up on Light-Paws.
+#DESC: Observable: Light-Paws 2/2 -> 3/4, Grizzly Bears stays 2/2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Grizzly Bears
+hand:Pacifism
+library:Holy Strength
+manapool:{1}{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Pacifism
+Grizzly Bears
+choice 0
+choice 0
+Holy Strength
+Grizzly Bears
+assertpt 3/4 light-paws, emperor's voice
+assertpt 2/2 grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Grizzly Bears,Pacifism,Holy Strength
+life:20
+[PLAYER2]
+life:20
+[END]
