@@ -920,6 +920,13 @@ private:
     //toxicity granted - while Player::poisonCount is settled by the time the
     //event lands, so the delta is derived from the settled totals instead.
     int mLastPoison[2];
+    //#W57-E (D15): the opponent's life at this seat's first look in each of the
+    //last three turns, newest at [2], with the turn number each sample belongs
+    //to. mOppLifeLastTurn is the sampling gate (-1 = nothing sampled yet).
+    int mOppLifeByTurn[3];
+    int mOppLifeTurnNo[3];
+    int mOppLifeSamples;
+    int mOppLifeLastTurn;
     //W43-R2 (owner report: "damage is receiving 2 entries, which may be
     //confusing to the model, and is also unnecessarily verbose"). Damage::
     //resolve raises WEventLife(fromDamage) and then the WEventDamage for the

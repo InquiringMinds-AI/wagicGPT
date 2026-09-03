@@ -56,6 +56,12 @@
 
 using json = nlohmann::json;
 
+//#W57-E (D2): the pregame hand header reads a modal-DFC back face's tapped
+//colour through the same helper the option row uses. Declared here, at FILE
+//scope, because the header lives inside the anonymous namespace below and a
+//declaration there would name a different function.
+static string landTapMana(const string& text);
+
 namespace
 {
 
@@ -2158,15 +2164,51 @@ static string mulliganNoCoverCause(int lands, const int sources[5], int cheapest
     return o.str();
 }
 
+//#W57-E (D2, wave-56 ledger HIGH; lane W's E-1, docketed with this design
+//note). The header counted PRINTED types, so a hand whose only lands are modal
+//double-faced back faces read `0 lands, 7 spells` - and that decided BOTH of
+//the corpus's mulligans and its only bottom (the seat bottomed its own second
+//land). Lane W left the plumbing and asked for the TALLY SEMANTICS; the ruling
+//taken here is: count the card in BOTH tallies (it really is both, and dropping
+//it out of the spell scan would trade one false number for another - a Pelakka
+//Predation would vanish from "Cheapest spell in this hand"), and carry the
+//ARITHMETIC in one line so the sum the pilot checks is never silently broken.
+//Nothing is deleted and no number is hedged: the counts are true, the
+//double-count is stated, and the totals are reconciled on the same screen.
+//Pure over the pairs, so every shape is provable in PARSETEST.
+static string dualRoleHandNote(int handSize, int lands, int spells,
+                               const vector<std::pair<string, string> >& dual)
+{
+    if (dual.empty())
+        return "";
+    std::ostringstream o;
+    o << (dual.size() == 1 ? "1 card is" : "") ;
+    if (dual.size() != 1)
+        o << dual.size() << " cards are";
+    o << " counted TWICE above, on purpose: ";
+    for (size_t i = 0; i < dual.size(); i++)
+        o << (i ? "; " : "") << dual[i].first << " is a spell you may instead play as"
+             " the land " << dual[i].second;
+    o << ". So " << lands << " land" << (lands == 1 ? "" : "s") << " + " << spells
+      << " spell" << (spells == 1 ? "" : "s") << " = " << (lands + spells) << " for a "
+      << handSize << "-card hand, not " << handSize << ": " << dual.size() << " card"
+      << (dual.size() == 1 ? " is" : "s are") << " in both counts. You may use each"
+      << (dual.size() == 1 ? " such card" : "") << " as ONE of the two, not both.\n";
+    return o.str();
+}
+
 string pregameHandHeaderText(int handSize, int lands, int spells, const int sources[5],
                              const string& cheapestLabel, int cheapestCmc,
-                             const vector<string>& reachable)
+                             const vector<string>& reachable,
+                             const vector<std::pair<string, string> >& dual
+                                 = vector<std::pair<string, string> >())
 {
     static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
     std::ostringstream o;
     o << "Your hand (" << handSize << " card" << (handSize == 1 ? "" : "s")
       << "), counted by the engine: " << lands << " land" << (lands == 1 ? "" : "s")
       << ", " << spells << " spell" << (spells == 1 ? "" : "s") << ".\n";
+    o << dualRoleHandNote(handSize, lands, spells, dual); //#W57-E (D2)
     o << "Mana sources among those lands, counted by the engine: ";
     if (!lands)
         o << "none - this hand holds no lands at all.";
@@ -2201,6 +2243,39 @@ string pregameHandHeaderText(int handSize, int lands, int spells, const int sour
     return o.str();
 }
 
+//#W57-E (D2): the back-face LAND of a modal double-faced card in HAND, by name,
+//read from card DATA alone - `autohand={0}:restriction{can play land}
+//name(<back>) flip(<back>) forcetype(land)`, which MTGDeck files under
+//magicTexts["hand"] (NOT magicText - the `auto=` bucket - which is why a scan of
+//magicText finds nothing). Data-only by construction, so it answers during the
+//pre-game, before a single ability is registered on this card, which is exactly
+//when the header needs it. `forcetype(land)` is the engine's own discriminator:
+//all 58 uses across the primitives carry a flip(...), and only the 55 MDFC
+//entries are hand-zone entries. Returns the lowercased script token (the whole
+//magicTexts bucket is lowercased at load); the caller resolves the printed
+//casing through the collection, the same way the option row does.
+static string mdfcHandBackLandName(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    map<string, string>::const_iterator it = c->magicTexts.find("hand");
+    if (it == c->magicTexts.end())
+        return "";
+    const string& t = it->second;
+    size_t p = t.find("forcetype(land)");
+    if (p == string::npos)
+        return "";
+    size_t ls = t.rfind('\n', p);
+    ls = (ls == string::npos) ? 0 : ls + 1;
+    size_t f = t.find("flip(", ls);
+    if (f == string::npos || f > p)
+        return "";
+    size_t e = t.find(')', f + 5);
+    if (e == string::npos)
+        return "";
+    return t.substr(f + 5, e - (f + 5));
+}
+
 static string pregameHandHeader(MTGGameZone * hand)
 {
     if (!hand)
@@ -2209,8 +2284,12 @@ static string pregameHandHeader(MTGGameZone * hand)
     static const int kEngineColor[5] = { Constants::MTG_COLOR_WHITE, Constants::MTG_COLOR_BLUE,
                                          Constants::MTG_COLOR_BLACK, Constants::MTG_COLOR_RED,
                                          Constants::MTG_COLOR_GREEN };
+    static const char * kColLow[5] = { "{w}", "{u}", "{b}", "{r}", "{g}" };
     int lands = 0, spells = 0;
     int sources[5] = { 0, 0, 0, 0, 0 };
+    vector<std::pair<string, string> > dual; //#W57-E (D2): front name, back land name
+    vector<int> dualIdx;                     //hand index of each dual-role card
+    vector<int> dualColorBits;               //the colours it contributes as a land
     for (int i = 0; i < hand->nb_cards; i++)
     {
         MTGCardInstance * c = hand->cards[i];
@@ -2226,7 +2305,39 @@ static string pregameHandHeader(MTGGameZone * hand)
                     sources[k]++;
         }
         else
+        {
             spells++;
+            //#W57-E (D2): a SPELL front with a land back face is both. Counted
+            //as a land as well, its back face's colours added to the source
+            //tally, and the double-count reconciled in the note above.
+            string back = mdfcHandBackLandName(c);
+            if (!back.empty())
+            {
+                string shown = back;
+                string tapped;
+                if (MTGCard * bc = MTGCollection()->getCardByName(back, c->setId))
+                    if (bc->data)
+                    {
+                        tapped = landTapMana(bc->data->text);
+                        if (!bc->data->name.empty())
+                            shown = bc->data->name;
+                    }
+                lands++;
+                int bits = 0;
+                string low = tapped;
+                for (size_t z = 0; z < low.size(); z++)
+                    low[z] = (char) tolower((unsigned char) low[z]);
+                for (int k = 0; k < 5; k++)
+                    if (low.find(kColLow[k]) != string::npos)
+                    {
+                        sources[k]++;
+                        bits |= (1 << k);
+                    }
+                dual.push_back(std::make_pair(c->getDisplayName(), shown));
+                dualIdx.push_back(i);
+                dualColorBits.push_back(bits);
+            }
+        }
     }
     //The castability summary, hand-only: what these lands could pay for if every
     //one of them were played. A NECESSARY condition (total lands cover the mana
@@ -2248,16 +2359,27 @@ static string pregameHandHeader(MTGGameZone * hand)
             cheapestCmc = cmc;
             cheapest = c->getDisplayName() + manaCostToken(c);
         }
-        bool payable = (cmc <= lands);
+        //#W57-E (D2): a dual-role card cannot fund its own cast - playing it as
+        //a land is what removes it from the hand. Judge it against the hand
+        //MINUS its own land half, so the coverage clause never claims a cast
+        //that the land count it rests on has already spent.
+        int selfLands = 0, selfBits = 0;
+        for (size_t di = 0; di < dualIdx.size(); di++)
+            if (dualIdx[di] == i)
+            {
+                selfLands = 1;
+                selfBits = dualColorBits[di];
+            }
+        bool payable = (cmc <= lands - selfLands);
         if (payable && mc)
             for (int k = 0; k < 5 && payable; k++)
-                if (mc->getCost(kEngineColor[k]) > sources[k])
+                if (mc->getCost(kEngineColor[k]) > sources[k] - ((selfBits >> k) & 1))
                     payable = false;
         if (payable && reachable.size() < 6)
             reachable.push_back(c->getDisplayName() + manaCostToken(c));
     }
     return pregameHandHeaderText(hand->nb_cards, lands, spells, sources,
-                                 cheapest, cheapestCmc, reachable);
+                                 cheapest, cheapestCmc, reachable, dual);
 }
 
 string instanceHandle(MTGCardInstance * card); //defined below; used by describeAttachments
@@ -3843,6 +3965,34 @@ static string leavesUntappedTag(int untappedSources, int sourcesUsed)
       << (untappedSources == 1 ? "" : "s") << " untapped";
     if (left == 0)
         o << " - casting this taps you out";
+    o << "}";
+    return o.str();
+}
+
+//#W57-E (D9, wave-56 ledger MED): the ANNOUNCE_X mana-fit clause, dead on
+//40 of 40 rows. Lane C's per-row `selectAutoTapProducers` call was correct code
+//on the wrong resource: at ANNOUNCE_X the mana is ALREADY PAID. The corpus is
+//unanimous - all 9 X menus render `Mana available: 0 total (no untapped
+//sources) | Already in pool: {u}{u}... floating right now`, because the classic
+//X route announces X out of a PRE-FLOATED pool (DecisionContract.cpp: `maxX =
+//pool CMC - base cost CMC`). So `potentialColorReach` is 0 there by
+//construction, `leavesUntappedTag` returns "" on its first line, and no row can
+//ever carry the clause. The resource this window actually spends is the POOL,
+//and what a bigger X costs is what it leaves FLOATING for the rest of the
+//phase. Same `{leaves ` channel as the cast row's remainder (same species: true
+//while the window is open, false the moment X is announced), so the guides'
+//existing key still finds it. Pure.
+static string leavesFloatingTag(int poolTotal, int spent)
+{
+    if (poolTotal <= 0)
+        return ""; //nothing floating: the untapped-source form is the live one
+    int left = poolTotal - spent;
+    if (left < 0)
+        left = 0;
+    std::ostringstream o;
+    o << " {leaves " << left << " of your " << poolTotal << " floating mana unspent";
+    if (left == 0)
+        o << " - this X spends your whole pool";
     o << "}";
     return o.str();
 }
@@ -8313,11 +8463,14 @@ static bool discardPunisherClauseUncached(const string& script, int& perDiscard,
 //first (the DRAW PUNISHERS scan's own `mine` list) then discard punishers,
 //each with its instance handle so the count is checkable against the lines
 //above it. A permanent that is both is named once.
-static void converterScan(Player * me, std::vector<std::string>& names)
+//#W57-E (D23): the same scan over an arbitrary zone. The battlefield form
+//keeps its instance handles (two Fate Unravelers on the board are two rows the
+//pilot can point at); a HAND card has no board instance to handle, so it is
+//named plainly.
+static void converterScanZone(MTGGameZone * bf, bool handles, std::vector<std::string>& names)
 {
-    if (!me || !me->game || !me->game->inPlay)
+    if (!bf)
         return;
-    MTGGameZone * bf = me->game->inPlay;
     std::set<MTGCardInstance *> seen;
     for (int pass = 0; pass < 2; pass++)
         for (int i = 0; i < bf->nb_cards; i++)
@@ -8332,8 +8485,28 @@ static void converterScan(Player * me, std::vector<std::string>& names)
             if (!hit)
                 continue;
             seen.insert(c);
-            names.push_back(c->name + instanceHandle(c));
+            names.push_back(handles ? (c->name + instanceHandle(c)) : c->name);
         }
+}
+
+static void converterScan(Player * me, std::vector<std::string>& names)
+{
+    if (!me || !me->game)
+        return;
+    converterScanZone(me->game->inPlay, true, names);
+}
+
+//#W57-E (D23, wave-56 ledger MED): the K-of-0 judgement deck162 makes needs
+//BOTH numbers - `162v125` seq 15 cast Dictate of Kruphix on a row reading
+//`converters on your battlefield: 0` while holding Forced Fruition, read a
+//FEEDER as a converter, and handed the opponent an extra card a turn for four
+//turns. The release condition the guide is written against is "a converter is
+//out or coming", and only half of it was printed. Same scan, other zone.
+static void handConverterScan(Player * me, std::vector<std::string>& names)
+{
+    if (!me || !me->game)
+        return;
+    converterScanZone(me->game->hand, false, names);
 }
 
 //The cast-row tag. Empty when the card feeds the opponent nothing (so a
@@ -8342,7 +8515,9 @@ static void converterScan(Player * me, std::vector<std::string>& names)
 //COUNT is the fact the seat had to re-derive and got wrong, so it is printed
 //as a number ahead of the names.
 static string feedsRowTag(int perTurn, bool variable, int perCast,
-                          const std::vector<std::string>& converters)
+                          const std::vector<std::string>& converters,
+                          const std::vector<std::string>& handConverters
+                              = std::vector<std::string>())
 {
     if (perTurn <= 0 && !variable && perCast <= 0)
         return "";
@@ -8371,6 +8546,17 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
         o << " - ";
         for (size_t i = 0; i < converters.size(); i++)
             o << (i ? ", " : "") << converters[i];
+    }
+    //#W57-E (D23): the hand half of the same count. Printed ALWAYS (including
+    //the zero), so a rule keyed to it is never silent - the discriminator the
+    //guide's release condition is written against is the PAIR of numbers, and a
+    //missing half reads as a zero the pilot then has to check by hand.
+    o << "; in your hand: " << handConverters.size();
+    if (!handConverters.empty())
+    {
+        o << " - ";
+        for (size_t i = 0; i < handConverters.size(); i++)
+            o << (i ? ", " : "") << handConverters[i];
     }
     o << "}";
     return o.str();
@@ -8853,6 +9039,42 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
         out.push_back(xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers));
 }
 
+//#W57-E (D20, wave-56 ledger MED): the `[<- ...]` marker is the most reliably
+//followed annotation the render produces (9 of 9 X menus marked, marked row
+//taken 7 of 9; 6 of 6 at deck130's seats) and it existed on exactly ONE
+//surface - the ANNOUNCE_X menu, one screen AFTER the decision it informs. The
+//place it pays next is named in the docket: the CAST row, where WHETHER is
+//decided and the pilot still reads the two lists by hand. The judgement is the
+//same judgement, computed from the same survey - it is only being said one
+//screen earlier, and it is said as a FACT about the ladder this cast opens
+//("best X for this cast"), never as an instruction to take the row: two X
+//spells in one menu each state their own ladder's best X without either of
+//them claiming to be the menu's answer. Pure over the menu marker's own text,
+//so the reframe is provable in PARSETEST and cannot drift from the menu's.
+static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool namesBestX)
+{
+    if (menuMarker.empty())
+        return "";
+    size_t s = menuMarker.find("[<- ");
+    if (s == string::npos)
+        return "";
+    string body = menuMarker.substr(s + 4);
+    if (!body.empty() && body[body.size() - 1] == ']')
+        body.erase(body.size() - 1);
+    if (body.empty())
+        return "";
+    std::ostringstream o;
+    o << " [<- ";
+    if (namesBestX)
+        o << "best X for this cast: X=" << bestX << " - ";
+    o << body << "]";
+    return o.str();
+}
+
+//Board-facing half of the same item: defined below xMenuMarkX (the ranking it
+//shares with the menu), declared here because the cast row is emitted above it.
+static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX);
+
 //Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
 //Returns "" for a non-X spell (every other cast line is byte-identical to
 //before).
@@ -8887,13 +9109,16 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
                     base += "; " + dp;
             }
             base += "}";
+            base += xCastRowBestXMarker(sv, lifePerX, drawPerX); //#W57-E (D20)
         }
         return base;
     }
     if (sv.sweep)
         return xDamageSweepCore(sv.maxX, sv.baseCMC, sv.victims, sv.hitsMe, sv.hitsOpp,
-                                sv.myLife, sv.oppLife);
-    return xDamageTargetedCore(sv.maxX, sv.baseCMC, sv.victims);
+                                sv.myLife, sv.oppLife)
+               + xCastRowBestXMarker(sv, 0, 0); //#W57-E (D20)
+    return xDamageTargetedCore(sv.maxX, sv.baseCMC, sv.victims)
+           + xCastRowBestXMarker(sv, 0, 0); //#W57-E (D20)
 }
 
 //#W45-5 (wave-44 seat130, two lost games): the {X pricing:} block above rides
@@ -9136,6 +9361,25 @@ static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& 
     }
     markerOut = kXNoKillsMarker;
     return 0;
+}
+
+//#W57-E (D20): the cast row's marker, ranked by the SAME functions the menu
+//uses, so the two screens cannot name different X values. maxX comes from the
+//survey (ManaEngine::maxAnnounceableX), which is the number that builds the
+//menu one screen later. Nothing is marked when there is no ladder to rank
+//(maxX <= 0: the row already says the mana affords only X=0).
+static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX)
+{
+    if (sv.maxX <= 0)
+        return "";
+    if (!sv.priceable)
+        return xCastRowMarkerFrom(xMonotoneMarker(sv.maxX, lifePerX, drawPerX), sv.maxX, true);
+    string mk;
+    int mx = xMenuMarkX(sv.victims, sv.maxX, mk);
+    //The no-kill verdict is a fact about the whole ladder and names no X, so it
+    //is carried across unchanged rather than dressed as a recommendation.
+    bool namesX = (mk != string(kXNoKillsMarker));
+    return xCastRowMarkerFrom(mk, mx, namesX);
 }
 
 //Board-facing wrapper for the ANNOUNCE_X menu. capX comes from the MENU (the
@@ -10471,6 +10715,13 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
+    for (int i = 0; i < 3; i++) //#W57-E (D15)
+    {
+        mOppLifeByTurn[i] = 0;
+        mOppLifeTurnNo[i] = 0;
+    }
+    mOppLifeSamples = 0;
+    mOppLifeLastTurn = -1;
     mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
     mBulkMoveMine = false;
     //#W43-11/#W48 (D11): mEventRun starts empty (its own ctor); nothing held.
@@ -13716,6 +13967,43 @@ static string opponentOpenManaLine(int sources, const string& colours)
     return o.str();
 }
 
+//#W57-E (D15, wave-56 ledger MED): the board frame carried the opponent's mana
+//(D24) but not their LIFE TREND, and deck130's entire face-damage decision -
+//and the CROSS-CHECK latch its guide is built on - turn on whether the
+//opponent's life is RISING and by how much per turn. `130v125` is 137 records
+//long and the latch's whole input was invisible on 136 of them: the frame gives
+//only the scalar `Opponent life: N`, so a trend is something the pilot has to
+//reconstruct across windows it can no longer see (the narration is append-only
+//but the pilot re-derives the arithmetic every window, and did not).
+//Same shape as the mana line: a fact the seat would otherwise rebuild by hand,
+//printed once, as a NUMBER and never as a verdict - "they are gaining" is the
+//pilot's inference to make. Samples are the opponent's life at THIS seat's
+//first look each turn, each labelled with its own turn number, so a turn with
+//no window of ours is absent rather than interpolated. Pure over the samples.
+static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3],
+                                    int samples, int nowLife)
+{
+    if (samples < 1)
+        return "";
+    bool flat = true;
+    for (int i = 0; i < samples; i++)
+        if (lifeByTurn[i] != nowLife)
+            flat = false;
+    std::ostringstream o;
+    o << "Opponent life trend: ";
+    if (flat)
+    {
+        o << "unchanged at " << nowLife << " since turn " << turnNo[0] << ".\n";
+        return o.str();
+    }
+    for (int i = 0; i < samples; i++)
+        o << "turn " << turnNo[i] << ": " << lifeByTurn[i] << ", ";
+    int delta = nowLife - lifeByTurn[0];
+    o << "now " << nowLife << " (" << (delta > 0 ? "+" : "") << delta
+      << " since turn " << turnNo[0] << ").\n";
+    return o.str();
+}
+
 //#W47 (R7): `optionText` is THIS window's option block (assemblePrompt hands it
 //down; the board-hash callers pass nothing). It is read for one purpose - to
 //tell a permanent that already explains itself on an option row from one that
@@ -13751,6 +14039,38 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     //line states the state at THIS render (see scanDayNightDesignation).
     out << dayNightStateLine(scanDayNightDesignation());
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
+    //#W57-E (D15): sample the opponent's life once per turn - the FIRST render
+    //this seat makes in that turn - and print the last three samples beside the
+    //scalar. Sampling here is idempotent within a turn (the turn number is the
+    //gate), so the two variants this function serves (prompt and ask-cache key)
+    //cannot disagree and re-rendering a window cannot shift the history.
+    if (opp)
+    {
+        int curTurn = observer ? observer->turn : 0;
+        if (curTurn != mOppLifeLastTurn)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                mOppLifeByTurn[i] = mOppLifeByTurn[i + 1];
+                mOppLifeTurnNo[i] = mOppLifeTurnNo[i + 1];
+            }
+            mOppLifeByTurn[2] = opp->life;
+            //#W51-D (D18)'s rule: the narration prints observer->turn + 1, so a
+            //turn label that reads against a "=== Turn N" header must too. The
+            //first live probe printed "since turn 0" under "=== Turn 1".
+            mOppLifeTurnNo[2] = translogTurn(curTurn);
+            if (mOppLifeSamples < 3)
+                mOppLifeSamples++;
+            mOppLifeLastTurn = curTurn;
+        }
+        int lifeBuf[3], turnBuf[3];
+        for (int i = 0; i < mOppLifeSamples; i++)
+        {
+            lifeBuf[i] = mOppLifeByTurn[3 - mOppLifeSamples + i];
+            turnBuf[i] = mOppLifeTurnNo[3 - mOppLifeSamples + i];
+        }
+        out << opponentLifeTrendLine(lifeBuf, turnBuf, mOppLifeSamples, opp->life);
+    }
     //N-105a: poison counters, for BOTH players, whenever either is nonzero.
     //The life line above was the ONLY resource line this seat ever saw, so an
     //infect game presented its entire win/loss condition as invisible - and the
@@ -17079,7 +17399,8 @@ static bool isHarmToTargetAbility(MTGAbility * a, int depth = 0)
 
 static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped,
                                      const string& colorsClause); //#W54-E (D20)
-static string fetchLandColorsClause(const bool adds[5], const bool canMake[5]); //#W54-E (D20)
+static string fetchLandColorsClause(const bool adds[5], const bool canMake[5],
+                                    const int sourceCounts[5] = NULL); //#W54-E (D20), #W57-E (D19)
 static bool isFetchCrackLine(const string& line);
 //#W54-M (A21): the untapped-source count is a BOARD fact, not a row fact -
 //chooseOrderedAction arms this around its describeAction loop so the 432-row
@@ -17550,11 +17871,21 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                                      Constants::MTG_COLOR_GREEN };
                 ManaEngine::FreeProducerPolicy colourPolicy;
                 ManaCost * potential = NEW ManaCost();
-                ManaEngine::potentialColorReach(this, colourPolicy, potential);
+                //#W57-E (D19): the per-SOURCE breakdown feeds the positive form.
+                //Same call, same policy, same counting rule as the mana line -
+                //one source that makes two colours counts under each.
+                std::vector<ManaEngine::ManaSourceView> colourSrc;
+                ManaEngine::potentialColorReach(this, colourPolicy, potential, &colourSrc);
+                static const char * kLowSym[5] = { "{w}", "{u}", "{b}", "{r}", "{g}" };
+                int srcCounts[5] = { 0, 0, 0, 0, 0 };
+                for (size_t si = 0; si < colourSrc.size(); si++)
+                    for (int k = 0; k < 5; k++)
+                        if (colourSrc[si].colors.find(kLowSym[k]) != string::npos)
+                            srcCounts[k]++;
                 for (int k = 0; k < 5; k++)
                     canMake[k] = potential && potential->getCost(kEngineColor[k]) > 0;
                 SAFE_DELETE(potential);
-                colorsClause = fetchLandColorsClause(adds, canMake);
+                colorsClause = fetchLandColorsClause(adds, canMake, srcCounts);
             }
             out << fetchMakesNoManaClause(untapped, entersTapped, colorsClause);
         }
@@ -19591,7 +19922,16 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
 //"(land: taps for {W}{U})" uses, and the cannot-make half is measured against
 //the same potential the mana line is built from - so no third opinion about
 //either fact can enter. Pure over two flag arrays so both halves are provable.
-static string fetchLandColorsClause(const bool adds[5], const bool canMake[5])
+//#W57-E (D19, wave-56 ledger MED): the clause had only a NEGATIVE form, so a
+//guide rule keyed to the parenthesis is silent exactly where both colours are
+//available - `123v126` seq 6 had 5 fetch windows, 4 tagged, and the untagged
+//one cracked Marsh Flats for a Swamp over a Scrubland that adds {W} or {B}. The
+//positive half states the SOURCE COUNT the seat already has of each colour the
+//row adds, which is what separates a redundant crack from a colour-fixing one.
+//`sourceCounts` may be NULL (the count is then simply not stated); the negative
+//form is BYTE-IDENTICAL to before, because guides key on it.
+static string fetchLandColorsClause(const bool adds[5], const bool canMake[5],
+                                    const int sourceCounts[5])
 {
     static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
     string list, missing;
@@ -19618,6 +19958,26 @@ static string fetchLandColorsClause(const bool adds[5], const bool canMake[5])
     string s = ", and it adds " + list;
     if (m)
         s += " (you cannot make " + missing + " right now)";
+    else
+    {
+        //Every colour this row adds is already makeable: say so, and say how
+        //REDUNDANT it would be. Same symbols, same per-SOURCE counting rule as
+        //the mana line, so the two cannot be read against different totals.
+        std::ostringstream o;
+        o << " (you can already make " << list;
+        if (sourceCounts)
+        {
+            o << " - you have";
+            int said = 0;
+            for (int k = 0; k < 5; k++)
+                if (adds[k])
+                    o << (said++ ? ", " : " ") << sourceCounts[k] << " source"
+                      << (sourceCounts[k] == 1 ? "" : "s") << " of " << kSym[k];
+            o << " right now";
+        }
+        o << ")";
+        s += o.str();
+    }
     return s;
 }
 
@@ -22119,7 +22479,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             {
                 std::vector<std::string> conv;
                 converterScan(this, conv);
-                o << feedsRowTag(perTurn, variable, perCastFed, conv);
+                std::vector<std::string> handConv; //#W57-E (D23)
+                handConverterScan(this, handConv);
+                o << feedsRowTag(perTurn, variable, perCastFed, conv, handConv);
             }
         }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
@@ -23105,8 +23467,25 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 //planner which sources it would spend. Counted per SOURCE CARD,
                 //so it reads against the same total the mana line prints.
                 {
+                    //#W57-E (D9): the POOL route first - it is the one the
+                    //corpus actually takes (9 of 9 menus). The pool covers the
+                    //base cost plus capX exactly (that is how the menu was
+                    //built), so the base is `pool - capX` and the row for X
+                    //leaves `capX - X` floating. Derived from the MENU's own
+                    //cap rather than from a second cost query, the same
+                    //contract rail the annotations above ride: if the two ever
+                    //disagree (a pay[[{X}]] announcement round, where the pool
+                    //is empty by design) nothing is claimed here and the
+                    //untapped-source form below runs instead.
+                    int xPool = getManaPool() ? getManaPool()->getConvertedCost() : 0;
+                    int xBaseCost = xPool - capX;
+                    bool poolForm = (xPool > 0 && capX >= 0 && xBaseCost >= 0);
+                    if (poolForm)
+                        for (size_t fi = 0; fi < shown.size(); fi++)
+                            shown[fi] += leavesFloatingTag(xPool,
+                                                           xBaseCost + (capX - (int) fi));
                     ManaCost * xBase = ctx ? ctx->getManaCost() : NULL;
-                    if (xBase && (xBase->hasX() || xBase->hasSpecificX()) && capX >= 0)
+                    if (!poolForm && xBase && (xBase->hasX() || xBase->hasSpecificX()) && capX >= 0)
                     {
                         GptManaPolicy fitPolicy(this);
                         int xUntapped = ManaEngine::potentialColorReach(this, fitPolicy, NULL);
@@ -40294,8 +40673,9 @@ static const char * kW50Y_r94 =
         two.push_back("Underworld Dreams #1");
         two.push_back("Liliana's Caress");
         string f2 = feedsRowTag(1, false, 0, two);
-        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Liliana's Caress}",
-              "#W51-F D11 the row carries the count ahead of the converter names, Caress included");
+        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Liliana's Caress; in your hand: 0}",
+              "#W51-F D11 the row carries the count ahead of the converter names, Caress included"
+              " (#W57-E D23: the hand half is now stated too, and the battlefield half is unchanged)");
         string f0 = feedsRowTag(1, false, 0, none);
         CHECK(f0.find("converters on your battlefield: 0") != string::npos && f0.find("free until a converter is out") != string::npos,
               "#W51-F D11 at zero converters the row says 0 and why it matters");
@@ -41771,8 +42151,9 @@ static const char * kW50Y_r94 =
                  " go from 2 to 3, and it adds {W} or {U} (you cannot make {U} right now)}",
               "#W54-E D20 the clause continues the shipped sources sentence inside the same braces");
         bool wOnly[5] = { true, false, false, false, false };
-        CHECK(fetchLandColorsClause(wOnly, bw) == ", and it adds {W}",
-              "#W54-E D20 NEGATIVE a colour you can already make earns no cannot-make tail");
+        CHECK(fetchLandColorsClause(wOnly, bw) == ", and it adds {W} (you can already make {W})",
+              "#W54-E D20 NEGATIVE a colour you can already make earns no cannot-make tail"
+              " (#W57-E D19: it earns the POSITIVE form instead - the parenthesis is never absent)");
         bool nothing[5] = { false, false, false, false, false };
         CHECK(fetchLandColorsClause(nothing, bw).empty(),
               "#W54-E D20 NEGATIVE a land whose colours the engine could not read claims nothing");
@@ -44053,6 +44434,212 @@ static const char * kW50Y_r94 =
         CHECK(revealStallStructSecsFor(120000) == 1800
               && revealStallStructSecsFor(900000) == 2700,
               "#W56-C D12 REGRESSION the wall floor itself is unchanged");
+    }
+
+    // ================= wave-57 lane E =================
+    cout << "\n[W57-E] D2 the pregame hand header counts MDFC back-face lands, and reconciles the sum\n";
+    {
+        int bsrc[5] = { 0, 0, 1, 0, 0 };
+        vector<string> noReach;
+        vector<std::pair<string, string> > oneDual;
+        oneDual.push_back(std::make_pair(string("Agadeem's Awakening {b}{b}{b}{x}"),
+                                         string("Agadeem, the Undercrypt")));
+        // The corpus's own hand (seq 1 of 146v152): seven spells, two of which
+        // play as lands. Counted here with ONE dual for the shape.
+        string h = pregameHandHeaderText(7, 1, 7, bsrc, "Pelakka Predation {1}{b}", 2,
+                                         noReach, oneDual);
+        cout << "     D2: " << h.substr(0, h.find("Mana sources")) << "\n";
+        CHECK(h.find("Your hand (7 cards), counted by the engine: 1 land, 7 spells.\n")
+              != string::npos,
+              "#W57-E D2 the back face is COUNTED as a land (the corpus read 0 lands and mulliganed)");
+        CHECK(h.find("1 card is counted TWICE above, on purpose: Agadeem's Awakening {b}{b}{b}{x}"
+                     " is a spell you may instead play as the land Agadeem, the Undercrypt."
+                     " So 1 land + 7 spells = 8 for a 7-card hand, not 7: 1 card is in both counts."
+                     " You may use each such card as ONE of the two, not both.\n") != string::npos,
+              "#W57-E D2 the note carries the ARITHMETIC, so the broken sum is stated, not hidden");
+        CHECK(h.find("Mana sources among those lands, counted by the engine: {B} 1") != string::npos,
+              "#W57-E D2 sources[] gains the back face's colour (the {b}{w} screw that lost a game)");
+        // Two duals: plural everywhere, one note, one sum.
+        vector<std::pair<string, string> > twoDual(oneDual);
+        twoDual.push_back(std::make_pair(string("Emeria's Call {4}{w}{w}{w}"),
+                                         string("Emeria, Shattered Skyclave")));
+        string h2 = pregameHandHeaderText(7, 2, 7, bsrc, "Pelakka Predation {1}{b}", 2,
+                                          noReach, twoDual);
+        CHECK(h2.find("2 cards are counted TWICE above") != string::npos
+              && h2.find("So 2 lands + 7 spells = 9 for a 7-card hand, not 7: 2 cards are in both"
+                         " counts.") != string::npos,
+              "#W57-E D2 two dual-role cards read as one note with the plural arithmetic");
+        CHECK(dualRoleHandNote(7, 2, 5, twoDual).find("Agadeem's Awakening {b}{b}{b}{x} is a spell"
+              " you may instead play as the land Agadeem, the Undercrypt; Emeria's Call") != string::npos,
+              "#W57-E D2 the pairs are listed with ';', each naming BOTH faces");
+        // NEGATIVE: a hand with no dual-role card is byte-identical to wave 56.
+        int ww[5] = { 2, 0, 0, 0, 0 };
+        vector<string> reach;
+        reach.push_back("Wall of Omens {1}{w}");
+        CHECK(pregameHandHeaderText(7, 2, 5, ww, "Wall of Omens {1}{w}", 2, reach)
+              == pregameHandHeaderText(7, 2, 5, ww, "Wall of Omens {1}{w}", 2, reach,
+                                       vector<std::pair<string, string> >()),
+              "#W57-E D2 NEGATIVE with no dual-role card the header is the shipped string, unchanged");
+        CHECK(pregameHandHeaderText(7, 2, 5, ww, "Wall of Omens {1}{w}", 2, reach)
+                  .find("counted TWICE") == string::npos
+              && dualRoleHandNote(7, 2, 5, vector<std::pair<string, string> >()).empty(),
+              "#W57-E D2 NEGATIVE the note never prints for a hand that holds no such card");
+        // NEGATIVE: still hand-only - no board word can reach this surface.
+        CHECK(h.find("battlefield") == string::npos && h.find("Mana available") == string::npos
+              && h.find("Opponent") == string::npos,
+              "#W57-E D2 NEGATIVE the pregame surface stays HAND-ONLY (owner directive)");
+    }
+
+    cout << "\n[W57-E] D9 the ANNOUNCE_X fit clause prices the POOL, which is what that window spends\n";
+    {
+        // 125v130 seq 72: pool {u}{u}{u}{u}{u}{w}{w}{w}{w} = 9, Sphinx's
+        // Revelation {X}{W}{U}{U} -> base 3, capX 6. Every row of that menu
+        // rendered with no fit clause of any form; the pool arithmetic is the
+        // one the window actually has.
+        CHECK(leavesFloatingTag(9, 9) == " {leaves 0 of your 9 floating mana unspent"
+                                         " - this X spends your whole pool}",
+              "#W57-E D9 the largest X spends the pool, and the row says so");
+        CHECK(leavesFloatingTag(9, 3 + 4) == " {leaves 2 of your 9 floating mana unspent}",
+              "#W57-E D9 X=4 on a 9-mana pool at base 3 leaves 2 floating - the trade the menu never printed");
+        CHECK(leavesFloatingTag(1, 1) == " {leaves 0 of your 1 floating mana unspent"
+                                         " - this X spends your whole pool}",
+              "#W57-E D9 the singular pool still reads as mana, not sources");
+        CHECK(leavesFloatingTag(0, 0).empty() && leavesFloatingTag(-1, 0).empty(),
+              "#W57-E D9 NEGATIVE an empty pool claims nothing (the pay[[{X}]] round, where the"
+              " untapped-source form is the live one)");
+        CHECK(leavesFloatingTag(4, 9) == " {leaves 0 of your 4 floating mana unspent"
+                                         " - this X spends your whole pool}",
+              "#W57-E D9 NEGATIVE overspend can never print a negative remainder");
+        // The shipped untapped-source form is untouched.
+        CHECK(leavesUntappedTag(7, 3) == " {leaves 4 of your 7 untapped mana sources untapped}",
+              "#W57-E D9 REGRESSION the cast row's untapped-source remainder is byte-identical");
+        // Echo shape: same {leaves ...} channel, so it is decision-time only.
+        string xrow = "X = 4 {X pricing: X=4 - you gain 4 life and draw 4 cards}"
+                      + leavesFloatingTag(9, 7);
+        CHECK(stripNarrationDecoration(xrow) == "X = 4",
+              "#W57-E D9 echo: the floating remainder leaves no residue in the narrated record");
+        vector<string> xm;
+        xm.push_back(xrow);
+        xm.push_back("X = 3 {X pricing: X=3 - you gain 3 life and draw 3 cards}");
+        bool xs = false;
+        CHECK(parseChoice("CHOICE: 1 (X = 4)", 2, &xm, &xs, NULL) == 1 && !xs,
+              "#W57-E D9 echo: a row carrying the clause still binds by index");
+    }
+
+    cout << "\n[W57-E] D15 the board frame carries the opponent's LIFE TREND\n";
+    {
+        int rising[3] = { 20, 25, 30 };
+        int turns[3] = { 4, 5, 6 };
+        CHECK(opponentLifeTrendLine(rising, turns, 3, 30)
+              == "Opponent life trend: turn 4: 20, turn 5: 25, turn 6: 30, now 30 (+10 since turn 4).\n",
+              "#W57-E D15 the rising case (130v125's Elixir) states every sample and the delta");
+        int falling[3] = { 20, 18, 15 };
+        CHECK(opponentLifeTrendLine(falling, turns, 3, 12)
+              == "Opponent life trend: turn 4: 20, turn 5: 18, turn 6: 15, now 12 (-8 since turn 4).\n",
+              "#W57-E D15 a falling total signs its own delta");
+        int flat[3] = { 30, 30, 30 };
+        CHECK(opponentLifeTrendLine(flat, turns, 3, 30)
+              == "Opponent life trend: unchanged at 30 since turn 4.\n",
+              "#W57-E D15 the flat case says so in one clause instead of three identical samples");
+        int one[3] = { 0, 0, 20 };
+        int oneT[3] = { 0, 0, 2 };
+        CHECK(opponentLifeTrendLine(one + 2, oneT + 2, 1, 17)
+              == "Opponent life trend: turn 2: 20, now 17 (-3 since turn 2).\n",
+              "#W57-E D15 one sample is a trend of one - no interpolation, no invented turn");
+        CHECK(opponentLifeTrendLine(rising, turns, 0, 30).empty(),
+              "#W57-E D15 NEGATIVE with nothing sampled the line does not print (no zero-life claim)");
+        CHECK(opponentLifeTrendLine(flat, turns, 3, 30).find("gaining") == string::npos
+              && opponentLifeTrendLine(rising, turns, 3, 30).find("racing") == string::npos,
+              "#W57-E D15 NEGATIVE the line is numbers only - the verdict is the pilot's to make");
+    }
+
+    cout << "\n[W57-E] D19 the fetch row's colour parenthesis gets a positive form\n";
+    {
+        bool scrubland[5] = { true, false, true, false, false }; //adds {W} or {B}
+        bool haveWB[5] = { true, false, true, false, false };
+        int oneEach[5] = { 1, 0, 1, 0, 0 };
+        string pos = fetchLandColorsClause(scrubland, haveWB, oneEach);
+        cout << "     D19: " << pos << "\n";
+        CHECK(pos == ", and it adds {W} or {B} (you can already make {W} or {B} - you have"
+                     " 1 source of {W}, 1 source of {B} right now)",
+              "#W57-E D19 123v126 seq 6: the row that was silent now states redundancy in SOURCES");
+        bool swampOnly[5] = { false, false, true, false, false };
+        int twoB[5] = { 1, 0, 2, 0, 0 };
+        CHECK(fetchLandColorsClause(swampOnly, haveWB, twoB)
+              == ", and it adds {B} (you can already make {B} - you have 2 sources of {B} right now)",
+              "#W57-E D19 the plural of the count is the count's own, not the colour list's");
+        CHECK(fetchLandColorsClause(scrubland, haveWB)
+              == ", and it adds {W} or {B} (you can already make {W} or {B})",
+              "#W57-E D19 with no per-source breakdown the positive form still prints, countless");
+        // NEGATIVE: the shipped negative form is byte-identical, counts or not.
+        bool tundra2[5] = { true, true, false, false, false };
+        CHECK(fetchLandColorsClause(tundra2, haveWB, oneEach)
+              == ", and it adds {W} or {U} (you cannot make {U} right now)",
+              "#W57-E D19 NEGATIVE a missing colour keeps the shipped cannot-make clause, unchanged");
+        CHECK(fetchLandColorsClause(tundra2, haveWB, oneEach).find("already make") == string::npos,
+              "#W57-E D19 NEGATIVE the two polarities never appear on one row");
+        bool blank[5] = { false, false, false, false, false };
+        CHECK(fetchLandColorsClause(blank, haveWB, oneEach).empty(),
+              "#W57-E D19 NEGATIVE an unread land still claims NOTHING about colours");
+    }
+
+    cout << "\n[W57-E] D20 the [<- ...] marker is promoted to the CAST row\n";
+    {
+        CHECK(xCastRowMarkerFrom(kXMostKillsMarker, 4, true)
+              == " [<- best X for this cast: X=4 - most kills at any affordable X that costs you nothing]",
+              "#W57-E D20 the Starstorm cast row names the best X one screen before the menu does");
+        CHECK(xCastRowMarkerFrom(kXBestTradeMarker, 2, true)
+              == " [<- best X for this cast: X=2 - best trade: the most of THEIRS at the smallest"
+                 " cost to YOURS]",
+              "#W57-E D20 the trade family reframes the same way");
+        CHECK(xCastRowMarkerFrom(kXNoKillsMarker, 0, false) == string(kXNoKillsMarker),
+              "#W57-E D20 the no-kill verdict names no X and is carried across verbatim");
+        CHECK(xCastRowMarkerFrom(xMonotoneMarker(6, 1, 1), 6, true)
+              == " [<- best X for this cast: X=6 - largest affordable X - X=6 gains 6 life and"
+                 " draws 6 cards; no listed X does more]",
+              "#W57-E D20 the monotone family (Sphinx's Revelation) rides the same reframe");
+        CHECK(xCastRowMarkerFrom("", 4, true).empty()
+              && xCastRowMarkerFrom(" {X pricing: max affordable X=4 (6 mana total)}", 4, true).empty(),
+              "#W57-E D20 NEGATIVE nothing without a marker to promote, and a pricing block is not one");
+        CHECK(xCastRowMarkerFrom(xMonotoneMarker(0, 1, 1), 0, true).empty(),
+              "#W57-E D20 NEGATIVE with no affordable ladder there is no best X to name");
+        // Echo shape: bracketed, so it never enters history and never binds.
+        string crow = "Cast Starstorm {2}{r}{r} {X pricing: max affordable X=4 (6 mana total)}"
+                      + xCastRowMarkerFrom(kXMostKillsMarker, 4, true);
+        CHECK(stripNarrationDecoration(crow) == "Cast Starstorm {2}{r}{r}",
+              "#W57-E D20 echo: the promoted marker leaves no residue in the narrated record");
+        vector<string> cm;
+        cm.push_back(crow);
+        cm.push_back("Cast nothing right now");
+        bool cs = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Starstorm)", 2, &cm, &cs, NULL) == 1 && !cs,
+              "#W57-E D20 echo: the marked cast row still binds by name and index");
+    }
+
+    cout << "\n[W57-E] D23 {feeds:} counts converters in HAND too\n";
+    {
+        std::vector<std::string> none57, board57, hand57;
+        board57.push_back("Underworld Dreams #1");
+        hand57.push_back("Forced Fruition");
+        CHECK(feedsRowTag(1, false, 0, none57, hand57)
+              == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 0"
+                 " (nothing of yours punishes their draws or discards yet - the cards you hand them"
+                 " are free until a converter is out); in your hand: 1 - Forced Fruition}",
+              "#W57-E D23 162v125 seq 15: the hand's converter is now a NUMBER on the row");
+        CHECK(feedsRowTag(1, false, 0, board57, hand57)
+                  .find("converters on your battlefield: 1 - Underworld Dreams #1; in your hand:"
+                        " 1 - Forced Fruition}") != string::npos,
+              "#W57-E D23 both halves print, each with its own names, in one clause");
+        CHECK(feedsRowTag(1, false, 0, board57, none57)
+                  .find("; in your hand: 0}") != string::npos,
+              "#W57-E D23 the zero prints too - a rule keyed to the hand half is never silent");
+        CHECK(feedsRowTag(0, false, 0, board57, hand57).empty(),
+              "#W57-E D23 NEGATIVE a card that feeds nothing still carries no tag");
+        CHECK(feedsRowTag(1, false, 0, board57, hand57).find("in your hand: 1 - Underworld") == string::npos,
+              "#W57-E D23 NEGATIVE the two zones are never merged into one list");
+        string frow = "Cast Dictate of Kruphix {2}{u}" + feedsRowTag(1, false, 0, none57, hand57);
+        CHECK(stripNarrationDecoration(frow) == "Cast Dictate of Kruphix {2}{u}",
+              "#W57-E D23 echo: the widened {feeds:} block still leaves no residue in history");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
