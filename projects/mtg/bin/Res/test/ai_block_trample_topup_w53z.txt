@@ -1,0 +1,58 @@
+#NAME: Blockers -- top up a TRAMPLER whose lone blocker cannot absorb it
+#DESC: Owner Vita play report 2026-09-02 (vpk12b, transcript-1788392029, deck7
+#DESC: "Relentless Growth" vs ai deck10, his tag "bad blocking", #result life 15/0).
+#DESC: A trampling Mossborn Hydra attacked alone into four untapped Goblins; exactly
+#DESC: ONE Hearthfire Hobgoblin blocked it, and the trample overflow took the seat to
+#DESC: exactly 0 with three more bodies standing untouched.
+#DESC:
+#DESC: MECHANISM: the wave-53 survival sweep computes the right number
+#DESC: (unblockedDamageTo is trample-aware) but its target search skips every attacker
+#DESC: that already has a blocker, so a trampler is unreachable the moment pass 3 has
+#DESC: put one body in front of it. Lane T docketed this gap; this is it closing.
+#DESC:
+#DESC: SCENARIO: Colossal Dreadmaw (6/6 trample) attacks a defender at 4 holding three
+#DESC: Mons's Goblin Raiders (1/1). Pass 3 blocks with one Raider (lethal-prevention
+#DESC: branch) and then caps out at maxBlockers 1. Absorbed 1, overflow 5 >= 4: dead.
+#DESC: Two more Raiders raise the absorbed total to 3 and the overflow to 3, which the
+#DESC: defender survives at 1. Every Raider dies either way; the difference is the game.
+#DESC:
+#DESC: RED on base: one blocker, 5 tramples through, defender at -1.
+#DESC: GREEN after: three blockers, 3 tramples through, defender at 1.
+AICALLS 120
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Colossal Dreadmaw
+life:20
+[PLAYER2]
+inplay:Mons's Goblin Raiders,Mons's Goblin Raiders,Mons's Goblin Raiders
+life:4
+[DO]
+Colossal Dreadmaw
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Colossal Dreadmaw
+life:20
+[PLAYER2]
+graveyard:Mons's Goblin Raiders,Mons's Goblin Raiders,Mons's Goblin Raiders
+life:1
+[END]

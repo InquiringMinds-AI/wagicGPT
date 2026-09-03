@@ -4440,6 +4440,45 @@ static bool blockerDiesToAttackerRegardless(MTGCardInstance * attacker, MTGCardI
     return true;
 }
 
+//W53-Z: a MTG_BLOCK_RULE click does not CHOOSE an attacker - it CYCLES the
+//blocker one step through the attackers it may legally block, and off again
+//(MTGBlockRule::reactToClick: getNextAttacker(current) until toggleDefenser
+//accepts or the list runs out). So a single click from "unassigned" always
+//lands on the FIRST legal attacker in the attacking player's battlefield
+//order, whatever the caller scored. Pass 3 below scores a bestAttacker with
+//care and then committed with exactly one blind click - so the block landed
+//on attacker #1 every time, and the per-attacker cap it had just checked
+//(currentBlockers >= maxBlockers) was checked against a DIFFERENT attacker
+//than the one that got the body. Owner Vita play reports 2026-09-02 (vpk12b,
+//his tag "bad blocking"): transcript-1788388578 - three untapped Trolls, each
+//clicked 3x by pass 1 (full reject cycle) and then once by pass 3, all three
+//landing on the 2/3 Winding Constrictor while the lethal Hungering Hydra went
+//unblocked; transcript-1788390984 - an Earth Elemental accepted by pass 1 on
+//attacker #1, then Elvish Archers cycled 6x by pass 1 and blind-clicked onto
+//the SAME attacker #1 by pass 3, with four other attackers unblocked. Aim the
+//declaration instead: keep clicking until the blocker is actually on the card
+//that was scored, and if it never lands (an evasion the scorer missed), take
+//the body back home rather than leave it somewhere nobody chose.
+static bool aimBlockerAt(GameObserver * observer, MTGCardInstance * blocker, MTGCardInstance * target)
+{
+    if (!observer || !blocker || !target)
+        return false;
+    if (blocker->defenser == target)
+        return true;
+    if (!blocker->canBlock(target))
+        return false;
+    const int cap = 2 + target->controller()->game->inPlay->nb_cards;
+    int guard = 0;
+    while (blocker->defenser != target && guard++ < cap)
+        observer->cardClick(blocker, MTGAbility::MTG_BLOCK_RULE);
+    if (blocker->defenser == target)
+        return true;
+    guard = 0;
+    while (blocker->defenser && guard++ < cap)
+        observer->cardClick(blocker, MTGAbility::MTG_BLOCK_RULE);
+    return false;
+}
+
 int AIPlayerBaka::chooseBlockers()
 {
     //Should not block during my own turn...
@@ -4566,6 +4605,14 @@ int AIPlayerBaka::chooseBlockers()
             if (!attacker)
                 continue;
 
+            //W53-Z: score only attackers this body may LEGALLY block. The old
+            //blind commit click made the filter unnecessary (an illegal pick
+            //silently landed somewhere else); an aimed one needs it, and it is
+            //the right question anyway - a ground blocker scoring a flier and
+            //then blocking nothing is the deck3 shape in transcript-1788394118.
+            if (!card->canBlock(attacker))
+                continue;
+
             int currentBlockers = (int)attacker->blockers.size();
             int totalAssignedDamage = 0;
 
@@ -4673,6 +4720,8 @@ int AIPlayerBaka::chooseBlockers()
                 {
                     if (c2 == card || c2->defenser || (hints && hints->HintSaysDontBlock(observer, c2)))
                         continue;
+                    if (!c2->canBlock(bestAttacker))
+                        continue; //W53-Z: the set has to be legal per member
 
                     int combinedPower = c2->power + card->power;
                     bool combinedCanKill = (combinedPower >= bestAttacker->toughness);
@@ -4693,7 +4742,8 @@ int AIPlayerBaka::chooseBlockers()
                     MTGAbility* a = observer->mLayers->actionLayer()->getAbility(MTGAbility::BLOCK_COST);
                     doAbility(a, card);
                 }
-                observer->cardClick(card, MTGAbility::MTG_BLOCK_RULE);
+                if (!aimBlockerAt(observer, card, bestAttacker))
+                    continue; //W53-Z: never leave it on an attacker nobody scored
                 opponentsToughness[bestAttacker] -= card->power;
 
                 for (size_t i = 0; i < extraBlockers.size(); ++i)
@@ -4704,7 +4754,8 @@ int AIPlayerBaka::chooseBlockers()
                         MTGAbility* a = observer->mLayers->actionLayer()->getAbility(MTGAbility::BLOCK_COST);
                         doAbility(a, extra);
                     }
-                    observer->cardClick(extra, MTGAbility::MTG_BLOCK_RULE);
+                    if (!aimBlockerAt(observer, extra, bestAttacker))
+                        continue;
                     opponentsToughness[bestAttacker] -= extra->power;
                 }
             }
@@ -4730,17 +4781,46 @@ int AIPlayerBaka::chooseBlockers()
         while (life > 0 && guard++ < 32 && unblockedDamageTo(this) >= life)
         {
             MTGCardInstance * target = NULL;
+            int targetThrough = 0;
             MTGCardInstance * atk = NULL;
             while ((atk = opponent()->game->inPlay->getNextAttacker(atk)))
             {
-                if (atk->power <= 0 || atk->blockers.size())
+                if (atk->power <= 0)
                     continue;
-                //menace / "three or more" sets are pass 3's job; a partial
-                //declaration here would only be deleted by the rules layer.
-                if (atk->minBlockersRequired() > 1 || !atk->blockRequirementSatisfiable())
-                    continue;
-                if (!target || atk->power > target->power)
+                int through = 0;
+                if (atk->blockers.size())
+                {
+                    //W53-Z: an already-blocked attacker still reaches me when
+                    //it TRAMPLES and its blockers cannot absorb the whole
+                    //swing - and one more body absorbs one more body's worth.
+                    //Lane T left this gap open by construction (it skipped
+                    //every blocked attacker) and docketed it; the owner's
+                    //vpk12b transcript-1788392029 is exactly it: a lone
+                    //Hearthfire Hobgoblin on a trampling Mossborn Hydra with
+                    //three more untapped Goblins standing behind it, and the
+                    //overflow killed the seat at 0.
+                    if (!atk->has(Constants::TRAMPLE))
+                        continue;
+                    int absorbed = 0;
+                    for (list<MTGCardInstance*>::iterator it = atk->blockers.begin(); it != atk->blockers.end(); ++it)
+                        if (*it) absorbed += (*it)->toughness;
+                    through = atk->power - absorbed;
+                    if (through <= 0)
+                        continue;
+                }
+                else
+                {
+                    //menace / "three or more" sets are pass 3's job; a partial
+                    //declaration here would only be deleted by the rules layer.
+                    if (atk->minBlockersRequired() > 1 || !atk->blockRequirementSatisfiable())
+                        continue;
+                    through = atk->power;
+                }
+                if (!target || through > targetThrough)
+                {
                     target = atk;
+                    targetThrough = through;
+                }
             }
             if (!target)
                 break;
