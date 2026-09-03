@@ -120,7 +120,7 @@ void StoryReward::Update(float)
             size_t pos = text.find("${SET}");
             if (pos != string::npos)
             {
-                text.replace(pos, pos + 6, unlockedString);
+                text.replace(pos, 6, unlockedString); //#W54-J (A45): count, not end
             }
         }
         break;
@@ -154,7 +154,7 @@ void StoryReward::Update(float)
         size_t pos = text.find("${CARD}");
         if (pos != string::npos && card)
         {
-            text.replace(pos, pos + 7, card->data->getName());
+            text.replace(pos, 7, card->data->getName()); //#W54-J (A45): count, not end
         }
         break;
     }
@@ -607,8 +607,11 @@ bool StoryFlow::parse(string path)
     if (!fileSystem->OpenFile(path.c_str())) return false;
 
     int size = fileSystem->GetFileSize();
-    char *xmlBuffer = NEW char[size];
+    //#W54-J (A45): TinyXML parses a C string; the buffer was exactly the
+    //file's bytes with no terminator (heap over-read, garbage on a small heap).
+    char *xmlBuffer = NEW char[size + 1];
     fileSystem->ReadFile(xmlBuffer, size);
+    xmlBuffer[size] = 0;
 
     TiXmlDocument doc;
     doc.Parse(xmlBuffer);

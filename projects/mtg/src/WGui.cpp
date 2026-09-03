@@ -2535,7 +2535,14 @@ bool WGuiKeyBinder::yieldFocus()
 
 void WGuiKeyBinder::populateKeyBindingList()
 {
+    //#W54-J (A44): items are owned rows (~WGuiMenu deletes them); clearing
+    //the vector leaked every OptionKey on each "Load Defaults..." press.
+    //Safe to delete here: the only re-entrant caller is confirmMenu's
+    //listener, which runs after this list's own item loop has finished.
+    for (vector<WGuiBase*>::iterator it = items.begin(); it != items.end(); ++it)
+        delete *it;
     items.clear();
+    currentItem = -1;
     Add(NEW WGuiButton(NEW WGuiItem("Load Defaults..."), -102, 3, this));
 #if !defined(VITA)
     // Sentinel "New binding..." row that lets the user grab a keysym to add a

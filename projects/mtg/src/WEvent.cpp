@@ -202,63 +202,44 @@ WEventCreatureBlockerRank::WEventCreatureBlockerRank(MTGCardInstance * card, MTG
 {
 }
 
+//#W54-J (A40): the two engage-mana events did twelve string-keyed
+//hasType("snow") lookups each (a 6-land tap = 72 map finds inside event
+//constructors) across two identical 60-line blocks. One helper, one typed
+//lookup, one owner pick; the counts land on exactly the pool the old
+//branches chose (controller's pool, else the opponent's pool, else nobody).
+static void accountSnowMana(int color, MTGCardInstance* card, ManaPool * destination)
+{
+    if (!card || !destination || !card->controller() || !card->hasType(Subtypes::TYPE_SNOW))
+        return;
+    Player * owner = NULL;
+    if (card->controller()->getManaPool() == destination)
+        owner = card->controller();
+    else if (card->controller()->opponent() && card->controller()->opponent()->getManaPool() == destination)
+        owner = card->controller()->opponent();
+    if (!owner)
+        return;
+    switch (color)
+    {
+    case 1: owner->snowManaG += 1; break;
+    case 2: owner->snowManaU += 1; break;
+    case 3: owner->snowManaR += 1; break;
+    case 4: owner->snowManaB += 1; break;
+    case 5: owner->snowManaW += 1; break;
+    case 0:
+    case 6: owner->snowManaC += 1; break;
+    default: break;
+    }
+}
+
 WEventEngageManaExtra::WEventEngageManaExtra(int color, MTGCardInstance* card, ManaPool * destination) :
     WEvent(), color(color), card(card), destination(destination)
-{//controller snow
-    if(color == 1 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaG += 1;
-    if(color == 2 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaU += 1;
-    if(color == 3 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaR += 1;
-    if(color == 4 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaB += 1;
-    if(color == 5 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaW += 1;
-    if((color == 0 || color == 6) && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaC += 1;
-    //opponent snow
-    if(color == 1 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaG += 1;
-    if(color == 2 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaU += 1;
-    if(color == 3 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaR += 1;
-    if(color == 4 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaB += 1;
-    if(color == 5 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaW += 1;
-    if((color == 0 || color == 6) && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaC += 1;
+{
+    accountSnowMana(color, card, destination);
 }
 WEventEngageMana::WEventEngageMana(int color, MTGCardInstance* card, ManaPool * destination) :
     WEvent(), color(color), card(card), destination(destination)
-{//controller snow
-    if(color == 1 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaG += 1;
-    if(color == 2 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaU += 1;
-    if(color == 3 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaR += 1;
-    if(color == 4 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaB += 1;
-    if(color == 5 && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaW += 1;
-    if((color == 0 || color == 6) && card->controller()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->snowManaC += 1;
-    //opponent snow
-    if(color == 1 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaG += 1;
-    if(color == 2 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaU += 1;
-    if(color == 3 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaR += 1;
-    if(color == 4 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaB += 1;
-    if(color == 5 && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaW += 1;
-    if((color == 0 || color == 6) && card->controller()->opponent()->getManaPool() == destination && card->hasType("snow"))
-        card->controller()->opponent()->snowManaC += 1;
+{
+    accountSnowMana(color, card, destination);
 }
 WEventConsumeMana::WEventConsumeMana(int color, ManaPool * source) :
     WEvent(), color(color), source(source)

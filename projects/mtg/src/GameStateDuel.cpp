@@ -267,7 +267,7 @@ GameState(parent, "duel")
         {
             found = 0;
             char buffer[512];
-            sprintf(buffer, "ai/baka/deck%i.txt", totalAIDecks + 1);
+            snprintf(buffer, sizeof(buffer), "ai/baka/deck%i.txt", totalAIDecks + 1); //#W54-J (L25)
             if (FileExists(buffer))
             {
                 found = 1;
@@ -1389,8 +1389,10 @@ void GameStateDuel::Update(float dt)
         }
         if (mEngine->GetButtonClick(JGE_BTN_MENU))
         {
+            bool builtMenu = false; //#W54-J (L27)
             if (!menu)
             {
+                builtMenu = true;
                 menu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), DUEL_MENU_GAME_MENU, this, Fonts::MENU_FONT, SCREEN_WIDTH / 2 - 100, 25);
                 menu->Add(MENUITEM_CANCEL, "Cancel");
                 if(taskList->getState() != TaskList::TASKS_ACTIVE){
@@ -1434,10 +1436,17 @@ void GameStateDuel::Update(float dt)
                     }
                 }
             }
-            if(taskList->getState() != TaskList::TASKS_ACTIVE){
-                menu->Add(MENUITEM_TASKBOARD, "Open task board");
-            } else {
-                menu->Add(MENUITEM_TASKBOARD, "Close task board");
+            //#W54-J (L27): this add sat OUTSIDE `if (!menu)`, so a MENU press
+            //while a menu already existed (the LLM patience prompt is one)
+            //appended another task-board row to the SAME menu each press.
+            //Add it only to a menu built by this press.
+            if (builtMenu)
+            {
+                if(taskList->getState() != TaskList::TASKS_ACTIVE){
+                    menu->Add(MENUITEM_TASKBOARD, "Open task board");
+                } else {
+                    menu->Add(MENUITEM_TASKBOARD, "Close task board");
+                }
             }
             setGamePhase(DUEL_STATE_MENU);
         }
@@ -1807,7 +1816,7 @@ void GameStateDuel::Render()
         {
             r->FillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ARGB(100,0,0,0));
             char buffer[4096];
-            sprintf(buffer, _("Turn:%i").c_str(), game->turn);
+            snprintf(buffer, sizeof(buffer), _("Turn:%i").c_str(), game->turn); //#W54-J (L25)
             mFont->SetColor(ARGB(255,255,255,255));
             mFont->DrawString(buffer, SCREEN_WIDTH / 2, 0, JGETEXT_CENTER);
         }
@@ -3250,7 +3259,7 @@ void Tournament::renderScoreTable()
         {
           f2->SetScale(1.5f);
           gamesPlayed=mVictories0+mVictories1+1;
-          sprintf(buffer, _("Starting Game %i ...").c_str(), gamesPlayed);
+          snprintf(buffer, sizeof(buffer), _("Starting Game %i ...").c_str(), gamesPlayed);
           f2->DrawString(buffer, 80, y);
         }
         else
@@ -3265,20 +3274,20 @@ void Tournament::renderScoreTable()
         switch(mMatchMode)
         {
             case MATCHMODE_FIXED:
-                sprintf(buffer, _("Game %i of %i games. ").c_str(),gamesPlayed,mNbGames);
+                snprintf(buffer, sizeof(buffer), _("Game %i of %i games. ").c_str(),gamesPlayed,mNbGames);
                 f2->DrawString(buffer ,30, 250);
                 break;
             case MATCHMODE_BESTOF:
                 //sprintf(buffer, _("Game %i,  Best of %i mode, win at least %i games. ").c_str(),gamesPlayed,mNbGames,(int)ceil((double)mNbGames/2.));
-                sprintf(buffer, _("Game %i,  Best of %i mode, win at least %i games. ").c_str(),gamesPlayed,mNbGames,(int)(((float)mNbGames/2.0f)+0.5f));
+                snprintf(buffer, sizeof(buffer), _("Game %i,  Best of %i mode, win at least %i games. ").c_str(),gamesPlayed,mNbGames,(int)(((float)mNbGames/2.0f)+0.5f));
                 f2->DrawString(buffer ,30, 250);
                 break;
             case MATCHMODE_DELTA:
-                    sprintf(buffer, _("Game %i, Win the match with %i wins difference. ").c_str(),gamesPlayed,mNbGames);
+                    snprintf(buffer, sizeof(buffer), _("Game %i, Win the match with %i wins difference. ").c_str(),gamesPlayed,mNbGames);
                     f2->DrawString(buffer ,30, 250);
                     break;
             case MATCHMODE_CONSECUTIVE:
-                    sprintf(buffer, _("Game %i, Win the match with %i wins in a row. ").c_str(), gamesPlayed,mNbGames);
+                    snprintf(buffer, sizeof(buffer), _("Game %i, Win the match with %i wins in a row. ").c_str(), gamesPlayed,mNbGames);
                     f2->DrawString(buffer ,30, 250);
                     break;
 
@@ -3291,7 +3300,7 @@ void Tournament::renderScoreTable()
             case TOURNAMENTMODES_ENDLESS:
                 x_score=80;
                 f2->DrawString(_("Endless demo mode").c_str() ,330, y2);
-                sprintf(buffer, _("%i matches played.").c_str(),scoreMatchesPlayed-1);
+                snprintf(buffer, sizeof(buffer), _("%i matches played.").c_str(),scoreMatchesPlayed-1);
                 y2+=20;
                 f2->DrawString(buffer ,330, y2);
                 break;
@@ -3300,7 +3309,7 @@ void Tournament::renderScoreTable()
                 //f2->DrawString(_("Gauntletmode").c_str() ,380, y2);
                 f2->DrawString(_("Tournament:").c_str() ,330, y2);
                 y2+=20;
-                sprintf(buffer,_("Gauntlet (%i matches left)").c_str(),scoreMatchesToPlay);
+                snprintf(buffer, sizeof(buffer), _("Gauntlet (%i matches left)").c_str(),scoreMatchesToPlay);
                 f2->DrawString(buffer ,330, y2);
                 break;
             case TOURNAMENTMODES_KO:

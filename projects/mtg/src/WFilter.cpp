@@ -576,9 +576,7 @@ bool WCFilterType::isMatch(MTGCard * c)
 
 string WCFilterType::getCode()
 {
-    char buf[4068];
-    sprintf(buf, "type:%s;", type.c_str());
-    return buf;
+    return "type:" + type + ";"; //#W54-J (L25): no fixed buffer
 }
 
 //Misc. filter code
@@ -598,30 +596,22 @@ float WCFilterOR::filterFee()
 
 string WCFilterNOT::getCode()
 {
-    char buf[4068];
-    sprintf(buf, "{%s}", kid->getCode().c_str());
-    return buf;
+    return "{" + kid->getCode() + "}"; //#W54-J (L25)
 }
 
 string WCFilterGROUP::getCode()
 {
-    char buf[4068];
-    sprintf(buf, "(%s)", kid->getCode().c_str());
-    return buf;
+    return "(" + kid->getCode() + ")"; //#W54-J (L25)
 }
 
 string WCFilterAND::getCode()
 {
-    char buf[4068];
-    sprintf(buf, "%s&%s", lhs->getCode().c_str(), rhs->getCode().c_str());
-    return buf;
+    return lhs->getCode() + "&" + rhs->getCode(); //#W54-J (L25)
 }
 
 string WCFilterOR::getCode()
 {
-    char buf[4068];
-    sprintf(buf, "%s|%s", lhs->getCode().c_str(), rhs->getCode().c_str());
-    return buf;
+    return lhs->getCode() + "|" + rhs->getCode(); //#W54-J (L25)
 }
 
 bool WCFilterOR::isMatch(MTGCard *c)

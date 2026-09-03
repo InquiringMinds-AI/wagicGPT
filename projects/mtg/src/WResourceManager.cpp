@@ -263,14 +263,11 @@ JQuadPtr ResourceManagerImpl::RetrieveCard(MTGCard * card, int style, int submod
 
     submode = submode | TEXTURE_SUB_CARD;
 
-    //static std::ostringstream filename;
-    //filename.str("");
-    string filename;
-    filename.reserve(4096);
-    //filename << setlist[card->setId] << "/" << card->getImageName();
-    filename.append(setlist[card->setId]);
-    filename.append("/");
-    filename.append(card->getImageName());
+    //#W54-J (A5): no 4 KB reserve per call - this is the per-card per-frame
+    //path; the name is "<set>/<id>.jpg", well inside a short string.
+    string filename = setlist[card->setId];
+    filename += '/';
+    filename += card->getImageName();
     int id = card->getMTGId();
 
     //Aliases.
@@ -322,19 +319,16 @@ JQuadPtr ResourceManagerImpl::RetrieveCardToken(MTGCard * card, int style, int s
 
     submode = submode | TEXTURE_SUB_CARD;
 
-    //static std::ostringstream filename;
-    //filename.str("");
-    string filename;
-    filename.reserve(4096);
-    //filename << setlist[card->setId] << "/" << card->getImageName();
-    filename.append(setlist[card->setId]);
-    filename.append("/");
+    //#W54-J (A5): same as RetrieveCard - stack-formatted name, no reserve,
+    //no ostringstream. The token image is "<set>/-<id>t.jpg" (id negative).
     int id = -card->getMTGId();
     if(tId)
         id = -tId;
-    ostringstream imagename;
-    imagename << "-" << id << "t.jpg";
-    filename.append(imagename.str());
+    char imagename[32];
+    snprintf(imagename, sizeof(imagename), "-%dt.jpg", id);
+    string filename = setlist[card->setId];
+    filename += '/';
+    filename += imagename;
 
     //Aliases.
     if (style == RETRIEVE_THUMB)
@@ -434,13 +428,13 @@ JQuadPtr ResourceManagerImpl::RetrieveTempQuad(const string& filename, int submo
     return RetrieveQuad(filename, 0, 0, 0, 0, "temporary", RETRIEVE_NORMAL, submode);
 }
 
-JQuadPtr ResourceManagerImpl::RetrieveQuad(const string& filename, float offX, float offY, float width, float height, string resname,
+JQuadPtr ResourceManagerImpl::RetrieveQuad(const string& filename, float offX, float offY, float width, float height, const string& resnameIn,
     int style, int submode, int id)
 {
     //Lookup managed resources, but only with a real resname.
-    if (resname.size() && (style == RETRIEVE_MANAGE || style == RETRIEVE_RESOURCE))
+    if (resnameIn.size() && (style == RETRIEVE_MANAGE || style == RETRIEVE_RESOURCE))
     {
-       JQuadPtr quad = GetQuad(resname);
+       JQuadPtr quad = GetQuad(resnameIn);
         if (quad.get() || style == RETRIEVE_RESOURCE) return quad;
     }
 
@@ -451,8 +445,9 @@ JQuadPtr ResourceManagerImpl::RetrieveQuad(const string& filename, float offX, f
         style = RETRIEVE_NORMAL;
     }
 
-    //Resname defaults to filename.
-    if (!resname.size()) resname = filename;
+    //Resname defaults to filename. #W54-J (A5): taken by reference - no
+    //per-call copy of the card path on the per-frame path.
+    const string& resname = resnameIn.size() ? resnameIn : filename;
 
     //No quad, but we have a managed texture for this!
     WCachedTexture* jtex = textureWCache.Retrieve(id, filename, style, submode);
@@ -521,6 +516,14 @@ void ResourceManagerImpl::ClearUnlocked()
     textureWCache.ClearUnlocked();
     sampleWCache.ClearUnlocked();
     psiWCache.ClearUnlocked();
+    //#W54-J (A42): the strike ledger is process-lifetime while the NULL
+    //tombstones it feeds are erased right here - reset it with them so it is
+    //bounded by one screen's misses, not the session's.
+    {
+        boost::mutex::scoped_lock lock(sCacheMutex);
+        sMissCounts.clear();
+        sMissTime.clear();
+    }
 }
 
 //WAGIC_MEMPROBE telemetry (see WResourceManager.h). Cheap counter reads only.

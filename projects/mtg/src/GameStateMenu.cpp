@@ -162,6 +162,7 @@ void GameStateMenu::Destroy()
     SAFE_DELETE(subMenuController);
     SAFE_DELETE(gameTypeMenu);
     WResourceManager::Instance()->Release(bgTexture);
+    bgTexture = NULL; //#W54-J (L24)
     SAFE_DELETE(scroller);
 }
 
@@ -360,6 +361,7 @@ void GameStateMenu::End()
     JRenderer::GetInstance()->EnableVSync(false);
 
     WResourceManager::Instance()->Release(bgTexture);
+    bgTexture = NULL; //#W54-J (L24): the destructor releases it again otherwise
     SAFE_DELETE(mGuiController);
 }
 
@@ -513,7 +515,7 @@ void GameStateMenu::ensureMGuiController()
             jq->mHeight = 32.f;
             jq->SetColor(ARGB(abs(255),255,255,255));
             mFont = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
-            vector<ModRulesOtherMenuItem *>otherItems = gModRules.menu.other;
+            const vector<ModRulesOtherMenuItem *>& otherItems = gModRules.menu.other; //#W54-J (L27)
             if (otherItems.size()) {
                 mGuiController->Add(NEW OtherMenuItem(
                                        otherItems[0]->mActionId,
@@ -734,7 +736,7 @@ void GameStateMenu::Update(float dt)
                 mGuiController->Update(dt);
 
             //Hook for Top Menu actions
-            vector<ModRulesOtherMenuItem *>items = gModRules.menu.other;
+            const vector<ModRulesOtherMenuItem *>& items = gModRules.menu.other; //#W54-J (L27): per Update
             for (size_t i = 0; i < items.size(); ++i)
             {
                 if (mEngine->GetButtonState(items[i]->mKey) && items[i]->getMatchingGameState())
@@ -861,7 +863,7 @@ void GameStateMenu::RenderTopMenu()
     float rightTextPos = SCREEN_WIDTH - 10;
     JRenderer * renderer = JRenderer::GetInstance();
 
-    vector<ModRulesOtherMenuItem *>items = gModRules.menu.other;
+    const vector<ModRulesOtherMenuItem *>& items = gModRules.menu.other; //#W54-J (L27): per Render
     for (size_t i = 0; i < items.size(); ++i)
     {
         switch(items[i]->mKey)

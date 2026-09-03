@@ -923,15 +923,18 @@ string ShopBooster::getSort()
 ;
 string ShopBooster::getName()
 {
+    //#W54-J (L25): the buffer was returned uninitialised when neither set was
+    //present; bounded and blank-initialised now.
     char buffer[512];
+    buffer[0] = 0;
     if (!mainSet && pack)
         return pack->getName();
     if (altSet == mainSet)
         altSet = NULL;
     if (altSet)
-        sprintf(buffer, _("%s & %s (15 Cards)").c_str(), mainSet->id.c_str(), altSet->id.c_str());
+        snprintf(buffer, sizeof(buffer), _("%s & %s (15 Cards)").c_str(), mainSet->id.c_str(), altSet->id.c_str());
     else if (mainSet)
-        sprintf(buffer, _("%s Booster (15 Cards)").c_str(), mainSet->id.c_str());
+        snprintf(buffer, sizeof(buffer), _("%s Booster (15 Cards)").c_str(), mainSet->id.c_str());
     return buffer;
 }
 

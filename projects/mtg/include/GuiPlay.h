@@ -78,6 +78,11 @@ protected:
     iterator end_spells;
 
     vector<CardView*> cards;
+    //#W54-J (A25): set by every game event that reaches this layer (the old
+    //unconditional trailing Replace() kept the same coverage); consumed by
+    //relayoutIfDirty() at most once per Update and once per Render.
+    bool mLayoutDirty;
+    void relayoutIfDirty();
 
 public:
     int wave;

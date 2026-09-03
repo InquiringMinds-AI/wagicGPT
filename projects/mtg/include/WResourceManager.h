@@ -74,6 +74,10 @@ public:
 
     virtual bool IsThreaded() = 0;
     void PlaySample(const string& fileName) {
+        //#W54-J (A42): a card with no sample resolves to "" - that used to
+        //open the sfx DIRECTORY as a file, fail, and log a blank-name
+        //"Destroying WCachedResource" on every cast (143 per 15 games).
+        if (fileName.empty()) return;
         JSample*sample = RetrieveSample(fileName);
         if(sample) {
             JSoundSystem::GetInstance()->PlaySample(sample);            
@@ -83,7 +87,7 @@ public:
     virtual JQuadPtr RetrieveCardToken(MTGCard * card, int style = RETRIEVE_NORMAL,int submode = CACHE_NORMAL, int tId = 0) = 0;
     virtual JSample * RetrieveSample(const string& filename, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL) = 0;
     virtual JTexture * RetrieveTexture(const string& filename, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL) = 0;
-    virtual JQuadPtr RetrieveQuad(const string& filename, float offX=0.0f, float offY=0.0f, float width=0.0f, float height=0.0f,  string resname="",  int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL, int id = 0) = 0;
+    virtual JQuadPtr RetrieveQuad(const string& filename, float offX=0.0f, float offY=0.0f, float width=0.0f, float height=0.0f,  const string& resname="",  int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL, int id = 0) = 0;
     virtual JQuadPtr RetrieveTempQuad(const string& filename, int submode = CACHE_NORMAL) = 0;
     virtual hgeParticleSystemInfo * RetrievePSI(const string& filename, JQuad * texture, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL) = 0;
     virtual int RetrieveError() = 0;

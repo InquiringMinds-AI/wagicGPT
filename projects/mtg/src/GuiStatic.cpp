@@ -236,8 +236,11 @@ void GuiGameZone::Render()
     //alpha, so the test is "below one alpha step", never "exactly zero".
     if (actA < 1.0f && !mHasFocus && !showCards && cards.empty())
         return;
-    bool showtop = (zone && zone->owner->game->battlefield->nb_cards && zone->owner->game->battlefield->hasAbility(Constants::SHOWFROMTOPLIBRARY))?true:false;
-    bool showopponenttop = (zone && zone->owner->opponent()->game->battlefield->nb_cards && zone->owner->opponent()->game->battlefield->hasAbility(Constants::SHOWOPPONENTTOPLIBRARY))?true:false;
+    //#W54-J (L23): only the library widget reads these (the top-card peek
+    //below is gated on GUI_LIBRARY); the other zone types skip both scans.
+    const bool isLibrary = (type == GUI_LIBRARY);
+    bool showtop = (isLibrary && zone && zone->owner->game->battlefield->nb_cards && zone->owner->game->battlefield->hasAbility(Constants::SHOWFROMTOPLIBRARY))?true:false;
+    bool showopponenttop = (isLibrary && zone && zone->owner->opponent()->game->battlefield->nb_cards && zone->owner->opponent()->game->battlefield->hasAbility(Constants::SHOWOPPONENTTOPLIBRARY))?true:false;
 
     quad->SetColor(ARGB((int)(actA),255,255,255));
     if(type == GUI_EXILE || type == GUI_COMMANDZONE || type == GUI_SIDEBOARD)

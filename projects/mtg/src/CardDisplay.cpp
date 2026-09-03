@@ -81,7 +81,8 @@ void CardDisplay::Update(float dt)
 
     if (zone)
     {//invert display so the top will always be the first one to show
-        vector<MTGCardInstance*> newCD (zone->cards.rbegin(), zone->cards.rend());
+        //#W54-J (L26): index the zone from the back instead of copying the
+        //whole vector every frame the display is open.
         int size = zone->cards.size();
         for (int i = start_item; i < start_item + nb_displayed_items && i < (int)(mObjects.size()); i++)
         {
@@ -91,7 +92,7 @@ void CardDisplay::Update(float dt)
                 break;
             }
             CardGui * cardg = (CardGui *) mObjects[i];
-            if (cardg->card != newCD[i]) update = true;
+            if (cardg->card != zone->cards[size - 1 - i]) update = true;
         }
     }
     PlayGuiObjectController::Update(dt);

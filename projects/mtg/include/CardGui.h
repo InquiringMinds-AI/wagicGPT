@@ -24,6 +24,16 @@ namespace DrawMode
     const int kNumDrawModes = 3;
 }
 
+//==== audit-J (W54-J) ====
+//"Was it me?" switch for every render-path cache this lane added (the HUD
+//quad statics and resolved type ids in CardGui.cpp, the lazy battlefield
+//relayout in GuiPlay.cpp): compile with -DWAGIC_RENDER_NOCACHE, or in a
+//development build (_DEBUG / WAGIC_DEVLOGS) set env WAGIC_RENDER_NOCACHE=1.
+//Either routes every lookup back through the original string-keyed path and
+//every event back to an eager Replace().
+bool wagicRenderCacheOff();
+//==== end audit-J ====
+
 struct CardGui: public PlayGuiObject
 {
 protected:
