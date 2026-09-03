@@ -84,6 +84,26 @@ string exileCastRegister(Player * seat);
 string ownCardChooserRegister(GameObserver * observer, Player * seat);
 
 //The register form of one zone change (pure; PARSETEST-covered).
+//#W57-H (D43): the game-log window's ask classes and arms. Declared here (not
+//beside their functions in the .cpp) because AIPlayerGPT's constructor and its
+//translog writer both sit above the window block in that file.
+enum GptAskWindowKind
+{
+    kAskWindowUnknown = 0,      //unclassified: keeps the full log under `kind`
+    kAskWindowLandDrop,
+    kAskWindowCleanupDiscard,
+    kAskWindowEmptyStackPass,
+    kAskWindowDisplayMenu,
+    kAskWindowCast,
+    kAskWindowCombat,
+    kAskWindowTargetOrReveal,
+    kAskWindowPregame           //never windowed: the pregame frame is hand-only
+};
+enum GptLogWindowMode { kLogWindowFull = 0, kLogWindowByKind = 1, kLogWindowEveryKind = 2 };
+const int kLogWindowDefaultTurns = 3;
+const int kLogWindowMaxTurns = 999;
+const char * askWindowKindName(int kind);
+
 string zoneChangeNarration(bool mine, const string& cardName, const string& from,
                            const string& to, bool isCreature, bool isLand,
                            bool countered, const string& counterSource,
@@ -462,6 +482,13 @@ private:
     //#W43-11: the raw (pre-collapse) narration write. Everything appendNarration
     //did before the run buffer was put in front of it.
     void writeNarration(const string& line);
+    //#W57-H (D43): the game-log window (WAGIC_GPT_LOGWINDOW). Default OFF -
+    //logWindowApply then returns the narration unchanged. See the pure block
+    //above assemblePrompt in the .cpp for the whole design.
+    void logWindowSetting(int& mode, int& turns);
+    bool logWindowStackRespondable();
+    string logWindowApply(const string& narration, int * elidedTurns);
+    string logWindowLabel();
     //#W43-11: narrate a day/night transition, once, when it actually changes.
     void noteDesignationChange();
     //#W50-X D14: narrate a permanent's chosen name once it is known.
@@ -842,6 +869,12 @@ private:
     //append-only game narration: every noteworthy event plus the model's
     //own consumed decisions, as if narrating the game (bounded, tail kept)
     string mNarration;
+    //#W57-H (D43): the ask class of the window currently being assembled (a
+    //GptAskWindowKind), set by each seam before it calls assemblePrompt, and
+    //the number of turns that window's log elided (0 = none, and 0 whenever
+    //the lever is off). Both ride the translog record.
+    int mLogWindowKind;
+    int mLogWindowElided;
     //Phase changes are narrated LAZILY: a phase change only updates this
     //marker (overwriting the last one), and the marker joins the narration
     //when a real event or decision lands in that phase - phases in which
