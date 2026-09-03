@@ -3359,17 +3359,27 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             bool maxiFound = false;
             bool compareZone = false;
 
+            //#W54-H (L13): `>=N` / `<=N` were read as atoi("=N") = 0, which turned
+            //Isleback Spawn's `<=20 compare` into "fewer than 0" - never active.
+            //The bounds below are strict (size > mini / size < maxi), so the
+            //inclusive forms widen by one.
             found = s.find(" >");
             if (found != string::npos)
             {
-                mini = atoi(s.substr(found + 2, 3).c_str());
+                if (found + 2 < s.size() && s[found + 2] == '=')
+                    mini = atoi(s.substr(found + 3, 3).c_str()) - 1;
+                else
+                    mini = atoi(s.substr(found + 2, 3).c_str());
                 miniFound = true;
             }
 
             found = s.find(" <");
             if (found != string::npos)
             {
-                maxi = atoi(s.substr(found + 2, 3).c_str());
+                if (found + 2 < s.size() && s[found + 2] == '=')
+                    maxi = atoi(s.substr(found + 3, 3).c_str()) + 1;
+                else
+                    maxi = atoi(s.substr(found + 2, 3).c_str());
                 maxiFound = true;
             }
             

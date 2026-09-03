@@ -3685,17 +3685,22 @@ public:
         }
     }
 
+    //#W54-H (L13): per player, SUM the matches across every zone the chooser
+    //can target. The old loop overwrote Value per zone, so `compare` only ever
+    //counted the LAST zone in the list (the sideboard) - a correctness bug
+    //hiding as dead work. Reset per player: the counts must not accumulate
+    //from player 0 into player 1.
     void findMatchingAmount()
     {
-        int Value = 0;
         for (int i = 0; i < 2; i++)
         {
+            int Value = 0;
             Player * p = game->players[i];
             MTGGameZone * zones[] = { p->game->inPlay, p->game->graveyard, p->game->hand, p->game->library, p->game->exile, p->game->commandzone, p->game->sideboard };
             for (int k = 0; k < 7; k++)
             {
                 MTGGameZone * zone = zones[k];
-                Value = zone->countByCanTarget(tc);
+                Value += zone->countByCanTarget(tc);
             }
             amount[i] = Value;
         }
