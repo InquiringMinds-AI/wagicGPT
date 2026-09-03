@@ -2446,7 +2446,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     vector<string> splitRevealx = parseBetween(s, "reveal:", " revealend", false);
-#ifndef PSP
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) //#W54-G (A33): dev-only probe
     if (splitRevealx.size() && getenv("WAGIC_MAYPROBE"))
         fprintf(stderr, "STASHGATE abil=%d trans=%d storedEmpty=%d | %.70s\n",
                 (int)abilfound.size(), (int)transfound.size(), (int)storedAbilityString.empty(), s.c_str());
@@ -2732,6 +2732,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     {
         TargetChooserFactory tcf(observer);
         tc = tcf.createTargetChooser(splitTarget[1], card);
+        if (!tc)
+            return NULL; //#W54-G (A28): a malformed target(...) is a loud reject, not a crash (the 'protection from(' twin already does this)
         tcString = splitTarget[1];
 
         if (!isTarget)
@@ -3739,6 +3741,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     if (found != string::npos)
     {
         MTGAbility * toGrant = parseMagicLine(storedAbilityString, id, spell, card);
+        if (!toGrant)
+            return NULL; //#W54-G (A28): an empty stash gave AGrantWrapper(NULL), which AGrant::getMenuText derefs
         MTGAbility * a = NEW AGrantWrapper(observer, id, card, target,toGrant);
         a->oneShot = 1;
         return a;
@@ -3879,7 +3883,12 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             MTGCard * safetycard = MTGCollection()->getCardById(tokenId);
             if (!safetycard) //Error, card not foudn in DB
+
+            {
+                SAFE_DELETE(multiplier); //#W54-G (A31): the error creator takes no multiplier
                 return NEW ATokenCreator(observer, id, creator, target, NULL, "ID NOT FOUND", "ERROR ID", 0, 0, "", "", NULL, 0);
+
+            }
 
             ATokenCreator * tok = NEW ATokenCreator(observer, id, creator, target, NULL, tokenId, starfound, multiplier, who);
             tok->oneShot = 1;
@@ -3996,7 +4005,12 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             MTGCard * mysafetycard = MTGCollection()->getCardById(mytokenId);
             if (!mysafetycard) //Error, card not foudn in DB
+
+            {
+                SAFE_DELETE(multiplier); //#W54-G (A31): the error creator takes no multiplier
                 return NEW ATokenCreator(observer, id, creator, target, NULL, "ID NOT FOUND", "ERROR ID", 0, 0, "", "", NULL, 0);
+
+            }
 
             ATokenCreator * mtok = NEW ATokenCreator(observer, id, creator, target, NULL, mytokenId, myMultiplierfound, multiplier, who);
             mtok->oneShot = 1;
@@ -4489,8 +4503,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             vector<string> splitCastKicked = parseBetween(splitCastCard[1], "kicked!:", ":!");
             if(splitCastKicked.size())
             {
-                WParsedInt * val = NEW WParsedInt(splitCastKicked[1], NULL, card);
-                kicked = val->getValue();
+                WParsedInt val(splitCastKicked[1], NULL, card); //#W54-G (A31): stack, was leaked per parse
+                kicked = val.getValue();
             }
         }
         int costx = 0;
@@ -4499,8 +4513,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             vector<string> splitCastCostX = parseBetween(splitCastCard[1], "costx!:", ":!");
             if(splitCastCostX.size())
             {
-                WParsedInt * val = NEW WParsedInt(splitCastCostX[1], NULL, card);
-                costx = val->getValue();
+                WParsedInt val(splitCastCostX[1], NULL, card); //#W54-G (A31): stack, was leaked per parse
+                costx = val.getValue();
             }
         }
         MTGAbility *a = NEW AACastCard(observer, id, card, target, withRestrictions, asCopy, asNormal, nameCard, newName, sendNoEvent, putinplay, asNormalMadness, alternative, kicked, costx, flipped, flashback);
@@ -4775,36 +4789,31 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     //alter mutation counter on target card with trigger activation
+    //#W54-G (A28): these three mutated the card during PARSE (an AI dry-run
+    //parse changed game state) and the last two indexed a different, empty
+    //vector. They are abilities now - see AAAlterMutationCounter.
     vector<string> splitMutated = parseBetween(s, "altermutationcounter:", " ", false);
     if (splitMutated.size())
     {
-        WParsedInt* parser = NEW WParsedInt(splitMutated[1], card);
-        if(parser){
-            card->mutation += parser->intValue;
-            SAFE_DELETE(parser);
-        }
-        WEvent * e = NEW WEventCardMutated(card);
-        card->getObserver()->receiveEvent(e);
+        MTGAbility * a = NEW AAAlterMutationCounter(observer, id, card, splitMutated[1], true);
+        a->oneShot = 1;
+        return a;
     }
 
     //set mutation counter on source card with no trigger activation
     vector<string> splitMutatedOver = parseBetween(s, "mutationover:", " ", false);
     if (splitMutatedOver.size())
     {
-        WParsedInt* parser = NEW WParsedInt(splitMutated[1], card);
-        if(parser){
-            card->mutation += parser->intValue;
-            SAFE_DELETE(parser);
-        }
+        MTGAbility * a = NEW AAAlterMutationCounter(observer, id, card, splitMutatedOver[1], false);
+        a->oneShot = 1;
+        return a;
     }
     vector<string> splitMutatedUnder = parseBetween(s, "mutationunder:", " ", false);
     if (splitMutatedUnder.size())
     {
-        WParsedInt* parser = NEW WParsedInt(splitMutated[1], card);
-        if(parser){
-            card->mutation += parser->intValue;
-            SAFE_DELETE(parser);
-        }
+        MTGAbility * a = NEW AAAlterMutationCounter(observer, id, card, splitMutatedUnder[1], false);
+        a->oneShot = 1;
+        return a;
     }
 
     //perform boast
@@ -5145,6 +5154,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             TargetChooserFactory tcf(observer);
             TargetChooser * castTargets = tcf.createTargetChooser(splitCast[1], card);
+            if (!castTargets)
+                return NULL; //#W54-G (A28)
 
             vector<string> splitValue = parseBetween(splitCast[2], "", " ", false);
             if (!splitValue.size())
@@ -7722,20 +7733,11 @@ MTGAbility * AbilityFactory::getManaReduxAbility(string s, int id, Spell *, MTGC
     return NEW AAlterCost(observer, id, card, target, amount, color);
 }
 
-#ifdef PSP
-vector<void*> MTGAbility::deletedpointers;
-#else
-thread_local vector<void*> MTGAbility::deletedpointers;
-#endif
-
 MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
 {
     mRegistryCard = NULL; //a clone is not the registered ability
     //Todo get rid of menuText, it is only used as a placeholder in getMenuText, for something that could be a string
-    for (int i = 0; i < 50; ++i)
-    {
-        menuText[i] = a.menuText[i];
-    }
+    memcpy(menuText, a.menuText, sizeof(menuText)); //#W54-G (L13): the whole [256], not 50
 
     game = a.game;
 
@@ -9076,7 +9078,7 @@ GenericTriggeredAbility* GenericTriggeredAbility::clone() const
     GenericTriggeredAbility * a =  NEW GenericTriggeredAbility(*this);
     a->t = t->clone();
     a->ability = ability->clone();
-    a->destroyCondition = destroyCondition->clone();
+    a->destroyCondition = destroyCondition ? destroyCondition->clone() : NULL; //#W54-G (A14): parseMagicLine always passes dc = NULL
     return a;
 }
 

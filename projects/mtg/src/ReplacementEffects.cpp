@@ -167,22 +167,41 @@ WEvent * REDrawReplacement::replace(WEvent *event)
     }
 
     
+    //#W54-G (A8/A31): (1) a one-shot clone was resolved and dropped; (2) the
+    //same `selection` pointers were handed to one MenuAbility PER replaced
+    //card - each menu deletes its abilities, so two draws double-freed them;
+    //(3) a selection nobody consumed leaked. Every menu after the first gets
+    //its own clones; an unconsumed selection is freed.
+    bool selectionConsumed = false;
     for(int j = 0; j < e->nb_cards; j++)
     {
         if(e->player != DrawerOfCard || selection.size() < 2)
         {
             MTGAbility * toResolve = replacementAbility->clone();
             if(replacementAbility->oneShot)
+            {
                 toResolve->resolve();
+                SAFE_DELETE(toResolve);
+            }
             else
                 toResolve->addToGame();
         }
         else
         {
-            MTGAbility * menuChoice = NEW MenuAbility(game, 1, source->source, source->source,true,selection,NULL,"Choose Draw Replacement");
+            vector<MTGAbility*> menuSelection;
+            if (!selectionConsumed)
+                menuSelection = selection;
+            else
+                for (size_t k = 0; k < selection.size(); ++k)
+                    menuSelection.push_back(selection[k]->clone());
+            selectionConsumed = true;
+            MTGAbility * menuChoice = NEW MenuAbility(game, 1, source->source, source->source,true,menuSelection,NULL,"Choose Draw Replacement");
             menuChoice->addToGame();
         }
     }
+    if (!selectionConsumed)
+        for (size_t k = 0; k < selection.size(); ++k)
+            SAFE_DELETE(selection[k]);
 
     delete event;
     event = NULL;

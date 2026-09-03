@@ -92,6 +92,7 @@ int ExtraCost::setPayment(MTGCardInstance * card)
 ExtraManaCost * ExtraManaCost::clone() const
 {
     ExtraManaCost * ec = NEW ExtraManaCost(*this);
+    ec->costToPay = costToPay ? NEW ManaCost(costToPay) : NULL; //#W54-G (A52): ~ExtraCost deletes it; the copy aliased it
     return ec;
 }
 
@@ -144,6 +145,17 @@ ExtraCost("Snow Mana")
 {
 }
 
+//#W54-G (A12): parseManaCost returns a NEW ManaCost that the old inline
+//canAfford(parseManaCost(...)) calls dropped - 7 per isPaymentSet poll and up
+//to 7 per doPay, the top LSan root in three audit runs.
+static int snowPoolCanAfford(MTGCardInstance * source, const char * costStr)
+{
+    ManaCost * probe = ManaCost::parseManaCost(costStr, NULL, source);
+    int r = source->controller()->getManaPool()->canAfford(probe, source->has(Constants::ANYTYPEOFMANAABILITY));
+    SAFE_DELETE(probe);
+    return r;
+}
+
 int SnowCost::isPaymentSet()
 {
     if (source->controller()->getManaPool()->getConvertedCost())
@@ -157,13 +169,13 @@ int SnowCost::isPaymentSet()
         result += source->controller()->snowManaC;
         if (result)
         {
-            if ((source->controller()->snowManaC && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{1}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaG && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{g}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaU && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{u}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaR && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{r}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaB && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{b}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaW && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{w}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))) ||
-               (source->controller()->snowManaC && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{c}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY))))
+            if ((source->controller()->snowManaC && snowPoolCanAfford(source, "{1}")) ||
+               (source->controller()->snowManaG && snowPoolCanAfford(source, "{g}")) ||
+               (source->controller()->snowManaU && snowPoolCanAfford(source, "{u}")) ||
+               (source->controller()->snowManaR && snowPoolCanAfford(source, "{r}")) ||
+               (source->controller()->snowManaB && snowPoolCanAfford(source, "{b}")) ||
+               (source->controller()->snowManaW && snowPoolCanAfford(source, "{w}")) ||
+               (source->controller()->snowManaC && snowPoolCanAfford(source, "{c}")))
                 return 1;
             else
                 return 0;
@@ -191,37 +203,37 @@ int SnowCost::doPay()
         if (result)
         {
             // Avoided double payments for Snow Mana cost
-            if (source->controller()->snowManaC && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{1}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            if (source->controller()->snowManaC && snowPoolCanAfford(source, "{1}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{1}",NULL,source));
                 source->controller()->snowManaC -= 1;
             }
-            else if (source->controller()->snowManaG && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{g}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaG && snowPoolCanAfford(source, "{g}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{g}",NULL,source));
                 source->controller()->snowManaG -= 1;
             }
-            else if (source->controller()->snowManaU && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{u}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaU && snowPoolCanAfford(source, "{u}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{u}",NULL,source));
                 source->controller()->snowManaU -= 1;
             }
-            else if (source->controller()->snowManaR && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{r}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaR && snowPoolCanAfford(source, "{r}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{r}",NULL,source));
                 source->controller()->snowManaR -= 1;
             }
-            else if (source->controller()->snowManaB && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{b}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaB && snowPoolCanAfford(source, "{b}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{b}",NULL,source));
                 source->controller()->snowManaB -= 1;
             }
-            else if (source->controller()->snowManaW && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{w}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaW && snowPoolCanAfford(source, "{w}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{w}",NULL,source));
                 source->controller()->snowManaW -= 1;
             }
-            else if (source->controller()->snowManaC && source->controller()->getManaPool()->canAfford(ManaCost::parseManaCost("{c}",NULL,source),source->has(Constants::ANYTYPEOFMANAABILITY)))
+            else if (source->controller()->snowManaC && snowPoolCanAfford(source, "{c}"))
             {
                 //source->controller()->getManaPool()->pay(ManaCost::parseManaCost("{c}",NULL,source));
                 source->controller()->snowManaC -= 1;
@@ -1568,14 +1580,14 @@ int Offering::canPay()
         if (target)
         {
             ManaCost * diff = source->getManaCost()->Diff(target->getManaCost());
-            if (target && (!source->controller()->getManaPool()->canAfford(source->getManaCost()->Diff(target->getManaCost()),source->has(Constants::ANYTYPEOFMANAABILITY))))
+            if (target && (!source->controller()->getManaPool()->canAfford(diff,source->has(Constants::ANYTYPEOFMANAABILITY))))
             {
                 SAFE_DELETE(diff);
                 tc->removeTarget(target);
                 target = NULL;
                 return 0;
             }
-            if (target && (source->controller()->getManaPool()->canAfford(source->getManaCost()->Diff(target->getManaCost()),source->has(Constants::ANYTYPEOFMANAABILITY))))
+            if (target && (source->controller()->getManaPool()->canAfford(diff,source->has(Constants::ANYTYPEOFMANAABILITY))))
             {
                 SAFE_DELETE(diff);
                 return 1;

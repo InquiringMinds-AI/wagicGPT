@@ -79,10 +79,13 @@ int GenericRevealAbility::resolve()
             a3->addToGame();
             return 1;
         }
-        a3->oneShot = 1;
-        a3->canBeInterrupted = false;
-        a3->resolve();
-        SAFE_DELETE(a3);
+        if (a3) //#W54-G (A28): a rejected aicode parse is not a crash
+        {
+            a3->oneShot = 1;
+            a3->canBeInterrupted = false;
+            a3->resolve();
+            SAFE_DELETE(a3);
+        }
         return 1;
     }
     MTGAbility * ability = NEW MTGRevealingCards(game, this->GetId(), source, howMany);
@@ -160,7 +163,7 @@ bool RevealDisplay::CheckUserInput(JButton key)
 
 //display card selector box of specified zone.
 MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardInstance * card, string coreAbility) :
-    MTGAbility(observer, _id, card), CardDisplay(_id, game, x, y, listener, NULL, nb_displayed_items)
+    MTGAbility(observer, _id, card), CardDisplay(_id, game, 0, 0, NULL, NULL, 7) //#W54-G (L14): were the base's own uninitialised members (init() overwrites them)
 
 {
     abilityToCast = NULL;
@@ -571,12 +574,14 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
             tc->forceTargetListReadyByPlayer = 1;
             //this is for when we have <upto:x> targets but only want to move Y targets, it allows us to
             //tell the targetchooser we are done.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) //#W54-G (A33): dev-only trace
             if (getenv("WAGIC_REVEAL_DEBUG"))
                 std::cerr << "[REVEAL] CheckUserInput NEXT: nbTargets=" << tc->getNbTargets()
                           << " abilitySecond=" << (void*) abilitySecond
                           << " -> " << ((!abilitySecond && !tc->getNbTargets() && tc->source)
                                         ? "DECLINE(all option-two)" : "FINALIZE(option-one picks)")
                           << std::endl;
+#endif
             if (!abilitySecond && !tc->getNbTargets() && tc->source)
             {//we selected nothing for the first ability.
                 tc->source->getObserver()->cardClick(tc->source, 0, false);
@@ -647,7 +652,11 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
 //that, finalize.
 //Env-gated tracing for the interactive-reveal async driver. Removed builds are
 //silent; set WAGIC_REVEAL_DEBUG=1 to follow the phase/target choreography.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) //#W54-G (A33): dev-only trace, compiled out of release
 #define REVEAL_DBG(x) do { if (getenv("WAGIC_REVEAL_DEBUG")) { std::cerr << "[REVEAL] " << x << std::endl; } } while (0)
+#else
+#define REVEAL_DBG(x) do { } while (0)
+#endif
 
 //TESTSUITE-only forced-async hook. The suite normally drives reveals with
 //scripted clicks (revealok/revealnext) and NEVER exercises the interactive-AI
@@ -1274,7 +1283,7 @@ int MTGRevealingCards::receiveEvent(WEvent* e)
 ///delayed changes the order, makes the ability fire after the 2nd reveal is finished.
 ///
 MTGScryCards::MTGScryCards(GameObserver* observer, int _id, MTGCardInstance * card, string coreAbility) :
-    MTGAbility(observer, _id, card), CardDisplay(_id, game, x, y, listener, NULL, nb_displayed_items)
+    MTGAbility(observer, _id, card), CardDisplay(_id, game, 0, 0, NULL, NULL, 7) //#W54-G (L14): were the base's own uninitialised members (init() overwrites them)
 
 {
     abilityToCast = NULL;
@@ -1502,7 +1511,8 @@ bool MTGScryCards::CheckUserInput(JButton key)
                     if (revealTopAmount == 0 && dontRevealAfter && delayed) // Execute delayed action even if dontshow option is active.
                     {
                         MTGAbility * delayedA = contructAbility(delayedAbilityString);
-                        if (delayedA->oneShot)
+                        if (!delayedA) {} //#W54-G (A28): rejected parse
+                        else if (delayedA->oneShot)
                         {
                             delayedA->resolve();
                             SAFE_DELETE(delayedA);
@@ -1541,7 +1551,8 @@ bool MTGScryCards::CheckUserInput(JButton key)
                 if(revealTopAmount == 0 && dontRevealAfter && delayed)
                 {
                     MTGAbility * delayedA = contructAbility(delayedAbilityString);
-                    if (delayedA->oneShot)
+                    if (!delayedA) {} //#W54-G (A28): rejected parse
+                    else if (delayedA->oneShot)
                     {
                         delayedA->resolve();
                         SAFE_DELETE(delayedA);
@@ -1571,7 +1582,8 @@ bool MTGScryCards::CheckUserInput(JButton key)
             if (delayed)
             {
                 MTGAbility * delayedA = contructAbility(delayedAbilityString);
-                if (delayedA->oneShot)
+                if (!delayedA) {} //#W54-G (A28): rejected parse
+                else if (delayedA->oneShot)
                 {
                     delayedA->resolve();
                     SAFE_DELETE(delayedA);
@@ -1648,10 +1660,13 @@ int GenericScryAbility::resolve()
         std::transform(abi.begin(), abi.end(), abi.begin(), ::tolower);//fix crash
         AbilityFactory af(game);
         MTGAbility * a3 = af.parseMagicLine(abi, this->GetId(), NULL, source);
-        a3->oneShot = 1;
-        a3->canBeInterrupted = false;
-        a3->resolve();
-        SAFE_DELETE(a3);
+        if (a3) //#W54-G (A28): a rejected aicode parse is not a crash
+        {
+            a3->oneShot = 1;
+            a3->canBeInterrupted = false;
+            a3->resolve();
+            SAFE_DELETE(a3);
+        }
     } else if(!replaceScry) {
         MTGAbility * ability = NEW MTGScryCards(game, this->GetId(), source, howMany);
         ability->addToGame();
@@ -1711,9 +1726,9 @@ int GenericActivatedAbility::resolve()
         source->X = diff->hasX();
         SAFE_DELETE(diff);
     }
-    ability->target = target; //may have been updated...
     if (ability)
     {
+        ability->target = target; //may have been updated... (#W54-G (L13): moved inside the check)
         //AACastCard works through Update ticks (it runs the whole cast flow
         //itself); plain resolve() is a silent no-op for it, which dropped
         //the free-cast leg of lord-granted mays (Mind's Dilation's
@@ -3060,7 +3075,6 @@ int AACopier::resolve()
         }
         if(source)
         {
-            source->GrantedAndAbility = andAbility;
             AbilityFactory af(game);
             //snapshot: removeObserver can free the ability, and ~MTGAbility
             //now erases its own slot from this very vector
@@ -3078,9 +3092,9 @@ int AACopier::resolve()
             for (size_t i = 0; i < currentAbilities.size(); ++i)
             {
                 MTGAbility * a = currentAbilities[i];
-                a->source = (MTGCardInstance *) source;
                 if (a)
                 {
+                    a->source = (MTGCardInstance *) source; //#W54-G (L13): was assigned before the NULL check
                     if (a->oneShot)
                     {
                         if(a->source->entersBattlefield)
@@ -3098,9 +3112,11 @@ int AACopier::resolve()
                     }
                 }
             }
-            if(source->GrantedAndAbility)
+            //#W54-G (L13): read the follow-up directly; it used to be parked in
+            //source->GrantedAndAbility, which dangled once this one-shot died
+            if(andAbility)
             {
-                MTGAbility * andAbilityClone = source->GrantedAndAbility->clone();
+                MTGAbility * andAbilityClone = andAbility->clone();
                 andAbilityClone->target = source;
                 if(andAbility->oneShot)
                 {
@@ -4284,6 +4300,8 @@ int AASetTypeChosen::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityToAlter, 0, NULL, _target);
+        if(!abilityAltered)
+            return 0; //#W54-G (A28): the colour twin already guards
         if(abilityAltered->oneShot)
         {
             abilityAltered->resolve();
@@ -4338,6 +4356,8 @@ int AASetNameChosen::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityToAlter, 0, NULL, _target);
+        if(!abilityAltered)
+            return 0; //#W54-G (A28): the colour twin already guards
         if(abilityAltered->oneShot)
         {
             abilityAltered->resolve();
@@ -4727,6 +4747,8 @@ int GenericPaidAbility::resolve()
     if (baseAbilityStrSplit.size() > 1)
     {
         baseAbility = Af.parseMagicLine(baseAbilityStrSplit[0], this->GetId(), NULL, source);
+        if (!baseAbility)
+            return 0; //#W54-G (A28)
         baseAbility->target = target;
         optionalCost =  ManaCost::parseManaCost(baseCost, NULL, source);
 
@@ -4745,6 +4767,12 @@ int GenericPaidAbility::resolve()
         SAFE_DELETE(baseAbility);
 
         baseAbility = Af.parseMagicLine(baseAbilityStrSplit[1], this->GetId(), NULL, source);
+        if (!baseAbility) //#W54-G (A28)
+        {
+            for (size_t k = 0; k < selection.size(); ++k)
+                SAFE_DELETE(selection[k]);
+            return 0;
+        }
         baseAbility->target = target;
         set = baseAbility->clone();
         set->oneShot = true;
@@ -4757,6 +4785,8 @@ int GenericPaidAbility::resolve()
         //not fixing this since its been heavily modified from the orginal implementation.
         nomenu = true;
         baseAbility = Af.parseMagicLine(baseAbilityStrSplit[0], this->GetId(), NULL, source);
+        if (!baseAbility)
+            return 0; //#W54-G (A28)
         baseAbility->target = target;
         optionalCost =  ManaCost::parseManaCost(baseCost, NULL, source);
         MTGAbility * set = baseAbility->clone();
@@ -4791,7 +4821,12 @@ int GenericPaidAbility::resolve()
             }
         }
         if(asAlternate && nomenu && optionalCost->getConvertedCost() < 1)
+        {
             nomenuAbility->resolve();
+            //#W54-G (A31): no menu opened, so nothing took ownership of the selection
+            for (size_t k = 0; k < selection.size(); ++k)
+                SAFE_DELETE(selection[k]);
+        }
         else
         {
             MenuAbility * a1 = NEW MenuAbility(game, this->GetId(), target, source, must, selection, NULL, newName);
@@ -4800,6 +4835,7 @@ int GenericPaidAbility::resolve()
             a1->resolve();
         }
     }
+    SAFE_DELETE(nomenuAbility); //#W54-G (A31): a clone only the no-menu branch consumes; leaked otherwise
     return 1;
 }
 
@@ -5725,7 +5761,8 @@ int AAMorph::resolve()
         for (size_t i = 0; i < currentAbilities.size(); ++i)
         {
             MTGAbility * a = currentAbilities[i];
-            a->source = (MTGCardInstance *) _target;
+            if (a) //#W54-G (L13): was assigned before the NULL checks below
+                a->source = (MTGCardInstance *) _target;
             //W53-TRICKSTER (owner Vita report 2026-08-28: Coral Trickster
             //bordered usable while face up, its only ability being morph).
             //The re-parse of the face-up card yields a fresh Morph ability;
@@ -6172,9 +6209,9 @@ int AAFlip::resolve()
             for (size_t i = 0; i < currentAbilities.size(); ++i)
             {
                 MTGAbility * a = currentAbilities[i];
-                a->source = (MTGCardInstance *) _target;
                 if (a)
                 {
+                    a->source = (MTGCardInstance *) _target; //#W54-G (L13): was assigned before the NULL check
                     if (a->oneShot)
                     {
                         if(!backfromcopy){ // Fix to avoid triggering of oneshot abilities when flip is used to return from a copy.
@@ -7064,7 +7101,7 @@ int AACloner::resolve()
         spell->source->model = spell->source;
         spell->source->model->data = spell->source;
         spell->source->tokCard = spell->source->clone();
-        spell->source->TokenAndAbility = _target->TokenAndAbility;//token andAbility
+        spell->source->TokenAndAbility = _target->TokenAndAbility ? _target->TokenAndAbility->clone() : NULL; //#W54-G (A9): the card OWNS its copy (see ~MTGCardInstance)
         //'Exile it at the beginning of the next end step' / unearth-style
         //riders are delayed effects attached by whatever created the
         //ORIGINAL - they are not copiable characteristics, so a copy
@@ -8276,20 +8313,18 @@ const string IfThenAbility::getMenuText()
 IfThenAbility * IfThenAbility::clone() const
 {
     IfThenAbility * a = NEW IfThenAbility(*this);
-    a->delayedAbility = delayedAbility->clone();
+    a->delayedAbility = delayedAbility ? delayedAbility->clone() : NULL;
+    //#W54-G (A10): the else branch was pointer-copied, so template and every
+    //clone shared one subtree - the double-owner the deletedpointers hack hid.
+    a->delayedElseAbility = delayedElseAbility ? delayedElseAbility->clone() : NULL;
     return a;
 }
 
 IfThenAbility::~IfThenAbility()
 {
-    if(delayedAbility && (std::find(deletedpointers.begin(), deletedpointers.end(), delayedAbility) == deletedpointers.end())) {
-        deletedpointers.push_back(delayedAbility); // Fix to avoid crash on May abilities nested in IfThenElse Abilities.
-        SAFE_DELETE(delayedAbility);
-    }
-    if(delayedElseAbility && (std::find(deletedpointers.begin(), deletedpointers.end(), delayedElseAbility) == deletedpointers.end())) {
-        deletedpointers.push_back(delayedElseAbility); // Fix to avoid crash on May abilities nested in IfThenElse Abilities.
-        SAFE_DELETE(delayedElseAbility);
-    }
+    //#W54-G (A10): sole owner of both branches (see clone) - plain deletes
+    SAFE_DELETE(delayedAbility);
+    SAFE_DELETE(delayedElseAbility);
 }
 
 //May Abilities
@@ -8316,7 +8351,7 @@ void MayAbility::Update(float dt)
                 return;
             }
         }
-#ifndef PSP
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) //#W54-G (A33): dev-only probe
         if (getenv("WAGIC_MAYPROBE"))
         {
             TargetAbility * dta = dynamic_cast<TargetAbility *>(ability);
@@ -8857,7 +8892,10 @@ MenuAbility * MenuAbility::clone() const
         for(int i = 0;i < int(abilities.size());i++)
         {
             a->abilities.push_back(abilities[i]->clone());
-            a->optionalCosts.push_back(NEW ManaCost(optionalCosts[i]));
+            //#W54-G (A52): only GenericPaidAbility fills optionalCosts (one entry)
+            //while abilities can hold 2+; keep size and alignment, never read past
+            if (i < int(optionalCosts.size()))
+                a->optionalCosts.push_back(optionalCosts[i] ? NEW ManaCost(optionalCosts[i]) : NULL);
             a->abilities[i]->target = abilities[i]->target;
         }
     }
@@ -8896,11 +8934,7 @@ MenuAbility::~MenuAbility()
     SAFE_DELETE(announceCost);
     SAFE_DELETE(toPay);
     //SAFE_DELETE(mClone);//crash fix with generated castcard with pay ability
-    if(mClone)
-    {
-        mClone = NULL;
-        delete mClone;
-    }
+    //mClone is game-owned (forceDestroy = 1 in reactToTargetClick); #W54-G (L13) removed a delete-of-NULL here
     if(optionalCosts.size())
         for(int i = 0;i < int(optionalCosts.size());i++)
         {
@@ -10226,6 +10260,13 @@ int AProduceMana::produce()
         ga2->resolve();
         ga3->resolve();
         ga4->resolve();
+        //#W54-G (A8): the wrappers were never freed (Counters.cpp's suspend
+        //tower is the idiom: resolve, then delete)
+        SAFE_DELETE(ga0);
+        SAFE_DELETE(ga1);
+        SAFE_DELETE(ga2);
+        SAFE_DELETE(ga3);
+        SAFE_DELETE(ga4);
     }
     else
     {
@@ -10363,14 +10404,11 @@ MTGAbility(observer, _id, card),sAbility(sAbility), phase(_phase),forcedestroy(f
 {
     abilityId = _id;
     abilityOwner = card->controller();
-    psMenuText = "";
-    AbilityFactory af(game);
-    ability = af.parseMagicLine(sAbility, abilityId, NULL, NULL);
-    if(ability)
-        psMenuText = ability->getMenuText();
-    else
-        psMenuText = sAbility.c_str();
-    delete (ability);
+    //#W54-G (L13): the old parse here passed card = NULL, which parseMagicLine
+    //rejects unconditionally, so the menu text was always the raw script and
+    //the member was left pointing at a deleted object.
+    ability = NULL;
+    psMenuText = sAbility;
 
     //The 'next' keyword guards against firing during the very phase the
     //ability was created in: a new ability's first Update synthesizes a
@@ -10430,12 +10468,14 @@ void APhaseAction::Update(float dt)
 
                 AbilityFactory af(game);
                 MTGAbility * ability = af.parseMagicLine(sAbility, abilityId, NULL, _target);
-
-                MTGAbility * a = ability->clone();
-                a->target = _target;
-                a->resolve();
-                delete (a);
-                delete (ability);
+                if (ability) //#W54-G (A28)
+                {
+                    MTGAbility * a = ability->clone();
+                    a->target = _target;
+                    a->resolve();
+                    delete (a);
+                    delete (ability);
+                }
                 if(this->oneShot || once)
                 {
                     this->forceDestroy = 1;
@@ -11405,6 +11445,9 @@ int AEquip::unequip()
         MTGAbility * a = currentAbilities[i];
         if (dynamic_cast<AEquip *> (a) || dynamic_cast<ATeach *> (a) || dynamic_cast<AAConnect *> (a)
             || dynamic_cast<AANewTarget *> (AbilityFactory::getCoreAbility(a))
+            //#W54-G (A31): equip() marks this one forceDestroy and never adds it,
+            //so removeObserver below was a no-op and it leaked per attach cycle
+            || dynamic_cast<AACopier *> (AbilityFactory::getCoreAbility(a))
             || (a->aType == MTGAbility::STANDARD_TOKENCREATOR && a->oneShot))
         {
             SAFE_DELETE(a);

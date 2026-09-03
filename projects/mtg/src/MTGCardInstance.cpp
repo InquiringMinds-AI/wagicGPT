@@ -214,7 +214,11 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
     setPhasedOutAbility(data->getPhasedOutAbility());
     origpower = card->origpower;//for flip
     origtoughness = card->origtoughness;//for flip
-    TokenAndAbility = card->TokenAndAbility;//token andAbility
+    //#W54-G (A9): ownership ruling - an MTGCardInstance OWNS its TokenAndAbility.
+    //Every assignment site deep-copies (here, AACloner::resolve, ATokenCreator)
+    //and ~MTGCardInstance frees it; nothing aliases the pointer any more.
+    SAFE_DELETE(TokenAndAbility);
+    TokenAndAbility = card->TokenAndAbility ? card->TokenAndAbility->clone() : NULL;
     tokCard = card->tokCard;
 
     //Now this is dirty...
@@ -327,6 +331,7 @@ MTGCardInstance::~MTGCardInstance()
     //card would later try to erase itself from freed storage
     clearAbilityRegistry();
     SAFE_DELETE(counters);
+    SAFE_DELETE(TokenAndAbility); //#W54-G (A9): sole owner (see copy())
     if (previous != NULL)
     {
         //DebugTrace("MTGCardInstance::~MTGCardInstance():  deleting " << ToHex(previous));
@@ -2101,14 +2106,16 @@ int MTGCardInstance::addProtection(TargetChooser * tc)
     return protections.size();
 }
 
+//#W54-G (A31): the choosers in protections/canttarget/cantBeBlockedBys are
+//OWNED by the ability that registered them (AProtectionFrom & co delete their
+//fromTc); the `erase` delete branch had no caller and would have freed an
+//unowned object - removed, the parameter is kept for the signature.
 int MTGCardInstance::removeProtection(TargetChooser * tc, int erase)
 {
     for (size_t i = 0; i < protections.size(); i++)
     {
         if (protections[i] == tc)
         {
-            if (erase)
-                delete (protections[i]);
             protections.erase(protections.begin() + i);
             return 1;
         }
@@ -2147,8 +2154,6 @@ int MTGCardInstance::removeCantBeTarget(TargetChooser * tc, int erase)
     {
         if (canttarget[i] == tc)
         {
-            if (erase)
-                delete (canttarget[i]);
             canttarget.erase(canttarget.begin() + i);
             return 1;
         }
@@ -2178,8 +2183,6 @@ int MTGCardInstance::removeCantBeBlockedBy(TargetChooser * tc, int erase)
     {
         if (cantBeBlockedBys[i] == tc)
         {
-            if (erase)
-                delete (cantBeBlockedBys[i]);
             cantBeBlockedBys.erase(cantBeBlockedBys.begin() + i);
             return 1;
         }
