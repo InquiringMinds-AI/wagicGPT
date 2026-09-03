@@ -34,7 +34,7 @@ independent of the grouping option. The claim that a per-card target border alre
 Claude's and unverified — the stack-entry target thumbnails exist (ActionStack.cpp), a board marker
 was not found.
 
-**Softlock escape (owner request, verbatim, 2026-09-03):** "We need a softlock exit to main menu
+**Softlock escape (owner request, verbatim, 2026-09-03; CORRECTED same day — "No, the menu button works. I used it." / "I pressed start, then selected main menu." -> primary = a menu entry beside Main Menu that dumps diagnostics then quits; watchdog thread dropped):** "We need a softlock exit to main menu
 option, for capturing diagnostics from softlocks." -> lane T: (a) in-thread hang guard at the
 engine's loop sites (per-tick time budget, throws a SoftlockAbort caught at the game-loop top ->
 diagnostics dump -> main menu); (b) watchdog thread + pad chord for unguarded hangs (dump, then
