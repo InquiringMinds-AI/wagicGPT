@@ -529,6 +529,14 @@ private:
     struct WorkerCtx;
     static void WorkerMain(void * p);
     std::shared_ptr<AsyncState> mAsyncState;
+    //#W57-A (D5): the SECOND async slot. The land-drop arm and the casting arm
+    //shared one slot, so an in-flight casting answer was thrown away the moment
+    //a `Land drop:` ask reached the poll - 44 of the wave-56 corpus's 65 stale
+    //drops, every one of the 32 preceded by the Baka opponent's own land
+    //auto-tap among them. Each arm now owns its storage; CONCURRENCY is
+    //unchanged (one round trip at a time across both arms, see asyncBusy), so
+    //this separates what is remembered, not what is spent.
+    std::shared_ptr<AsyncState> mAsyncLandState;
     float mThinkTime; //seconds the current request has been in flight (for the indicator)
     long mTimeoutMs;  //per-call HTTP timeout (config timeout= / WAGIC_GPT_TIMEOUT)
     //Seconds in flight before the duel screen offers "keep waiting / play
@@ -1067,6 +1075,9 @@ private:
     int mHoldTurn;
     std::map<string, std::set<string> > mHoldRows;
     int mHoldWindowsSkipped; //gameend report field
+    //#W57-A (D4): the repeat count of the take being logged, consumed by
+    //writeTransLog into `repeat_n`. Report only; nothing in the engine reads it.
+    int mLastRepeatN;
     //#W53-N (D2, second half): per-turn declines of an EXACT option list,
     //keyed by the joined rows. Rendered as a PROMPT-ONLY annotation (never
     //part of an ask key - see declinedListNote).

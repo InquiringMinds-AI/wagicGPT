@@ -9642,8 +9642,17 @@ static string answerTailFromReasoning(const string& reasoning)
 
 bool AIPlayerGPT::asyncBusy() const
 {
-    std::lock_guard<GptMutex> g(mAsyncState->mtx);
-    return mAsyncState->status == 1;
+    //#W57-A (D5): busy if EITHER arm has a round trip in flight. The second
+    //slot separates what each arm REMEMBERS, never how many requests are out:
+    //every caller that reads this (the decision gate, the stall watchdog, the
+    //launch guard in pollCompletion) still sees at most one live request.
+    {
+        std::lock_guard<GptMutex> g(mAsyncState->mtx);
+        if (mAsyncState->status == 1)
+            return true;
+    }
+    std::lock_guard<GptMutex> g2(mAsyncLandState->mtx);
+    return mAsyncLandState->status == 1;
 }
 
 //THE NO-ANSWER CLASSES ARE NOT ALL THE SAME FAILURE. "empty_reply" has always
@@ -9769,6 +9778,48 @@ static string asyncSlotKeyOf(bool forceClose, int turn, int phase,
     return k.str();
 }
 
+//#W57-A (D5): WHICH ARM a seam tail belongs to. The land-drop ask is the only
+//question this seat puts that a casting window can interleave with across a
+//turn flip, and the wave-56 corpus classified all 65 stale drops by the ask
+//that followed them: 44 `Land drop:`, 21 `Casting decision`, and every one of
+//the 32 drops preceded by the Baka opponent's own land auto-tap
+//("AIPlayerBaka: Mana cost is NULL.") is inside the 44. So the displacement is
+//between the two ARMS, not inside either one. The test is the tail's first
+//line, which is the question itself - the same string the slot key already
+//carries, so no new state is introduced and the classification is a pure
+//function of what was asked.
+static const char * kLandDropQuestionPrefix = "Land drop: ";
+
+static bool asyncLandArm(const string& seamTail)
+{
+    return seamTail.compare(0, strlen(kLandDropQuestionPrefix), kLandDropQuestionPrefix) == 0;
+}
+
+//#W57-A (D5): a drop's own classification, so the residual never needs a second
+//archaeology pass over two 40 KB strings. Both keys have the shape
+//"<fc>|turn|phase|\n<seam>\n=BOARD=\n<board>", so the two halves are separable
+//by their own separator and a drop can say WHICH half moved.
+static const char * kAsyncSlotBoardSep = "\n=BOARD=\n";
+
+static string asyncSlotDriftKind(const string& oldKey, const string& newKey)
+{
+    if (oldKey.empty() || newKey.empty())
+        return "unknown";
+    if (oldKey == newKey)
+        return "same slot";
+    const size_t a = oldKey.find(kAsyncSlotBoardSep);
+    const size_t z = newKey.find(kAsyncSlotBoardSep);
+    if (a == string::npos || z == string::npos)
+        return "unknown";
+    const bool seamMoved = (oldKey.compare(0, a, newKey, 0, z) != 0);
+    const bool boardMoved = (oldKey.compare(a, string::npos, newKey, z, string::npos) != 0);
+    if (seamMoved && boardMoved)
+        return "question and board";
+    if (seamMoved)
+        return "question (or turn/phase)";
+    return "board";
+}
+
 string AIPlayerGPT::asyncSlotKey(const string& userMsg)
 {
     return asyncSlotKeyOf(userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0,
@@ -9776,40 +9827,51 @@ string AIPlayerGPT::asyncSlotKey(const string& userMsg)
                           mPromptTail, serializeGameState());
 }
 
+
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 {
+    //#W57-A (D5): THE ARM'S OWN SLOT. `mPromptTail` is the question-and-options
+    //tail assemblePrompt wrote for THIS ask, in this same tick, so the arm is
+    //read off the question being asked - not off any latched state. A land-drop
+    //ask no longer reaches into the casting arm's storage, which is where 44 of
+    //the wave-56 corpus's 65 stale drops came from. Nothing about concurrency
+    //changes: the launch below is still gated on asyncBusy(), which is true
+    //while EITHER arm is in flight.
+    const bool landArm = asyncLandArm(mPromptTail);
+    std::shared_ptr<AsyncState> slot = landArm ? mAsyncLandState : mAsyncState;
+    const char * armName = landArm ? "land-drop" : "casting";
     {
-        std::lock_guard<GptMutex> g(mAsyncState->mtx);
-        if (mAsyncState->status == 1)
+        std::lock_guard<GptMutex> g(slot->mtx);
+        if (slot->status == 1)
             return kChoicePending; //one request at a time; whatever asked, wait
-        if (mAsyncState->status == 2)
+        if (slot->status == 2)
         {
             //#W56-A (D18): the same SLOT - same seam, turn, phase and board -
             //is the same question, however the narration header around it has
             //grown since the request went out. The answer is consumed, not
             //dropped and re-bought at a full round trip.
             bool sameSlot = false;
-            if (mAsyncState->prompt != userMsg && !mAsyncState->slotKey.empty()
-                && mAsyncState->slotKey == asyncSlotKey(userMsg))
+            if (slot->prompt != userMsg && !slot->slotKey.empty()
+                && slot->slotKey == asyncSlotKey(userMsg))
             {
                 sameSlot = true;
                 DebugTrace("AIPlayerGPT: consuming an in-flight answer whose prompt text drifted"
                            " (same seam, turn, phase and board)");
             }
-            if (mAsyncState->prompt == userMsg || sameSlot)
+            if (slot->prompt == userMsg || sameSlot)
             {
-                string body = mAsyncState->response;
+                string body = slot->response;
                 mLastLatencyMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - mAsyncState->started).count();
-                mAsyncState->status = 0;
-                mAsyncState->response.clear();
+                    std::chrono::steady_clock::now() - slot->started).count();
+                slot->status = 0;
+                slot->response.clear();
                 //#W53-Q (D10): consumed with the body. A reply that CARRIED
                 //text can never be a timeout, so the flag is cleared again
                 //below once `content` is known.
-                mLastTimeout = mAsyncState->timedOut;
-                mAsyncState->timedOut = false;
-                mLastHttpStatus = mAsyncState->httpStatus; //audit-L (A24)
-                mAsyncState->httpStatus = 0;
+                mLastTimeout = slot->timedOut;
+                slot->timedOut = false;
+                mLastHttpStatus = slot->httpStatus; //audit-L (A24)
+                slot->httpStatus = 0;
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -9960,7 +10022,17 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             }
             //An answer for a prompt the game state has moved past (should
             //not happen while the AI neither acts nor passes; drop safely).
-            DebugTrace("AIPlayerGPT: dropping stale async answer");
+            //#W57-A (D5): the drop names its ARM and which half of the slot key
+            //moved. The wave-56 residual (21 drops whose next ask was a
+            //`Casting decision`) had to be classified by reading the NEXT line
+            //of a 40 KB stderr; this states it on the drop itself, so the next
+            //corpus can separate a genuinely moved board from a second
+            //cross-arm displacement without an archaeology pass. The leading
+            //literal is UNCHANGED - every existing census keys on it.
+            DebugTrace("AIPlayerGPT: dropping stale async answer (" << armName
+                       << " arm; the "
+                       << asyncSlotDriftKind(slot->slotKey, asyncSlotKey(userMsg))
+                       << " moved)");
             //#W55-E (D5b): WHERE the prompt moved. A stale drop says only that
             //the rebuilt prompt differs from the one in flight; the wave-54
             //reveal livelock (146v123 s15) then needed an archaeology pass over
@@ -9968,10 +10040,10 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //names the first divergence and its neighbourhood. Development
             //builds only (owner rule: diagnostics are compiled out of release);
             //WAGIC_GPT_DRIFT=1 arms it, so a dev build is silent by default.
-            GPT_DRIFT_TRACE(mAsyncState->prompt, userMsg);
-            GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", mAsyncState->response.size());
-            mAsyncState->status = 0;
-            mAsyncState->response.clear();
+            GPT_DRIFT_TRACE(slot->prompt, userMsg);
+            GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", slot->response.size());
+            slot->status = 0;
+            slot->response.clear();
             //LIVELOCK BREAKER (146v36, 2026-08-21): a RUN of drops with no
             //consume between them means the rebuilt prompt is not stable for
             //an unchanged state - left alone this loops at one model round
@@ -10008,6 +10080,14 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         }
     }
 
+    //#W57-A (D5): ONE round trip at a time, across BOTH arms. The other arm may
+    //be holding a done-but-unconsumed answer (that is the whole point of the
+    //second slot) but it must never be holding a LIVE request while this arm
+    //opens another: the second slot buys storage, never a second spend. The
+    //caller unwinds and re-polls, exactly as it does for its own arm.
+    if (asyncBusy())
+        return kChoicePending;
+
     //Idle: build the request on the game thread (the prompt members are not
     //shared with the worker) and launch the round trip in the background.
     string requestBody = buildRequestBody(userMsg);
@@ -10015,7 +10095,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     bool codex = gptCodexEndpoint(mEndpoint);
     string url = codex ? mEndpoint + "/responses" : mEndpoint + "/v1/chat/completions";
     string key = mApiKey;
-    std::shared_ptr<AsyncState> state = mAsyncState;
+    std::shared_ptr<AsyncState> state = slot; //#W57-A (D5): this arm's slot
     {
         std::lock_guard<GptMutex> g(state->mtx);
         state->status = 1;
@@ -10455,7 +10535,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -10868,6 +10948,10 @@ static string refusedChosenText(int choice, const char * fallback,
         return string("<refused: ") + fallback + ">";
     if (optionTexts && choice >= 1 && choice <= (int) optionTexts->size())
         return string("<refused: not executed: ") + (*optionTexts)[choice - 1] + ">";
+    //#W57-A (D4): a record with no live choice and no class named still says
+    //so in the field, rather than leaving it absent.
+    if (choice < 0)
+        return string("<refused: no answer executed>");
     std::ostringstream o;
     o << "<refused: not executed: row " << choice << ">";
     return o.str();
@@ -10887,6 +10971,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //this clear catches anything that reached it before the path was known.
         mNarrationPending.clear();
         mLastHttpStatus = 0; //audit-L (A24): consumed even when logging is off
+        mLastRepeatN = 0;    //#W57-A (D4): likewise, so it cannot leak forward
         return;
     }
     ensureGameStartRecord();
@@ -11025,8 +11110,21 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     }
     if (!chosenText.empty())
         rec["chosen_text"] = chosenText;
-    else if (choice >= 0) //#W56-A (D4): never empty while a choice is live
+    else //#W57-A (D4): never ABSENT either. Wave 56 filled the field only while
+         //`choice >= 0`, so all 6 of the wave-56 corpus's `choice: -1` records
+         //(3 named_row_reask, 1 stale_echo, 2 wall_miss_unrecorded) carried no
+         //`chosen_text` at all and the promised `<refused: ...>` value rendered
+         //0 times - a harvest could not tell a refusal from a missing field,
+         //which is the same silent instrument D16 fixes one seam over.
         rec["chosen_text"] = refusedChosenText(choice, fallback, optionTexts);
+    //#W57-A (D4): a repeat-N take keeps `chosen_text` BYTE-EQUAL to the row and
+    //states its count in a field of its own. Wave 56 appended " xN" to the row
+    //text, which is exactly the shape that makes an exact-match census fail.
+    if (mLastRepeatN >= 2)
+    {
+        rec["repeat_n"] = mLastRepeatN;
+        mLastRepeatN = 0;
+    }
     if (fallback)
         rec["fallback"] = fallback;
     //#W50-Y D10 (iii): how many consecutive replies re-stated the carried plan
@@ -11229,6 +11327,20 @@ void AIPlayerGPT::logGameEnd()
         {"wall_miss_unrecorded", mWallMissUnrecorded},
     };
     transLogWrite(rec.dump()); //audit-L (L4)
+    //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
+    //cross-tabbing holds against savings reads the stderr; before this the
+    //window-skip totals existed only inside the gameend JSON, so the two
+    //surfaces could not be reconciled without opening both. Report only -
+    //nothing reads it, nothing is removed, and the figures are the same
+    //members the record above serialises.
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: game end (turn "
+               << observer->turn << ", " << (iWon ? "won" : (oppWon ? "lost" : "draw"))
+               << ") - windows held by the model's own hold row: " << mHoldWindowsSkipped
+               << "; mana-only windows auto-passed: " << mManaOnlyWindowsSkipped
+               << "; interchangeable-option asks resolved without a call: "
+               << mIdenticalOptionAsksResolved
+               << "; deadline misses: " << mWallMissEvents
+               << " (" << mWallMissUnrecorded << " unrecorded)");
     if (mTransLog.is_open())
         mTransLog.close(); //the game's last record
 }
@@ -15208,9 +15320,18 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         return false;
     }
     mHoldWindowsSkipped++;
-    DebugTrace("AIPlayerGPT: holding priority at the " << seam << " seam (the model's own"
-               " hold row, turn " << observer->turn << "; " << mHoldWindowsSkipped
-               << " windows held this game)");
+    //#W57-A (D31): the running SAVING was already on this line (verified on the
+    //wave-56 corpus: 1,236 lines carrying "N windows held this game", equal to
+    //the sum of `hold_windows_skipped` over all 42 gameend records) - the
+    //docket's "no stderr companion" is a harvest that keyed on the line's
+    //prefix. What was genuinely missing is WHOSE: both seats of a matchup write
+    //into ONE stderr with byte-identical wording, so two interleaved running
+    //counts could not be attributed, and there was no closing total at all
+    //(see logGameEnd). The seat token is the same one the translog filename
+    //and `my_deck` carry.
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: holding priority at the " << seam
+               << " seam (the model's own hold row, turn " << observer->turn << "; "
+               << mHoldWindowsSkipped << " windows held this game)");
     return true;
 }
 
@@ -19990,6 +20111,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         index++;
         shown.push_back(shown[rb]);
         shownLines.push_back(rline);
+        //#W57-A (D4): the RENDERED list stays parallel to shownLines for every
+        //row the model can press, so `chosen_text` and `options_text` can both
+        //be the row the prompt actually printed.
+        renderRows.push_back(rline);
         repeatBaseRow.push_back(rb);
         tail << index << ". " << rline << "\n";
     }
@@ -20030,6 +20155,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     {
         const string holdLine = holdRowLine(); //#W55-A (D21)
         shownLines.push_back(holdLine);
+        renderRows.push_back(holdLine); //#W57-A (D4)
         tail << holdRow << ". " << holdLine << "\n";
     }
     //#W48-F3: on a single-option window the decline becomes a real, numbered
@@ -20424,7 +20550,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string rivalRowName;
         bool planChoiceConflict = passVerdictInProse
                                   && proseNamesOtherMenuRow(content, shownLines, choice, &rivalRowName);
-        if (planChoiceConflict)
+        //#W57-A (D16): the BROAD census is stamped on the BROAD condition. Wave
+        //56 promised the old stamp would be kept beside the narrowed one and
+        //then wrote it on `planChoiceConflict` - the narrowed condition - so
+        //`decision_reversed_in_prose` rendered 0 on a corpus in which
+        //`plan_choice_conflict_narrowed` rendered 14, and "0 conflicts" could
+        //not be told from "0 counted" (silent-instrument class, skill #263).
+        //The three stamps now partition the shape exactly:
+        //  decision_reversed_in_prose   = a taken row under a pass verdict (broad)
+        //  plan_choice_conflict_narrowed = that shape with no rival row named
+        //  (the re-ask itself)          = that shape WITH a rival row named
+        //so broad = narrowed + firings, and a zero in the broad column is now
+        //evidence about the game rather than about the instrument.
+        if (passVerdictInProse)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
         if (passVerdictInProse && !planChoiceConflict)
             //the narrowing, measured: the shape that used to buy a round trip
@@ -20502,7 +20640,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             mPriorityReaskLine = corr.str();
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
-            writeTransLog("priority", userMsg, content, choice, index, "", fb, &shownLines);
+            writeTransLog("priority", userMsg, content, choice, index, "", fb, &renderRows); //#W57-A (D4)
             setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
                       : indexNameConflict ? "the number and the name disagree - asking again"
                       : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
@@ -20680,18 +20818,25 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //#W49-S (D2): what executed IS the first coded line -> not replaced
             if (choice >= 0 && firstCodedChoice(content, index, &shownLines) == choice)
                 mAnswerReplacedFalse = true;
-            string chosen = (holdRow > 0 && choice == holdRow) ? string(kHoldPriorityRowText)
-                          : (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
+            //#W57-A (D4): `chosen_text` IS the rendered row, byte for byte.
+            //Wave 56 wrote `kHoldPriorityRowText` for the hold row (tail-less:
+            //112 of 320 HOLD takes, and the reason an exact-match census read
+            //208) and `describeAction(*shown[N-1])` for the rest - the PURE
+            //line, without the last-offer and upkeep-animation clauses the
+            //prompt printed, and the BASE action's text for a repeat row.
+            //On the wave-56 corpus that is 124 of 2,416 single-row takes
+            //disagreeing with the row they name. renderRows is what
+            //joinNumberedRows printed; shownLines is deliberately the pure
+            //de-dup/decline key and stays what it was.
+            string chosen = (choice >= 1 && choice <= (int) renderRows.size())
+                          ? renderRows[choice - 1]
                           : (choice == 0 ? string("pass") : string());
             //#W48-F1: ONE record carries the whole repeat - the action and the
-            //N the model named for it.
+            //N the model named for it. #W57-A (D4): the N rides its own field
+            //(`repeat_n`) so the row text stays byte-equal to the printed row.
             if (repeatN >= 2)
-            {
-                std::ostringstream rc;
-                rc << chosen << " x" << repeatN;
-                chosen = rc.str();
-            }
-            writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
+                mLastRepeatN = repeatN;
+            writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &renderRows);
         }
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
     }
@@ -43616,6 +43761,148 @@ static const char * kW50Y_r94 =
               != asyncSlotKeyOf(false, 13, 4, castTail, board),
               "#W56-A D18 NEGATIVE the forced-close retry is its own slot");
     }
+
+    cout << "\n[#W57-A D5] the second async slot: the land-drop arm and the casting arm\n";
+    {
+        // The wave-56 corpus classified all 65 stale drops by the ask that
+        // followed: 44 `Land drop:`, 21 `Casting decision`, and all 32 drops
+        // preceded by "AIPlayerBaka: Mana cost is NULL." (the opponent's own
+        // land auto-tap - the fetch-land displacement class) are INSIDE the 44.
+        // So the displacement is between the arms, and the arm is a pure
+        // function of the question the tail carries.
+        const string landTail = "Land drop: which land do you play now, if any?\n1. Play Forest\n2. Play nothing\n";
+        const string landTail1 = "Land drop: play Glacial Fortress now?\n1. Play Glacial Fortress\n2. Hold it\n";
+        const string castTail = "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+                                "1. Cast Devour Flesh {1}{b}\n2. Cast nothing right now\n";
+        CHECK(asyncLandArm(landTail) && asyncLandArm(landTail1),
+              "#W57-A D5 both land-drop question shapes (one land, several) are the land arm");
+        CHECK(!asyncLandArm(castTail),
+              "#W57-A D5 NEGATIVE a casting window is the casting arm");
+        CHECK(!asyncLandArm(""),
+              "#W57-A D5 NEGATIVE an unset tail is the casting arm (the default slot), never the land arm");
+        // must-NOT-match: the arm is the QUESTION, not a mention of a land.
+        CHECK(!asyncLandArm("Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+                            "1. Cast Land Tax {1}{w}\n2. Cast nothing right now\n"),
+              "#W57-A D5 NEGATIVE a cast row naming a land does not move the ask to the land arm");
+        CHECK(!asyncLandArm("Which land do you sacrifice?\n1. Forest\n"),
+              "#W57-A D5 NEGATIVE a land QUESTION that is not the land DROP stays on the casting arm");
+        CHECK(!asyncLandArm(" Land drop: which land do you play now, if any?\n"),
+              "#W57-A D5 NEGATIVE the test is a prefix, not a search - a shifted tail is not the land arm");
+        // the drop's own classification, so the residual 21 need no archaeology
+        const string board = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
+        string moved = board;
+        moved.replace(moved.find("Opponent life: 20"), 17, "Opponent life: 17");
+        CHECK(asyncSlotDriftKind(asyncSlotKeyOf(false, 13, 4, castTail, board),
+                                 asyncSlotKeyOf(false, 13, 4, castTail, board)) == "same slot",
+              "#W57-A D5 an unmoved slot key reports `same slot`");
+        CHECK(asyncSlotDriftKind(asyncSlotKeyOf(false, 13, 4, castTail, board),
+                                 asyncSlotKeyOf(false, 13, 4, castTail, moved)) == "board",
+              "#W57-A D5 a board-only move is reported as `board` - the residual class");
+        CHECK(asyncSlotDriftKind(asyncSlotKeyOf(false, 13, 4, castTail, board),
+                                 asyncSlotKeyOf(false, 13, 4, landTail, board)) == "question (or turn/phase)",
+              "#W57-A D5 a cross-arm displacement is reported as a question move");
+        CHECK(asyncSlotDriftKind(asyncSlotKeyOf(false, 13, 4, castTail, board),
+                                 asyncSlotKeyOf(false, 14, 4, castTail, board)) == "question (or turn/phase)",
+              "#W57-A D5 the turn flip rides the same half of the key as the question, and the label says so");
+        CHECK(asyncSlotDriftKind(asyncSlotKeyOf(false, 13, 4, castTail, board),
+                                 asyncSlotKeyOf(false, 13, 4, landTail, moved)) == "question and board",
+              "#W57-A D5 both halves moving is named as both");
+        CHECK(asyncSlotDriftKind("", asyncSlotKeyOf(false, 13, 4, castTail, board)) == "unknown",
+              "#W57-A D5 NEGATIVE a slot key that was never written says `unknown`, never a fabricated cause");
+        // ECHO SHAPE: the drop line keeps its wave-55 leading literal, so every
+        // existing census that keys on it still counts the same events.
+        CHECK(string("AIPlayerGPT: dropping stale async answer (land-drop arm; the board moved)")
+                  .compare(0, 42, "AIPlayerGPT: dropping stale async answer (") == 0,
+              "#W57-A D5 ECHO the drop line's leading literal is unchanged - the arm rides after it");
+    }
+
+    cout << "\n[#W57-A D16] the BROAD reversal census is stamped on the BROAD condition\n";
+    {
+        // The wave-56 code stamped `decision_reversed_in_prose` on
+        // planChoiceConflict (the NARROWED condition), so the broad column read
+        // 0 while plan_choice_conflict_narrowed read 14 - "0 conflicts" and
+        // "0 counted" were the same output. The three stamps must partition:
+        // broad = narrowed + firings.
+        struct Pin
+        {
+            static string stamps(bool passVerdictInProse, bool rivalNamed)
+            {
+                string note;
+                const bool conflict = passVerdictInProse && rivalNamed;
+                if (passVerdictInProse)
+                    appendParseNote(&note, "decision_reversed_in_prose");
+                if (passVerdictInProse && !conflict)
+                    appendParseNote(&note, "plan_choice_conflict_narrowed");
+                return note;
+            }
+        };
+        CHECK(Pin::stamps(true, true) == "decision_reversed_in_prose",
+              "#W57-A D16 a genuine rival: the broad census counts it and the narrowing does not");
+        CHECK(Pin::stamps(true, false)
+                  == "decision_reversed_in_prose;plan_choice_conflict_narrowed",
+              "#W57-A D16 the narrowed-away shape is counted TWICE - once broad, once as the narrowing");
+        CHECK(Pin::stamps(false, false).empty() && Pin::stamps(false, true).empty(),
+              "#W57-A D16 NEGATIVE no pass verdict in the prose stamps nothing at all");
+        // The property the item exists for, stated as arithmetic.
+        {
+            int broad = 0, narrowed = 0, fired = 0;
+            const bool cases[4][2] = { {true, true}, {true, false}, {true, false}, {false, true} };
+            for (int i = 0; i < 4; i++)
+            {
+                const string s = Pin::stamps(cases[i][0], cases[i][1]);
+                if (s.find("decision_reversed_in_prose") != string::npos) broad++;
+                if (s.find("plan_choice_conflict_narrowed") != string::npos) narrowed++;
+                if (cases[i][0] && cases[i][1]) fired++;
+            }
+            CHECK(broad == narrowed + fired && broad == 3 && narrowed == 2 && fired == 1,
+                  "#W57-A D16 broad == narrowed + firings, so a 0 in the broad column is about the game");
+        }
+    }
+
+    cout << "\n[#W57-A D4] chosen_text is the RENDERED row, byte for byte\n";
+    {
+        // The priority seam kept two lists: shownLines (the pure de-dup and
+        // decline key) and renderRows (what joinNumberedRows printed). Wave 56
+        // logged the first, so 124 of the wave-56 corpus's 2,416 single-row
+        // takes disagreed with the row they named - 112 of them the tail-less
+        // HOLD row, which is why an exact-match census read 208 HOLD takes
+        // where the truth was 320.
+        const string pure = kHoldPriorityRowText;
+        const string rendered = holdRowLine();
+        CHECK(rendered != pure && rendered.compare(0, pure.size(), pure) == 0,
+              "#W57-A D4 the wave-56 value was a strict PREFIX of the row - the exact shape the census missed");
+        CHECK(rendered == pure + " {taking this row skips the rest of this turn's identical windows}",
+              "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
+        // the last-offer and upkeep-animation clauses are on the rendered row too
+        {
+            vector<string> shownLines, renderRows;
+            const string base = "Crack Marsh Flats [cost: Tap, Life, Sacrifice]";
+            shownLines.push_back(base);
+            renderRows.push_back(base + lastOfferClause(true));
+            shownLines.push_back(holdRowLine());
+            renderRows.push_back(holdRowLine());
+            CHECK(renderRows.size() == shownLines.size(),
+                  "#W57-A D4 the rendered list stays parallel to the pure list for every pressable row");
+            CHECK(renderRows[0] != shownLines[0] && renderRows[1] == shownLines[1],
+                  "#W57-A D4 the last-offer clause is on the rendered row only - shownLines is deliberately pure");
+            CHECK(renderRows[0].compare(0, base.size(), base) == 0,
+                  "#W57-A D4 the rendered row EXTENDS the pure line; it never rewrites it");
+        }
+        // second face: a refusal always has a value, choice -1 included
+        {
+            vector<string> rows;
+            rows.push_back("Cast Devour Flesh {1}{b}");
+            CHECK(refusedChosenText(-1, NULL, &rows) == "<refused: no answer executed>",
+                  "#W57-A D4 a choice of -1 with no class named still writes a marked value");
+            CHECK(refusedChosenText(-1, "named_row_reask", &rows) == "<refused: named_row_reask>",
+                  "#W57-A D4 a -1 with a class names the class");
+            CHECK(refusedChosenText(-1, "wall_miss_unrecorded", &rows).compare(0, 10, "<refused: ") == 0,
+                  "#W57-A D4 ECHO every refusal value is marked, so a harvest can never read one as a row");
+            CHECK(!nameEchoesRow(refusedChosenText(-1, NULL, &rows), rows),
+                  "#W57-A D4 NEGATIVE the -1 value echoes no row of the menu it was written for");
+        }
+    }
+
 
     // ==================== #W56-B (wave-55 ledger D2/D6/D9/D10/D13/D14/D15) ====================
     cout << "\n[#W56-B] render prices: the seat's real life, the incoming total,"
