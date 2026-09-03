@@ -44055,6 +44055,41 @@ static const char * kW50Y_r94 =
               "#W56-C D12 REGRESSION the wall floor itself is unchanged");
     }
 
+    cout << "\n[W57-F] MTGCardInstance::initMTGCI leaves no member uninitialised\n";
+    {
+        //#W57-F (lane G's key dump): swapP / swapT / MaxLevelUp / handEffects /
+        //castX / nb_damages were read before their only writers ever ran, so a
+        //fresh card carried whatever bytes the allocator returned (observed
+        //live: swapP=1999648119 on a Memnite). The RED is built rather than
+        //hoped for: poison a card's fields, free it, and allocate the next one
+        //- glibc hands back the same block for the same size class, so on the
+        //pre-fix binary the second card INHERITS the poison. After the fix
+        //initMTGCI overwrites all six and two fresh cards compare equal.
+        MTGCardInstance * poisoned = NEW MTGCardInstance();
+        poisoned->swapP = 1999648119;
+        poisoned->swapT = 1818587231;
+        poisoned->MaxLevelUp = 1919249251;
+        poisoned->handEffects = true;
+        poisoned->castX = 1852793171;
+        SAFE_DELETE(poisoned);
+        MTGCardInstance * fresh = NEW MTGCardInstance();
+        MTGCardInstance * fresh2 = NEW MTGCardInstance();
+        const bool zeroed = fresh->swapP == 0 && fresh->swapT == 0
+            && fresh->MaxLevelUp == 0 && !fresh->handEffects && fresh->castX == 0;
+        const bool identical = fresh->swapP == fresh2->swapP
+            && fresh->swapT == fresh2->swapT
+            && fresh->MaxLevelUp == fresh2->MaxLevelUp
+            && fresh->handEffects == fresh2->handEffects
+            && fresh->castX == fresh2->castX;
+        CHECK(zeroed,
+              "#W57-F a freshly constructed card reads 0 on swapP / swapT / MaxLevelUp /"
+              " handEffects / castX - not the previous card's bytes");
+        CHECK(identical,
+              "#W57-F two freshly constructed identical cards compare equal on those fields");
+        SAFE_DELETE(fresh);
+        SAFE_DELETE(fresh2);
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

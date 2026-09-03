@@ -81,6 +81,74 @@ bool ActionLayer::isInGarbage(ActionElement * e)
     return false;
 }
 
+//#W57-F (D25): sweep every back-pointer into a zone that is about to be freed.
+//`zone`'s cards are still valid when this runs (the caller is
+//MTGPlayerCards::beforeBeginPhase, immediately before the SAFE_DELETE), which is
+//what makes eviction safe: an ability whose SOURCE is dying is removed through
+//the layer's own removeFromGame/destroy contract, exactly as it would have been
+//had the card left play in the ordinary way. An ability whose TARGET is dying
+//keeps working - every consumer already handles a NULL target - so that
+//back-pointer is simply cleared. Returns the number of elements evicted.
+int ActionLayer::purgeDeadReferences(MTGGameZone * zone)
+{
+    if (!zone)
+        return 0;
+    int evicted = 0;
+    //A pointer-identity scan, no dereference of the ability's own pointers.
+    for (int j = 0; j < zone->nb_cards; j++)
+    {
+        MTGCardInstance * doomed = zone->cards[j];
+        if (!doomed)
+            continue;
+        //TARGET first, for the whole layer including the garbage list: an
+        //element already removed from mObjects is still deleted later, and its
+        //destructor (or a consumer walking the garbage list) can read it.
+        for (size_t i = 0; i < mObjects.size(); i++)
+        {
+            MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
+            if (a && a->target == (Targetable *) doomed)
+                a->target = NULL;
+        }
+        for (size_t i = 0; i < garbage.size(); i++)
+        {
+            MTGAbility * a = dynamic_cast<MTGAbility *>(garbage[i]);
+            if (a && a->target == (Targetable *) doomed)
+                a->target = NULL;
+        }
+        //SOURCE: the ability cannot function without it (every method reads
+        //source), so it is evicted rather than nulled. Restart the walk after
+        //each removal - destroy() can cascade into further removals.
+        bool again = true;
+        while (again)
+        {
+            again = false;
+            for (size_t i = 0; i < mObjects.size(); i++)
+            {
+                MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
+                if (!a || a->source != doomed)
+                    continue;
+                if (moveToGarbage(a))
+                    evicted++;
+                again = true;
+                break;
+            }
+        }
+    }
+    //Pointer identity again - hasCard() would dereference `currentActionCard`,
+    //and a stale one is exactly what this sweep exists to prevent.
+    for (int j = 0; j < zone->nb_cards; j++)
+    {
+        MTGCardInstance * doomed = zone->cards[j];
+        if (!doomed)
+            continue;
+        if (currentActionCard == doomed)
+            currentActionCard = NULL;
+        if (menuObject == (Targetable *) doomed)
+            menuObject = NULL;
+    }
+    return evicted;
+}
+
 void ActionLayer::cleanGarbage()
 {
     for (size_t i = 0; i < garbage.size(); ++i)

@@ -1,0 +1,55 @@
+##W57-F (D38). The phase-advance LIVELOCK, root-caused at the ADVANCE and not at
+#the row that exposed it. Lane C's wave-56 stub repro sat in phase 7 for ever -
+#both seats emitting "only display-toggle (Flip Side) options; auto-passing
+#without a model call", 65 MB of one line, the phase never moving. The
+#display-only row is the symptom (take the row away and this instance hides;
+#any other window where every seat auto-passes brings it back). The mechanism is
+#in GameObserver::userRequestNextGamePhase: `if (getCurrentTargetChooser())
+#return;` is UNCONDITIONAL, and nothing in the engine clears a chooser that no
+#seat will ever answer - so one armed chooser refuses every advance for the rest
+#of the game.
+#
+#WITNESS: PLAYER1 clicks Putrefy, which arms GameObserver::targetChooser with
+#NOTHING paid (MTGPutInPlayRule::reactToClick pays only after
+#targetListIsSet - the same seam as #W56-Z), and then never declares a target.
+#Twelve `next` commands follow. PRE-FIX every one is refused at the chooser
+#gate and the game is still in FIRSTMAIN at the end. POST-FIX the breaker sees
+#the same chooser refuse the advance more times than its floor with its owner -
+#an AI/scripted seat with no decision in flight - unable to answer it, releases
+#it, and the phase moves on. Putrefy is still in HAND and PLAYER1's life is
+#untouched: nothing was ever paid, so the release costs the seat nothing. (The
+#pool is empty in the assert because it empties at the phase change the fix
+#allows - on the pre-fix binary it still reads {B}{G}{R} in Main phase 1, which
+#is the second half of the RED.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Putrefy
+manapool:{B}{G}{R}
+life:20
+[PLAYER2]
+inplay:Thornweald Archer
+life:20
+[DO]
+Putrefy
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+[ASSERT]
+COMBATBEGIN
+[PLAYER1]
+hand:Putrefy
+life:20
+[PLAYER2]
+inplay:Thornweald Archer
+life:20
+[END]

@@ -352,6 +352,34 @@ int MTGCardInstance::init()
 
 void MTGCardInstance::initMTGCI()
 {
+    //#W57-F (lane G's live key dump, 2026-09-03): every member below is read
+    //somewhere before its ONLY writer has ever run, so a fresh card starts with
+    //whatever bytes the allocator handed back. Observed live on two otherwise
+    //identical Memnites: swapP=1999648119, swapT=1818587231,
+    //MaxLevelUp=1919249251 (ASCII garbage). What each one costs:
+    //  swapP / swapT   - only switchPT() writes them, and its "switch back"
+    //                    branch READS them first (MTGCardInstance.cpp ~1159):
+    //                    an un-switched card told to switch back gets a random
+    //                    power and toughness.
+    //  MaxLevelUp      - only the leveler parser writes it (AllAbilities.cpp
+    //                    ~8176), and AIPlayerBaka reads `currentlevel <
+    //                    MaxLevelUp` (~463 / ~1180) for EVERY card: a garbage
+    //                    ceiling makes every creature look level-uppable.
+    //  handEffects     - only MTGAbility.cpp ~6731/6738 writes it, and ~7877
+    //                    reads it to decide a card in hand has an active
+    //                    effect.
+    //  castX           - MTGCardInstance::init() zeroes it, but init() is not
+    //                    on the initMTGCI path, so the default constructor
+    //                    leaves it uninitialised.
+    //  nb_damages      - carried by the header, written nowhere.
+    //The values are the ones the writers themselves imply (no switch pending,
+    //no leveler ceiling, no hand effect, X not announced, no damages).
+    swapP = 0;
+    swapT = 0;
+    MaxLevelUp = 0;
+    handEffects = false;
+    castX = 0;
+    nb_damages = 0;
     X = 0;
     setX = -1;
     sample = "";

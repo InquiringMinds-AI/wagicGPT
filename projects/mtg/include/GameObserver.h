@@ -215,6 +215,16 @@ class GameObserver{
   int mSettledTurn;
   int mSettledStep;
   int mPhaseTicks; //full ticks the current phase/step has survived (see gameStateBasedEffects)
+  //#W57-F (D38): the phase-advance LIVELOCK breaker. `userRequestNextGamePhase`
+  //refuses to leave a phase while a target chooser is armed - correct for a seat
+  //that is about to click a target, permanent for a chooser NO seat will ever
+  //answer (an AI seat that auto-passes the window, a chooser orphaned by a
+  //released interrupt window). Nothing else in the engine can clear it, so the
+  //phase never advances and every seat re-enters the same window for ever
+  //(lane C's stub repro: 65 MB of one auto-pass line). These two count
+  //CONSECUTIVE refusals of the SAME chooser; the pointer changing is progress.
+  TargetChooser * mChooserBlockPtr;
+  int mChooserBlockRefusals;
   void cleanupPhase();
   void nextPlayer();
 
@@ -271,6 +281,13 @@ class GameObserver{
   void phasingPhase();
   void untapPhase();
   MTGCardInstance * isCardWaiting(){ return cardWaitingForTargets; }
+  //#W57-F (D25): clear every observer-level back-pointer into a zone whose
+  //cards are about to be freed, then hand the same zone to the action layer.
+  //Called while the cards are still alive.
+  void purgeDeadReferences(MTGGameZone * zone);
+  //#W57-F (D34): free the armed chooser and the cast waiting on it together -
+  //cardWaitingForTargets is protected, and the two are one state.
+  void releaseTargetChooser();
   int isInPlay(MTGCardInstance *  card);
   int isInGrave(MTGCardInstance *  card);
   int isInExile(MTGCardInstance *  card);

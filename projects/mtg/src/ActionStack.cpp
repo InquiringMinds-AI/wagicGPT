@@ -1520,7 +1520,7 @@ void ActionStack::Update(float dt)
                 //unlogged so a replay's action list is not rewritten by the
                 //recovery. isInterrupting is set in both the "asked" and the
                 //"took it" state, which is what cancelInterruptOffer keys on.
-                cancelInterruptOffer(DONT_INTERRUPT, false);
+                cancelInterruptOffer(DONT_INTERRUPT, false, true); //#W57-F (D34): forced
                 mHoldOn = NULL;
                 mHoldWho = NULL;
                 mHoldTicks = 0;
@@ -1531,7 +1531,29 @@ void ActionStack::Update(float dt)
     }
 }
 
-void ActionStack::cancelInterruptOffer(InterruptDecision cancelMode, bool log)
+//#W57-F (D36): THE THIRD REPLAY DEFECT, root-caused. The stall floor's LOADING
+//arm (12 ticks, "no seat can answer") is right about the seats - a replay never
+//calls AIPlayer::Act, so no seat answers a window - but it is WRONG about the
+//record, which is the answer. Measured on a fresh Baka-vs-Baka transcript
+//(125v126, 2026-09-03): the record has p1 take the window on Overgrown
+//Battlement and tap two lands inside it; the loader spent 12 ticks pumping the
+//action BETWEEN those two taps, the floor released p1's window, the Battlement
+//resolved, and p1's recorded Plains tap then came back `0plains` - refused for
+//all 60 retries, because ActivatedAbility::isReactingToClick needs
+//`source->controller() == game->currentlyActing()` and the window that made p1
+//the acting seat had just been taken away. That is the `0<name>` shape lane E
+//parked, in full.
+//The loader consuming a recorded action IS progress: reset the no-progress
+//budget, so the floor fires only when the loader is stuck on ONE action (the
+//softlock lane AA's fix exists for), never merely because a replay is slow.
+void ActionStack::noteReplayProgress()
+{
+    mHoldTicks = 0;
+    mHoldSeconds = 0.0f;
+    mHoldStartMs = 0;
+}
+
+void ActionStack::cancelInterruptOffer(InterruptDecision cancelMode, bool log, bool forcedRelease)
 {
     int playerId = (observer->isInterrupting == observer->players[1]) ? 1 : 0;
     //#W56-Z: NO safety net here, deliberately. `observer->targetChooser` is
@@ -1541,6 +1563,25 @@ void ActionStack::cancelInterruptOffer(InterruptDecision cancelMode, bool log)
     //in-flight chooser: counter_unless_pay_x and spell_blast_counter_matching_mv
     //both went red. endOfInterruption is safe because it only runs once a seat
     //has TAKEN the window, so the pending choice is that seat's own.
+    //#W57-F (D34): lane Z's residual, and the reason it was a residual. The
+    //chooser IS per-seat - TargetChooser::Owner is stamped from
+    //source->controller() at construction - the OBSERVER's pointer just never
+    //carried the fact. With the owner read, the net lane Z had to remove can be
+    //put back where its residual is: the stall watchdog takes a window away
+    //from a seat that never answered, and a chooser that seat armed inside it
+    //has no other route out (nothing else clears it, and the next window's
+    //first click on any legal target completes the abandoned cast - the owner's
+    //vpk15 Putrefy report). Scoped twice: the FORCED route only, and only a
+    //chooser the RELEASED SEAT owns, so the ordinary decline still cannot touch
+    //the active player's in-flight cast.
+    Player * released = observer->isInterrupting ? observer->isInterrupting : askIfWishesToInterrupt;
+    if (forcedRelease && released && observer->targetChooser
+        && observer->targetChooser->Owner == released)
+    {
+        DebugTrace("ActionStack: releasing the chooser " << released->getDisplayName()
+                   << " armed inside the window the watchdog is taking back");
+        observer->releaseTargetChooser(); //#W57-F (D34)
+    }
     interruptDecision[playerId] = cancelMode;
     askIfWishesToInterrupt = NULL;
     observer->isInterrupting = NULL;
