@@ -1,0 +1,1 @@
+section char costs (specimen above): narration 20953 | current situation 2910 | legal choices+protocol 436 | total 24299

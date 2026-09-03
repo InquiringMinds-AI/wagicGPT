@@ -1,0 +1,580 @@
+# wave-56 lategame specimen: 1788455429-ai_baka_deck125-0x558b19876100-vs-ai_baka_deck130.jsonl seq 112 turn 59 ask, 24299 chars, 3 rows
+# choice=1 chosen_text=Play Seachrome Coast
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Fall of the Gavel; Sphinx's Revelation; Path to Exile; Seachrome Coast; Glacial Fortress; Supreme Verdict; Island
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Pyrite Spellbomb
+- Opponent's Pyrite Spellbomb resolved and entered the battlefield
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Lightmine Field
+- Phase: Main phase 1
+- You played Island
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Talisman of Impulse
+- Opponent's Talisman of Impulse resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Lay Waste
+- Your Seachrome Coast was put into your graveyard from the battlefield
+- Opponent's Lay Waste resolved and went to the opponent's graveyard
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Molten Rain
+- Opponent's Molten Rain dealt 2 damage to you (now 18)
+- Your Glacial Fortress was put into your graveyard from the battlefield
+- Opponent's Molten Rain resolved and went to the opponent's graveyard
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Rorix Bladewing
+- Opponent's Rorix Bladewing resolved and entered the battlefield
+- Phase: Combat damage
+- Opponent's Rorix Bladewing dealt 6 damage to you (now 12)
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+- Paid {w} for Path to Exile with Tundra
+- You cast Path to Exile
+- Opponent's Rorix Bladewing was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Mountain
+- Opponent's Mountain entered the battlefield from the opponent's library
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Stone Rain
+- Your Island was put into your graveyard from the battlefield
+- Opponent's Stone Rain resolved and went to the opponent's graveyard
+=== Turn 13 - YOUR turn ===
+- Phase: Upkeep
+- Opponent's Pyrite Spellbomb was put into the opponent's graveyard from the battlefield
+- Opponent used: Deal 2 damage with Pyrite Spellbomb targeting you
+- Opponent's Pyrite Spellbomb dealt 2 damage to you (now 10)
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Starstorm
+- Opponent used: cycling with Starstorm
+- Opponent drew a card
+- Opponent cast Siege-Gang Commander
+- Paid {1}{u} for Essence Scatter with Island; Tundra
+- You cast Essence Scatter
+- Opponent's Siege-Gang Commander was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Stone Rain
+- Your Tundra was put into your graveyard from the battlefield
+- Opponent's Stone Rain resolved and went to the opponent's graveyard
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent discarded Spark Spray
+- Opponent used: cycling with Spark Spray
+- Opponent drew a card
+- Opponent played Mountain
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Molten Rain
+- Opponent's Molten Rain dealt 2 damage to you (now 8)
+- Your Glacial Fortress was put into your graveyard from the battlefield
+- Opponent's Molten Rain resolved and went to the opponent's graveyard
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Sphinx's Revelation
+- You discarded Sphinx's Revelation
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Siege-Gang Commander
+- Opponent's Siege-Gang Commander resolved and entered the battlefield
+- Opponent's Siege-Gang Commander created 3 1/1 Goblin tokens
+- Opponent's Goblin died (that Goblin was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent used: Deal 2 damage with Siege-Gang Commander targeting you
+- Opponent's Siege-Gang Commander dealt 2 damage to you (now 6)
+- Opponent's Goblin died (that Goblin was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent used: Deal 2 damage with Siege-Gang Commander targeting you
+- Opponent's Siege-Gang Commander dealt 2 damage to you (now 4)
+- Opponent's Goblin died
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent used: Deal 2 damage with Siege-Gang Commander targeting you
+- Opponent's Siege-Gang Commander dealt 2 damage to you (now 2)
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Paid {w} for Path to Exile with Seachrome Coast
+- You cast Path to Exile
+- Opponent's Siege-Gang Commander was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Mountain
+- Opponent's Mountain entered the battlefield from the opponent's library
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Lightmine Field
+- You discarded Lightmine Field
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Lay Waste
+- Opponent used: cycling with Lay Waste
+- Opponent drew a card
+- Opponent cast Siege-Gang Commander
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Seachrome Coast
+- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Siege-Gang Commander was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Plains
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Plains
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lay Waste
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains
+- You cast Dream Fracture
+- Opponent's Lay Waste was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Island
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Forgotten Cave
+- Opponent discarded Starstorm
+- Opponent used: cycling with Starstorm
+- Opponent drew a card
+- Opponent discarded Starstorm
+- Opponent used: cycling with Starstorm
+- Opponent drew a card
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Island
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 7)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (13 cards) into your library with Elixir of Immortality
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Main phase 1
+- You played Island
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Island #4; Plains; Seachrome Coast
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forgotten Cave
+=== Turn 37 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Island
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 12)
+- Your Elixir of Immortality was put into your library from the battlefield
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Dwarven Blastminer
+- Paid {1}{u}{u} for Dream Fracture with Island #4; Island #5; Plains
+- You cast Dream Fracture
+- Opponent's Dwarven Blastminer was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Supreme Verdict
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to you (now 9)
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 39 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 40 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Pyrite Spellbomb
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains
+- You cast Dream Fracture
+- Opponent's Pyrite Spellbomb was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Seachrome Coast
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Mountain
+=== Turn 41 - YOUR turn ===
+- Phase: Upkeep
+- You drew Lightmine Field
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Glacial Fortress
+- You discarded Glacial Fortress
+=== Turn 42 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Hammer of Bogardan
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Hammer of Bogardan was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 14)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 43 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Main phase 1
+- You played Plains
+=== Turn 44 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Pyrite Spellbomb
+- Opponent's Pyrite Spellbomb resolved and entered the battlefield
+- Opponent's Pyrite Spellbomb was put into the opponent's graveyard from the battlefield
+- Opponent used: Draw 1 with Pyrite Spellbomb
+- Opponent drew a card
+- Opponent discarded Lay Waste
+- Opponent used: cycling with Lay Waste
+- Opponent drew a card
+- Opponent played Mountain
+=== Turn 45 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Plains
+- You discarded Plains
+=== Turn 46 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Molten Rain
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #1; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Molten Rain was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 19)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 47 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #2; Seachrome Coast #1; Plains #1; Island #3; Island #4; Island #5; Seachrome Coast #2; Plains #2; Island #6
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 22)
+- You drew Essence Scatter
+- You drew Tundra
+- You drew Seachrome Coast
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Tundra
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality from mana already floating
+- You gained 5 life (now 27)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (7 cards) into your library with Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Seachrome Coast
+- You discarded Seachrome Coast
+=== Turn 48 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+=== Turn 49 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 50 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Dwarven Blastminer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Dwarven Blastminer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 51 - YOUR turn ===
+- Phase: Upkeep
+- You drew Glacial Fortress
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forgotten Cave
+=== Turn 53 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Supreme Verdict
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent discarded Spark Spray
+- Opponent used: cycling with Spark Spray
+- Opponent drew a card
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- You drew Elixir of Immortality
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- You drew Fall of the Gavel
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 32)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (5 cards) into your library with Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Emrakul, the Aeons Torn, Lightmine Field
+- You discarded Emrakul, the Aeons Torn
+- You discarded Lightmine Field
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (2 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 56 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Spark Spray
+- Opponent used: cycling with Spark Spray
+- Opponent drew a card
+=== Turn 57 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 5)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 4)
+- You drew Island
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Final Judgment
+- You discarded Supreme Verdict
+- You discarded Final Judgment
+=== Turn 58 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Talisman of Impulse
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains #1
+- You cast Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Talisman of Impulse was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 59 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 3)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 2)
+- You drew Seachrome Coast
+- Phase: Draw
+- You drew Island
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 32 | Opponent life: 2
+Mana available: 14 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 7, {U} 12 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Island #1 {u}; Island #2 {u}; Seachrome Coast #1 {w} or {u}; Plains #1 {w}; Island #3 {u}; Island #4 {u}; Island #5 {u}; Seachrome Coast #2 {w} or {u}; Plains #2 {w}; Island #6 {u}; Tundra {w} or {u}; Glacial Fortress #1 {w} or {u}; Glacial Fortress #2 {w} or {u}; Island #7 {u}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options); it is never listed in a casting, ability or target menu, so its absence from the choices below does not mean it is gone.
+Your hand (9 cards): Path to Exile (copy 1 of 3 in your hand) {w} [instant]; Path to Exile (copy 2 of 3 in your hand) {w} [instant]; Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]; Dream Fracture {1}{u}{u} [instant]; Fall of the Gavel (copy 2 of 2 in your hand) {3}{u}{w} [instant]; Cancel {1}{u}{u} [instant]; Path to Exile (copy 3 of 3 in your hand) {w} [instant]; Seachrome Coast (land: taps for {W}{U}); Island (land: taps for {U})
+Your battlefield (16 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 14 are lands): Glacial Fortress #1; Glacial Fortress #2; Island #1-#7 x7; Plains #1; Plains #2; Seachrome Coast #1; Seachrome Coast #2; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra
+Opponent battlefield (24 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 23 are lands): Forgotten Cave #1-#3 x3; Mountain #3-#20 x18; Mountain #1 [tapped]; Mountain #2 [tapped]; Talisman of Impulse {2} [artifact] [tapping for mana deals 1 damage to its controller] {effect: "{T}: Add {1}. -- {T}: Add {R} or {G}. Talisman of Impulse deals 1 damage to you."}
+Their untapped sources: 22 (colours they could make: {g}{r}{c})
+Opponent hand size: 0 | Opponent library: 9 cards
+Artifacts in play: you 2 | opponent 1
+Your library: 32 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 59): Ping opponent with Staff of Nin every turn until they reach 0 life. Counter any threats that can kill me or end the game quickly.
+
+Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn)
+1. Play Seachrome Coast
+2. Play Island
+3. Play no land right now
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Play Seachrome Coast)" (a worked example of the format using the first option - choose the option YOU want); this decision needs no PLAN line. Write nothing else.
