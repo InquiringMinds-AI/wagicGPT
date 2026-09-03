@@ -262,7 +262,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
     p2 = g->players[1];
     observer = g;
     app = _app;
-    showMsg = (WRand() % 3);
+    showMsg = (std::rand() % 3);
 
     //no credits when the AI plays :)
     if (p1->isAI())
@@ -600,7 +600,7 @@ void Credits::computeTournament(GameObserver* g, GameApp * _app,bool tournament,
     p2 = g->players[1];
     observer = g;
     app = _app;
-    showMsg = (WRand() % 3);
+    showMsg = (std::rand() % 3);
 
     //no credits when the AI plays :)
     if (p1->isAI())
@@ -1011,7 +1011,7 @@ int Credits::unlockSetByName(string name, bool deferSave)
 
 int Credits::unlockRandomSet(bool force, bool deferSave)
 {
-    int setId = WRand() % setlist.size();
+    int setId = std::rand() % setlist.size();
 
     if (force)
     {

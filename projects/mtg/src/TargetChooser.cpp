@@ -1252,7 +1252,9 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                         cd->removeType("battle");
                         cd->removeType("kindred");
                         if (!cd->types.size()){
-                            int i = rand() % 10000 + 1;
+                            //#W56-E (A35): per-observer generator, not the
+                            //process-global libc stream.
+                            int i = ((card && card->getObserver()) ? card->getObserver()->getRandomGenerator()->random() : std::rand()) % 10000 + 1;
                             ostringstream subt;
                             subt << card->getName() << "_DummyType_" << i;
                             cd->setSubtype(subt.str()); // Fix to avoid type vector size is 0 causing the always true match issue.

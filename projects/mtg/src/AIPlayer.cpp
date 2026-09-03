@@ -144,6 +144,12 @@ AIPlayer::AIPlayer(GameObserver *observer, string file, string fileSmall, MTGDec
 
 }
 
+//#W56-E: see include/AIPlayer.h.
+RandomGenerator* AIPlayer::getRandomGenerator()
+{
+    return observer ? observer->getAIRandomGenerator() : &randomGenerator;
+}
+
 AIPlayer::~AIPlayer()
 {
     while (!clickstream.empty())
@@ -188,7 +194,7 @@ int AIPlayer::clickMultiTarget(TargetChooser * tc, vector<Targetable*>& potentia
         ++ite;
     }
 
-    randomGenerator.random_shuffle(potentialTargets.begin(), potentialTargets.end());
+    getRandomGenerator()->random_shuffle(potentialTargets.begin(), potentialTargets.end()); //#W56-E
     if(potentialTargets.size())
         clickstream.push(NEW AIAction(this, NULL,tc->source,potentialTargets));
     while(clickstream.size())
@@ -203,7 +209,7 @@ int AIPlayer::clickMultiTarget(TargetChooser * tc, vector<Targetable*>& potentia
 
 int AIPlayer::clickSingleTarget(TargetChooser *, vector<Targetable*>& potentialTargets, MTGCardInstance * chosenCard)
 {
-    int i = randomGenerator.random() % potentialTargets.size();
+    int i = getRandomGenerator()->random() % potentialTargets.size(); //#W56-E
 
     if(MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(potentialTargets[i]))
     {
@@ -240,7 +246,7 @@ AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards *
             int nbdecks = MIN(AIPlayer::getTotalAIDecks(), options[Options::AIDECKS_UNLOCKED].number);
             if (!nbdecks)
                 return NULL;
-            deckid = 1 + WRand() % (nbdecks);
+            deckid = 1 + std::rand() % (nbdecks); //#W56-E: WRand was a bare alias for rand()
         }
         char buf[64];
         sprintf(buf, "ai/baka/deck%i.txt", deckid);
@@ -307,7 +313,7 @@ bool AIPlayer::parseLine(const string& s)
         areaS = s.substr(0, limiter);
         if (areaS.compare("rvalues") == 0)
         {
-            randomGenerator.loadRandValues(s.substr(limiter + 1));
+            getRandomGenerator()->loadRandValues(s.substr(limiter + 1)); //#W56-E
             return true;
         }
     }

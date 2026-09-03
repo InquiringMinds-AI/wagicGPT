@@ -378,7 +378,7 @@ int OrderedAIAction::getEfficiency()
             }
 
             if ( efficiency < 20 && efficiency > 0 )
-                efficiency += target->controller()->getObserver()->getRandomGenerator()->random() % 30;
+                efficiency += target->controller()->getObserver()->getAIRandomGenerator()->random() % 30 /*#W56-E*/;
             break;
         }
     case MTGAbility::STANDARD_LEVELUP:
@@ -1095,7 +1095,7 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
             }
 
             if ( eff2 < 20 && eff2 > 0 )
-                eff2 += target->controller()->getObserver()->getRandomGenerator()->random() % 30;
+                eff2 += target->controller()->getObserver()->getAIRandomGenerator()->random() % 30 /*#W56-E*/;
             break;
         }
     case MTGAbility::STANDARD_LEVELUP:
@@ -2296,7 +2296,7 @@ int AIPlayerBaka::selectHintAbility()
     ManaCost * totalPotentialMana = getPotentialMana(); 
     totalPotentialMana->add(this->getManaPool());
     AIAction * action = hints->suggestAbility(totalPotentialMana);
-    if (action && ((randomGenerator.random() % 100) < 95)) //95% chance
+    if (action && ((getRandomGenerator()->random() % 100) < 95)) //95% chance //#W56-E
     {
         if (!clickstream.size())
         {
@@ -2398,7 +2398,7 @@ const OrderedAIAction * AIPlayerBaka::chooseOrderedAction(RankingContainer& rank
     OrderedAIAction action = ranking.begin()->first; //copy: getEfficiency() is not const
     int chance = 1;
     if (!forceBestAbilityUse)
-        chance = 1 + randomGenerator.random() % 100;
+        chance = 1 + getRandomGenerator()->random() % 100; //#W56-E
     int actionScore = action.getEfficiency();
     if(action.ability->getCost() && action.ability->getCost()->hasX() && this->game->hand->cards.size())
         actionScore = actionScore/int(this->game->hand->cards.size());//reduce chance for "x" abilities if cards are in hand.
@@ -2446,7 +2446,7 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
         OrderedAIAction action = ranking.begin()->first;
         int chance = 1;
         if (!forceBestAbilityUse)
-            chance = 1 + randomGenerator.random() % 100;
+            chance = 1 + getRandomGenerator()->random() % 100; //#W56-E
         int actionScore = 95;
         if (action.ability->getCost() && action.ability->getCost()->hasX() && this->game->hand->cards.size())
             actionScore = actionScore / int(this->game->hand->cards.size());//reduce chance for "x" abilities if cards are in hand.
@@ -3430,7 +3430,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
                         continue;
                 }
             }
-            int randomChance = randomGenerator.random();
+            int randomChance = getRandomGenerator()->random(); //#W56-E
             int chance = randomChance % 100;
             //FORCEABILITY tests: any card worth playing at all is played,
             //so scripted AI tests don't depend on the (process-global,
@@ -5001,7 +5001,7 @@ AIPlayer(observer, file, fileSmall, deck)
     {
         avatarFile = "avatar";
         char buffer[4];
-        sprintf(buffer, "%i", int(observer->getRandomGenerator()->random()%200));
+        sprintf(buffer, "%i", int(observer->getAIRandomGenerator()->random()%200)); //#W56-E
         avatarFile.append(buffer);
         avatarFile.append(".jpg");
         if(!loadAvatar(avatarFile, "bakaAvatar"))

@@ -719,8 +719,11 @@ Player* Rules::loadPlayerRandomCommanderFromFile(GameObserver* observer, int isA
     }
 
     // Randomly select a commander ID
-    std::srand(static_cast<unsigned int>(time(NULL)));
-    int randomIndex = std::rand() % validCommanderIds.size();
+    //#W56-E (A35): this used to std::srand(time(NULL)) and std::rand() - a
+    //RESEED of the process-global stream every commander load, shared with
+    //every other thread and invisible to `rvalues:`. The game generator is
+    //per-observer, seeded and recorded.
+    int randomIndex = (observer ? observer->getRandomGenerator()->random() : std::rand()) % validCommanderIds.size();
     std::string commanderId = validCommanderIds[randomIndex];
 
     MTGDeck* cmdTempDeck = NEW MTGDeck(MTGCollection());
