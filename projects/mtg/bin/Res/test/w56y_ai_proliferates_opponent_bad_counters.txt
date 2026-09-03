@@ -1,0 +1,40 @@
+#NAME: The AI still proliferates an opponent's HARMFUL counters (no over-blocking)
+#DESC: Second guard for the #W56-Y ProliferateChooser guidance. The opponent's Grizzly Bears
+#DESC: carries a -1/-1 counter (net power+toughness -2 = harmful to its controller), so
+#DESC: proliferating it is the AI's play: the second -1/-1 counter makes the Bears 0/0 and it
+#DESC: is put into the graveyard as a state-based action.
+#DESC: This fixture passes on the pre-fix binary too - it exists to prove the fix does not
+#DESC: over-block, not to reproduce the defect.
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Swamp,Swamp
+hand:Lexicon Minus Counter Seed,Craw Wurm,Craw Wurm
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Minus Counter Seed
+Grizzly Bears
+assertpt 1/1 grizzly bears
+ai
+no
+no
+no
+no
+no
+no
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Swamp,Swamp
+hand:Craw Wurm
+graveyard:Lexicon Minus Counter Seed,Craw Wurm
+life:20
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

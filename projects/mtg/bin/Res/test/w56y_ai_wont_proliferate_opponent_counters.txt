@@ -1,0 +1,54 @@
+#NAME: An AI never proliferates counters that help the opponent
+#DESC: Owner Vita play report 2026-09-03 (vpk15, "bad targeting"): "One match where the
+#DESC: opponent proliferated +1/+1 counters on my creature." Transcript
+#DESC: 20260903-vpk15/transcript-1788458030-player_deck6-vs-ai_baka_deck133.txt shows the AI
+#DESC: activating Yawgmoth, Thran Physician's `{B}{B}, Discard a card: Proliferate` FIVE times
+#DESC: in one turn while none of its own permanents carried a counter and the HUMAN's
+#DESC: Stonebrow / Toski / Boartusk Liege carried +1/+1 counters - every activation paid a card
+#DESC: to grow the opponent's board.
+#DESC: Mechanism: ProliferateChooser::canTarget's PLAYER branch already carries AI guidance
+#DESC: (never our own poison, never an opponent with no poison); its CARD branch had none, so
+#DESC: any in-play card with any counter was a legal choice, and AIPlayerBaka::chooseTarget
+#DESC: sets playerTargetedZone = 2 for a ProliferateChooser so the walk covers BOTH boards.
+#DESC: Expected with the guidance: the AI's own board has no counters, the opponent's Grizzly
+#DESC: Bears carries a +1/+1 counter that is GOOD for its controller, so no legal choice
+#DESC: exists, createAbilityTargets returns 0 and the ability is never ranked - the Bears stay
+#DESC: 3/3 and the AI's hand is still two cards (nothing was discarded).
+#DESC: "Lexicon Proliferate Physician" is a test-only comma-free stand-in carrying only
+#DESC: Yawgmoth's proliferate ability; suite zone lists are comma-separated, so the real
+#DESC: card's name cannot be placed by a fixture.
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Swamp,Swamp
+hand:Lexicon Plus Counter Seed,Craw Wurm,Hill Giant
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Plus Counter Seed
+Grizzly Bears
+assertpt 3/3 grizzly bears
+ai
+no
+no
+no
+no
+no
+no
+assertpt 3/3 grizzly bears
+assertpt 2/4 lexicon proliferate physician
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Swamp,Swamp
+hand:Craw Wurm,Hill Giant
+graveyard:Lexicon Plus Counter Seed
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[END]

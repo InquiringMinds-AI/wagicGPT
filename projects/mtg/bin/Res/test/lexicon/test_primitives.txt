@@ -6351,3 +6351,33 @@ type=Artifact
 auto={0}:counter(1/1,2) target(creature|battlefield)
 text=Test-only: put two +1/+1 counters on target creature on either battlefield as ONE event.
 [/card]
+[card]
+id=2100000600
+name=Lexicon Plus Counter Seed
+rarity=C
+mana={0}
+type=Sorcery
+auto=counter(1/1) target(creature|battlefield)
+text=Test-only: put a +1/+1 counter on target creature on either battlefield, then leave play (one-shot seeder for counter fixtures).
+[/card]
+[card]
+id=2100000601
+name=Lexicon Minus Counter Seed
+rarity=C
+mana={0}
+type=Sorcery
+auto=counter(-1/-1) target(creature|battlefield)
+text=Test-only: put a -1/-1 counter on target creature on either battlefield, then leave play (one-shot seeder for counter fixtures).
+[/card]
+[card]
+id=2100000602
+name=Lexicon Proliferate Physician
+rarity=C
+mana={2}{B}{B}
+type=Creature
+subtype=Human Cleric
+power=2
+toughness=4
+auto={B}{B}{discard(*|myhand)}:name(Proliferate) notatarget(proliferation) proliferate
+text=Test-only comma-free stand-in for the proliferate half of Yawgmoth, Thran Physician ({B}{B}, Discard a card: Proliferate). The engine's suite zone lists are comma-separated, so the real card's name cannot be placed by a fixture.
+[/card]

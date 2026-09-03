@@ -1,0 +1,44 @@
+#NAME: The AI still proliferates its OWN beneficial counters (no over-blocking)
+#DESC: Guard for the #W56-Y ProliferateChooser guidance: the rule is DIRECTIONAL, not a
+#DESC: blanket ban. Same board as w56y_ai_wont_proliferate_opponent_counters.txt with the
+#DESC: +1/+1 counter moved to the AI's OWN Grizzly Bears and nothing countered on the
+#DESC: opponent's side. Expected: the AI activates the proliferate ability once (its two
+#DESC: Swamps pay for exactly one {B}{B}), discards one card, and its own Bears go 3/3 -> 4/4
+#DESC: while the opponent's Runeclaw Bear is untouched.
+#DESC: This fixture passes on the pre-fix binary too - it exists to prove the fix does not
+#DESC: over-block, not to reproduce the defect.
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Grizzly Bears,Swamp,Swamp
+hand:Lexicon Plus Counter Seed,Craw Wurm,Craw Wurm
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[DO]
+Lexicon Plus Counter Seed
+Grizzly Bears
+assertpt 3/3 grizzly bears
+ai
+no
+no
+no
+no
+no
+no
+assertpt 4/4 grizzly bears
+assertpt 2/2 runeclaw bear
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Lexicon Proliferate Physician,Grizzly Bears,Swamp,Swamp
+hand:Craw Wurm
+graveyard:Lexicon Plus Counter Seed,Craw Wurm
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[END]

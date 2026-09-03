@@ -2562,6 +2562,44 @@ bool dredgeChooser::equals(TargetChooser * tc)
 }
 //-----------
 //-----------
+//#W56-Y: what a counter of this kind is WORTH to the permanent's controller,
+//as a proliferate decision. Return >0 beneficial, <0 harmful, 0 unknown.
+//P/T-carrying counters (+1/+1, -1/-1, +2/+0 ...) tell the whole story from
+//their own numbers; the rest are named 0/0 counters and are scored from a
+//small explicit list. Anything unlisted scores 0 and is resolved by the
+//caller's unknown-counter policy.
+static int proliferateCounterValue(const Counter * c)
+{
+    if (!c)
+        return 0;
+    int pt = c->power + c->toughness;
+    if (pt)
+        return pt;
+    string n = c->name;
+    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+    //Adding one more of these HELPS the permanent's controller. "fade" and
+    //"time" are the fading/vanishing counters (MTGAbility.cpp AVanishing):
+    //the permanent is sacrificed when one can no longer be removed, so more
+    //of them is more turns. (Suspend also names its counters "time", but a
+    //suspended card sits in EXILE and canTarget already requires isInPlay,
+    //so an in-play "time" counter is always the vanishing kind.)
+    static const char * kGood[] = { "loyalty", "charge", "level", "quest", "lore",
+                                    "shield", "oil", "experience", "energy", "verse",
+                                    "study", "ki", "growth", "spore", "hoofprint",
+                                    "fade", "time", "page", "fate", "gold", NULL };
+    //Adding one more of these HURTS the permanent's controller: age is
+    //cumulative upkeep, stun eats an untap step, doom and finality are
+    //punishments their controller wants gone.
+    static const char * kBad[]  = { "age", "stun", "doom", "finality", NULL };
+    for (int i = 0; kGood[i]; ++i)
+        if (n == kGood[i])
+            return 1;
+    for (int i = 0; kBad[i]; ++i)
+        if (n == kBad[i])
+            return -1;
+    return 0;
+}
+
 /*Proliferate Target */
 bool ProliferateChooser::canTarget(Targetable * target, bool withoutProtections)
 {
@@ -2586,6 +2624,45 @@ bool ProliferateChooser::canTarget(Targetable * target, bool withoutProtections)
             return false;
         if(!card->counters || (card->counters && card->counters->counters.empty()))
             return false;
+        //#W56-Y (owner Vita report 2026-09-03, "bad targeting"): the PLAYER
+        //branch above already carries AI guidance; this branch had NONE, so
+        //any in-play card with any counter was accepted and Baka happily
+        //spent {B}{B} + a discard five times in one turn growing the HUMAN's
+        //+1/+1-countered creatures (Yawgmoth, Thran Physician). Mirror the
+        //player branch: an AI proliferates its OWN permanent only when the
+        //counters there help it, and an OPPONENT's only when they hurt them.
+        //
+        //Proliferate adds one more counter of EVERY kind already on the
+        //chosen permanent (the parser builds AAProliferate with
+        //allcounters=true for both `proliferate` and `propagate`, so the
+        //MenuAbility one-kind pick in AAProliferate::resolve is unreachable
+        //from card script today). The marginal effect of the choice is
+        //therefore one counter of each KIND - so sum per kind, NOT per
+        //counter count.
+        //
+        //Unknown 0/0 counters net to 0. Policy: on our OWN card treat that as
+        //worth proliferating (the upside is free, we already paid the cost);
+        //on an OPPONENT's card treat it as helping THEM and decline - when we
+        //cannot tell what a counter does, we do not hand it to the other seat.
+        //Human seats are untouched: a human is a Player (isAI() == 0), so the
+        //whole block is skipped and the click behaves byte-identically.
+        if(source && source->controller()->isAI())
+        {
+            int net = 0;
+            for(size_t i = 0; i < card->counters->counters.size(); ++i)
+                net += proliferateCounterValue(card->counters->counters[i]);
+            bool mine = (card->controller() == source->controller());
+            if(mine)
+            {
+                if(net < 0)
+                    return false; //our own permanent, the counters hurt it
+            }
+            else
+            {
+                if(net >= 0)
+                    return false; //their permanent, the counters help them
+            }
+        }
         return true;
     }
     return false;
