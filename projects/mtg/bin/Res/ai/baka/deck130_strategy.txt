@@ -114,10 +114,10 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      "{kills 0 of the 2 legal targets at 3 damage}", aimed the Hammer at a planeswalker instead
      of at the row reading "The opponent (player, life 1)", declined the Spellbomb next window
      as "no direct damage", and lost that game 0 to 1.
-  0. FIRST read the "{X pricing:" annotation on the Cast Starstorm line, and read the WHOLE of
-     it - the "At X=..." clause after the first sentence, not just the first number. The
-     annotation prints TWO lists at each X: what it kills of THEIRS and what it kills of
-     YOURS. Both halves are binding.
+  0b. AFTER step 0 above, and before step 1 below: read the "{X pricing:" annotation on the
+     Cast Starstorm line, and read the WHOLE of it - the "At X=..." clause after the first
+     sentence, not just the first number. The annotation prints TWO lists at each X: what it
+     kills of THEIRS and what it kills of YOURS. Both halves are binding.
      TAKE IT when the THEIRS list at an affordable X names TWO OR MORE creatures. At that X it
      OUTRANKS every single-target damage spell you hold and every land destruction spell in
      your hand - Hammer of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one.
@@ -304,7 +304,7 @@ At every "which card do you cast now" ask on your own turn, read your numbered o
 bottom and take the FIRST line below that matches something in your menu. Stop there - do not
 weigh a later line against an earlier one. The card sections underneath are detail hanging off
 these entries, never a separate instruction.
- 1. STARSTORM, when rule #2 step 0 says take it (the THEIRS list at an affordable X names TWO OR
+ 1. STARSTORM, when rule #2 step 0b says take it (the THEIRS list at an affordable X names TWO OR
     MORE creatures, and the YOURS list names neither Rorix nor Siege-Gang). It answers a board;
     nothing else here does. AND IT GOES FIRST IN THE TURN: the X you can afford shrinks with every
     spell you cast before it. With "Thraben Doomsayer, Human x2" on their line and Intruder
@@ -370,7 +370,7 @@ let the Captain live for one mana. The X is chosen by rule #2 STEP 1 - the LARGE
 list whose "YOURS:" reads "none" - and by nothing else. Because it
 kills your own Blastminers, Goblins, Siege-Gang AND RORIX too, SWEEP FIRST and deploy your bodies
 AFTER - and once Rorix or Siege-Gang is already on the battlefield, Starstorm is a card you hold,
-not a card you cast (rule #2, step 0).
+not a card you cast (rule #2, step 0b).
 SIEGE-GANG COMMANDER brings FOUR BODIES (a 2/2 plus three 1/1 Goblins) - your board and your
 blockers. Its "Sacrifice a Goblin" ability is for killing a creature or finishing a player at 6 or
 less life; a Goblin spent on 2 face damage against a healthy opponent is the worst trade in the deck.
@@ -679,7 +679,7 @@ DECIDING SITUATIONS (recognise -> do)
 - Their board shows two or more creatures that are NOT marked "[defender]", Starstorm is in hand,
   and NEITHER Rorix Bladewing NOR Siege-Gang Commander is on your battlefield -> cast Starstorm,
   and cast it BEFORE you cast Siege-Gang Commander. If Rorix or Siege-Gang IS already out, or
-  every creature the annotation kills of theirs is "[defender]", hold the card (rule #2, step 0)
+  every creature the annotation kills of theirs is "[defender]", hold the card (rule #2, step 0b)
   - this deck held it correctly through five such windows in one game while Rorix raced the
   opponent from 20 to dead.
 - The "{X pricing:" annotation's YOURS list at the X you were going to pick names Rorix Bladewing
