@@ -71,73 +71,73 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
     {
         halfup = true;
         size_t hU = s.find("halfup");
-        s.erase(hU,hU + 6);
+        s.erase(hU, 6); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("halfdown") != string::npos)
     {
         halfdown = true;
         size_t hD = s.find("halfdown");
-        s.erase(hD,hD + 8);
+        s.erase(hD, 8); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("thirdup") != string::npos)
     {
         thirdup = true;
         size_t tU = s.find("thirdup");
-        s.erase(tU,tU + 7);
+        s.erase(tU, 7); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("thirddown") != string::npos)
     {
         thirddown = true;
         size_t tD = s.find("thirddown");
-        s.erase(tD,tD + 9);
+        s.erase(tD, 9); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("twice") != string::npos)
     {
         twice = true;
         size_t tXX = s.find("twice");
-        s.erase(tXX,tXX + 5);
+        s.erase(tXX, 5); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("thrice") != string::npos)
     {
         thrice = true;
         size_t tXXX = s.find("thrice");
-        s.erase(tXXX,tXXX + 6);
+        s.erase(tXXX, 6); //#W54-H (A26): erase(pos, count), not (pos, pos + count)
     }
     if(s.find("fourtimes") != string::npos)
     {
         fourtimes = true;
         size_t tXXX = s.find("fourtimes");
-        s.erase(tXXX,tXXX + 9);
+        s.erase(tXXX, 9); //#W54-H (A26)
     }
     if(s.find("fivetimes") != string::npos)
     {
         fivetimes = true;
         size_t tXXX = s.find("fivetimes");
-        s.erase(tXXX,tXXX + 9);
+        s.erase(tXXX, 9); //#W54-H (A26)
     }
     if(s.find("othertype") != string::npos)
     {
         other = true;
         size_t oth = s.find("othertype");
-        s.erase(oth,oth + 5);
+        s.erase(oth, 5); //#W54-H (A26): strips the "other" prefix only
     }
     if(s.find("otherpower") != string::npos)
     {
         other = true;
         size_t otp = s.find("otherpower");
-        s.erase(otp,otp + 5);
+        s.erase(otp, 5); //#W54-H (A26): strips the "other" prefix only
     }
     if(s.find("othertoughness") != string::npos)
     {
         other = true;
         size_t ott = s.find("othertoughness");
-        s.erase(ott,ott + 5);
+        s.erase(ott, 5); //#W54-H (A26): strips the "other" prefix only
     }
     if(s.find("otherconvertedcost") != string::npos)
     {
         other = true;
         size_t otc = s.find("otherconvertedcost");
-        s.erase(otc,otc + 5);
+        s.erase(otc, 5); //#W54-H (A26): strips the "other" prefix only
     }
 
     if (s.find("plusend") != string::npos || s.find("minusend") != string::npos || s.find("math") != string::npos)

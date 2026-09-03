@@ -927,6 +927,7 @@ int ActionStack::addAction(Interruptible * action)
         interruptDecision[i] = NOT_DECIDED;
     }
     Add(action);
+    observer->bumpAbilityEpoch(); //#W54-H (A6b)
     lastActionController = observer->currentlyActing();
     DebugTrace("Action added to stack: " << action->getDisplayName());
 
@@ -1033,6 +1034,7 @@ int ActionStack::resolve()
     {
         action->state = RESOLVED_NOK;
     }
+    observer->bumpAbilityEpoch(); //#W54-H (A6b): a resolution is a state change
     if (action->type == ACTION_DAMAGE)
         ((Damage *) action)->target->afterDamage();
     if (!getNext(NULL, NOT_RESOLVED))
@@ -1657,11 +1659,9 @@ int ActionStack::garbageCollect()
         Interruptible * current = ((Interruptible *) *iter);
         if (current->state != NOT_RESOLVED)
         {
-            AManaProducer * amp = dynamic_cast<AManaProducer*>(current);
-            if(amp)
-            {
-                manaObjects.erase(iter);
-            }
+            //#W54-H (L16): the dynamic_cast<AManaProducer*> branch that stood
+            //here could never fire (no class derives from both) and erased
+            //manaObjects with an iterator into mObjects if it ever did.
             iter = mObjects.erase(iter);
             SAFE_DELETE(current);
         }

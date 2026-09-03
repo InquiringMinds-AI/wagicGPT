@@ -31,6 +31,8 @@ static inline bool w54gLegacyBehavior()
     }
     return cached == 1;
 }
+//#W54-H: WAGIC_W54H_LEGACY=1 restores every-tick condition polling (defined in MTGAbility.cpp).
+bool w54hLegacyBehavior();
 #include "GameObserver.h"
 #include "Subtypes.h"
 #include "ThisDescriptor.h"
@@ -3679,7 +3681,14 @@ public:
 
     void Update(float dt)
     {
-        ListMaintainerAbility::Update(dt);
+        //#W54-H (A6b/c): epoch-gated, and a single updateTargets per tick -
+        //SorterFunction runs it; added()/removed() are no-ops for this class,
+        //so the old first call only re-filled the list the second call then
+        //found unchanged.
+        if (w54hLegacyBehavior())
+            ListMaintainerAbility::Update(dt);
+        else if (!conditionEpochDue())
+            return;
         if(!ability->oneShot) {
             SorterFunction();
         }
@@ -4846,6 +4855,8 @@ public:
 
     void Update(float)
     {
+        if (!conditionEpochDue()) //#W54-H (A6b)
+            return;
         resolve();
     }
 
@@ -4942,6 +4953,8 @@ public:
 
     void Update(float)
     {
+        if (!conditionEpochDue()) //#W54-H (A6b)
+            return;
         resolve();
     }
 

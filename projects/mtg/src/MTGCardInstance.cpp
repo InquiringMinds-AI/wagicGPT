@@ -534,7 +534,11 @@ void MTGCardInstance::addType(int type)
     CardPrimitive::addType(type);
 
     if (!before)
+    {
         mPropertiesChangedSinceLastUpdate = true;
+        if (getObserver())
+            getObserver()->bumpAbilityEpoch(); //#W54-H (A6b): the list maintainers must see this
+    }
 
     // If the card name is not set, set it to the type.
     //This is a hack for "transform", used in combination with "losesubtypes" on Basic Lands
@@ -578,6 +582,8 @@ int MTGCardInstance::removeType(int id, int removeAll)
     if (before != after)
     {
         mPropertiesChangedSinceLastUpdate = true;
+        if (getObserver())
+            getObserver()->bumpAbilityEpoch(); //#W54-H (A6b)
         // Basic lands have the same name as their subtypes, and TargetChoosers don't make a distinction between name and type,
         // so if we remove a subtype "Forest", we also need to remove its name.
         //This means the card might lose its name, but usually when we force remove a type, we add another one just after that.

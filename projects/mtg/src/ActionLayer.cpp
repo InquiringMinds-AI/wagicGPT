@@ -22,6 +22,7 @@ MTGAbility* ActionLayer::getAbility(int type)
 
 int ActionLayer::removeFromGame(ActionElement * e)
 {
+    observer->bumpAbilityEpoch(); //#W54-H (A6b): an ability leaving is a state change
     mReactions.erase(e);
     int i = getIndexOf(e);
     if (i == -1)
@@ -145,6 +146,8 @@ bool ActionLayer::CheckUserInput(JButton key)
 
 void ActionLayer::Update(float dt)
 {
+    if (stuffHappened)
+        observer->bumpAbilityEpoch(); //#W54-H (A6b): a click or a harness poke landed
     stuffHappened = 0;
     if (menuObject)
     {

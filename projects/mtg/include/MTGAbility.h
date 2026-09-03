@@ -138,6 +138,14 @@ public:
     bool oneShot;
     int forceDestroy;
     int forcedAlive;
+    //#W54-H (A6b): GameObserver::mAbilityEpoch as last seen by this ability's
+    //condition re-evaluation; 0 = never evaluated (a clone starts at 0 too).
+    unsigned int mConditionEpoch;
+    //True when the game changed since this ability last re-evaluated its
+    //condition (or under WAGIC_W54H_LEGACY=1, always). Records the epoch
+    //BEFORE the caller evaluates, so a change the evaluation itself causes
+    //is seen on the next tick.
+    bool conditionEpochDue();
     //The card whose MTGCardInstance::cardsAbilities index currently lists this
     //ability, or NULL.  That index is a raw-pointer cache read back by
     //GameObserver::Affinity, MTGCardInstance::canproduceMana and WParsedInt's
