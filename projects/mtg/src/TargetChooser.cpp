@@ -13,8 +13,13 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
 {
     if (!s.size()) return NULL;
 
-    int zones[10];
+    //#W54-G (A29): the member this feeds is TargetZoneChooser::zones[15]; the
+    //local was [10] and `nonbattlezone` alone contributes 10, so a script like
+    //`|nonbattlezone,mystack` smashed the stack. Bounded push, same capacity
+    //as the member; entries past it are dropped like init() would drop them.
+    int zones[15];
     int nbzones = 0;
+#define TC_PUSH_ZONE(z) do { if (nbzones < 15) zones[nbzones++] = (z); } while (0)
     size_t found;
     bool other = false;
 
@@ -36,7 +41,7 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
     if (found != string::npos)
     {
         int maxtargets = 1;
-        zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
+        TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
         return NEW dredgeChooser(observer,zones,nbzones, card, maxtargets);
     }
 
@@ -293,194 +298,195 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                 zoneName = s2;
                 s2 = "";
             }
-            zones[nbzones] = MTGGameZone::MY_BATTLEFIELD;
+            if (nbzones < 15)
+                zones[nbzones] = MTGGameZone::MY_BATTLEFIELD;
 
             // First, check if it defines multiple zones
             if (zoneName.compare("*") == 0)
             {
-                zones[nbzones++] = MTGGameZone::ALL_ZONES;
+                TC_PUSH_ZONE(MTGGameZone::ALL_ZONES);
             }
             else if (zoneName.compare("sideboard") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_SIDEBOARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_SIDEBOARD;
+                TC_PUSH_ZONE(MTGGameZone::MY_SIDEBOARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_SIDEBOARD);
             }
             else if (zoneName.compare("commandzone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("reveal") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_REVEAL;
-                zones[nbzones++] = MTGGameZone::OPPONENT_REVEAL;
+                TC_PUSH_ZONE(MTGGameZone::MY_REVEAL);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_REVEAL);
             }
             else if (zoneName.compare("graveyard") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
             }
             else if (zoneName.compare("battlefield") == 0 || zoneName.compare("inplay") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_BATTLEFIELD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_BATTLEFIELD;
+                TC_PUSH_ZONE(MTGGameZone::MY_BATTLEFIELD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_BATTLEFIELD);
             }
             else if (zoneName.compare("hand") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
             }
             else if (zoneName.compare("mybattlefieldhand") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_BATTLEFIELD;                
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_BATTLEFIELD);                
             }
             else if (zoneName.compare("library") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
             }
             else if (zoneName.compare("nonbattlezone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("stack") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_STACK;
-                zones[nbzones++] = MTGGameZone::OPPONENT_STACK;
+                TC_PUSH_ZONE(MTGGameZone::MY_STACK);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_STACK);
             }
             else if (zoneName.compare("exile") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
             }
             else if (zoneName.compare("mycastingzone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
             }
             else if (zoneName.compare("myrestrictedcastingzone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
             }
             else if (zoneName.compare("mycommandplay") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_BATTLEFIELD;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_BATTLEFIELD);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
             }
             else if (zoneName.compare("myhandlibrary") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
             }
             else if (zoneName.compare("mygravelibrary") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
             }
             else if (zoneName.compare("opponentgravelibrary") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
             }
             else if (zoneName.compare("mygraveexile") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
             }
             else if (zoneName.compare("opponentgraveexile") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
             }
             else if (zoneName.compare("opponentcastingzone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("opponentrestrictedcastingzone") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("opponentcommandplay") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_BATTLEFIELD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_BATTLEFIELD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("opponenthandlibrary") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
             }
             else if (zoneName.compare("mynonplaynonexile") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
             }
             else if (zoneName.compare("opponentnonplaynonexile") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else if (zoneName.compare("myhandexilegrave") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::MY_HAND;
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
             }
             else if (zoneName.compare("opponenthandexilegrave") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
             }
             else if (zoneName.compare("myzones") == 0)
             {
-                zones[nbzones++] = MTGGameZone::MY_BATTLEFIELD;
-                zones[nbzones++] = MTGGameZone::MY_STACK;
-                zones[nbzones++] = MTGGameZone::MY_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::MY_LIBRARY;
-                zones[nbzones++] = MTGGameZone::MY_HAND;
-                zones[nbzones++] = MTGGameZone::MY_EXILE;
-                zones[nbzones++] = MTGGameZone::MY_SIDEBOARD;
-                zones[nbzones++] = MTGGameZone::MY_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::MY_BATTLEFIELD);
+                TC_PUSH_ZONE(MTGGameZone::MY_STACK);
+                TC_PUSH_ZONE(MTGGameZone::MY_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::MY_HAND);
+                TC_PUSH_ZONE(MTGGameZone::MY_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::MY_SIDEBOARD);
+                TC_PUSH_ZONE(MTGGameZone::MY_COMMANDZONE);
             }
             else if (zoneName.compare("opponentzones") == 0)
             {
-                zones[nbzones++] = MTGGameZone::OPPONENT_BATTLEFIELD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_STACK;
-                zones[nbzones++] = MTGGameZone::OPPONENT_GRAVEYARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_LIBRARY;
-                zones[nbzones++] = MTGGameZone::OPPONENT_HAND;
-                zones[nbzones++] = MTGGameZone::OPPONENT_EXILE;
-                zones[nbzones++] = MTGGameZone::OPPONENT_SIDEBOARD;
-                zones[nbzones++] = MTGGameZone::OPPONENT_COMMANDZONE;
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_BATTLEFIELD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_STACK);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_GRAVEYARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_LIBRARY);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_HAND);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_EXILE);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_SIDEBOARD);
+                TC_PUSH_ZONE(MTGGameZone::OPPONENT_COMMANDZONE);
             }
             else
             {
                 int zone = MTGGameZone::zoneStringToId(zoneName);
-                if (zone) zones[nbzones++] = zone;
+                if (zone) TC_PUSH_ZONE(zone);
             }
         }
     }
@@ -1863,6 +1869,12 @@ void TypeTargetChooser::addType(const char * _type)
 
 void TypeTargetChooser::addType(int type)
 {
+    //#W54-G (A29): types[10] had no bound - an 11-name target(...) list overflowed the heap
+    if (nbtypes >= (int)(sizeof(types) / sizeof(types[0])))
+    {
+        DebugTrace("TypeTargetChooser::addType: more than " << (int)(sizeof(types) / sizeof(types[0])) << " types, dropping " << type);
+        return;
+    }
     types[nbtypes] = type;
     nbtypes++;
 }

@@ -13,6 +13,24 @@
 #include "Counters.h"
 #include "WEvent.h"
 #include "GuiStatic.h"
+
+//#W54-G: DISABLE FLAG for the two output-affecting changes of the lane (the
+//silent-instrument rule - "was it me?" must be one env var, not a build swap).
+//WAGIC_W54G_LEGACY=1 restores (1) the pre-A8 click-path ownership in
+//GenericAbilityMod/GenericAddToGame::resolve (the accepted clone is orphaned
+//as before) and (2) ABushidoAbility::destroy subtracting from attackCost.
+//Read once; default off. Everything else in the lane is pure ownership/leak
+//repair with no output surface.
+static inline bool w54gLegacyBehavior()
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char * v = getenv("WAGIC_W54G_LEGACY");
+        cached = (v && v[0] && v[0] != '0') ? 1 : 0;
+    }
+    return cached == 1;
+}
 #include "GameObserver.h"
 #include "Subtypes.h"
 #include "ThisDescriptor.h"
@@ -264,7 +282,13 @@ public:
 
     TrCardAddedToZone * clone() const
     {
-        return NEW TrCardAddedToZone(*this);
+        //#W54-G (A14): the copy ctor aliased four owned choosers the dtor frees
+        TrCardAddedToZone * a = NEW TrCardAddedToZone(*this);
+        a->toTcZone = toTcZone ? toTcZone->clone() : NULL;
+        a->fromTcZone = fromTcZone ? fromTcZone->clone() : NULL;
+        a->toTcCard = toTcCard ? toTcCard->clone() : NULL;
+        a->fromTcCard = fromTcCard ? fromTcCard->clone() : NULL;
+        return a;
     }
 };
 
@@ -587,7 +611,9 @@ public:
 
     TrCombatTrigger * clone() const
     {
-        return NEW TrCombatTrigger(*this);
+        TrCombatTrigger * a = NEW TrCombatTrigger(*this);
+        a->fromTc = fromTc ? fromTc->clone() : NULL; //#W54-G (A14): owned, was aliased
+        return a;
     }
 };
 
@@ -809,9 +835,16 @@ public:
         return 1;
     }
 
+    ~TrplayerProliferated()
+    {
+        SAFE_DELETE(proliferateException); //#W54-G (A31): had no dtor at all
+    }
+
     TrplayerProliferated * clone() const
     {
-        return NEW TrplayerProliferated(*this);
+        TrplayerProliferated * a = NEW TrplayerProliferated(*this);
+        a->proliferateException = proliferateException ? proliferateException->clone() : NULL; //#W54-G (A14)
+        return a;
     }
 };
 
@@ -1516,7 +1549,9 @@ public:
 
     TrDamaged * clone() const
     {
-        return NEW TrDamaged(*this);
+        TrDamaged * a = NEW TrDamaged(*this);
+        a->fromTc = fromTc ? fromTc->clone() : NULL; //#W54-G (A14): owned, was aliased
+        return a;
     }
 };
 
@@ -1565,11 +1600,15 @@ public:
     ~TrLifeGained()
     {
         SAFE_DELETE(fromTc);
+        SAFE_DELETE(gainException); //#W54-G (A31): leaked per parse
     }
 
     TrLifeGained * clone() const
     {
-        return NEW TrLifeGained(*this);
+        TrLifeGained * a = NEW TrLifeGained(*this);
+        a->fromTc = fromTc ? fromTc->clone() : NULL; //#W54-G (A14): owned, was aliased
+        a->gainException = gainException ? gainException->clone() : NULL;
+        return a;
     }
 };
 
@@ -1611,7 +1650,9 @@ public:
 
     TrVampired * clone() const
     {
-        return NEW TrVampired(*this);
+        TrVampired * a = NEW TrVampired(*this);
+        a->fromTc = fromTc ? fromTc->clone() : NULL; //#W54-G (A14): owned, was aliased
+        return a;
     }
 };
 
@@ -1648,7 +1689,9 @@ public:
 
     TrTargeted * clone() const
     {
-        return NEW TrTargeted(*this);
+        TrTargeted * a = NEW TrTargeted(*this);
+        a->fromTc = fromTc ? fromTc->clone() : NULL; //#W54-G (A14): owned, was aliased
+        return a;
     }
 };
 
@@ -1694,12 +1737,15 @@ public:
     ~TrCounter()
     {
         SAFE_DELETE(counter);
+        SAFE_DELETE(counterException); //#W54-G (A31): leaked per parse
     }
 
     TrCounter * clone() const
     {
         TrCounter * mClone = NEW TrCounter(*this);
-        mClone->counter = NEW Counter(*this->counter);
+        //#W54-G (A14): counter is legitimately NULL for counteradded((any))
+        mClone->counter = counter ? NEW Counter(*this->counter) : NULL;
+        mClone->counterException = counterException ? counterException->clone() : NULL;
         return mClone;
     }
 };
@@ -1798,12 +1844,15 @@ public:
     ~TrTotalCounter()
     {
         SAFE_DELETE(counter);
+        SAFE_DELETE(counterException); //#W54-G (A31): leaked per parse
     }
 
     TrTotalCounter * clone() const
     {
         TrTotalCounter * mClone = NEW TrTotalCounter(*this);
-        mClone->counter = NEW Counter(*this->counter);
+        //#W54-G (A14): counter is legitimately NULL for counteradded((any))
+        mClone->counter = counter ? NEW Counter(*this->counter) : NULL;
+        mClone->counterException = counterException ? counterException->clone() : NULL;
         return mClone;
     }
 };
@@ -3060,6 +3109,31 @@ public:
         triggers = 0;
     }
     
+    //#W54-G (A30): the four copies of the re-parse block became one, and the
+    //`triggers` count no longer goes through char buffer[4] (five bytes at
+    //1000 activations). Semantics kept exactly: PT is rewritten in place the
+    //first time `numofactivation` is substituted, so later re-parses see the
+    //number, not the keyword - caching the parse would change verdicts.
+    void rebuildPT()
+    {
+        if (!PT.size())
+            return;
+        SAFE_DELETE(wppt);
+        char buffer[16];
+        snprintf(buffer, sizeof(buffer), "%i", triggers);
+        string trg(buffer);
+        size_t pos = PT.find("numofactivation");
+        if (pos != string::npos)
+            PT.replace(pos, 15, trg);
+        pos = PT.find("numofactivation");
+        if (pos != string::npos)
+            PT.replace(pos, 15, trg);
+        if (cda)
+            wppt = NEW WParsedPT(cReplaceString(PT, " cdaactive", ""), NULL, (MTGCardInstance *) source);
+        else
+            wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""), NULL, (MTGCardInstance *) source);
+    }
+
     void Update(float)
     {
         if(!nonstatic)
@@ -3085,28 +3159,7 @@ public:
 
             ((MTGCardInstance *) target)->power -= wppt->power.getValue();
             ((MTGCardInstance *) target)->addToToughness(-wppt->toughness.getValue());
-            if(PT.size())
-                {
-                    SAFE_DELETE(wppt);
-                    char buffer[4];
-                    sprintf(buffer, "%i", triggers);
-                    string trg;
-                    trg.append(buffer);
-                    if(PT.find("numofactivation") != string::npos){
-                        size_t pos = PT.find("numofactivation");
-                        if(pos != string::npos)
-                            PT.replace(pos, 15, trg);
-                    }
-                    if(PT.find("numofactivation") != string::npos){
-                        size_t pos = PT.find("numofactivation");
-                        if(pos != string::npos)
-                            PT.replace(pos, 15, trg);
-                    }
-                    if(cda)
-                        wppt = NEW WParsedPT(cReplaceString(PT, " cdaactive", ""),NULL,(MTGCardInstance *) source);
-                    else
-                        wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""),NULL,(MTGCardInstance *) source);
-                }
+            rebuildPT();
             MTGCardInstance * _target = (MTGCardInstance *) target;
             _target->power += wppt->power.getValue();
             _target->addToToughness(wppt->toughness.getValue());
@@ -3116,28 +3169,7 @@ public:
         }
         if(cda)
         {//update but not apply
-            if(PT.size())
-                {
-                    SAFE_DELETE(wppt);
-                    char buffer[4];
-                    sprintf(buffer, "%i", triggers);
-                    string trg;
-                    trg.append(buffer);
-                    if(PT.find("numofactivation") != string::npos){
-                        size_t pos = PT.find("numofactivation");
-                        if(pos != string::npos)
-                            PT.replace(pos, 15, trg);
-                    }
-                    if(PT.find("numofactivation") != string::npos){
-                        size_t pos = PT.find("numofactivation");
-                        if(pos != string::npos)
-                            PT.replace(pos, 15, trg);
-                    }
-                    if(cda)
-                        wppt = NEW WParsedPT(cReplaceString(PT, " cdaactive", ""),NULL,(MTGCardInstance *) source);
-                    else
-                        wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""),NULL,(MTGCardInstance *) source);
-                }
+            rebuildPT();
             ((MTGCardInstance *) target)->origpower = wppt->power.getValue();
             ((MTGCardInstance *) target)->origtoughness = (wppt->toughness.getValue() + ((MTGCardInstance *) target)->life)-((MTGCardInstance *) target)->life;//what?
         }
@@ -3145,28 +3177,7 @@ public:
     int addToGame()
     {
         MTGCardInstance * _target = (MTGCardInstance *) target;
-        if(PT.size())
-        {
-            SAFE_DELETE(wppt);
-            char buffer[4];
-            sprintf(buffer, "%i", triggers);
-            string trg;
-            trg.append(buffer);
-            if(PT.find("numofactivation") != string::npos){
-                size_t pos = PT.find("numofactivation");
-                if(pos != string::npos)
-                    PT.replace(pos, 15, trg);
-            }
-            if(PT.find("numofactivation") != string::npos){
-                size_t pos = PT.find("numofactivation");
-                if(pos != string::npos)
-                    PT.replace(pos, 15, trg);
-            }
-            if(cda)
-                wppt = NEW WParsedPT(cReplaceString(PT, " cdaactive", ""),NULL,(MTGCardInstance *) source);
-            else
-                wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""),NULL,(MTGCardInstance *) source);
-        }
+        rebuildPT();
         if(cda)
         {//Characteristic-defining abilities
             if(_target->isSwitchedPT)
@@ -3210,28 +3221,7 @@ public:
     }
     const string getMenuText()
     {                
-        if(PT.size())
-        {
-            SAFE_DELETE(wppt);
-            char buffer[4];
-            sprintf(buffer, "%i", triggers);
-            string trg;
-            trg.append(buffer);
-            if(PT.find("numofactivation") != string::npos){
-                size_t pos = PT.find("numofactivation");
-                if(pos != string::npos)
-                    PT.replace(pos, 15, trg);
-            }
-            if(PT.find("numofactivation") != string::npos){
-                size_t pos = PT.find("numofactivation");
-                if(pos != string::npos)
-                    PT.replace(pos, 15, trg);
-            }
-            if(cda)
-                wppt = NEW WParsedPT(cReplaceString(PT, " cdaactive", ""),NULL,(MTGCardInstance *) source);
-            else
-                wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""),NULL,(MTGCardInstance *) source);
-        }
+        rebuildPT();
         sprintf(menuText, "%i/%i", wppt->power.getValue(), wppt->toughness.getValue());
         return menuText;
     }
@@ -3404,7 +3394,23 @@ public:
           toAdd->target = target;
           if(toAdd->getActionTc())
           {
-              toAdd->reactToTargetClick(source);
+              int accepted = toAdd->reactToTargetClick(source);
+              //#W54-G (A8): the clone was neither added nor deleted here (the
+              //largest LSan root in the tree). Ownership after the click: a
+              //MayAbility hands its payload to the game as mClone
+              //(MayAbility::reactToTargetClick) and the wrapper itself is
+              //finished either way - free it. Any other chooser-bearing
+              //ability that ACCEPTED the click is now the action layer's
+              //current waiting action (TargetAbility::reactToClick) and later
+              //a stack entry, so the game must own it (addToGame - the same
+              //idiom the rejected branch of GenericAddToGame::resolve uses);
+              //a rejected one is referenced by nobody.
+              if (w54gLegacyBehavior())
+                  return 1; //legacy: orphan the clone (leak) - forensics only
+              if (dynamic_cast<MayAbility *>(toAdd) || !accepted)
+                  SAFE_DELETE(toAdd);
+              else
+                  toAdd->addToGame();
               return 1;
           }
           toAdd->addToGame();
@@ -3458,7 +3464,19 @@ public:
               //Try-first (not canTarget-predict): reactToTargetClick's
               //acceptance logic is its own.
               if (toAdd->reactToTargetClick(source))
+              {
+                  //#W54-G (A8): see GenericAbilityMod::resolve - a MayAbility
+                  //wrapper has moved its payload into the game (mClone) and is
+                  //done; anything else that accepted the click is the layer's
+                  //current waiting action and must be game-owned.
+                  if (w54gLegacyBehavior())
+                      return 1; //legacy: orphan the clone (leak) - forensics only
+                  if (dynamic_cast<MayAbility *>(toAdd))
+                      SAFE_DELETE(toAdd);
+                  else
+                      toAdd->addToGame();
                   return 1;
+              }
               return toAdd->addToGame();
           }
           return toAdd->addToGame();
@@ -4435,12 +4453,17 @@ public:
     {
         ATokenCreator * a = NEW ATokenCreator(*this);
         a->multiplier = NEW WParsedInt(*(multiplier));
+        //#W54-G (A9): the and!(...)! follow-up is owned - deep copy, never alias
+        //(the AADrawer idiom the other 28 carriers already use)
+        if (andAbility)
+            a->andAbility = andAbility->clone();
         return a;
     }
 
     ~ATokenCreator()
     {
         SAFE_DELETE(multiplier);
+        SAFE_DELETE(andAbility); //#W54-G (A9)
     }
 
 };
@@ -6592,7 +6615,7 @@ public:
 class AKjeldoranFrostbeast: public MTGAbility
 {
 public:
-    MTGCardInstance * opponents[20];
+    vector<MTGCardInstance *> opponents; //#W54-G (A29): was a fixed [20] filled unbounded from getNextOpponent
     int nbOpponents;
     AKjeldoranFrostbeast(GameObserver* observer, int _id, MTGCardInstance * _source) :
         MTGAbility(observer, _id, _source)
@@ -6607,10 +6630,11 @@ public:
             if (newPhase == MTG_PHASE_COMBATEND)
             {
                 nbOpponents = 0;
+                opponents.clear();
                 MTGCardInstance * opponent = source->getNextOpponent();
                 while (opponent)
                 {
-                    opponents[nbOpponents] = opponent;
+                    opponents.push_back(opponent);
                     nbOpponents++;
                     opponent = source->getNextOpponent(opponent);
                 }
@@ -6639,7 +6663,7 @@ public:
 
     virtual ostream& toString(ostream& out) const
     {
-        out << "AKjeldoranFrostbeast ::: opponents : " << opponents << " ; nbOpponents : " << nbOpponents << " (";
+        out << "AKjeldoranFrostbeast ::: opponents : " << opponents.size() << " ; nbOpponents : " << nbOpponents << " (";
         return MTGAbility::toString(out) << ")";
     }
     AKjeldoranFrostbeast * clone() const
@@ -7546,7 +7570,7 @@ public:
 class AFlankerAbility: public MTGAbility
 {
 public:
-    MTGCardInstance * opponents[20];
+    vector<MTGCardInstance *> opponents; //#W54-G (A29): was a fixed [20] filled unbounded from getNextOpponent
     int nbOpponents;
     AFlankerAbility(GameObserver* observer, int _id, MTGCardInstance * _source) :
         MTGAbility(observer, _id, _source)
@@ -7558,10 +7582,11 @@ public:
         if (dynamic_cast<WEventBlockersChosen*> (event))
         {
             nbOpponents = 0;
+            opponents.clear();
             MTGCardInstance * opponent = source->getNextOpponent();
             while (opponent && !opponent->has(Constants::FLANKING) && game->currentlyActing() == source->controller()->opponent())
             {
-                opponents[nbOpponents] = opponent;
+                opponents.push_back(opponent);
                 nbOpponents++;
                 opponent = source->getNextOpponent(opponent);
             }
@@ -7581,7 +7606,7 @@ public:
 
     virtual ostream& toString(ostream& out) const
     {
-        out << "AFlankerAbility ::: opponents : " << opponents << " ; nbOpponents : " << nbOpponents << " (";
+        out << "AFlankerAbility ::: opponents : " << opponents.size() << " ; nbOpponents : " << nbOpponents << " (";
         return MTGAbility::toString(out) << ")";
     }
 
@@ -7632,7 +7657,11 @@ public:
     int destroy()
     {
         WParsedInt bushidoPoint(bpoints, NULL, source);
-        source->attackCost -= bushidoPoint.getValue();
+        //#W54-G (L13): subtracted from attackCost, not bushidoPoints (WAGIC_W54G_LEGACY=1 restores that)
+        if (w54gLegacyBehavior())
+            source->attackCost -= bushidoPoint.getValue();
+        else
+            source->bushidoPoints -= bushidoPoint.getValue();
         return 1;
     }
     ABushidoAbility * clone() const
@@ -8015,7 +8044,14 @@ public:
     }
     AManifest * clone() const
     {
-        return NEW AManifest(*this);
+        AManifest * a = NEW AManifest(*this);
+        if (andAbility)
+            a->andAbility = andAbility->clone(); //#W54-G (A9): owned, deep copy
+        return a;
+    }
+    ~AManifest()
+    {
+        SAFE_DELETE(andAbility); //#W54-G (A9): was never freed
     }
 };
 //provoke
@@ -8072,7 +8108,14 @@ public:
     }
     AProvoke * clone() const
     {
-        return NEW AProvoke(*this);
+        AProvoke * a = NEW AProvoke(*this);
+        if (andAbility)
+            a->andAbility = andAbility->clone(); //#W54-G (A9): owned, deep copy
+        return a;
+    }
+    ~AProvoke()
+    {
+        SAFE_DELETE(andAbility); //#W54-G (A9): was never freed
     }
 };
 //exert
@@ -8123,7 +8166,14 @@ public:
     }
     AExert * clone() const
     {
-        return NEW AExert(*this);
+        AExert * a = NEW AExert(*this);
+        if (andAbility)
+            a->andAbility = andAbility->clone(); //#W54-G (A9): owned, deep copy
+        return a;
+    }
+    ~AExert()
+    {
+        SAFE_DELETE(andAbility); //#W54-G (A9): was never freed
     }
 };
 //------------------
@@ -8237,6 +8287,46 @@ public:
         return NEW ATriggerTotem(*this);
     }
 };
+//#W54-G (A28): `altermutationcounter:` / `mutationover:` / `mutationunder:`
+//used to mutate the card and (for the first) fire WEventCardMutated at PARSE
+//time, so an AI dry-run parse changed game state; the last two also read a
+//different, empty vector. The side effect now lives in resolve(), like every
+//other keyword. No shipped primitive uses any of the three.
+class AAAlterMutationCounter: public InstantAbility
+{
+public:
+    string amount;
+    bool fireEvent;
+    AAAlterMutationCounter(GameObserver* observer, int _id, MTGCardInstance * _source, string amount, bool fireEvent) :
+        InstantAbility(observer, _id, _source), amount(amount), fireEvent(fireEvent)
+    {
+        target = _source;
+    }
+    int resolve()
+    {
+        MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(target);
+        if (!card)
+            card = source;
+        if (!card)
+            return 0;
+        WParsedInt value(amount, card);
+        card->mutation += value.intValue;
+        if (fireEvent)
+        {
+            WEvent * e = NEW WEventCardMutated(card);
+            game->receiveEvent(e);
+        }
+        return 1;
+    }
+    const string getMenuText()
+    {
+        return "Mutation Counter";
+    }
+    AAAlterMutationCounter * clone() const
+    {
+        return NEW AAAlterMutationCounter(*this);
+    }
+};
 //Modular Ability
 class AModularAbility: public InstantAbility
 {
@@ -8260,10 +8350,13 @@ public:
             counterString.append(")");
             AbilityFactory af(card->getObserver());
             MTGAbility * modCounter = af.parseMagicLine(counterString,this->GetId(),NULL,card);
-            modCounter->oneShot = true;
-            modCounter->canBeInterrupted = false;
-            modCounter->resolve();
-            SAFE_DELETE(modCounter);
+            if (modCounter) //#W54-G (A28): a rejected parse must not crash the resolve
+            {
+                modCounter->oneShot = true;
+                modCounter->canBeInterrupted = false;
+                modCounter->resolve();
+                SAFE_DELETE(modCounter);
+            }
             card->modularPoints += atoi(modularpoint.c_str());
         }
         return 1;

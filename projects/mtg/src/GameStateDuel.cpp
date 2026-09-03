@@ -573,7 +573,6 @@ void GameStateDuel::End()
     SAFE_DELETE(testSuite);
 #endif
 
-    MTGAbility::deletedpointers.clear(); // Clear the list of deallocated pointer.
     kBgFile = ""; //Reset the chosen background.
 }
 
