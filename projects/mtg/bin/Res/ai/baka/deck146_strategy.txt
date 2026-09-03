@@ -146,29 +146,25 @@ the rest of the list, and do not weigh a later line against an earlier one.
  3. Nadaar, Barrowin or Triumphant Adventurer - a body that ventures.
  4. SILVERQUILL SILENCER - your other real body. It is not a venture creature and it has no rule
     of its own; it belongs HERE, above the Command, whenever no body from entry 3 is listed.
- 5. Silverquill Command - when at least ONE of these three is true on the screen: their
-    battlefield line shows a creature (the sacrifice mode is live); your battlefield line shows a
-    creature (the pump mode is live); THE RETURN MODE IS LIVE - and that one is decided by your
-    GRAVEYARD, which the Command row does not annotate. The row prints its card text and its
-    "{leaves N of your M" clause and NOTHING ELSE: there is no "{right now:" clause on this card
-    and there never will be, so do not wait for one. The return mode reads "Return target creature
-    card with mana value 2 or less from your graveyard to the battlefield", and this deck owns
-    exactly TWO creatures at mana value 2 - TRIUMPHANT ADVENTURER {b}{w} and SILVERQUILL SILENCER
-    {b}{w}. So the test is a name search in the log lines above the menu: if the log has printed
-    "Triumphant Adventurer" or "Silverquill Silencer" going to YOUR graveyard (died, was
-    countered, was destroyed, was sacrificed) and that name is not on your battlefield line now,
-    THE RETURN MODE IS LIVE and the Command is a body plus a card for four mana. Two live modes
-    is a two-for-one and it is not a card to hold. When NONE of the three is true, its only live
+ 5. Silverquill Command - when at least ONE of its modes is live: the sacrifice mode, the pump
+    mode, THE RETURN MODE. You do not work any of them out yourself. The row prints a clause that
+    opens "{modes live right now:" and, after a semicolon, "dead (no legal object right now):".
+    Everything before that semicolon is live this window; everything after it is dead. Read the
+    live half and look for the words "return creature" in it - that, and nothing in the log, is
+    how you know the return mode is live. This deck owns exactly TWO creatures at mana value 2,
+    TRIUMPHANT ADVENTURER {b}{w} and SILVERQUILL SILENCER {b}{w}; when one of them is in your
+    graveyard the engine has already found it and printed the return pairs on the live side.
+    When the return mode is dead the row often says so outright in a second clause: "{right now:
+    returns NOTHING - your graveyard has no creature cards, so the return part cannot happen at
+    any X}". Do not reconstruct your graveyard from the log lines above the menu; the row has
+    already done it, on every Command row it prints.
+    Two live modes is a two-for-one and it is not a card to hold. When the live half names no
+    pair you want - no sacrifice, no return, no pump on a creature you control - its only live
     mode is a card for 1 life and it drops to entry 8b.
-    WHAT THIS COST: about twenty "Cast nothing right now" answers to a live Command row across
-    turns 29-83 of one game, at eight to twenty untapped sources and a board of two animated
-    lands - one reply writing "my graveyard has no creature cards with mana value 2 or less"
-    while the log above it showed both an Adventurer and a Silencer countered into that
-    graveyard. Never call the return mode dead without searching the log for the two names.
  6. EMERIA'S CALL, when the option is actually listed (that means you can pay its seven).
  7. Pelakka Predation, when their hand size is 3 or more.
  8. Acererak the Archlich - only here, near the bottom, and only when nothing above matched.
- 8b. Silverquill Command with NONE of its three conditions true (a cantrip for one life) - here,
+ 8b. Silverquill Command with none of its three modes live (a cantrip for one life) - here,
     below Acererak's free dungeon room, and still above "nothing".
  9. "Cast nothing right now".
 EVERY CARD YOU CAN CAST HAS A LINE ABOVE. If you find yourself casting something the list does

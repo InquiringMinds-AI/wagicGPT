@@ -600,14 +600,14 @@ MATCHUP POSTURE:
   ZERO to their life and hands them N, which the converter takes off you as well - it moves the
   race backwards in both directions at once.
   BUT A GAIN CLAUSE INSIDE A TAG IS A PRICE, NOT A PROHIBITION, AND ONE NAME IN THE TAG CANNOT
-  BLOCK EVERYTHING. Each A-line lists "their untapped blockers: <name>; <name>; ...". COUNT THE
-  DISTINCT NAMES IN THAT LIST - call it B. That is how many of your attackers they can block AT
-  ALL this combat. If you declare more than B attackers, at least (your attackers minus B) of
-  them are UNBLOCKED and their full power lands on the opponent's life, and the gain clauses on
-  the other tags never fire at all. So the hold is for the creature whose EVERY listed blocker
-  prints a gain clause AND stops its damage - never for a creature whose tag contains even one
-  entry reading "(you kill it, your attacker lives)", which is a blocker traded away for a
-  printed price of 1 or 3 life.
+  BLOCK EVERYTHING. The attackers header prints the count for you: "They have N untapped
+  creatures able to block; declaring more than N attackers leaves at least (your attackers - N)
+  of them unblocked." Read N off that line - never re-derive it by counting names across the
+  A-lines. The surplus above N is unblocked, its full power lands on the opponent's life, and
+  the gain clauses on the other tags never fire at all. So the hold is for the creature whose
+  EVERY listed blocker prints a gain clause AND stops its damage - never for a creature whose
+  tag contains even one entry reading "(you kill it, your attacker lives)", which is a blocker
+  traded away for a printed price of 1 or 3 life.
   WHAT THIS COST, one game, three combats: with Sanguine Bond alone on their line, this seat held
   a 4/4 Luminarch Aspirant and a 7/5 lifelink Adversary at their 17 life - its own tags reading
   "Wall of Omens (0/4) (you kill it, your attacker lives)" and "Vampire (1/1) (... lifelink: they
@@ -653,11 +653,12 @@ MATCHUP POSTURE:
 DECIDING SITUATIONS (recognize -> do):
 - Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> ATTACK: none, every
   combat, fliers included; block every "[lifelink]" attacker you are offered a block for.
-- Their line shows ONE converter name, you have more attackers than there are distinct names in
-  "their untapped blockers", and the surplus tags read "(you kill it, your attacker lives)" ->
-  DECLARE every one whose power beats TWICE the gain number printed in its own tag; the surplus
-  cannot be blocked and that is the price you are buying it at. An A-line reading "[no creature
-  they control can block this attacker]" is always sent and never counts against B.
+- Their line shows ONE converter name, you have more attackers than the N in the attackers
+  header's "They have N untapped creatures able to block", and the surplus tags read "(you kill
+  it, your attacker lives)" -> DECLARE every one whose power beats TWICE the gain number printed
+  in its own tag; the surplus cannot be blocked and that is the price you are buying it at. An
+  A-line reading "[no creature they control can block this attacker]" is always sent and never
+  counts against N.
 - Their line shows ONE of the two names -> race it with your EVASION: send every creature whose
   A-line prints no "(blocking trigger:" and no stop, fliers first; hold every creature whose
   tag prints one.

@@ -847,13 +847,13 @@ without a creature ever hitting its battlefield.
   2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: tokens go
   anyway, and Thraben Doomsayer, Bloodline Keeper, Lord of Lineage or anything wearing the
   Greaves stays home - unless their printed life is at or below the power you are sending.
-- The blockers prompt says "you would be at K - NOT lethal: block only where the trade favors
-  you; taking damage while ahead on LIFE is often correct": that hint names its own condition -
-  read it against the two life totals above it. While THEIR life is higher than yours you are
-  not the player it describes: a token goes in front of the biggest attacker, because a 2/2 you
-  can remake is not a cost and K is the life your combo has to live on next turn. At 7 against
-  12 this deck answered "BLOCKS: none" to a lone 6/5 with a Vampire untapped, went to 1, and
-  lost with the Intruder Alarm still in hand.
+- The blockers prompt says "- NOT lethal: block only where the trade favors you." and stops
+  there. That is the form it takes whenever their life is at or above yours: the engine does not
+  print the "taking damage while ahead on LIFE is often correct" half unless you are the player
+  it describes. A token goes in front of the biggest attacker, because a 2/2 you can remake is
+  not a cost and the "you would be at" number is the life your combo has to live on next turn.
+  At 7 against 12 this deck answered "BLOCKS: none" to a lone 6/5 with a Vampire untapped, went
+  to 1, and lost with the Intruder Alarm still in hand.
 - The blockers prompt says LETHAL: your first blocker goes on the attacker with the largest
   "deals N", not on the smallest one you can kill.
 - An attacker row says "[menace]": two blockers on it, or none.
