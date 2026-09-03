@@ -35,6 +35,13 @@
 //Sign-in worker pacing on non-Vita platforms (Vita sleeps via the kernel).
 #include <thread>
 #include <chrono>
+#if defined (VITA)
+//audit-L follow-up: sceKernelGetRandomNumber (salt) and sceKernelDelayThread
+//(gptSleepMs) are used above the worker block that included threadmgr.h;
+//vpk13's first build failed on exactly these two. Declared here for the TU.
+#include <psp2/kernel/threadmgr.h>
+#include <psp2/kernel/rng.h>
+#endif
 
 using std::string;
 using std::vector;
