@@ -26,3 +26,10 @@ out into clickable members and re-collapses on resolve/cancel; a click on a coll
 targeting expands, never targets; reuse the existing target border + the stack's per-entry target
 thumbnails (one thumbnail x N when all targets come from one group). Same rule for attacker/blocker
 declaration and cost-target prompts. Owner has not ruled on the mechanism.
+Owner correction (verbatim): "afaik, it doesnt, but since all tge cards maintain positioning, the
+user remembers what they have targeted." -> two binding adjustments sent to lane G: expanded groups
+FREEZE (order + slots) until every stack item referencing a member has resolved; and an explicit
+board marker on every card that is a pending stack item's target (CardGui, before the art quad),
+independent of the grouping option. The claim that a per-card target border already exists was
+Claude's and unverified — the stack-entry target thumbnails exist (ActionStack.cpp), a board marker
+was not found.
