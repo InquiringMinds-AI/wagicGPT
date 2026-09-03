@@ -565,6 +565,16 @@ private:
     //conflicted reply falls back to the shipped first-wins behavior.
     int mBlockReaskTurn;
 
+    //#W55-B (D3 = R195). Turn on which the ALL-ILLEGAL blockers re-ask already
+    //fired, and the pruned pairs that re-ask quotes back. Deliberately SEPARATE
+    //from mBlockReaskTurn above: a one-blocker-many-attackers reply and a reply
+    //whose every pairing was pruned as illegal are different failures, and one
+    //firing must not spend the other's single arm. `152v146` seq 58: both
+    //pairings under-filled a menace attacker, both were pruned, no blocks were
+    //declared at a lethal window and no follower record was written at all.
+    int mBlockIllegalReaskTurn;
+    string mBlockIllegalReaskPairs;
+
     //Parse-shape signature for the NEXT translog record (parseChoice noteOut,
     //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
     //note can never leak onto a later, unrelated record.
