@@ -8,7 +8,7 @@ game dir projects/mtg. READ FIRST, in order:
 2. projects/mtg/strategy-design/wave54/strategy-writing-skill.md (the CURRENT skill edition, amendments 1-232:
    how guides for this model tier are written; the perception-vs-strategy routing doctrine;
    the trust doctrine — never teach doubt of the render).
-3. Your seats' wave-54 file(s) in projects/mtg/strategy-design/wave54/seats/ (and wave54/general-strategy.md R1-R224, wave54/engine-ledger.md = the wave-55 docket D1-D35 whose lanes M-Q shipped D1-D14, plus wave53/lane-*.md for what each lane actually changed) (rung state,
+3. Your seats' wave-54 file(s) in projects/mtg/strategy-design/wave54/seats/ (and wave54/general-strategy.md R1-R224, wave54/engine-ledger.md = the wave-55 docket D1-D35 whose lanes A-E shipped D2-D23, plus wave55/lane-*.md for what each lane actually changed) (rung state,
    open predictions), and the live guides projects/mtg/bin/Res/ai/baka/deckN_strategy.txt.
 
 CORPUS: ~/.Wagic/ai/gpt/selfplay-runs/matchups-20260903-074354/ — one JSONL per SEAT
