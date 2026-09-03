@@ -72,7 +72,7 @@ set(VITA_VERSION  "01.00")
 # addresses, so a dump from the shipped build symbolizes correctly against the
 # unstripped ELF sitting next to it.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -fno-omit-frame-pointer -fexceptions")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fno-omit-frame-pointer -std=c++11 -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fno-omit-frame-pointer -std=c++14 -fexceptions")
 
 add_definitions(
   -DVITA
