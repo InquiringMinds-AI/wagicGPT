@@ -1,0 +1,21 @@
+# W56-B (D2): the ability row's life total must come from a REAL Player. The player-ability
+# AIAction ctor left `player` indeterminate, so the GPT ability row printed a life computed from
+# a constant base of 166 on 238 of 248 corpus rows. Staff of Nin is the corpus's own source
+# ({T}: 1 damage to any target); the opponent sits at 17, so the resolved seat must read 17.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Staff of Nin
+life:20
+[PLAYER2]
+life:17
+[DO]
+assertabilityseat 17 Staff of Nin
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Staff of Nin
+life:20
+[PLAYER2]
+life:17
+[END]
