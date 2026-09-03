@@ -14,10 +14,12 @@ bool compare_aistats(AIStat * first, AIStat * second)
     return (damage1 > damage2);
 }
 
-AIStats::AIStats(Player * _player, char * _filename)
+AIStats::AIStats(Player * _player, char * _filename, bool persistent)
+    : mPersistent(persistent), mDirty(false)
 {
     filename = _filename;
-    load(_filename);
+    if (mPersistent)
+        load(_filename);
     player = _player;
 }
 
@@ -43,6 +45,7 @@ void AIStats::updateStatsCard(MTGCardInstance * cardInstance, Damage * damage, f
         stat = NEW AIStat(card->getMTGId(), 0, 1, 0);
         stats.push_back(stat);
     }
+    mDirty = true;
     if (damage->target == player)
     {
         stat->value += static_cast<int>(multiplier * STATS_PLAYER_MULTIPLIER * damage->damage);
@@ -173,6 +176,8 @@ void AIStats::load(char * filename)
 }
 void AIStats::save()
 {
+    if (!mPersistent || !mDirty)
+        return; //#W54-K (A39): nothing learned this game, or a non-persistent (suite/headless) table
     std::ofstream file;
     if (JFileSystem::GetInstance()->openForWrite(file, filename))
     {

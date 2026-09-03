@@ -107,7 +107,8 @@ void GuiHandOpponent::Render()
 }
 
 GuiHandSelf::GuiHandSelf(GameObserver* observer, MTGHand* hand) :
-    GuiHand(observer, hand), state(Closed), backpos(ClosedX, SCREEN_HEIGHT - 250, 1.0, 0, 255), mCastableRefresh(0)
+    GuiHand(observer, hand), state(Closed), backpos(ClosedX, SCREEN_HEIGHT - 250, 1.0, 0, 255), mCastableRefresh(0),
+    mDisplayDirty(true)
 {
     limitor = NEW HandLimitor(this);
     if (OptionHandDirection::HORIZONTAL == options[Options::HANDDIRECTION].number)
@@ -236,45 +237,81 @@ void GuiHandSelf::Update(float dt)
     //CardGui::Render, so they show no matter which layer draws the card
     //(CardSelector re-renders the focused card on top of this layer).
     mCastableRefresh -= dt;
+    //#W54-K (A4): the flags this refresh writes (castableNow, canAttackNow,
+    //canBlockNow, hasUsableAbilityNow, willPayForFocused) are read only by
+    //CardGui::Render for a human at the controls. An AI-owned hand (self-
+    //play, the demo, every suite seat) has nobody reading them - skip the
+    //oracles entirely; the flags stay at their neutral 0.
+    if (mCastableRefresh <= 0 && hand && hand->owner && hand->owner->isAI())
+        mCastableRefresh = 0.25f;
     if (mCastableRefresh <= 0 && hand && hand->owner)
     {
         mCastableRefresh = 0.25f;
-        std::set<MTGCardInstance*> ok = LegalActionsOracle::castableForDisplay(hand->owner);
+        Player * p = hand->owner;
+        MTGGameZone * bf = p->game->inPlay;
         MTGCardInstance * focused = NULL;
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
+            if ((*it)->card && (*it)->mHasFocus)
+                focused = (*it)->card;
+        //#W54-K (A4): change-driven recompute. On a static board (the player
+        //reading the screen) every 0.25 s refresh produced the same verdicts;
+        //re-run the oracles only when an event landed since the last one or
+        //the cheap state signature moved. The signature is everything the
+        //oracles read that can change without an event reaching this layer:
+        //phase/turn/acting player, stack depth, the number of live ability
+        //objects, the mana pool, and the hand/battlefield card identities
+        //with their tap state.
+        std::ostringstream state;
+        state << observer->getCurrentGamePhase() << '|' << observer->turn << '|'
+              << (const void *) observer->currentPlayer << '|' << (const void *) observer->currentlyActing() << '|'
+              << observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) << '|'
+              << observer->mLayers->actionLayer()->mObjects.size() << '|'
+              << p->getManaPool()->toString() << '|';
+        for (int i = 0; i < p->game->hand->nb_cards; i++)
+            state << (const void *) p->game->hand->cards[i] << ',';
+        state << '|';
+        for (int i = 0; i < bf->nb_cards; i++)
+            state << (const void *) bf->cards[i] << (bf->cards[i]->isTapped() ? 't' : 'u');
+        std::string stateSig = state.str();
+        static const bool refreshAlways = getenv("WAGIC_HAND_REFRESH_ALWAYS") != NULL;
+        bool changed = refreshAlways || mDisplayDirty || stateSig != mDisplaySig;
+        mDisplayDirty = false;
+        mDisplaySig = stateSig;
+        if (changed)
         {
-            MTGCardInstance * c = (*it)->card;
-            if (!c)
-                continue;
-            c->castableNow = ok.count(c) ? 1 : -1;
-            if ((*it)->mHasFocus)
-                focused = c;
+            std::set<MTGCardInstance*> ok = LegalActionsOracle::castableForDisplay(p);
+            for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
+            {
+                MTGCardInstance * c = (*it)->card;
+                if (!c)
+                    continue;
+                c->castableNow = ok.count(c) ? 1 : -1;
+            }
+            //#W53-S perf (owner Vita report, vpk11: "it became almost frozen when
+            //attempting to select cards in my hand"). The usable-ability verdict is
+            //the expensive one - it prices every activation against the board's
+            //potential mana - and asking it PER CARD rebuilt that potential and
+            //re-walked every ability object once per permanent. One batch pass
+            //answers it for the whole battlefield with identical semantics.
+            std::set<MTGCardInstance*> usable = LegalActionsOracle::usableAbilityCards(p);
+            for (int i = 0; i < bf->nb_cards; i++)
+            {
+                //Availability signals for the battlefield, refreshed on the same
+                //tick as castability so the whole board tells the player the
+                //same story at the same moment. Both are display-only: the
+                //engine still decides what is legal when the button is pressed.
+                bf->cards[i]->canAttackNow =
+                    LegalActionsOracle::canDeclareAttacker(bf->cards[i]) ? 1 : 0;
+                bf->cards[i]->hasUsableAbilityNow = usable.count(bf->cards[i]) ? 1 : 0;
+                bf->cards[i]->canBlockNow =
+                    LegalActionsOracle::canDeclareBlocker(bf->cards[i]) ? 1 : 0;
+            }
         }
         //Tap preview: mark the producers the auto-tap plan would activate
         //for the focused hand card (rendered as a border on the
         //battlefield cards, cleared every refresh).
-        Player * p = hand->owner;
-        MTGGameZone * bf = p->game->inPlay;
-        //#W53-S perf (owner Vita report, vpk11: "it became almost frozen when
-        //attempting to select cards in my hand"). The usable-ability verdict is
-        //the expensive one - it prices every activation against the board's
-        //potential mana - and asking it PER CARD rebuilt that potential and
-        //re-walked every ability object once per permanent. One batch pass
-        //answers it for the whole battlefield with identical semantics.
-        std::set<MTGCardInstance*> usable = LegalActionsOracle::usableAbilityCards(p);
         for (int i = 0; i < bf->nb_cards; i++)
-        {
             bf->cards[i]->willPayForFocused = 0;
-            //Availability signals for the battlefield, refreshed on the same
-            //throttled tick as castability so the whole board tells the player
-            //the same story at the same moment. Both are display-only: the
-            //engine still decides what is legal when the button is pressed.
-            bf->cards[i]->canAttackNow =
-                LegalActionsOracle::canDeclareAttacker(bf->cards[i]) ? 1 : 0;
-            bf->cards[i]->hasUsableAbilityNow = usable.count(bf->cards[i]) ? 1 : 0;
-            bf->cards[i]->canBlockNow =
-                LegalActionsOracle::canDeclareBlocker(bf->cards[i]) ? 1 : 0;
-        }
         if (focused && focused->castableNow == 1 && focused->getManaCost()
             && !p->getManaPool()->canAfford(focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA)))
         {
@@ -283,12 +320,7 @@ void GuiHandSelf::Update(float dt)
             //reads changed (focused card, pool, hand, battlefield tap state);
             //the console re-ran it four times a second on a static board.
             std::ostringstream sig;
-            sig << (const void *) focused << '|' << p->getManaPool()->toString() << '|';
-            for (int i = 0; i < p->game->hand->nb_cards; i++)
-                sig << (const void *) p->game->hand->cards[i] << ',';
-            sig << '|';
-            for (int i = 0; i < bf->nb_cards; i++)
-                sig << (const void *) bf->cards[i] << (bf->cards[i]->isTapped() ? 't' : 'u');
+            sig << (const void *) focused << '|' << stateSig;
             if (sig.str() != mPreviewSig)
             {
                 mPreviewSig = sig.str();
@@ -347,6 +379,7 @@ float GuiHandSelf::LeftBoundary()
 
 int GuiHandSelf::receiveEventPlus(WEvent* e)
 {
+    mDisplayDirty = true; //#W54-K (A4): any game event may change the availability display
     if (WEventZoneChange* ev = dynamic_cast<WEventZoneChange*>(e))
         if (hand == ev->to)
         {

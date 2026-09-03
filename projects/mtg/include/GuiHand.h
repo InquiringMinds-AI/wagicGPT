@@ -70,6 +70,14 @@ protected:
     float mCastableRefresh;
     std::string mPreviewSig;                        //#W55-OPT perf memo (see Update)
     std::vector<MTGCardInstance*> mPreviewSources;
+    // audit-K (A4): the availability oracles (castableForDisplay + the
+    // battlefield oracles) re-run only when something changed: any game
+    // event sets mDisplayDirty, and a cheap state signature (phase, turn,
+    // acting player, stack depth, ability count, pool, hand/battlefield
+    // identity + tap state) catches what arrives without an event.
+    // WAGIC_HAND_REFRESH_ALWAYS=1 restores the unconditional 0.25 s refresh.
+    bool mDisplayDirty;
+    std::string mDisplaySig;
 
 public:
     GuiHandSelf(GameObserver* observer, MTGHand* hand);

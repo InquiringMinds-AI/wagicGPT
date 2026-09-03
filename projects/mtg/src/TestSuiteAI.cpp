@@ -1213,6 +1213,8 @@ TestSuiteActions::TestSuiteActions()
 
 void TestSuiteActions::add(string s)
 {
+    if ((int) actions.size() <= nbitems)
+        actions.resize(nbitems + 1);
     actions[nbitems] = s;
     nbitems++;
 }
@@ -2349,7 +2351,7 @@ void TestSuiteGame::initGame()
 
 MTGPlayerCards * TestSuiteGame::buildDeck(Player* player, int playerId)
 {
-    int list[100];
+    vector<int> list; //#W54-K (A51): was int[100], unchecked
     int nbcards = 0;
     MTGPlayerCards * deck = NULL;
 
@@ -2368,11 +2370,11 @@ MTGPlayerCards * TestSuiteGame::buildDeck(Player* player, int playerId)
             for (size_t k = 0; k < loadedPlayerZones[j]->cards.size(); k++)
             {
                 int cardid = loadedPlayerZones[j]->cards[k]->getId();
-                list[nbcards] = cardid;
+                list.push_back(cardid);
                 nbcards++;
             }
         }
-        deck = NEW MTGPlayerCards(player, list, nbcards);
+        deck = NEW MTGPlayerCards(player, nbcards ? &list[0] : NULL, nbcards);
     }
     else
     {

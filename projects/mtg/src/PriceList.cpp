@@ -34,13 +34,11 @@ int PriceList::save()
     std::ofstream file;
     if (JFileSystem::GetInstance()->openForWrite(file, filename))
     {
-        char writer[20];
         map<int, int>::iterator it = prices.begin();
         while (it != prices.end())
         {
-            sprintf(writer, "%i\n%i\n", (*it).first, (*it).second);
+            file << (*it).first << "\n" << (*it).second << "\n"; //#W54-K (L19): was a char[20] sprintf
             it++;
-            file << writer;
         }
         file.close();
     }

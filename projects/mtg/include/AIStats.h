@@ -38,7 +38,13 @@ public:
     Player * player;
     string filename;
     list<AIStat *> stats;
-    AIStats(Player * _player, char * filename);
+    // audit-K (A39): persistent=false keeps the table in memory only (no
+    // file read at the first event, no file write at game end) - the suite,
+    // headless self-play and PARSETEST processes. mDirty gates the save so
+    // an untouched table is never rewritten (each rewrite halves it).
+    bool mPersistent;
+    bool mDirty;
+    AIStats(Player * _player, char * filename, bool persistent = true);
     ~AIStats();
     void load(char * filename);
     void save();
