@@ -1317,6 +1317,7 @@ w54_path_search_is_framed_as_a_gain.txt
 w54_granted_sacrifice_names_the_opponent.txt
 w54_assertmtgid_transform.txt
 w54_reveal_stall_forceclose.txt
+w55_reveal_stall_pollchurn.txt
 w53AA_ai_interrupt_window_stall.txt
 w54R_ai_pending_window_held.txt
 isleback_spawn_compare_library.txt

@@ -129,12 +129,24 @@ public:
     long mAIStallSince;                    //wall-clock (s) the stall started
     int mAIPollTicks;                      //model-poll count (progress, not a stall)
     bool mAIForceClosed;                   //this reveal was force-closed
+    //#W55-E (D5a): the POLL-CHURN stall the wave-54 guard has no window on.
+    //mAIPollTicks moves on every phase-0 tick with a model call in flight, so a
+    //driver that does nothing but re-ask - corpus 146v123 s15, six stale drops
+    //on an unchanged board with no phase step and no stack action between them -
+    //resets the signature above every tick and can never reach its budget. The
+    //STRUCTURAL signature is that same value with the poll counter left OUT: it
+    //does not move while the driver only polls. Its wall floor is sized above
+    //the worst legitimate single decision (deadline + lane Q's one retry, read
+    //off the seat) so a slow model is never mistaken for a dead driver.
+    int mAIStallStructTicks;               //consecutive no-structural-progress ticks
+    size_t mAIStallStructSig;              //last structural signature
+    long mAIStallStructSince;              //wall-clock (s) the structural stall started
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
     void driveInteractiveReveal();         //stall-guard wrapper
     void driveInteractiveRevealStep();     //the state machine itself
-    size_t revealProgressSignature();      //what "progress" means, in one value
-    void forceCloseStalledReveal();
+    size_t revealProgressSignature(bool withPolls); //what "progress" means, in one value
+    void forceCloseStalledReveal(const char * why);
     TargetChooser * ownChooser();          //the current chooser iff it is THIS reveal's
     //Input arming. False from the moment the display opens until it has been
     //through one full Render, so no button can answer a display the player has
@@ -154,6 +166,12 @@ public:
     ~MTGRevealingCards();
     int receiveEvent(WEvent*);
 };
+
+//#W55-E (D5a): the reveal stall guard's POLL-CHURN wall floor, from the seat's
+//own per-decision deadline. Pure, pinned in PARSETEST (AIPlayerGPT.cpp): a seat
+//with no deadline gets the static floor; a seat with one gets three deadlines,
+//which is one deadline plus lane Q's one retry plus a full deadline of margin.
+long revealStallStructSecsFor(long deadlineMs);
 
 class RevealDisplay : public CardDisplay
 {

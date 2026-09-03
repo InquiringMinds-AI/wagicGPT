@@ -708,6 +708,8 @@ private:
     //pruning must be visible or the two are indistinguishable in review.
     string mLastPrunedPairs;
     void ensureGameStartRecord();
+    //#W55-E (D23): write the abandoned wall-missed ask down before it is lost.
+    void flushWallMissRecord();
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
                        const std::vector<string> * optionTexts = NULL,
@@ -1175,6 +1177,13 @@ public:
     //force-close is never silent and earns its own recovery record.
     virtual void logEngineResolution(const char * kind, const string& what,
                                      int optionCount, const char * fallbackClass);
+    //#W55-E (D5a): the reveal driver's own no-structural-progress figures for
+    //the tick about to run. Consumed by the next `reveal` record as
+    //reveal_stall / reveal_stall_secs / reveal_stall_phase - a REPORT, nothing
+    //in the engine reads it.
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase);
+    //#W55-E (D5a): the deadline the reveal stall guard sizes its wall floor on.
+    virtual long decisionDeadlineMs() { return mTimeoutMs; }
 private:
     //Was reasoning asked for on this endpoint (thinking flag, or the Codex
     //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
@@ -1202,6 +1211,20 @@ private:
     //the board every tick) is the async design working, and restarts the count.
     string mStaleDropBoard;
     bool mLastStaleLivelock; //the last no-answer was the breaker firing
+    //#W55-E (D5a): reveal-driver stall figures for the record being written.
+    int mRevealStallTicks;
+    long mRevealStallSecs;
+    int mRevealStallPhase;
+    //#W55-E (D23): a WALL MISS - the deadline reached with an empty reply - is
+    //an event the seat review counts, and wave 54 had one that produced no
+    //record at all (the decision was abandoned when the window auto-passed, so
+    //nothing ever wrote it down). mWallMissBase is the prompt that missed;
+    //whichever comes first, the record that consumes that prompt stamps
+    //wall_miss, or the abandonment writes a zero-choice `wall_miss` record.
+    bool mWallMissPending;
+    string mWallMissBase;
+    int mWallMissEvents;
+    int mWallMissUnrecorded;
     bool mLastFinishLength;  //the last reply stopped at the token cap
     long mLastReasoningTokens; //the server's own reasoning-token count when it
                              //reports one (-1 = it did not); the budget is in

@@ -243,6 +243,21 @@ public:
         (void) kind; (void) what; (void) optionCount; (void) fallbackClass;
     }
 
+    //#W55-E (D5a): the reveal driver reports its own no-STRUCTURAL-progress
+    //figures every tick it is parked, BEFORE the step that may write a record,
+    //so a reveal decision written while the driver was stuck carries how long
+    //it had been stuck. A seat that keeps no decision log ignores it.
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase)
+    {
+        (void) ticks; (void) secs; (void) driverPhase;
+    }
+
+    //#W55-E (D5a): this seat's per-decision deadline in milliseconds (0 = the
+    //seat makes no timed calls). The reveal stall guard sizes its wall-clock
+    //floor ABOVE deadline + one retry, so raising WAGIC_GPT_TIMEOUT can never
+    //turn a legitimately slow decision into a force-closed one.
+    virtual long decisionDeadlineMs() { return 0; }
+
     Player * opponent();
     int getId();
     JQuadPtr getIcon();

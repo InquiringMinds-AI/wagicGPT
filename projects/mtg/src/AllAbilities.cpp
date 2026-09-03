@@ -182,6 +182,9 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAIStallTicks = 0;     //#W54-F (D7a)
     mAIStallSig = 0;
     mAIStallSince = 0;
+    mAIStallStructTicks = 0; //#W55-E (D5a)
+    mAIStallStructSig = 0;
+    mAIStallStructSince = 0;
     mAIPollTicks = 0;
     mAIForceClosed = false;
     mInputArmed = false;
@@ -733,7 +736,7 @@ static bool revealTestAsyncActive(GameObserver *) { return false; }
 static const int kRevealStallTicks   = 20000; //no-progress ticks before...
 static const long kRevealStallSecs   = 600;   //...AND this much wall clock
 
-size_t MTGRevealingCards::revealProgressSignature()
+size_t MTGRevealingCards::revealProgressSignature(bool withPolls)
 {
     //DRIVER-LOCAL ONLY, deliberately. The first draft folded the game's turn,
     //phase and layer depths in here as well, so that a reveal waiting on a stack
@@ -751,7 +754,11 @@ size_t MTGRevealingCards::revealProgressSignature()
     parts[2]  = mAIZoneAtFinalize;
     parts[3]  = mAIGraceTicks;
     parts[4]  = mAISecondRebuilt ? 1 : 0;
-    parts[5]  = mAIPollTicks;
+    //#W55-E (D5a): the ONE part that separates the two signatures. With it, a
+    //model call in flight is progress (its deadline belongs to the async layer);
+    //without it, a driver that only ever re-asks stops looking like a driver
+    //that is getting somewhere.
+    parts[5]  = withPolls ? mAIPollTicks : 0;
     parts[6]  = (long) mAIGraveSel.size();
     parts[7]  = zone ? zone->nb_cards : -1;
     parts[8]  = ownChooser() ? 1 : 0;
@@ -769,15 +776,22 @@ size_t MTGRevealingCards::revealProgressSignature()
 //never silent: an ungated DebugTrace line names it, and the seat writes a
 //translog record (kind `reveal`, class `reveal_stall_forced`) so a corpus can
 //COUNT force-closes rather than infer them from a game that stopped.
-void MTGRevealingCards::forceCloseStalledReveal()
+void MTGRevealingCards::forceCloseStalledReveal(const char * why)
 {
     mAIForceClosed = true;
     mAIDriveDone = true;
     int stranded = zone ? zone->nb_cards : 0;
+    //#W55-E (D5a): `why` names WHICH budget ran out - `driver` (nothing moved at
+    //all, the wave-54 shape) or `poll-churn` (the driver re-asked and re-asked
+    //while nothing else in it moved). A corpus that force-closes should say which
+    //one it hit without an archaeology pass over the ticks.
     DebugTrace("MTGRevealingCards: reveal from " << (source ? source->getName() : string("?"))
-               << " made no progress for " << mAIStallTicks << " ticks / "
+               << " made no progress (" << why << ") for " << mAIStallTicks << " ticks / "
                << (mAIStallSince ? (long)(time(NULL) - mAIStallSince) : 0L)
-               << "s with " << stranded << " card(s) still revealed - FORCE-CLOSING it "
+               << "s (structural " << mAIStallStructTicks << " ticks / "
+               << (mAIStallStructSince ? (long)(time(NULL) - mAIStallStructSince) : 0L)
+               << "s, " << mAIPollTicks << " polls) with " << stranded
+               << " card(s) still revealed - FORCE-CLOSING it "
                << "(driver phase " << mAIPhase << "). The game could not advance while "
                << "this display was open; the revealed cards go back where they came from.");
     //Take the options out of the action layer first, so no orphaned chooser
@@ -807,37 +821,87 @@ void MTGRevealingCards::forceCloseStalledReveal()
             stranded, "reveal_stall_forced");
 }
 
+//#W55-E (D5a): the wall floor for the POLL-CHURN budget, sized off the seat's
+//own deadline so raising WAGIC_GPT_TIMEOUT cannot turn a legitimately slow
+//decision into a force-close. Worst legitimate case is one deadline plus lane
+//Q's one retry; three deadlines is that with a full deadline of margin, and
+//kRevealStallStructSecs is the floor under a seat that reports no deadline.
+static const int  kRevealStallStructTicks = 20000;
+static const long kRevealStallStructSecs  = 1800;
+long revealStallStructSecsFor(long deadlineMs)
+{
+    long fromDeadline = (deadlineMs > 0) ? (deadlineMs / 1000) * 3 : 0;
+    return fromDeadline > kRevealStallStructSecs ? fromDeadline : kRevealStallStructSecs;
+}
+
 void MTGRevealingCards::driveInteractiveReveal()
 {
     if (mAIDriveDone)
         return;
+    //#W55-E (D5a): report the stall the driver is ALREADY in before running the
+    //step, because the step is where decideReveal writes its record - so the
+    //record for a decision taken out of a parked driver carries the park.
+    Player * revCtrl = source ? source->controller() : NULL;
+    if (revCtrl && mAIStallStructTicks > 0)
+        revCtrl->noteRevealStall(mAIStallStructTicks,
+                                 mAIStallStructSince
+                                     ? (long)(time(NULL) - mAIStallStructSince) : 0L,
+                                 mAIPhase);
     driveInteractiveRevealStep();
     if (mAIDriveDone)
     {
         mAIStallTicks = 0;
+        mAIStallStructTicks = 0;
         return;
     }
-    size_t sig = revealProgressSignature();
+    int fixtureTicks = (observer && observer->mRevealStallTicks > 0)
+                       ? observer->mRevealStallTicks : 0; //fixture-only: see GameObserver.h
+    //Both budgets are advanced EVERY tick - the structural one cannot be behind
+    //an early return on the full test, because the poll-churn shape is exactly
+    //the one whose full signature changes on every single tick.
+    size_t ssig = revealProgressSignature(false);
+    if (ssig != mAIStallStructSig)
+    {
+        mAIStallStructSig = ssig;
+        mAIStallStructTicks = 0;
+        mAIStallStructSince = 0;
+    }
+    else
+    {
+        if (!mAIStallStructTicks)
+            mAIStallStructSince = (long) time(NULL);
+        mAIStallStructTicks++;
+    }
+    size_t sig = revealProgressSignature(true);
     if (sig != mAIStallSig)
     {
         mAIStallSig = sig;
         mAIStallTicks = 0;
         mAIStallSince = 0;
-        return;
     }
-    if (!mAIStallTicks)
-        mAIStallSince = (long) time(NULL);
-    mAIStallTicks++;
-    int tickBudget = kRevealStallTicks;
-    long secsBudget = kRevealStallSecs;
-    if (observer && observer->mRevealStallTicks > 0)
+    else
     {
-        tickBudget = observer->mRevealStallTicks; //fixture-only: see GameObserver.h
-        secsBudget = 0;
+        if (!mAIStallTicks)
+            mAIStallSince = (long) time(NULL);
+        mAIStallTicks++;
     }
-    if (mAIStallTicks >= tickBudget
-        && (long)(time(NULL) - mAIStallSince) >= secsBudget)
-        forceCloseStalledReveal();
+    int tickBudget = fixtureTicks ? fixtureTicks : kRevealStallTicks;
+    long secsBudget = fixtureTicks ? 0 : kRevealStallSecs;
+    bool fullHit = mAIStallTicks >= tickBudget
+                   && (long)(time(NULL) - mAIStallSince) >= secsBudget;
+    int sTicks = fixtureTicks ? fixtureTicks : kRevealStallStructTicks;
+    long sSecs = fixtureTicks
+                 ? 0
+                 : revealStallStructSecsFor(revCtrl ? revCtrl->decisionDeadlineMs() : 0);
+    bool structHit = mAIStallStructTicks >= sTicks
+                     && (long)(time(NULL) - mAIStallStructSince) >= sSecs;
+    //`driver` wins the naming when NOTHING moved at all (the wave-54 shape);
+    //`poll-churn` is the strictly weaker test and names the shape the wave-54
+    //guard had no window on.
+    if (fullHit)
+        forceCloseStalledReveal("driver");
+    else if (structHit)
+        forceCloseStalledReveal("poll-churn");
 }
 
 void MTGRevealingCards::driveInteractiveRevealStep()
