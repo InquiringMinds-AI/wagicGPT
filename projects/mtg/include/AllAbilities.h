@@ -172,6 +172,9 @@ public:
 //with no deadline gets the static floor; a seat with one gets three deadlines,
 //which is one deadline plus lane Q's one retry plus a full deadline of margin.
 long revealStallStructSecsFor(long deadlineMs);
+//#W56-C (D12): the reveal driver's structural-park predicate, shared by the
+//force-close guard and the figure the seat stamps on its record.
+bool revealStructParked(int ticks, long secs, int fixtureTicks, long deadlineMs);
 
 class RevealDisplay : public CardDisplay
 {

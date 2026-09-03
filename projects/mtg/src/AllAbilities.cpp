@@ -834,6 +834,18 @@ long revealStallStructSecsFor(long deadlineMs)
     return fromDeadline > kRevealStallStructSecs ? fromDeadline : kRevealStallStructSecs;
 }
 
+//#W56-C (D12): the structural threshold as ONE predicate, so the figure the
+//seat stamps and the figure the force-close acts on can never be two different
+//tests. `fixtureTicks` is the fixture override (GameObserver::mRevealStallTicks,
+//0 outside a fixture), which shortens the tick budget and drops the wall floor
+//exactly as the force-close reads it. Pure.
+bool revealStructParked(int ticks, long secs, int fixtureTicks, long deadlineMs)
+{
+    int  sTicks = fixtureTicks ? fixtureTicks : kRevealStallStructTicks;
+    long sSecs  = fixtureTicks ? 0 : revealStallStructSecsFor(deadlineMs);
+    return ticks >= sTicks && secs >= sSecs;
+}
+
 void MTGRevealingCards::driveInteractiveReveal()
 {
     if (mAIDriveDone)
@@ -843,10 +855,17 @@ void MTGRevealingCards::driveInteractiveReveal()
     //record for a decision taken out of a parked driver carries the park.
     Player * revCtrl = source ? source->controller() : NULL;
     if (revCtrl && mAIStallStructTicks > 0)
-        revCtrl->noteRevealStall(mAIStallStructTicks,
-                                 mAIStallStructSince
-                                     ? (long)(time(NULL) - mAIStallStructSince) : 0L,
-                                 mAIPhase);
+    {
+        long waited = mAIStallStructSince ? (long)(time(NULL) - mAIStallStructSince) : 0L;
+        //#W56-C (D12): report the WAIT, and the driver's own verdict on whether
+        //that wait has crossed the structural threshold - the same predicate the
+        //force-close below uses, so the record and the guard agree by construction.
+        int fixtureTicksNow = (observer && observer->mRevealStallTicks > 0)
+                              ? observer->mRevealStallTicks : 0;
+        revCtrl->noteRevealStall(mAIStallStructTicks, waited, mAIPhase,
+                                 revealStructParked(mAIStallStructTicks, waited, fixtureTicksNow,
+                                                    revCtrl->decisionDeadlineMs()));
+    }
     driveInteractiveRevealStep();
     if (mAIDriveDone)
     {
@@ -889,12 +908,9 @@ void MTGRevealingCards::driveInteractiveReveal()
     long secsBudget = fixtureTicks ? 0 : kRevealStallSecs;
     bool fullHit = mAIStallTicks >= tickBudget
                    && (long)(time(NULL) - mAIStallSince) >= secsBudget;
-    int sTicks = fixtureTicks ? fixtureTicks : kRevealStallStructTicks;
-    long sSecs = fixtureTicks
-                 ? 0
-                 : revealStallStructSecsFor(revCtrl ? revCtrl->decisionDeadlineMs() : 0);
-    bool structHit = mAIStallStructTicks >= sTicks
-                     && (long)(time(NULL) - mAIStallStructSince) >= sSecs;
+    bool structHit = revealStructParked(mAIStallStructTicks,
+                                        (long)(time(NULL) - mAIStallStructSince), fixtureTicks,
+                                        revCtrl ? revCtrl->decisionDeadlineMs() : 0);
     //`driver` wins the naming when NOTHING moved at all (the wave-54 shape);
     //`poll-churn` is the strictly weaker test and names the shape the wave-54
     //guard had no window on.
