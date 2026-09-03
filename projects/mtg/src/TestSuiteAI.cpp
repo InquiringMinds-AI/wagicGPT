@@ -959,16 +959,27 @@ int TestSuiteAI::Act(float)
         //whose budget is wall clock. Both persist until the next aipending
         //rewrites them, so `aipending 0 0 0` is how a fixture stands down
         //without freezing anything.
+        //#W57-U: optional FOURTH argument - the per-request deadline in ms
+        //this seat reports through decisionDeadlineMs. ActionStack's in-flight
+        //bound is 2*deadline + a grace of half a deadline clamped to
+        //[1 s, 30 s], all real wall clock, so a fixture that wants to pin the
+        //bound states a tiny deadline instead of waiting out an LLM seat's.
+        //Omitted (or 0) = report no deadline, i.e. the exemption stays
+        //unbounded, which is what every pre-#W57-U fixture wants.
+        //Syntax: aipending <ticks> <inflight 0|1> <interactive 0|1> [deadline_ms]
         string rest = action.substr(10);
         int ticks = 0, inFlight = 0, interactive = 0;
-        sscanf(rest.c_str(), "%d %d %d", &ticks, &inFlight, &interactive);
+        long deadlineMs = 0;
+        sscanf(rest.c_str(), "%d %d %d %ld", &ticks, &inFlight, &interactive, &deadlineMs);
         suite->mAiPendingSeat = this;
         suite->mAiPendingTicks = ticks;
         suite->mAiPendingInFlight = inFlight != 0;
         suite->mAiPendingInteractive = interactive != 0;
+        suite->mAiPendingDeadlineMs = deadlineMs;
         DebugTrace("TESTSUITE aipending: player " << ((this == observer->players[0]) ? 1 : 2)
                    << " holds for " << ticks << " ticks, in flight=" << inFlight
                    << ", interactive=" << (suite->mAiPendingInteractive ? 1 : 0)
+                   << ", deadline_ms=" << suite->mAiPendingDeadlineMs
                    << " [" << suite->filename << "]");
     }
     else if (action.compare(0, 19, "assertinterrupting ") == 0)
@@ -2462,7 +2473,7 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
       currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
       mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
-      mAiPendingInteractive(false), testsuite(testsuite)
+      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), testsuite(testsuite)
 {
 }
 
@@ -2470,7 +2481,7 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
       currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
       mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
-      mAiPendingInteractive(false), testsuite(testsuite)
+      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), testsuite(testsuite)
 {
     filename = _filename;
     observer = new GameObserver();

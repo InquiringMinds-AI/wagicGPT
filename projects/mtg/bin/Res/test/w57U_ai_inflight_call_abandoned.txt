@@ -1,0 +1,78 @@
+#W57-U (the owner's vpk16 softlock, 2026-09-03: "my screen was frozen, unable to
+#move the selector, and the turn indicator was opponent, despite being my turn";
+#the pause menu still worked). Lane S eliminated the counter-spell shapes and
+#named the remaining unbounded state: while the LLM seat has a model request IN
+#FLIGHT it is EXEMPT from the stall floor (AIPlayerGPT::decisionPending calls
+#extendInterruptOffer every tick, and ActionStack::Update treats
+#holder->aiDecisionInFlight() as progress), and that exemption had NO wall at
+#all. A round trip that never comes back - a wedged socket on the console's
+#network stack, a server that accepts and never answers, a worker thread that
+#dies without publishing - therefore froze the duel for ever, with the game loop
+#alive (hence the working menu) and isInterrupting pinned on the AI (hence the
+#dead selector and the wrong turn indicator).
+#
+#What this pins: an in-flight call may hold an interrupt window only for as long
+#as its OWN deadline allows. The bound is derived, never a fixed number -
+#2 x deadline (the request plus its one retry) + a grace of half a deadline
+#clamped to [1 s, 30 s], all REAL WALL CLOCK. A live call is untouched: at the
+#shipped 600 s default the window survives 20.5 minutes, and wave-55's
+#legitimate 900 s decisions sit an order of magnitude inside it.
+#
+#p1 casts Hill Giant. p2 is offered the response window (Shock + untapped
+#Mountains make it real) and takes it with `yes`. Then:
+#  aipending 2000000000 1 1 300
+#                       - hold the window with a model call in flight, as an
+#                         INTERACTIVE AI (the live-LLM branch), reporting a
+#                         300 ms per-request deadline. The tick target is
+#                         effectively infinite: the freeze can only end when
+#                         something TAKES THE WINDOW AWAY, which is the whole
+#                         point. Bound = 2*300 + max(150,1000) = 1,600 ms wall.
+#  aipending 0 0 0 0    - stand the latches down once the window is gone.
+#Hill Giant then resolves and the turn runs out to the next untap.
+#
+#RED on base (0a5668074): `==Test timed out (game never ended)==` - the freeze
+#never ends, exactly the owner's shape, and the only thing that stops it is the
+#suite's 1,000,000-update runaway cap.
+#GREEN after: one release line in stderr, the freeze ends inside two wall
+#seconds, and the game advances to the declared UNTAP.
+#
+#The seat-level half of the fix (AIPlayerGPT::reapWedgedRequests - abandon the
+#request, discard any late worker write by generation, ANSWER the decision
+#through the heuristic and stamp `fallback: abandoned_in_flight`) cannot be
+#reached from this harness: the suite builds TestSuiteAI seats, never an
+#AIPlayerGPT, so no suite fixture can own a real transport. It is exercised by
+#the desktop selfplay repro in wave57/lane-U.md (WAGIC_GPT_WEDGE).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain
+hand:Hill Giant
+manapool:{3}{R}
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[DO]
+Hill Giant
+yes
+aipending 2000000000 1 1 300
+aipending 0 0 0 0
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Hill Giant
+hand:
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[END]

@@ -282,6 +282,15 @@ public:
     //ticks, 468 releases all at the same tick count, every one of them a
     //window whose owner had a model call in flight.
     long long mHoldStartMs;
+    //#W57-U (the vpk16 in-flight softlock): REAL WALL CLOCK since this holder
+    //went IN FLIGHT on this stack object (0 = not in flight). Deliberately a
+    //second anchor rather than a reuse of mHoldStartMs: extendInterruptOffer
+    //zeroes that one on every tick the seat is being OFFERED the window, and
+    //the seat calls it from decisionPending on every tick it is thinking - so
+    //the only clock the old floor had could be reset for ever by a seat whose
+    //request was already dead. Nothing resets this one but a change of holder,
+    //a change of the stack object, or the call actually landing.
+    long long mHoldInFlightSinceMs;
     //The stack object the current priority round refers to. When the top
     //of the stack changes (new spell/trigger/phase item), decisions reset
     //and one tick passes before anyone can pass or anything resolves -

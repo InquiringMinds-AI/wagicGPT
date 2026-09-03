@@ -1196,6 +1196,31 @@ private:
     //by the one-retry gate. A retry is fired ONCE per decision; a second wall
     //hit hands the decision to the heuristic with the stderr line printed.
     bool mLastTimeout;
+    //#W57-U (D-U, the vpk16 in-flight softlock): the last poll ABANDONED a
+    //request that had been in flight past its own deadline plus a grace with
+    //nothing published. Latched in SECONDS so the translog record for the
+    //decision the heuristic then answered names the cause
+    //(`fallback: abandoned_in_flight`) and how long the call had been out.
+    //-1 = nothing to stamp. A REPORT plus one fallback class; no dial rides it.
+    long mAbandonedInFlightSecs;
+    //#W57-U: how long ONE in-flight request may run before the game thread
+    //abandons it - the request's OWN deadline (mTimeoutMs, i.e. WAGIC_GPT_TIMEOUT
+    //or config `timeout=`) plus a grace of half that deadline clamped to
+    //[1 s, 30 s]. Honouring the deadline is the transport's job; this is the
+    //bound for a transport that does not do it (a wedged socket, a worker that
+    //died without publishing), which is otherwise unbounded because
+    //decisionPending re-extends the interrupt offer every tick.
+    long inFlightAbandonMs() const;
+    //#W57-U: the same arithmetic, PURE, so PARSETEST pins the bound itself
+    //rather than a run that happened to fire. Public and static for that.
+public:
+    static long inFlightAbandonMsFor(long deadlineMs);
+private:
+    //#W57-U: abandon any arm whose request has passed inFlightAbandonMs with
+    //nothing published. Returns true iff the arm the caller is POLLING was the
+    //one abandoned - the caller then answers this decision through the same
+    //heuristic path a refused worker thread takes.
+    bool reapWedgedRequests(const std::shared_ptr<AsyncState>& polled, const char * polledArm);
     //#W53-Q (D24): the seq/class of the last record that handed its decision
     //to the heuristic (choice < 0 with a fallback class). The NEXT record - or
     //the game-end record - flushes a `recovery` record naming it and the

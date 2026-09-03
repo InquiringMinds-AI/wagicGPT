@@ -27,6 +27,23 @@ The Action Stack contains all information for Game Events that can be interrupte
 //build swap. (The wave-53 lane that introduced the floor shipped no flag; a
 //wave-54 corpus then spent ~3.2 h of inference on answers the floor threw
 //away and it could not be A/B'd.)
+//#W57-U: THE DISABLE FLAG for the in-flight bound (both halves: this backstop
+//and AIPlayerGPT's abandonment). Every output-affecting change here ships one,
+//so "was it the new bound?" is one env var on a shipped binary instead of a
+//build swap - and so the defect it fixes stays reproducible on the SAME binary
+//as a positive control. WAGIC_INFLIGHT_BOUND=0 restores the pre-#W57-U
+//behaviour: an in-flight call holds its window for ever.
+static bool inFlightBoundEnabled()
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char * v = getenv("WAGIC_INFLIGHT_BOUND");
+        cached = (v && (v[0] == '0') && !v[1]) ? 0 : 1;
+    }
+    return cached != 0;
+}
+
 static bool stallFloorEnabled()
 {
     static int cached = -1;
@@ -1104,6 +1121,7 @@ ActionStack::ActionStack(GameObserver* game)
     mHoldTicks = 0;
     mHoldSeconds = 0.0f;
     mHoldStartMs = 0;
+    mHoldInFlightSinceMs = 0; //#W57-U
     timer = -1;
     currentState = -1;
     mode = ACTIONSTACK_STANDARD;
@@ -1583,6 +1601,7 @@ void ActionStack::Update(float dt)
             mHoldTicks = 0;
             mHoldSeconds = 0.0f;
             mHoldStartMs = 0;
+            mHoldInFlightSinceMs = 0; //#W57-U
         }
         else
         {
@@ -1593,6 +1612,7 @@ void ActionStack::Update(float dt)
                 mHoldTicks = 0;
                 mHoldSeconds = 0.0f;
                 mHoldStartMs = 0;
+                mHoldInFlightSinceMs = 0; //#W57-U
             }
             else
             {
@@ -1631,11 +1651,55 @@ void ActionStack::Update(float dt)
             //two, 20 s of any denomination is slack, and changing it would
             //move the lane-AA softlock pin.
             const bool inFlight = holder->aiDecisionInFlight();
-            const bool spent = !inFlight && (loading
+            //#W57-U (the vpk16 in-flight softlock, 2026-09-03). The exemption
+            //above is right for a LIVE call and wrong for a DEAD one, and
+            //until now it could not tell them apart: `aiDecisionInFlight` says
+            //a request was launched, never that it will ever come back. A
+            //round trip that wedges (a socket the console's network stack
+            //never fails, a server that accepts and never answers, a worker
+            //thread that dies without publishing) therefore held this window
+            //with NO wall at all - the owner's frozen screen with the turn
+            //indicator pinned on the AI, pause menu alive.
+            //
+            //The bound is the seat's OWN deadline, never a fixed number, so
+            //nothing is cut short that the seat was still allowed to be doing:
+            //deadline (one request) + deadline (the one retry) + a grace of
+            //half a deadline clamped to [1 s, 30 s]. At the shipped 600 s
+            //default that is 20.5 minutes before this fires, and wave-55's
+            //legitimate 900 s decisions sit an order of magnitude inside it.
+            //A seat that reports no deadline (0 - every non-LLM seat) keeps
+            //the old unbounded exemption: there is no arithmetic to bound it
+            //with, and it has no transport that can wedge.
+            //
+            //This is the BACKSTOP. AIPlayerGPT::reapWedgedRequests abandons
+            //the request itself half a bound earlier, which is what lets the
+            //seat ANSWER (through the heuristic) instead of merely losing the
+            //window; this catches a seat whose in-flight flag is stuck for any
+            //other reason, and it is measured on an anchor extendInterruptOffer
+            //cannot zero.
+            bool inFlightExpired = false;
+            if (inFlight && inFlightBoundEnabled())
+            {
+                if (!mHoldInFlightSinceMs)
+                    mHoldInFlightSinceMs = stallFloorNowMs();
+                const long long deadlineMs = (long long) holder->decisionDeadlineMs();
+                if (deadlineMs > 0)
+                {
+                    long long graceMs = deadlineMs / 2;
+                    if (graceMs < 1000) graceMs = 1000;
+                    if (graceMs > 30000) graceMs = 30000;
+                    const long long boundMs = 2 * deadlineMs + graceMs;
+                    if (stallFloorNowMs() - mHoldInFlightSinceMs >= boundMs)
+                        inFlightExpired = true;
+                }
+            }
+            else
+                mHoldInFlightSinceMs = 0;
+            const bool spent = inFlightExpired || (!inFlight && (loading
                 ? (mHoldTicks >= 12)
                 : (holder->isInteractiveAI()
                        ? (mHoldTicks >= 300 && wallSeconds >= 1200.0f)
-                       : (mHoldTicks >= 300 && mHoldSeconds >= 20.0f)));
+                       : (mHoldTicks >= 300 && mHoldSeconds >= 20.0f))));
             if (spent)
             {
                 const string who = holder->getDisplayName();
@@ -1661,6 +1725,7 @@ void ActionStack::Update(float dt)
                 mHoldTicks = 0;
                 mHoldSeconds = 0.0f;
                 mHoldStartMs = 0;
+                mHoldInFlightSinceMs = 0; //#W57-U
             }
         }
     }

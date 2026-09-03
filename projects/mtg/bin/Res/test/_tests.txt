@@ -1341,3 +1341,4 @@ light_paws_attaches_to_lightpaws.txt
 light_paws_normal_aura_choice_free.txt
 w57S_human_seat_cast_countered_advances.txt
 w57S_human_seat_cast_dissipated_advances.txt
+w57U_ai_inflight_call_abandoned.txt
