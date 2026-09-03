@@ -420,6 +420,7 @@ int TestSuiteAI::Act(float)
         bool cannotAnswer = (action == "" || action == "next" || action == "eot"
                              || action == "yes" || action == "no" || action == "human"
                              || action == "ai" || action == "endinterruption"
+                             || action == "cancelbutton"                          //#W56-Z
                              || action.find("goto") != string::npos
                              || action.compare(0, 8, "holdkey ") == 0
                              || action.compare(0, 11, "releasekey ") == 0
@@ -491,6 +492,7 @@ int TestSuiteAI::Act(float)
             //lookup (its miss path dumps the whole board to the log).
             bool keyword = action == "" || action == "next" || action == "eot" || action == "yes"
                 || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
+                || action == "cancelbutton" //#W56-Z
                 || action == "interactivereveal" || action == "realgame"
                 || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
                 || action.compare(0, 10, "aipending ") == 0 //#W54-R
@@ -659,6 +661,20 @@ int TestSuiteAI::Act(float)
         observer->mLayers->stackLayer()->setIsInterrupting(this);
     else if (action.compare("endinterruption") == 0)
         observer->mLayers->stackLayer()->endOfInterruption();
+    else if (action.compare("cancelbutton") == 0)
+    {
+        //#W56-Z: press the duel's CANCEL button (JGE_BTN_SEC) at the layer that
+        //sees it first (DuelLayers::CheckUserInput order: stack, combat,
+        //avatars, action, hand, card selector). The real key path is human-only
+        //- DuelLayers gates it on `!isAI` and a scripted seat always reports
+        //isAI() - so this is the only way a fixture can drive the interrupt
+        //window's SEC branch. Semantics deliberately match a human press:
+        //with a target/cost choice pending it CANCELS that choice and leaves
+        //the interrupt window open; with nothing pending it ends the window
+        //(the pre-#W56-Z behaviour of every press).
+        observer->mLayers->stackLayer()->CheckUserInput(JGE_BTN_SEC);
+        DebugTrace("TESTSUITE cancelbutton: JGE_BTN_SEC -> stack layer [" << suite->filename << "]");
+    }
     else if (action.compare("no") == 0)
     {
         if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)

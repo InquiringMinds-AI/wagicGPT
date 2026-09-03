@@ -230,6 +230,11 @@ public:
     Interruptible * getAt(int id);
     void cancelInterruptOffer(InterruptDecision cancelMode = DONT_INTERRUPT, bool log = true);
     void endOfInterruption(bool log = true);
+    //#W56-Z: an armed target/cost chooser must never outlive the interrupt
+    //window it was armed in. Cancels a pending choice held by a NON-AI seat
+    //(human, or a scripted test-suite seat); returns 1 if one was cancelled,
+    //0 if there was nothing pending or the choice is mandatory (cantCancel).
+    int cancelPendingChoice();
     //Keep an open interrupt offer to `who` from timing out: an asynchronous
     //decision maker (the LLM player) can need longer than the configured
     //interrupt seconds to answer.

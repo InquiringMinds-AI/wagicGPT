@@ -1,0 +1,53 @@
+#W56-Z report (owner Vita build vpk15, 2026-09-03, verbatim): "engine forced me
+#to kill my own creature, not allowing me to cancel casting a spell that i hadnt
+#declared targets for. this is rules noncompliant, and also not fun."
+#
+#MECHANISM: MTGPutInPlayRule::reactToClick pays only AFTER
+#game->targetListIsSet(card), so clicking a targeted spell arms
+#GameObserver::targetChooser + cardWaitingForTargets with NOTHING paid. The
+#cancel button (JGE_BTN_SEC) reached ActionStack::CheckUserInput first
+#(DuelLayers::CheckUserInput order) and, while the seat was interrupting, that
+#branch ALWAYS meant "end the window" - it consumed the key and returned true,
+#so the ordinary cast-cancel path (CardSelector -> cancelCurrentAction) never
+#ran. Nothing cleared the chooser when the window closed either, so it outlived
+#its window; on the next window the first click on any legal target hit
+#cardClick's `if (targetChooser)` branch -> TARGET_OK_FULL ->
+#cardClick(cardWaitingForTargets) and the spell resolved on a target the player
+#never chose. His board: Putrefy armed, the ONLY legal target his own
+#Thornweald Archer.
+#
+#WITNESS (the endOfInterruption route - the safety net, fix leg b): PLAYER2
+#takes the interrupt window on PLAYER1's Raging Goblin, clicks Putrefy so its
+#chooser arms, then ends the window with the spell undeclared, then clicks the
+#Archer. PRE-FIX the orphan chooser eats that click and Putrefy destroys
+#PLAYER2's own Archer (Putrefy to the graveyard, pool spent). POST-FIX the
+#chooser dies with the window: Putrefy is still in hand, the pool still floats,
+#the Archer lives and the click is inert.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+life:20
+[PLAYER2]
+hand:Putrefy
+inplay:Thornweald Archer
+manapool:{B}{G}{R}
+life:20
+[DO]
+Raging Goblin
+yes
+Putrefy
+endinterruption
+Thornweald Archer
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin
+life:20
+[PLAYER2]
+hand:Putrefy
+inplay:Thornweald Archer
+manapool:{B}{G}{R}
+life:20
+[END]
