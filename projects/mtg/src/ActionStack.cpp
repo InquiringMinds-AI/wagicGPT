@@ -222,7 +222,7 @@ float Interruptible::GetVerticalTextOffset() const
 }
 
 void Interruptible::Render(MTGCardInstance * source, JQuad * targetQuad, string alt1, string alt2, string action,
-    bool bigQuad, int aType, vector<JQuadPtr> mytargetsQuad)
+    bool bigQuad, int aType, vector<JQuadPtr> mytargetsQuad, vector<int> mytargetCounts)
 {
     WFont * mFont = observer->getResourceManager()->GetWFont(Fonts::MAIN_FONT);
     mFont->SetColor(ARGB(255,255,255,255));
@@ -248,7 +248,16 @@ void Interruptible::Render(MTGCardInstance * source, JQuad * targetQuad, string 
         int count = 1;
         if(mytargetsQuad.size())
         {
-            count = mytargetsQuad.size();
+            //#W57-G (D42): the "(N)" in the header stays the TRUE number of
+            //targets even when the icons were collapsed - a Fireball split over
+            //3 copies of one token is three targets, and saying "(1)" would be
+            //the kind of true-in-the-wrong-scope statement the trust doctrine
+            //forbids.
+            count = 0;
+            for(unsigned int k = 0; k < mytargetsQuad.size(); k++)
+                count += (k < mytargetCounts.size()) ? mytargetCounts[k] : 1;
+            if (!count)
+                count = (int) mytargetsQuad.size();
             for(unsigned int k = 0; k < mytargetsQuad.size(); k++)
             {
                 if(k > 10)
@@ -341,6 +350,15 @@ void Interruptible::Render(MTGCardInstance * source, JQuad * targetQuad, string 
                 }
                 renderer->RenderQuad(multiQ.get(), x + 55 + xadj, y + ((mHeight - multiQ->mHeight) / 2) + multiQ->mHotSpotY, 0, scale, scale);
                 multiQ->SetHotSpot(backupX, backupY);
+                //#W57-G (D42): xN on a collapsed run of identical targets.
+                if (k < mytargetCounts.size() && mytargetCounts[k] > 1)
+                {
+                    char cbuf[16];
+                    sprintf(cbuf, "x%i", mytargetCounts[k]);
+                    mFont->SetColor(ARGB(255,255,235,140));
+                    mFont->DrawString(cbuf, x + 55 + xadj, y + mHeight - 8 + GetVerticalTextOffset(), JGETEXT_LEFT);
+                    mFont->SetColor(ARGB(255,255,255,255));
+                }
                 xadj+=4;
             }
         }
@@ -364,6 +382,43 @@ void Interruptible::Render(MTGCardInstance * source, JQuad * targetQuad, string 
     }
 }
 
+//#W57-G (D42): collapse a stack entry's target icons the way the board
+//collapses the permanents themselves. Members of one pile are, by the stack
+//key's own definition, indistinguishable - name and every observable state are
+//equal - so N identical thumbnails carry no more information than one
+//thumbnail and the number N, and the row is 480 logical pixels wide.
+//Entries that are not battlefield cards (players, spells, library cards) never
+//merge: they get a unique key. Order is preserved; the first occurrence keeps
+//the slot.
+static void w57gCollapseTargetIcons(vector<JQuadPtr>& quads, vector<MTGCardInstance*>& cards,
+                                    vector<int>& counts)
+{
+    counts.assign(quads.size(), 1);
+    if (!wagicBoardGroupingEnabled() || quads.size() < 2)
+        return;
+    vector<JQuadPtr> outQ;
+    vector<int> outC;
+    vector<string> outK;
+    for (size_t i = 0; i < quads.size(); ++i)
+    {
+        string key;
+        if (i < cards.size() && cards[i] && cards[i]->isInPlay(cards[i]->getObserver()))
+            key = wagicBoardStackKey(cards[i]);
+        if (key.size())
+        {
+            size_t at = outK.size();
+            for (size_t j = 0; j < outK.size(); ++j)
+                if (outK[j] == key) { at = j; break; }
+            if (at < outK.size()) { outC[at]++; continue; }
+        }
+        outQ.push_back(quads[i]);
+        outC.push_back(1);
+        outK.push_back(key);
+    }
+    quads = outQ;
+    counts = outC;
+}
+
 /* Ability */
 int StackAbility::resolve()
 {
@@ -376,6 +431,8 @@ void StackAbility::Render()
     string alt1 = source->getName();
     vector<JQuadPtr> mytargetQuads;
     vector<MTGCardInstance*> myClones;
+    vector<MTGCardInstance*> myQuadCards; //#W57-G (D42): parallel to mytargetQuads
+    vector<int> myTargetCounts;           //#W57-G (D42)
 
     int fmLibrary = 0;
     int force = 0;
@@ -403,14 +460,23 @@ void StackAbility::Render()
                         if(card)
                             myClones.push_back(card); //fill vector
                         if(source->has(Constants::HIDDENFACE) && card && !observer->isInLibrary(card))
+                        {
                             mytargetQuads.push_back(card->getIcon()); //Fixed crash on targeting a spell on stack by correctly casting variable tt.
+                            myQuadCards.push_back(card); //#W57-G (D42)
+                        }
                         else if (!source->has(Constants::HIDDENFACE) && card)
+                        {
                             mytargetQuads.push_back(card->getIcon()); //Fixed crash on targeting a spell on stack by correctly casting variable tt.
+                            myQuadCards.push_back(card); //#W57-G (D42)
+                        }
                         else
                             fmLibrary++;
                     }
                     else if(card)
+                    {
                         mytargetQuads.push_back(card->getIcon()); //Fixed crash on targeting a spell on stack by correctly casting variable tt.
+                        myQuadCards.push_back(card); //#W57-G (D42)
+                    }
                 }
             }
         }
@@ -450,10 +516,12 @@ void StackAbility::Render()
     if(source->has(Constants::HIDDENFACE) && fmLibrary)
         force = MTGAbility::HIDDENVIEW;
 
+    w57gCollapseTargetIcons(mytargetQuads, myQuadCards, myTargetCounts); //#W57-G (D42)
+
     if(observer->gameType() == GAME_TYPE_MOMIR)
-        Interruptible::Render(source, quad.get(), alt1, alt2, action, true, ability->aType, mytargetQuads);
+        Interruptible::Render(source, quad.get(), alt1, alt2, action, true, ability->aType, mytargetQuads, myTargetCounts);
     else
-        Interruptible::Render(source, quad.get(), alt1, alt2, action, false, force, mytargetQuads);
+        Interruptible::Render(source, quad.get(), alt1, alt2, action, false, force, mytargetQuads, myTargetCounts);
 }
 StackAbility::StackAbility(GameObserver* observer, int id, MTGAbility * _ability) :
 Interruptible(observer, id), ability(_ability)
@@ -696,6 +764,43 @@ void Spell::Render()
         {
             alt2 = ((MTGCardInstance *) target)->name;
         }
+    }
+
+    //#W57-G (D42): the per-card BOARD marker for a spell's targets. Wagic
+    //already draws one for a multi-target ABILITY (StackAbility sets
+    //forcedBorderA on each of its targets, and CardGui renders that as the red
+    //rim), but a SPELL on the stack set nothing - the owner's Fireball case,
+    //where the whole question is "which of these copies did I aim at". The
+    //answer was only in the stack entry's thumbnails. This closes the gap with
+    //the language the game already speaks: red rim on every current target,
+    //green rim on the source, cleared by GameObserver's existing sweep the
+    //moment the stack empties. It is independent of the grouping option - a
+    //pre-existing gap, fixed for everyone.
+    vector<JQuadPtr> mytargetQuads;
+    vector<MTGCardInstance*> myQuadCards;
+    vector<int> myTargetCounts;
+    if (tc)
+    {
+        vector<Targetable*> tfrom = tc->getTargetsFrom();
+        for (size_t i = 0; i < tfrom.size(); ++i)
+        {
+            MTGCardInstance * c = dynamic_cast<MTGCardInstance *> (tfrom[i]);
+            if (!c)
+                continue;
+            c->forcedBorderA = 1;
+            myQuadCards.push_back(c);
+            mytargetQuads.push_back(c->getIcon());
+        }
+        if (myQuadCards.size())
+            source->forcedBorderB = 1;
+    }
+    //Only take the multi-icon path when there IS more than one target: a
+    //single-target spell keeps the exact stack row it has always drawn.
+    if (mytargetQuads.size() > 1)
+    {
+        w57gCollapseTargetIcons(mytargetQuads, myQuadCards, myTargetCounts);
+        Interruptible::Render(source, quad.get(), alt1, alt2, action, true, 0, mytargetQuads, myTargetCounts);
+        return;
     }
     Interruptible::Render(source, quad.get(), alt1, alt2, action, true);
 }

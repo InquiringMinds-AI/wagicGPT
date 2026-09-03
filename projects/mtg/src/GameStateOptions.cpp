@@ -162,6 +162,8 @@ void GameStateOptions::Start()
     optionsList->Add(NEW OptionInteger(Options::DISABLECARDS, "Disable card images"));
     optionsList->Add(NEW OptionInteger(Options::TRANSITIONS, "Disable screen transitions"));
     optionsList->Add(NEW OptionInteger(Options::OSD, "Display InGame extra information"));
+    //#W57-G (D42)
+    optionsList->Add(NEW OptionInteger(Options::BOARDGROUPING, "Stack identical permanents"));
     optionsTabs->Add(optionsList);
 
 #ifdef WITH_GPT_AI
