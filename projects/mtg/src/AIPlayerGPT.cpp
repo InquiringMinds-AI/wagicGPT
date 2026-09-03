@@ -9885,6 +9885,10 @@ void AIPlayerGPT::flushOpeningHand()
     mDealDone = true;
 }
 
+//#W54-A (D12b): forward declaration - the clause builder itself lives with
+//consumePlan's other plan helpers, below.
+static string planMenuDiffClause(const string& absentName);
+
 string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     std::ostringstream u;
@@ -9981,7 +9985,22 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         //#W53-N (D12a): the age. 146v125 seq 177-227 re-served ONE plan across
         //five turns while the opponent went 27 -> 35 life, with nothing on the
         //block to say the model had not restated it since turn 32.
-        u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << "): " << mCurrentPlan << "\n";
+        //#W54-A (D12b): the age says HOW OLD; this says WHAT MOVED. One clause,
+        //naming the first card the plan commits to acting on that this window's
+        //option list does not carry.
+        string planAbsent;
+        {
+            std::vector<string> planCards;
+            MTGGameZone * dz[] = { game->library, game->hand, game->inPlay, game->graveyard };
+            for (int z = 0; z < 4; z++)
+                for (int i = 0; i < dz[z]->nb_cards; i++)
+                    planCards.push_back(dz[z]->cards[i]->getDisplayName());
+            string absentName;
+            if (gptcaveat::planAbsentActionName(mCurrentPlan, tail, planCards, absentName))
+                planAbsent = planMenuDiffClause(absentName);
+        }
+        u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << planAbsent
+          << "): " << mCurrentPlan << "\n";
         //#W50-Y D10 (ii): on a TARGET window, a carried plan whose named
         //target (a permanent on either battlefield, under a targeting verb)
         //matches no row gets the one-line note - deck130 G4's two self-hits
@@ -10621,6 +10640,86 @@ static size_t findPlanMarker(const string& text, size_t labelLineStart, size_t *
     return pos;
 }
 
+//#W54-A (D12a): the plan's bound is a SHAPE, not a byte count. The protocol
+//asks for "a few sentences"; 1,600 bytes is far more than that, and a byte
+//bound cuts wherever the arithmetic lands. The served block is the pilot's own
+//prose - bounding it removes no legal window, no row and no option. Two cuts,
+//in order: the first BLANK LINE, and the first line that STARTS A NEW SENTENCE
+//(the line before it ended in . ! or ?) and does not open with a connective, so
+//an ordinary wrapped sentence and a "Then attack." continuation both survive.
+//The old 1,600-byte trim stays behind this as a backstop for a single runaway
+//paragraph.
+static bool planLineOpensWithConnective(const string& line)
+{
+    size_t s = line.find_first_not_of(" \t\r");
+    if (s == string::npos)
+        return false;
+    string w;
+    for (size_t i = s; i < line.size(); i++)
+    {
+        char c = (char) tolower((unsigned char) line[i]);
+        if (!isalpha((unsigned char) c))
+            break;
+        w += c;
+    }
+    static const char * conn[] = {
+        "and", "but", "or", "nor", "so", "then", "yet", "because", "since", "if",
+        "unless", "until", "while", "after", "before", "once", "also", "plus",
+        "however", "therefore", "thus", "next", "otherwise", "meanwhile", "with",
+        "to", "for", "that", "which", "this", "these", "those", "it", "they"
+    };
+    for (size_t i = 0; i < sizeof(conn) / sizeof(conn[0]); i++)
+        if (w == conn[i])
+            return true;
+    return false;
+}
+
+static string planParagraphBound(const string& planIn)
+{
+    string out;
+    size_t start = 0;
+    bool first = true;
+    string prevLine;
+    while (start <= planIn.size())
+    {
+        size_t end = planIn.find('\n', start);
+        string line = (end == string::npos) ? planIn.substr(start) : planIn.substr(start, end - start);
+        if (!first)
+        {
+            //a blank line ends the paragraph
+            if (line.find_first_not_of(" \t\r") == string::npos)
+                break;
+            size_t pe = prevLine.find_last_not_of(" \t\r");
+            char prevLast = (pe == string::npos) ? '\0' : prevLine[pe];
+            bool prevEnded = (prevLast == '.' || prevLast == '!' || prevLast == '?');
+            if (prevEnded && !planLineOpensWithConnective(line))
+                break;
+            out += "\n";
+        }
+        out += line;
+        prevLine = line;
+        first = false;
+        if (end == string::npos)
+            break;
+        start = end + 1;
+    }
+    size_t s = out.find_first_not_of(" \t\r\n");
+    size_t e = out.find_last_not_of(" \t\r\n");
+    return (s == string::npos) ? string() : out.substr(s, e - s + 1);
+}
+
+//#W54-A (D12b): the one-clause diff of the served plan against THIS window's
+//option list. 162v152 s11 -> s12 was served, verbatim, a plan naming
+//`Cast Master of the Feast` after the row it took in the same breath made
+//Master unaffordable, and nothing on the block said so. The clause states a
+//fact about the MENU, never a ruling about the card.
+static string planMenuDiffClause(const string& absentName)
+{
+    if (absentName.empty())
+        return string();
+    return string("; \"") + absentName + "\" is no longer on your menu";
+}
+
 string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel,
                                 int * choiceRunLen, int * rejectedLines)
 {
@@ -10691,6 +10790,7 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     if (s != string::npos)
     {
         plan = plan.substr(s, e - s + 1);
+        plan = planParagraphBound(plan); //#W54-A (D12a): SHAPE first
         if (plan.size() > 1600)
         {
             //bound a runaway plan; cut at a sentence boundary when one
@@ -12892,8 +12992,17 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //carry. So the only constraint-safe form is a row the MODEL may take: no
 //window is removed, nothing is cached blind, and the engine replays only an
 //answer the model itself gave, only while the board it gave it on stands.
+//#W54-A (D2d): the wording, after wave 53 measured 1,173 renders / 29 takes
+//(2.5%) and 703 windows already carrying the declined-note at N >= 3 taken 3
+//times. Two additive changes, no behaviour: lead with the VERB the pilot
+//already uses (its own PLAN prose says "I must pass priority" while it takes
+//this row - which is exactly what the D2b collision measures, so "hold" and
+//"pass" are not two acts to this reader), and put the GUARANTEE on the row,
+//which it never stated: any change re-opens the window and no cast is given
+//up. Nothing is withheld, nothing is advised.
 static const char * kHoldPriorityRowText =
-    "Hold priority - do not ask me again this turn unless the board changes";
+    "Pass priority, and do not ask me again this turn unless the board changes"
+    " (any change re-opens this window; you give up no cast)";
 
 //#W53-N (D2): the hold's board key is the situation block WITHOUT its leading
 //phase line. Phase progression is NOT a board change - it is exactly the
@@ -12901,10 +13010,46 @@ static const char * kHoldPriorityRowText =
 //TURN, so a phase step must not silently retire it. Everything else the block
 //carries does re-open it: life, poison, both battlefields, both hands, and
 //the STACK top-first, so a new stack object changes this string.
+//#W54-A (D2c): and WITHOUT the hidden-zone counters. serializeGameState emits
+//"Opponent hand size: N | Opponent library: M cards" and "Your library: N
+//cards"; both move on every draw step, so the OPPONENT'S OWN DRAW retired
+//every hold taken at their upkeep - by construction, on every opponent turn
+//(125v126 seq 128 -> 130, then twelve more windows that turn; and
+//hold_windows_skipped was 0 on 38 of 40 gameends while six seats took the
+//row). A card moving into a hidden zone is not a board change the hold was
+//about. Every other re-opener the lane designed is untouched: life, poison,
+//both battlefields, the stack top-first, a newly affordable row, the turn
+//ending - and the opponent's hand CONTENTS are not in this block at all, so
+//nothing that could be acted on is dropped.
+static bool holdKeyDroppedLine(const string& line)
+{
+    return line.compare(0, 19, "Opponent hand size:") == 0
+        || line.compare(0, 14, "Your library: ") == 0;
+}
+
 static string holdBoardKeyOf(const string& situation)
 {
     size_t nl = situation.find('\n');
-    return (nl == string::npos) ? string() : situation.substr(nl + 1);
+    if (nl == string::npos)
+        return string();
+    string rest = situation.substr(nl + 1);
+    string out;
+    size_t start = 0;
+    while (start <= rest.size())
+    {
+        size_t end = rest.find('\n', start);
+        string line = (end == string::npos) ? rest.substr(start) : rest.substr(start, end - start);
+        if (!holdKeyDroppedLine(line))
+        {
+            out += line;
+            if (end != string::npos)
+                out += '\n';
+        }
+        if (end == string::npos)
+            break;
+        start = end + 1;
+    }
+    return out;
 }
 
 //#W53-N (D2): does a hold taken on <heldBoard> with <heldRows> still stand at
@@ -12978,6 +13123,67 @@ static bool isReservedPassEcho(const string& echoLc)
         lowRow[i] = (char) tolower((unsigned char) lowRow[i]);
     return t == "pass" || t == "0" || t == "pass priority" || t == "pass (0)"
         || t == "0 (pass)" || t == "pass this window" || t == "no action" || t == lowRow;
+}
+
+//#W54-A (D2a): the HOLD row's own name, reserved the way "pass" is. wave 53
+//measured 2 firings of `CHOICE: 0 (Hold priority)` and BOTH executed a plain
+//pass (125v146 seq 74, 146v125 seq 372): the index-wins branch never remaps a
+//coded 0, so the name could not win and the hold intent was discarded with no
+//note and no re-ask. Exact match on the trimmed, lowercased echo - never a
+//substring - against the row's own text and its short names, including the
+//pre-D2d spelling the model may still write.
+static bool isReservedHoldEcho(const string& echoLc)
+{
+    size_t s = echoLc.find_first_not_of(" \t");
+    size_t e = echoLc.find_last_not_of(" \t.!");
+    if (s == string::npos || e == string::npos || e < s)
+        return false;
+    string t = echoLc.substr(s, e - s + 1);
+    string lowRow = kHoldPriorityRowText;
+    for (size_t i = 0; i < lowRow.size(); i++)
+        lowRow[i] = (char) tolower((unsigned char) lowRow[i]);
+    if (t == lowRow)
+        return true;
+    //the disambiguating prefix: everything up to the row's own comma is what
+    //separates it from row 0's "Pass priority (take no action this window)".
+    size_t comma = lowRow.find(',');
+    if (comma != string::npos && t.size() > comma
+        && t.compare(0, comma + 1, lowRow.substr(0, comma + 1)) == 0)
+        return true;
+    return t == "hold" || t == "hold priority"
+        || t == "hold priority - do not ask me again this turn unless the board changes";
+}
+
+//#W54-A (D2a): where does the HOLD row sit on this menu (0-based), if at all?
+static int holdRowIndexOf(const std::vector<string> * optionTexts)
+{
+    if (!optionTexts)
+        return -1;
+    for (size_t o = 0; o < optionTexts->size(); o++)
+        if ((*optionTexts)[o] == kHoldPriorityRowText)
+            return (int) o;
+    return -1;
+}
+
+//#W54-A (D2a): is this reserved PASS echo also a word-boundary head of the HOLD
+//row's own text? After D2d both rows open "Pass priority", so a bare "(pass)"
+//or "(pass priority)" no longer names row 0 unambiguously - the index has to
+//break the tie, and the answer is never a third row either way.
+static bool passEchoAmbiguousWithHold(const string& echoLc, int holdRowIdx)
+{
+    if (holdRowIdx < 0)
+        return false;
+    size_t s = echoLc.find_first_not_of(" \t");
+    size_t e = echoLc.find_last_not_of(" \t.!");
+    if (s == string::npos || e == string::npos || e < s)
+        return false;
+    string t = echoLc.substr(s, e - s + 1);
+    string lowRow = kHoldPriorityRowText;
+    for (size_t i = 0; i < lowRow.size(); i++)
+        lowRow[i] = (char) tolower((unsigned char) lowRow[i]);
+    if (t.empty() || t.size() > lowRow.size() || lowRow.compare(0, t.size(), t) != 0)
+        return false;
+    return t.size() == lowRow.size() || !isalnum((unsigned char) lowRow[t.size()]);
 }
 
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
@@ -14982,6 +15188,9 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     bool echoConflict = false;
     bool echoNoMatch = false;
     bool passEchoNamed = false; //#W53-N (D9): the parenthetical names row 0
+    bool holdEchoNamed = false; //#W54-A (D2a): the parenthetical names the HOLD row
+    bool passEchoAmbiguous = false; //#W54-A (D2a): "(pass priority)" heads BOTH rows
+    const int holdRowIdx = holdRowIndexOf(optionTexts); //#W54-A (D2a), 0-based
     bool exactNameRemap = false; //#W52-J D6: bound by the exact short name (hoisted for the conflict signatures)
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
     string echoLc;        //lowercased echo string (hoisted for INDEX-WINS (a2))
@@ -15102,6 +15311,15 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //only mis-execution in 3,063 CHOICE: n (name) parentheticals.
             if (passRowOffered && isReservedPassEcho(echoLc))
                 passEchoNamed = true;
+            //#W54-A (D2a): the HOLD row's own name binds the same way, at BOTH
+            //seams (the casting menu carries the row and no row 0). A reserved
+            //pass echo that is also a head of the hold row's text is AMBIGUOUS
+            //after D2d and must let the coded index break the tie rather than
+            //silently take row 0.
+            if (holdRowIdx >= 0 && isReservedHoldEcho(echoLc))
+                holdEchoNamed = true;
+            else if (passEchoNamed && passEchoAmbiguousWithHold(echoLc, holdRowIdx))
+                passEchoAmbiguous = true;
             //#W52-J (D6): the EXACT short name binds FIRST. The word pass below
             //drops "right"/"now" as render vocabulary and "cast" as filler, so
             //"Cast nothing right now" reduced to the single word "nothing" -
@@ -15410,18 +15628,50 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     //and fails the whole reply to the heuristic. deck146 vs152 seq 91 executed
     //Kaya's +1 on "CHOICE: 1 (Pass)" - the sole mis-execution in 3,063
     //parentheticals. A coded 0 already IS this row, so it earns no note.
+    //#W54-A (D2a): the first coded number in the reply, shared by the two
+    //reserved-name branches below (the index that would otherwise win).
+    int firstCodedNum = -1;
+    for (size_t pn = 0; pn < text.size(); pn++)
+        if (isdigit((unsigned char) text[pn]))
+        {
+            size_t pe = pn;
+            while (pe < text.size() && isdigit((unsigned char) text[pe]))
+                pe++;
+            firstCodedNum = atoi(text.substr(pn, pe - pn).c_str());
+            break;
+        }
+
+    //#W54-A (D2a): the parenthetical NAMES the HOLD row. This binds ahead of
+    //every index verdict for the same reason the pass name does: on a menu
+    //carrying the row, its short name is not an off-menu name, it is that
+    //row's own label. The failure this repairs is the reverse of D9's -
+    //`CHOICE: 0 (Hold priority)` executed a plain PASS both times it was
+    //written (125v146 seq 74, 146v125 seq 372), because the index-wins branch
+    //refuses to remap a coded 0. Where the index disagrees, the NAMED row is
+    //taken and the divergence is stamped; the third thing is never executed.
+    if (holdEchoNamed)
+    {
+        if (firstCodedNum != holdRowIdx + 1)
+        {
+            appendParseNote(noteOut, "hold_row_named");
+            appendParseNote(noteOut, "echo_index_conflict");
+        }
+        return holdRowIdx + 1;
+    }
+
     if (passEchoNamed)
     {
-        int firstNum = -1;
-        for (size_t pn = 0; pn < text.size(); pn++)
-            if (isdigit((unsigned char) text[pn]))
-            {
-                size_t pe = pn;
-                while (pe < text.size() && isdigit((unsigned char) text[pe]))
-                    pe++;
-                firstNum = atoi(text.substr(pn, pe - pn).c_str());
-                break;
-            }
+        int firstNum = firstCodedNum;
+        //#W54-A (D2a): after D2d both rows open "Pass priority", so a bare
+        //"(pass)" / "(pass priority)" names neither uniquely. The coded index
+        //decides between the two - and only between the two.
+        if (passEchoAmbiguous)
+        {
+            appendParseNote(noteOut, "pass_hold_ambiguous");
+            if (firstNum == holdRowIdx + 1)
+                return holdRowIdx + 1;
+            return 0;
+        }
         if (firstNum != 0)
             appendParseNote(noteOut, "pass_row_named");
         return 0;
@@ -16945,8 +17195,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //plan and "CHOICE: 1 (Lolth 0)" over "We must pass" are the same
         //contradiction. The matched verdict is quoted back; the class is
         //counted (decision_reversed_in_prose) whether or not the re-ask fires.
+        //#W54-A (D2b): the HOLD row is EXEMPT from the pass-verdict test. Taking
+        //it means "I do nothing this turn", so the reply's own prose says "I
+        //must pass priority" - and the detector read a non-zero index plus a
+        //pass verdict as a contradiction. That collision is 5 of wave 53's 8
+        //`plan_choice_conflict` firings (146v125 s150/s371/s398/s470/s491, plus
+        //two on the same vocabulary): two re-asks degraded a hold to a plain
+        //pass and three reached plan_choice_conflict_exhausted, at a full extra
+        //model call each. A pass verdict CONFIRMS a hold. This narrows the
+        //detector for NO other shape - the wave-52 rejection of a general
+        //narrowing stands (general-strategy.md, the R118 reconciliation).
         string passVerdict;
         bool planChoiceConflict = (choice >= 1 && choice <= index && !content.empty()
+                                   && !(holdRow > 0 && choice == holdRow)
                                    && planSaysPassThisWindow(content, &passVerdict));
         if (planChoiceConflict)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
@@ -36741,8 +37002,13 @@ static const char * kW50Y_r94 =
     cout << "\n[#W53-N D2] the HOLD row: a model-takeable answer, not a cadence\n";
     {
         string row = kHoldPriorityRowText;
-        CHECK(row == "Hold priority - do not ask me again this turn unless the board changes",
-              "#W53-N D2 the hold row renders the docket's literal");
+        CHECK(row == "Pass priority, and do not ask me again this turn unless the board changes"
+                     " (any change re-opens this window; you give up no cast)",
+              "#W54-A D2d the hold row renders the docket's literal (was 'Hold priority - ...')");
+        CHECK(row.find("Pass priority") == 0,
+              "#W54-A D2d it leads with the verb the pilot already writes in its own PLAN");
+        CHECK(row.find("any change re-opens this window; you give up no cast") != string::npos,
+              "#W54-A D2d the guarantee is ON the row, which it never stated before");
         string lc = row;
         for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
         // NEGATIVE: it states an act the model may take; it never advises it and
@@ -37174,6 +37440,204 @@ static const char * kW50Y_r94 =
               "#W53-V with three printings the nearest FORWARD id wins, not the last one");
         CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
               "#W53-V past every candidate it falls back to the nearest one behind");
+    }
+    // ---- #W54-A (docket D2 a/b/c/d + D12): the HOLD row's three defects and
+    // the PLAN block's shape bound ----
+    cout << "\n[#W54-A D2a] 125v146 seq 74 / 146v125 seq 372: 'CHOICE: 0 (Hold priority)'\n";
+    {
+        // the repro's own shape: a 2-row menu whose LAST row is the HOLD row,
+        // answered with the reserved pass INDEX and the HOLD NAME.
+        vector<string> menu;
+        menu.push_back("Cast Tribute to Hunger {1}{b}");
+        menu.push_back(kHoldPriorityRowText);
+        bool stale = false; string note;
+        int c = parseChoice("CHOICE: 0 (Hold priority)", (int) menu.size(), &menu,
+                            &stale, NULL, &note, true);
+        CHECK(c == 2 && !stale && note.find("hold_row_named") != string::npos,
+              "#W54-A D2a the repro: the NAMED hold row is taken over the index, and stamped");
+        CHECK(note.find("echo_index_conflict") != string::npos,
+              "#W54-A D2a the divergence is signed, never silent");
+        // NEGATIVE (the docket's own): the same menu, a plain pass echo, still row 0.
+        bool st2 = false; string note2;
+        CHECK(parseChoice("CHOICE: 0 (pass)", (int) menu.size(), &menu, &st2, NULL, &note2, true) == 0,
+              "#W54-A D2a NEGATIVE 'CHOICE: 0 (pass)' on the same menu still binds row 0");
+        // NEGATIVE: a real cast on a hold-bearing menu is untouched.
+        bool st3 = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Tribute to Hunger)", (int) menu.size(), &menu,
+                          &st3, NULL, NULL, true) == 1,
+              "#W54-A D2a NEGATIVE a real cast on a hold-bearing menu still executes");
+        // the index AGREEING with the name earns no conflict stamp
+        bool st4 = false; string note4;
+        CHECK(parseChoice("CHOICE: 2 (Hold priority)", (int) menu.size(), &menu, &st4, NULL, &note4, true) == 2
+              && note4.find("hold_row_named") == string::npos,
+              "#W54-A D2a NEGATIVE an agreeing index is not a conflict - no stamp");
+        // the whole row echoed back, nested parenthetical and all
+        bool st5 = false;
+        CHECK(parseChoice(string("CHOICE: 0 (") + kHoldPriorityRowText + ")",
+                          (int) menu.size(), &menu, &st5, NULL, NULL, true) == 2,
+              "#W54-A D2a the whole row echoed back (nested parens) answers as its own row");
+        // ECHO SHAPE: the row's own leading clause, comma and all, is the hold row
+        bool st6 = false;
+        CHECK(parseChoice("CHOICE: 0 (Pass priority, and do not ask me again this turn)",
+                          (int) menu.size(), &menu, &st6, NULL, NULL, true) == 2,
+              "#W54-A D2a the row's disambiguating prefix ('Pass priority, and ...') is the hold row");
+        // AMBIGUITY: after D2d "Pass priority" heads BOTH rows - the index decides.
+        bool st7 = false; string note7;
+        CHECK(parseChoice("CHOICE: 2 (Pass priority)", (int) menu.size(), &menu, &st7, NULL, &note7, true) == 2
+              && note7.find("pass_hold_ambiguous") != string::npos,
+              "#W54-A D2a an ambiguous '(Pass priority)' with the hold index takes the hold row");
+        bool st8 = false; string note8;
+        CHECK(parseChoice("CHOICE: 0 (Pass priority)", (int) menu.size(), &menu, &st8, NULL, &note8, true) == 0
+              && note8.find("pass_hold_ambiguous") != string::npos,
+              "#W54-A D2a an ambiguous '(Pass priority)' with index 0 takes the pass row");
+        // NEGATIVE: no hold row on the menu -> nothing changes for anyone.
+        vector<string> nohold;
+        nohold.push_back("Cast Tribute to Hunger {1}{b}");
+        nohold.push_back("Cast nothing right now");
+        bool st9 = false; string note9;
+        CHECK(parseChoice("CHOICE: 0 (Hold priority)", (int) nohold.size(), &nohold,
+                          &st9, NULL, &note9, true) == 0
+              && note9.find("hold_row_named") == string::npos,
+              "#W54-A D2a NEGATIVE with no hold row offered the reply is a plain pass, unstamped");
+        // NEGATIVE: a card name that merely CONTAINS 'hold' is not the hold row.
+        vector<string> hb;
+        hb.push_back("Cast Stronghold Assassin {2}{b}");
+        hb.push_back(kHoldPriorityRowText);
+        bool st10 = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Stronghold Assassin)", (int) hb.size(), &hb,
+                          &st10, NULL, NULL, true) == 1,
+              "#W54-A D2a NEGATIVE a card name containing 'hold' is not the hold row");
+    }
+
+    cout << "\n[#W54-A D2c] 125v126 seq 128 -> 130: the opponent's own draw step retired the hold\n";
+    {
+        // the repro: two byte-identical windows one phase apart, turn 30, with
+        // ONLY the opponent's hand size and both library counts moved by their
+        // draw. Every other re-opener must survive untouched.
+        string base =
+            "Phase: Upkeep | It is the opponent's turn.\n"
+            "Your life: 20 | Opponent life: 20\n"
+            "Stack: empty\n"
+            "Opponent hand size: 4 | Opponent library: 41 cards\n"
+            "Your library: 38 cards\n";
+        string drew =
+            "Phase: Draw | It is the opponent's turn.\n"
+            "Your life: 20 | Opponent life: 20\n"
+            "Stack: empty\n"
+            "Opponent hand size: 5 | Opponent library: 40 cards\n"
+            "Your library: 38 cards\n";
+        CHECK(holdBoardKeyOf(base) == holdBoardKeyOf(drew),
+              "#W54-A D2c the opponent's draw step no longer retires the hold");
+        CHECK(holdBoardKeyOf(base).find("Opponent hand size") == string::npos
+              && holdBoardKeyOf(base).find("Your library") == string::npos,
+              "#W54-A D2c the hidden-zone counters are not in the key");
+        CHECK(holdBoardKeyOf(base).find("Your life: 20 | Opponent life: 20") != string::npos
+              && holdBoardKeyOf(base).find("Stack: empty") != string::npos,
+              "#W54-A D2c everything else the block carries IS still in the key");
+        // NEGATIVEs: the re-openers the lane designed all still fire.
+        string life = base; life.replace(life.find("Your life: 20"), 13, "Your life: 17");
+        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(life),
+              "#W54-A D2c NEGATIVE a life change still re-opens the window");
+        string stack = base;
+        stack.replace(stack.find("Stack: empty"), 12,
+                      "Stack: 1 (top): opponent's Lightning Bolt [instant]");
+        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(stack),
+              "#W54-A D2c NEGATIVE a new stack object still re-opens the window");
+        string board = base + "Their battlefield: Grizzly Bears (2/2)\n";
+        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(board),
+              "#W54-A D2c NEGATIVE a permanent arriving still re-opens the window");
+        std::set<string> held;
+        held.insert("Cast Dictate of Kruphix {3}{u}");
+        held.insert(kHoldPriorityRowText);
+        vector<string> same;
+        same.push_back("Cast Dictate of Kruphix {3}{u}");
+        same.push_back(kHoldPriorityRowText);
+        const char * why = "x";
+        CHECK(holdStillStands(holdBoardKeyOf(base), holdBoardKeyOf(drew), held, same, &why)
+              && string(why).empty(),
+              "#W54-A D2c the hold taken at their upkeep SURVIVES their draw step");
+        vector<string> grown(same);
+        grown.push_back("Cast Spark Spray {r}");
+        CHECK(!holdStillStands(holdBoardKeyOf(base), holdBoardKeyOf(drew), held, grown, &why)
+              && string(why) == "a row is newly available",
+              "#W54-A D2c NEGATIVE a newly affordable row still re-opens it across the draw step");
+    }
+
+    cout << "\n[#W54-A D12a] the PLAN block is bounded by SHAPE, not by 1,600 bytes\n";
+    {
+        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.")
+              == "Fetch a dual, then cast Intruder Alarm.",
+              "#W54-A D12a a one-paragraph plan is returned unchanged");
+        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.\n\nNow, some notes: "
+                                 "the opponent is at 30 and I have been repeating myself.")
+              == "Fetch a dual, then cast Intruder Alarm.",
+              "#W54-A D12a the first BLANK LINE ends the block");
+        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.\nThe opponent is at 30 "
+                                 "and their board is empty.")
+              == "Fetch a dual, then cast Intruder Alarm.",
+              "#W54-A D12a a new sentence on a new line without a connective ends the block");
+        // NEGATIVE: an ordinary wrapped sentence is NOT a new paragraph.
+        CHECK(planParagraphBound("Fetch a dual land so that I can cast\nIntruder Alarm next turn.")
+              == "Fetch a dual land so that I can cast\nIntruder Alarm next turn.",
+              "#W54-A D12a NEGATIVE a wrapped sentence survives (the line before it did not end)");
+        // NEGATIVE: a connective continuation is the same thought.
+        CHECK(planParagraphBound("Cast Intruder Alarm.\nThen attack with everything.")
+              == "Cast Intruder Alarm.\nThen attack with everything.",
+              "#W54-A D12a NEGATIVE a 'Then ...' continuation is kept");
+        CHECK(planParagraphBound("Cast Intruder Alarm.\nand hold the Bolt.")
+              == "Cast Intruder Alarm.\nand hold the Bolt.",
+              "#W54-A D12a NEGATIVE a lower-case connective line is kept");
+        CHECK(planParagraphBound("   Cast Intruder Alarm.  \n\n   ")
+              == "Cast Intruder Alarm.",
+              "#W54-A D12a the result is trimmed");
+        CHECK(planParagraphBound("").empty(),
+              "#W54-A D12a NEGATIVE an empty plan stays empty");
+    }
+
+    cout << "\n[#W54-A D12b] 162v152 s11 -> s12: the served plan names a card the menu lost\n";
+    {
+        CHECK(planMenuDiffClause("Master of the Feast")
+              == "; \"Master of the Feast\" is no longer on your menu",
+              "#W54-A D12b the docket's literal clause");
+        CHECK(planMenuDiffClause("").empty(),
+              "#W54-A D12b NEGATIVE nothing absent -> no clause");
+        string header = string("YOUR PLAN (as you last stated it") + planAgeClauseText(1, 10)
+                        + planMenuDiffClause("Master of the Feast") + "): cast Master of the Feast.";
+        CHECK(header == "YOUR PLAN (as you last stated it, 1 window ago on turn 10; "
+                        "\"Master of the Feast\" is no longer on your menu): cast Master of the Feast.",
+              "#W54-A D12b the whole header line, at the repro's own age");
+        std::vector<string> mine;
+        mine.push_back("Master of the Feast");
+        mine.push_back("Gray Merchant of Asphodel");
+        string menu = "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+                      "1. Cast Gray Merchant of Asphodel {3}{b}{b}\n"
+                      "2. Cast nothing right now\n";
+        string absent;
+        CHECK(gptcaveat::planAbsentActionName("Cast Master of the Feast, then hold up removal.",
+                                              menu, mine, absent)
+              && absent == "Master of the Feast",
+              "#W54-A D12b the repro: the plan's card is not on this menu and is named");
+        // NEGATIVE: a card the menu DOES carry is never named.
+        absent.clear();
+        CHECK(!gptcaveat::planAbsentActionName("Cast Gray Merchant of Asphodel for the drain.",
+                                               menu, mine, absent)
+              && absent.empty(),
+              "#W54-A D12b NEGATIVE a card this window offers earns no clause");
+        // NEGATIVE: a negated / future clause is not a commitment about this window.
+        absent.clear();
+        CHECK(!gptcaveat::planAbsentActionName("Hold Master of the Feast until they tap out.",
+                                               menu, mine, absent),
+              "#W54-A D12b NEGATIVE a HELD card is not a stale commitment");
+        absent.clear();
+        CHECK(!gptcaveat::planAbsentActionName("Next turn, cast Master of the Feast.",
+                                               menu, mine, absent),
+              "#W54-A D12b NEGATIVE a clause about a LATER turn is not about this menu");
+        // NEGATIVE: not an action menu at all -> the clause has nothing to claim.
+        absent.clear();
+        CHECK(!gptcaveat::planAbsentActionName("Cast Master of the Feast, then hold up removal.",
+                                               "TARGET CHOICE for Lightning Bolt\n1. Grizzly Bears (2/2)\n",
+                                               mine, absent),
+              "#W54-A D12b NEGATIVE a target sub-menu is not a cast menu");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

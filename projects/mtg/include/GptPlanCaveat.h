@@ -422,6 +422,57 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
     return anyAffirmative && !anyOffered;
 }
 
+// #W54-A (D12b, wave-53 ledger MED = R172): the one-clause DIFF. planActionsStale
+// only fires when EVERY affirmed card has fallen off the menu, so a plan that
+// names two cards and keeps one of them says nothing about the one that is gone
+// (162v152 s11 -> s12: the plan named `Cast Master of the Feast` and the row the
+// same reply took made Master unaffordable; s12 was served that plan verbatim).
+// This returns the FIRST card the plan affirmatively commits to acting on THIS
+// window that the current option list does not carry, so the header can name it.
+// Same affirmation test as planActionsStale - a negated clause ("hold X"), a
+// future clause ("next turn, cast X") and a non-action menu never fire.
+inline bool planAbsentActionName(const std::string& planRaw, const std::string& optsRaw,
+                                 const std::vector<std::string>& myCardNames,
+                                 std::string& absentOut)
+{
+    absentOut.clear();
+    if (planRaw.empty())
+        return false;
+    std::string plan = toLower(planRaw);
+    std::string opts = stripTargetEnumerations(toLower(optsRaw));
+    if (castFreeAskHeader(opts))
+        return false;
+    if (!optionsAreActionMenu(opts))
+        return false;
+    std::set<std::string> seen;
+    for (size_t n = 0; n < myCardNames.size(); n++)
+    {
+        std::string full = toLower(myCardNames[n]);
+        if (full.size() < 4)
+            continue;
+        std::string nm = shortName(full);
+        if (nm.size() < 4)
+            continue;
+        if (!seen.insert(nm).second)
+            continue;
+        if (opts.find(nm) != std::string::npos || opts.find(full) != std::string::npos)
+            continue; //this window offers it: nothing to say
+        size_t pos = 0;
+        while ((pos = plan.find(nm, pos)) != std::string::npos)
+        {
+            size_t ws = pos > 40 ? pos - 40 : 0;
+            std::string win = plan.substr(ws, pos - ws);
+            if (windowHasVerb(win) && !windowNegated(win) && !planClauseIsFuture(plan, pos))
+            {
+                absentOut = myCardNames[n];
+                return true;
+            }
+            pos += nm.size();
+        }
+    }
+    return false;
+}
+
 // #W50-Y D10 (wave-49 ledger MED): a plan that OPENS with a verdict is not a
 // plan. deck123 vs125 seq 53-56 and deck130 vs125 seq 125 carried "The game is
 // lost. ..." - text that goes on to name cards, so planNamesNoAction could not
