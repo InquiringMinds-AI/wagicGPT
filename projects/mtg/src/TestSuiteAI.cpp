@@ -1283,6 +1283,17 @@ TestSuiteActions::TestSuiteActions()
 
 void TestSuiteActions::add(string s)
 {
+    //W53-AA: `actions` is a fixed MAX_TESTSUITE_ACTIONS array and this had no
+    //bounds check - a fixture one line over the limit wrote past the end and
+    //SEGV'd in the string allocator, with nothing naming the fixture. Name it
+    //and drop the overflow instead; the test then fails on its assert, which
+    //is a readable red.
+    if (nbitems >= MAX_TESTSUITE_ACTIONS)
+    {
+        DebugTrace("TESTSUITE: more than " << MAX_TESTSUITE_ACTIONS
+                   << " actions in one test - dropping '" << s << "'");
+        return;
+    }
     actions[nbitems] = s;
     nbitems++;
 }

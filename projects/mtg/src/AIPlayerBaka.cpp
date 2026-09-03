@@ -5164,6 +5164,13 @@ int AIPlayerBaka::Act(float dt)
         //open it: wouldOfferWindow read a different instant-response state)
         //would hold the stack forever; decline it UNLOGGED so the replay can
         //continue, and say so - it marks a state divergence worth reading.
+        //W53-AA: this branch is DEAD from the duel loop - DuelLayers::Update
+        //calls Act() only `if (isAI && !isLoading)`, so no seat reaches it
+        //during a replay and every such window really did hang the replay
+        //(measured 2026-09-02 on the vpk12b deck33 transcript). The working
+        //release now lives in ActionStack::Update's stall floor, which needs
+        //no seat to be updated at all; this stays as the seat-side answer for
+        //any caller that does drive Act while loading.
         ActionStack * stack = observer->mLayers ? observer->mLayers->stackLayer() : NULL;
         if (stack && stack->askIfWishesToInterrupt == this)
         {
@@ -5230,6 +5237,21 @@ int AIPlayerBaka::Act(float dt)
                         observer->mExtraPayment->action->CheckUserInput(JGE_BTN_SEC);
                         observer->mExtraPayment = NULL;
                     }
+                }
+                else
+                {
+                    //W53-AA: a NON-mana extra payment (sacrifice, discard,
+                    //exile...) the dynamic_cast above does not recognise used
+                    //to fall straight to `return 0` with mExtraPayment still
+                    //armed and this seat still holding the interrupt window -
+                    //every tick, forever. That is a total game stop for the
+                    //other seat: WaitForExtraPayment and the NOT_RESOLVED
+                    //stack both refuse userRequestNextGamePhase, and
+                    //DuelLayers::CheckUserInput discards a human's keys while
+                    //`isInterrupting` names this player. Decline it instead,
+                    //the same way chooseTarget already does.
+                    observer->mExtraPayment->action->CheckUserInput(JGE_BTN_SEC);
+                    observer->mExtraPayment = NULL;
                 }
                 return 0;
             }
