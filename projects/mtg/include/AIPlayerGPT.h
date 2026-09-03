@@ -1071,6 +1071,34 @@ private:
     void flushRecoveryRecord();
     //#W53-Q (D24): the latch's gate, pure so PARSETEST can pin it.
     static bool handedToHeuristic(int choice, const char * fallback);
+    //#W54-B (D9): a reply that ANSWERED after eating the whole deadline is
+    //not a timeout - noAnswerClassFor only ever classifies a NON-answer, so
+    //the wave-53 corpus's six replies above 600 s (one at 868,729 ms = 96.5%
+    //of a 900 s wall, and the seat that lost that game) arrived at review
+    //indistinguishable from a five-second one. These two are the stamp's
+    //arithmetic, pure so PARSETEST pins the whole table. deadlineTenthsPct
+    //returns the elapsed fraction in TENTHS of a percent (965 = 96.5%), -1
+    //when unknowable (a cache/reuse record carries latency -1). isLongReply
+    //is the >= 95% gate the wave-53 timeout arm already uses, on the ANSWERED
+    //side of it. Neither touches WAGIC_GPT_TIMEOUT: the deadline is the
+    //owner's dial and this item is observability.
+    static long deadlineTenthsPct(long latencyMs, long timeoutMs);
+    static bool isLongReply(long latencyMs, long timeoutMs, bool answered);
+    //#W54-B (D13): the latched coded line's index AND its parenthetical both
+    //disagree with the row that EXECUTED (deck126 vs125 seq 13/14: "CHOICE: 2
+    //(Cast Idyllic Tutor)" on a three-row menu, row 1 Cast Perimeter Captain
+    //ran, no note anywhere). A legitimate name-over-index remap keeps its
+    //parenthetical on the executed row and is never stamped. Pure.
+    static bool latchedRowMismatch(const string& reply, int choice, int optionCount,
+                                   const std::vector<string> * optionTexts);
+    //#W54-B (D14): the chosen row's OWN annotation says the action does
+    //nothing, and the reply's PLAN argues against that same row (deck126
+    //vs125 seq 73/74: "CHOICE: 1 (Cast Tribute to Hunger)" + "PLAN: ... Avoid
+    //casting Tribute to Hunger as there are no creatures to target."). The
+    //pair is a STAMP only - no re-ask, no suppression: whether it should ever
+    //narrow a choice is a decision for after the count exists. Pure.
+    static bool rowSaysNoOp(const string& row);
+    static bool planArguesAgainstRow(const string& reply, const string& row);
     //Was reasoning asked for on this endpoint (thinking flag, or the Codex
     //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
     //never reasoned - parsing and fallback never consult it.
