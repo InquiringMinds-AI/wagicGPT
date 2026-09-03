@@ -65,6 +65,18 @@ protected:
     //W48: failures raised by scripted assert commands (assertcastable /
     //assertusable), folded into the [ASSERT] verdict.
     int commandAssertFailures;
+    //#W54-R: the interactive-AI stall-floor arm. `aipending <ticks> <0|1>`
+    //latches ONE scripted seat as an INTERACTIVE AI (isInteractiveAI, the
+    //live-LLM branch of ActionStack's stall floor) and freezes the shared
+    //command pump for <ticks> game updates, optionally reporting a model
+    //call in flight while it does. Nothing else in the game moves, so the
+    //hold is a real one; the freeze ends when ActionStack's own mHoldTicks
+    //reaches <ticks> - or the moment the window is taken away, so a base
+    //binary reports instead of wedging. Suite-only, inert everywhere else.
+    Player * mAiPendingSeat;
+    int mAiPendingTicks; //target ActionStack::mHoldTicks, 0 = not freezing
+    bool mAiPendingInFlight;
+    bool mAiPendingInteractive;
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);
@@ -199,7 +211,24 @@ public:
     //interactive AI so the reveal resolves the interactive way (aicode
     //substitute skipped, MTGRevealingCards display driven by
     //driveInteractiveReveal) - faithfully mirroring the live AIPlayerGPT path.
-    virtual bool isInteractiveAI() const { return getenv("WAGIC_REVEAL_TEST_ASYNC") != NULL; }
+    virtual bool isInteractiveAI() const
+    {
+        //#W54-R: `aipending` latches this seat onto the live-LLM branch of the
+        //stall floor for the rest of the test (not just the frozen span) - a
+        //seat that stops being interactive the moment its call lands would get
+        //the heuristic budget applied to a hold the LLM branch had allowed.
+        return (suite->mAiPendingSeat == this && suite->mAiPendingInteractive)
+               || getenv("WAGIC_REVEAL_TEST_ASYNC") != NULL;
+    }
+    //#W54-R: a model call in flight. Both latches OUTLIVE the frozen span -
+    //the fixture clears them with its own `aipending 0 0 0` - because the
+    //driver takes a few ticks to pull the next command after the freeze
+    //lifts, and a state that evaporated at tick N would leave the assertion
+    //reading a window the floor had legitimately taken in the gap.
+    virtual bool aiDecisionInFlight() const
+    {
+        return suite->mAiPendingSeat == this && suite->mAiPendingInFlight;
+    }
     virtual int displayStack();
     bool parseLine(const string& s);
     bool summoningSickness() {return (suite->summoningSickness == 1); }

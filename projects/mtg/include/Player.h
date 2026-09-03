@@ -162,6 +162,20 @@ public:
         return false;
     }
 
+    //#W54-R: is this seat WAITING ON AN ANSWER IT HAS ALREADY ASKED FOR -
+    //a model round trip in flight? A seat that is thinking is making
+    //progress by definition, so no stall watchdog may take the window it is
+    //holding away from it (wave-54 corpus: 468 interrupt windows released
+    //out from under in-flight calls, 488 answers dropped as stale, and the
+    //affected seats' opponent-turn decision surface went to ~zero).
+    //Deliberately NOT decisionPending(dt): that one is the Act-loop policy
+    //hook and has side effects (think-time accounting, interrupt keep-alive).
+    //This is a pure const query for observers.
+    virtual bool aiDecisionInFlight() const
+    {
+        return false;
+    }
+
     //An AI that answers over a network can stall for an unbounded time on a
     //slow or wedged endpoint. Freezing the duel behind an HTTP timeout the
     //player cannot see is not an option, so the frontend asks: keep waiting,

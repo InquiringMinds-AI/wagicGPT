@@ -19,6 +19,33 @@ The Action Stack contains all information for Game Events that can be interrupte
 #include "AllAbilities.h"
 #include "CardSelector.h"
 #include <typeinfo>
+#include <chrono>
+
+//#W54-R: the stall floor's DISABLE FLAG and its wall clock.
+//WAGIC_STALL_FLOOR=0 turns the whole floor off - one env var, no rebuild, so
+//"was it the watchdog?" is answerable on a shipped binary instead of by a
+//build swap. (The wave-53 lane that introduced the floor shipped no flag; a
+//wave-54 corpus then spent ~3.2 h of inference on answers the floor threw
+//away and it could not be A/B'd.)
+static bool stallFloorEnabled()
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char * v = getenv("WAGIC_STALL_FLOOR");
+        cached = (v && (v[0] == '0') && !v[1]) ? 0 : 1;
+    }
+    return cached != 0;
+}
+
+//REAL elapsed time, never dt. steady_clock so a wall-clock adjustment cannot
+//make a held window look ancient (or immortal).
+static long long stallFloorNowMs()
+{
+    using namespace std::chrono;
+    return (long long) duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
 #ifdef VITA
 #include <psp2/ctrl.h>
 #endif
@@ -971,6 +998,7 @@ ActionStack::ActionStack(GameObserver* game)
     mHoldWho = NULL;
     mHoldTicks = 0;
     mHoldSeconds = 0.0f;
+    mHoldStartMs = 0;
     timer = -1;
     currentState = -1;
     mode = ACTIONSTACK_STANDARD;
@@ -1408,6 +1436,7 @@ void ActionStack::Update(float dt)
     //transcript tool at the one moment it is needed. A recorded answer always
     //arrives inside the load loop's next re-issue (6 updates per attempt), so
     //12 ticks cannot pre-empt one.
+    if (stallFloorEnabled())
     {
         Interruptible * top = getNext(NULL, 0, NOT_RESOLVED);
         Player * holder = askIfWishesToInterrupt ? askIfWishesToInterrupt : observer->isInterrupting;
@@ -1418,6 +1447,7 @@ void ActionStack::Update(float dt)
             mHoldWho = NULL;
             mHoldTicks = 0;
             mHoldSeconds = 0.0f;
+            mHoldStartMs = 0;
         }
         else
         {
@@ -1427,37 +1457,62 @@ void ActionStack::Update(float dt)
                 mHoldWho = holder;
                 mHoldTicks = 0;
                 mHoldSeconds = 0.0f;
+                mHoldStartMs = 0;
             }
             else
             {
                 ++mHoldTicks;
                 mHoldSeconds += dt;
             }
-            //Budgets, in BOTH ticks and elapsed game seconds, so neither a
-            //slow frame rate nor a fast headless pump can trip it early.
-            //Loading: 12 ticks only - dt is a synthetic counter inside the
-            //load loop, and see above for why 12 cannot pre-empt a recorded
-            //answer. An INTERACTIVE AI (the LLM seat with a live endpoint)
-            //legitimately holds a window for as long as its model takes, and
-            //once it has TAKEN the window extendInterruptOffer no longer
-            //reaches it - so its budget sits past the whole request timeout.
-            //The heuristic seat answers within a tick or two of its own
-            //throttle; 20 s is orders of magnitude of slack and still
-            //recovers the game while the player is still looking at it.
-            const bool spent = loading
+            //#W54-R: arm/re-arm the wall clock (extendInterruptOffer zeroes it).
+            if (!mHoldStartMs)
+                mHoldStartMs = stallFloorNowMs();
+            const float wallSeconds = (float)(stallFloorNowMs() - mHoldStartMs) / 1000.0f;
+            //Budgets in BOTH ticks and elapsed time, so neither a slow frame
+            //rate nor a fast headless pump can trip it early. Loading: 12
+            //ticks only - dt is a synthetic counter inside the load loop, and
+            //see above for why 12 cannot pre-empt a recorded answer.
+            //#W54-R. Two corrections to the wave-53 budget, and nothing else
+            //about the floor moves - the softlock it fixed is a seat that can
+            //NEVER answer, and that case is untouched.
+            //
+            //(1) A seat with a request IN FLIGHT is making progress by
+            //definition. `extendInterruptOffer` was supposed to say so, but it
+            //only resets while `askIfWishesToInterrupt == who`; once the seat
+            //has TAKEN the window the holder is `observer->isInterrupting` and
+            //the keep-alive silently no-ops - the seat's only "still thinking"
+            //signal was disconnected from the watchdog about to kill it. Ask
+            //the holder directly instead, on every branch: no window is ever
+            //released out from under an answer that is on its way.
+            //
+            //(2) The interactive-AI budget is denominated in WALL CLOCK. It
+            //was `mHoldSeconds`, i.e. accumulated dt, and dt is synthetic: the
+            //corpus harness feeds a fixed WAGIC_FASTCLOCK 0.1 s per tick, so
+            //1,200 "seconds" was exactly 12,000 ticks - about twelve wall
+            //seconds against a mean model latency of 23.9 s. Every release in
+            //the wave-54 corpus (468 of them) read the same 12,002 ticks, and
+            //the seats they fired on recorded ~zero opponent-turn decisions.
+            //The heuristic seat keeps its dt budget: it answers in a tick or
+            //two, 20 s of any denomination is slack, and changing it would
+            //move the lane-AA softlock pin.
+            const bool inFlight = holder->aiDecisionInFlight();
+            const bool spent = !inFlight && (loading
                 ? (mHoldTicks >= 12)
-                : (mHoldTicks >= 300 && mHoldSeconds >= (holder->isInteractiveAI() ? 1200.0f : 20.0f));
+                : (holder->isInteractiveAI()
+                       ? (mHoldTicks >= 300 && wallSeconds >= 1200.0f)
+                       : (mHoldTicks >= 300 && mHoldSeconds >= 20.0f)));
             if (spent)
             {
                 const string who = holder->getDisplayName();
                 const string what = top->getDisplayName();
                 DebugTrace("ActionStack: interrupt window held by " << who << " on '" << what
-                           << "' for " << mHoldTicks << " ticks with no progress - releasing"
+                           << "' for " << mHoldTicks << " ticks / " << wallSeconds
+                           << " s wall with no progress - releasing"
                            << (loading ? " (loading: no seat can answer)" : ""));
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_TRANSCRIPT_ON)
                 fprintf(stderr, "wagic: interrupt window held by %s on '%s' for %d ticks"
-                                " (turn %d phase %d%s) - releasing so the game advances\n",
-                        who.c_str(), what.c_str(), mHoldTicks, observer->turn,
+                                " / %.1f s wall (turn %d phase %d%s) - releasing so the game advances\n",
+                        who.c_str(), what.c_str(), mHoldTicks, wallSeconds, observer->turn,
                         (int) observer->getCurrentGamePhase(), loading ? ", loading" : "");
                 fflush(stderr);
 #endif
@@ -1470,6 +1525,7 @@ void ActionStack::Update(float dt)
                 mHoldWho = NULL;
                 mHoldTicks = 0;
                 mHoldSeconds = 0.0f;
+                mHoldStartMs = 0;
             }
         }
     }

@@ -244,6 +244,7 @@ public:
         {
             mHoldTicks = 0;
             mHoldSeconds = 0.0f;
+            mHoldStartMs = 0; //#W54-R: re-arm the wall clock on the next tick
         }
     }
     Interruptible * getLatest(int state);
@@ -259,7 +260,19 @@ public:
     Interruptible * mHoldOn;
     Player * mHoldWho;
     int mHoldTicks;
+    //dt-accumulated GAME seconds. Still the budget for a HEURISTIC AI seat
+    //(the softlock class: it answers within a tick or two of its own
+    //throttle, so any denomination is orders of magnitude of slack).
     float mHoldSeconds;
+    //#W54-R: REAL WALL CLOCK since this hold began (steady_clock ms; 0 = not
+    //armed yet). The interactive-AI budget is denominated here and nowhere
+    //else. dt is a synthetic counter by design - the headless harness feeds
+    //a fixed WAGIC_FASTCLOCK dt and the suite feeds an INCREMENTING one -
+    //so a watchdog that rides it measures ticks while claiming to measure
+    //seconds. Wave-54 corpus: 1,200 "seconds" cashed out as exactly 12,000
+    //ticks, 468 releases all at the same tick count, every one of them a
+    //window whose owner had a model call in flight.
+    long long mHoldStartMs;
     //The stack object the current priority round refers to. When the top
     //of the stack changes (new spell/trigger/phase item), decisions reset
     //and one tick passes before anyone can pass or anything resolves -

@@ -1318,6 +1318,7 @@ w54_granted_sacrifice_names_the_opponent.txt
 w54_assertmtgid_transform.txt
 w54_reveal_stall_forceclose.txt
 w53AA_ai_interrupt_window_stall.txt
+w54R_ai_pending_window_held.txt
 isleback_spawn_compare_library.txt
 isleback_spawn_compare_library_neg.txt
 w54q_autotap_options_16_sources.txt

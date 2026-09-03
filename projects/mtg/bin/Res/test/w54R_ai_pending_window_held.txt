@@ -1,0 +1,86 @@
+#W54-R (wave-54 seat findings: seat-engine-narration HIGH #1; seat-146-152-162
+#headline 1 / E-1). The wave-53 stall floor releases an interrupt window on a
+#budget it CALLS 1,200 seconds but accumulates out of dt, and it never asks
+#the seat holding the window whether it is in the middle of answering. In the
+#wave-54 corpus (WAGIC_FASTCLOCK=0.1, so dt is a fixed 0.1 s a tick) that
+#budget cashed out as exactly 12,000 ticks: 468 releases, every one printing
+#the same `12002 ticks`, each taking the window away from a seat that had a
+#model call IN FLIGHT. The answer landed into a window that no longer existed
+#(488 `dropping stale async answer`, up from 63 in wave 53) and the window was
+#NOT re-asked - one seat in game-126v123 made 1 opponent-turn decision to its
+#counterpart's 71.
+#
+#What this pins: a seat that is THINKING is making progress, so the floor must
+#never take its window, on any branch and under any clock. (The wall-clock
+#denomination of the interactive-AI budget needs the corpus clock to show at
+#all; it is pinned by test/probe/w54R_ai_wallclock_budget.txt.)
+#
+#p1 casts Hill Giant. p2 is offered the response window (Shock + untapped
+#Mountains make it real) and takes it with `yes`. Then:
+#  aipending 2400 1 0   - hold the window until ActionStack's own mHoldTicks
+#                         reaches 2,400, with a model call in flight (the
+#                         freeze stops BOTH seats pulling commands, so nothing
+#                         else in the game moves). 2,400 is past the seeded
+#                         binary's release point in both of this suite's dt
+#                         regimes: 300 ticks on the worker path, where dt is
+#                         `counter++`, and ~1,980 ticks / 20 s wall on the
+#                         main-thread path, where it is real. The freeze also
+#                         ends the instant the window is TAKEN, so the base
+#                         binary reaches the assertion instead of wedging, and
+#                         the in-flight latch outlives it either way.
+#  assertinterrupting p2- the pin. Nothing else in the harness can see it: a
+#                         released window and a held one leave the same zones
+#                         behind, which is exactly why the corpus defect was
+#                         invisible to 1,219 tests.
+#  endinterruption      - the seat answers, the way the live one would.
+#  aipending 0 0 0      - stand the latches down.
+#Hill Giant resolves and the turn runs out to the next untap. The trailing eot
+#re-queues itself until CLEANUP so the assert does not depend on the driver's
+#command cadence.
+#
+#RED on base = this fixture and its two suite commands built on the seeded
+#tree with ActionStack's #W54-R hunks reverted: `TESTSUITE assertinterrupting:
+#expected p2 got none`, with the release line in stderr.
+#GREEN after: no release line anywhere in this test, the assert passes, zones
+#as declared.
+#The floor's DISABLE FLAG has its own positive control, on the fixed binary:
+#`WAGIC_STALL_FLOOR=0` with w53AA_ai_interrupt_window_stall.txt reproduces the
+#owner's softlock outright - 0 release lines, `eot` re-queued for ever, killed
+#at the timeout. The flag really turns the floor off, so "was it the
+#watchdog?" is answerable on a shipped binary instead of by a build swap.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain
+hand:Hill Giant
+manapool:{3}{R}
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[DO]
+Hill Giant
+yes
+aipending 2400 1 0
+assertinterrupting p2
+endinterruption
+aipending 0 0 0
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Hill Giant
+hand:
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[END]
