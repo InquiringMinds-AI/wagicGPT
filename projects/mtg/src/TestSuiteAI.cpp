@@ -371,6 +371,24 @@ int TestSuiteAI::Act(float)
         return 1;
     }
 
+    //#W54-R: the aipending freeze. Placed BEFORE the driver's own throttle:
+    //both seats stop pulling commands while it burns, the engine keeps
+    //updating, so the armed seat's interrupt window is held for real. The
+    //target is read off the stall floor's OWN counter rather than counted
+    //here - that is the quantity under test, and it means the freeze also
+    //ends the instant the window is taken away (the base binary's behaviour),
+    //which is what lets the assertion below run and report instead of the
+    //fixture wedging.
+    if (suite->mAiPendingTicks > 0)
+    {
+        ActionStack * as = observer->mLayers->stackLayer();
+        bool held = (as->askIfWishesToInterrupt == suite->mAiPendingSeat)
+                    || (observer->isInterrupting == suite->mAiPendingSeat);
+        if (held && as->mHoldTicks < suite->mAiPendingTicks)
+            return 1;
+        suite->mAiPendingTicks = 0;
+    }
+
     timer += 1;
     if (timer < suite->timerLimit) return 1;
     timer = 0;
@@ -404,7 +422,9 @@ int TestSuiteAI::Act(float)
                              || action == "ai" || action == "endinterruption"
                              || action.find("goto") != string::npos
                              || action.compare(0, 8, "holdkey ") == 0
-                             || action.compare(0, 11, "releasekey ") == 0);
+                             || action.compare(0, 11, "releasekey ") == 0
+                             || action.compare(0, 10, "aipending ") == 0          //#W54-R
+                             || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
         int candidates = mtc ? mtc->countValidTargets() : 0;
@@ -473,6 +493,8 @@ int TestSuiteAI::Act(float)
                 || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
                 || action == "interactivereveal" || action == "realgame"
                 || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
+                || action.compare(0, 10, "aipending ") == 0 //#W54-R
+                || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
             MTGCardInstance * manaCard = keyword ? NULL : getCard(action);
@@ -883,6 +905,52 @@ int TestSuiteAI::Act(float)
                     std::cerr << " " << picks[i]->source->getName();
             std::cerr << " [" << suite->filename << "]" << std::endl;
             ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
+        }
+    }
+    else if (action.compare(0, 10, "aipending ") == 0)
+    {
+        //#W54-R: arm THIS seat as an interactive AI (the live-LLM branch of
+        //ActionStack's stall floor) and freeze the shared command pump for N
+        //game updates, reporting a model call in flight for that span iff the
+        //second argument is 1. Syntax: aipending <ticks> <0|1>
+        //This is the cheapest REAL arm for the floor: the live shape needs an
+        //AIPlayerGPT with a live endpoint and a slow model, and neither the
+        //suite nor a stub server can hold a window for a bounded, asserted
+        //number of ticks. The freeze is the fixture's clock.
+        //Syntax: aipending <ticks> <inflight 0|1> <interactive 0|1>
+        //The two flags are separate because they pin separate halves of the
+        //floor: `inflight` is the never-release-a-thinking-seat rule (which
+        //holds on EVERY branch), `interactive` selects the live-LLM branch
+        //whose budget is wall clock. Both persist until the next aipending
+        //rewrites them, so `aipending 0 0 0` is how a fixture stands down
+        //without freezing anything.
+        string rest = action.substr(10);
+        int ticks = 0, inFlight = 0, interactive = 0;
+        sscanf(rest.c_str(), "%d %d %d", &ticks, &inFlight, &interactive);
+        suite->mAiPendingSeat = this;
+        suite->mAiPendingTicks = ticks;
+        suite->mAiPendingInFlight = inFlight != 0;
+        suite->mAiPendingInteractive = interactive != 0;
+        DebugTrace("TESTSUITE aipending: player " << ((this == observer->players[0]) ? 1 : 2)
+                   << " holds for " << ticks << " ticks, in flight=" << inFlight
+                   << ", interactive=" << (suite->mAiPendingInteractive ? 1 : 0)
+                   << " [" << suite->filename << "]");
+    }
+    else if (action.compare(0, 19, "assertinterrupting ") == 0)
+    {
+        //#W54-R: pin WHO owns the open interrupt window right now. Nothing
+        //else in the harness can see it - a released window and a held one
+        //leave the same zones behind, and the whole wave-54 defect (468
+        //windows taken away from seats that were answering) lived in exactly
+        //that invisible difference. Syntax: assertinterrupting <p1|p2|none>
+        string want = action.substr(19);
+        Player * held = observer->isInterrupting;
+        string got = !held ? "none" : (held == observer->players[0] ? "p1" : "p2");
+        if (got != want)
+        {
+            std::cerr << "TESTSUITE assertinterrupting: expected " << want << " got " << got
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
         }
     }
     else if (action.find("asserttaps ") == 0)
@@ -2311,13 +2379,17 @@ TestSuiteGame::~TestSuiteGame()
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
-      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
+      mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
+      mAiPendingInteractive(false), testsuite(testsuite)
 {
 }
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
-      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
+      mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
+      mAiPendingInteractive(false), testsuite(testsuite)
 {
     filename = _filename;
     observer = new GameObserver();

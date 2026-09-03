@@ -147,6 +147,10 @@ public:
     //interrupt-offer timer is kept alive so a slow model cannot time out of
     //its response window. Render draws the "thinking" indicator.
     virtual bool decisionPending(float dt);
+    //#W54-R: the const, side-effect-free half of the same fact, for the
+    //stall floor. An endpoint-less seat is never in flight (all its seams
+    //fall through to the heuristic).
+    virtual bool aiDecisionInFlight() const { return !mEndpoint.empty() && asyncBusy(); }
     virtual void Render();
 
     //The patience prompt. A call still in flight after mPatienceLimit

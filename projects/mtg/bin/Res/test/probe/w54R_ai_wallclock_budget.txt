@@ -1,0 +1,56 @@
+#W54-R - the WALL-CLOCK half of the stall-floor fix, in the corpus's own
+#clock regime. NOT registered in _tests.txt: it needs WAGIC_FASTCLOCK=0.1
+#(the selfplay harness default), the exact setting under which the wave-54
+#corpus released 468 windows at `12002 ticks`. Run from projects/mtg/bin:
+#   systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -- env \
+#     -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#     WAGIC_TESTSUITE_THREADS=1 WAGIC_FASTCLOCK=0.1 \
+#     WAGIC_TESTSUITE_FILE=test/probe/_w54R.txt ./wagic
+#(test/probe/_w54R.txt holds one line, `probe/w54R_ai_wallclock_budget.txt` -
+#registry entries resolve under Res/test/, so the probe/ prefix stays.)
+#
+#An INTERACTIVE-AI seat holds a window with NO call in flight for 12,100
+#ticks. Under FASTCLOCK=0.1 every tick feeds dt=0.1, so the seeded binary's
+#`mHoldSeconds >= 1200` is satisfied at tick 12,000 and it releases - the
+#corpus defect, reproduced exactly, with no model and no endpoint. With the
+#budget denominated in steady_clock the same hold is about twelve REAL
+#seconds against an allowance of 1,200, and the window stands.
+#RED on base: `TESTSUITE assertinterrupting: expected p2 got none`, with
+#`interrupt window held by Player 2 ... for 12002 ticks` in stderr.
+#GREEN after: no release line, assert passes.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain
+hand:Hill Giant
+manapool:{3}{R}
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[DO]
+Hill Giant
+yes
+aipending 12100 0 1
+assertinterrupting p2
+endinterruption
+aipending 0 0 0
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Hill Giant
+hand:
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[END]
