@@ -65,6 +65,16 @@ public:
     //This string is snapshotted while the object is provably alive, so it names
     //the subject when no pointer can. Empty when the object had no name.
     std::string contextName;
+    //#W55-D (D22): CHOOSE_MODE is also how a card-NAME choice arrives - the
+    //engine builds `chooseaname`'s list of names as a MenuAbility of
+    //AASetNameChosen options, indistinguishable at this seam from a modal
+    //"choose one". Nine corpus records rendered Silverquill Silencer's name
+    //list under the header "Choose one mode for Silverquill Silencer:" over
+    //bare card names. True of the menu OBJECT, false of the decision: the rows
+    //are card names, not modes. The kind stays CHOOSE_MODE (the apply path is
+    //identical); this flag says what the rows MEAN so the consumer can name
+    //the choice correctly.
+    bool nameChoiceMenu;
     bool canDecline;
     //CHOOSE_MENU, triggered/activated "may"-ability ask (the all(trigger[to])
     //moveto class - Tergrid's steal): the card-script option label is a
@@ -99,7 +109,7 @@ public:
     //declining (casting nothing) is always legal at a casting window
     std::vector<LegalActionsOracle::Cast> casts;
 
-    DecisionRequest() : player(NULL), contextCard(NULL), canDecline(false),
+    DecisionRequest() : player(NULL), contextCard(NULL), nameChoiceMenu(false), canDecline(false),
                         sourceCard(NULL), targetMin(0), maxTargets(0) {}
 };
 

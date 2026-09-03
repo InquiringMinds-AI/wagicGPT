@@ -4989,6 +4989,148 @@ static string expandRowHandleFold(const string& tail, int first, int last)
     return out;
 }
 
+//#W55-D (D18): the SECOND instance grammar the render uses. A reveal / search /
+//hand list does not print "#N" - two identical cards are told apart by
+//`copyOfTag` ("(copy 2 of 4 in this list)"), deliberately, because a hand
+//"Swamp #2" beside a battlefield "Swamp #2" would assert an identity that does
+//not exist (N-166a). The collapse could not see that ordinal, so `123v125` s9
+//printed 50 rows with `Intruder Alarm` x4, `Damnation` x4 and `Thraben
+//Doomsayer` x4 as separate byte-different strings. Same decomposition as
+//splitRowHandle, other notation: head, rank, total, scope, tail. Pure.
+bool splitCopyRowHandle(const string& row, string& head, string& tail, int& rank,
+                        int& total, string& scope)
+{
+    const string open = " (copy ";
+    size_t i = row.find(open);
+    if (i == string::npos)
+        return false;
+    size_t p = i + open.size();
+    size_t d = p;
+    while (d < row.size() && isdigit((unsigned char) row[d]))
+        d++;
+    if (d == p)
+        return false;
+    int r = atoi(row.c_str() + p);
+    const string of = " of ";
+    if (row.compare(d, of.size(), of) != 0)
+        return false;
+    size_t t = d + of.size();
+    size_t e = t;
+    while (e < row.size() && isdigit((unsigned char) row[e]))
+        e++;
+    if (e == t)
+        return false;
+    int n = atoi(row.c_str() + t);
+    const string inTok = " in ";
+    if (row.compare(e, inTok.size(), inTok) != 0)
+        return false;
+    size_t s = e + inTok.size();
+    size_t close = row.find(')', s);
+    if (close == string::npos || r < 1 || n < 2 || r > n)
+        return false;
+    head = row.substr(0, i);
+    tail = row.substr(close + 1);
+    rank = r;
+    total = n;
+    scope = row.substr(s, close - s);
+    return true;
+}
+
+//#W55-D (D18): the printed form of a collapsed copy run. Nothing is invented -
+//the range is the copies the run actually covers, out of the same total the
+//uncollapsed rows printed, in the same scope they named.
+string copyRangeTag(int first, int last, int total, const string& scope)
+{
+    std::ostringstream o;
+    if (first == last)
+        o << " (copy " << first;
+    else
+        o << " (copies " << first << "-" << last;
+    o << " of " << total << " in " << scope << ")";
+    return o.str();
+}
+
+//#W55-D (D8): the SOURCE half of a two-dimensional ability menu. A row like
+//"Destroy with Dwarven Blastminer #1 targeting Underground Sea #1" carries two
+//ordinals; splitRowHandle keys on the TARGET one (the handle after
+//" targeting "), so the source ordinal stays in the head and N sources x M
+//targets print N*M rows. This finds the source's own ordinal - the LAST "#K"
+//token BEFORE " targeting " - and returns the row with that ONE token masked,
+//so two rows from different sources compare equal exactly when everything else
+//about them, the target ordinal included, is byte-identical. Masking only the
+//pre-targeting token is what keeps it honest: "Blastminer #1 targeting Sea #1"
+//and "Blastminer #2 targeting Sea #1" are the same option from two sources,
+//while a blanket mask would also equate them with "#2 targeting Sea #2", which
+//is a different option. A row with no " targeting " clause, or no ordinal
+//before it, is not a source row. Pure.
+const char kSourceHandleMask = '\x07';
+bool splitSourceOrdinal(const string& row, string& masked, int& rank, string& sourceName)
+{
+    size_t tg = row.find(" targeting ");
+    if (tg == string::npos)
+        return false;
+    size_t at = string::npos, atEnd = 0;
+    int r = 0;
+    for (size_t i = 0; i + 2 < tg; i++)
+    {
+        size_t j = 0;
+        int rr = 0;
+        if (rowHandleAt(row, i, j, rr) && j <= tg)
+        {
+            at = i;
+            atEnd = j;
+            r = rr;
+        }
+    }
+    if (at == string::npos)
+        return false;
+    masked = row.substr(0, at) + " #" + string(1, kSourceHandleMask) + row.substr(atEnd);
+    rank = r;
+    //the source's NAME: what stands between the last " with " (the engine's own
+    //"Verb with <source>" grammar) and the ordinal. No " with " - the whole
+    //head, which is still a true description of the row's subject.
+    string headText = row.substr(0, at);
+    size_t w = headText.rfind(" with ");
+    sourceName = (w == string::npos) ? headText : headText.substr(w + 6);
+    return !sourceName.empty();
+}
+
+//#W55-D (D8): the printed form of a repeated source block. The rows of the
+//SECOND and later blocks are not deleted and not capped - every one keeps its
+//own option number, and the line states the exact one-for-one decode against
+//the block printed above it, so a number inside it resolves with no guessing.
+string sourceBlockLine(int first, int last, int refFirst, int refLast,
+                       const string& sourceName, int rank, int refRank)
+{
+    std::ostringstream o;
+    int run = last - first + 1;
+    o << first << "-" << last << ". The same " << run << " option"
+      << (run == 1 ? "" : "s") << " as " << refFirst << "-" << refLast
+      << ", with " << sourceName << " #" << rank << " as the source instead of #"
+      << refRank << " (" << first << " is the same choice as " << refFirst << ", "
+      << (first + 1) << " as " << (refFirst + 1) << ", and so on to " << last
+      << " as " << refLast << ") x" << run;
+    return o.str();
+}
+
+//#W55-D (D18): a collapsed list is rendered from a PERMUTED row vector, so a
+//reply parsed in printed positions has to come back through the same
+//permutation before it can name a card. One function, used by every list-shaped
+//ask that collapses, so the map-back cannot drift between them. An identity
+//permutation leaves the selection exactly as it was; a malformed one (wrong
+//size) is refused and the selection is left untouched, which is the pre-collapse
+//behaviour. Pure.
+void unpermuteSelection(const vector<size_t>& order, size_t n, vector<bool>& send)
+{
+    if (order.size() != n)
+        return;
+    vector<bool> out(n, false);
+    for (size_t k = 0; k < n && k < send.size(); k++)
+        if (send[k] && order[k] < n)
+            out[order[k]] = true;
+    send.swap(out);
+}
+
 //#W48 (D2): the option list, rows numbered from 1, collapsed the same way. The
 //NUMBERING IS NEVER REWRITTEN - a collapsed row prints the label range it
 //covers ("5-430."), so the number the model answers with still indexes the
@@ -5001,7 +5143,19 @@ const char * kOptionRangeNote =
     " option for the first instance of the printed #N range, 6 the next, and so on"
     " to the last. When the collapsed row carries NO #N ordinal, the options in"
     " the range are interchangeable copies of the same thing and any number in"
-    " the range picks one of them. Answer with ONE number from inside the range"
+    " the range picks one of them."
+    //#W55-D (D18): the copy-tag grammar's own range.
+    " A range whose row reads \"(copies 3-6 of 6 in this list)\" is the same"
+    " thing in that list's own copy notation: each number in the range is one of"
+    " those copies, in order."
+    //#W55-D (D8): the two-dimensional (source x target) form.
+    " A line reading \"The same 4 options as 8-11, with <source> #2 as the source"
+    " instead of #1\" is that many SEPARATE options that pair up ONE FOR ONE with"
+    " the options in the range it names: its first number is the same choice as"
+    " the first number of that range, its second the same as the second, and so"
+    " on - the only difference is which copy of the source does it. Nothing is"
+    " hidden: read the option you want off the range it names."
+    " Answer with ONE number from inside the range"
     " exactly as you would any other option number.\n";
 
 //#W48 (D2 + D12's lesson): the numbered lists are ordered by the engine, and
@@ -5042,11 +5196,28 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
         //the gather reaches them as well; joinNumberedRows prints the run as a
         //label range with no "#a-#b" tail (there is no ordinal to print).
         //Nothing is deleted: every member keeps its own option number.
+        //#W55-D (D18): before falling through to the whole-row key, try the
+        //OTHER instance grammar - "(copy 2 of 4 in this list)". A reveal /
+        //search list is made entirely of such rows and its duplicates are
+        //scattered, so the gather is what makes them collapsible at all.
         else
         {
-            key[i] = string("\x03") + rows[i];
-            rank[i] = 0;
-            count[key[i]]++;
+            string ctail, cscope;
+            int crank = 0, ctotal = 0;
+            if (splitCopyRowHandle(rows[i], head, ctail, crank, ctotal, cscope))
+            {
+                std::ostringstream ck;
+                ck << "\x05" << head << "\x01" << ctail << "\x01" << ctotal << "\x01" << cscope;
+                key[i] = ck.str();
+                rank[i] = crank;
+                count[key[i]]++;
+            }
+            else
+            {
+                key[i] = string("\x03") + rows[i];
+                rank[i] = 0;
+                count[key[i]]++;
+            }
         }
     }
     bool worth = false;
@@ -5086,27 +5257,123 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
     if (rangeUsed)
         *rangeUsed = false;
     std::ostringstream o;
-    vector<string> head(rows.size()), tail(rows.size());
-    vector<int> rank(rows.size(), -1);
-    for (size_t i = 0; i < rows.size(); i++)
-        if (!splitRowHandle(rows[i], head[i], tail[i], rank[i]))
-            rank[i] = -1;
-    size_t i = 0;
-    while (i < rows.size())
+    size_t n = rows.size();
+    vector<string> head(n), tail(n), scope(n);
+    vector<int> rank(n, -1), total(n, 0), form(n, 0);
+    for (size_t i = 0; i < n; i++)
     {
+        if (splitRowHandle(rows[i], head[i], tail[i], rank[i]))
+            form[i] = 1;
+        //#W55-D (D18): the copy-tag grammar, tried second so nothing about the
+        //"#N" collapse changes.
+        else if (splitCopyRowHandle(rows[i], head[i], tail[i], rank[i], total[i], scope[i]))
+            form[i] = 2;
+        else
+        {
+            form[i] = 0;
+            rank[i] = -1;
+        }
+    }
+    //#W55-D (D8): the two-dimensional (source x target) collapse. Rows whose
+    //source carries its own ordinal come off the engine in SOURCE-MAJOR order -
+    //every option of source #1, then the same options of source #2 - so a
+    //repeated block is detectable without moving a single row. The second and
+    //later blocks print as ONE line each that states the exact one-for-one
+    //decode against the first block; every option keeps its own number and
+    //nothing is capped. A cross-product printed as a single "#a-#b x #c-#d"
+    //range could NOT be decoded truthfully (wave-54 lane D declined to ship
+    //that, correctly); a block that names its reference range can.
+    vector<string> smask(n), sname(n);
+    vector<int> srank(n, 0);
+    for (size_t i = 0; i < n; i++)
+        if (!splitSourceOrdinal(rows[i], smask[i], srank[i], sname[i]))
+            srank[i] = 0;
+    vector<int> blockRef(n, -1), blockLen(n, 0);
+    {
+        size_t i = 0;
+        while (i < n)
+        {
+            if (srank[i] <= 0)
+            {
+                i++;
+                continue;
+            }
+            size_t L = 1;
+            while (i + L < n && srank[i + L] == srank[i] && sname[i + L] == sname[i])
+                L++;
+            if (L < 2)
+            {
+                i += L;
+                continue;
+            }
+            size_t k = 1;
+            while (true)
+            {
+                size_t s = i + k * L;
+                if (s + L > n)
+                    break;
+                bool ok = (srank[s] > 0 && srank[s] != srank[i]);
+                for (size_t t = 0; ok && t < L; t++)
+                    if (srank[s + t] != srank[s] || sname[s + t] != sname[i]
+                        || smask[s + t] != smask[i + t])
+                        ok = false;
+                //the repeated block must be exactly as long as the first one
+                if (ok && s + L < n && srank[s + L] == srank[s] && sname[s + L] == sname[i])
+                    ok = false;
+                if (!ok)
+                    break;
+                k++;
+            }
+            if (k >= 2 && (k - 1) * L >= kBattlefieldCollapseFloor)
+            {
+                for (size_t bkt = 1; bkt < k; bkt++)
+                {
+                    blockRef[i + bkt * L] = (int) i;
+                    blockLen[i + bkt * L] = (int) L;
+                }
+                i += k * L;
+            }
+            else
+                i += L;
+        }
+    }
+    size_t i = 0;
+    while (i < n)
+    {
+        if (blockRef[i] >= 0)
+        {
+            size_t L = (size_t) blockLen[i];
+            o << sourceBlockLine((int) i + 1, (int) (i + L), blockRef[i] + 1,
+                                 blockRef[i] + (int) L, sname[i], srank[i],
+                                 srank[(size_t) blockRef[i]])
+              << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i += L;
+            continue;
+        }
         size_t j = i + 1;
-        if (rank[i] > 0)
-            while (j < rows.size() && rank[j] == rank[i] + (int) (j - i)
+        if (form[i] == 1 && rank[i] > 0)
+            while (j < n && blockRef[j] < 0 && form[j] == 1
+                   && rank[j] == rank[i] + (int) (j - i)
                    && head[j] == head[i] && tail[j] == tail[i])
+                j++;
+        else if (form[i] == 2)
+            //#W55-D (D18): a run of copies of ONE card, told apart only by the
+            //copy ordinal the render prints.
+            while (j < n && blockRef[j] < 0 && form[j] == 2
+                   && rank[j] == rank[i] + (int) (j - i)
+                   && head[j] == head[i] && tail[j] == tail[i]
+                   && total[j] == total[i] && scope[j] == scope[i])
                 j++;
         else
             //#W54-D (D8a): a run of BYTE-IDENTICAL rows carrying no instance
             //ordinal. The 17 library Mountains had nothing to collapse on and
             //printed 17 times.
-            while (j < rows.size() && rank[j] <= 0 && rows[j] == rows[i])
+            while (j < n && blockRef[j] < 0 && form[j] == 0 && rows[j] == rows[i])
                 j++;
         size_t run = j - i;
-        if (rank[i] <= 0 && run >= kBattlefieldCollapseFloor)
+        if (form[i] == 0 && run >= kBattlefieldCollapseFloor)
         {
             //#W54-D (D8a): the label range only - no "#a-#b", because these
             //rows carry no ordinal; kOptionRangeNote says what such a range is.
@@ -5115,11 +5382,20 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
                 *rangeUsed = true;
             i = j;
         }
-        else if (rank[i] > 0 && run >= kBattlefieldCollapseFloor)
+        else if (form[i] == 1 && rank[i] > 0 && run >= kBattlefieldCollapseFloor)
         {
             o << (i + 1) << "-" << j << ". " << head[i]
               << " #" << rank[i] << "-#" << (rank[i] + (int) run - 1)
               << expandRowHandleFold(tail[i], rank[i], rank[i] + (int) run - 1) << " x" << run << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else if (form[i] == 2 && run >= kBattlefieldCollapseFloor)
+        {
+            o << (i + 1) << "-" << j << ". " << head[i]
+              << copyRangeTag(rank[i], rank[i] + (int) run - 1, total[i], scope[i])
+              << tail[i] << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
             i = j;
@@ -13531,7 +13807,14 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 15, "{taps you out -") == 0)
                 || (in.compare(i, 22, "{modes live right now:") == 0)
                 || (in.compare(i, 27, "{this mode has a legal obje") == 0)
-                || (in.compare(i, 15, "{DEAD right now") == 0);
+                || (in.compare(i, 15, "{DEAD right now") == 0)
+                //#W55-D: D9's three discard verdicts and D22's public-visibility
+                //tag are the same species - each is true of the board while the
+                //window is open and says nothing that belongs in history.
+                || (in.compare(i, 8, "{spare: ") == 0)
+                || (in.compare(i, 15, "{dead right now") == 0)
+                || (in.compare(i, 24, "{you already control one") == 0)
+                || (in.compare(i, 14, "{visible now: ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -15521,6 +15804,69 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
     }
     return out.size() >= 2;
 }
+//#W55-D (D22): the card-NAME menu's own header. `chooseaname` arrives at the
+//seat as a CHOOSE_MODE request (the engine builds it as a MenuAbility like any
+//modal), so nine corpus records rendered "Choose one mode for Silverquill
+//Silencer:" over ten to fourteen bare card names - the header named the wrong
+//KIND of choice, and no row said what naming it would do. The observing seat's
+//surface for the same fact is the battlefield tag "[named: <card>]", so this
+//header uses the same verb: both seats describe the choice as NAMING a card.
+//Pure over (source name, card text), so the wording is provable.
+string chooseANameHeaderText(const string& sourceName, const string& cardText)
+{
+    std::ostringstream o;
+    const string who = sourceName.empty() ? string("this card") : sourceName;
+    o << "Choose a card NAME for " << who
+      << " - this is a card-NAME choice, NOT a mode: every row below is the NAME"
+         " of a card, and the one you pick becomes the name "
+      << who << " is set to";
+    if (!cardText.empty())
+        o << ". What naming it does: " << cardText;
+    else
+        o << ".";
+    o << " A row carrying a {visible now: ...} tag names a card that can be seen"
+         " in a public zone right now; an unmarked row names a card that is not"
+         " visible in any public zone.";
+    return o.str();
+}
+
+//#W55-D (D22): the per-row fact. Only PUBLIC zones are counted - the menu's own
+//name list is built by the engine from every zone including hidden ones, and
+//annotating a row with "still in their hand" would put information on the
+//prompt that the pilot has no right to. Counts only, no verdict: what a name is
+//worth against this deck is the pilot's call. Pure.
+string namedCardVisibilityTag(int theirBattlefield, int theirGraveyard,
+                              int myBattlefield, int myGraveyard)
+{
+    if (theirBattlefield <= 0 && theirGraveyard <= 0 && myBattlefield <= 0 && myGraveyard <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {visible now:";
+    bool first = true;
+    if (theirBattlefield > 0)
+    {
+        o << (first ? " " : ", ") << theirBattlefield << " on their battlefield";
+        first = false;
+    }
+    if (theirGraveyard > 0)
+    {
+        o << (first ? " " : ", ") << theirGraveyard << " in their graveyard";
+        first = false;
+    }
+    if (myBattlefield > 0)
+    {
+        o << (first ? " " : ", ") << myBattlefield << " on your battlefield";
+        first = false;
+    }
+    if (myGraveyard > 0)
+    {
+        o << (first ? " " : ", ") << myGraveyard << " in your graveyard";
+        first = false;
+    }
+    o << "}";
+    return o.str();
+}
+
 //The clause. Pure over the two name lists, so the wording is provable.
 static string modalModesTag(const std::vector<std::string>& live,
                             const std::vector<std::string>& dead)
@@ -21500,8 +21846,13 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             string mName = ctx ? ctx->getDisplayName() : string("the spell");
             vector<string> narr;
             for (size_t mi = 0; mi < req.optionTexts.size(); mi++)
-                narr.push_back("You chose " + mName + "'s mode \""
-                               + stripNarrationDecoration(req.optionTexts[mi]) + "\"");
+                //#W55-D (D22): a card-NAME choice is narrated with the same verb
+                //the observing seat's "[named: <card>]" tag uses.
+                narr.push_back(req.nameChoiceMenu
+                               ? ("You named \"" + stripNarrationDecoration(req.optionTexts[mi])
+                                  + "\" with " + mName)
+                               : ("You chose " + mName + "'s mode \""
+                                  + stripNarrationDecoration(req.optionTexts[mi]) + "\""));
             setAskNarration(narr);
         }
         //N-152h: a pay-repeat menu (Add N counters) states its partial-pay
@@ -21515,6 +21866,40 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //ORDER are untouched, so act.choice still means what applyMenuChoice
         //thinks it means.
         vector<string> shownModes = req.optionTexts;
+        //#W55-D (D22): a card-NAME menu is not a mode menu. Its rows are card
+        //names, so the mode live/dead clause has nothing to match and the
+        //header must say what the choice IS. Each row gains only the PUBLIC
+        //fact about that name; the list itself is the engine's.
+        if (req.nameChoiceMenu)
+        {
+            for (size_t mi = 0; mi < shownModes.size(); mi++)
+            {
+                int tb = 0, tg = 0, mb = 0, mg = 0;
+                const string& want = req.optionTexts[mi];
+                Player * players[2] = { this, opponent() };
+                for (int pi = 0; pi < 2; pi++)
+                {
+                    Player * pl = players[pi];
+                    if (!pl || !pl->game)
+                        continue;
+                    MTGGameZone * zs[2] = { pl->game->inPlay, pl->game->graveyard };
+                    for (int zi = 0; zi < 2; zi++)
+                    {
+                        MTGGameZone * z = zs[zi];
+                        for (int ci = 0; z && ci < z->nb_cards; ci++)
+                            if (z->cards[ci] && z->cards[ci]->name == want)
+                            {
+                                if (pi == 0)
+                                    (zi == 0 ? mb : mg)++;
+                                else
+                                    (zi == 0 ? tb : tg)++;
+                            }
+                    }
+                }
+                shownModes[mi] += namedCardVisibilityTag(tb, tg, mb, mg);
+            }
+        }
+        else
         {
             std::vector<std::string> liveM, deadM;
             if (ctx && modalModeLiveness(observer, ctx, liveM, deadM))
@@ -21529,9 +21914,15 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                             shownModes[mi] += " {DEAD right now: no legal object for this mode}";
                 }
         }
-        int pick = askModel("Choose one mode for "
-                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":"
-                            + payRepeatModeNote(req.optionTexts), shownModes,
+        string modeHeader;
+        if (req.nameChoiceMenu)
+            modeHeader = chooseANameHeaderText(ctx ? ctx->getDisplayName() : req.contextName,
+                                               ctx ? cardTextSnippet(ctx, 220) : string());
+        else
+            modeHeader = "Choose one mode for "
+                         + (ctx ? ctx->getDisplayName() : string("this spell")) + ":"
+                         + payRepeatModeNote(req.optionTexts);
+        int pick = askModel(modeHeader, shownModes,
                             true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
@@ -26624,8 +27015,17 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
                                  const string& optOneEffect,
                                  const vector<bool>& eligibleForOptionOne,
                                  int revealSource, bool pickExactlyOne,
-                                 bool wholeLibrary)
+                                 bool wholeLibrary,
+                                 //#W55-D (D18): the permutation the collapse used, so the
+                                 //caller can map the reply's positions back to `revealed`.
+                                 vector<size_t> * outOrder = NULL)
 {
+    if (outOrder)
+    {
+        outOrder->resize(revealed.size());
+        for (size_t oi = 0; oi < revealed.size(); oi++)
+            (*outOrder)[oi] = oi;
+    }
     bool haveElig = (eligibleForOptionOne.size() == revealed.size());
     int eligCount = 0;
     if (haveElig)
@@ -26696,34 +27096,56 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
             tail << " (none of these qualify - answer \"PUT: none\")";
         tail << ".\n";
     }
+    //#W55-D (D18): the rows are built into a vector and collapsed the same way
+    //every ask menu is. `123v125` s9 printed FIFTY rows with `Intruder Alarm`
+    //x4, `Damnation` x4 and `Thraben Doomsayer` x4 as separate strings that
+    //differed only in their copy ordinal, which the collapse could not see.
+    //Nothing is deleted or capped: the copies are gathered (groupNumberedRows'
+    //stable permutation) and printed as ONE row carrying the copy range, and
+    //the caller un-permutes the reply so a number still means the card it named.
+    vector<string> revealRows;
     for (size_t j = 0; j < revealed.size(); j++)
     {
         int rcopies = 0;
         int rrank = listCopyRank(revealed, j, rcopies);
-        tail << (j + 1) << ". " << revealed[j]->name
-             << copyOfTag(rrank, rcopies, "this list");
+        std::ostringstream row;
+        row << revealed[j]->name << copyOfTag(rrank, rcopies, "this list");
         if (revealed[j]->isCreature())
-            tail << " (" << revealed[j]->power << "/" << revealed[j]->toughness
+            row << " (" << revealed[j]->power << "/" << revealed[j]->toughness
                  << " creature)";
         else
         {
             string tt = typeTag(revealed[j]);
             if (!tt.empty())
-                tail << " (" << tt << ")";
+                row << " (" << tt << ")";
         }
         string kw = keywordList(revealed[j]);
         if (!kw.empty())
-            tail << " [" << kw << "]";
+            row << " [" << kw << "]";
         string txt = cardTextSnippet(revealed[j], 140);
         if (!txt.empty())
-            tail << " {text: " << txt << "}";
+            row << " {text: " << txt << "}";
         //The eligibility tag rides the option line so the filter cannot be
         //missed (the same "deciding fact rides the option" principle as combat).
         if (restricted)
-            tail << (eligibleForOptionOne[j]
+            row << (eligibleForOptionOne[j]
                      ? revealEligMarker(optOneLabel)
                      : " [does NOT qualify - goes to \"" + optTwoLabel + "\"]");
-        tail << "\n";
+        revealRows.push_back(row.str());
+    }
+    {
+        vector<size_t> revealOrder;
+        groupNumberedRows(revealRows, revealOrder);
+        vector<string> shownReveal;
+        shownReveal.reserve(revealRows.size());
+        for (size_t k = 0; k < revealOrder.size(); k++)
+            shownReveal.push_back(revealRows[revealOrder[k]]);
+        bool revealRanged = false;
+        tail << joinNumberedRows(shownReveal, &revealRanged);
+        if (revealRanged)
+            tail << kOptionRangeNote;
+        if (outOrder)
+            *outOrder = revealOrder;
     }
     if (pickExactlyOne)
         tail << "On the FIRST line write PUT: followed by the ONE card number you"
@@ -26792,13 +27214,24 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     if (mSystemPrompt.empty())
         buildSystemPrompt();
 
+    //#W55-D (D18): `revealOrder` is the collapse's stable permutation of the
+    //printed rows. The reply is parsed in PRINTED positions and mapped back
+    //through it, so a collapsed list cannot make a number mean another card.
+    vector<size_t> revealOrder;
     string userMsg = assemblePrompt(
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
                            eligibleForOptionOne, revealSource, pickExactlyOne,
                            //N-166p: a search empties the library zone into the
                            //reveal zone; a top-of-library look does not.
                            revealSource == 0 && game->library->nb_cards == 0
-                               && revealed.size() > 1));
+                               && revealed.size() > 1,
+                           &revealOrder));
+    if (revealOrder.size() != revealed.size())
+    {
+        revealOrder.resize(revealed.size());
+        for (size_t oi = 0; oi < revealed.size(); oi++)
+            revealOrder[oi] = oi;
+    }
 
     string content;
     if (pollCompletionRetry(userMsg, content) == kChoicePending)
@@ -26814,8 +27247,10 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     vector<bool> send;
     vector<string> names;
     names.reserve(revealed.size());
+    //#W55-D (D18): names are in PRINTED order - the same order the numbers the
+    //model answers with index.
     for (size_t j = 0; j < revealed.size(); j++)
-        names.push_back(revealed[j]->name);
+        names.push_back(revealed[revealOrder[j]]->name);
     int result = content.empty() ? -1
                  : parseAttackerSet(decisionPart, revealed.size(), send, &names, true);
 
@@ -26842,6 +27277,8 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         return -1;
     }
 
+    //#W55-D (D18): back from PRINTED positions to `revealed` positions.
+    unpermuteSelection(revealOrder, revealed.size(), send);
     string chosen;
     for (size_t j = 0; j < revealed.size(); j++)
         if (send[j])
@@ -27172,6 +27609,41 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
     return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
 }
 
+//#W55-D (D9): the cleanup discard row's missing verdicts. `125v162` seq 47
+//(t17, 8 life, send 2) listed nine cards with cost, type and card text and no
+//VERDICT of any kind, while the same prompt's own header said the seat had 9
+//permanents of which 9 were lands and the opponent controlled 0 creatures. It
+//sent both Fall of the Gavel - its only answers to a noncreature - and died two
+//turns later. Every other ask kind prices its rows; this one did not. Three
+//clauses, each pure over facts the emitter already computes elsewhere.
+string discardSpareLandClause(int myLands)
+{
+    if (myLands <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {spare: you control " << myLands << " land" << (myLands == 1 ? "" : "s")
+      << " already}";
+    return o.str();
+}
+//The dead-right-now clause names the COUNT the engine's own target chooser
+//sees, never a guess about what the card is for. It is deliberately NOT
+//rendered for a card that targets the stack: a counterspell has no legal
+//target during a cleanup step and always would, so "dead" would be true of the
+//moment and false of the card - the trust doctrine's wrong-scope lie, and the
+//exact card class the seat wrongly discarded.
+string discardDeadTargetClause(int legalTargets)
+{
+    if (legalTargets != 0)
+        return "";
+    return " {dead right now: 0 legal targets on the board for it}";
+}
+string discardAlreadyControlClause(const string& onBattlefield)
+{
+    if (onBattlefield.empty())
+        return "";
+    return " {you already control one: " + onBattlefield + "}";
+}
+
 //W50-W (D4): the cleanup discard ask. Header is a free function so PARSETEST
 //can pin its numbers without a game.
 string cleanupDiscardHeaderText(int handN, int limit, int over)
@@ -27185,33 +27657,91 @@ string cleanupDiscardHeaderText(int handN, int limit, int over)
     return o.str();
 }
 
-string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over)
+string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over,
+                                              vector<size_t> * outOrder)
 {
     std::ostringstream tail;
     tail << cleanupDiscardHeaderText((int) hand.size(), limit, over);
+    if (outOrder)
+    {
+        outOrder->resize(hand.size());
+        for (size_t oi = 0; oi < hand.size(); oi++)
+            (*outOrder)[oi] = oi;
+    }
+    //#W55-D (D9): the board facts the three clauses are computed off, read
+    //ONCE for the whole list.
+    int myLands = 0;
+    std::set<string> myBattlefieldNames;
+    for (int bi = 0; game && game->inPlay && bi < game->inPlay->nb_cards; bi++)
+    {
+        MTGCardInstance * bc = game->inPlay->cards[bi];
+        if (!bc)
+            continue;
+        if (bc->hasType(Subtypes::TYPE_LAND))
+            myLands++;
+        if (!bc->isToken)
+            myBattlefieldNames.insert(bc->name);
+    }
+    vector<string> discardRows;
     for (size_t j = 0; j < hand.size(); j++)
     {
         int copies = 0;
         int rank = listCopyRank(hand, j, copies);
-        tail << (j + 1) << ". " << hand[j]->name << copyOfTag(rank, copies, "your hand");
+        std::ostringstream row;
+        row << hand[j]->name << copyOfTag(rank, copies, "your hand");
         if (hand[j]->getManaCost())
         {
             string mc = hand[j]->getManaCost()->toString();
             if (!mc.empty())
-                tail << " " << mc;
+                row << " " << mc;
         }
         if (hand[j]->isCreature())
-            tail << " (" << hand[j]->power << "/" << hand[j]->toughness << " creature)";
+            row << " (" << hand[j]->power << "/" << hand[j]->toughness << " creature)";
         else
         {
             string tt = typeTag(hand[j]);
             if (!tt.empty())
-                tail << " (" << tt << ")";
+                row << " (" << tt << ")";
         }
         string txt = cardTextSnippet(hand[j], 140);
         if (!txt.empty())
-            tail << " {card text: " << txt << "}";
-        tail << "\n";
+            row << " {card text: " << txt << "}";
+        //#W55-D (D9): the verdicts. A land row says how many lands are already
+        //down; a permanent whose name is already on the battlefield says so;
+        //a spell whose own target spec sees nothing on the board says that,
+        //and a spell that targets the STACK is never given the clause.
+        if (hand[j]->hasType(Subtypes::TYPE_LAND))
+            row << discardSpareLandClause(myLands);
+        else
+        {
+            if (myBattlefieldNames.count(hand[j]->name))
+                row << discardAlreadyControlClause(hand[j]->name);
+            string spec = hand[j]->spellTargetType;
+            if (!spec.empty() && toLowerCopy(spec).find("stack") == string::npos)
+            {
+                int n = modalSpecObjectCount(observer, hand[j], spec);
+                if (n >= 0)
+                    row << discardDeadTargetClause(n);
+            }
+        }
+        discardRows.push_back(row.str());
+    }
+    {
+        //#W55-D (D18): the same collapse every other list gets - three copies of
+        //one card in hand printed three byte-different rows only because of the
+        //copy ordinal. The caller un-permutes the reply.
+        vector<size_t> discardOrder;
+        groupNumberedRows(discardRows, discardOrder);
+        vector<string> shownDiscard;
+        shownDiscard.reserve(discardRows.size());
+        for (size_t k = 0; k < discardOrder.size(); k++)
+            shownDiscard.push_back(discardRows[discardOrder[k]]);
+        bool discardRanged = false;
+        tail << joinNumberedRows(shownDiscard, &discardRanged);
+        if (discardRanged)
+            tail << kOptionRangeNote;
+        if (outOrder)
+            *outOrder = discardOrder;
     }
     tail << "On the FIRST line write PUT: followed by the " << over << " card number"
          << (over == 1 ? "" : "s") << " you discard"
@@ -27237,13 +27767,27 @@ int AIPlayerGPT::cleanupDiscard(int over)
     int result = -1;
     vector<bool> send;
     vector<string> names;
+    //#W55-D (D18): PRINTED order - filled after the ask text is built, which is
+    //what fixes the permutation.
+    vector<size_t> discardOrder(hand.size(), 0);
     for (size_t j = 0; j < hand.size(); j++)
-        names.push_back(hand[j]->name);
+        discardOrder[j] = j;
     if (!mEndpoint.empty())
     {
         if (mSystemPrompt.empty())
             buildSystemPrompt();
-        userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over));
+        userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over, &discardOrder));
+        if (discardOrder.size() != hand.size())
+        {
+            discardOrder.resize(hand.size());
+            for (size_t j = 0; j < hand.size(); j++)
+                discardOrder[j] = j;
+        }
+    }
+    for (size_t j = 0; j < hand.size(); j++)
+        names.push_back(hand[discardOrder[j]]->name);
+    if (!mEndpoint.empty())
+    {
         if (pollCompletionRetry(userMsg, content) == kChoicePending)
             return 1; //call in flight; the base Act neither acts nor passes
         //#W52-G (E-1): the discard ask's own label. deck162 vs deck146 seq 17:
@@ -27262,6 +27806,9 @@ int AIPlayerGPT::cleanupDiscard(int over)
                 result = sal;
         }
     }
+    //#W55-D (D18): back from PRINTED positions to hand positions.
+    if (result >= 0 && !send.empty())
+        unpermuteSelection(discardOrder, hand.size(), send);
     vector<MTGCardInstance*> chosen;
     string chosenText;
     if (result >= 0)
@@ -40917,6 +41464,226 @@ static const char * kW50Y_r94 =
         CHECK(parseChoice("CHOICE: 0 (taking this row skips the rest of this turn's identical windows)",
                           (int) menu.size(), &menu, &st2, NULL, NULL, true) != 1,
               "#W55-A D21 NEGATIVE the benefit annotation echoed alone never steals the cast row");
+    }
+    // ---- #W55-D: D8 two-dimensional collapse, D18 copy-tag collapse, D9, D22 ----
+    cout << "\n[#W55-D] D18 the copy-tag instance grammar\n";
+    {
+        string h, t, sc;
+        int rk = 0, tot = 0;
+        CHECK(splitCopyRowHandle("Intruder Alarm (copy 2 of 4 in this list) (enchantment) {text: x}",
+                                 h, t, rk, tot, sc)
+              && h == "Intruder Alarm" && rk == 2 && tot == 4 && sc == "this list"
+              && t == " (enchantment) {text: x}",
+              "#W55-D D18 the copy tag decomposes into head/rank/total/scope/tail");
+        CHECK(splitCopyRowHandle("Damnation (copy 1 of 2 in your hand) {2}{b}{b}", h, t, rk, tot, sc)
+              && rk == 1 && tot == 2 && sc == "your hand",
+              "#W55-D D18 the hand scope reads back as written");
+        CHECK(!splitCopyRowHandle("Arcane Sanctum (land) {text: taps for W}", h, t, rk, tot, sc),
+              "#W55-D D18 NEGATIVE a row with no copy tag is not a copy row");
+        CHECK(!splitCopyRowHandle("Fake (copy 0 of 4 in this list)", h, t, rk, tot, sc)
+              && !splitCopyRowHandle("Fake (copy 5 of 4 in this list)", h, t, rk, tot, sc)
+              && !splitCopyRowHandle("Fake (copy 1 of 1 in this list)", h, t, rk, tot, sc),
+              "#W55-D D18 NEGATIVE an out-of-range or single-copy tag is refused");
+        CHECK(!splitCopyRowHandle("Deal 2 damage with Staff of Nin (copy of the original)", h, t, rk, tot, sc),
+              "#W55-D D18 NEGATIVE 'copy' without the rank/total/scope grammar is not a handle");
+        CHECK(copyRangeTag(1, 4, 4, "this list") == " (copies 1-4 of 4 in this list)",
+              "#W55-D D18 the collapsed range prints the copies it covers");
+        CHECK(copyRangeTag(3, 3, 4, "your hand") == " (copy 3 of 4 in your hand)",
+              "#W55-D D18 a run of one keeps the singular tag");
+        //the whole path: scattered copies gather and print as ONE row
+        vector<string> rev;
+        rev.push_back("Intruder Alarm (copy 1 of 4 in this list) (enchantment)");
+        rev.push_back("Scrubland (copy 1 of 2 in this list) (land)");
+        rev.push_back("Intruder Alarm (copy 2 of 4 in this list) (enchantment)");
+        rev.push_back("Arcane Sanctum (land)");
+        rev.push_back("Intruder Alarm (copy 3 of 4 in this list) (enchantment)");
+        rev.push_back("Scrubland (copy 2 of 2 in this list) (land)");
+        rev.push_back("Intruder Alarm (copy 4 of 4 in this list) (enchantment)");
+        vector<size_t> ord;
+        groupNumberedRows(rev, ord);
+        vector<string> shown;
+        for (size_t k = 0; k < ord.size(); k++)
+            shown.push_back(rev[ord[k]]);
+        bool ranged = false;
+        string joined = joinNumberedRows(shown, &ranged);
+        CHECK(ranged && joined.find("1-4. Intruder Alarm (copies 1-4 of 4 in this list) (enchantment) x4") == 0,
+              "#W55-D D18 four scattered copies gather and collapse to one row");
+        CHECK(joined.find("Scrubland (copy 1 of 2 in this list)") != string::npos
+              && joined.find("Scrubland (copy 2 of 2 in this list)") != string::npos,
+              "#W55-D D18 NEGATIVE a pair below the collapse floor still prints both rows");
+        CHECK(joined.find("Arcane Sanctum (land)") != string::npos,
+              "#W55-D D18 NEGATIVE a unique row is untouched");
+        //the permutation is index-safe: every original row appears exactly once
+        CHECK(ord.size() == rev.size(),
+              "#W55-D D18 the permutation is total - no row is dropped");
+        {
+            std::set<size_t> seen(ord.begin(), ord.end());
+            CHECK(seen.size() == rev.size(), "#W55-D D18 the permutation is a bijection");
+        }
+        //the map-back: a pick made in PRINTED positions names the card that was
+        //printed there, whatever the collapse moved
+        {
+            //printed row 5 (index 4) is the SECOND Scrubland in this gather
+            vector<bool> picked(rev.size(), false);
+            picked[4] = true;
+            vector<bool> back(picked);
+            unpermuteSelection(ord, rev.size(), back);
+            size_t hits = 0, at = rev.size();
+            for (size_t k = 0; k < back.size(); k++)
+                if (back[k]) { hits++; at = k; }
+            CHECK(hits == 1 && at == ord[4] && rev[at] == shown[4],
+                  "#W55-D D18 a pick at printed position 5 maps back to the row printed there");
+            vector<size_t> ident(rev.size());
+            for (size_t k = 0; k < rev.size(); k++) ident[k] = k;
+            vector<bool> same(picked);
+            unpermuteSelection(ident, rev.size(), same);
+            CHECK(same == picked,
+                  "#W55-D D18 NEGATIVE an identity permutation changes nothing");
+            vector<bool> untouched(picked);
+            unpermuteSelection(ident, rev.size() + 3, untouched);
+            CHECK(untouched == picked,
+                  "#W55-D D18 NEGATIVE a size mismatch is refused, not half-applied");
+        }
+    }
+    cout << "\n[#W55-D] D8 the two-dimensional (source x target) collapse\n";
+    {
+        string masked, sname;
+        int rk = 0;
+        CHECK(splitSourceOrdinal("Destroy with Dwarven Blastminer #2 targeting Underground Sea #1"
+                                 " [opponent's battlefield]", masked, rk, sname)
+              && rk == 2 && sname == "Dwarven Blastminer"
+              && masked.find("Underground Sea #1") != string::npos,
+              "#W55-D D8 the SOURCE ordinal is the one before ' targeting ' and the target's survives");
+        CHECK(!splitSourceOrdinal("Equip with Lightning Greaves targeting Human #3", masked, rk, sname),
+              "#W55-D D8 NEGATIVE one source with no ordinal is not a source row (the 1-D collapse owns it)");
+        CHECK(!splitSourceOrdinal("Cast Damnation {2}{b}{b}", masked, rk, sname),
+              "#W55-D D8 NEGATIVE a row with no ' targeting ' clause is not a source row");
+        {
+            string m1, m2, n1, n2;
+            int r1 = 0, r2 = 0;
+            splitSourceOrdinal("Destroy with Blastminer #1 targeting Sea #1", m1, r1, n1);
+            splitSourceOrdinal("Destroy with Blastminer #2 targeting Sea #2", m2, r2, n2);
+            CHECK(m1 != m2,
+                  "#W55-D D8 NEGATIVE masking only the SOURCE token keeps '#1 targeting Sea #1' and"
+                  " '#2 targeting Sea #2' distinct - they are different options");
+        }
+        CHECK(sourceBlockLine(12, 15, 8, 11, "Dwarven Blastminer", 2, 1)
+              == "12-15. The same 4 options as 8-11, with Dwarven Blastminer #2 as the source"
+                 " instead of #1 (12 is the same choice as 8, 13 as 9, and so on to 15 as 11) x4",
+              "#W55-D D8 the collapsed block states its exact one-for-one decode");
+        //the live shape: 2 Blastminers x 4 lands, source-major
+        vector<string> rows;
+        const char * tgt[4] = { "Forgotten Cave [your battlefield]", "Isolated Chapel [opponent's battlefield]",
+                                "Underground Sea #1 [opponent's battlefield]", "Underground Sea #2 [opponent's battlefield]" };
+        for (int s = 1; s <= 2; s++)
+            for (int k = 0; k < 4; k++)
+            {
+                std::ostringstream r;
+                r << "Destroy with Dwarven Blastminer #" << s << " targeting " << tgt[k]
+                  << " [cost: {2}{r}, Tap]";
+                rows.push_back(r.str());
+            }
+        bool ranged = false;
+        string joined = joinNumberedRows(rows, &ranged);
+        CHECK(ranged, "#W55-D D8 the repeated source block is a collapse");
+        CHECK(joined.find("5-8. The same 4 options as 1-4, with Dwarven Blastminer #2 as the source"
+                          " instead of #1") != string::npos,
+              "#W55-D D8 the second source's four rows print as one decodable line");
+        CHECK(joined.find("1. Destroy with Dwarven Blastminer #1 targeting Forgotten Cave") == 0,
+              "#W55-D D8 the FIRST block prints in full - nothing is deleted");
+        {
+            //every option number 1..8 still exists in the render
+            int lines = 0;
+            for (size_t k = 0; k < joined.size(); k++)
+                if (joined[k] == '\n') lines++;
+            CHECK(lines == 5, "#W55-D D8 eight options render as five lines, none of them a cap");
+        }
+        //NEGATIVE: two sources whose option lists DIFFER never collapse
+        vector<string> uneven(rows.begin(), rows.begin() + 7);
+        bool r2 = false;
+        string j2 = joinNumberedRows(uneven, &r2);
+        CHECK(j2.find("The same") == string::npos,
+              "#W55-D D8 NEGATIVE an incomplete second block is printed row by row");
+        //NEGATIVE: identical target lists but a differing tail is a different option
+        vector<string> tweaked(rows);
+        tweaked[5] += " {this hits YOUR permanent}";
+        bool r3 = false;
+        string j3 = joinNumberedRows(tweaked, &r3);
+        CHECK(j3.find("The same") == string::npos,
+              "#W55-D D8 NEGATIVE one differing row anywhere in the block defeats the collapse");
+        //the note explains both new forms
+        CHECK(string(kOptionRangeNote).find("The same 4 options as 8-11") != string::npos
+              && string(kOptionRangeNote).find("(copies 3-6 of 6 in this list)") != string::npos,
+              "#W55-D D8/D18 the range note carries the decode rule for both new forms");
+        //the ECHO shape: an answer naming a member of a collapsed block
+        vector<string> menu(rows);
+        bool stale = false;
+        string src;
+        CHECK(AIPlayerGPT::parseChoice("CHOICE: 6 (Destroy with Dwarven Blastminer)",
+                                       (int) menu.size(), &menu, &stale, &src) == 6 && !stale,
+              "#W55-D D8 echo: a number inside the collapsed block resolves to that option");
+        CHECK(AIPlayerGPT::parseChoice("CHOICE: 5 (Destroy with Dwarven Blastminer #2 targeting"
+                                       " Forgotten Cave [your battlefield] [cost: {2}{r}, Tap])",
+                                       (int) menu.size(), &menu, &stale, &src) == 5 && !stale,
+              "#W55-D D8 echo: the collapsed member's FULL text still binds to its own number");
+    }
+    cout << "\n[#W55-D] D9 the cleanup discard row's verdicts\n";
+    {
+        CHECK(discardSpareLandClause(9) == " {spare: you control 9 lands already}",
+              "#W55-D D9 the land row states the lands already down");
+        CHECK(discardSpareLandClause(1) == " {spare: you control 1 land already}",
+              "#W55-D D9 singular at one");
+        CHECK(discardSpareLandClause(0).empty(),
+              "#W55-D D9 NEGATIVE no land on the battlefield, no spare clause");
+        CHECK(discardDeadTargetClause(0) == " {dead right now: 0 legal targets on the board for it}",
+              "#W55-D D9 a spell whose own chooser sees nothing says so");
+        CHECK(discardDeadTargetClause(1).empty() && discardDeadTargetClause(7).empty(),
+              "#W55-D D9 NEGATIVE a spell with a legal target carries no dead clause");
+        CHECK(discardAlreadyControlClause("Howling Mine") == " {you already control one: Howling Mine}",
+              "#W55-D D9 the duplicate-permanent clause names the permanent");
+        CHECK(discardAlreadyControlClause("").empty(),
+              "#W55-D D9 NEGATIVE nothing of that name on the battlefield, no clause");
+        //the echo shape: the clauses strip off an anchored candidate
+        vector<string> menu;
+        menu.push_back("Island (land)" + discardSpareLandClause(9));
+        menu.push_back("Fall of the Gavel {3}{u}{w} (instant)");
+        CHECK(stripNarrationDecoration(menu[0]) == "Island (land)",
+              "#W55-D D9 echo: the spare clause leaves no residue in the narrated record");
+    }
+    cout << "\n[#W55-D] D22 the card-NAME menu\n";
+    {
+        string h = chooseANameHeaderText("Silverquill Silencer",
+                                         "Whenever an opponent casts a spell with the chosen name,"
+                                         " that player loses 3 life and you draw a card.");
+        CHECK(h.find("Choose a card NAME for Silverquill Silencer") == 0,
+              "#W55-D D22 the header names the choice for what it is");
+        CHECK(h.find("NOT a mode") != string::npos && h.find("Choose one mode") == string::npos,
+              "#W55-D D22 NEGATIVE the mode wording is gone from this header");
+        CHECK(h.find("What naming it does: Whenever an opponent casts a spell with the chosen name")
+              != string::npos,
+              "#W55-D D22 the header states what naming does, in the card's own words");
+        CHECK(chooseANameHeaderText("", "").find("Choose a card NAME for this card") == 0,
+              "#W55-D D22 NEGATIVE a nameless source still gets a correct header");
+        CHECK(namedCardVisibilityTag(1, 2, 0, 0)
+              == " {visible now: 1 on their battlefield, 2 in their graveyard}",
+              "#W55-D D22 the row states only what is publicly visible");
+        CHECK(namedCardVisibilityTag(0, 0, 3, 1)
+              == " {visible now: 3 on your battlefield, 1 in your graveyard}",
+              "#W55-D D22 both sides are named when both are visible");
+        CHECK(namedCardVisibilityTag(0, 0, 0, 0).empty(),
+              "#W55-D D22 NEGATIVE a name nowhere public carries no tag - the hidden zones are"
+              " never described");
+        //echo shape: the tag strips off an anchored candidate
+        vector<string> menu;
+        menu.push_back("Essence Scatter" + namedCardVisibilityTag(0, 1, 0, 0));
+        menu.push_back("Supreme Verdict");
+        bool stale = false;
+        string src;
+        CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Essence Scatter {visible now: 1 in their graveyard})",
+                                       2, &menu, &stale, &src) == 1 && !stale,
+              "#W55-D D22 echo: the visibility tag echoed whole still binds");
+        CHECK(stripNarrationDecoration(menu[0]) == "Essence Scatter",
+              "#W55-D D22 echo: the tag leaves no residue in the narrated record");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
