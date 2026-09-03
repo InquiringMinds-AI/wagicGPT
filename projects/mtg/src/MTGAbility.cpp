@@ -14,6 +14,7 @@
 #include "ExtraCost.h"
 #include "MTGRules.h"
 #include "AbilityParser.h"
+#include "LegalActions.h" //#W56-W (E-2): canPlayLandNow
 
 
 //Used for Lord/This parsing
@@ -125,6 +126,12 @@ int AbilityFactory::parseCastRestrictions(MTGCardInstance * card, Player * playe
             if (player != observer->currentPlayer)
                 return 0;
             if (cPhase != MTG_PHASE_FIRSTMAIN && cPhase != MTG_PHASE_SECONDMAIN)
+                return 0;
+            break;
+        //#W56-W (E-2): `can play land` - CR 305.1 in full, land drop included.
+        //assorcery alone would still permit a SECOND drop in the same turn.
+        case MTGAbility::CAN_PLAY_LAND:
+            if (!LegalActionsOracle::canPlayLandNow(card, player))
                 return 0;
             break;
         }
@@ -1068,6 +1075,10 @@ int AbilityFactory::parseCastRestrictions(MTGCardInstance * card, Player * playe
 
 int AbilityFactory::parseRestriction(string s)
 {
+    //#W56-W (E-2). Checked FIRST: this is an exact-phrase token and the loops
+    //below are substring scans that must not get a chance to mis-claim it.
+    if (s.find("can play land") != string::npos || s.find("canplayland") != string::npos)
+        return ActivatedAbility::CAN_PLAY_LAND;
     if (s.find("myturnonly") != string::npos)
         return ActivatedAbility::PLAYER_TURN_ONLY;
     if (s.find("opponentturnonly") != string::npos)
@@ -8003,6 +8014,13 @@ int ActivatedAbility::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
         break;
     case OPPONENT_TURN_ONLY:
         if (player == game->currentPlayer)
+            return 0;
+        break;
+    //#W56-W (E-2): the same token on the ABILITY's own restriction int (the
+    //line-level parseRestriction sets it too), so the row is not merely refused
+    //on click - it is never offered. One predicate, both routes.
+    case CAN_PLAY_LAND:
+        if (!LegalActionsOracle::canPlayLandNow(card, player))
             return 0;
         break;
     case AS_SORCERY:

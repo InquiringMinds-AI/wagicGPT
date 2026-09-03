@@ -133,6 +133,14 @@ public:
 
         OPPONENT_TURN_ONLY = 60,
 
+        //#W56-W (E-2): `restriction{can play land}` (alias `canplayland`) - the
+        //card-script token the modal-DFC back-face land entry carries. Until
+        //this existed the token parsed to NO_RESTRICTION and gated NOTHING, so
+        //a `{0}` flip-into-play row was offered on the opponent's turn and
+        //after the land drop was spent. Enforced by
+        //LegalActionsOracle::canPlayLandNow (CR 305.1).
+        CAN_PLAY_LAND = 61,
+
     };
 
     bool oneShot;

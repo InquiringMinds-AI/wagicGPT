@@ -242,6 +242,27 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
     return result;
 }
 
+//#W56-W (E-2). See LegalActions.h. Pure: no zone, ability or counter is
+//mutated, so it is safe from rendering and from an isReactingToClick poll.
+bool LegalActionsOracle::canPlayLandNow(MTGCardInstance * card, Player * actor)
+{
+    if (!card)
+        return false;
+    Player * ctrl = card->controller();
+    if (!ctrl)
+        return false;
+    //Only the card's controller plays it; `actor` is whoever is clicking.
+    if (actor && actor != ctrl)
+        return false;
+    //Own turn + a main phase + empty stack + no foreign interrupt. This is
+    //MTGPutInPlayRule's own gate for a land, called on the same object.
+    if (!card->StackIsEmptyandSorcerySpeed())
+        return false;
+    if (!ctrl->game || !ctrl->game->playRestrictions)
+        return false;
+    return ctrl->game->playRestrictions->landDropAvailable(card->getObserver(), card);
+}
+
 vector<LegalActionsOracle::Cast> LegalActionsOracle::legalLandPlays(Player * p)
 {
     vector<LegalActionsOracle::Cast> result;

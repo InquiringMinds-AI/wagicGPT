@@ -52,6 +52,24 @@ public:
     //casts, so legalCasts excludes them; this is their enumeration.
     static std::vector<Cast> legalLandPlays(Player * p);
 
+    //#W56-W (E-2): CR 305.1 - may `card`'s controller play a land RIGHT NOW?
+    //Own turn, a main phase, an empty stack with no interrupt, and a land drop
+    //still unspent. This is the predicate behind the `can play land` card-script
+    //restriction, which the modal-DFC back-face land entry carries: that entry
+    //does NOT go through MTGPutInPlayRule (the hand card is a Sorcery; the land
+    //arrives via the AAFlip forcetype(land) branch), so without this it was
+    //gated by nothing at all - the row was offered on the opponent's turn, in
+    //the blockers step, and after the drop was spent, and one such play resolved
+    //in an opponent's upkeep (wave-56 corpus, 152v162 seq 3).
+    //
+    //Reuses the two predicates the NORMAL land drop is made of, so the two
+    //routes cannot disagree: MTGCardInstance::StackIsEmptyandSorcerySpeed (the
+    //exact test MTGPutInPlayRule::isReactingToClick applies to a land) and
+    //PlayRestrictions::landDropAvailable (the maxPlay(land)N quota, asked by
+    //type because the hand card is not itself a land). `actor` is the player
+    //taking the action - NULL means "do not check, the caller already knows".
+    static bool canPlayLandNow(MTGCardInstance * card, Player * actor);
+
     //Payability across every cost variant (normal / alternative / morph /
     //flashback / retrace, plus specific-producer payment plans).
     static bool payable(Player * p, ManaEngine::ManaPolicy & policy,

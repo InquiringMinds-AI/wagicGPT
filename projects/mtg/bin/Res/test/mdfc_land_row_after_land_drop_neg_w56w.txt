@@ -1,0 +1,45 @@
+#W56-W (E-2) NEGATIVE -- one land drop per turn, whichever ROUTE takes it. A
+#normal land already played this turn must close the modal-DFC back-face row.
+#
+#SYMPTOM: 6 of the 62 wave-56 back-face-land windows printed
+#`Land drop: ALREADY USED this turn` on the SAME prompt as a live
+#`PLAY THIS AS A LAND` row (seat 146/152/162, E-2).
+#
+#MECHANISM: the lands-per-turn quota lives in a MaxPerTurnRestriction whose
+#TargetChooser matches LANDS. MTGPutInPlayRule asks it via
+#playRestrictions->canPutIntoZone(card, inPlay) -- but the card in HAND here is
+#Emeria's Call, a SORCERY, which that chooser cannot target, so the restriction
+#returned NO_OPINION and the whole check said CAN_PLAY. The quota is therefore
+#asked BY TYPE now (PlayRestrictions::landDropAvailable), against the same
+#restriction object and the same count (MaxPerTurnRestriction::quotaLeft, which
+#canPutIntoZone itself now calls -- one definition, so the two routes cannot
+#disagree).
+#
+#Plains is played first and consumes the drop. The click on Emeria's Call then
+#finds only the display toggle: no menu, nothing enters, life stays 20.
+#
+#PRE-FIX this fixture is RED: the back face entered as a second land the same
+#turn and its ETB took life to 17.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Emeria's Call,Plains
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+Plains
+Emeria's Call
+choice 1
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+hand:Emeria^ Shattered Skyclave
+inplay:Mind Stone,Plains
+life:20
+[PLAYER2]
+life:20
+[END]
