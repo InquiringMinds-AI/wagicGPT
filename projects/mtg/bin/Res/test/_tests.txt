@@ -1328,3 +1328,6 @@ mdfc_land_back_face_w56d.txt
 mdfc_land_drop_consumed_w56d.txt
 mdfc_land_back_face_pathway_w56d.txt
 mdfc_land_back_face_upkeep_neg_w56d.txt
+w56y_ai_wont_proliferate_opponent_counters.txt
+w56y_ai_proliferates_own_good_counters.txt
+w56y_ai_proliferates_opponent_bad_counters.txt
