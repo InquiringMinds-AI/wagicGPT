@@ -10455,7 +10455,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -13673,9 +13673,22 @@ static string converterSituationLine(Player * me, Player * opp)
 //the lethal branch and the blockable split are provable without a board.
 //`unblockedDamage` counts only attackers with no blocker assigned yet, so a
 //block already declared removes its attacker from the total.
+//#W57-B (D24, wave-56 ledger MED): the header raised the question "can any
+//assignment of my blockers get me above 0" and made the seat do the
+//subtraction. `123v152` seq 23: 8 life, "4 attackers, 16 unblocked damage -
+//you would be at -8; this KILLS you (of that, 10 from 2 attackers none of your
+//creatures can block)", one blocker whose only legal assignment removes 3. The
+//seat answered BLOCKS: none and was RIGHT (16 - 3 = 13 > 8) while its guide's
+//LETHAL rule ordered a block. `bestCaseDamage` is the damage that still lands
+//after the best legal assignment (< 0 = not computed, nothing printed);
+//`bestCaseOptimal` says whether that number is a proven maximum - a trample
+//attacker in the total makes it merely ACHIEVABLE, and the wording drops from
+//"best case" to "one legal assignment" rather than over-claiming.
 static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                                  bool haveBodies, int unblockableAttackers,
-                                 int unblockableDamage)
+                                 int unblockableDamage,
+                                 int bestCaseDamage = -1,
+                                 bool bestCaseOptimal = true)
 {
     if (attackers <= 0)
         return "";
@@ -13697,7 +13710,143 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
         else
             o << " (your creatures may legally block every attacker in that total)";
     }
+    //#W57-B (D24): the assignable remainder, from the same counts. Only ever
+    //printed where a legal assignment exists to price - with no bodies, or no
+    //legal block at all, the parenthetical above already says so.
+    if (haveBodies && bestCaseDamage >= 0)
+        o << (bestCaseOptimal ? " - best case with every blocker assigned: you would be at "
+                              : " - one legal assignment gets you to ")
+          << (myLife - bestCaseDamage);
     return o.str();
+}
+
+//#W57-B (D6, wave-56 ledger HIGH): the line shipped and is correct, and it
+//still reached only 9 of the corpus's ~200 windows during the opponent's
+//combat. The gate is the engine's own `attacker` flag, which is FALSE before
+//the declaration (57 `Combat begins` + 43 pre-declaration `Attackers` windows)
+//and clears again once combat is over, so the number that ends games is absent
+//from exactly the windows where the seat is asked to spend mana about it. Two
+//more forms, so the header token is present on EVERY window of their combat:
+//a FORECAST before the declaration, and the combat's own total re-rendered
+//after the flags clear. Both pure, so the whole per-combat sequence is
+//provable without a board.
+static string incomingCombatForecastLine(int ableAttackers, int maxDamage, int myLife)
+{
+    if (ableAttackers <= 0 || maxDamage <= 0)
+        return "";
+    std::ostringstream o;
+    o << "INCOMING THIS COMBAT: not declared yet - " << ableAttackers
+      << " of their creatures can attack, for up to " << maxDamage
+      << " - you would be at " << (myLife - maxDamage);
+    if (myLife - maxDamage <= 0)
+        o << "; that would KILL you";
+    return o.str();
+}
+
+//The same combat, after the engine has cleared its attacker flags. Nothing is
+//re-computed: these are the numbers the declared form printed, in the past
+//tense they have earned. No "you would be at" - that subtraction has already
+//happened to the life total the frame prints two lines above.
+static string incomingCombatSettledLine(int attackers, int unblockedDamage)
+{
+    if (attackers <= 0)
+        return "";
+    std::ostringstream o;
+    o << "INCOMING THIS COMBAT: " << attackers << " attacker"
+      << (attackers == 1 ? "" : "s") << ", " << unblockedDamage
+      << " unblocked damage - already dealt or removed this combat";
+    return o.str();
+}
+
+//The fourth form: their combat is past the declaration and nothing was
+//declared. A seat that has spent the whole combat reading "not declared yet"
+//needs the step to CLOSE - and "no attack is coming" is the fact a hold-up
+//mana decision at Blockers or Combat ends turns on.
+static const char * const kNoAttackThisCombatLine =
+    "INCOMING THIS COMBAT: they declared no attackers - no combat damage is coming at you this combat";
+
+//#W57-B (D6): which form this window gets, computed ONCE per combat and
+//re-rendered. `latchTurn` is the turn the latched total belongs to (< 0 = no
+//latch); `phase` is the engine's own GamePhase ordinal. 1 = the declared total
+//(live attacker flags, recompute), 2 = the latched total in the settled form,
+//3 = the pre-declaration forecast, 4 = the declaration closed with no attack,
+//0 = nothing. Pure so PARSETEST can walk a whole combat.
+static int incomingCombatForm(bool oppActive, int phase, int liveAttackers,
+                              int latchTurn, int turn, int ableAttackers)
+{
+    if (!oppActive || phase < (int) MTG_PHASE_COMBATBEGIN || phase > (int) MTG_PHASE_COMBATEND)
+        return 0;
+    if (liveAttackers > 0)
+        return 1;
+    if (latchTurn == turn)
+        return 2;
+    if (phase <= (int) MTG_PHASE_COMBATATTACKERS)
+        return ableAttackers > 0 ? 3 : 0;
+    return 4;
+}
+
+//#W57-B (D24): the best legal blocker assignment, as damage that still lands.
+//`damage[j]` is what attacker j puts on the face if it goes unblocked and 0
+//for an attacker whose block prevention is not exactly computable (a trampler:
+//see the caller). `can[i][j]` is the ENGINE's own legality map. Each blocker
+//blocks one attacker; a second blocker on an already-blocked attacker removes
+//nothing more, so the maximum prevented is a maximum-weight matching whose
+//weights depend only on the attacker - a transversal matroid, on which the
+//greedy (heaviest attacker first, augmenting path) is provably optimal.
+//Returns the residual damage, or -1 when there is no legal pairing to price.
+static bool assignableAugment(int j, const vector<vector<char> >& can,
+                              vector<char>& seen, vector<int>& matchOfBlocker)
+{
+    for (int i = 0; i < (int) can.size(); i++)
+    {
+        if (seen[i] || j >= (int) can[i].size() || !can[i][j])
+            continue;
+        seen[i] = 1;
+        if (matchOfBlocker[i] < 0
+            || assignableAugment(matchOfBlocker[i], can, seen, matchOfBlocker))
+        {
+            matchOfBlocker[i] = j;
+            return true;
+        }
+    }
+    return false;
+}
+
+static int assignableRemainderDamage(const vector<int>& damage,
+                                     const vector<vector<char> >& can)
+{
+    const int nb = (int) can.size();
+    const int na = (int) damage.size();
+    if (nb <= 0 || na <= 0 || nb > 32 || na > 32)
+        return -1;
+    int total = 0;
+    bool anyPair = false;
+    for (int j = 0; j < na; j++)
+        total += damage[j] > 0 ? damage[j] : 0;
+    for (int i = 0; i < nb; i++)
+        for (int j = 0; j < na; j++)
+            if (j < (int) can[i].size() && can[i][j])
+                anyPair = true;
+    if (!anyPair)
+        return -1;
+    vector<int> order;
+    for (int j = 0; j < na; j++)
+        order.push_back(j);
+    for (int x = 1; x < na; x++) //insertion sort, descending by damage
+        for (int y = x; y > 0 && damage[order[y]] > damage[order[y - 1]]; y--)
+            std::swap(order[y], order[y - 1]);
+    vector<int> matchOfBlocker(nb, -1);
+    int prevented = 0;
+    for (int k = 0; k < na; k++)
+    {
+        const int j = order[k];
+        if (damage[j] <= 0)
+            continue;
+        vector<char> seen(nb, 0);
+        if (assignableAugment(j, can, seen, matchOfBlocker))
+            prevented += damage[j];
+    }
+    return total - prevented;
 }
 
 //#W56-B (D10, wave-55 ledger MED = R234): the opponent's open mana was never a
@@ -14122,28 +14271,101 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         //#W56-B (D6): the incoming total, on EVERY window during their combat -
         //the seat with no creature is never handed a blockers ask, and that is
         //exactly the seat that dies to an unread board.
-        if (activeSeat == opp && oppAttacking > 0)
+        //#W57-B (D6): "every window" was the claim and 9 of ~200 was the
+        //delivery - the engine's `attacker` flag is false before the
+        //declaration and clears after combat, so the pre-declaration windows
+        //(Combat begins, and the Attackers windows the seat is handed before
+        //the opponent declares) and every window after damage carried nothing.
+        //The total is now computed ONCE per combat, latched on the turn it
+        //belongs to, and re-rendered in the form the window has earned.
         {
+            const int gp = observer ? (int) observer->getCurrentGamePhase() : (int) MTG_PHASE_INVALID;
+            const int nowTurn = observer ? observer->turn : -1;
             int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
+            int ableAttackers = 0, ableDamage = 0;
+            vector<int> faceDamage; //#W57-B (D24): per declared attacker, priced or 0
+            vector<MTGCardInstance *> declared;
+            bool exactAssignment = true; //#W57-B (D24)
             for (int ai = 0; ai < opp->game->inPlay->nb_cards; ai++)
             {
                 MTGCardInstance * ac = opp->game->inPlay->cards[ai];
-                if (!ac || !ac->isAttacker())
+                if (!ac || !ac->isCreature())
                     continue;
+                const int pw = ac->power > 0 ? ac->power : 0;
+                if (!ac->isAttacker())
+                {
+                    //#W57-B (D6): the forecast half - what they could declare.
+                    if (boardCreatureCanAttackNow(ac, true))
+                    {
+                        ableAttackers++;
+                        ableDamage += pw;
+                    }
+                    continue;
+                }
                 inAttackers++;
+                ableAttackers++;
+                ableDamage += pw;
                 if (!ac->blockers.empty())
                     continue; //already blocked: its damage is not aimed at the face
-                int pw = ac->power > 0 ? ac->power : 0;
                 inDamage += pw;
+                declared.push_back(ac);
+                //#W57-B (D24): a trampler still pushes damage past its blocker
+                //and a menace attacker is not stopped by ONE body, so neither
+                //is given a preventable value - the assignment stays legal and
+                //the number it yields is achievable rather than maximal.
+                const bool exact = !ac->basicAbilities[Constants::TRAMPLE]
+                                   && ac->minBlockersRequired() <= 1;
+                if (!exact && pw > 0)
+                    exactAssignment = false;
+                faceDamage.push_back(exact ? pw : 0);
                 if (ac->potentialBlockerCount() <= 0)
                 {
                     inUnblockable++;
                     inUnblockableDmg += pw;
                 }
             }
-            out << "\n" << incomingCombatLine(inAttackers, inDamage, life,
-                                              myCreatures > 0, inUnblockable,
-                                              inUnblockableDmg);
+            const int form = incomingCombatForm(activeSeat == opp, gp, inAttackers,
+                                                mIncomingCombatTurn, nowTurn, ableAttackers);
+            if (form == 1)
+            {
+                //#W57-B (D24): the assignable remainder, over the ENGINE's own
+                //pairwise legality map for the bodies this seat actually has.
+                int bestCase = -1;
+                {
+                    vector<vector<char> > can;
+                    for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
+                    {
+                        MTGCardInstance * bc = game->inPlay->cards[bi];
+                        if (!bc || !bc->isCreature() || !bc->canBlock())
+                            continue;
+                        vector<char> row;
+                        bool any = false;
+                        for (size_t dj = 0; dj < declared.size(); dj++)
+                        {
+                            const bool ok = bc->canBlock(declared[dj]) != 0;
+                            row.push_back(ok ? 1 : 0);
+                            any = any || ok;
+                        }
+                        if (any)
+                            can.push_back(row);
+                    }
+                    bestCase = assignableRemainderDamage(faceDamage, can);
+                }
+                mIncomingCombatTurn = nowTurn; //latched for the rest of this combat
+                mIncomingCombatAttackers = inAttackers;
+                mIncomingCombatDamage = inDamage;
+                out << "\n" << incomingCombatLine(inAttackers, inDamage, life,
+                                                  myCreatures > 0, inUnblockable,
+                                                  inUnblockableDmg, bestCase,
+                                                  exactAssignment);
+            }
+            else if (form == 2)
+                out << "\n" << incomingCombatSettledLine(mIncomingCombatAttackers,
+                                                         mIncomingCombatDamage);
+            else if (form == 3)
+                out << "\n" << incomingCombatForecastLine(ableAttackers, ableDamage, life);
+            else if (form == 4)
+                out << "\n" << kNoAttackThisCombatLine;
         }
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
@@ -14564,7 +14786,12 @@ static string stripNarrationDecoration(const string& in)
                 //that belongs in history.
                 || (in.compare(i, 20, "{same effect as row ") == 0)
                 || (in.compare(i, 31, "{blocking trigger, this combat:") == 0)
-                || (in.compare(i, 20, "{after this combat: ") == 0);
+                || (in.compare(i, 20, "{after this combat: ") == 0)
+                //#W57-B (D10): the two un-nested lifelink clauses are the same
+                //species as D13's - true of a block not yet declared.
+                || (in.compare(i, 10, "{lifelink,") == 0)
+                || (in.compare(i, 11, "{lifelink +") == 0)
+                || (in.compare(i, 19, "{their attacker's l") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -25232,7 +25459,9 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
                                       int bRemaining = -1,
                                       bool bGainConverted = false,
                                       string * outBlockTrigger = NULL,
-                                      bool * outBlockerDies = NULL)
+                                      bool * outBlockerDies = NULL,
+                                      string * outBlockerLifelink = NULL,
+                                      string * outAttackerLifelink = NULL)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
@@ -25389,19 +25618,30 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
                                                " much off you"
                                              : ", and your converter takes that"
                                                " much off them";
+            //#W57-B (D10): D13's residual. The blocking-trigger gain was
+            //un-nested and the LIFELINK gain - the same species, an own gain
+            //printed INSIDE the survival verdict - was left where it was.
+            //`126v123` seq 37: "B7. Vampire (1/1) [lifelink] - may block A1
+            //(your blocker dies, attacker lives (lifelink: you gain 1))". Same
+            //seam, same out-param shape: with the out-param NULL every existing
+            //caller renders byte-identically.
+            std::ostringstream body; //the clause WITHOUT its label
             if (b.doublestrike)
-                o << " (lifelink + double strike: " << who
-                  << " life in BOTH damage steps - total not computed here"
-                  << (bGainConverted ? conv : "") << ")";
+                body << who << " life in BOTH damage steps - total not computed here"
+                     << (bGainConverted ? conv : "");
             else
             {
-                o << " (lifelink: " << who << " " << bp;
+                body << who << " " << bp;
                 if (bGainConverted)
-                    o << (attackerSeat ? ", and their converter takes "
-                                       : ", and your converter takes ")
-                      << bp << (attackerSeat ? " off you" : " off them");
-                o << ")";
+                    body << (attackerSeat ? ", and their converter takes "
+                                          : ", and your converter takes ")
+                         << bp << (attackerSeat ? " off you" : " off them");
             }
+            const char * label = b.doublestrike ? "lifelink + double strike" : "lifelink";
+            if (outBlockerLifelink)
+                *outBlockerLifelink = string(label) + ", this block: " + body.str();
+            else
+                o << " (" << label << ": " << body.str() << ")";
         }
         if (aDeals)
         {
@@ -25423,18 +25663,28 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
             const bool noFace = (trampleThrough <= 0 || preventAtoFace == kPreventFull);
             const bool someFace = (trampleThrough > 0 && preventAtoFace == kPreventNone);
             const char * whoseLife = attackerSeat ? " their life" : " your life";
+            //#W57-B (D10): nine of the ten residual nested B-line gains are
+            //this one - the ATTACKER's lifelink, a THEIR gain reported inside
+            //the seat's own survival verdict (`126v152` s7/s11, `123v126`
+            //s57/s65/s92, `162v152` s8, `146v126` s20). Same out-param shape as
+            //the own-gain half above; NULL renders byte-identically.
+            std::ostringstream body;
             if (a.doublestrike)
-                o << " (lifelink + double strike: " << who
-                  << " life in BOTH damage steps of this block - total not"
-                     " computed here";
+                body << who << " life in BOTH damage steps of this block - total not"
+                        " computed here";
             else
-                o << " (lifelink: " << who << " " << ap << " from this block only";
+                body << who << " " << ap << " from this block only";
             if (noFace)
-                o << ", and this attacker deals nothing to" << whoseLife;
+                body << ", and this attacker deals nothing to" << whoseLife;
             else if (someFace)
-                o << " - that number already counts the damage it tramples"
-                     " through";
-            o << ")";
+                body << " - that number already counts the damage it tramples"
+                        " through";
+            const char * label = a.doublestrike ? "lifelink + double strike" : "lifelink";
+            if (outAttackerLifelink)
+                *outAttackerLifelink = string("their attacker's ") + label
+                                       + ", this block: " + body.str();
+            else
+                o << " (" << label << ": " << body.str() << ")";
         }
     }
     //#W45-3: the block itself moves life. Unlike lifelink, trample and the
@@ -25638,8 +25888,47 @@ static string afterCombatBlockerCostText(int availableBlockers)
     return o.str();
 }
 
+//#W57-B (D22, wave-56 ledger MED): the per-row `{blocking trigger, this
+//combat: ...}` clause (45 rows at deck126) renders BESIDE the 1-on-1 verdict
+//`(your blocker dies, attacker lives)`, whose plain meaning is "don't".
+//`126v146` seq 37: the seat read the death half, answered `no blockers`,
+//forfeited 2 damage stopped + 2 life + 2 off their total, and lost that game at
+//-10 against 10. The per-row clause stays; the TOTAL is the number the decision
+//turns on, and this render lifts totals onto headers everywhere else
+//(`INCOMING THIS COMBAT` is the same device). Pure over the counts.
+//`uniform` = every triggered blocker carries the same (sure, may) pair, which
+//is what licenses the distributive "each of your N". `totalGain` is the whole
+//window's ceiling, so it is always voiced as "up to": how many of them block
+//is the reader's own choice, and a "may" gain is theirs too.
+static string blockingTriggerTotalLine(int triggered, int sure, int may, bool uniform,
+                                       int totalGain, bool converter, int oppLife)
+{
+    if (triggered <= 0 || totalGain <= 0)
+        return "";
+    std::ostringstream o;
+    o << "BLOCKING THIS COMBAT: ";
+    if (uniform)
+    {
+        o << "each of your " << triggered << " blocker" << (triggered == 1 ? "" : "s")
+          << " that blocks gains you " << sure;
+        if (may > 0)
+            o << " and may gain " << may << " more";
+    }
+    else
+        o << "your " << triggered << " blockers with a blocking trigger gain you up to "
+          << totalGain << " in total";
+    if (converter)
+        o << ", and your converter takes that much off them - up to " << totalGain
+          << " off their " << oppLife;
+    else
+        o << " - up to " << totalGain << " life for you";
+    return o.str();
+}
+
 static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocker, MTGCardInstance * attacker,
-                                 string * outBlockTrigger = NULL, bool * outBlockerDies = NULL)
+                                 string * outBlockTrigger = NULL, bool * outBlockerDies = NULL,
+                                 string * outBlockerLifelink = NULL,
+                                 string * outAttackerLifelink = NULL) //#W57-B (D10)
 {
     //#W54-M (A22): stats and the converter scan come from the window memo
     return combatTradePreviewStats(cw.statOf(blocker), cw.statOf(attacker),
@@ -25648,7 +25937,8 @@ static string combatBlockOutcome(CombatWindowCache& cw, MTGCardInstance * blocke
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
                                    false, blocker->life,
                                    cw.converterOf(blocker->controller()),
-                                   outBlockTrigger, outBlockerDies); //#W56-B (D13)
+                                   outBlockTrigger, outBlockerDies, //#W56-B (D13)
+                                   outBlockerLifelink, outAttackerLifelink); //#W57-B (D10)
 }
 
 //W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
@@ -27531,6 +27821,37 @@ int AIPlayerGPT::chooseBlockers()
         tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming,
                                      opponent() ? opponent()->life : life);
     }
+    //#W57-B (D22): and the OTHER total this window turns on - what the seat
+    //gains, and (under a converter of its own) takes off them, simply for
+    //declaring blocks. Read off the same blockTriggeredLifeFor() the per-row
+    //`{blocking trigger, this combat:}` clause reads, so the header and the
+    //rows beneath it can never disagree.
+    {
+        int triggered = 0, totalGain = 0, firstSure = 0, firstMay = 0;
+        bool uniform = true;
+        for (size_t i = 0; i < blockers.size(); i++)
+        {
+            int sure = 0, may = 0;
+            blockTriggeredLifeFor(blockers[i], sure, may);
+            if (sure <= 0 && may <= 0)
+                continue;
+            if (triggered == 0)
+            {
+                firstSure = sure;
+                firstMay = may;
+            }
+            else if (sure != firstSure || may != firstMay)
+                uniform = false;
+            triggered++;
+            totalGain += sure + may;
+        }
+        const string bt = blockingTriggerTotalLine(triggered, firstSure, firstMay, uniform,
+                                                   totalGain,
+                                                   playerHasLifeToDamageConverter(this),
+                                                   opponent() ? opponent()->life : 0);
+        if (!bt.empty())
+            tail << bt << "\n";
+    }
     //Capture each presented combat option line (attacker context + blocker
     //options WITH their trade annotations) for the translog: combat records
     //logged options_text EMPTY, which blocked wave-19's validation of the
@@ -27827,6 +28148,7 @@ int AIPlayerGPT::chooseBlockers()
                     std::ostringstream pn;
                     string blockTrigger; //#W56-B (D13)
                     bool blockerDies = false; //#W56-B (D13)
+                    string ownLifelink, theirLifelink; //#W57-B (D10)
                     mbLabels.push_back((int) (k + 1));
                     //The computed trade rides the B#:A# pairing so there is
                     //nothing left to re-derive (block-outcome annotation).
@@ -27858,7 +28180,8 @@ int AIPlayerGPT::chooseBlockers()
                                                         combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()),
                                                         false, blockers[i]->life,
                                                         cw.converterOf(blockers[i]->controller()),
-                                                        &blockTrigger, &blockerDies); //#W56-B (D13)
+                                                        &blockTrigger, &blockerDies, //#W56-B (D13)
+                                                        &ownLifelink, &theirLifelink); //#W57-B (D10)
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -27872,7 +28195,8 @@ int AIPlayerGPT::chooseBlockers()
                         //#W56-B (D13): same call, with the gain and the death
                         //taken OUT of the verdict string.
                         trade = combatBlockOutcome(cw, blockers[i], attackers[k],
-                                                   &blockTrigger, &blockerDies);
+                                                   &blockTrigger, &blockerDies,
+                                                   &ownLifelink, &theirLifelink); //#W57-B (D10)
                         if (bbKind[k] == 2 && !trade.empty())
                             trade += " - PLUS its becomes-blocked trigger, NOT"
                                      " included here: read its text";
@@ -27884,6 +28208,12 @@ int AIPlayerGPT::chooseBlockers()
                     //body this seat stops owning - is stated in its own right.
                     if (!blockTrigger.empty())
                         pn << " {" << blockTrigger << "}";
+                    //#W57-B (D10): the two lifelink flavours, siblings of the
+                    //verdict for the same reason the blocking trigger is.
+                    if (!ownLifelink.empty())
+                        pn << " {" << ownLifelink << "}";
+                    if (!theirLifelink.empty())
+                        pn << " {" << theirLifelink << "}";
                     if (blockerDies)
                         pn << " {" << afterCombatBlockerCostText((int) blockers.size()) << "}";
                     mbParens.push_back(pn.str());
@@ -43885,6 +44215,220 @@ static const char * kW50Y_r94 =
                       == "Cast Damnation {4}{b}{b}",
                       "#W56-B D15 echo: the comparison is decision-time and stays out of history");
             }
+        }
+    }
+
+    // ==================== #W57-B (wave-56 ledger D6/D24/D22/D10) ====================
+    cout << "\n[#W57-B] combat surfaces: the incoming total on EVERY window of"
+            " their combat, the assignable remainder, the blocking-trigger"
+            " total on the header, and the last nested B-line gains\n";
+    {
+        // ---- D6: the three new forms + the form selector, walked over a whole
+        // combat. Phase ordinals are the engine's own GamePhase.
+        CHECK(incomingCombatForecastLine(3, 10, 13)
+              == "INCOMING THIS COMBAT: not declared yet - 3 of their creatures can attack,"
+                 " for up to 10 - you would be at 3",
+              "#W57-B D6 `125v146`'s ten power on the screen, priced before the declaration");
+        CHECK(incomingCombatForecastLine(3, 14, 13)
+              .find("you would be at -1; that would KILL you") != string::npos,
+              "#W57-B D6 the forecast finishes the subtraction and names the lethal case");
+        CHECK(incomingCombatForecastLine(3, 10, 13).find("KILL") == string::npos,
+              "#W57-B D6 NEGATIVE a survivable forecast carries no death claim");
+        CHECK(incomingCombatForecastLine(0, 0, 13).empty()
+              && incomingCombatForecastLine(2, 0, 13).empty(),
+              "#W57-B D6 NEGATIVE no attack-capable body, or no power, no forecast line");
+        CHECK(incomingCombatSettledLine(3, 11)
+              == "INCOMING THIS COMBAT: 3 attackers, 11 unblocked damage - already dealt or"
+                 " removed this combat",
+              "#W57-B D6 after the flags clear the combat's own total is re-rendered, past tense");
+        CHECK(incomingCombatSettledLine(3, 11).find("you would be at") == string::npos,
+              "#W57-B D6 NEGATIVE the settled form never re-states a subtraction that already happened");
+        CHECK(incomingCombatSettledLine(0, 0).empty(),
+              "#W57-B D6 NEGATIVE nothing latched, nothing re-rendered");
+        CHECK(string(kNoAttackThisCombatLine)
+              == "INCOMING THIS COMBAT: they declared no attackers - no combat damage is"
+                 " coming at you this combat",
+              "#W57-B D6 the declaration can also CLOSE with nothing, and that is a fact too");
+        {
+            // the whole combat, in order, for a seat facing a 3-body board that
+            // declares 2 attackers on turn 7. latch < 0 until the declaration.
+            const int T = 7;
+            int latch = -1;
+            bool ok = true;
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATBEGIN, 0, latch, T, 3) == 3;
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATATTACKERS, 0, latch, T, 3) == 3;
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATATTACKERS, 2, latch, T, 3) == 1;
+            latch = T; //the declared form latches the total
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATBLOCKERS, 2, latch, T, 3) == 1;
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATDAMAGE, 0, latch, T, 3) == 2;
+            ok = ok && incomingCombatForm(true, (int) MTG_PHASE_COMBATEND, 0, latch, T, 3) == 2;
+            CHECK(ok, "#W57-B D6 every window of their combat carries a form - none is 0");
+            CHECK(incomingCombatForm(true, (int) MTG_PHASE_COMBATEND, 0, T, T + 2, 3) == 4,
+                  "#W57-B D6 a latch from an EARLIER turn is never re-rendered as this combat's total");
+            CHECK(incomingCombatForm(true, (int) MTG_PHASE_COMBATBLOCKERS, 0, -1, T, 3) == 4
+                  && incomingCombatForm(true, (int) MTG_PHASE_COMBATEND, 0, -1, T, 0) == 4,
+                  "#W57-B D6 past the declaration with nothing declared, the window says so");
+        }
+        CHECK(incomingCombatForm(false, (int) MTG_PHASE_COMBATBLOCKERS, 3, 7, 7, 3) == 0,
+              "#W57-B D6 NEGATIVE nothing is claimed about the seat's OWN combat");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_FIRSTMAIN, 3, 7, 7, 3) == 0
+              && incomingCombatForm(true, (int) MTG_PHASE_SECONDMAIN, 0, 7, 7, 3) == 0
+              && incomingCombatForm(true, (int) MTG_PHASE_UPKEEP, 0, -1, 7, 3) == 0,
+              "#W57-B D6 NEGATIVE the line stays inside their combat - no main-phase or upkeep window");
+
+        // ---- D24: the assignable remainder. `123v152` seq 23.
+        {
+            // 4 attackers for 16; 2 of them (10) unblockable; one blocker whose
+            // only legal assignment removes 3.
+            vector<int> dmg;
+            dmg.push_back(3); dmg.push_back(3); dmg.push_back(6); dmg.push_back(4);
+            vector<vector<char> > can(1, vector<char>(4, 0));
+            can[0][0] = 1; //the one blocker, legal on the 3-power attacker only
+            CHECK(assignableRemainderDamage(dmg, can) == 13,
+                  "#W57-B D24 seq 23's board: 16 incoming, one legal block worth 3, 13 still lands");
+            CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, true)
+                  == "INCOMING THIS COMBAT: 4 attackers, 16 unblocked damage - you would be at -8;"
+                     " this KILLS you (of that, 10 from 2 attackers none of your creatures can"
+                     " block) - best case with every blocker assigned: you would be at -5",
+                  "#W57-B D24 the seat no longer has to do the subtraction the header raises");
+            CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
+                  .find("- one legal assignment gets you to -5") != string::npos,
+                  "#W57-B D24 with a trampler or a menace attacker in the total the claim drops to achievable");
+            CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false).find("best case") == string::npos,
+                  "#W57-B D24 NEGATIVE no optimality is claimed where the matching cannot prove it");
+            CHECK(incomingCombatLine(3, 11, 10, false, 0, 0, 5, true)
+                  == "INCOMING THIS COMBAT: 3 attackers, 11 unblocked damage - you would be at -1;"
+                     " this KILLS you",
+                  "#W57-B D24 NEGATIVE the creatureless seat has no assignment to price");
+            CHECK(incomingCombatLine(3, 11, 10, true, 0, 0)
+                  == "INCOMING THIS COMBAT: 3 attackers, 11 unblocked damage - you would be at -1;"
+                     " this KILLS you (your creatures may legally block every attacker in that total)",
+                  "#W57-B D24 NEGATIVE the wave-56 call with no remainder supplied is byte-identical");
+        }
+        {
+            // the matching itself: two blockers, three attackers, and a
+            // legality map where the greedy must AUGMENT to reach the optimum
+            // (the 7 and the 5 share the only blocker that can take the 7).
+            vector<int> dmg;
+            dmg.push_back(7); dmg.push_back(5); dmg.push_back(2);
+            vector<vector<char> > can(2, vector<char>(3, 0));
+            can[0][0] = 1; can[0][1] = 1; //B1 may block A1 or A2
+            can[1][1] = 1;                //B2 may block A2 only
+            CHECK(assignableRemainderDamage(dmg, can) == 2,
+                  "#W57-B D24 the augmenting path finds 7+5 prevented, not the greedy-first 7 alone");
+            vector<vector<char> > none(2, vector<char>(3, 0));
+            CHECK(assignableRemainderDamage(dmg, none) == -1,
+                  "#W57-B D24 NEGATIVE no legal pairing at all yields no number, not a zero");
+            vector<int> zero(3, 0);
+            CHECK(assignableRemainderDamage(zero, can) == 0,
+                  "#W57-B D24 an all-unpriceable set (every attacker tramples) prevents nothing");
+            CHECK(assignableRemainderDamage(vector<int>(), can) == -1
+                  && assignableRemainderDamage(dmg, vector<vector<char> >()) == -1,
+                  "#W57-B D24 NEGATIVE empty either side yields no number");
+            {
+                vector<vector<char> > wide(2, vector<char>(3, 1));
+                CHECK(assignableRemainderDamage(dmg, wide) == 2,
+                      "#W57-B D24 two blockers against three attackers stop the two biggest");
+            }
+        }
+
+        // ---- D22: the blocking-trigger TOTAL, on the header. `126v146` seq 37.
+        CHECK(blockingTriggerTotalLine(3, 2, 0, true, 6, true, 10)
+              == "BLOCKING THIS COMBAT: each of your 3 blockers that blocks gains you 2,"
+                 " and your converter takes that much off them - up to 6 off their 10",
+              "#W57-B D22 the total the seat declined at -10 against 10, lifted onto the header");
+        CHECK(blockingTriggerTotalLine(1, 2, 0, true, 2, true, 10)
+              .find("each of your 1 blocker that blocks") != string::npos,
+              "#W57-B D22 the singular agrees");
+        CHECK(blockingTriggerTotalLine(2, 2, 2, true, 8, true, 10)
+              == "BLOCKING THIS COMBAT: each of your 2 blockers that blocks gains you 2 and may"
+                 " gain 2 more, and your converter takes that much off them - up to 8 off their 10",
+              "#W57-B D22 the script's own may-half is kept apart from the certain half");
+        CHECK(blockingTriggerTotalLine(3, 2, 0, true, 6, false, 10)
+              == "BLOCKING THIS COMBAT: each of your 3 blockers that blocks gains you 2"
+                 " - up to 6 life for you",
+              "#W57-B D22 with no converter of the seat's the total is life only");
+        CHECK(blockingTriggerTotalLine(3, 0, 0, false, 7, true, 10)
+              == "BLOCKING THIS COMBAT: your 3 blockers with a blocking trigger gain you up to 7"
+                 " in total, and your converter takes that much off them - up to 7 off their 10",
+              "#W57-B D22 blockers with DIFFERENT triggers get the total, never a false 'each'");
+        CHECK(blockingTriggerTotalLine(3, 2, 0, true, 6, false, 10).find("off their") == string::npos,
+              "#W57-B D22 NEGATIVE no drain is claimed without a converter");
+        CHECK(blockingTriggerTotalLine(0, 0, 0, true, 0, true, 10).empty()
+              && blockingTriggerTotalLine(2, 0, 0, true, 0, true, 10).empty(),
+              "#W57-B D22 NEGATIVE no triggered blocker, or no gain, no header line");
+        CHECK(blockingTriggerTotalLine(3, 2, 0, true, 6, true, 10).find('{') == string::npos
+              && blockingTriggerTotalLine(3, 2, 0, true, 6, true, 10).find('[') == string::npos,
+              "#W57-B D22 NEGATIVE the header is a window fact, not a row annotation");
+
+        // ---- D10: D13's residual - both lifelink flavours leave the verdict.
+        {
+            CombatTradeStat vamp = CombatTradeStat(); //`126v123` seq 37's B7
+            vamp.power = 1; vamp.toughness = 1; vamp.lifelink = true;
+            CombatTradeStat big = CombatTradeStat();
+            big.power = 3; big.toughness = 3;
+            const string nested = combatTradePreviewStats(vamp, big);
+            CHECK(nested == "your blocker dies, attacker lives (lifelink: you gain 1)",
+                  "#W57-B D10 the default form is byte-identical to wave 56 - nothing else moves");
+            string own, theirs;
+            const string split = combatTradePreviewStats(vamp, big, kPreventNone, kPreventNone,
+                                                         kPreventNone, false, -1, false,
+                                                         NULL, NULL, &own, &theirs);
+            CHECK(split == "your blocker dies, attacker lives",
+                  "#W57-B D10 seq 37's OWN gain is no longer nested inside the survival verdict");
+            CHECK(own == "lifelink, this block: you gain 1",
+                  "#W57-B D10 it comes back as its own annotation, scoped to this block");
+            CHECK(theirs.empty(),
+                  "#W57-B D10 NEGATIVE a plain attacker yields no attacker-lifelink annotation");
+            CHECK(split.find("lifelink") == string::npos,
+                  "#W57-B D10 NEGATIVE no gain of any flavour is left inside the routed verdict");
+        }
+        {
+            CombatTradeStat wall = CombatTradeStat(); //the nine ATTACKER-lifelink residuals
+            wall.power = 0; wall.toughness = 4;
+            CombatTradeStat lifer = CombatTradeStat();
+            lifer.power = 3; lifer.toughness = 3; lifer.lifelink = true;
+            const string nested = combatTradePreviewStats(wall, lifer);
+            CHECK(nested.find("(lifelink: they gain 3 from this block only, and this attacker"
+                              " deals nothing to your life)") != string::npos,
+                  "#W57-B D10 the default form is byte-identical to wave 56");
+            string own, theirs;
+            const string split = combatTradePreviewStats(wall, lifer, kPreventNone, kPreventNone,
+                                                         kPreventNone, false, -1, false,
+                                                         NULL, NULL, &own, &theirs);
+            CHECK(theirs == "their attacker's lifelink, this block: they gain 3 from this block"
+                            " only, and this attacker deals nothing to your life",
+                  "#W57-B D10 the attacker's gain is voiced as THEIRS and sits outside the verdict");
+            CHECK(own.empty() && split.find("lifelink") == string::npos,
+                  "#W57-B D10 NEGATIVE nothing of the seat's own is claimed, and the verdict is clean");
+            CombatTradeStat dblLifer = CombatTradeStat();
+            dblLifer.power = 3; dblLifer.toughness = 3;
+            dblLifer.lifelink = true; dblLifer.doublestrike = true; dblLifer.firststrike = true;
+            string own2, theirs2;
+            combatTradePreviewStats(wall, dblLifer, kPreventNone, kPreventNone, kPreventNone,
+                                    false, -1, false, NULL, NULL, &own2, &theirs2);
+            CHECK(theirs2.find("their attacker's lifelink + double strike, this block:") == 0
+                  && theirs2.find("total not computed here") != string::npos,
+                  "#W57-B D10 a double striker still names the effect and withholds the number");
+        }
+        {
+            //echo shape: a B-line carrying the two new brace annotations parses
+            //to the same assignment, and neither reaches history.
+            const string bline = "B7. Vampire (1/1) [lifelink] - may block A1 (your blocker dies,"
+                                 " attacker lives) {lifelink, this block: you gain 1}"
+                                 " {their attacker's lifelink, this block: they gain 3 from this"
+                                 " block only, and this attacker deals nothing to your life}";
+            vector<int> outB;
+            CHECK(parseBlockAssignments("BLOCKS: B1:A1", 1, 1, outB) == 1
+                  && !outB.empty() && outB[0] == 1,
+                  "#W57-B D10 echo: the assignment the annotated B-line offers still parses");
+            CHECK(stripNarrationDecoration(bline)
+                  == "B7. Vampire (1/1) - may block A1 (your blocker dies, attacker lives)",
+                  "#W57-B D10 echo: both un-nested gains are decision-time and stay out of history");
+            CHECK(stripNarrationDecoration("BLOCKING THIS COMBAT: each of your 3 blockers that"
+                                           " blocks gains you 2")
+                  == "BLOCKING THIS COMBAT: each of your 3 blockers that blocks gains you 2",
+                  "#W57-B D22 echo: the header is prose, not an annotation, and is left alone");
         }
     }
 

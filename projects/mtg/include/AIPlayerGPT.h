@@ -1072,6 +1072,14 @@ private:
     //part of an ask key - see declinedListNote).
     std::map<size_t, int> mListDeclineCount; //#W54-M (L6): keyed by std::hash of the joined rows
     int mListDeclineTurn;
+    //#W57-B (D6): the opponent's declared attack, latched for the combat it
+    //belongs to. The engine's `attacker` flag is false before the declaration
+    //and clears once combat is over, so without this the incoming total is
+    //absent from most of the windows during their combat. mIncomingCombatTurn
+    //< 0 = no latch; it is only ever read for the turn it was written on.
+    int mIncomingCombatTurn;
+    int mIncomingCombatAttackers;
+    int mIncomingCombatDamage;
     //#W53-N (D12a): when the carried plan was last WRITTEN by the model -
     //the translog seq (= window) and the turn. mPlanSetSeq < 0 = no plan.
     int mPlanSetSeq;
