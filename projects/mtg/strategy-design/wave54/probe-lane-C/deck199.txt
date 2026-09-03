@@ -1,0 +1,7 @@
+#NAME:W54-C probe targets
+#DESC:probe opponent for wave-54 lane C render items
+Grizzly Bears *4
+Shield Sphere *4
+Rorix Bladewing *2
+Forest *12
+Island *8
