@@ -1,0 +1,124 @@
+#W53-AA (owner Vita report 2026-09-02: "one of the quit to menu games was a
+#softlock"). An interrupt window that its AI owner never releases stops the
+#game outright and there is no way out: userRequestNextGamePhase refuses while
+#anything on the stack is NOT_RESOLVED, INTERRUPT_SECONDS is 0 by default so
+#ActionStack's own timer never runs, and DuelLayers::CheckUserInput reads and
+#DISCARDS every key from the other seat while `isInterrupting` names this one.
+#The player presses and literally nothing happens - no message, no advance.
+#
+#This fixture arms exactly that terminal state: p1 casts Hill Giant, p2 is
+#offered the response window (Shock + an untapped Mountain make it a real one),
+#takes it with `yes`, and then never ends the interruption. Every `next` after
+#that is a refused phase request - the owner holding his trigger.
+#
+#The trailing `eot` re-queues itself until CLEANUP, so the assert does not
+#depend on the driver's command cadence (40 ticks/command for the first test in
+#a scoped run, 6 in the full suite).
+#RED on base: the game never leaves Main phase 1 - Hill Giant sits unresolved on
+#the stack, every `next` is refused, and `eot` spins until the runaway cap
+#("==Test timed out (game never ended)=="). That is the softlock.
+#GREEN after: ActionStack::Update's stall floor releases the window (300 idle
+#ticks and 20 s of game time) with a stderr line, Hill Giant resolves and the
+#turn runs out (the trailing eot lands on the next untap).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain
+hand:Hill Giant
+manapool:{3}{R}
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[DO]
+Hill Giant
+yes
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Hill Giant
+hand:
+[PLAYER2]
+inplay:Mountain,Mountain
+hand:Shock
+[END]

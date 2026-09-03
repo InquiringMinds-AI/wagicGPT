@@ -1309,3 +1309,4 @@ w53_reveal_no_eligible_option_one.txt
 branching_evolution_doubles_one_counter.txt
 branching_evolution_doubles_two_counters.txt
 branching_evolution_opponent_creature_not_doubled.txt
+w53AA_ai_interrupt_window_stall.txt

@@ -966,6 +966,10 @@ ActionStack::ActionStack(GameObserver* game)
     for (int i = 0; i < 2; i++)
         interruptDecision[i] = NOT_DECIDED;
     askIfWishesToInterrupt = NULL;
+    mHoldOn = NULL;
+    mHoldWho = NULL;
+    mHoldTicks = 0;
+    mHoldSeconds = 0.0f;
     timer = -1;
     currentState = -1;
     mode = ACTIONSTACK_STANDARD;
@@ -1374,6 +1378,97 @@ void ActionStack::Update(float dt)
             timer -= dt;
             if (timer < 0)
                 cancelInterruptOffer();
+        }
+    }
+
+    //W53-AA - THE STALL FLOOR. An interrupt window held by a seat that never
+    //answers stops the whole game: userRequestNextGamePhase refuses while
+    //anything is NOT_RESOLVED, INTERRUPT_SECONDS is 0 by default (the timer
+    //above never runs), and DuelLayers::CheckUserInput reads-and-discards
+    //every human key while `isInterrupting` names the other seat - so the
+    //player presses and nothing at all happens, with no message. That is the
+    //owner's Vita softlock shape (2026-09-02, deck5 vs baka deck33: The Rack's
+    //upkeep trigger on the stack at the human's own upkeep, isInterrupting=p2,
+    //stackUnresolved=1, every recorded phase request refused from there on).
+    //
+    //Progress is defined narrowly: a DIFFERENT holder, a DIFFERENT top stack
+    //object, or an explicit extendInterruptOffer (the LLM seat's "still
+    //thinking" signal) all reset the count. Nothing else does - a genuine
+    //wedge changes none of them. Only AI-owned windows are watched: a human's
+    //own window is bounded by their own input, which the key road accepts
+    //(ActionStack::CheckUserInput / MTGGamePhase), and yanking it would steal
+    //a response they are in the middle of making.
+    //
+    //While the game is LOADING (a transcript replay or an undo) the threshold
+    //is tiny: DuelLayers::Update does not call Act() at all in that state, so
+    //NO seat can answer a window the record does not contain, and the replay
+    //stops dead exactly where a live softlock would - which blinds the
+    //transcript tool at the one moment it is needed. A recorded answer always
+    //arrives inside the load loop's next re-issue (6 updates per attempt), so
+    //12 ticks cannot pre-empt one.
+    {
+        Interruptible * top = getNext(NULL, 0, NOT_RESOLVED);
+        Player * holder = askIfWishesToInterrupt ? askIfWishesToInterrupt : observer->isInterrupting;
+        const bool loading = observer->isLoading();
+        if (!top || !holder || (!loading && !holder->isAI()))
+        {
+            mHoldOn = NULL;
+            mHoldWho = NULL;
+            mHoldTicks = 0;
+            mHoldSeconds = 0.0f;
+        }
+        else
+        {
+            if (top != mHoldOn || holder != mHoldWho)
+            {
+                mHoldOn = top;
+                mHoldWho = holder;
+                mHoldTicks = 0;
+                mHoldSeconds = 0.0f;
+            }
+            else
+            {
+                ++mHoldTicks;
+                mHoldSeconds += dt;
+            }
+            //Budgets, in BOTH ticks and elapsed game seconds, so neither a
+            //slow frame rate nor a fast headless pump can trip it early.
+            //Loading: 12 ticks only - dt is a synthetic counter inside the
+            //load loop, and see above for why 12 cannot pre-empt a recorded
+            //answer. An INTERACTIVE AI (the LLM seat with a live endpoint)
+            //legitimately holds a window for as long as its model takes, and
+            //once it has TAKEN the window extendInterruptOffer no longer
+            //reaches it - so its budget sits past the whole request timeout.
+            //The heuristic seat answers within a tick or two of its own
+            //throttle; 20 s is orders of magnitude of slack and still
+            //recovers the game while the player is still looking at it.
+            const bool spent = loading
+                ? (mHoldTicks >= 12)
+                : (mHoldTicks >= 300 && mHoldSeconds >= (holder->isInteractiveAI() ? 1200.0f : 20.0f));
+            if (spent)
+            {
+                const string who = holder->getDisplayName();
+                const string what = top->getDisplayName();
+                DebugTrace("ActionStack: interrupt window held by " << who << " on '" << what
+                           << "' for " << mHoldTicks << " ticks with no progress - releasing"
+                           << (loading ? " (loading: no seat can answer)" : ""));
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_TRANSCRIPT_ON)
+                fprintf(stderr, "wagic: interrupt window held by %s on '%s' for %d ticks"
+                                " (turn %d phase %d%s) - releasing so the game advances\n",
+                        who.c_str(), what.c_str(), mHoldTicks, observer->turn,
+                        (int) observer->getCurrentGamePhase(), loading ? ", loading" : "");
+                fflush(stderr);
+#endif
+                //The codebase's own decline: DONT_INTERRUPT for this seat,
+                //unlogged so a replay's action list is not rewritten by the
+                //recovery. isInterrupting is set in both the "asked" and the
+                //"took it" state, which is what cancelInterruptOffer keys on.
+                cancelInterruptOffer(DONT_INTERRUPT, false);
+                mHoldOn = NULL;
+                mHoldWho = NULL;
+                mHoldTicks = 0;
+                mHoldSeconds = 0.0f;
+            }
         }
     }
 }

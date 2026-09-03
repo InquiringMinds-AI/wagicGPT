@@ -237,8 +237,29 @@ public:
     {
         if (askIfWishesToInterrupt == who && timer >= 0 && timer < seconds)
             timer = seconds;
+        //The stall watchdog must not count an asynchronous decision maker's
+        //thinking time as a wedge: every tick it keeps its window alive is
+        //progress.
+        if (askIfWishesToInterrupt == who)
+        {
+            mHoldTicks = 0;
+            mHoldSeconds = 0.0f;
+        }
     }
     Interruptible * getLatest(int state);
+    //W53-AA (owner Vita softlock, 2026-09-02): an interrupt window owned by
+    //an AI seat has NO escape hatch. DuelLayers::CheckUserInput drops every
+    //human key while `isInterrupting` names the other seat, INTERRUPT_SECONDS
+    //defaults to 0 ("wait forever"), and userRequestNextGamePhase refuses on
+    //anything NOT_RESOLVED - so if the AI's Act ever stops answering, the
+    //human's game stops dead with no message and no way out but the menu.
+    //These three fields bound that: the same holder sitting on the same stack
+    //object for mHoldTicks consecutive ActionStack updates with no progress is
+    //a wedge, and Update releases it (loudly) instead of hanging the game.
+    Interruptible * mHoldOn;
+    Player * mHoldWho;
+    int mHoldTicks;
+    float mHoldSeconds;
     //The stack object the current priority round refers to. When the top
     //of the stack changes (new spell/trigger/phase item), decisions reset
     //and one tick passes before anyone can pass or anything resolves -
