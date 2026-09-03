@@ -1265,6 +1265,29 @@ static string edictAlreadyOnStackClause(bool alreadyAimed)
            " this one would find their next-highest";
 }
 
+//#W57-C (D11, wave-56 ledger MED): the SAME defect one branch over. The plain
+//edict (`notaTarget(creature|mybattlefield) ... targetedplayer` - Tribute to
+//Hunger, Devour Flesh) names its victim whenever the opponent controls exactly
+//one creature, and that forecast was computed off the BATTLEFIELD with no look
+//at the stack. `126v146` seq 19 rendered `they control 1 creature -
+//Silverquill Silencer (3/2) is sacrificed, you gain 2` while the prompt's own
+//stack section, forty lines above, listed the seat's FIRST Tribute already
+//aimed at that same creature. Both statements were true of that instant and
+//misleading together; the seat spent its second copy for nothing, and in the
+//game where it burned both on one creature it had none left for a nine-attacker
+//board. Same shape at `126v130` s29 and `126v125` s262 (3 of 3).
+//The clause is a CONDITIONAL, not a claim that the removal has happened: the
+//stack object may still be countered or fizzle. Nothing is capped and no row is
+//withheld - the row gains the fact the forecast was missing. Pure over a bool.
+static string edictOnlyVictimOnStackClause(bool alreadyAimed)
+{
+    if (!alreadyAimed)
+        return "";
+    return " - but an effect already on the stack is aimed at that same creature;"
+           " if it is gone when this resolves they control 0 creatures and this"
+           " does nothing";
+}
+
 //#W51-D (D10): the Soul Shatter class - "each opponent sacrifices a creature
 //or planeswalker with the highest mana value" (Soul Shatter, Flare of Malice,
 //Riveteers Charm's first mode; scripts fixed in 42f2eff2b as
@@ -1609,10 +1632,21 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
                                 ? myOnly->getDisplayName() + instanceHandle(myOnly) : string(),
                             myOnly ? myOnly->toughness : 0, targetGains);
         }
+        //#W57-C (D11): at N == 1 the victim is DETERMINED, so the stack can be
+        //asked about it exactly as the highest-MV branch above asks about its
+        //tied tops. At N > 1 the row says "they choose which one" and names no
+        //victim, so there is nothing for the stack to contradict.
+        string stackTail;
+        if (theirs == 1 && only)
+        {
+            vector<MTGCardInstance *> victim;
+            victim.push_back(only);
+            stackTail = edictOnlyVictimOnStackClause(edictVictimAlreadyOnStack(card, victim));
+        }
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
                            targetGains, facts, convName, convTakes, myLife)
-             + selfClause;
+             + stackTail + selfClause;
     }
     if (sweepVerb)
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live);
@@ -13773,6 +13807,61 @@ static string converterSituationLine(Player * me, Player * opp)
     return converterSummaryText(mineConv, theirsConv, mineMir, theirsMir);
 }
 
+//#W57-C (D7, wave-56 ledger HIGH, fourth corpus / three games): every converter
+//fact this engine renders lived in the PARAGRAPH above (converterSituationLine),
+//and the wave-56 corpus is the fourth in which a rule enforced by a paragraph
+//broke while every rule enforced by a NUMBER ON THE ROW held. `125v126` seq 254
+//(turn 55, 37 life against 2) offered `Cast Emrakul, the Aeons Torn {15} (15/15)`
+//carrying a mana clause and card text and nothing else, on a menu whose OTHER
+//rows carried eleven enumerated removal targets and a full X pricing block, with
+//`LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond #1,
+//Sanguine Bond #2` forty lines above it. The seat took the row; they turned the
+//body into life of their own and 37 became -8 in one turn.
+//The scan is the OPPONENT's half of converterSituationLine's own scan, so the
+//row and the paragraph cannot disagree about who controls what.
+static void theirConverterScan(Player * opp, std::vector<std::string>& names)
+{
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (c && lifeToDamageConverterScript(c->magicText))
+            names.push_back(c->name + instanceHandle(c));
+    }
+}
+
+//The row tag. What it states is exactly what the converter GUARANTEES and no
+//more: N converters of theirs multiply any life they gain by N off the seat's
+//own total, and this body's toughness is the size of the gain that the standard
+//sacrifice-for-toughness effect hands them. It is written as a conditional
+//("an effect of theirs that gains them life equal to its toughness") because the
+//engine cannot see their hand - asserting the effect exists would be a wrong-
+//scope claim. No cast is capped and no row is removed: the row gains the
+//subtraction the paragraph above left for the pilot to do. Pure over
+//(toughness, names, life), so every branch is provable without a board.
+string theirConverterBodyTag(int toughness, const std::vector<std::string>& theirConverters,
+                             int myLife)
+{
+    if (toughness <= 0 || theirConverters.empty())
+        return "";
+    const int n = (int) theirConverters.size();
+    const int off = toughness * n;
+    std::ostringstream o;
+    o << " {their converter: this body has toughness " << toughness << " and they control "
+      << n << " life-to-damage converter" << (n == 1 ? "" : "s") << " (";
+    for (int i = 0; i < n; i++)
+        o << (i ? ", " : "") << theirConverters[i];
+    o << ") - any effect of theirs that gains them life equal to its toughness (a"
+         " sacrifice-for-toughness edict, a drain of that size) takes " << off
+      << " off YOU: life " << myLife << " -> " << (myLife - off);
+    if (myLife - off <= 0)
+        o << "; that KILLS you";
+    o << "}";
+    return o.str();
+}
+
 //#W56-B (D6, wave-55 ledger MED = R229; skill #255): no window during the
 //OPPONENT's combat printed the incoming damage total. `125v146` seq 32 and
 //35-41 (turn 13, 10 life) listed three attackers with their live P/T - eleven
@@ -14897,6 +14986,14 @@ static string stripNarrationDecoration(const string& in)
                 //window's menu or of a block not yet declared, and says nothing
                 //that belongs in history.
                 || (in.compare(i, 20, "{same effect as row ") == 0)
+                //#W57-C: D7's converter price, D30's cross-card verdict match
+                //and D21's two replaced-path clauses are the same species -
+                //each is true of THIS window's board or of THIS window's menu,
+                //and none of them belongs in history.
+                || (in.compare(i, 18, "{their converter: ") == 0)
+                || (in.compare(i, 36, "{identical verdict right now to row ") == 0)
+                || (in.compare(i, 25, "{the cast this replaces: ") == 0)
+                || (in.compare(i, 16, "{the alternative") == 0)
                 || (in.compare(i, 31, "{blocking trigger, this combat:") == 0)
                 || (in.compare(i, 20, "{after this combat: ") == 0)
                 //#W57-B (D10): the two un-nested lifelink clauses are the same
@@ -16914,6 +17011,25 @@ static string rowVerdictClause(const string& row)
 //same non-empty verdict clause - the corpus shape, and the only pair for which
 //"same effect" is a fact rather than an inference. The tag goes on the DEARER
 //row and points at the cheapest matching one. Pure over (rows, names, costs).
+//#W57-C (D30, wave-56 ledger LOW): the same window one card apart. `123v125`
+//seq 45 listed `Cast Devour Flesh {1}{b}` and `Cast Tribute to Hunger {2}{b}`
+//reading the byte-identical verdict `they control 0 creatures - at 0 this does
+//nothing`; D15's marker keys on the card NAME, so it saw two different cards
+//and said nothing (0 renders all corpus). The claim this tag makes is narrower
+//than D15's and is exactly what is provable: the two rows carry the SAME
+//rendered verdict on THIS board at two prices. It does not say the cards are
+//interchangeable. Pure.
+static string duplicateVerdictTag(int cheaperRow, const string& cheaperName, int lessMana)
+{
+    if (cheaperRow <= 0 || lessMana <= 0 || cheaperName.empty())
+        return "";
+    std::ostringstream o;
+    o << " {identical verdict right now to row " << cheaperRow << " (" << cheaperName
+      << "), which costs " << lessMana << " less mana - a different card, the same"
+         " priced outcome on this board}";
+    return o.str();
+}
+
 static void applyDuplicateEffectTags(std::vector<std::string>& rows,
                                      const std::vector<std::string>& names,
                                      const std::vector<int>& costs)
@@ -16926,21 +17042,75 @@ static void applyDuplicateEffectTags(std::vector<std::string>& rows,
         if (vi.empty())
             continue;
         int bestRow = -1, bestCost = 0;
+        int diffRow = -1, diffCost = 0; //#W57-C (D30): the cross-card match
         for (size_t j = 0; j < rows.size() && j < names.size() && j < costs.size(); j++)
         {
-            if (j == i || costs[j] < 0 || costs[j] >= costs[i] || names[j] != names[i])
+            if (j == i || costs[j] < 0 || costs[j] >= costs[i])
                 continue;
             if (rowVerdictClause(rows[j]) != vi)
                 continue;
-            if (bestRow < 0 || costs[j] < bestCost)
+            if (names[j] == names[i])
             {
-                bestRow = (int) j + 1;
-                bestCost = costs[j];
+                if (bestRow < 0 || costs[j] < bestCost)
+                {
+                    bestRow = (int) j + 1;
+                    bestCost = costs[j];
+                }
+            }
+            else if (diffRow < 0 || costs[j] < diffCost)
+            {
+                diffRow = (int) j + 1;
+                diffCost = costs[j];
             }
         }
+        //The same-card statement is the stronger one and wins the row: a second
+        //tag saying less about a third row would only dilute it.
         if (bestRow > 0)
             rows[i] += duplicateEffectTag(bestRow, costs[i] - bestCost);
+        else if (diffRow > 0)
+            rows[i] += duplicateVerdictTag(diffRow, names[diffRow - 1], costs[i] - diffCost);
     }
+}
+
+//#W57-C (D12, wave-56 ledger MED): the highest-frequency inference the prompt
+//asks for, and it is a multi-row scan. deck123 faced 85 all-dead casting menus
+//of 197 and performed the scan correctly 84 times (`123v125` s45 is the miss);
+//deck126 spent six casts in ONE game (`126v125` seqs 15, 30, 32, 46, 167, 215)
+//off menus whose only other Cast row was already dead by the engine's own
+//marker. The predicate is the ROW's own rendered verdict, never the card text
+//around it - a `{card text: "..."}` blob quoting "does nothing" must not make a
+//live row read as dead - and EVERY cast row must carry a verdict, so a menu
+//holding one unpriced row never fires. Pure over the rows.
+static bool everyCastRowDead(const std::vector<std::string>& rows)
+{
+    if (rows.empty())
+        return false;
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        const string v = rowVerdictClause(rows[i]);
+        if (v.empty() || !AIPlayerGPT::rowSaysNoOp(v))
+            return false;
+    }
+    return true;
+}
+
+//The header token itself. It is a HEADER TOKEN and not a removed window: the
+//rows all stay, the decline and hold rows stay, and the last sentence says so
+//explicitly - the seat may still cast any of them. Mirror of the menu-fit
+//clause, which works for the same reason (a menu-level fact stated once,
+//instead of an inference the pilot has to run over every row). Pure over a bool
+//and the count.
+static string allCastRowsDeadNote(bool allDead, int castRows)
+{
+    if (!allDead || castRows <= 0)
+        return "";
+    std::ostringstream o;
+    o << "\nNO LIVE CAST ROW ON THIS MENU: all " << castRows << " cast row"
+      << (castRows == 1 ? "" : "s") << " below carry a verdict computed from the board"
+         " that reads zero - not one of them changes a number on the board as it stands."
+         " Nothing is withheld and no row is capped: casting one is still legal and still"
+         " your choice, and the decline and hold rows are on the menu as always.";
+    return o.str();
 }
 
 static void applyMenuFitTags(std::vector<std::string>& rows, const std::vector<int>& uses,
@@ -22494,6 +22664,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << feedsRowTag(perTurn, variable, perCastFed, conv);
             }
         }
+        //#W57-C (D7): and, on a CREATURE row, what a converter of THEIRS turns
+        //this body into if they get life equal to its toughness out of it. The
+        //fact is on the prompt already, in a paragraph the pilot did not carry
+        //down to the row (the Emrakul-at-37-life game); this is that paragraph's
+        //arithmetic, finished, on the row where the decision is made.
+        if (card->isCreature())
+        {
+            std::vector<std::string> theirConv;
+            theirConverterScan(opponent(), theirConv);
+            o << theirConverterBodyTag(card->toughness, theirConv, life);
+        }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -22564,6 +22745,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //menu copy and for the same reason - a row cannot know its own number
         //until the suppression filter and any re-ask removal have settled.
         applyDuplicateEffectTags(menu, rowNames, rowCosts);
+        //#W57-C (D12): the menu-level verdict, taken over the CAST rows only -
+        //before the decline and hold rows join the list, since neither is a
+        //cast and neither carries a board verdict.
+        const string deadMenuNote = allCastRowsDeadNote(everyCastRowDead(menu), (int) menu.size());
         menu.push_back(castDeclineRow(observer->currentPlayer == this
                                       && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
         //#W53-N (D2, second half) + #W55-A (D2a/D19): the declined-list count,
@@ -22599,6 +22784,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         q << "Casting decision (" << observer->getCurrentGamePhaseName()
           << (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn")
           << "): which card do you cast now, if any?";
+        q << deadMenuNote; //#W57-C (D12)
         if (attempt > 0)
             q << "\n[RE-ASK " << attempt << "] The engine could not actually complete: "
               << rejectedSoFar << " - its cost or its targets cannot be satisfied right"
@@ -23394,6 +23580,59 @@ static string scriptCostGloss(const string& costTokens)
 //One row's annotation: its own cost, then its own printed text. Both halves
 //are optional (a free path prints no cost clause; a card with no printed text
 //for that path prints no quote) and the tag is empty when neither exists.
+//#W57-C (D21, wave-56 ledger MED): the cast-mode menu offers two MUTUALLY
+//EXCLUSIVE uses of one card and neither row said what the other one was worth.
+//`cycling with Lay Waste [cost: {2}, Cycle]` said nothing about the land kill it
+//spends; `130v125` seqs 52-73 sat the opponent at 2 life for seven turns with
+//four lands while the seat held 12-14 untapped sources and its whole menu was
+//`Cast Lay Waste` / `cycling with Lay Waste` / `Cast nothing` / hold - it took
+//the cycle once. 137 cycle windows at that seat, 16 taken; at `Opponent life:`
+//<= 6, 17 offered and 3 taken. Both directions are priced from facts the SAME
+//pass already computes for the other row, so no new evaluation and no new claim
+//is introduced - only the opportunity cost each row silently carried.
+//The tag on an ALTERNATIVE row: what casting the card normally would do instead.
+static string castModeCastPriceTag(const string& castCost, const string& castClause,
+                                   int legalTargets)
+{
+    if (castCost.empty() && castClause.empty())
+        return "";
+    std::ostringstream o;
+    o << " {the cast this replaces: ";
+    if (!castCost.empty())
+        o << "cost " << castCost;
+    if (!castClause.empty())
+        o << (castCost.empty() ? "" : " - ") << castClause;
+    if (legalTargets >= 0)
+        o << " (" << legalTargets << " legal target" << (legalTargets == 1 ? "" : "s")
+          << " on the board right now)";
+    o << "}";
+    return o.str();
+}
+
+//And the symmetric tag on the CAST row: the alternatives it spends. `draws` is
+//the card count the alternative's own script draws (0 prints nothing about
+//drawing rather than the false "draws 0" - a cycling-less alternative such as
+//an equip or a channel path genuinely draws nothing and must not read as dead).
+static string castModeAltPriceTag(const std::vector<std::string>& labels,
+                                  const std::vector<std::string>& costs,
+                                  const std::vector<int>& draws)
+{
+    if (labels.empty() || labels.size() != costs.size() || labels.size() != draws.size())
+        return "";
+    std::ostringstream o;
+    o << " {the alternative" << (labels.size() == 1 ? "" : "s") << " this replaces: ";
+    for (size_t i = 0; i < labels.size(); i++)
+    {
+        o << (i ? "; " : "") << labels[i];
+        if (!costs[i].empty())
+            o << " for " << costs[i];
+        if (draws[i] > 0)
+            o << " - draws " << draws[i] << " card" << (draws[i] == 1 ? "" : "s");
+    }
+    o << "}";
+    return o.str();
+}
+
 static string castModeRowTag(const string& costBody, const string& clause)
 {
     if (costBody.empty() && clause.empty())
@@ -23977,6 +24216,13 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         std::ostringstream pnames;
         for (size_t ni = 0; ni < theirsP.size(); ni++)
             pnames << (ni ? ", " : "") << theirsP[ni];
+        //#W57-C (D21): the facts each direction needs about the other, gathered
+        //in the pass that already computes them.
+        int castRowIdx = -1, castTargets = -1;
+        string castCostStr, castClauseStr;
+        vector<size_t> altIdx;
+        vector<string> altLabels, altCosts;
+        vector<int> altDraws;
         for (size_t i = 0; i < opts.size() && i < req.optionTexts.size(); i++)
         {
             const string& label = req.optionTexts[i];
@@ -23990,6 +24236,16 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 else if (ctx->getManaCost())
                     cost = ctx->getManaCost()->toString();
                 opts[i] += castModeRowTag(cost, printedFirstClause(ctx->text));
+                castRowIdx = (int) i; //#W57-C (D21)
+                castCostStr = cost;
+                castClauseStr = printedFirstClause(ctx->text);
+                {
+                    //The same chooser count every other row gets, so the cast
+                    //side of the comparison carries a NUMBER and not only prose.
+                    string spec = ctx->spellTargetType;
+                    if (!spec.empty() && toLowerCopy(spec).find("stack") == string::npos)
+                        castTargets = modalSpecObjectCount(observer, ctx, spec);
+                }
                 continue;
             }
             string costTokens = scriptAbilityCost(handScript, label);
@@ -24003,6 +24259,20 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             int cards = scriptAbilityDrawCount(handScript, label)
                         + scriptAbilityDrawCount(ctx->magicText, label);
             opts[i] += drawPriceRowTag(cards, theirsPer, pnames.str(), life); //#W54-C (D10)
+            altIdx.push_back(i); //#W57-C (D21)
+            altLabels.push_back(label);
+            altCosts.push_back(scriptCostGloss(costTokens));
+            altDraws.push_back(cards);
+        }
+        //#W57-C (D21): cross-price the two directions. Append-only, so the
+        //answer index and req.optionTexts (the staleness key) are unchanged.
+        {
+            const string castTag = castModeCastPriceTag(castCostStr, castClauseStr, castTargets);
+            if (!castTag.empty())
+                for (size_t k = 0; k < altIdx.size(); k++)
+                    opts[altIdx[k]] += castTag;
+            if (castRowIdx >= 0)
+                opts[castRowIdx] += castModeAltPriceTag(altLabels, altCosts, altDraws);
         }
     }
     //Dungeon room-BRANCH menu (deck146 N-146b): advancing WITHIN a dungeon offers
@@ -29528,6 +29798,52 @@ string discardDeadTargetClause(int legalTargets)
         return "";
     return " {dead right now: 0 legal targets on the board for it}";
 }
+//#W57-C (D8, wave-56 ledger HIGH, second wave at HIGH): 357 of 426 discard rows
+//carried no verdict, and the ASYMMETRY was the blocker, not the absence.
+//`123v130` seq 22 is a 14-row cleanup on a board where the opponent controls no
+//creature: the `Tragic Slip` rows read `{dead right now: 0 legal targets on the
+//board for it}` (they carry a target spec, so the clause above fires) while
+//`Tribute to Hunger`, `Devour Flesh` and `Damnation` on the SAME menu carried
+//nothing - an edict at N=0 and a Damnation at `destroys 0` are exactly as dead,
+//and the engine already computes both for the CAST menu in the same turn. While
+//two dead cards render differently no guide can teach "the unannotated row is
+//the keep".
+//So: run the cast row's own evaluator (dynamicMagnitudes) over the discard menu
+//and re-badge its output into ONE family - a verdict that reads zero prints under
+//the same `{dead right now: ...}` tag the target-count clause already uses, and a
+//verdict that states a real magnitude prints as `{right now: ...}`. rowSaysNoOp
+//is the engine's own zero-predicate, so the two surfaces cannot disagree about
+//what "dead" means. Pure over the rendered clause.
+string discardBoardVerdictTag(const string& rightNowClause)
+{
+    const string open = " {right now: ";
+    //size() <= open.size() + 1 rejects both a short string and an EMPTY payload
+    //(" {right now: }"): an empty verdict is not a verdict.
+    if (rightNowClause.size() <= open.size() + 1
+        || rightNowClause.compare(0, open.size(), open) != 0
+        || rightNowClause[rightNowClause.size() - 1] != '}')
+        return "";
+    if (!AIPlayerGPT::rowSaysNoOp(rightNowClause))
+        return rightNowClause;
+    return " {dead right now: " + rightNowClause.substr(open.size());
+}
+
+//The legend, printed only when at least one row carries a verdict. Its last
+//sentence is the load-bearing half: a bare row is a row this engine could not
+//price, NOT a row it priced as live. Without it the family rule the guide wants
+//to teach ("the unannotated row is the keep") would be a lie about every card
+//whose text the evaluator does not model. Pure over a bool.
+string discardVerdictLegend(bool anyVerdict)
+{
+    if (!anyVerdict)
+        return "";
+    return "Verdict tags above are computed from the board as it stands right now:"
+           " {dead right now: ...} means the card changes nothing on the board as it"
+           " stands, and {right now: ...} states what it would do. A row carrying"
+           " NEITHER tag is one this engine could not price here - that is not a"
+           " statement that the card is dead.\n";
+}
+
 string discardAlreadyControlClause(const string& onBattlefield)
 {
     if (onBattlefield.empty())
@@ -29574,6 +29890,7 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
             myBattlefieldNames.insert(bc->name);
     }
     vector<string> discardRows;
+    bool anyVerdict = false; //#W57-C (D8): does the legend below have anything to explain?
     for (size_t j = 0; j < hand.size(); j++)
     {
         int copies = 0;
@@ -29612,7 +29929,23 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
             {
                 int n = modalSpecObjectCount(observer, hand[j], spec);
                 if (n >= 0)
-                    row << discardDeadTargetClause(n);
+                {
+                    string dt = discardDeadTargetClause(n);
+                    if (!dt.empty())
+                    {
+                        row << dt;
+                        anyVerdict = true;
+                    }
+                }
+            }
+            //#W57-C (D8): and the cast row's own board evaluator, re-badged into
+            //the same family - this is the half that reaches the sweepers and
+            //the edicts, which is where the 357 bare rows are.
+            string bv = discardBoardVerdictTag(dynamicMagnitudes(hand[j]));
+            if (!bv.empty())
+            {
+                row << bv;
+                anyVerdict = true;
             }
         }
         discardRows.push_back(row.str());
@@ -29631,6 +29964,7 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         tail << joinNumberedRows(shownDiscard, &discardRanged);
         if (discardRanged)
             tail << kOptionRangeNote;
+        tail << discardVerdictLegend(anyVerdict); //#W57-C (D8)
         if (outOrder)
             *outOrder = discardOrder;
     }
@@ -44884,6 +45218,296 @@ static const char * kW50Y_r94 =
         CHECK(revealStallStructSecsFor(120000) == 1800
               && revealStallStructSecsFor(900000) == 2700,
               "#W56-C D12 REGRESSION the wall floor itself is unchanged");
+    }
+
+
+    cout << "\n[#W57-C] D7 the creature cast row under THEIR converter\n";
+    {
+        vector<string> one, two;
+        one.push_back("Sanguine Bond #1");
+        two.push_back("Sanguine Bond #1");
+        two.push_back("Sanguine Bond #2");
+        const string emrakul = theirConverterBodyTag(15, two, 37);
+        cout << "     D7 row: Cast Emrakul, the Aeons Torn {15} (15/15)" << emrakul << "\n";
+        CHECK(emrakul == " {their converter: this body has toughness 15 and they control 2"
+                         " life-to-damage converters (Sanguine Bond #1, Sanguine Bond #2) - any"
+                         " effect of theirs that gains them life equal to its toughness (a"
+                         " sacrifice-for-toughness edict, a drain of that size) takes 30 off YOU:"
+                         " life 37 -> 7}",
+              "#W57-C D7 the corpus row: two converters double the 15 and the subtraction is finished");
+        CHECK(theirConverterBodyTag(3, one, 10)
+              == " {their converter: this body has toughness 3 and they control 1"
+                 " life-to-damage converter (Sanguine Bond #1) - any effect of theirs that gains"
+                 " them life equal to its toughness (a sacrifice-for-toughness edict, a drain of"
+                 " that size) takes 3 off YOU: life 10 -> 7}",
+              "#W57-C D7 singular converter, singular arithmetic");
+        //the number is checked against the inputs, not merely present (skill #259)
+        for (int t = 1; t <= 12; t++)
+            for (int L = 1; L <= 30; L++)
+            {
+                std::ostringstream want;
+                want << "takes " << (t * 2) << " off YOU: life " << L << " -> " << (L - t * 2);
+                CHECK(theirConverterBodyTag(t, two, L).find(want.str()) != string::npos,
+                      "#W57-C D7 K == life - toughness*converters at every toughness and life");
+            }
+        CHECK(theirConverterBodyTag(4, two, 8).find("; that KILLS you") != string::npos
+              && theirConverterBodyTag(4, two, 9).find("KILLS") == string::npos,
+              "#W57-C D7 the lethal branch fires exactly at and past 0");
+        CHECK(theirConverterBodyTag(0, two, 20).empty(),
+              "#W57-C D7 NEGATIVE a 0-toughness body (a non-creature row) carries no tag");
+        CHECK(theirConverterBodyTag(15, vector<string>(), 37).empty(),
+              "#W57-C D7 NEGATIVE no converter of theirs on the battlefield, no tag");
+        CHECK(emrakul.find("do not cast") == string::npos
+              && emrakul.find("cannot") == string::npos
+              && emrakul.find("they will") == string::npos,
+              "#W57-C D7 NEGATIVE the tag states a conditional price; it never forbids the cast"
+              " and never asserts that they hold such an effect");
+        //echo shape: the annotation leaves no residue in the narrated record
+        vector<string> menu;
+        menu.push_back("Cast Emrakul, the Aeons Torn {15} (15/15)" + emrakul);
+        menu.push_back("Cast nothing");
+        bool stale = false;
+        string src;
+        CHECK(stripNarrationDecoration(menu[0]) == "Cast Emrakul, the Aeons Torn {15} (15/15)",
+              "#W57-C D7 echo: the converter price is decision-time pricing, not history");
+        CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Cast Emrakul, the Aeons Torn)",
+                                       (int) menu.size(), &menu, &stale, &src) == 1 && !stale,
+              "#W57-C D7 echo: an answer naming the row still binds to it with the tag on");
+    }
+
+    cout << "\n[#W57-C] D8 the discard menu's verdicts are ONE family\n";
+    {
+        const string dead = " {right now: they control 0 creatures - at 0 this does nothing}";
+        const string live = " {right now: destroys 3 of their creatures (2 able to attack right now), 1 of yours}";
+        CHECK(discardBoardVerdictTag(dead)
+              == " {dead right now: they control 0 creatures - at 0 this does nothing}",
+              "#W57-C D8 a zero verdict re-badges into the SAME tag the target-count clause uses");
+        CHECK(discardBoardVerdictTag(live) == live,
+              "#W57-C D8 a real magnitude keeps the {right now:} tag and states what it would do");
+        //the 123v130 seq 22 asymmetry, as one menu
+        vector<string> menu;
+        menu.push_back("Tragic Slip {b} (instant)" + discardDeadTargetClause(0));
+        menu.push_back("Tribute to Hunger {2}{b} (instant)" + discardBoardVerdictTag(dead));
+        menu.push_back("Damnation {2}{b}{b} (sorcery)"
+                       + discardBoardVerdictTag(" {right now: destroys 0 of their creatures"
+                                                " (0 without a restriction against attacking), 0 of yours}"));
+        for (size_t i = 0; i < menu.size(); i++)
+            cout << "     D8 " << (i + 1) << ". " << menu[i] << "\n";
+        for (size_t i = 0; i < menu.size(); i++)
+            CHECK(menu[i].find("{dead right now: ") != string::npos,
+                  "#W57-C D8 the edict at N=0 and the sweeper at destroys-0 now read the same"
+                  " family as the target-count row that was already marked");
+        CHECK(discardBoardVerdictTag("").empty()
+              && discardBoardVerdictTag(" {right now: }").empty(),
+              "#W57-C D8 NEGATIVE an empty evaluation carries no tag");
+        CHECK(discardBoardVerdictTag(" {X pricing: X=3 - kills 2}").empty()
+              && discardBoardVerdictTag("{right now: drains 3}").empty()
+              && discardBoardVerdictTag(" {right now: drains 3").empty(),
+              "#W57-C D8 NEGATIVE only a complete, correctly-anchored {right now: ...} clause is"
+              " re-badged - no other annotation is touched");
+        CHECK(discardVerdictLegend(true).find("that is not a statement that the card is dead")
+                  != string::npos
+              && discardVerdictLegend(true).find("{dead right now: ...}") != string::npos,
+              "#W57-C D8 the legend names both tags AND says a bare row is unpriced, not dead");
+        CHECK(discardVerdictLegend(false).empty(),
+              "#W57-C D8 NEGATIVE no verdict on any row, no legend");
+        CHECK(stripNarrationDecoration(menu[1]) == "Tribute to Hunger {2}{b} (instant)"
+              && stripNarrationDecoration(menu[2]) == "Damnation {2}{b}{b} (sorcery)",
+              "#W57-C D8 echo: both badges are decision-time and leave no residue in history");
+    }
+
+    cout << "\n[#W57-C] D11 the edict row knows the seat's own answer is on the stack\n";
+    {
+        const string base = edictClause(1, "Silverquill Silencer", 2, true);
+        const string tail = edictOnlyVictimOnStackClause(true);
+        cout << "     D11 row: Cast Tribute to Hunger {2}{b} {right now: " << base << tail << "}\n";
+        CHECK(base + tail == "they control 1 creature - Silverquill Silencer is sacrificed,"
+                             " you gain 2 - but an effect already on the stack is aimed at that"
+                             " same creature; if it is gone when this resolves they control 0"
+                             " creatures and this does nothing",
+              "#W57-C D11 the 126v146 seq 19 row now carries the fact the stack section held");
+        CHECK(base + edictOnlyVictimOnStackClause(false) == base,
+              "#W57-C D11 NEGATIVE with nothing aimed at it the row is byte-identical to wave 56");
+        CHECK(tail.find("cannot") == string::npos && tail.find("do not cast") == string::npos
+              && tail.find("is already removed") == string::npos,
+              "#W57-C D11 NEGATIVE the clause is a conditional about the stack; it never forbids"
+              " the cast and never asserts the removal has happened");
+        CHECK(edictOnlyVictimOnStackClause(true) != edictAlreadyOnStackClause(true),
+              "#W57-C D11 NEGATIVE the N=1 clause is NOT the highest-MV clause - there is no"
+              " next-highest to find when they control exactly one creature");
+        vector<string> menu;
+        menu.push_back("Cast Tribute to Hunger {2}{b} {right now: " + base + tail + "}");
+        CHECK(stripNarrationDecoration(menu[0]) == "Cast Tribute to Hunger {2}{b}",
+              "#W57-C D11 echo: the whole verdict is decision-time, tail included");
+    }
+
+    cout << "\n[#W57-C] D12 the menu-level no-live-cast-row token\n";
+    {
+        const string deadV = " {right now: they control 0 creatures - at 0 this does nothing}";
+        const string liveV = " {right now: destroys 2 of their creatures (2 able to attack right now), 0 of yours}";
+        vector<string> allDead;
+        allDead.push_back("Cast Tribute to Hunger {2}{b}" + deadV);
+        allDead.push_back("Cast Devour Flesh {1}{b}" + deadV);
+        allDead.push_back("Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures"
+                          " (0 without a restriction against attacking), 0 of yours}");
+        CHECK(everyCastRowDead(allDead), "#W57-C D12 a menu whose every cast row reads zero is dead");
+        const string note = allCastRowsDeadNote(true, (int) allDead.size());
+        cout << "     D12 header:" << note << "\n";
+        CHECK(note == "\nNO LIVE CAST ROW ON THIS MENU: all 3 cast rows below carry a verdict"
+                      " computed from the board that reads zero - not one of them changes a number"
+                      " on the board as it stands. Nothing is withheld and no row is capped:"
+                      " casting one is still legal and still your choice, and the decline and hold"
+                      " rows are on the menu as always.",
+              "#W57-C D12 the token states the fact AND that no window is removed");
+        CHECK(allCastRowsDeadNote(false, 3).empty() && allCastRowsDeadNote(true, 0).empty(),
+              "#W57-C D12 NEGATIVE no token without the verdict, and none over an empty menu");
+        vector<string> mixed(allDead);
+        mixed[1] = "Cast Damnation {2}{b}{b}" + liveV;
+        CHECK(!everyCastRowDead(mixed),
+              "#W57-C D12 NEGATIVE one live row on the menu and the token does not fire");
+        vector<string> unpriced(allDead);
+        unpriced[2] = "Cast Lightning Greaves {2} (artifact)";
+        CHECK(!everyCastRowDead(unpriced),
+              "#W57-C D12 NEGATIVE one UNPRICED row and the token does not fire - silence is not"
+              " a dead verdict");
+        vector<string> textTrap;
+        textTrap.push_back("Cast Fall of the Gavel {3}{u}{w}" + liveV
+                           + " {card text: \"Counter target spell. You gain 4 life. If it does"
+                             " nothing else, deals 0.\"}");
+        CHECK(!everyCastRowDead(textTrap),
+              "#W57-C D12 NEGATIVE the predicate reads the ROW VERDICT only - a card-text blob"
+              " quoting \"does nothing\" or \"deals 0\" can never make a live row read as dead");
+        CHECK(everyCastRowDead(vector<string>()) == false,
+              "#W57-C D12 NEGATIVE an empty menu is not an all-dead menu");
+    }
+
+    cout << "\n[#W57-C] D21 the cycle row prices the cast, and the cast row the cycle\n";
+    {
+        const string cycTag = castModeCastPriceTag("{2}{r}", "Destroy target land.", 4);
+        cout << "     D21 cycle row: cycling with Lay Waste [cost: {3}, discard this card]"
+             << cycTag << "\n";
+        CHECK(cycTag == " {the cast this replaces: cost {2}{r} - Destroy target land."
+                        " (4 legal targets on the board right now)}",
+              "#W57-C D21 the cycle row carries the cost, the effect and the target COUNT of the"
+              " cast it spends");
+        CHECK(castModeCastPriceTag("{2}{r}", "Destroy target land.", 1)
+                  .find("(1 legal target on the board right now)") != string::npos,
+              "#W57-C D21 singular at one target");
+        CHECK(castModeCastPriceTag("{2}{r}", "Destroy target land.", 0)
+                  .find("(0 legal targets on the board right now)") != string::npos,
+              "#W57-C D21 zero is PRINTED as zero - a dead cast is the fact that makes the cycle"
+              " correct, and a silent omission would be confabulated over");
+        CHECK(castModeCastPriceTag("{2}{r}", "Destroy target land.", -1)
+              == " {the cast this replaces: cost {2}{r} - Destroy target land.}",
+              "#W57-C D21 NEGATIVE an untargeted cast claims no target count");
+        CHECK(castModeCastPriceTag("", "", 4).empty(),
+              "#W57-C D21 NEGATIVE nothing known about the cast, no tag");
+        vector<string> labels, costs;
+        vector<int> draws;
+        labels.push_back("cycling");
+        costs.push_back("{3}, discard this card");
+        draws.push_back(1);
+        const string altTag = castModeAltPriceTag(labels, costs, draws);
+        cout << "     D21 cast row: Cast Card Normally [cost: {2}{r}, Destroy target land.]"
+             << altTag << "\n";
+        CHECK(altTag == " {the alternative this replaces: cycling for {3}, discard this card"
+                        " - draws 1 card}",
+              "#W57-C D21 the cast row carries the cost and the draw of the cycle it spends");
+        labels.push_back("channel");
+        costs.push_back("{1}{r}, discard this card");
+        draws.push_back(0);
+        const string altTag2 = castModeAltPriceTag(labels, costs, draws);
+        CHECK(altTag2 == " {the alternatives this replaces: cycling for {3}, discard this card"
+                         " - draws 1 card; channel for {1}{r}, discard this card}",
+              "#W57-C D21 two alternatives are both named, and a path that draws nothing says"
+              " nothing about drawing rather than the false \"draws 0\"");
+        CHECK(castModeAltPriceTag(vector<string>(), vector<string>(), vector<int>()).empty(),
+              "#W57-C D21 NEGATIVE no alternative on the menu, no tag");
+        {
+            vector<string> bad(labels);
+            bad.push_back("mutate");
+            CHECK(castModeAltPriceTag(bad, costs, draws).empty(),
+                  "#W57-C D21 NEGATIVE mismatched vectors are refused rather than half-printed");
+        }
+        vector<string> menu;
+        menu.push_back("cycling with Lay Waste [cost: {3}, discard this card]" + cycTag);
+        menu.push_back("Cast Card Normally [cost: {2}{r}, Destroy target land.]" + altTag);
+        bool stale = false;
+        string src;
+        CHECK(stripNarrationDecoration(menu[0])
+                  == "cycling with Lay Waste"
+              && stripNarrationDecoration(menu[1]) == "Cast Card Normally",
+              "#W57-C D21 echo: both cross-price tags are decision-time and leave no residue");
+        CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (cycling with Lay Waste)",
+                                       (int) menu.size(), &menu, &stale, &src) == 1 && !stale,
+              "#W57-C D21 echo: the cycle answer still binds with the new tag on the row");
+    }
+
+    cout << "\n[#W57-C] D30 two DIFFERENT cards, one verdict, two prices\n";
+    {
+        const string v = " {right now: they control 0 creatures - at 0 this does nothing}";
+        vector<string> rows;
+        vector<string> names;
+        vector<int> costs;
+        rows.push_back("Cast Devour Flesh {1}{b}" + v);   names.push_back("Devour Flesh");     costs.push_back(2);
+        rows.push_back("Cast Tribute to Hunger {2}{b}" + v); names.push_back("Tribute to Hunger"); costs.push_back(3);
+        applyDuplicateEffectTags(rows, names, costs);
+        for (size_t i = 0; i < rows.size(); i++)
+            cout << "     D30 " << (i + 1) << ". " << rows[i] << "\n";
+        CHECK(rows[1].find(" {identical verdict right now to row 1 (Devour Flesh), which costs 1"
+                           " less mana - a different card, the same priced outcome on this board}")
+                  != string::npos,
+              "#W57-C D30 the 123v125 seq 45 pair: the DEARER row points at the cheaper one");
+        CHECK(rows[0].find("identical verdict") == string::npos,
+              "#W57-C D30 NEGATIVE the cheaper row is not tagged - only the row that would overpay");
+        CHECK(rows[1].find("{same effect as row") == string::npos,
+              "#W57-C D30 NEGATIVE two different cards never claim D15's same-EFFECT statement");
+        {
+            //a same-card pair still gets D15's stronger tag, and only that one
+            vector<string> r2; vector<string> n2; vector<int> c2;
+            r2.push_back("Cast Damnation {2}{b}{b}" + v); n2.push_back("Damnation"); c2.push_back(4);
+            r2.push_back("Cast Damnation {4}{b}{b}" + v); n2.push_back("Damnation"); c2.push_back(6);
+            applyDuplicateEffectTags(r2, n2, c2);
+            CHECK(r2[1].find(" {same effect as row 1, for 2 more mana}") != string::npos
+                  && r2[1].find("identical verdict") == string::npos,
+                  "#W57-C D30 REGRESSION the same-card pair keeps D15's tag and gains no second one");
+        }
+        {
+            //different verdicts: nothing is claimed
+            vector<string> r3; vector<string> n3; vector<int> c3;
+            r3.push_back("Cast Devour Flesh {1}{b}" + v);          n3.push_back("Devour Flesh");      c3.push_back(2);
+            r3.push_back("Cast Tribute to Hunger {2}{b} {right now:"
+                         " they control 1 creature - Wall of Omens is sacrificed}");
+            n3.push_back("Tribute to Hunger"); c3.push_back(3);
+            applyDuplicateEffectTags(r3, n3, c3);
+            CHECK(r3[1].find("identical verdict") == string::npos,
+                  "#W57-C D30 NEGATIVE two different verdicts are never called identical");
+        }
+        {
+            //equal cost: neither row overpays, so neither is marked
+            vector<string> r4; vector<string> n4; vector<int> c4;
+            r4.push_back("Cast Devour Flesh {1}{b}" + v);       n4.push_back("Devour Flesh");      c4.push_back(2);
+            r4.push_back("Cast Tribute to Hunger {1}{b}" + v);  n4.push_back("Tribute to Hunger"); c4.push_back(2);
+            applyDuplicateEffectTags(r4, n4, c4);
+            CHECK(r4[0].find("identical verdict") == string::npos
+                  && r4[1].find("identical verdict") == string::npos,
+                  "#W57-C D30 NEGATIVE at the same price there is no cheaper row to point at");
+        }
+        {
+            //no verdict at all: no comparison exists to make
+            vector<string> r5; vector<string> n5; vector<int> c5;
+            r5.push_back("Cast Devour Flesh {1}{b}");      n5.push_back("Devour Flesh");      c5.push_back(2);
+            r5.push_back("Cast Tribute to Hunger {2}{b}"); n5.push_back("Tribute to Hunger"); c5.push_back(3);
+            applyDuplicateEffectTags(r5, n5, c5);
+            CHECK(r5[1].find("identical verdict") == string::npos,
+                  "#W57-C D30 NEGATIVE unpriced rows are never compared");
+        }
+        CHECK(duplicateVerdictTag(0, "Devour Flesh", 1).empty()
+              && duplicateVerdictTag(1, "", 1).empty()
+              && duplicateVerdictTag(1, "Devour Flesh", 0).empty(),
+              "#W57-C D30 NEGATIVE every input the tag needs is required");
+        CHECK(stripNarrationDecoration(rows[1]) == "Cast Tribute to Hunger {2}{b}",
+              "#W57-C D30 echo: the comparison is decision-time and leaves no residue in history");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
