@@ -781,10 +781,12 @@ DECIDING SITUATIONS (recognise -> do)
 - You kept and the game asks which cards to bottom -> build the N in the MULLIGAN order: the
   lands that cover your cheapest spells, the Starstorm, the cheapest spells, the rest by cost;
   the last card in that order is the one that goes under.
-- It is the OPPONENT'S turn and the last row reads "Pass priority, and do not ask me again this
-  turn unless the board changes (any change re-opens this window; you give up no cast)" -> take
-  THAT row, at the FIRST such ask of the turn, not after four declines. It is the same decision
-  said once for the whole turn, a board change re-opens the window, and you give up nothing.
+- The last row of the menu - on your own turn as well as theirs - reads "Hold priority for the
+  rest of this turn: pass now, and do not ask me again unless the board changes (any change
+  re-opens this window; you give up no cast) {taking this row skips the rest of this turn's
+  identical windows}" -> take THAT row, at the FIRST such ask of the turn, not after four
+  declines. It is the same decision said once for the whole turn, a board change re-opens the
+  window, and you give up nothing.
   "[you declined this exact list N times already this turn]" is not new information and is not a
   reason to cast.
 - "Opponent life:" went UP since your last decision -> stop aiming damage at the face for the rest

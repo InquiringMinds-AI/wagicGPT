@@ -135,8 +135,9 @@ this deck took it 106 times last corpus, and it now takes it EARLY - the row is 
 first or second dead window of most turns, and it saved this deck from every dead cast it was
 offered in a counter-deck game it still lost on the clock. Keep doing that. A hold taken in the
 Cleanup step saves nothing; a hold taken in their upkeep saves the whole turn.
-THE ROW IS NOW KEPT. Last corpus this deck took the hold row 119 times and the byte-identical
-list came back inside the same turn 8 times, against 79 of 170 the corpus before: the hold holds.
+THE ROW IS NOW KEPT ALMOST ALWAYS. Last corpus this deck took the hold row 60 times and the
+byte-identical list came back inside the same turn twice; corpus-wide it came back after 15 of
+320 takes, against 116 of 282 the corpus before: the hold nearly always holds.
 Take it at the first dead window of the turn and stop reading the menu. When a run does still
 come back - a drain moves a life number and the price on a row moves with it - answer the SAME
 way every time. The one thing that must not happen in such a run is a cast: the menu that was

@@ -465,6 +465,9 @@ artifact, not a cost you can pay - it never means a card is free to cast.
   A flip costs you a whole decision and buys nothing. WHAT THIS PAID: at `vs123` seq 24 this seat
   answered the other-face row directly and cast a {4}{g}{g} Tovolar's Huntmaster on the same turn;
   across the corpus the Flip Side row was offered 109 times and taken zero times, which is right.
+  REMOVE THIS PARAGRAPH WHEN the "Flip Side" row stops rendering on a land menu - re-verify by
+  counting "Flip Side" option rows in the corpus; it was 109 rows / 0 takes in wave 56, and the
+  docket asks for the row to be suppressed.
 
 TEFERI ({2}{W}{U}) is your ONLY blue card. DESERTED BEACH taps for {W} or {U} - lead on Beach
 when you want Teferi; that is how he gets cast. Because one Beach pays only one pip, you need a
@@ -705,10 +708,12 @@ recorded 72 and 16 skippable windows.
 When that line is absent - this is the first time you have seen this list this turn - answer
 "Cast nothing right now" as usual, because the next window may be a different list.
 The row costs you nothing you would have taken: it says so on its own face, and the engine re-opens
-the window the moment anything on the board changes. WHAT THIS COST: 190 windows across three of
-this pool's decks carried that declined line with the HOLD row on the menu, and not one of them
-took it - 85 of them in a single 65-turn game, the same short menu re-asked eight to ten times a
-turn while nothing on either board moved.
+the window the moment anything on the board changes.
+WHAT THIS COST, wave 55: 190 windows across three of this pool's decks carried that declined line
+with the HOLD row on the menu, and not one of them took it - 85 of them in a single 65-turn game,
+the same short menu re-asked eight to ten times a turn while nothing on either board moved.
+WHAT IT IS NOW, wave 56: this deck took it 2 of 35 - the rule is working and the number is the
+measurement, not the story.
 
 DECIDING SITUATIONS (recognize -> do):
 - Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> ATTACK: none, every

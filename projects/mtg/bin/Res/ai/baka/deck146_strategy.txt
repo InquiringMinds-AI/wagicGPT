@@ -124,9 +124,11 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   A 5-land hand with two Lolths is a KEEP - you will draw spells. Never mulligan a hand for having
   too many lands or for lacking a one-drop.
 - THREE OF YOUR SPELLS ARE ALSO LANDS, AND THE HAND HEADER DOES NOT COUNT THEM. Emeria's Call,
-  Agadeem's Awakening and Pelakka Predation each have a LAND on the back, and the game now offers
-  that face on your own main phase as a row reading "<land name> with <spell name> -> PLAY THIS AS
-  A LAND". Taking it puts the land onto your battlefield for no mana and uses your land drop.
+  Agadeem's Awakening and Pelakka Predation each have a LAND on the back, and the game offers that
+  face as a row reading "<land name> with <spell name> -> PLAY THIS AS A LAND". TAKE IT ONLY ON
+  YOUR OWN MAIN PHASE WITH YOUR LAND DROP UNUSED - that is when playing a land is legal, and it is
+  the only window where taking it is a real land drop. Taking it puts the land onto your
+  battlefield for no mana and uses your land drop.
   So: READ THE HEADER'S LAND NUMBER, THEN ADD ONE FOR EACH of those three names on the hand line.
   That sum - not the header's own number - is the land count every mulligan and bottom rung below
   is written against. A "1 land" seven holding Agadeem's Awakening is a TWO-land seven.
@@ -612,10 +614,11 @@ right now". You have already given this list your answer; the row exists to make
 When that line is absent - this is the first time you have seen this list this turn - answer
 "Cast nothing right now" as usual, because the next window may be a different list.
 The row costs you nothing you would have taken: it says so on its own face, and the engine re-opens
-the window the moment anything on the board changes. WHAT THIS COST: 190 windows across three of
-this pool's decks carried that declined line with the HOLD row on the menu, and not one of them
-took it - 85 in a single game, the same two-row Dictate menu re-asked eight to ten times a turn
-for eleven turns.
+the window the moment anything on the board changes.
+WHAT THIS COST, wave 55: 190 windows across three of this pool's decks carried that declined line
+with the HOLD row on the menu, and not one of them took it - 85 in a single game, the same two-row
+Dictate menu re-asked eight to ten times a turn for eleven turns. WHAT IT IS NOW, wave 56: this
+deck took it 5 of 20 - the rule is working and the number is the measurement, not the story.
 
 DECIDING SITUATIONS (recognize -> do):
 - A cast row carries "[DRAW PRICE: casting this draws YOU N cards (their <card>), and their
