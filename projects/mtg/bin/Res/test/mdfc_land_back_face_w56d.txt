@@ -1,0 +1,41 @@
+#W56-D (D8) -- an MDFC's LAND back face must be playable as a land drop straight
+#from HAND. Emeria's Call // Emeria, Shattered Skyclave says "You may play
+#Emeria, Shattered Skyclave as a land" with no prerequisite; deck146 runs two of
+#them plus an Agadeem's Awakening.
+#
+#PRE-FIX the primitives gated the {0} hand entry
+#  autohand={0}:restriction{can play land,compare(isflipped)~equalto~1} ...
+#           flip(Emeria, Shattered Skyclave) forcetype(land)
+#behind isflipped==1, a state nothing sets for a card in hand except the manual
+#"Flip Side" DISPLAY toggle. So a single click on the hand card fired the toggle
+#(the only reacting ability) and the land face never entered: re-derived over all
+#3,171 decisions of the wave-55 corpus, ZERO land-drop asks named either back
+#face. Repro of the loss: 146v130 seq 22/23/24 -- turns 21, 23 and 25 at 2-3
+#mono-white sources, an Emeria's Call in hand, no land drop taken, 19 -> 0.
+#
+#POST-FIX the restriction is just restriction{can play land}: the click menu
+#offers the land play (option 1 here), the back face enters the battlefield, its
+#"pay 3 life or enter tapped" choice resolves (harness default = pay), and the
+#instance carries the BACK face's own multiverse id (lane V's getOtherFaceCard).
+[INIT]
+firstmain
+[PLAYER1]
+hand:Emeria's Call
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+Emeria's Call
+choice 1
+assertmtgid 491634 Emeria, Shattered Skyclave
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Mind Stone,Emeria^ Shattered Skyclave
+life:17
+[PLAYER2]
+life:20
+[END]

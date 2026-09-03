@@ -1,0 +1,31 @@
+#W56-D (D8) -- playing an MDFC's land back face from hand SPENDS the land drop.
+#The back face reaches the battlefield through AAFlip's forcetype(land) branch,
+#which adds the card to the battlefield zone directly rather than through
+#MTGPutInPlayRule. MTGGameZone::addCard still records it in cardsSeenThisTurn,
+#so MaxPerTurnRestriction counts it -- but nothing else pins that, and losing it
+#would hand the seat a free extra land every turn it held one of these 55 cards.
+#Here Emeria's Call is played as Emeria, Shattered Skyclave and the Plains that
+#follows must STAY IN HAND.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Emeria's Call,Plains
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+Emeria's Call
+choice 1
+Plains
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Mind Stone,Emeria^ Shattered Skyclave
+hand:Plains
+life:17
+[PLAYER2]
+life:20
+[END]

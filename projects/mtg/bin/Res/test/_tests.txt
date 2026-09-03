@@ -1324,3 +1324,7 @@ isleback_spawn_compare_library.txt
 isleback_spawn_compare_library_neg.txt
 w54q_autotap_options_16_sources.txt
 w56b_ability_row_seat.txt
+mdfc_land_back_face_w56d.txt
+mdfc_land_drop_consumed_w56d.txt
+mdfc_land_back_face_pathway_w56d.txt
+mdfc_land_back_face_upkeep_neg_w56d.txt

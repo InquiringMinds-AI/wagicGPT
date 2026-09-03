@@ -1,0 +1,8 @@
+#NAME: W56D MDFC land probe
+#DESC:temporary probe deck - delete after use
+Emeria's Call (*) *10
+Agadeem's Awakening (*) *10
+Hengegate Pathway (*) *10
+Grizzly Bears (*) *10
+Plains (*) *10
+Swamp (*) *10
