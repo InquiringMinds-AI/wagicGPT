@@ -176,6 +176,11 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAITestTicks = 0;
     mAIGraceTicks = 0;
     mAISecondRebuilt = false;
+    mAIStallTicks = 0;     //#W54-F (D7a)
+    mAIStallSig = 0;
+    mAIStallSince = 0;
+    mAIPollTicks = 0;
+    mAIForceClosed = false;
     mInputArmed = false;
 
     afterReveal = "";
@@ -689,7 +694,144 @@ static int revealTestAsyncDecide(GameObserver * g, const vector<MTGCardInstance*
 static bool revealTestAsyncActive(GameObserver *) { return false; }
 #endif
 
+//#W54-F (D7a): the reveal driver's STALL GUARD.
+//
+//WHY. An open reveal display is held by GameObserver::OpenedDisplay and blocks
+//every phase-advance path, userRequestNextGamePhase included. So a driver phase
+//that can never make progress does not merely lose the reveal: it freezes the
+//whole game, silently and forever. The wave-53 corpus lost game 152v125 to
+//exactly that - ~13 hours at the Blockers step, one seat record, no stderr,
+//invariant 00 failed. Lane X removed the KNOWN path into it. This is the floor
+//under every other path, known and unknown.
+//
+//WHAT COUNTS AS PROGRESS. The signature below folds together everything a live
+//reveal moves: the driver's own cursors and latches, the reveal zone's size,
+//whether this reveal's chooser is armed, the model-poll counter (so a model call
+//in flight is progress - its deadline belongs to the async layer, not here), and
+//the GAME's own turn / phase / stack / action-layer depth (so a reveal waiting
+//on a stack item that is still resolving is not a stall). Any change resets the
+//budget. Only a reveal where NOTHING moves anywhere is force-closed.
+//
+//WHY TWO FLOORS, AND BOTH. Ticks alone are frame-rate relative - the same budget
+//is minutes in a windowed game and a heartbeat under WAGIC_FASTCLOCK - so a tick
+//floor cannot on its own tell a slow game from a dead one. The wall-clock floor
+//is what makes the verdict honest, and it is also what carries the safety the
+//signature deliberately gives up: the one case a driver-local signature cannot
+//see is a reveal legitimately waiting on something outside itself (a stack item
+//resolving, a human holding priority). Ten minutes with the driver frozen covers
+//every such wait this engine can produce. (invariant 00: stop a dead loop and SAY
+//so; never cap a live game.)
+static const int kRevealStallTicks   = 20000; //no-progress ticks before...
+static const long kRevealStallSecs   = 600;   //...AND this much wall clock
+
+size_t MTGRevealingCards::revealProgressSignature()
+{
+    //DRIVER-LOCAL ONLY, deliberately. The first draft folded the game's turn,
+    //phase and layer depths in here as well, so that a reveal waiting on a stack
+    //item still resolving would never be counted as stalled. It made the guard
+    //UNRELIABLE: unrelated action-layer churn reset the counter on most ticks and
+    //a genuinely parked reveal was force-closed only when the churn happened to
+    //settle (the same fixture passed and failed run to run). The wall-clock floor
+    //below is the honest way to buy that safety - a reveal that has not moved for
+    //ten minutes is not waiting on anything - so the signature says only what the
+    //DRIVER did, and says it deterministically.
+    size_t h = 1469598103934665603ULL;
+    long parts[9];
+    parts[0]  = mAIPhase;
+    parts[1]  = (long) mAIClickIdx;
+    parts[2]  = mAIZoneAtFinalize;
+    parts[3]  = mAIGraceTicks;
+    parts[4]  = mAISecondRebuilt ? 1 : 0;
+    parts[5]  = mAIPollTicks;
+    parts[6]  = (long) mAIGraveSel.size();
+    parts[7]  = zone ? zone->nb_cards : -1;
+    parts[8]  = ownChooser() ? 1 : 0;
+    for (size_t i = 0; i < 9; i++)
+    {
+        h ^= (size_t) parts[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+//Force-close: return every still-revealed card to the zone it was revealed FROM
+//and let the reveal end. This is the least-harm resolution of a reveal that has
+//no reachable outcome - the alternative is a game nobody can finish - and it is
+//never silent: an ungated DebugTrace line names it, and the seat writes a
+//translog record (kind `reveal`, class `reveal_stall_forced`) so a corpus can
+//COUNT force-closes rather than infer them from a game that stopped.
+void MTGRevealingCards::forceCloseStalledReveal()
+{
+    mAIForceClosed = true;
+    mAIDriveDone = true;
+    int stranded = zone ? zone->nb_cards : 0;
+    DebugTrace("MTGRevealingCards: reveal from " << (source ? source->getName() : string("?"))
+               << " made no progress for " << mAIStallTicks << " ticks / "
+               << (mAIStallSince ? (long)(time(NULL) - mAIStallSince) : 0L)
+               << "s with " << stranded << " card(s) still revealed - FORCE-CLOSING it "
+               << "(driver phase " << mAIPhase << "). The game could not advance while "
+               << "this display was open; the revealed cards go back where they came from.");
+    //Take the options out of the action layer first, so no orphaned chooser
+    //survives the display and captures the next click.
+    if (abilityFirst && observer->mLayers->actionLayer()->getIndexOf(abilityFirst) != -1)
+    {
+        observer->mLayers->stackLayer()->Remove(abilityFirst);
+        game->removeObserver(abilityFirst);
+    }
+    if (abilitySecond && observer->mLayers->actionLayer()->getIndexOf(abilitySecond) != -1)
+    {
+        observer->mLayers->stackLayer()->Remove(abilitySecond);
+        game->removeObserver(abilitySecond);
+    }
+    repeat = false; //a repeat reveal must not re-open on the same stall
+    if (zone && RevealFromZone && playerForZone)
+        for (int i = zone->nb_cards - 1; i >= 0; i--)
+            if (zone->cards[i])
+                playerForZone->game->putInZone(zone->cards[i], zone, RevealFromZone);
+    Player * ctrl = source ? source->controller() : NULL;
+    if (ctrl)
+        ctrl->logEngineResolution(
+            "reveal",
+            "The reveal could not be completed - the engine returned the "
+            + std::to_string(stranded) + " revealed card"
+            + (stranded == 1 ? "" : "s") + " to your library so the game could continue",
+            stranded, "reveal_stall_forced");
+}
+
 void MTGRevealingCards::driveInteractiveReveal()
+{
+    if (mAIDriveDone)
+        return;
+    driveInteractiveRevealStep();
+    if (mAIDriveDone)
+    {
+        mAIStallTicks = 0;
+        return;
+    }
+    size_t sig = revealProgressSignature();
+    if (sig != mAIStallSig)
+    {
+        mAIStallSig = sig;
+        mAIStallTicks = 0;
+        mAIStallSince = 0;
+        return;
+    }
+    if (!mAIStallTicks)
+        mAIStallSince = (long) time(NULL);
+    mAIStallTicks++;
+    int tickBudget = kRevealStallTicks;
+    long secsBudget = kRevealStallSecs;
+    if (observer && observer->mRevealStallTicks > 0)
+    {
+        tickBudget = observer->mRevealStallTicks; //fixture-only: see GameObserver.h
+        secsBudget = 0;
+    }
+    if (mAIStallTicks >= tickBudget
+        && (long)(time(NULL) - mAIStallSince) >= secsBudget)
+        forceCloseStalledReveal();
+}
+
+void MTGRevealingCards::driveInteractiveRevealStep()
 {
     if (mAIDriveDone)
         return;
@@ -818,6 +960,7 @@ void MTGRevealingCards::driveInteractiveReveal()
         SAFE_DELETE(oneTc); //eligible[] + pickExactlyOne captured; done with it
         vector<int> sel;
         int r;
+        mAIPollTicks++; //#W54-F (D7a): a model poll IS progress for the stall guard
 #ifdef TESTSUITE
         if (revealTestAsyncActive(game))
             r = revealTestAsyncDecide(game, revealed, mAITestTicks, sel);
@@ -5847,11 +5990,15 @@ int AATurnSide::resolve()
                 }
             }
         }
-        if(_target->owner->playMode != Player::MODE_TEST_SUITE)
-        {
-            _target->setMTGId(sideCard->getMTGId());
-            _target->setId = sideCard->setId;
-        }
+        //#W54-F (D38): the test-suite skip is LIFTED. It existed so a suite
+        //[ASSERT] naming the FRONT face could still match a flipped card by id,
+        //but it also made the post-flip printing unobservable to every harness -
+        //lane V's assembled getOtherFaceCard (which decides WHICH printing's
+        //back face the console asks art for) had no possible pin. The suite's
+        //zone matcher is face-aware by NAME (TestSuiteAI.cpp), so the id may now
+        //track the face it really is, and `assertmtgid` can pin it.
+        _target->setMTGId(sideCard->getMTGId());
+        _target->setId = sideCard->setId;
         _target->power = sideCard->power;
         _target->toughness = sideCard->toughness;
         _target->origpower = sideCard->origpower;
@@ -5997,11 +6144,9 @@ int AAFlip::resolve()
             }
             cdaDamage = _target->damageCount;
             _target->copiedID = myFlip->getMTGId();//for copier
-            if(_target->owner->playMode != Player::MODE_TEST_SUITE)
-            {
-                _target->setMTGId(myFlip->getMTGId());
-                _target->setId = myFlip->setId;
-            }
+            //#W54-F (D38): test-suite skip lifted - see AATurnSide::resolve.
+            _target->setMTGId(myFlip->getMTGId());
+            _target->setId = myFlip->setId;
             //check pw
             if(_target->hasType(Subtypes::TYPE_PLANESWALKER))
             {

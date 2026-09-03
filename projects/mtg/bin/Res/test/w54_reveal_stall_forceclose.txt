@@ -1,0 +1,57 @@
+#W54-F (D7a): the reveal driver's STALL GUARD - the floor under every reveal
+#hang, not just the one lane X removed.
+#
+#An open reveal display is held by GameObserver::OpenedDisplay and blocks every
+#phase-advance path, userRequestNextGamePhase included. So a driver phase that
+#can never make progress does not merely lose the reveal: it freezes the whole
+#game, with no tick and no stderr. Wave-53 corpus game 152v125 sat that way for
+#~13 hours and cost the corpus its 21/21 (invariant 00). Lane X removed the
+#KNOWN path in (option one predicate-gated to zero targets, option two armed up
+#front). This fixture drives a DIFFERENT, still-live path into the same park:
+#
+#Lexicon Deadend Wizard is the Hurkyl reveal with NO option two. When option
+#one's chooser has zero valid targets among the revealed cards, toResolve()
+#builds NEITHER option - abilityFirst stays NULL and there is no abilityTwo to
+#construct - so no chooser ever arms. driveInteractiveReveal's phase 0 waits on
+#`!tc`; lane X's `option one consumed elsewhere` branch is gated on abilityFirst
+#being non-NULL, so it cannot fire. Nothing moves again, ever.
+#
+#All five revealed cards are creatures and option one takes only
+#noncreature-nonland, so the gate is closed. `revealasync` opts the scripted
+#seat into the interactive-AI driver; `revealstallbudget 5` shrinks ONLY the
+#no-progress budget (the shipped one is 20000 ticks AND 600s of wall clock, so a
+#fixture cannot reach it inside a script) - the stall itself is entirely real.
+#
+#RED on base (and on master WITH lane X's fix, which does not reach this path):
+#the five revealed cards stay stranded in the reveal zone and the library is 1 of
+#6. The engine stopped ticking; only the script running out ends the run, and in
+#a real game there is no script - which is the 13 hours.
+#GREEN after: the guard force-closes the reveal and the five cards go back to the
+#library in their original order. (A GPT seat also writes a translog record
+#classed `reveal_stall_forced`; the suite's seat is a TestSuiteAI, which keeps no
+#decision log, so this fixture pins the ENGINE half only.)
+#Top of library = last listed; Mind Stone is the noncreature spell that arms the
+#end-step restriction. Hill Giant is the sixth card, below the revealed five.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Deadend Wizard,island,swamp
+hand:Mind Stone
+library:Hill Giant,Grizzly Bears,Gray Ogre,Ornithopter,Juggernaut,Craw Wurm
+[PLAYER2]
+[DO]
+interactivereveal
+revealasync zzznosuchcardzzz
+revealstallbudget 5
+island
+swamp
+Mind Stone
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Deadend Wizard,island,swamp,Mind Stone
+hand:
+library:Hill Giant,Craw Wurm,Juggernaut,Ornithopter,Gray Ogre,Grizzly Bears
+[PLAYER2]
+[END]

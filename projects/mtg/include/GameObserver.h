@@ -140,6 +140,11 @@ class GameObserver{
   //reports "in flight" before deciding (default 2). Empty/-1 = off.
   std::string mRevealTestAsyncPicks;
   int mRevealTestAsyncTicks = -1;
+  //#W54-F (D7a) test-suite hook: shrink the reveal driver's stall budget so a
+  //fixture can reach the force-close inside a script. -1 = the shipped budget
+  //(both a tick floor and a wall-clock floor); N > 0 = N no-progress ticks and
+  //NO wall-clock floor. Never set outside a fixture.
+  int mRevealStallTicks = -1;
   //The CR pre-game phase (opening hands + London mulligan + 103.6 actions),
   //run before turn 1 of real/selfplay/demo games. NULL in suite games and
   //once the phase has completed. While non-NULL, Update runs the phase and

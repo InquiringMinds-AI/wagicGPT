@@ -219,6 +219,16 @@ public:
         return -1;
     }
 
+    //#W54-F (D7a): the engine RESOLVED a decision this seat could not answer -
+    //today only the reveal driver's stall force-close. A seat that keeps a
+    //decision log writes a record so the force-close is never silent; every
+    //other seat ignores it.
+    virtual void logEngineResolution(const char * kind, const string& what,
+                                     int optionCount, const char * fallbackClass)
+    {
+        (void) kind; (void) what; (void) optionCount; (void) fallbackClass;
+    }
+
     Player * opponent();
     int getId();
     JQuadPtr getIcon();

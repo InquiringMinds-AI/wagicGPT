@@ -1105,6 +1105,18 @@ private:
     //narrow a choice is a decision for after the count exists. Pure.
     static bool rowSaysNoOp(const string& row);
     static bool planArguesAgainstRow(const string& reply, const string& row);
+    //#W54-F (D7b): an engine-answered decision (no prompt, no reply, nothing
+    //executed) has no class of its own and so was invisible to the recovery
+    //contract above. Pure, pinned in PARSETEST.
+    static bool engineAnsweredNoModel(int choice, const char * fallback,
+                                      bool emptyPrompt, bool emptyReply);
+public:
+    //#W54-F (D7a): the engine resolved a decision this seat could not - the
+    //reveal driver's stall force-close. Writes a translog record so a
+    //force-close is never silent and earns its own recovery record.
+    virtual void logEngineResolution(const char * kind, const string& what,
+                                     int optionCount, const char * fallbackClass);
+private:
     //Was reasoning asked for on this endpoint (thinking flag, or the Codex
     //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
     //never reasoned - parsing and fallback never consult it.
