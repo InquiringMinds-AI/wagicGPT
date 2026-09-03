@@ -1,0 +1,47 @@
+#W56-Z, fix leg (a): the CANCEL BUTTON itself inside an interrupt window.
+#Pressing cancel with a target choice pending must cancel THE SPELL, not the
+#window - nothing has been paid (the pay happens after targetListIsSet), so the
+#card returns to being uncast, the mana stays floated, and the player keeps the
+#window they are entitled to. A SECOND press then ends the interruption, as
+#every press did before.
+#
+#The real key path is human-only (DuelLayers::CheckUserInput is gated on
+#!isAI and a scripted suite seat always reports isAI()), so this fixture uses
+#the `cancelbutton` suite command, which feeds JGE_BTN_SEC to the stack layer - the
+#first layer in the duel's input order and the one that owns the branch under
+#test. PRE-FIX press one ended the window and left the chooser armed, so the
+#Archer click destroyed it; POST-FIX press one cancels Putrefy, the Archer
+#click is inert, and press two closes the window. `assertinterrupting` pins the
+#window's owner around each press - it is the only witness that press one
+#cancelled the SPELL and not the WINDOW (zones look identical either way).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+life:20
+[PLAYER2]
+hand:Putrefy
+inplay:Thornweald Archer
+manapool:{B}{G}{R}
+life:20
+[DO]
+Raging Goblin
+yes
+Putrefy
+cancelbutton
+assertinterrupting p2
+Thornweald Archer
+cancelbutton
+assertinterrupting none
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin
+life:20
+[PLAYER2]
+hand:Putrefy
+inplay:Thornweald Archer
+manapool:{B}{G}{R}
+life:20
+[END]

@@ -1,0 +1,34 @@
+#W56-Z NEGATIVE control: the ordinary interrupt-cast flow must be untouched.
+#Same board as w56Z_interrupt_cancel_orphan_chooser, but the target IS declared
+#before the window closes: Putrefy is clicked, the Archer is clicked as its
+#target (the cast then pays and goes on the stack), and endinterruption lets it
+#resolve. The Archer dies, Putrefy is in the graveyard and the pool is spent -
+#exactly as before the W56-Z change. If the cancel/safety-net work ever starts
+#eating declared casts, this fixture goes red.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+life:20
+[PLAYER2]
+hand:Putrefy
+inplay:Thornweald Archer
+manapool:{B}{G}{R}
+life:20
+[DO]
+Raging Goblin
+yes
+Putrefy
+Thornweald Archer
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin
+life:20
+[PLAYER2]
+graveyard:Putrefy,Thornweald Archer
+manapool:{0}
+life:20
+[END]

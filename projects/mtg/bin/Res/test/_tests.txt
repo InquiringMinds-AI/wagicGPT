@@ -1328,3 +1328,6 @@ mdfc_land_back_face_w56d.txt
 mdfc_land_drop_consumed_w56d.txt
 mdfc_land_back_face_pathway_w56d.txt
 mdfc_land_back_face_upkeep_neg_w56d.txt
+w56Z_interrupt_cancel_orphan_chooser.txt
+w56Z_interrupt_cancel_button_keeps_window.txt
+w56Z_interrupt_targeted_cast_resolves.txt

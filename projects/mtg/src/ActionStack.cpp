@@ -1534,6 +1534,13 @@ void ActionStack::Update(float dt)
 void ActionStack::cancelInterruptOffer(InterruptDecision cancelMode, bool log)
 {
     int playerId = (observer->isInterrupting == observer->players[1]) ? 1 : 0;
+    //#W56-Z: NO safety net here, deliberately. `observer->targetChooser` is
+    //global to the observer, not per-seat, and cancelInterruptOffer runs on the
+    //ORDINARY decline path - every time a seat waves off an offer while the
+    //ACTIVE player is mid-cast. Cancelling there killed the caster's own
+    //in-flight chooser: counter_unless_pay_x and spell_blast_counter_matching_mv
+    //both went red. endOfInterruption is safe because it only runs once a seat
+    //has TAKEN the window, so the pending choice is that seat's own.
     interruptDecision[playerId] = cancelMode;
     askIfWishesToInterrupt = NULL;
     observer->isInterrupting = NULL;
@@ -1545,9 +1552,47 @@ void ActionStack::cancelInterruptOffer(InterruptDecision cancelMode, bool log)
     }
 }
 
+//#W56-Z. A target/cost chooser armed inside an interrupt window used to
+//OUTLIVE that window: MTGPutInPlayRule::reactToClick pays only AFTER
+//game->targetListIsSet(card), so clicking a targeted spell arms
+//GameObserver::targetChooser (and cardWaitingForTargets) with nothing paid,
+//and nothing cleared it when the window closed. On the NEXT window the first
+//click on any legal target ran GameObserver::cardClick's `if (targetChooser)`
+//branch -> TARGET_OK_FULL -> cardClick(cardWaitingForTargets) and the spell
+//resolved. The owner's Vita report (2026-09-03): Putrefy was armed, cancel was
+//pressed eighteen times, and the only legal target was his own Thornweald
+//Archer - which the engine then destroyed for him.
+//This is the one cancel used by both fix legs. It mirrors the human's ordinary
+//cancel path (CardSelector JGE_BTN_SEC -> GameObserver::cancelCurrentAction):
+//the action layer's cancelCurrentAction() honours cantCancel, and the cast
+//chooser is released only when nothing mandatory is pending.
+int ActionStack::cancelPendingChoice()
+{
+    if (!observer || !observer->mLayers)
+        return 0;
+    ActionLayer * al = observer->mLayers->actionLayer();
+    bool pendingAbility = (al && al->isWaitingForAnswer() != NULL);
+    bool pendingCast = (observer->targetChooser != NULL);
+    if (!pendingAbility && !pendingCast)
+        return 0;
+    if (pendingAbility && !al->cancelCurrentAction())
+        return 0; //mandatory choice (cantCancel): leave it exactly as it was
+    if (pendingCast)
+        SAFE_DELETE(observer->targetChooser);
+    return 1;
+}
+
 void ActionStack::endOfInterruption(bool log)
 {
     int playerId = (observer->isInterrupting == observer->players[1]) ? 1 : 0;
+    //#W56-Z safety net: whatever route closes the window (this includes the
+    //test suite's `endinterruption` command and the abilities-menu Cancel id),
+    //a non-AI seat's pending choice dies with the window. AI seats are left
+    //byte-identical - they drive their own choosers through AIPlayerBaka and
+    //never reach this by pressing a key (DuelLayers::CheckUserInput is gated
+    //on !isAI).
+    if (observer->isInterrupting && observer->isInterrupting->playMode != Player::MODE_AI)
+        cancelPendingChoice();
     interruptDecision[playerId] = NOT_DECIDED;
     observer->isInterrupting = NULL;
     if(log)
@@ -1649,6 +1694,17 @@ bool ActionStack::CheckUserInput(JButton inputKey)
                     observer->mExtraPayment->action->CheckUserInput(JGE_BTN_SEC);
                     observer->mExtraPayment = NULL;
                 }
+                //#W56-Z. The stack layer sees the key BEFORE the action layer
+                //and CardSelector (DuelLayers::CheckUserInput order), so while
+                //this seat was interrupting the cancel button could never reach
+                //the ordinary cast-cancel path - it always meant "end the
+                //window" instead. If a choice is pending, cancel THAT and keep
+                //the window open (nothing has been paid yet - the pool still
+                //floats and the card stays in hand); a second press then ends
+                //the interruption exactly as before. A mandatory choice
+                //(cantCancel) falls through untouched.
+                if (cancelPendingChoice())
+                    return true;
                 endOfInterruption();
                 return true;
             }
