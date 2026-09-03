@@ -1,5 +1,7 @@
 #include "PrecompiledHeader.h"
 
+#include <chrono>  //#W57-T: the hang guard's wall clock
+
 //WAGIC_MEMPROBE: opt-in heap/cache telemetry at every duel phase transition
 //(compile with -DWAGIC_MEMPROBE; writes User/wagic-memprobe.log). This is the
 //instrument that root-caused the 2026-08-04 cross-match crash-to-off: heapUsed
@@ -757,8 +759,471 @@ void GameStateDuel::ThreadProc(void* inParam)
 }
 #endif //AI_CHANGE_TESTING
 
+
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+//#W57-T: the last frame/frames telemetry line the Vita memlog wrote, so a
+//softlock capture carries the same number the memlog would have shown.
+//Defined in JGE/src/Vitamain.cpp next to memlogAppend.
+extern "C" const char * vitaFrameLastLine();
+#endif
+
+//===========================================================================
+//#W57-T  SOFTLOCK ESCAPE - diagnostics capture
+//
+//Owner request (2026-09-03, verbatim): "We need a softlock exit to main menu
+//option, for capturing diagnostics from softlocks."  His correction the same
+//day is what shapes this file: "No, the menu button works. I used it." The
+//game loop was ALIVE through his vpk16 freeze - the in-game menu opened and he
+//quit through it - so the state that mattered was still readable the whole
+//time and simply went unrecorded. The primary escape is therefore a MENU ITEM,
+//not a thread and not a watchdog: it runs on the game thread, at a moment the
+//player chose, with every pointer live.
+//
+//Nothing here mutates the game. It reads, formats and writes; a capture taken
+//from a wedged game must not be able to change what it is describing (and the
+//same function is called from the hang-guard unwind, where the game is in an
+//unknown-but-consistent state and mutation would be reckless).
+//
+//Pointer discipline: every MTGCardInstance read here goes through
+//GameObserver::validateCardPointer, which compares by POINTER against the
+//zones the game still tracks and never dereferences. A softlock capture is
+//exactly the situation where a dangling source pointer is likely, and a dump
+//that segfaults is worse than no dump.
+//===========================================================================
+
+//Per-frame heartbeat. Published by GameStateDuel::Update; costs one clock read
+//and a handful of integer adds per frame. It exists so the dump can carry a
+//memlog-style `frames` line on EVERY platform (the Vita memlog's own frame
+//telemetry is WAGIC_VITAMEMLOG-only and alpha-only).
+namespace
+{
+struct SoftlockFrameStats
+{
+    unsigned n;          //frames since the last reset
+    unsigned lastMs;     //wall ms of the most recent frame gap
+    unsigned maxMs;      //worst frame gap since the reset
+    unsigned long long sumMs;
+    int prevTick;        //JGEGetTime() at the previous frame
+    float dtSum;         //engine dt accumulated (what the engine THINKS elapsed)
+    SoftlockFrameStats() : n(0), lastMs(0), maxMs(0), sumMs(0), prevTick(0), dtSum(0) {}
+};
+SoftlockFrameStats gSoftlockFrames;
+}
+
+void wagicSoftlockFrameTick(float dt)
+{
+    SoftlockFrameStats & f = gSoftlockFrames;
+    int now = JGEGetTime();
+    if (f.prevTick)
+    {
+        int d = now - f.prevTick;
+        if (d < 0) d = 0;
+        f.lastMs = (unsigned) d;
+        if (f.lastMs > f.maxMs) f.maxMs = f.lastMs;
+        f.sumMs += f.lastMs;
+        ++f.n;
+    }
+    f.prevTick = now;
+    f.dtSum += dt;
+}
+
+void wagicSoftlockFrameReset()
+{
+    gSoftlockFrames = SoftlockFrameStats();
+}
+
+namespace
+{
+//A name for a card pointer that may already be dead. NULL and unvalidated
+//pointers come back as markers, never as a dereference.
+std::string slCardName(GameObserver * g, MTGCardInstance * c)
+{
+    if (!c) return "(none)";
+    //validateCardPointer proves a pointer is one the game still tracks; it
+    //cannot prove the opposite. The engine's own rule abilities carry sources
+    //that live outside every tracked zone (ExtraRules), and those come back
+    //unmatched while being perfectly alive - so the negative verdict is
+    //"unverified", never "dangling". Calling a live pointer dead in a
+    //diagnostics file would send the next reader hunting a use-after-free
+    //that is not there.
+    MTGCardInstance * live = g ? g->validateCardPointer(c) : NULL;
+    if (!live) return "(unverified)";
+    return live->getName();
+}
+
+std::string slPlayerName(GameObserver * g, Player * p)
+{
+    if (!p) return "(none)";
+    if (g && g->players.size() > 0 && g->players[0] == p) return "p1";
+    if (g && g->players.size() > 1 && g->players[1] == p) return "p2";
+    return "(foreign)";
+}
+
+//RTTI name, unmangled only where the platform gives it away for free. The
+//mangled form is still discriminating - it is a class identity, not prose.
+const char * slTypeName(const std::type_info & t)
+{
+    const char * n = t.name();
+    return n ? n : "?";
+}
+
+//One line describing a TargetChooser: what it is, whose it is, how full it
+//is, and how many legal candidates it can still see. countValidTargets walks
+//the board - acceptable here (once per capture), never per frame.
+std::string slTargetChooser(GameObserver * g, TargetChooser * tc)
+{
+    if (!tc) return "(none)";
+    std::ostringstream o;
+    o << "class=" << slTypeName(typeid(*tc))
+      << " source=" << slCardName(g, tc->source)
+      << " targetter=" << slCardName(g, tc->targetter)
+      << " owner=" << slPlayerName(g, tc->Owner)
+      << " targets=" << (unsigned) tc->getNbTargets()
+      << " maxtargets=" << tc->maxtargets
+      << " valid=" << tc->countValidTargets()
+      << " done=" << (tc->done ? 1 : 0)
+      << " full=" << tc->full()
+      << " other=" << (tc->other ? 1 : 0)
+      << " targetMin=" << (tc->targetMin ? 1 : 0)
+      << " autoChoice=" << (tc->autoChoice ? 1 : 0)
+      << " attempts=" << tc->attemptsToFill
+      << " ability='" << tc->belongsToAbility << "'";
+    return o.str();
+}
+
+const char * slZoneCounts(std::ostringstream & o, Player * p)
+{
+    if (!p || !p->game) { o << " (no zones)"; return ""; }
+    MTGPlayerCards * z = p->game;
+    o << " library=" << z->library->nb_cards
+      << " hand=" << z->hand->nb_cards
+      << " inplay=" << z->inPlay->nb_cards
+      << " graveyard=" << z->graveyard->nb_cards
+      << " exile=" << z->exile->nb_cards
+      << " stack=" << z->stack->nb_cards
+      << " commandzone=" << z->commandzone->nb_cards
+      << " reveal=" << z->reveal->nb_cards
+      << " sideboard=" << z->sideboard->nb_cards
+      << " garbage=" << z->garbage->nb_cards
+      << " garbageLastTurn=" << z->garbageLastTurn->nb_cards
+      << " temp=" << z->temp->nb_cards;
+    return "";
+}
+} //anonymous namespace
+
+//---------------------------------------------------------------------------
+//#W57-T half A: the in-thread hang guard.
+//
+//Defined here, with the dump it feeds, rather than in GameObserver.cpp - that
+//file is CP1252+CRLF and every wave has several lanes editing it; this is a
+//self-contained feature and belongs where its other half lives.
+//
+//DEFAULT OFF. The budget is a WALL CLOCK per game tick, not per decision, and
+//it is armed at the top of GameObserver::Update, so the only thing that can
+//burn it is code that does not return from one tick - which is exactly the
+//hang class. An AI seat waiting on a model answer is NOT inside the tick (its
+//seam returns kChoicePending and the frame completes normally), so the async
+//wait cannot trip this no matter how long the endpoint takes.
+//---------------------------------------------------------------------------
+namespace
+{
+long long slNowMs()
+{
+    return (long long) std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}
+
+void GameObserver::hangTickBegin()
+{
+    if (!mHangGuardResolved)
+    {
+        mHangGuardResolved = true;
+        const char * on = getenv("WAGIC_HANG_GUARD");
+        //Explicit opt-in only. The suite and the selfplay/PARSETEST harnesses
+        //are excluded unless the variable names the guard for THIS run - a
+        //slow legitimate tick under a loaded machine must never read as a hang.
+        mHangGuardOn = (on && on[0] == '1');
+        if (mHangGuardOn)
+        {
+            const char * ms = getenv("WAGIC_HANG_GUARD_MS");
+            long v = ms ? atol(ms) : 0;
+            //5 s desktop / 8 s console: a console tick is slower across the
+            //board, and a false trip there costs the player a match.
+#if defined(VITA) || defined(PSP)
+            mHangBudgetMs = v > 0 ? v : 8000;
+#else
+            mHangBudgetMs = v > 0 ? v : 5000;
+#endif
+        }
+    }
+    if (!mHangGuardOn) return;
+    mHangTickStartMs = slNowMs();
+    mHangIterations = 0;
+}
+
+void GameObserver::hangCheck(const char * site)
+{
+    if (!mHangGuardOn) return;
+    //One clock read per 64 iterations. The counter is the cost in the common
+    //case: an increment and a mask, which is what lets this sit inside the
+    //engine's hottest loops without being felt.
+    if ((++mHangIterations & 0x3Ful) != 0) return;
+    if (!mHangTickStartMs) return;
+    const long long elapsed = slNowMs() - mHangTickStartMs;
+    if (elapsed < mHangBudgetMs) return;
+    //Disarm before throwing: the unwind runs the dump, which walks the same
+    //structures, and a guard that re-fires inside its own capture would throw
+    //out of the capture and lose it.
+    mHangGuardOn = false;
+    throw SoftlockAbort(site, mHangIterations, (long) elapsed);
+}
+
+std::string wagicSoftlockDump(GameObserver * game, const char * trigger)
+{
+    if (!game) return std::string();
+
+    std::ostringstream o;
+    const time_t now = time(0);
+
+    o << "#softlock dump\n";
+    o << "build=" << WAGIC_RELEASE_NAME << " compiled=" << __DATE__ << " " << __TIME__
+#ifdef WAGIC_BUILD_ID
+      //Define -DWAGIC_BUILD_ID=\"<commit>\" to stamp the exact source revision;
+      //no build file sets it today, so the compile timestamp is the build id.
+      << " id=" << WAGIC_BUILD_ID
+#endif
+      << "\n";
+    o << "trigger=" << (trigger ? trigger : "?") << "\n";
+    o << "epoch=" << (unsigned long long) now << "\n";
+
+    //--- turn / phase / who is acting -------------------------------------
+    o << "\n[game]\n";
+    o << "turn=" << game->turn
+      << " phase=" << game->getCurrentGamePhaseName() << "(" << game->getCurrentGamePhase() << ")"
+      << " nextphase=" << game->getNextGamePhaseName()
+      << " combatStep=" << (int) game->combatStep
+      << " settled(turn/phase/step)=" << game->mSettledTurn << "/" << game->mSettledPhase << "/" << game->mSettledStep
+      << " phaseTicks=" << game->mPhaseTicks << "\n";
+    o << "currentPlayer=" << slPlayerName(game, game->currentPlayer)
+      << " currentActionPlayer=" << slPlayerName(game, game->currentActionPlayer)
+      << " currentlyActing=" << slPlayerName(game, game->currentlyActing())
+      << " isInterrupting=" << slPlayerName(game, game->isInterrupting)
+      << " gameOver=" << (game->didWin() ? 1 : 0) << "\n";
+    o << "pregame=" << (game->mPregame ? 1 : 0)
+      << " pregameDone=" << (game->pregameDone() ? 1 : 0)
+      << " loading=" << (game->isLoading() ? 1 : 0)
+      << " suiteGame=" << (game->mSuiteGame ? 1 : 0)
+      << " cardWaitingForTargets=" << slCardName(game, game->isCardWaiting())
+      << " extraPayment=" << (game->mExtraPayment ? 1 : 0) << "\n";
+    o << "observer.targetChooser: " << slTargetChooser(game, game->targetChooser) << "\n";
+    o << "currentTargetChooser: " << slTargetChooser(game, game->getCurrentTargetChooser()) << "\n";
+    o << "openedDisplay=" << (game->OpenedDisplay ? 1 : 0)
+      << " humanDisplayOpen=" << (game->humanDisplayOpen() ? 1 : 0) << "\n";
+
+    DuelLayers * layers = game->getView();
+    if (!layers)
+    {
+        o << "\n[layers] (none - game not started)\n";
+    }
+    else
+    {
+        //--- the action layer ---------------------------------------------
+        ActionLayer * al = layers->actionLayer();
+        o << "\n[actionlayer]\n";
+        if (!al)
+            o << "(none)\n";
+        else
+        {
+            ActionElement * waiting = al->isWaitingForAnswer();
+            o << "cantCancel=" << al->checkCantCancel()
+              << " stuffHappened=" << al->stuffHappened
+              << " menuArmedSerial=" << al->menuArmedSerial
+              << " menuObject=" << (al->menuObject ? slTypeName(typeid(*al->menuObject)) : "(none)")
+              << " menuObjectName='" << al->menuObjectName << "'"
+              << " currentActionCard=" << slCardName(game, al->currentActionCard) << "\n";
+            o << "abilitiesMenu=" << (al->abilitiesMenu ? "open" : "null")
+              << " abilitiesTriggered=" << (al->abilitiesTriggered ? "open" : "null")
+              << " garbage=" << (unsigned) al->garbage.size()
+              << " destroying=" << (unsigned) al->mDestroying.size() << "\n";
+            o << "currentWaitingAction=" << (waiting ? slTypeName(typeid(*waiting)) : "(none)");
+            if (waiting)
+            {
+                MTGAbility * wa = dynamic_cast<MTGAbility*>(waiting);
+                o << " source=" << (wa ? slCardName(game, wa->source) : std::string("(not an ability)"))
+                  << " waitingForAnswer=" << waiting->waitingForAnswer
+                  << " modal=" << waiting->modal;
+            }
+            o << "\n";
+            o << "waitingAction.tc: " << (waiting ? slTargetChooser(game, waiting->getActionTc()) : std::string("(none)")) << "\n";
+            o << "mObjects=" << (unsigned) al->mObjects.size() << "\n";
+            for (size_t i = 0; i < al->mObjects.size(); ++i)
+            {
+                JGuiObject * ob = al->mObjects[i];
+                if (!ob) { o << "  i=" << (unsigned) i << " (null)\n"; continue; }
+                MTGAbility * ab = dynamic_cast<MTGAbility*>((ActionElement*) ob);
+                o << "  i=" << (unsigned) i
+                  << " class=" << slTypeName(typeid(*ob))
+                  << " source=" << (ab ? slCardName(game, ab->source) : std::string("(n/a)"));
+                if (ab)
+                    o << " tcTargets=" << (ab->getActionTc() ? (int) ab->getActionTc()->getNbTargets() : -1);
+                o << "\n";
+            }
+        }
+
+        //--- the stack -----------------------------------------------------
+        ActionStack * st = layers->stackLayer();
+        o << "\n[stack]\n";
+        if (!st)
+            o << "(none)\n";
+        else
+        {
+            o << "askIfWishesToInterrupt=" << slPlayerName(game, st->askIfWishesToInterrupt)
+              << " interruptDecision=[" << (int) st->getInterruptDecision(0) << "," << (int) st->getInterruptDecision(1) << "]"
+              << " timer=" << st->getInterruptTimer()
+              << " state=" << st->getCurrentState()
+              << " calm=" << (st->isCalm() ? 1 : 0) << "\n";
+            o << "priorityOn=" << (st->mPriorityOn ? slTypeName(typeid(*st->mPriorityOn)) : "(none)")
+              << " holdOn=" << (st->mHoldOn ? slTypeName(typeid(*st->mHoldOn)) : "(none)")
+              << " holdWho=" << slPlayerName(game, st->mHoldWho)
+              << " holdTicks=" << st->mHoldTicks
+              << " holdSeconds=" << st->mHoldSeconds
+              << " holdStartMs=" << st->mHoldStartMs
+              << " lastActionController=" << slPlayerName(game, st->lastActionController) << "\n";
+            o << "items=" << (unsigned) st->mObjects.size() << "\n";
+            for (size_t i = 0; i < st->mObjects.size(); ++i)
+            {
+                Interruptible * it = (Interruptible *) st->mObjects[i];
+                if (!it) { o << "  i=" << (unsigned) i << " (null)\n"; continue; }
+                o << "  i=" << (unsigned) i
+                  << " class=" << slTypeName(typeid(*it))
+                  << " state=" << it->state
+                  << " display=" << it->display
+                  << " source=" << slCardName(game, it->source)
+                  << " name='" << it->getDisplayName() << "'";
+                Spell * sp = dynamic_cast<Spell*>(it);
+                if (sp)
+                {
+                    o << " targets=" << sp->getNbTargets() << " [";
+                    MTGCardInstance * t = NULL;
+                    int guard = 0;
+                    while ((t = sp->getNextCardTarget(t)) != NULL && ++guard < 32)
+                        o << slCardName(game, t) << ";";
+                    o << "]";
+                    o << " tc: " << slTargetChooser(game, sp->tc);
+                }
+                o << "\n";
+            }
+        }
+    }
+
+    //--- the seats ---------------------------------------------------------
+    o << "\n[players]\n";
+    for (size_t i = 0; i < game->players.size(); ++i)
+    {
+        Player * p = game->players[i];
+        if (!p) { o << "p" << (unsigned)(i + 1) << " (null)\n"; continue; }
+        o << "p" << (unsigned)(i + 1)
+          << " name='" << p->getDisplayName() << "'"
+          << " deck='" << p->deckName << "'"
+          << " life=" << p->life
+          << " ai=" << p->isAI()
+          << " interactiveAI=" << (p->isInteractiveAI() ? 1 : 0)
+          << " decisionInFlight=" << (p->aiDecisionInFlight() ? 1 : 0)
+          << " manapool='" << (p->getManaPool() ? p->getManaPool()->toString() : std::string("(none)")) << "'";
+        slZoneCounts(o, p);
+        o << "\n";
+        const std::string diag = p->softlockDiagnostic();
+        if (diag.size())
+            o << "p" << (unsigned)(i + 1) << " gpt:\n" << diag << "\n";
+    }
+
+    //--- frame timing ------------------------------------------------------
+    //Same shape as the Vita memlog's `frames` line so the two read together.
+    o << "\n[frames]\n";
+    {
+        const SoftlockFrameStats & f = gSoftlockFrames;
+        o << "frames turn=" << game->turn
+          << " n=" << f.n
+          << " avg_ms=" << (f.n ? (unsigned)(f.sumMs / f.n) : 0u)
+          << " max_ms=" << f.maxMs
+          << " last_ms=" << f.lastMs
+          << " dtsum_s=" << f.dtSum << "\n";
+    }
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+    {
+        const char * last = vitaFrameLastLine();
+        o << "memlog_last=" << (last && *last ? last : "(none)") << "\n";
+    }
+#else
+    o << "memlog_last=(not built)\n";
+#endif
+
+    //--- transcript tail ---------------------------------------------------
+    o << "\n[transcript]\n";
+    o << "path=" << (game->mTranscriptPath.size() ? game->mTranscriptPath : std::string("(none)")) << "\n";
+    {
+        const std::list<std::string> & acts = game->getActionsList();
+        const size_t kTail = 40;
+        size_t skip = acts.size() > kTail ? acts.size() - kTail : 0;
+        o << "actions=" << (unsigned) acts.size() << " showing_last=" << (unsigned)(acts.size() - skip) << "\n";
+        std::list<std::string>::const_iterator it = acts.begin();
+        for (size_t k = 0; k < skip && it != acts.end(); ++k) ++it;
+        for (; it != acts.end(); ++it)
+            o << "  " << *it << "\n";
+    }
+    o << "#end\n";
+
+    //--- write it ----------------------------------------------------------
+    std::ostringstream path;
+#ifdef VITA
+    sceIoMkdir("ux0:data", 0777);
+    sceIoMkdir("ux0:data/Wagic", 0777);
+    path << "ux0:data/Wagic/softlock-" << (unsigned long long) now;
+#else
+    //Next to User/transcripts, the writable directory every desktop/handheld
+    //build already owns. WAGIC_SOFTLOCK_DIR overrides it (the suite fixture
+    //uses that so a capture never lands in the player's own User/).
+    const char * dir = getenv("WAGIC_SOFTLOCK_DIR");
+    path << (dir ? dir : "User") << "/softlock-" << (unsigned long long) now;
+#endif
+
+    //A second capture inside the same wall-clock second must not silently
+    //overwrite the first (the fixture takes two; so would a player pressing
+    //the item twice). The epoch names the capture; a suffix disambiguates.
+    std::string outPath = path.str() + ".txt";
+    for (int dup = 1; dup < 100; ++dup)
+    {
+        FILE * probe = fopen(outPath.c_str(), "rb");
+        if (!probe) break;
+        fclose(probe);
+        std::ostringstream alt;
+        alt << path.str() << "-" << dup << ".txt";
+        outPath = alt.str();
+    }
+    const std::string body = o.str();
+    FILE * fp = fopen(outPath.c_str(), "wb");
+    if (!fp)
+    {
+        std::cerr << "==Softlock dump: could not open " << outPath << std::endl;
+        return std::string();
+    }
+    fwrite(body.data(), 1, body.size(), fp);
+    fclose(fp);
+
+    //The transcript is the replayable half of the same evidence; stamping it
+    //means a capture and its game are matched up without a timestamp guess.
+    game->mSoftlockDumpPath = outPath;
+    game->appendTranscriptNote("classification=softlock");
+    game->appendTranscriptNote("softlock file=" + outPath);
+    game->appendTranscriptNote(std::string("softlock trigger=") + (trigger ? trigger : "?"));
+    std::cerr << "==Softlock dump written: " << outPath << std::endl;
+    return outPath;
+}
+
 void GameStateDuel::Update(float dt)
 {
+    wagicSoftlockFrameTick(dt); //#W57-T frame heartbeat for the softlock dump
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #ifdef WAGIC_AUTODEMO
     WagicScopeMs _updTimer(gUpdMs);
@@ -1147,7 +1612,27 @@ void GameStateDuel::Update(float dt)
                 tournament->setScoreDisplayed(false);
             }
         }
-        game->Update(dt);
+        //#W57-T half A: the outermost per-frame call that can unwind safely.
+        //Nothing above this line in the frame has been mutated by the tick,
+        //and everything below is the duel screen's own bookkeeping - so an
+        //abort here loses one frame and nothing else. The escape is then the
+        //SAME exit the "Softlock: dump diagnostics and quit to menu" item
+        //takes (and the plain "Back to main menu" before it).
+        try
+        {
+            game->Update(dt);
+        }
+        catch (SoftlockAbort & abort)
+        {
+            std::ostringstream trig;
+            trig << "hangguard site=" << (abort.site ? abort.site : "?")
+                 << " iterations=" << abort.iterations
+                 << " elapsed_ms=" << abort.budgetMs;
+            wagicSoftlockDump(game, trig.str().c_str());
+            if (menu) menu->Close();
+            setGamePhase(DUEL_STATE_BACK_TO_MAIN_MENU);
+            break;
+        }
         //run a "post update" init call in the rules. This is for things such as Manapool, which gets emptied in the update
         // That's mostly because of a legacy bug, where we use the update sequence for some things when we should use events (such as phase changes)
         mParent->rules->postUpdateInit(game);
@@ -1425,6 +1910,12 @@ void GameStateDuel::Update(float dt)
                         }
                     }
                     menu->Add(MENUITEM_MAIN_MENU, "Back to main menu");
+                    //#W57-T (softlock escape): the same exit, with the game's
+                    //state written out first. Sits next to the plain quit
+                    //deliberately - the owner reaches for this menu when the
+                    //game has stopped responding, and the evidence has to be
+                    //one item away from the door he was already going to take.
+                    menu->Add(MENUITEM_SOFTLOCK_DUMP, "Softlock: dump diagnostics and quit to menu");
 #ifdef TESTSUITE
                     menu->Add(MENUITEM_UNDO, "Undo");
                     menu->Add(MENUITEM_LOAD, "Load");
@@ -1862,6 +2353,11 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
             static const char * labels[] = { "no problems", "bug", "bad blocking", "bad targeting", "bad mana selection", "other" };
             if (game && controlId >= 1 && controlId <= 6)
                 game->appendTranscriptNote(string("classification=") + labels[controlId - 1]);
+            //#W57-T: if a softlock capture was taken during THIS game, a "bug"
+            //verdict names the file, so the classification and the diagnostics
+            //are one grep apart instead of two timestamps to reconcile.
+            if (game && controlId == 2 && game->mSoftlockDumpPath.size())
+                game->appendTranscriptNote("softlock file=" + game->mSoftlockDumpPath);
             if (transcriptMenu) transcriptMenu->Close();
             mTranscriptMenuDone = true;
             break;
@@ -2391,6 +2887,18 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
             setGamePhase(DUEL_STATE_MENU_TO_SCORE);
             break;
         case MENUITEM_MAIN_MENU:
+            menu->Close();
+            setGamePhase(DUEL_STATE_BACK_TO_MAIN_MENU);
+            break;
+        //#W57-T: capture first, then EXACTLY the MENUITEM_MAIN_MENU path above
+        //- same menu->Close(), same DUEL_STATE_BACK_TO_MAIN_MENU, so the
+        //observer, the layers and the tournament are torn down by the one
+        //quit path the game already has. The dump reads live state and
+        //mutates nothing, so it can run before the close with no ordering
+        //risk; running it after would read a half-closed menu.
+        case MENUITEM_SOFTLOCK_DUMP:
+            if (game)
+                wagicSoftlockDump(game, "menu");
             menu->Close();
             setGamePhase(DUEL_STATE_BACK_TO_MAIN_MENU);
             break;

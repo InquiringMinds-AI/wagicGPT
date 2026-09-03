@@ -494,7 +494,7 @@ int TestSuiteAI::Act(float)
             bool keyword = action == "" || action == "next" || action == "eot" || action == "yes"
                 || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
                 || action == "cancelbutton" //#W56-Z
-                || action == "interactivereveal" || action == "realgame"
+                || action == "interactivereveal" || action == "realgame" || action == "softlockdump" || action.compare(0, 9, "hangspin ") == 0
                 || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
                 || action.compare(0, 10, "aipending ") == 0 //#W54-R
                 || action.compare(0, 7, "aiseat ") == 0 //#W57-S
@@ -698,6 +698,135 @@ int TestSuiteAI::Act(float)
     {
         if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
             observer->mLayers->stackLayer()->cancelInterruptOffer();
+    }
+    else if (action.compare(0, 9, "hangspin ") == 0)
+    {
+        //#W57-T half A fixture pin: arm the in-thread hang guard with a tiny
+        //budget and then SPIN, exactly the way a wedged engine loop spins, and
+        //assert that the guard names the site, unwinds, and that the capture
+        //the unwind writes is on disk. The abort is caught HERE rather than at
+        //the duel screen's catch on purpose: the suite has no duel screen and
+        //must not be dragged to the main menu mid-fixture. What is pinned is
+        //the mechanism (budget -> throw -> dump); the menu transition is the
+        //same two statements the "Back to main menu" item runs and is pinned
+        //by reuse, not by this fixture. Syntax: hangspin <budget-ms>
+        const long budget = atol(action.substr(9).c_str());
+        observer->hangGuardForTest(budget > 0 ? budget : 20);
+        observer->hangTickBegin();
+        bool tripped = false;
+        std::string site;
+        std::string dumpPath;
+        try
+        {
+            for (unsigned long i = 0; i < 100000000ul; ++i)
+                observer->hangCheck("testsuite.spin");
+        }
+        catch (SoftlockAbort & abortSignal)
+        {
+            tripped = true;
+            site = abortSignal.site ? abortSignal.site : "";
+            std::ostringstream trig;
+            trig << "hangguard site=" << site << " iterations=" << abortSignal.iterations;
+            dumpPath = wagicSoftlockDump(observer, trig.str().c_str());
+        }
+        if (!tripped)
+        {
+            std::cerr << "TESTSUITE hangspin: guard never tripped [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else if (site != "testsuite.spin")
+        {
+            std::cerr << "TESTSUITE hangspin: wrong site '" << site << "' [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else if (dumpPath.empty())
+        {
+            std::cerr << "TESTSUITE hangspin: no capture written [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else
+        {
+            std::string body;
+            FILE * f = fopen(dumpPath.c_str(), "rb");
+            if (f)
+            {
+                char buf[4096]; size_t n;
+                while ((n = fread(buf, 1, sizeof(buf), f)) > 0) body.append(buf, n);
+                fclose(f);
+            }
+            if (body.find("trigger=hangguard site=testsuite.spin") == std::string::npos
+                || body.find("#end") == std::string::npos)
+            {
+                std::cerr << "TESTSUITE hangspin: capture did not name the tripping site"
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+            if (!getenv("WAGIC_SOFTLOCK_KEEP"))
+                remove(dumpPath.c_str());
+        }
+        //Leave the guard the way the fixture found it: every later tick of
+        //this game (and the suite's shared driver) must be unguarded again.
+        observer->mHangGuardOn = false;
+        DebugTrace("TESTSUITE hangspin: tripped=" << tripped << " site='" << site << "'");
+    }
+    else if (action.compare("softlockdump") == 0)
+    {
+        //#W57-T (softlock escape) fixture pin. Runs the SAME dump function the
+        //in-game "Softlock: dump diagnostics and quit to menu" item runs, then
+        //reads the file back and asserts the sections a capture must carry.
+        //Reading it back is the point: a capture is only worth what it says,
+        //and "the function returned a path" would pass with an empty file.
+        //WAGIC_SOFTLOCK_DIR keeps the artefact out of the player's User/.
+        const std::string dumpPath = wagicSoftlockDump(observer, "testsuite");
+        if (dumpPath.empty())
+        {
+            std::cerr << "TESTSUITE softlockdump: no file written [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else
+        {
+            std::string body;
+            FILE * f = fopen(dumpPath.c_str(), "rb");
+            if (f)
+            {
+                char buf[4096];
+                size_t n;
+                while ((n = fread(buf, 1, sizeof(buf), f)) > 0) body.append(buf, n);
+                fclose(f);
+            }
+            static const char * required[] = {
+                "#softlock dump", "build=", "trigger=testsuite", "[game]", "turn=",
+                "currentPlayer=", "isInterrupting=", "observer.targetChooser:",
+                "[actionlayer]", "currentWaitingAction=", "mObjects=",
+                "[stack]", "askIfWishesToInterrupt=", "interruptDecision=[", "items=",
+                "[players]", "p1 ", "library=", "hand=", "inplay=",
+                "[frames]", "frames turn=", "memlog_last=",
+                "[transcript]", "actions=", "#end"
+            };
+            for (size_t r = 0; r < sizeof(required) / sizeof(required[0]); ++r)
+            {
+                if (body.find(required[r]) == std::string::npos)
+                {
+                    std::cerr << "TESTSUITE softlockdump: missing field '" << required[r]
+                              << "' in " << dumpPath << " [" << suite->filename << "]" << std::endl;
+                    suite->commandAssertFailures++;
+                }
+            }
+            //The dump must also stamp the transcript. In a suite game there is
+            //no transcript path (they are deliberately never kept), so the
+            //note itself is what is checked, not a file on disk.
+            if (observer->mSoftlockDumpPath != dumpPath)
+            {
+                std::cerr << "TESTSUITE softlockdump: observer did not record the path"
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+            //The fixture cleans up after itself; WAGIC_SOFTLOCK_KEEP=1 leaves
+            //the capture on disk when someone is actually reading it.
+            if (!getenv("WAGIC_SOFTLOCK_KEEP"))
+                remove(dumpPath.c_str());
+        }
+        DebugTrace("TESTSUITE softlockdump: " << dumpPath << " [" << suite->filename << "]");
     }
     else if (action.compare("interactivereveal") == 0)
     {

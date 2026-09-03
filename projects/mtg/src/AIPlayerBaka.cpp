@@ -2290,6 +2290,7 @@ int AIPlayerBaka::createAbilityTargets(MTGAbility * a, MTGCardInstance * c, Rank
         }
         while(potentialTargets.size())
         {
+            observer->hangCheck("AIPlayerBaka::selectAbility/potentialTargets"); //#W57-T
             OrderedAIAction * check = NULL;
 
             MTGCardInstance * cTargeting = dynamic_cast<MTGCardInstance*>(potentialTargets[0]);
@@ -2855,6 +2856,7 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
     }
     while(playerTargetedZone)
     {
+        observer->hangCheck("AIPlayerBaka::chooseTarget/playerTargetedZone"); //#W57-T
         if (!tc->alreadyHasTarget(target) && tc->canTarget(target) && potentialTargets.size() < 50)
         {
             for (int i = 0; i < 3; i++)
@@ -4506,6 +4508,7 @@ int AIPlayerBaka::chooseBlockers()
         int set = 0;
         while (!set)
         {
+            observer->hangCheck("AIPlayerBaka::declareBlocker/setDefenser"); //#W57-T
             if (!card->defenser)
             {
                 set = 1;

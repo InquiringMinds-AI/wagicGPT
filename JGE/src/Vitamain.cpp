@@ -108,8 +108,24 @@ static unsigned int gFrSlowLines = 0;
 // container sizes). They describe the frame the numbers came from.
 static int gFrTurn = 0, gFrP1 = 0, gFrP2 = 0, gFrHand = 0, gFrAbil = 0;
 
+//#W57-T: the last telemetry line written, kept so a softlock capture can quote
+//it (the softlock dump runs on the game thread and cannot read the file back
+//without an I/O round trip on a wedged console). One strncpy per memlog line -
+//and memlog lines are per-turn plus at most five slow frames, not per frame.
+static char gLastMemlogLine[352] = "";
+
+extern "C" const char * vitaFrameLastLine()
+{
+    return gLastMemlogLine;
+}
+
 static void memlogAppend(const char* line)
 {
+    strncpy(gLastMemlogLine, line, sizeof(gLastMemlogLine) - 1);
+    gLastMemlogLine[sizeof(gLastMemlogLine) - 1] = '\0';
+    //One line per record; the dump embeds it in a line of its own.
+    for (size_t i = 0; i < sizeof(gLastMemlogLine); ++i)
+        if (gLastMemlogLine[i] == '\n' || gLastMemlogLine[i] == '\r') gLastMemlogLine[i] = ' ';
     SceUID fd = sceIoOpen("ux0:data/Wagic/memlog.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
     if (fd >= 0)
     {

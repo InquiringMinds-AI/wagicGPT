@@ -295,6 +295,9 @@ public:
         MENUITEM_CONFIRM_SELECT_ALL = -35,
         MENUITEM_LLM_KEEP_WAITING = -36,
         MENUITEM_LLM_SWITCH_OFF = -37,
+        //#W57-T: capture a softlock diagnostics file, then leave by the same
+        //door MENUITEM_MAIN_MENU uses.
+        MENUITEM_SOFTLOCK_DUMP = -38,
         MENUITEM_MORE_INFO = kInfoMenuID
     };
 
