@@ -56,6 +56,12 @@ int ActionLayer::removeFromGame(ActionElement * e)
             manaObjects.erase(manaObjects.begin() + k);
             break;
         }
+    //#W58-F (F1): an armed menu row that names this element must stop naming
+    //it BEFORE the erase compacts the vector - a pointer-identity scan, no
+    //dereference, so it is safe whatever destroy() just did to the element.
+    for (size_t k = 0; k < menuRowElements.size(); k++)
+        if (menuRowElements[k] == e)
+            menuRowElements[k] = NULL;
     mObjects.erase(mObjects.begin() + i);
     return 1;
 }
@@ -482,6 +488,11 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
 
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, object->getDisplayName().c_str());
     abilitiesTriggered = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, object->getDisplayName().c_str());
+    //#W58-F (F1): one entry per row of the menu that is finally kept, in the
+    //same order the rows are added.
+    vector<ActionElement *> plainRowElements;
+    vector<ActionElement *> triggeredRowElements;
+    menuRowElements.clear();
     currentActionCard = (MTGCardInstance*)object;
     menuObjectName = object->getDisplayName();
     for (size_t i = 0; i < mObjects.size(); i++)
@@ -492,6 +503,7 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
             if(dynamic_cast<MTGAbility*>(currentAction)->getCost()||dynamic_cast<PermanentAbility*>(currentAction))
             {
                 abilitiesMenu->Add(i, currentAction->getMenuText());
+                plainRowElements.push_back(currentAction); //#W58-F (F1)
 #ifdef WAGIC_TRANSCRIPT_ON
                 if (observer->isLoading() && getenv("WAGIC_TRANSCRIPT_TRACE"))
                     DebugTrace("[transcript-trace] menu " << menuObjectName << " + " << currentAction->getMenuText());
@@ -507,6 +519,7 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
                 //a triggered or may ability as it leads to exploits.
                 //only exception is perminent abilities such as "cast card normally" which can share the menu with autohand=
                 abilitiesTriggered->Add(i, currentAction->getMenuText());
+                triggeredRowElements.push_back(currentAction); //#W58-F (F1)
 #ifdef WAGIC_TRANSCRIPT_ON
                 if (observer->isLoading() && getenv("WAGIC_TRANSCRIPT_TRACE"))
                     DebugTrace("[transcript-trace] menu(triggered) " << menuObjectName << " + " << currentAction->getMenuText());
@@ -518,13 +531,18 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
     {
         SAFE_DELETE(abilitiesMenu);
         abilitiesMenu = abilitiesTriggered;
+        menuRowElements = triggeredRowElements; //#W58-F (F1)
     }
     else
     {
         SAFE_DELETE(abilitiesTriggered);
+        menuRowElements = plainRowElements; //#W58-F (F1)
     }
     if (!must)
+    {
         abilitiesMenu->Add(kCancelMenuID, "Cancel");
+        menuRowElements.push_back(NULL); //#W58-F (F1): the cancel row names no ability
+    }
     else
         cantCancel = 1;
     modal = 1;
@@ -542,6 +560,9 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
     menuObjectName = object->getDisplayName(); //#W48 D6, same capture as setMenuObject
     SAFE_DELETE(abilitiesMenu);
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, customName.size()?customName.c_str():object->getDisplayName().c_str());
+    menuRowElements.clear(); //#W58-F (F1): the rows of a multiple-choice menu
+    //carry no mObjects index at all (every row is added with the same id); the
+    //resolvers below short-circuit on isMultipleChoice before reading this.
     currentActionCard = NULL;
     abilitiesMenu->isMultipleChoice = false;
     if(abilities.size())
@@ -552,13 +573,69 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
             ActionElement* currentAction = (ActionElement*)abilities[w];
             currentActionCard = (MTGCardInstance*)abilities[0]->target;
             abilitiesMenu->Add(mObjects.size()-1, currentAction->getMenuText(),"",false);
+            menuRowElements.push_back(NULL); //#W58-F (F1)
         }
     }
     if (!must)
+    {
         abilitiesMenu->Add(kCancelMenuID, "Cancel");
+        menuRowElements.push_back(NULL); //#W58-F (F1)
+    }
     else
         cantCancel = 1;
     modal = 1;
+}
+
+//#W58-F (F1): menu row -> the ability it names, resolved by IDENTITY. `slot`
+//comes back as the ability's index in mObjects RIGHT NOW, which is the row's
+//stored id when nothing moved and the re-pointed index when the vector was
+//compacted under the armed menu. False = this row names nothing the layer
+//still holds: the caller must make no decision from it (readers skip the row,
+//the act path does nothing this tick and the menu stays armed to be re-asked).
+//A row id <= 0 is passed through untouched - -1 is the cancel row, and id 0
+//keeps the engine's own long-standing "not a selectable option" convention
+//that every reader here already applies.
+bool ActionLayer::getMenuControlId(int menuIndex, int & slot)
+{
+    if (!abilitiesMenu || menuIndex < 0 || (size_t) menuIndex >= abilitiesMenu->mObjects.size())
+        return false;
+    slot = abilitiesMenu->mObjects[menuIndex]->GetId();
+    if (abilitiesMenu->isMultipleChoice || slot <= 0)
+        return true;
+    ActionElement * armed = ((size_t) menuIndex < menuRowElements.size())
+                            ? menuRowElements[menuIndex] : NULL;
+    if (!armed)
+        return false; //the ability this row was built from has left the game
+    if ((size_t) slot < mObjects.size() && mObjects[slot] == armed)
+        return true;
+    //Still in the game, at a new index: re-point rather than answer with
+    //whatever ability happens to sit at the stale position now.
+    int live = getIndexOf(armed);
+    if (live < 0)
+        return false;
+    DebugTrace("ActionLayer: menu row " << menuIndex << " re-pointed " << slot << " -> " << live);
+    slot = live;
+    return true;
+}
+
+//#W58-F (F1): the same mapping from the other end, for the human path -
+//SimpleMenu hands JGuiListener::ButtonPressed a row ID, not a row index.
+bool ActionLayer::getLiveMenuSlot(int controlid, int & slot)
+{
+    if (abilitiesMenu)
+    {
+        for (size_t i = 0; i < abilitiesMenu->mObjects.size(); i++)
+            if (abilitiesMenu->mObjects[i]->GetId() == controlid)
+                return getMenuControlId((int) i, slot);
+    }
+    //An id that names no row of the current menu (an engine call rather than a
+    //menu answer): accept it only as a live index into the layer.
+    if (controlid >= 0 && (size_t) controlid < mObjects.size())
+    {
+        slot = controlid;
+        return true;
+    }
+    return false;
 }
 
 void ActionLayer::doReactTo(int menuIndex)
@@ -571,6 +648,12 @@ void ActionLayer::doReactTo(int menuIndex)
         if (!abilitiesMenu || menuIndex < 0 || (size_t)menuIndex >= abilitiesMenu->mObjects.size())
         {
             DebugTrace("ActionLayer::doReactTo ignoring out-of-range menu index " << menuIndex);
+            return;
+        }
+        int slot = 0;
+        if (!getMenuControlId(menuIndex, slot)) //#W58-F (F1): stale row, no decision this tick
+        {
+            DebugTrace("ActionLayer::doReactTo ignoring stale menu index " << menuIndex);
             return;
         }
         int controlid = abilitiesMenu->mObjects[menuIndex]->GetId();
@@ -600,9 +683,14 @@ void ActionLayer::ButtonPressed(int, int controlid)
     {
         return ButtonPressedOnMultipleChoice();
     }
-    if (controlid >= 0 && controlid < static_cast<int>(mObjects.size()))
+    //#W58-F (F1): the id is a POSITION captured when the menu was armed, so it
+    //is only meaningful while the row's ability is still in the layer. A stale
+    //row falls through to the "id we don't recognize" branch below: no
+    //decision this tick, and the menu is deliberately NOT cleared.
+    int slot = -2;
+    if (getLiveMenuSlot(controlid, slot) && slot >= 0 && slot < static_cast<int>(mObjects.size()))
     {
-        ActionElement * currentAction = (ActionElement *) mObjects[controlid];
+        ActionElement * currentAction = (ActionElement *) mObjects[slot];
         //#W43-6. A rule callback may CHAIN a new decision instead of finishing:
         //answering "Cast Card Normally" for an {X} spell runs
         //MTGPutInPlayRule::reactToClick, which arms the X-ANNOUNCEMENT menu and

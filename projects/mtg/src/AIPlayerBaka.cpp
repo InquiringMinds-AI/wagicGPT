@@ -3079,10 +3079,15 @@ int AIPlayerBaka::selectMenuOption()
         {
             for(unsigned int k = 0;k < object->abilitiesMenu->mObjects.size();k++)
             {
-                if(object->abilitiesMenu->mObjects[k]->GetId() <= 0)
+                int slot = 0;
+                //#W58-F (F1): a row whose ability left the game is not a choice
+                //this AI can rank - skip it, never index with its stale id.
+                if (!object->getMenuControlId((int) k, slot))
+                    continue;
+                if(slot <= 0)
                     continue;
 
-                MTGAbility * checkEff = (MTGAbility *)object->mObjects[object->abilitiesMenu->mObjects[k]->GetId()];
+                MTGAbility * checkEff = (MTGAbility *)object->mObjects[slot];
                 int checked = getEfficiency(checkEff);
                 if(checked > 60 && checked > checkedLast)
                 {

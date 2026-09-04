@@ -362,9 +362,16 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     MTGAbility * firstOptionAbility = NULL;
     for (unsigned int k = 0; k < object->abilitiesMenu->mObjects.size(); k++)
     {
-        if (object->abilitiesMenu->mObjects[k]->GetId() <= 0)
+        //#W58-F (F1): resolve the row by identity. A row whose ability left the
+        //game since the menu was armed is simply not offered - the surviving
+        //rows stay legal choices, and applyMenuChoice's optionTexts gate makes
+        //an answer built against the old row set drop for a fresh ask.
+        int slot = 0;
+        if (!object->getMenuControlId((int) k, slot))
             continue;
-        MTGAbility * ab = (MTGAbility *) object->mObjects[object->abilitiesMenu->mObjects[k]->GetId()];
+        if (slot <= 0)
+            continue;
+        MTGAbility * ab = (MTGAbility *) object->mObjects[slot];
         req.optionTexts.push_back(ab ? ab->getMenuText() : string("(option)"));
         req.menuIndices.push_back((int) k);
         soleOptionAbility = ab;
@@ -463,8 +470,10 @@ bool DecisionManager::inspectMayBatch(Player * p, const DecisionRequest & req, M
     int item = req.menuIndices[0];
     if (item < 0 || (size_t) item >= object->abilitiesMenu->mObjects.size())
         return false;
-    int slot = object->abilitiesMenu->mObjects[item]->GetId();
-    if (slot <= 0 || (size_t) slot >= object->mObjects.size())
+    int slot = 0;
+    if (!object->getMenuControlId(item, slot) || slot <= 0) //#W58-F (F1)
+        return false;
+    if ((size_t) slot >= object->mObjects.size())
         return false;
     MayAbility * may = batchableMay((MTGAbility *) object->mObjects[slot]);
     if (!may)

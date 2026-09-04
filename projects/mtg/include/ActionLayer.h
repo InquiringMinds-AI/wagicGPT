@@ -43,6 +43,16 @@ public:
     //tell "the menu I answered is finished" from "the callback armed a NEW
     //decision on the same card" - the second must not be thrown away.
     unsigned int menuArmedSerial;
+    //#W58-F (F1): a SimpleMenu row stores ONLY its position in mObjects. That
+    //position is not an identity: removeFromGame erases from the middle of the
+    //vector, so an ability leaving the game between the moment a menu is armed
+    //and the moment it is answered shifts every later row's meaning - the id
+    //can land past the end (the F1 SIGABRT) or, worse, still in range and
+    //naming a DIFFERENT ability. This vector captures, per menu row, the
+    //ActionElement the row was built from, so every id -> mObjects mapping can
+    //be resolved by identity instead of position. Entries are nulled when their
+    //element leaves the game; a row whose element is gone yields no decision.
+    vector<ActionElement *> menuRowElements;
     int stuffHappened;
     //destroy()-in-progress stack: an element's destroy() can cascade into
     //more removals (a lord's destroy removes the abilities it granted -
@@ -76,6 +86,12 @@ public:
     void ButtonPressed(int controllerid, int controlid);
     void ButtonPressedOnMultipleChoice(int choice = -1);
     void doReactTo(int menuIndex);
+    //#W58-F (F1): the two directions of the menu-id mapping. Both return false
+    //when the row's ability has left the game (no decision this tick, the menu
+    //stays armed and the engine re-asks); on success `slot` is the ability's
+    //CURRENT index in mObjects, re-pointed if the vector was compacted.
+    bool getMenuControlId(int menuIndex, int & slot);
+    bool getLiveMenuSlot(int controlid, int & slot);
     TargetChooser * getCurrentTargetChooser();
     void setCurrentWaitingAction(ActionElement * ae);
     MTGAbility * getAbility(int type);

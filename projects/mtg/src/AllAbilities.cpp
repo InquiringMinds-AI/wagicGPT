@@ -8854,7 +8854,13 @@ int MenuAbility::processAbility()
 
 int MenuAbility::reactToChoiceClick(Targetable * object,int choice,int control)
 {
-    ActionElement * currentAction = (ActionElement *) game->mLayers->actionLayer()->mObjects[control];
+    //#W58-F (F1): `control` is a position in the action layer supplied by the
+    //caller; the layer can be compacted between the two, so never index on it
+    //unchecked - an out-of-range control is simply not this menu.
+    ActionLayer * al = game->mLayers->actionLayer();
+    if (control < 0 || (size_t) control >= al->mObjects.size())
+        return 0;
+    ActionElement * currentAction = (ActionElement *) al->mObjects[control];
     if(currentAction != (ActionElement*)this)
         return 0;
     if(!abilities.size()||!triggered)
