@@ -1,0 +1,563 @@
+file: /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260904-171140/1788559917-ai_baka_deck125-0x55ad4a3c92f0-vs-ai_baka_deck126.jsonl
+seq: 185 | kind: priority | turn: 39 | phase (field): Upkeep | my_life 33 | opp_life 1 | latency_ms 3068
+why this one: the game-winning decision. The seat took row 14 and the very next record is `gameend won=true` (opp 1 -> 0). It is the corpus's only late-turn window carrying the wave-60 B1 win token on a live board, and at 31,096 chars it is also the largest prompt in the corpus - the prompt-economy surface at its worst.
+----------------------------------------------------------------------
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Island; Glacial Fortress; Essence Scatter; Fall of the Gavel; Staff of Nin; Plains; Island
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Urborg, Tomb of Yawgmoth
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Plains
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Opponent put the revealed Sanguine Bond into their hand
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You played Island
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Exquisite Blood
+- Opponent put the revealed Exquisite Blood into their hand
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent played Scrubland
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sanguine Bond
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains; Island #2; Glacial Fortress #1; Glacial Fortress #2
+- You cast Fall of the Gavel
+- Opponent's Sanguine Bond was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 25)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Exquisite Blood
+- Paid {1}{u}{u} for Dream Fracture with Glacial Fortress #1; Island #1; Island #2
+- You cast Dream Fracture
+- Opponent's Exquisite Blood was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Plains
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Savannah
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Plains
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 24)
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {6} for Staff of Nin with Island #1; Plains #1; Island #2; Plains #2; Glacial Fortress #1; Glacial Fortress #2
+- You cast Staff of Nin (that Staff of Nin was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+=== Turn 18 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 23)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+- Phase: Main phase 2
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 19 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Island
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Plains #1; Plains #2; Glacial Fortress #1
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+=== Turn 20 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 22)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+=== Turn 21 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- You drew Lightmine Field
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 22 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 21)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+=== Turn 23 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Final Judgment, Supreme Verdict
+- You discarded Final Judgment
+- You discarded Supreme Verdict
+=== Turn 24 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 20)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+=== Turn 25 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+- You drew Plains
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Plains
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Glacial Fortress #1; Island #1; Plains #1; Island #2; Glacial Fortress #2; Plains #2; Island #3; Seachrome Coast; Island #4; Plains #3
+- You announced X = 7 for Sphinx's Revelation
+- You cast Sphinx's Revelation (that Sphinx's Revelation was 1 of 3 copies in your hand; the other 2 are still there)
+- You gained 7 life (now 27)
+- You drew Island
+- You drew Fall of the Gavel
+- You drew Island
+- You drew Lightmine Field
+- You drew Seachrome Coast
+- You drew Path to Exile
+- You drew Fall of the Gavel
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 15, limit 7): you chose Sphinx's Revelation, Lightmine Field, Sphinx's Revelation, Island, Island, Island, Lightmine Field, Seachrome Coast
+- You discarded Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Lightmine Field (that Lightmine Field was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Sphinx's Revelation
+- You discarded Island (that Island was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Lightmine Field
+- You discarded Seachrome Coast
+=== Turn 26 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got 3 loyalty counters (now 3)
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 27 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You drew Glacial Fortress
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Plains
+- Phase: Main phase 2
+- Paid {w} for Path to Exile with Glacial Fortress #1
+- You targeted Vampire (1/1) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Forest
+- Opponent's Forest entered the battlefield from the opponent's library
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #1; Plains #1
+- You gained 5 life (now 31)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (15 cards) into your library with Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Glacial Fortress
+- You discarded Glacial Fortress
+=== Turn 28 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 30)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 29 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Essence Scatter
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Plains #1; Island #2
+- You gained 5 life (now 35)
+- Your Elixir of Immortality was put into your library from the battlefield
+- Your Glacial Fortress was put into your library from your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Fall of the Gavel
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 30 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 34)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 33)
+- Opponent gained 1 life (now 8)
+=== Turn 31 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- You used: Deal 1 damage with Staff of Nin #2 targeting Vampire #1
+- Your Staff of Nin dealt 1 damage to Vampire
+- Opponent's Vampire died (that Vampire was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- You drew Island
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Island
+- Phase: Main phase 2
+- Paid {w} for Path to Exile with Glacial Fortress #1
+- You targeted Vampire (1/1) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Fall of the Gavel
+- You discarded Fall of the Gavel
+=== Turn 32 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 32)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Idyllic Tutor
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Island #3
+- You cast Cancel (that Cancel was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Paid {1}{u}{u} for Cancel with Glacial Fortress #2; Seachrome Coast #1; Island #4
+- You targeted Idyllic Tutor with Cancel
+- You cast Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Idyllic Tutor was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Your Cancel resolved and went to your graveyard
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 33 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 5)
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Paid {w} for Path to Exile with Glacial Fortress #1
+- You targeted Vampire (1/1) with Path to Exile
+- You cast Path to Exile
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+=== Turn 34 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 31)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 35 - YOUR turn ===
+- Phase: Upkeep
+- You drew Lightmine Field
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 4)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 3)
+- You drew Plains
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You played Plains
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 36 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 30)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+- Opponent cast Staff of Nin
+- Paid {1}{u}{u} for Cancel with Glacial Fortress #1; Island #1; Plains #1
+- You cast Cancel
+- Opponent's Staff of Nin was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 29)
+- Opponent gained 1 life (now 4)
+=== Turn 37 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 3)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 2)
+- You drew Elixir of Immortality
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Main phase 2
+- Paid {2}{w}{w} for Lightmine Field with Glacial Fortress #1; Plains #1; Island #1; Island #2
+- You cast Lightmine Field
+- Your Lightmine Field resolved and entered the battlefield
+=== Turn 38 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 28)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Exquisite Blood
+- Paid {1}{u}{u} for Dream Fracture with Glacial Fortress #2; Island #3; Plains #2
+- You cast Dream Fracture
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Opponent's Exquisite Blood was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Sphinx's Revelation
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Sanguine Bond
+- Paid {3}{u}{w} for Fall of the Gavel with Island #4; Plains #3; Plains #4; Island #5; Plains #5
+- You cast Fall of the Gavel
+- Opponent's Sanguine Bond was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 33)
+- Your Fall of the Gavel resolved and went to your graveyard
+- Phase: Blockers
+- Your Lightmine Field dealt 1 damage to Vampire
+- Opponent's Vampire died (that Vampire was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Your Lightmine Field dealt 1 damage to Vampire
+- Opponent's Vampire died (that Vampire was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+=== Turn 39 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 1)
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+Your life: 33 | Opponent life: 1
+Opponent life trend: turn 37: 4, turn 38: 2, turn 39: 2, now 1 (-3 since turn 37).
+ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):
+  1 (top): ability: Staff of Nin's Draw 1 [from your Staff of Nin] [triggered/activated ability]
+Mana available: 16 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 11, {U} 11, {B} 16 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Glacial Fortress #1 {w} or {u} or {b}; Island #1 {u} or {b}; Plains #1 {w} or {b}; Island #2 {u} or {b}; Glacial Fortress #2 {w} or {u} or {b}; Plains #2 {w} or {b}; Island #3 {u} or {b}; Seachrome Coast #1 {w} or {u} or {b}; Island #4 {u} or {b}; Plains #3 {w} or {b}; Plains #4 {w} or {b}; Seachrome Coast #2 {w} or {u} or {b}; Island #5 {u} or {b}; Seachrome Coast #3 {w} or {u} or {b}; Plains #5 {w} or {b}; Glacial Fortress #3 {w} or {u} or {b}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (7 cards): Essence Scatter (copy 1 of 2 in your hand) {1}{u} [instant]; Essence Scatter (copy 2 of 2 in your hand) {1}{u} [instant]; Final Judgment {4}{w}{w} [sorcery]; Sphinx's Revelation (copy 1 of 2 in your hand) {u}{u}{w}{x} [instant]; Elixir of Immortality {1} [artifact]; Sphinx's Revelation (copy 2 of 2 in your hand) {u}{u}{w}{x} [instant]; Path to Exile {w} [instant]
+Your battlefield (19 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 16 are lands): Glacial Fortress #1-#3 x3; Island #1-#5 x5; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1-#5 x5; Seachrome Coast #1-#3 x3; Staff of Nin #2 {6} [artifact]; Staff of Nin #1 {6} [artifact] [tapped]
+Opponent battlefield (36 permanents listed, of which 12 are creatures, 1 of them without a restriction against attacking, and 18 are lands): Bayou #2; Bayou #1 [tapped]; Chromatic Lantern #3 {3} [artifact]; Chromatic Lantern #4 {3} [artifact]; Chromatic Lantern #2 {3} [artifact] [tapped]; Chromatic Lantern #1 {3} [artifact] [tapped] {effect (each copy of this card does this): "Lands you control have "{T}: Add one mana of any color." -- {T}: Add one mana of any color."}; Forest; Isolated Chapel #1 [tapped]; Isolated Chapel #2 [tapped]; Overgrown Battlement #1-#3 {1}{g} (0/4) [defender] x3; Perimeter Captain #1-#3 {w} (0/4) [defender] x3; Plains [tapped]; Pride Guardian #1 {w} (0/3) [defender]; Pride Guardian #2 {w} (0/3) [defender]; Savannah #2; Savannah #3; Savannah #1 [tapped]; Scrubland #2; Scrubland #1 [tapped]; Sorin, Lord of Innistrad {2}{b}{w} [planeswalker] [counters: 10x loyalty] {effect: "+1: Put a 1/1 black Vampire creature token with lifelink onto the... -- -2: You get an emblem with "Creatures you control get +1/+0." -- -6: Destroy up to three target creatures and/or other planeswalkers. Return each card put into a graveyard this way to the battlefield under..."}; Staff of Nin {6} [artifact] [tapped] {effect: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Sunpetal Grove #1-#3 x3; Swamp [tapped]; Urborg, Tomb of Yawgmoth [tapped]; Vampire (1/1) [lifelink]; Wall of Omens #1-#3 {1}{w} (0/4) [defender] x3; Woodland Cemetery #1 [tapped]; Woodland Cemetery #2 [tapped]
+Their untapped sources: 13 (colours they could make: {g}{u}{r}{b}{w})
+Opponent hand size: 2 | Opponent library: 15 cards
+Artifacts in play: you 2 | opponent 5
+Your library: 24 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 39): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+
+Your legal actions (Upkeep, YOUR turn):
+1-3. Deal 1 damage with Staff of Nin #2 targeting Overgrown Battlement #1-#3 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."} x3
+4-6. Deal 1 damage with Staff of Nin #2 targeting Perimeter Captain #1-#3 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."} x3
+7. Deal 1 damage with Staff of Nin #2 targeting Pride Guardian #1 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+8. Deal 1 damage with Staff of Nin #2 targeting Pride Guardian #2 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+9. Deal 1 damage with Staff of Nin #2 targeting Sorin, Lord of Innistrad [opponent's battlefield] {right now: takes 1 damage - SURVIVES (loyalty 10, 9 left)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+10. Deal 1 damage with Staff of Nin #2 targeting Vampire [opponent's battlefield] {right now: takes 1 damage - DIES} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+11-13. Deal 1 damage with Staff of Nin #2 targeting Wall of Omens #1-#3 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."} x3
+14. Deal 1 damage with Staff of Nin #2 targeting the opponent {right now: takes 1 damage - they would be at 0; THIS WINS THE GAME} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+15. Deal 1 damage with Staff of Nin #2 targeting you {right now: takes 1 damage - you would be at 32} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+An option whose number is a RANGE ("5-430.") is that many SEPARATE options whose text was identical apart from the instance ordinal, printed once. Every number in the range is a real, separately choosable option: 5 is the option for the first instance of the printed #N range, 6 the next, and so on to the last. When the collapsed row carries NO #N ordinal, the options in the range are interchangeable copies of the same thing and any number in the range picks one of them. A range whose row reads "(copies 3-6 of 6 in this list)" is the same thing in that list's own copy notation: each number in the range is one of those copies, in order. A line reading "The same 4 options as 8-11, with <source> #2 as the source instead of #1" is that many SEPARATE options that pair up ONE FOR ONE with the options in the range it names: its first number is the same choice as the first number of that range, its second the same as the second, and so on - the only difference is which copy of the source does it. Nothing is hidden: read the option you want off the range it names. A row reading "X = 12 down to X = 2" is one option per X in that range, largest X first: its first number is X = 12, the next X = 11, and so on to X = 2. The two options it quotes in full are the two ENDS of that run, and every option between them reads the same line with its own X. Answer with ONE number from inside the range exactly as you would any other option number.
+16. Hold priority for the rest of this turn: pass now, and do not ask me again unless the board changes (any change re-opens this window; you give up no cast) {taking this row skips the rest of this turn's identical windows}
+
+Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other main-phase cards are NOT castable in this window - your main phase's own Casting decision is where you cast them, later this same turn.
+You will have priority again later this turn, so instants and activated abilities you hold stay castable this turn.
+You have already answered this phase's Casting decision (a card you did not cast there is not re-offered below). The rows below are the OTHER actions available now.
+
+Which action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list) or "CHOICE: 0 (pass)"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
