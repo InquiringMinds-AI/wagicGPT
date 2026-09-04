@@ -8061,8 +8061,13 @@ static bool xSurveyBoard(MTGCardInstance * card, Player * me, XVictimSurvey & sv
 //all is claimable the line says the cost exists without inventing a figure.
 //Pure over the two name lists and the two summed prices, so both shapes are
 //provable in PARSETEST without a board.
+//#W60-N (B6): `loopCaution` is loopCautionClause()'s sentence, or "". It is
+//APPENDED - no number and no name is removed - because the two summed prices
+//above are what the punishers deal; what the caution adds is what the
+//opponent's completed loop then does with them.
 static string drawPunisherSummaryText(const vector<string>& mine, int minePerDraw,
-                                      const vector<string>& theirs, int theirsPerDraw)
+                                      const vector<string>& theirs, int theirsPerDraw,
+                                      const string& loopCaution = "")
 {
     if (mine.empty() && theirs.empty())
         return "";
@@ -8100,6 +8105,7 @@ static string drawPunisherSummaryText(const vector<string>& mine, int minePerDra
     o << " They fire on EVERY draw - the draw step, a cycling ability, a draw"
          " spell, any extra draw - and the loss lands as the card is drawn, before"
          " anything can be done with it. Count that cost before choosing to draw.";
+    o << loopCaution; //#W60-N (B6)
     return o.str();
 }
 
@@ -8239,12 +8245,14 @@ static void drawPunisherScan(Player * me, Player * opp,
     }
 }
 
-static string drawPunisherSituationLine(Player * me, Player * opp)
+//#W60-N (B6): `loopCaution` is computed by the caller (loopCautionForBoards is
+//defined with the converter block, below this line's own emitter).
+static string drawPunisherSituationLine(Player * me, Player * opp, const string& loopCaution = "")
 {
     vector<string> mine, theirs;
     int minePer = 0, theirsPer = 0;
     drawPunisherScan(me, opp, mine, minePer, theirs, theirsPer);
-    return drawPunisherSummaryText(mine, minePer, theirs, theirsPer);
+    return drawPunisherSummaryText(mine, minePer, theirs, theirsPer, loopCaution);
 }
 
 //#W47 R1, the second half: the summary line states the standing price, but the
@@ -8563,33 +8571,173 @@ static bool discardPunisherClauseUncached(const string& script, int& perDiscard,
 //keeps its instance handles (two Fate Unravelers on the board are two rows the
 //pilot can point at); a HAND card has no board instance to handle, so it is
 //named plainly.
-static void converterScanZone(MTGGameZone * bf, bool handles, std::vector<std::string>& names)
+//#W60-N (B5, wave-59 deck125 HIGH-1, a lost game): the DISCARD mirror of
+//drawPunisherScan. `theirsPerDiscard` is what THIS seat pays for every card IT
+//discards - Liliana's Caress x2 on the opponent's battlefield is 4 a card, and
+//an 11-card cleanup discard is 44 life, which is exactly the 13 -> -31 the
+//`125v162` seat took off a row that told it the cast was NET 0.
+static void discardPunisherScan(Player * me, Player * opp,
+                                std::vector<std::string>& mine, int& minePerDiscard,
+                                std::vector<std::string>& theirs, int& theirsPerDiscard)
 {
-    if (!bf)
-        return;
-    std::set<MTGCardInstance *> seen;
-    for (int pass = 0; pass < 2; pass++)
+    minePerDiscard = 0;
+    theirsPerDiscard = 0;
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? me : opp;
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
         for (int i = 0; i < bf->nb_cards; i++)
         {
             MTGCardInstance * c = bf->cards[i];
-            if (!c || seen.count(c))
-                continue;
             int per = 0;
             bool cond = false;
-            bool hit = (pass == 0) ? drawPunisherClause(c->magicText, per, cond)
-                                   : discardPunisherClause(c->magicText, per, cond);
-            if (!hit)
+            if (!c || !discardPunisherClause(c->magicText, per, cond))
                 continue;
-            seen.insert(c);
-            names.push_back(handles ? (c->name + instanceHandle(c)) : c->name);
+            (side == 0 ? mine : theirs).push_back(c->name + instanceHandle(c));
+            (side == 0 ? minePerDiscard : theirsPerDiscard) += per;
         }
+    }
 }
 
-static void converterScan(Player * me, std::vector<std::string>& names)
+//#W60-N (B5): the board-frame line, built on the same rails as
+//drawPunisherSummaryText - a permanent whose amount is conditional is NAMED
+//without a number, never guessed. The last sentence names the discard the
+//pilot never sees coming: the CLEANUP step, which is not a choice to decline.
+//Pure over the two name lists and the two summed prices.
+static string discardPunisherSummaryText(const vector<string>& mine, int minePerDiscard,
+                                         const vector<string>& theirs, int theirsPerDiscard)
+{
+    if (mine.empty() && theirs.empty())
+        return "";
+    std::ostringstream o;
+    o << "DISCARD PUNISHERS on the battlefield:";
+    for (int side = 0; side < 2; side++)
+    {
+        const vector<string>& v = (side == 0) ? mine : theirs;
+        if (v.empty())
+            continue;
+        o << (side == 0 ? " yours - " : " theirs - ");
+        for (size_t i = 0; i < v.size(); i++)
+            o << (i ? ", " : "") << v[i];
+        o << ".";
+    }
+    if (!theirs.empty())
+    {
+        o << " Every card YOU discard costs you ";
+        if (theirsPerDiscard > 0)
+            o << theirsPerDiscard << " life";
+        else
+            o << "life (the amount is not fixed - read the permanents named)";
+        o << " to theirs.";
+    }
+    if (!mine.empty())
+    {
+        o << " Every card the OPPONENT discards costs them ";
+        if (minePerDiscard > 0)
+            o << minePerDiscard << " life";
+        else
+            o << "life (the amount is not fixed - read the permanents named)";
+        o << " to yours.";
+    }
+    o << " A DRAW is not a discard - these do not fire on the draw itself. They"
+         " fire on a discard cost, on an opponent's discard effect, and on the"
+         " CLEANUP step, where a hand over its maximum size discards down to it"
+         " with no choice to decline. Count that before drawing past your"
+         " maximum hand size.";
+    return o.str();
+}
+
+static string discardPunisherSituationLine(Player * me, Player * opp)
+{
+    vector<string> mine, theirs;
+    int minePer = 0, theirsPer = 0;
+    discardPunisherScan(me, opp, mine, minePer, theirs, theirsPer);
+    return discardPunisherSummaryText(mine, minePer, theirs, theirsPer);
+}
+
+//#W60-N (B5): the arithmetic the `125v162` seq 111 row owed and did not pay.
+//`handAfterDraw` is the hand this choice leaves, `limit` the maximum hand size;
+//the overflow is CR 514.1's forced cleanup discard, and under a discard
+//punisher of theirs it has a price. Returns "" when nothing overflows, when no
+//punisher is out, or when the price is not a number (the same rail as every
+//other punisher clause). `life` < 0 means "not supplied". Pure.
+static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDiscard,
+                                        const string& punishers, int life = -1,
+                                        const string& label = "CLEANUP PRICE")
+{
+    if (limit < 0 || handAfterDraw <= limit || perDiscard <= 0 || punishers.empty())
+        return "";
+    const int over = handAfterDraw - limit;
+    const int cost = over * perDiscard;
+    std::ostringstream o;
+    o << label << ": that leaves " << handAfterDraw << " cards in hand against a"
+         " maximum hand size of " << limit << ", so the cleanup step forces " << over
+      << " discard" << (over == 1 ? "" : "s") << " you cannot decline, and the"
+         " opponent's " << punishers << punisherVerb(punishers) << " every discard for "
+      << perDiscard << " life each = " << cost << " life";
+    if (life >= 0)
+    {
+        o << " - you would be at " << (life - cost);
+        if (life - cost <= 0)
+            o << "; this KILLS you";
+    }
+    return o.str();
+}
+
+//#W60-N (B5, wave-59 deck162 HIGH-2, 18 rows): the two classes were scanned
+//into ONE undifferentiated list, so a DISCARD punisher was counted and named
+//under a sentence that says "the opponent draws N extra cards" - Liliana's
+//Caress (`@discarded(*|opponenthand):life:-2 opponent`) was credited to a
+//Howling Mine on `162v152` seq 13 and the seat stacked a draw engine at 13
+//life on the strength of it. A draw feeder feeds draw punishers; a discard
+//punisher fires only when a card leaves a hand as a discard. The class of a
+//script, as a pure predicate PARSETEST can pin: bit 1 = draw punisher,
+//bit 2 = discard punisher (a permanent that is both sets both).
+enum { kConverterClassDraw = 1, kConverterClassDiscard = 2 };
+static int converterClassOfScript(const string& script)
+{
+    int per = 0;
+    bool cond = false;
+    int cls = 0;
+    if (drawPunisherClause(script, per, cond))
+        cls |= kConverterClassDraw;
+    if (discardPunisherClause(script, per, cond))
+        cls |= kConverterClassDiscard;
+    return cls;
+}
+
+//#W60-N (B5): the zone scan, split by class. Nothing is dropped - a card that
+//punishes both appears in both lists - but the counts no longer merge.
+static void converterScanZone(MTGGameZone * bf, bool handles,
+                              std::vector<std::string>& drawNames,
+                              std::vector<std::string>& discardNames)
+{
+    if (!bf)
+        return;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        int cls = converterClassOfScript(c->magicText);
+        if (!cls)
+            continue;
+        const string label = handles ? (c->name + instanceHandle(c)) : c->name;
+        if (cls & kConverterClassDraw)
+            drawNames.push_back(label);
+        if (cls & kConverterClassDiscard)
+            discardNames.push_back(label);
+    }
+}
+
+static void converterScan(Player * me, std::vector<std::string>& drawNames,
+                          std::vector<std::string>& discardNames)
 {
     if (!me || !me->game)
         return;
-    converterScanZone(me->game->inPlay, true, names);
+    converterScanZone(me->game->inPlay, true, drawNames, discardNames);
 }
 
 //#W57-E (D23, wave-56 ledger MED): the K-of-0 judgement deck162 makes needs
@@ -8598,11 +8746,12 @@ static void converterScan(Player * me, std::vector<std::string>& names)
 //FEEDER as a converter, and handed the opponent an extra card a turn for four
 //turns. The release condition the guide is written against is "a converter is
 //out or coming", and only half of it was printed. Same scan, other zone.
-static void handConverterScan(Player * me, std::vector<std::string>& names)
+static void handConverterScan(Player * me, std::vector<std::string>& drawNames,
+                              std::vector<std::string>& discardNames)
 {
     if (!me || !me->game)
         return;
-    converterScanZone(me->game->hand, false, names);
+    converterScanZone(me->game->hand, false, drawNames, discardNames);
 }
 
 //The cast-row tag. Empty when the card feeds the opponent nothing (so a
@@ -8610,9 +8759,17 @@ static void handConverterScan(Player * me, std::vector<std::string>& names)
 //them and how many of the caster's permanents turn that into damage - the
 //COUNT is the fact the seat had to re-derive and got wrong, so it is printed
 //as a number ahead of the names.
+//#W60-N (B5): `converters`/`handConverters` are now the DRAW punishers only -
+//the class this row actually feeds. The discard punishers are not deleted (the
+//pilot's own release conditions are written against them): they are printed in
+//their own clause, labelled with what does and does not set them off.
 static string feedsRowTag(int perTurn, bool variable, int perCast,
                           const std::vector<std::string>& converters,
                           const std::vector<std::string>& handConverters
+                              = std::vector<std::string>(),
+                          const std::vector<std::string>& discardConverters
+                              = std::vector<std::string>(),
+                          const std::vector<std::string>& handDiscardConverters
                               = std::vector<std::string>())
 {
     if (perTurn <= 0 && !variable && perCast <= 0)
@@ -8654,6 +8811,21 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
         for (size_t i = 0; i < handConverters.size(); i++)
             o << (i ? ", " : "") << handConverters[i];
     }
+    //#W60-N (B5): the OTHER class, counted separately and never folded into the
+    //number above. Printed only when one exists, so every row that has no
+    //discard punisher anywhere is byte-identical to before.
+    if (!discardConverters.empty() || !handDiscardConverters.empty())
+    {
+        o << "; discard punishers (a different class - this row hands them CARDS,"
+             " and a discard punisher fires only when a card leaves a hand as a"
+             " discard, though a larger hand can overflow a cleanup step): on your"
+             " battlefield: " << discardConverters.size();
+        for (size_t i = 0; i < discardConverters.size(); i++)
+            o << (i ? ", " : " - ") << discardConverters[i];
+        o << "; in your hand: " << handDiscardConverters.size();
+        for (size_t i = 0; i < handDiscardConverters.size(); i++)
+            o << (i ? ", " : " - ") << handDiscardConverters[i];
+    }
     o << "}";
     return o.str();
 }
@@ -8688,7 +8860,7 @@ static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const strin
 //same scan, seats swapped); a Puzzle Box entry labelled for the drawer's own
 //hand is relabelled for this chair. Pure.
 static string theirDrawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
-                                        int perDraw)
+                                        int perDraw, const string& loopCaution = "") //#W60-N (B6)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
@@ -8711,11 +8883,12 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
     if (perDraw > 0)
         o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to you from your punishers above";
     o << ".";
+    o << loopCaution; //#W60-N (B6)
     return o.str();
 }
 
 static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
-                                   int perDraw)
+                                   int perDraw, const string& loopCaution = "") //#W60-N (B6)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
@@ -8732,6 +8905,7 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
     if (perDraw > 0)
         o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to the punishers above";
     o << ".";
+    o << loopCaution; //#W60-N (B6)
     return o.str();
 }
 
@@ -9058,8 +9232,19 @@ static string xLifeDrawEffectClause(int lifePerX, int drawPerX)
 //and the NET, which is the whole decision at a low life total (deck125 vs162
 //seq 36: 6 life, two Underworld Dreams, cast for X=1 and drew itself to 4).
 //X = 0 is called out as a null cast, the second half of this item. Pure.
+//#W60-N (B5, wave-59 deck125 HIGH-1, a lost game): the NET was true about the
+//DRAW punishers and silent about everything else, and "NET 0 life for this
+//cast" is read as a verdict on the cast. `125v162` seq 111 took X=9 off that
+//row at 13 life with two Liliana's Caress on the opposing board; the draw put
+//18 cards in a 7-card hand, the cleanup step forced 11 discards, and 11 x 4 was
+//exactly the 13 -> -31 the game ended on. `handAfterCast` is the hand this row
+//leaves BEFORE its own draws (the spell itself has left it); `handLimit` is the
+//maximum hand size. Both < 0 means "not supplied", and every branch of the old
+//shape then renders byte-identical.
 static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
-                               int punisherPerDraw, const string& punishers)
+                               int punisherPerDraw, const string& punishers,
+                               int handAfterCast = -1, int handLimit = -1,
+                               int perDiscard = 0, const string& discardPunishers = "")
 {
     std::ostringstream o;
     o << " {X pricing: X=" << x << " - ";
@@ -9088,10 +9273,26 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
     if (drawPerX > 0)
         o << (lifePerX > 0 ? "draw" : "you draw") << " " << cards
           << " card" << (cards == 1 ? "" : "s");
+    int cost = 0;
     if (cards > 0 && punisherPerDraw > 0 && !punishers.empty())
+    {
+        cost += cards * punisherPerDraw;
         o << "; the opponent's " << punishers << punisherVerb(punishers) << " every draw, so those draws"
-             " cost you " << (cards * punisherPerDraw) << " life - NET "
-          << (gain - cards * punisherPerDraw) << " life for this cast";
+             " cost you " << (cards * punisherPerDraw) << " life";
+    }
+    //#W60-N (B5): the OTHER guaranteed consequence of drawing this many cards.
+    string cleanup;
+    if (handAfterCast >= 0 && cards > 0)
+        cleanup = cleanupDiscardPriceClause(handAfterCast + cards, handLimit, perDiscard,
+                                            discardPunishers);
+    if (!cleanup.empty())
+    {
+        const int over = (handAfterCast + cards) - handLimit;
+        cost += over * perDiscard;
+        o << "; " << cleanup;
+    }
+    if (cost > 0)
+        o << " - NET " << (gain - cost) << " life for this cast";
     o << "}";
     return o.str();
 }
@@ -9128,11 +9329,14 @@ static string xMonotoneMarker(int capX, int lifePerX, int drawPerX)
 //totals, so there is never an identical neighbour to collapse into. Pure.
 static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
                                     int punisherPerDraw, const string& punishers,
-                                    std::vector<string>& out)
+                                    std::vector<string>& out,
+                                    int handAfterCast = -1, int handLimit = -1,
+                                    int perDiscard = 0, const string& discardPunishers = "")
 {
     out.clear();
     for (int x = capX; x >= 0; x--)
-        out.push_back(xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers));
+        out.push_back(xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers,
+                                       handAfterCast, handLimit, perDiscard, discardPunishers));
 }
 
 //#W57-E (D20, wave-56 ledger MED): the `[<- ...]` marker is the most reliably
@@ -9174,6 +9378,11 @@ static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int dra
 //Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
 //Returns "" for a non-X spell (every other cast line is byte-identical to
 //before).
+//#W60-N (B5): defined with the ANNOUNCE_X plumbing below; used by the cast row.
+static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * opp,
+                                int& handAfterCast, int& limit, int& perDiscard,
+                                string& discardPunishers);
+
 string xSpellPricing(MTGCardInstance * card, Player * me)
 {
     XVictimSurvey sv;
@@ -9203,6 +9412,28 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
                 string dp = xDrawPunishClause(sv.maxX, drawPerX, theirsPer, pn.str());
                 if (!dp.empty())
                     base += "; " + dp;
+            }
+            //#W60-N (B5): the same row's OTHER guaranteed price - what the
+            //largest affordable X leaves in hand, and what the cleanup step it
+            //forces costs under a discard punisher of theirs. Independent of
+            //the draw-punisher clause above: `125v162` seq 111 would have
+            //carried it with no draw punisher on the board at all.
+            if (drawPerX > 0 && me && sv.maxX > 0)
+            {
+                int handAfterCast = -1, handLimit = -1, perDiscard = 0;
+                string discardPunishers;
+                forcedCleanupInputs(card, me, me->opponent(), handAfterCast, handLimit,
+                                    perDiscard, discardPunishers);
+                if (handAfterCast >= 0)
+                {
+                    std::ostringstream lab;
+                    lab << "CLEANUP PRICE at X=" << sv.maxX;
+                    string cp = cleanupDiscardPriceClause(handAfterCast + sv.maxX * drawPerX,
+                                                          handLimit, perDiscard,
+                                                          discardPunishers, me->life, lab.str());
+                    if (!cp.empty())
+                        base += "; " + cp;
+                }
             }
             base += "}";
             base += xCastRowBestXMarker(sv, lifePerX, drawPerX); //#W57-E (D20)
@@ -9528,6 +9759,43 @@ static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& 
     return 0;
 }
 
+//#W60-N (B5): the board facts the forced-cleanup clause is computed from, read
+//once. `handAfterCast` counts the hand this cast leaves BEFORE its own draws -
+//the spell itself is subtracted when it is still sitting in the hand zone, so
+//the number is the same whether the engine has moved it to the stack yet or
+//not. `limit` is < 0 (i.e. "no clause") for a seat with no maximum hand size.
+static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * opp,
+                                int& handAfterCast, int& limit, int& perDiscard,
+                                string& discardPunishers)
+{
+    handAfterCast = -1;
+    limit = -1;
+    perDiscard = 0;
+    discardPunishers.clear();
+    if (!me || !me->game || !me->game->hand)
+        return;
+    int n = me->game->hand->nb_cards;
+    for (int i = 0; i < me->game->hand->nb_cards; i++)
+        if (card && me->game->hand->cards[i] == card)
+        {
+            n--;
+            break;
+        }
+    handAfterCast = n;
+    if (me->nomaxhandsize)
+        return;
+    limit = me->handsize + me->handmodifier;
+    if (limit < 0)
+        limit = 0;
+    vector<string> mineD, theirsD;
+    int minePer = 0;
+    discardPunisherScan(me, opp, mineD, minePer, theirsD, perDiscard);
+    std::ostringstream dn;
+    for (size_t i = 0; i < theirsD.size(); i++)
+        dn << (i ? ", " : "") << theirsD[i];
+    discardPunishers = dn.str();
+}
+
 //#W57-E (D20): the cast row's marker, ranked by the SAME functions the menu
 //uses, so the two screens cannot name different X values. maxX comes from the
 //survey (ManaEngine::maxAnnounceableX), which is the number that builds the
@@ -9584,7 +9852,12 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         std::ostringstream names;
         for (size_t ni = 0; ni < theirsP.size(); ni++)
             names << (ni ? ", " : "") << theirsP[ni];
-        xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out);
+        //#W60-N (B5): and what the draws force at the cleanup step.
+        int handAfterCast = -1, handLimit = -1, perDiscard = 0;
+        string discardPunishers;
+        forcedCleanupInputs(card, me, opp, handAfterCast, handLimit, perDiscard, discardPunishers);
+        xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out,
+                                handAfterCast, handLimit, perDiscard, discardPunishers);
         //#W56-C (D7 b): the monotone menu's own marker, on the largest X, via
         //the same one-row-marked plumbing the kill families use.
         if (markX && markerText)
@@ -15111,6 +15384,68 @@ string converterSummaryText(const vector<string>& mine, const vector<string>& th
     return converterSummaryText(mine, theirs, vector<string>(), vector<string>());
 }
 
+//#W60-N (B6, wave-59 deck162 HIGH-1, a lost game): the loop block above exists
+//and is correct, and on `162v126` seq 20 it stood on the SAME screen as two
+//punisher lines and a forecast that read as a gain ("= 5 x 1 = 5 life to you
+//from your punishers above"). The seat cast a fourth punisher into the closed
+//pair and went 16 -> 0 in one draw step while the opponent went 24 -> 40. This
+//is that block's sentence, carried DOWN to the lines that state a life number,
+//so the number and its consequence are never on separate screens. Both halves
+//are quoted from their own Oracle text: Exquisite Blood "whenever an opponent
+//loses life, you gain that much life"; Sanguine Bond "whenever you gain life,
+//target opponent loses that much life". Pure over the two names.
+string loopCautionClause(const string& converter, const string& mirror, bool theirs)
+{
+    if (converter.empty() || mirror.empty())
+        return "";
+    std::ostringstream o;
+    if (theirs)
+        o << " LOOP CAUTION: they control BOTH halves of a life LOOP (" << converter
+          << " + " << mirror << ") - " << mirror << " turns life YOU lose into life"
+             " THEY gain, and " << converter << " turns life they gain into life YOU"
+             " lose, so once anything enters that chain it does not stop until a"
+             " player is at 0. While the pair stands, a number above that reads as"
+             " life TO you is not a safe gain, and any life you pay is fatal rather"
+             " than merely expensive.";
+    else
+        o << " LOOP NOTE: you control BOTH halves of a life LOOP (" << converter
+          << " + " << mirror << ") - " << mirror << " turns life THEY lose into life"
+             " YOU gain, and " << converter << " turns life you gain into life THEY"
+             " lose, so once anything enters that chain it does not stop until a"
+             " player is at 0.";
+    return o.str();
+}
+
+//#W60-N (B6, wave-59 deck152 #4): the warning arrived one decision AFTER the
+//loop closed. `152v126` carried Exquisite Blood on the opponent's battlefield
+//and `Cards you have seen in the opponent's hand: Sanguine Bond` in the same
+//frame for seq 9 through seq 33 - 25 consecutive decisions, turns 7-13 - and
+//printed nothing, because converterSummaryText's own gate needs a CONVERTER in
+//play and only the mirror was. A warning is worth its bytes only if it precedes
+//the decision it governs, so a half in play plus the other half in a zone the
+//seat has SEEN (their hand, their graveyard, their exile) says so on every
+//frame from the moment both facts are known. It claims nothing about when the
+//card will be cast - only that the pair is one resolution from closing. Pure
+//over the two names and the place-name.
+string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
+                              const string& seenWhere, bool theirs)
+{
+    if (inPlayHalf.empty() || seenHalf.empty() || seenWhere.empty())
+        return "";
+    std::ostringstream o;
+    o << "LOOP HALF PENDING: " << inPlayHalf << " is on "
+      << (theirs ? "THEIR" : "YOUR") << " battlefield and the other half of the"
+         " pair, " << seenHalf << ", is " << seenWhere << ". Nothing has chained"
+         " yet - the pair is one resolution from closing, and when it closes"
+      << (theirs
+              ? " any life YOU lose, and any life they gain, chains until you are at"
+                " 0, so every life payment you are pricing now becomes fatal rather"
+                " than expensive."
+              : " any life THEY lose, and any life you gain, chains until they are"
+                " at 0.");
+    return o.str();
+}
+
 //The board scan behind it: name every converter on either battlefield, with the
 //instance handle so the claim is checkable against the lines above it.
 static string converterSituationLine(Player * me, Player * opp)
@@ -15159,6 +15494,127 @@ static void theirConverterScan(Player * opp, std::vector<std::string>& names)
         if (c && lifeToDamageConverterScript(c->magicText))
             names.push_back(c->name + instanceHandle(c));
     }
+}
+
+//#W60-N (B6): the two loop halves in ONE zone, first instance of each. Same
+//two predicates converterSituationLine uses, so the paragraph, the caution and
+//the pending warning can never disagree about who holds what.
+static void loopHalvesInZone(MTGGameZone * z, bool handles, string& converter, string& mirror)
+{
+    if (!z)
+        return;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (!c)
+            continue;
+        const string label = handles ? (c->name + instanceHandle(c)) : c->name;
+        if (converter.empty() && lifeToDamageConverterScript(c->magicText))
+            converter = label;
+        if (mirror.empty() && lifeLossMirrorScript(c->magicText))
+            mirror = label;
+    }
+}
+
+//#W60-N (B6): the caution for whichever battlefield has the pair closed. The
+//opponent's is returned first: it is the half that ends the reader's own game.
+static string loopCautionForBoards(Player * me, Player * opp)
+{
+    string myConv, myMir, thConv, thMir;
+    if (me && me->game)
+        loopHalvesInZone(me->game->inPlay, true, myConv, myMir);
+    if (opp && opp->game)
+        loopHalvesInZone(opp->game->inPlay, true, thConv, thMir);
+    string s = loopCautionClause(thConv, thMir, true);
+    if (s.empty())
+        s = loopCautionClause(myConv, myMir, false);
+    return s;
+}
+
+//#W60-N (B6): the same two predicates over a list of card NAMES the seat has
+//seen but cannot point at an instance of (the remembered opponent hand). The
+//script comes from the card database entry for that name, which is the same
+//text the instance would carry.
+static void loopHalvesInNames(const std::map<string, int>& names, string& converter, string& mirror)
+{
+    for (std::map<string, int>::const_iterator it = names.begin(); it != names.end(); ++it)
+    {
+        MTGCard * mc = MTGCollection()->getCardByName(it->first, -1);
+        if (!mc || !mc->data)
+            continue;
+        if (converter.empty() && lifeToDamageConverterScript(mc->data->magicText))
+            converter = it->first;
+        if (mirror.empty() && lifeLossMirrorScript(mc->data->magicText))
+            mirror = it->first;
+    }
+}
+
+//#W60-N (B6): one half in play, the other half SEEN. Public zones are read off
+//the board; the opponent's hand is read off the names the seat has already been
+//shown (the same list the frame prints as "Cards you have seen in the
+//opponent's hand"), so the warning never claims knowledge the pilot was not
+//given. Returns "" when the pair is already closed on that battlefield (the
+//LIFE-TO-DAMAGE CONVERTER block says it in full there) or when no second half
+//is anywhere the seat can see.
+static string loopPendingSituationLine(Player * me, Player * opp,
+                                       const std::map<string, int>& knownOppHand)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? opp : me; //theirs first: it ends this game
+        if (!pl || !pl->game)
+            continue;
+        string conv, mir;
+        loopHalvesInZone(pl->game->inPlay, true, conv, mir);
+        if ((conv.empty() && mir.empty()) || (!conv.empty() && !mir.empty()))
+            continue; //nothing in play, or the pair is already closed
+        const bool wantMirror = mir.empty();
+        string found, where;
+        struct { MTGGameZone * z; const char * ours; const char * theirs; } zones[] = {
+            { pl->game->graveyard, "in your graveyard", "in their graveyard" },
+            { pl->game->exile, "in your exile", "in their exile" },
+            { NULL, NULL, NULL }
+        };
+        if (side == 0 && !knownOppHand.empty())
+        {
+            string hc, hm;
+            loopHalvesInNames(knownOppHand, hc, hm);
+            const string& hit = wantMirror ? hm : hc;
+            if (!hit.empty())
+            {
+                found = hit;
+                where = "in their hand (a card you have been shown)";
+            }
+        }
+        if (found.empty() && side != 0 && pl->game->hand)
+        {
+            string hc, hm;
+            loopHalvesInZone(pl->game->hand, false, hc, hm);
+            const string& hit = wantMirror ? hm : hc;
+            if (!hit.empty())
+            {
+                found = hit;
+                where = "in your hand";
+            }
+        }
+        for (int zi = 0; found.empty() && zi < 2; zi++)
+        {
+            if (!zones[zi].z)
+                continue;
+            string zc, zm;
+            loopHalvesInZone(zones[zi].z, false, zc, zm);
+            const string& hit = wantMirror ? zm : zc;
+            if (!hit.empty())
+            {
+                found = hit;
+                where = (side == 0) ? zones[zi].theirs : zones[zi].ours;
+            }
+        }
+        if (found.empty())
+            continue;
+        return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0);
+    }
+    return "";
 }
 
 //The row tag. What it states is exactly what the converter GUARANTEES and no
@@ -16191,12 +16647,27 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         string conv = converterSituationLine(this, opp);
         if (!conv.empty())
             out << "\n" << conv;
+        //#W60-N (B6): and the half-in-play / half-SEEN state, which the block
+        //above cannot report because its own gate needs a converter in play.
+        string pend = loopPendingSituationLine(this, opp, mKnownOppHand);
+        if (!pend.empty())
+            out << "\n" << pend;
+    }
+    //#W60-N (B5): the DISCARD lens, beside the draw one. Same board frame, same
+    //reason: `125v162` seq 111 priced a cast at NET 0 with two Liliana's Caress
+    //on the opposing board and took 44 life at the cleanup step two records
+    //later.
+    {
+        string dpunish = discardPunisherSituationLine(this, opp);
+        if (!dpunish.empty())
+            out << "\n" << dpunish;
     }
     //#W47 R1: the mirror class - permanents that damage a player FOR DRAWING -
     //in the same board frame, for the same reason. Two seats died holding every
     //fact separately (see drawPunisherSummaryText).
     {
-        string punish = drawPunisherSituationLine(this, opp);
+        const string loopCaution = loopCautionForBoards(this, opp); //#W60-N (B6)
+        string punish = drawPunisherSituationLine(this, opp, loopCaution);
         if (!punish.empty())
         {
             out << "\n" << punish;
@@ -16210,7 +16681,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             {
                 std::vector<std::pair<std::string, int> > extras;
                 drawStepExtrasScan(this, opp, extras);
-                out << "\n" << drawStepForecastText(1, extras, theirsPer);
+                out << "\n" << drawStepForecastText(1, extras, theirsPer, loopCaution);
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -16218,7 +16689,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             {
                 std::vector<std::pair<std::string, int> > theirExtras;
                 drawStepExtrasScan(opp, this, theirExtras);
-                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer);
+                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer, loopCaution);
             }
         }
     }
@@ -24752,11 +25223,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             int perCastFed = castTriggerDrawCount(card->magicText);
             if (perTurn > 0 || variable || perCastFed > 0)
             {
-                std::vector<std::string> conv;
-                converterScan(this, conv);
-                std::vector<std::string> handConv; //#W57-E (D23)
-                handConverterScan(this, handConv);
-                o << feedsRowTag(perTurn, variable, perCastFed, conv, handConv);
+                std::vector<std::string> conv, discConv; //#W60-N (B5): split
+                converterScan(this, conv, discConv);
+                std::vector<std::string> handConv, handDiscConv; //#W57-E (D23)
+                handConverterScan(this, handConv, handDiscConv);
+                o << feedsRowTag(perTurn, variable, perCastFed, conv, handConv,
+                                 discConv, handDiscConv);
             }
         }
         //#W57-C (D7): and, on a CREATURE row, what a converter of THEIRS turns
@@ -32317,12 +32789,34 @@ string discardAlreadyControlClause(const string& onBattlefield)
 
 //W50-W (D4): the cleanup discard ask. Header is a free function so PARSETEST
 //can pin its numbers without a game.
-string cleanupDiscardHeaderText(int handN, int limit, int over)
+//#W60-N (B5, wave-59 deck125 HIGH-1): the header did the CR 514.1 arithmetic
+//correctly and said nothing about the 44 life the discards were about to cost -
+//`125v162` seq 112 discarded 11 cards into two Liliana's Caress at 13 life.
+//The price is a fact about this ask, so it rides this ask. `perDiscard`/
+//`punishers` default to "no punisher", which renders the old bytes exactly;
+//`life` < 0 means "not supplied", the same convention as every other tag.
+string cleanupDiscardHeaderText(int handN, int limit, int over, int perDiscard = 0,
+                                const string& punishers = "", int life = -1)
 {
     std::ostringstream o;
     o << "Cleanup step (CR 514.1): your hand has " << handN << " card" << (handN == 1 ? "" : "s")
       << " and your maximum hand size is " << limit << ", so you must discard exactly "
-      << over << " card" << (over == 1 ? "" : "s") << " now. Name EXACTLY " << over
+      << over << " card" << (over == 1 ? "" : "s") << " now.";
+    if (perDiscard > 0 && !punishers.empty() && over > 0)
+    {
+        const int cost = over * perDiscard;
+        o << " The opponent's " << punishers << punisherVerb(punishers) << " every discard"
+             " for " << perDiscard << " life each, so these " << over << " discard"
+          << (over == 1 ? "" : "s") << " cost you " << cost << " life";
+        if (life >= 0)
+        {
+            o << " - you would be at " << (life - cost);
+            if (life - cost <= 0)
+                o << "; this KILLS you";
+        }
+        o << ". You cannot decline the discard; you choose only WHICH cards go.";
+    }
+    o << " Name EXACTLY " << over
       << " card number" << (over == 1 ? "" : "s") << " - this is the ONLY ask for them;"
          " keep the cards your plan needs and discard what you can spare.\n";
     return o.str();
@@ -32332,7 +32826,17 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
                                               vector<size_t> * outOrder)
 {
     std::ostringstream tail;
-    tail << cleanupDiscardHeaderText((int) hand.size(), limit, over);
+    {
+        //#W60-N (B5): the price of the discard this ask is about to force.
+        vector<string> mineD, theirsD;
+        int minePerD = 0, theirsPerD = 0;
+        discardPunisherScan(this, opponent(), mineD, minePerD, theirsD, theirsPerD);
+        std::ostringstream dn;
+        for (size_t di = 0; di < theirsD.size(); di++)
+            dn << (di ? ", " : "") << theirsD[di];
+        tail << cleanupDiscardHeaderText((int) hand.size(), limit, over, theirsPerD,
+                                         dn.str(), life);
+    }
     if (outOrder)
     {
         outOrder->resize(hand.size());
@@ -43624,13 +44128,17 @@ static const char * kW50Y_r94 =
         CHECK(discardPunisherClause("@discarded(*|opponenthand) restriction{mylife>5}:life:-2 opponent", per, cond) && per == 0 && cond,
               "#W51-F D11 a gated discard converter is named, not numbered");
         //D11: the row string and its count.
+        //#W60-N (B5): this case BAKED IN the merge - a discard punisher counted
+        //under "the opponent draws 1 extra card per turn". Same case, corrected:
+        //`two` is now two DRAW punishers (the class this row does feed), and the
+        //Caress pairing is checked below in its own, split, form.
         std::vector<std::string> none, two;
         two.push_back("Underworld Dreams #1");
-        two.push_back("Liliana's Caress");
+        two.push_back("Fate Unraveler");
         string f2 = feedsRowTag(1, false, 0, two);
-        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Liliana's Caress; in your hand: 0}",
-              "#W51-F D11 the row carries the count ahead of the converter names, Caress included"
-              " (#W57-E D23: the hand half is now stated too, and the battlefield half is unchanged)");
+        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Fate Unraveler; in your hand: 0}",
+              "#W51-F D11 the row carries the count ahead of the converter names"
+              " (#W57-E D23: the hand half is now stated too; #W60-N B5: DRAW punishers only)");
         string f0 = feedsRowTag(1, false, 0, none);
         CHECK(f0.find("converters on your battlefield: 0") != string::npos && f0.find("free until a converter is out") != string::npos,
               "#W51-F D11 at zero converters the row says 0 and why it matters");
@@ -43666,6 +44174,179 @@ static const char * kW50Y_r94 =
         bool sd = false;
         CHECK(parseChoice("CHOICE: 1 (Cast Stone Rain)", 1, &dm, &sd, NULL) == 1 && !sd,
               "#W51-F D16 echo: the marked note on the target clause does not unbind the row");
+    }
+    // ---- #W60-N (B5): the DISCARD-punisher lens beside the draw one ----
+    cout << "\n[#W60-N B5] draw and discard punishers are separate classes; the forced cleanup discard is priced\n";
+    {
+        //(1) the class predicate the zone scan is built on.
+        CHECK(converterClassOfScript("@drawfoeof(player):damage:1 opponent") == kConverterClassDraw,
+              "#W60-N B5 Underworld Dreams is a DRAW punisher and only that");
+        CHECK(converterClassOfScript("@discarded(*|opponenthand):life:-2 opponent") == kConverterClassDiscard,
+              "#W60-N B5 Liliana's Caress is a DISCARD punisher and only that");
+        CHECK(converterClassOfScript("@drawfoeof(player):damage:1 opponent\n"
+                                     "@discarded(*|opponenthand):life:-2 opponent")
+                  == (kConverterClassDraw | kConverterClassDiscard),
+              "#W60-N B5 a permanent that punishes both is both, and is named in both lists");
+        CHECK(converterClassOfScript("@each my upkeep:draw:1 controller") == 0
+                  && converterClassOfScript("") == 0,
+              "#W60-N B5 NEGATIVE a plain draw trigger and an empty script are neither class");
+        //(2) the wave-59 repro row (162v152 seq 13), corrected: a Howling Mine
+        //feeds DRAWS, so the count ahead of the names is the draw punishers'.
+        std::vector<std::string> drawC, discC, noneC;
+        drawC.push_back("Underworld Dreams #1");
+        discC.push_back("Liliana's Caress");
+        string fx = feedsRowTag(1, false, 0, drawC, noneC, discC, noneC);
+        CHECK(fx.find("converters on your battlefield: 1 - Underworld Dreams #1; in your hand: 0")
+                  != string::npos,
+              "#W60-N B5 the fed count is the DRAW punishers only");
+        CHECK(fx.find("converters on your battlefield: 2") == string::npos,
+              "#W60-N B5 MUST-NOT-MATCH: the discard punisher is never added to the draw count");
+        CHECK(fx.find("; discard punishers (a different class") != string::npos
+                  && fx.find("on your battlefield: 1 - Liliana's Caress; in your hand: 0}") != string::npos,
+              "#W60-N B5 the discard punisher is not deleted - it is named in its own clause");
+        CHECK(feedsRowTag(1, false, 0, drawC, noneC) == feedsRowTag(1, false, 0, drawC, noneC, noneC, noneC),
+              "#W60-N B5 NEGATIVE with no discard punisher anywhere the row is byte-identical to before");
+        //(3) the forced cleanup discard's price. 125v162 seq 111: hand 9 after
+        //the cast, X=9 draws 9 -> 18 against a limit of 7 -> 11 discards at 4.
+        string cp = cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress #1, Liliana's Caress #2", 13);
+        CHECK(cp == "CLEANUP PRICE: that leaves 18 cards in hand against a maximum hand size of 7,"
+                    " so the cleanup step forces 11 discards you cannot decline, and the opponent's"
+                    " Liliana's Caress #1, Liliana's Caress #2 punish every discard for 4 life each"
+                    " = 44 life - you would be at -31; this KILLS you",
+              "#W60-N B5 THE DECIDING FACT: the 44 life the 'NET 0' row never priced");
+        CHECK(cleanupDiscardPriceClause(7, 7, 4, "Liliana's Caress").empty()
+                  && cleanupDiscardPriceClause(18, -1, 4, "Liliana's Caress").empty()
+                  && cleanupDiscardPriceClause(18, 7, 0, "Liliana's Caress").empty()
+                  && cleanupDiscardPriceClause(18, 7, 4, "").empty(),
+              "#W60-N B5 NEGATIVE no overflow, no hand limit, no price and no punisher each render nothing");
+        CHECK(cleanupDiscardPriceClause(9, 7, 1, "Megrim").find("forces 2 discards you cannot decline") != string::npos
+                  && cleanupDiscardPriceClause(9, 7, 1, "Megrim").find("you would be at") == string::npos,
+              "#W60-N B5 singular/plural and the 'life not supplied' branch");
+        CHECK(cleanupDiscardPriceClause(8, 7, 1, "Megrim", 5).find("forces 1 discard you cannot decline") != string::npos,
+              "#W60-N B5 one card over is 'discard', not 'discards'");
+        //(4) the X row's NET, with the discard half folded in.
+        vector<string> rows;
+        xLifeDrawRowAnnotations(9, 1, 1, 2, "Underworld Dreams", rows, 9, 7, 4,
+                                "Liliana's Caress #1, Liliana's Caress #2");
+        CHECK(rows[0].find("you gain 9 life and draw 9 cards") != string::npos
+                  && rows[0].find("those draws cost you 18 life") != string::npos
+                  && rows[0].find("CLEANUP PRICE: that leaves 18 cards in hand") != string::npos
+                  && rows[0].find("NET -53 life for this cast}") != string::npos,
+              "#W60-N B5 the X=9 row's NET is the draw price AND the forced cleanup discard");
+        CHECK(rows[0].find("NET 0 life for this cast") == string::npos,
+              "#W60-N B5 MUST-NOT-MATCH: the row that lost the 162 game can no longer read NET 0");
+        vector<string> plain;
+        xLifeDrawRowAnnotations(5, 1, 1, 2, "Underworld Dreams, Ob Nixilis, the Hate-Twisted", plain);
+        CHECK(plain[0] == " {X pricing: X=5 - you gain 5 life and draw 5 cards; the opponent's"
+                          " Underworld Dreams, Ob Nixilis, the Hate-Twisted punish every draw,"
+                          " so those draws cost you 10 life - NET -5 life for this cast}",
+              "#W60-N B5 NEGATIVE with no discard punisher supplied the row is the wave-47 shape, byte for byte");
+        vector<string> nooverflow;
+        xLifeDrawRowAnnotations(2, 1, 1, 0, "", nooverflow, 1, 7, 4, "Liliana's Caress");
+        CHECK(nooverflow[0] == " {X pricing: X=2 - you gain 2 life and draw 2 cards}",
+              "#W60-N B5 NEGATIVE a draw that does not overflow the hand carries no cleanup clause and no NET");
+        //echo shape: the new clauses ride INSIDE the existing {X pricing: ...}
+        //braces, so the row still binds and the narration keeps no residue.
+        vector<string> xm;
+        xm.push_back("X = 9" + rows[0]);
+        xm.push_back("X = 8" + rows[1]);
+        bool xs = false;
+        CHECK(parseChoice("CHOICE: 1 (X = 9)", 2, &xm, &xs, NULL) == 1 && !xs,
+              "#W60-N B5 echo: the bare row name binds with the cleanup clause on the row");
+        bool xs2 = false;
+        CHECK(parseChoice("CHOICE: 1 (" + xm[0] + ")", 2, &xm, &xs2, NULL) == 1 && !xs2,
+              "#W60-N B5 echo: a reply copying the whole row incl. the clause binds to 1");
+        CHECK(stripNarrationDecoration(xm[0]).find("CLEANUP PRICE") == string::npos
+                  && stripNarrationDecoration(xm[0]).find("X = 9") != string::npos,
+              "#W60-N B5 echo: the cleanup clause leaves no residue in the narrated record");
+        //(5) the board-frame line and the cleanup ask's own header.
+        vector<string> dmine, dtheirs;
+        dtheirs.push_back("Liliana's Caress #1");
+        dtheirs.push_back("Liliana's Caress #2");
+        string ds = discardPunisherSummaryText(dmine, 0, dtheirs, 4);
+        CHECK(ds.find("DISCARD PUNISHERS on the battlefield: theirs - Liliana's Caress #1,"
+                      " Liliana's Caress #2.") == 0
+                  && ds.find("Every card YOU discard costs you 4 life to theirs.") != string::npos
+                  && ds.find("A DRAW is not a discard") != string::npos
+                  && ds.find("CLEANUP step") != string::npos,
+              "#W60-N B5 the board frame names the class, the price, and what does NOT set it off");
+        dmine.push_back("Megrim #1");
+        CHECK(discardPunisherSummaryText(dmine, 0, dtheirs, 4)
+                  .find("Every card the OPPONENT discards costs them life (the amount is not"
+                        " fixed - read the permanents named) to yours.") != string::npos,
+              "#W60-N B5 a conditional amount is NAMED without a number, never guessed");
+        CHECK(discardPunisherSummaryText(vector<string>(), 0, vector<string>(), 0).empty(),
+              "#W60-N B5 NEGATIVE no discard punisher anywhere prints no line");
+        string ch = cleanupDiscardHeaderText(18, 7, 11, 4, "Liliana's Caress #1, Liliana's Caress #2", 13);
+        CHECK(ch.find("you must discard exactly 11 cards now. The opponent's Liliana's Caress #1,"
+                      " Liliana's Caress #2 punish every discard for 4 life each, so these 11"
+                      " discards cost you 44 life - you would be at -31; this KILLS you. You cannot"
+                      " decline the discard; you choose only WHICH cards go. Name EXACTLY 11") != string::npos,
+              "#W60-N B5 the cleanup ask prices the discard it is about to force (125v162 seq 112)");
+        CHECK(cleanupDiscardHeaderText(9, 7, 2) == cleanupDiscardHeaderText(9, 7, 2, 0, "", 20),
+              "#W60-N B5 NEGATIVE with no discard punisher the header is byte-identical to before");
+    }
+    // ---- #W60-N (B6): the loop the punisher lines were counting backwards ----
+    cout << "\n[#W60-N B6] a completed life LOOP is carried onto every punisher number, and a PENDING half is announced\n";
+    {
+        //(1) the caution sentence, off the pair's own Oracle texts.
+        string lc = loopCautionClause("Sanguine Bond #1", "Exquisite Blood #1", true);
+        CHECK(lc.find(" LOOP CAUTION: they control BOTH halves of a life LOOP (Sanguine Bond #1"
+                      " + Exquisite Blood #1) - Exquisite Blood #1 turns life YOU lose into life"
+                      " THEY gain, and Sanguine Bond #1 turns life they gain into life YOU lose") == 0
+                  && lc.find("does not stop until a player is at 0") != string::npos
+                  && lc.find("is not a safe gain") != string::npos,
+              "#W60-N B6 the caution states the direction the forecast got backwards (162v126 seq 20)");
+        CHECK(loopCautionClause("Sanguine Bond #1", "Exquisite Blood #1", false)
+                  .find(" LOOP NOTE: you control BOTH halves") == 0,
+              "#W60-N B6 the seat's own closed loop is a NOTE, not a caution");
+        CHECK(loopCautionClause("Sanguine Bond #1", "", true).empty()
+                  && loopCautionClause("", "Exquisite Blood #1", true).empty(),
+              "#W60-N B6 NEGATIVE one half alone is not a loop and says nothing here");
+        //(2) it rides the three lines that state a punisher number, and the
+        //numbers themselves are untouched.
+        vector<string> mine, theirs;
+        mine.push_back("Underworld Dreams #1");
+        string sum = drawPunisherSummaryText(mine, 1, theirs, 0, lc);
+        CHECK(sum.find("Every card the OPPONENT draws costs them 1 life to yours.") != string::npos
+                  && sum.find("LOOP CAUTION: they control BOTH halves") != string::npos,
+              "#W60-N B6 the summary keeps its number and gains the loop's consequence");
+        CHECK(drawPunisherSummaryText(mine, 1, theirs, 0)
+                  == drawPunisherSummaryText(mine, 1, theirs, 0, ""),
+              "#W60-N B6 NEGATIVE with no loop the summary is byte-identical to before");
+        std::vector<std::pair<std::string, int> > extras;
+        extras.push_back(std::make_pair(string("Howling Mine"), 1));
+        extras.push_back(std::make_pair(string("Dictate of Kruphix"), 3));
+        string tf = theirDrawStepForecastText(1, extras, 1, lc);
+        CHECK(tf.find("DRAW FORECAST (theirs): their next draw step draws 5 cards"
+                      " (1 + Howling Mine 1 + Dictate of Kruphix 3) = 5 x 1 = 5 life to you"
+                      " from your punishers above. LOOP CAUTION:") == 0,
+              "#W60-N B6 the 162v126 seq 20 forecast keeps its 5 and no longer reads as a safe gain");
+        CHECK(theirDrawStepForecastText(1, extras, 1) == theirDrawStepForecastText(1, extras, 1, ""),
+              "#W60-N B6 NEGATIVE no loop, no change to the forecast");
+        CHECK(drawStepForecastText(1, extras, 2, lc).find("= 5 x 2 = 10 life to the punishers"
+                                                          " above. LOOP CAUTION:") != string::npos,
+              "#W60-N B6 the punished seat's own forecast carries it too");
+        //(3) the PENDING half: 152v126 sat 25 decisions with Exquisite Blood in
+        //play and Sanguine Bond named in the seat's own frame, and printed
+        //nothing at all.
+        string pw = pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond",
+                                           "in their hand (a card you have been shown)", true);
+        CHECK(pw.find("LOOP HALF PENDING: Exquisite Blood #1 is on THEIR battlefield and the other"
+                      " half of the pair, Sanguine Bond, is in their hand (a card you have been"
+                      " shown). Nothing has chained yet - the pair is one resolution from closing,"
+                      " and when it closes any life YOU lose, and any life they gain, chains until"
+                      " you are at 0") == 0,
+              "#W60-N B6 the warning precedes the decision it governs (152v126 seq 9-33)");
+        CHECK(pendingLoopWarningText("Sanguine Bond #1", "Exquisite Blood", "in your graveyard", false)
+                  .find("is on YOUR battlefield") != string::npos,
+              "#W60-N B6 the seat's own pending pair reads from its own chair");
+        CHECK(pendingLoopWarningText("", "Sanguine Bond", "in their hand", true).empty()
+                  && pendingLoopWarningText("Exquisite Blood #1", "", "in their hand", true).empty()
+                  && pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "", true).empty(),
+              "#W60-N B6 NEGATIVE a missing half, a missing name or a missing place says nothing");
+        CHECK(pw.find("LIFE-TO-DAMAGE CONVERTER") == string::npos,
+              "#W60-N B6 MUST-NOT-MATCH: the pending line never claims the loop is closed");
     }
     // ---- #W51-D: D5 receipt on every payment, D17 separator, D18 turn, D10 highest-MV edict ----
     cout << "\n[#W51-D] D5 / D17 / D18 / D10\n";
