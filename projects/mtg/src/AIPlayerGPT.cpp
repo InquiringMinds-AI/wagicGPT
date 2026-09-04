@@ -293,6 +293,23 @@ const char * kStalePlanNote =
     "(note: this decision's list does not contain the actions your plan names. That is about this "
     "menu, not about what is legal for you - pick the best option below, and re-state your plan if "
     "it has gone out of date.)\n";
+//#W60-M (B13a): the carried plan's LENGTH bound, in characters, after the
+//first-paragraph shape bound. A plan is the commitment the next decision acts
+//on; the reasoning that produced it is not carried and never was meant to be.
+static const size_t kPlanCarryMaxChars = 400;
+//#W60-M (B13a): what is printed INSTEAD of a plan that denies a permanent the
+//pilot's own battlefield line shows. Two true surfaces cannot both be served,
+//and the board is the one the engine computes - so the plan is withdrawn and
+//the withdrawal says exactly which claim withdrew it. Nothing is hidden: the
+//model is told what it wrote, what the board says, and to restate.
+static string planContradictedBlock(const string& deniedName)
+{
+    std::ostringstream o;
+    o << "\nYOUR PLAN was withdrawn: it says you have no \"" << deniedName
+      << "\", and the CURRENT SITUATION below shows \"" << deniedName
+      << "\" on your own battlefield. State a fresh plan from the board as it is now.\n";
+    return o.str();
+}
 
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
@@ -11340,7 +11357,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -12970,7 +12987,28 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
         //the plan GONE from the frame and one sentence saying so, instead of
         //the retraction being printed under the text it retracts.
         const int planAgeW = (mPlanSetSeq < 0) ? 0 : (mTransSeq - mPlanSetSeq);
-        if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
+        //#W60-M (B13a): the plan denies a permanent this pilot's OWN
+        //battlefield holds. 126v125 s48 served "No Sanguine Bond. No Exquisite
+        //Blood." four lines below a battlefield line printing Exquisite Blood,
+        //and the reply that came back answered row 4 of a three-row menu. The
+        //echo is withdrawn, and the withdrawal states the contradiction.
+        string planDenied;
+        {
+            std::vector<string> ownInPlay;
+            if (game && game->inPlay)
+                for (int i = 0; i < game->inPlay->nb_cards; i++)
+                    ownInPlay.push_back(game->inPlay->cards[i]->getDisplayName());
+            if (!gptcaveat::planDeniesOwnPermanent(mCurrentPlan, ownInPlay, planDenied))
+                planDenied.clear();
+        }
+        if (!planDenied.empty())
+        {
+            u << planContradictedBlock(planDenied);
+            mCurrentPlan.clear();
+            mPlanEchoCount = 0;
+            mPlanSetSeq = -1;
+        }
+        else if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
         {
             u << planWithdrawnBlock(planAgeClause(), planAbsent);
             mCurrentPlan.clear();
@@ -13872,14 +13910,13 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     {
         plan = plan.substr(s, e - s + 1);
         plan = planParagraphBound(plan); //#W54-A (D12a): SHAPE first
-        if (plan.size() > 1600)
-        {
-            //bound a runaway plan; cut at a sentence boundary when one
-            //exists (a mid-sentence stump re-fed every decision reads
-            //like an instruction fragment)
-            size_t dot = plan.rfind(". ", 1600);
-            plan = plan.substr(0, (dot != string::npos && dot > 400) ? dot + 1 : 1600);
-        }
+        //#W60-M (B13a): then the LENGTH bound, with a stated marker where it
+        //cut. The old ceiling was 1,600 characters, which is not a bound on a
+        //deliberation stream: 148 of one wave-59 seat's 410 echoes were over
+        //400 characters and the 1,236-character one produced an off-menu
+        //CHOICE. kPlanCarryMaxChars is the plan the NEXT decision is asked to
+        //act on, not a transcript of how this one was reached.
+        plan = gptcaveat::planCarryBound(plan, kPlanCarryMaxChars);
         //A reply cut off by max_tokens leaves a mid-word stump ("...value
         //by sac", observed live); trim back to the last complete sentence.
         char last = plan.empty() ? '.' : plan[plan.size() - 1];
@@ -23394,6 +23431,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //engine tick in between (FindCardToPlay's boardNow).
     string situationPrefill;
     situationPrefill.swap(mAskSituationPrefill);
+    //#W60-M (B13c): this window has not been reserved until one of the two
+    //answer-reuse returns below says so. Set here, once, so every other exit
+    //of this function (a fresh model call, a heuristic handoff, a resolved
+    //single/interchangeable option) leaves it false.
+    mAskAnswerReserved = false;
     //#W54-M (A17): the state+question cache can only hit within a turn (the
     //key embeds the turn header and the board), so the turn boundary is a free
     //point to drop the dead keys - median 99 KB, max 1.59 MB per seat-game were
@@ -23513,7 +23555,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     string askKey = reasked ? askKey0 + "\n" + mAskReaskLine : askKey0; //#W54-M (A19): same bytes, no second render
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
+    {
+        mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
+    }
     //#W59-J (K10): the same question, asked again with the board moved under it.
     //The cache above wants the board too, and a resolving drain loop moves it
     //every iteration - 32 identical windows in one upkeep, all answered by the
@@ -23528,6 +23573,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                               mRepeatAskChoice, (int) optionsIn.size()))
     {
         mRepeatAskAnswersReserved++;
+        mAskAnswerReserved = true; //#W60-M (B13c): the model was not shown this window
         DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the same ask again, unchanged - re-serving"
                    " this seat's own answer " << mRepeatAskChoice << " of " << optionsIn.size()
                    << " (" << mRepeatAskAnswersReserved << " this game): " << decision);
@@ -24896,17 +24942,28 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             return NULL; //no cast this tick; the answer is consumed on a later poll
         if (pick < 0) //model deferred or endpoint failed: heuristic decides
             return AIPlayerBaka::FindCardToPlay(pMana, type);
+        //#W60-M (B13c): count a decline only when the MODEL was shown this
+        //window. The sentence the count feeds is addressed to the model ("you
+        //declined this exact list N times already this turn"), and after
+        //#W59-J (K10) the ask seam answers some windows from its own latch or
+        //its state+question cache without showing them - 125v126 turn 31
+        //printed 23 in a turn with 9 asks, and 130v125 turn 67 printed 9 over 7
+        //windows. Nothing is deleted: the engine still re-puts the question and
+        //the model still sees every window it is actually asked; only the
+        //number now describes what it says it describes.
         if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
         {
             DebugTrace("AIPlayerGPT: chose to cast nothing");
-            mListDeclineCount[listKeyHash(listKey)]++; //#W53-N (D2, second half)
+            if (!mAskAnswerReserved)
+                mListDeclineCount[listKeyHash(listKey)]++; //#W53-N (D2, second half)
             return NULL;
         }
         //#W53-N (D2): the model closed this turn's casting question itself.
         if (holdRow >= 0 && pick == holdRow)
         {
             takeHold("cast", menu);
-            mListDeclineCount[listKeyHash(listKey)]++;
+            if (!mAskAnswerReserved)
+                mListDeclineCount[listKeyHash(listKey)]++;
             return NULL;
         }
 
@@ -28715,8 +28772,14 @@ static int becomesBlockedSelfPump(const string& text, int& dp, int& dt)
 
 //Forward declarations: the salvage helpers below re-parse a labeled line
 //through the same validators the primary path uses (defined further down).
+//#W60-M (B3): `repeatedOut` receives how many index tokens named a row this
+//reply had ALREADY named - the duplicate the deduping loop below silently
+//absorbs. The set semantics are unchanged (a repeat has never selected a row
+//twice); what is new is that the caller can now tell "the model wrote 16
+//numbers, 15 of them distinct" from "the model wrote 15 numbers".
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
-                            const vector<string> * optionNames = NULL, bool echoBinds = false);
+                            const vector<string> * optionNames = NULL, bool echoBinds = false,
+                            int * repeatedOut = NULL);
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
                                  const vector<string> * blockerNames = NULL,
                                  const vector<string> * attackerNames = NULL,
@@ -29526,10 +29589,13 @@ static string stripTrailingListGlossLines(const string& reply, vector<string> * 
 }
 
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
-                            const vector<string> * optionNames, bool echoBinds)
+                            const vector<string> * optionNames, bool echoBinds,
+                            int * repeatedOut)
 {
     out.assign(nAttackers, false);
     int named = 0;
+    if (repeatedOut)
+        *repeatedOut = 0; //#W60-M (B3)
     bool sawNamedContent = false; //the reply named creature(s), eligible or not
     //W41-13: the INDEX and NAME passes read the de-annotated reply; the
     //decline detection below still reads the ORIGINAL, so a bracketed
@@ -29590,10 +29656,15 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             }
         }
         for (int v = n; v <= hi; v++)
-            if (v >= 1 && v <= (int) nAttackers && !out[v - 1])
+            if (v >= 1 && v <= (int) nAttackers)
             {
-                out[v - 1] = true;
-                named++;
+                if (!out[v - 1])
+                {
+                    out[v - 1] = true;
+                    named++;
+                }
+                else if (repeatedOut && n == hi)
+                    (*repeatedOut)++; //#W60-M (B3): a REPEATED index, not a range overlap
             }
         i = j; //advance past the number
     }
@@ -32435,6 +32506,13 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
     tail << "On the FIRST line write PUT: followed by the " << over << " card number"
          << (over == 1 ? "" : "s") << " you discard"
          << (over == 1 ? " (e.g. \"PUT: 2\")" : ", comma-separated (e.g. \"PUT: 2, 5\")")
+         //#W60-M (B3): the ask never said the numbers had to differ, and
+         //"Name EXACTLY 16 card numbers" admits the reading the model used -
+         //125v126 seq 246 wrote 16 numbers of which two were `19`, and seq 354
+         //answered a 2-card ask with `PUT: 4, 4`. Stated here, once, in the
+         //sentence that asks for them.
+         << (over == 1 ? "" : "; the numbers must all be DIFFERENT (a number written twice"
+                              " counts once)")
          << "; then a PLAN: line only if the reply rules call for one (no plan shown yet,"
             " or part of yours is now done or false). Write nothing else.";
     return tail.str();
@@ -32452,8 +32530,10 @@ int AIPlayerGPT::cleanupDiscard(int over)
     int limit = handsize + handmodifier;
     if (limit < 0)
         limit = 0;
-    string userMsg, content;
+    string userMsg, content, askText;
     int result = -1;
+    int repeatedIdx = 0;   //#W60-M (B3)
+    bool reasked = false;  //#W60-M (B3)
     vector<bool> send;
     vector<string> names;
     //#W55-D (D18): PRINTED order - filled after the ask text is built, which is
@@ -32466,7 +32546,13 @@ int AIPlayerGPT::cleanupDiscard(int over)
         if (mSystemPrompt.empty())
             buildSystemPrompt();
         mLogWindowKind = kAskWindowCleanupDiscard; //#W57-H (D43)
-        userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over, &discardOrder));
+        askText = buildCleanupDiscardAskText(hand, limit, over, &discardOrder);
+        //#W60-M (B3): this hand+limit already earned its one re-ask; the
+        //corrected question is THE question from here on (the #W49-S D8 idiom
+        //at the ask seam, applied to a channel that had no recovery window at
+        //all - the prompt itself says "this is the ONLY ask for them").
+        reasked = (!mDiscardReaskKey.empty() && mDiscardReaskKey == askText);
+        userMsg = assemblePrompt(reasked ? askText + "\n" + mDiscardReaskLine : askText);
         if (discardOrder.size() != hand.size())
         {
             discardOrder.resize(hand.size());
@@ -32488,13 +32574,43 @@ int AIPlayerGPT::cleanupDiscard(int over)
         if (decisionPart.empty() && !content.empty())
             decisionPart = consumePlan(content); //no PUT: line at all: any labeled answer
         result = content.empty() ? -1
-                 : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
+                 : parseAttackerSet(decisionPart, hand.size(), send, &names, true, &repeatedIdx);
         if (result < 0 && !content.empty())
         {
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
             if (sal >= 1)
                 result = sal;
         }
+        //#W60-M (B3): a repeated index is DEDUPED, never a rejection. When the
+        //distinct set is still complete the answer stands and says why in the
+        //record; when the repeat left the list SHORT (125v126 seq 246: 16
+        //numbers, 15 distinct, on a 16-card discard) the seat buys ONE re-ask
+        //that names the fault, rather than handing 1-16ths of a permanent,
+        //unrecoverable decision to the heuristic with no receipt.
+        if (repeatedIdx > 0)
+            appendParseNote(&mLastParseNote, result >= over ? "duplicate_index_deduped"
+                                                            : "duplicate_index_short");
+        if (repeatedIdx > 0 && result >= 0 && result < over && !reasked)
+        {
+            std::ostringstream corr;
+            corr << "[RE-ASK] Your PUT: line repeated a card number, so it named only "
+                 << result << " different card" << (result == 1 ? "" : "s")
+                 << " and this discard needs " << over << ". Every number must be DIFFERENT."
+                 << " Answer again with " << over << " different card numbers from the list above.";
+            mDiscardReaskKey = askText;
+            mDiscardReaskLine = corr.str();
+            writeTransLog("discard", userMsg, content, result, (int) hand.size(), "",
+                          "distinct_index_reask", &names);
+            setNotice("that discard list repeated a number - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: cleanup discard named " << result << " distinct of "
+                       << over << " (" << repeatedIdx << " repeated) - re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected);
+            return 1; //the caller unwinds; the corrected call answers later
+        }
+        if (reasked)
+            appendParseNote(&mLastParseNote, result >= over ? "distinct_index_reask_recovered"
+                                                            : "distinct_index_reask_exhausted");
     }
     //#W55-D (D18): back from PRINTED positions to hand positions.
     if (result >= 0 && !send.empty())
@@ -32543,6 +32659,8 @@ int AIPlayerGPT::cleanupDiscard(int over)
     narr << "Cleanup discard (hand " << hand.size() << ", limit " << limit << "): "
          << (heuristic ? "the heuristic chose " : "you chose ") << chosenText;
     narrateDecision(narr.str());
+    mDiscardReaskKey.clear();  //#W60-M (B3): spent with this discard
+    mDiscardReaskLine.clear();
     cleanupDiscardCards(chosen);
     return 1;
 }
@@ -49636,6 +49754,289 @@ static const char * kW50Y_r94 =
               " index outside this menu is refused");
         CHECK(!repeatAskAnswerStands("", "", "p", "p", 25, 25, 1, 2),
               "#W59-J K10 NEGATIVE nothing latched, nothing re-served");
+    }
+
+    //================= #W60-M (B4): the connect budget =====================
+    cout << "\n[w60-M B4] the connect timeout is a bounded fraction of the decision deadline\n";
+    {
+        //POSITIVE: the corpus's own numbers. A 900 s decision deadline gives
+        //connection setup 20 s (the cap), not 900 s - which is what turned
+        //130v162 seq 21's `curl=28` into a 900,020 ms wall miss.
+        CHECK(gptConnectTimeoutMs(900000) == kGptConnectTimeoutCapMs,
+              "#W60-M B4 POSITIVE a 900 s deadline gives connect setup the 20 s cap, not 900 s");
+        CHECK(gptConnectTimeoutMs(120000) == 15000L,
+              "#W60-M B4 POSITIVE at the default 120 s decision deadline the SHARE governs:"
+              " 120 s / 8 = 15 s of connection setup, well under the 20 s cap");
+        CHECK(gptConnectTimeoutMs(80000) == 10000L,
+              "#W60-M B4 POSITIVE the SHARE governs below the cap: 80 s / 8 = 10 s");
+        CHECK(gptConnectTimeoutMs(24000) == kGptConnectTimeoutMinMs,
+              "#W60-M B4 POSITIVE the 5 s floor governs a short deadline (24 s / 8 = 3 s)");
+        CHECK(gptConnectTimeoutMs(0) == kGptConnectTimeoutCapMs
+              && gptConnectTimeoutMs(-1) == kGptConnectTimeoutCapMs,
+              "#W60-M B4 POSITIVE no deadline given -> the stated cap, never libcurl's 0"
+              " (which means no connect timeout at all)");
+        //MUST-NOT-MATCH: connection setup can never reach the worker's own
+        //deadline test (an empty body at or past 95% of the deadline), which is
+        //the confusion that made `transport_error` fire 0 times in wave 59.
+        bool everReaches95 = false, everZero = false;
+        for (long dl = 1000; dl <= 1200000; dl += 977)
+        {
+            const long c = gptConnectTimeoutMs(dl);
+            if (c * 100 >= dl * 95)
+                everReaches95 = true;
+            if (c < 1)
+                everZero = true;
+        }
+        CHECK(!everReaches95,
+              "#W60-M B4 NEGATIVE across every deadline from 1 s to 20 min, the connect budget"
+              " never reaches 95% of it - so a connect failure is never classified as a wall miss");
+        CHECK(!everZero,
+              "#W60-M B4 NEGATIVE the connect budget is never 0 (libcurl reads 0 as unbounded)");
+        //The classification this unblocks, and the one it must NOT steal.
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, 28)) == "transport_error",
+              "#W60-M B4 POSITIVE a connect failure that returns INSIDE the deadline classifies"
+              " as transport_error (wave 59: 0 of 2, because both burned the whole deadline)");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0, 28)) == "timeout",
+              "#W60-M B4 NEGATIVE a request killed at its own deadline still reports curl 28 and"
+              " is still a `timeout` - #W53-Q D10's class is not renamed");
+        //The retry budget: attempt + retry inside ONE decision deadline.
+        {
+            bool everOver = false;
+            for (long dl = 1000; dl <= 1200000; dl += 977)
+            {
+                const long first = gptConnectTimeoutMs(dl);
+                const long rem = AIPlayerGPT::remainingTransportRetryMs(dl, first);
+                if (first + rem > dl || rem <= 0)
+                    everOver = true;
+            }
+            CHECK(!everOver,
+                  "#W60-M B4 POSITIVE for every deadline, a bounded connect failure leaves a"
+                  " POSITIVE remainder and first attempt + retry fit inside one deadline"
+                  " (123v146 seq 7 finished at deadline_pct 108.6 because the failure took the"
+                  " wall-miss arm's fresh full deadline instead)");
+            CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 20000) == 880000,
+                  "#W60-M B4 POSITIVE the corpus case: 900 s deadline, 20 s connect failure ->"
+                  " the retry is bought with 880 s, not with a second 900 s");
+            CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 900020) == 0,
+                  "#W60-M B4 NEGATIVE a first attempt that DID spend the deadline leaves no"
+                  " transport budget - the transport arm cannot fire, the wall-miss arm owns it");
+        }
+    }
+
+    //=============== #W60-M (B3): a repeated cleanup discard index ===========
+    cout << "\n[w60-M B3] a repeated PUT: index is deduped, and counted, not rejected\n";
+    {
+        vector<string> hand;
+        for (int i = 1; i <= 23; i++)
+        {
+            std::ostringstream n;
+            n << "Card " << i;
+            hand.push_back(n.str());
+        }
+        //POSITIVE: `125v126` seq 246 verbatim - 16 numbers, `19` written twice.
+        vector<bool> send;
+        int repeated = -1;
+        int r = parseAttackerSet("PUT: 8, 11, 22, 19, 20, 16, 21, 23, 12, 10, 4, 5, 13, 17, 18, 19",
+                                 hand.size(), send, &hand, true, &repeated);
+        CHECK(r == 15 && repeated == 1,
+              "#W60-M B3 POSITIVE `125v126` s246: 16 numbers, 15 distinct, ONE repeat reported -"
+              " the caller can now tell a short list from a repeated one");
+        CHECK(send[18] && send[7] && send[10] && !send[0],
+              "#W60-M B3 POSITIVE the 15 distinct indices are all selected; the repeat selects"
+              " row 19 once and no row the reply did not name");
+        //POSITIVE: `125v126` seq 354 verbatim, on a 2-card ask.
+        {
+            vector<string> two;
+            two.push_back("Plains"); two.push_back("Island");
+            two.push_back("Swamp");  two.push_back("Forest");
+            vector<bool> s2;
+            int rep2 = -1;
+            int r2 = parseAttackerSet("PUT: 4, 4", two.size(), s2, &two, true, &rep2);
+            CHECK(r2 == 1 && rep2 == 1 && s2[3],
+                  "#W60-M B3 POSITIVE `125v126` s354: `PUT: 4, 4` names one distinct card and"
+                  " reports the repeat (the ask needed two, so this is the ONE re-ask case)");
+        }
+        //POSITIVE: a repeat that still leaves the distinct set COMPLETE is
+        //accepted as it stands - dedupe, no re-ask.
+        {
+            vector<bool> s3;
+            int rep3 = -1;
+            int r3 = parseAttackerSet("PUT: 4, 4, 5, 6", hand.size(), s3, &hand, true, &rep3);
+            CHECK(r3 == 3 && rep3 == 1 && s3[3] && s3[4] && s3[5],
+                  "#W60-M B3 POSITIVE a repeat inside a list whose DISTINCT set is complete is"
+                  " deduped and the answer stands - the re-ask is for a SHORT list only");
+        }
+        //MUST-NOT-MATCH: a clean list reports no repeat, and a RANGE is not a
+        //repeat (ranges legitimately re-cover indices at their overlap).
+        {
+            vector<bool> s4;
+            int rep4 = -1;
+            int r4 = parseAttackerSet("PUT: 1, 2, 3", hand.size(), s4, &hand, true, &rep4);
+            CHECK(r4 == 3 && rep4 == 0,
+                  "#W60-M B3 NEGATIVE a list with no repeated index reports 0 repeats");
+            vector<bool> s5;
+            int rep5 = -1;
+            int r5 = parseAttackerSet("PUT: 1-4, 3-6", hand.size(), s5, &hand, true, &rep5);
+            CHECK(r5 == 6 && rep5 == 0,
+                  "#W60-M B3 NEGATIVE overlapping RANGES are not repeated indices - only a bare"
+                  " index naming a row the same reply already named is counted");
+            vector<bool> s6;
+            int rep6 = -1;
+            parseAttackerSet("PUT: none", hand.size(), s6, &hand, true, &rep6);
+            CHECK(rep6 == 0,
+                  "#W60-M B3 NEGATIVE `PUT: none` names no index and reports no repeat");
+        }
+        //ECHO SHAPE: the re-ask line the seat appends, and the ask sentence
+        //that now states the rule.
+        {
+            std::ostringstream corr;
+            const int result = 15, over = 16;
+            corr << "[RE-ASK] Your PUT: line repeated a card number, so it named only "
+                 << result << " different card" << (result == 1 ? "" : "s")
+                 << " and this discard needs " << over << ". Every number must be DIFFERENT."
+                 << " Answer again with " << over << " different card numbers from the list above.";
+            CHECK(corr.str() == "[RE-ASK] Your PUT: line repeated a card number, so it named only"
+                                " 15 different cards and this discard needs 16. Every number must"
+                                " be DIFFERENT. Answer again with 16 different card numbers from"
+                                " the list above.",
+                  "#W60-M B3 ECHO the one re-ask notice names the fault, the shortfall and the"
+                  " count - it never restates the whole list");
+            //The notice is prose the model may echo back; it must not parse as
+            //an answer to the ask it corrects.
+            vector<bool> se;
+            int repe = -1;
+            parseAttackerSet(corr.str(), hand.size(), se, &hand, true, &repe);
+            CHECK(!se.empty(),
+                  "#W60-M B3 ECHO the notice text runs through the same parser without crashing");
+        }
+    }
+
+    //=============== #W60-M (B13a): the carried plan's bound =================
+    cout << "\n[w60-M B13a] the carried YOUR PLAN echo is bounded, and withdrawn when it denies the board\n";
+    {
+        const string marker = gptcaveat::planTruncationMarker();
+        //POSITIVE: `126v125` s48's own 1,236-character deliberation stream.
+        const string s48 =
+            "Cast Exquisite Blood to complete the combo with Sanguine Bond (which is not currently"
+            " on the battlefield, but I need to check my battlefield line again... wait, I do NOT"
+            " have Sanguine Bond on the battlefield. I only have Exquisite Blood in hand. I need"
+            " Sanguine Bond to complete the pair. Let me re-read the battlefield. Battlefield has:"
+            " Sorin, Vampire, Lands, Chromatic Lantern. No Sanguine Bond. No Exquisite Blood. I"
+            " just drew Exquisite Blood. I do NOT have the pair. I need to find Sanguine Bond. I"
+            " have Idyllic Tutor in hand? No, I drew Exquisite Blood. My hand was Chromatic"
+            " Lantern and Exquisite Blood. I have no Tutor. I have to wait to draw Sanguine Bond."
+            " Wait, I have Sorin. I can make Vampires. But the loop requires BOTH. If I cast it,"
+            " I have one half. I still need Sanguine Bond. I have to draw it.";
+        const string bounded = gptcaveat::planCarryBound(s48, kPlanCarryMaxChars);
+        CHECK(s48.size() > 700 && bounded.size() < s48.size()
+              && bounded.size() - marker.size() <= kPlanCarryMaxChars,
+              "#W60-M B13a POSITIVE `126v125` s48's deliberation stream is carried bounded, not"
+              " verbatim (148 of that seat's 410 echoes were over 400 chars; the longest was"
+              " 1,599, and the 1,236-char one produced an off-menu CHOICE)");
+        CHECK(bounded.size() >= marker.size()
+              && bounded.compare(bounded.size() - marker.size(), marker.size(), marker) == 0,
+              "#W60-M B13a POSITIVE a plan that was cut SAYS SO - the truncation marker is"
+              " printed, so nothing is silently dropped from what the model wrote");
+        CHECK(bounded.find("Cast Exquisite Blood to complete the combo") == 0,
+              "#W60-M B13a POSITIVE the bound keeps the plan's OPENING commitment, which is the"
+              " part the next decision acts on");
+        CHECK(bounded.find(marker) != string::npos
+              && bounded.substr(0, bounded.size() - marker.size())
+                     .find_last_of(".!?") + 1 == bounded.size() - marker.size(),
+              "#W60-M B13a POSITIVE the cut lands on a sentence end, never mid-sentence");
+        //MUST-NOT-MATCH: a plan already inside the bound is carried byte for
+        //byte and carries NO marker.
+        {
+            const string shortPlan = "Cast Sanguine Bond, then hold Path for their next threat.";
+            CHECK(gptcaveat::planCarryBound(shortPlan, kPlanCarryMaxChars) == shortPlan,
+                  "#W60-M B13a NEGATIVE a plan within the bound is unchanged - no marker, no cut");
+            CHECK(gptcaveat::planCarryBound(shortPlan, kPlanCarryMaxChars).find(marker)
+                      == string::npos,
+                  "#W60-M B13a NEGATIVE the truncation marker never appears on an uncut plan");
+            CHECK(gptcaveat::planCarryBound(s48, 0) == s48,
+                  "#W60-M B13a NEGATIVE maxChars 0 disables the length bound entirely");
+            CHECK(gptcaveat::planCarryBound("", kPlanCarryMaxChars).empty(),
+                  "#W60-M B13a NEGATIVE an empty plan stays empty");
+        }
+        //POSITIVE: the contradiction. s48's plan denies a permanent the pilot's
+        //own battlefield line prints in the same prompt.
+        {
+            vector<string> inPlay;
+            inPlay.push_back("Exquisite Blood");
+            inPlay.push_back("Sorin, Lord of Innistrad");
+            inPlay.push_back("Chromatic Lantern");
+            string denied;
+            CHECK(gptcaveat::planDeniesOwnPermanent(s48, inPlay, denied)
+                  && denied == "Exquisite Blood",
+                  "#W60-M B13a POSITIVE `126v125` s48: the plan says \"No Exquisite Blood\" while"
+                  " the battlefield line prints Exquisite Blood - the echo is withdrawn");
+            CHECK(planContradictedBlock("Exquisite Blood")
+                  == "\nYOUR PLAN was withdrawn: it says you have no \"Exquisite Blood\", and the"
+                     " CURRENT SITUATION below shows \"Exquisite Blood\" on your own battlefield."
+                     " State a fresh plan from the board as it is now.\n",
+                  "#W60-M B13a ECHO the withdrawal names the claim, the board and what to do -"
+                  " it never prints the retracted plan under the retraction");
+            //MUST-NOT-MATCH, four ways the denial is TRUE and must survive.
+            string d2;
+            CHECK(!gptcaveat::planDeniesOwnPermanent("No Sanguine Bond. Cast the Blood.",
+                                                     inPlay, d2),
+                  "#W60-M B13a NEGATIVE a denial about a card that is NOT on the pilot's"
+                  " battlefield is true and is carried");
+            CHECK(!gptcaveat::planDeniesOwnPermanent("I have no second Exquisite Blood.",
+                                                     inPlay, d2),
+                  "#W60-M B13a NEGATIVE a qualifier between the negation and the name (\"no"
+                  " SECOND Exquisite Blood\") is a different, true claim");
+            CHECK(!gptcaveat::planDeniesOwnPermanent("I have no Exquisite Blood in hand.",
+                                                     inPlay, d2),
+                  "#W60-M B13a NEGATIVE a ZONE-qualified denial (\"no Exquisite Blood in hand\")"
+                  " is true while the permanent sits on the battlefield");
+            CHECK(!gptcaveat::planDeniesOwnPermanent("Cast Exquisite Blood, then hold up mana.",
+                                                     inPlay, d2),
+                  "#W60-M B13a NEGATIVE a plan that NAMES the permanent without denying it is"
+                  " untouched");
+            {
+                vector<string> theirs;
+                theirs.push_back("Sanguine Bond");
+                CHECK(!gptcaveat::planDeniesOwnPermanent("They have no Sanguine Bond.",
+                                                         vector<string>(), d2),
+                      "#W60-M B13a NEGATIVE with nothing on the pilot's battlefield nothing is"
+                      " contradicted - the test reads the PILOT'S OWN board only");
+            }
+            CHECK(gptcaveat::planDeniesOwnPermanent("Sorin is not on the battlefield, so wait.",
+                                                    inPlay, d2)
+                  && d2 == "Sorin, Lord of Innistrad",
+                  "#W60-M B13a POSITIVE the copular form (\"X is not on the battlefield\") is"
+                  " caught too, on the comma-shortened name form");
+        }
+    }
+
+    //=========== #W60-M (B13b): identical consecutive narration events =======
+    cout << "\n[w60-M B13b] identical consecutive log events collapse to one line with a count\n";
+    {
+        //This item was already shipped by #W57-D (D29) - collapseAdjacentDuplicate
+        //at the narration WRITE seam, rendering through collapsedRunNarration.
+        //The wave-59 corpus confirms it: across all 42 seat logs' final prompts
+        //there are ZERO consecutive duplicate event lines and 34 collapsed
+        //renders. These cases pin the shapes the wave-60 item names, so a later
+        //change to the renderer cannot quietly remove them.
+        CHECK(collapsedRunNarration("Opponent drew a card", 5, -1) == "Opponent drew 5 cards",
+              "#W60-M B13b POSITIVE five consecutive `Opponent drew a card` events render as one"
+              " line stating the count (the register's own plural, not an invented shape)");
+        CHECK(collapsedRunNarration("Opponent used: Deal 1 damage with Staff of Nin #2"
+                                    " targeting you", 3, -1)
+              == "Opponent used: Deal 1 damage with Staff of Nin #2 targeting you (x3)",
+              "#W60-M B13b POSITIVE a line with no register of its own keeps the author's"
+              " sentence and states the count outright as (xN)");
+        CHECK(collapsedRunNarration("Your Sorin, Lord of Innistrad created a 1/1 Vampire token",
+                                    16, -1)
+              == "Your Sorin, Lord of Innistrad created 16 1/1 Vampire tokens",
+              "#W60-M B13b POSITIVE the token register pluralises rather than appending (xN)");
+        CHECK(collapsedRunNarration("Opponent drew a card", 1, -1) == "Opponent drew a card"
+              && collapsedRunNarration("Opponent drew a card", 0, -1) == "Opponent drew a card",
+              "#W60-M B13b NEGATIVE a single occurrence is never rewritten and never counted -"
+              " append-only semantics hold, the collapse only ever states a count that happened");
+        CHECK(collapsedRunNarration("", 5, -1).empty(),
+              "#W60-M B13b NEGATIVE nothing to collapse stays nothing");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

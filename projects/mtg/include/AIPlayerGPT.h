@@ -1123,6 +1123,16 @@ private:
     string mAskReaskKey;
     string mAskReaskLine;
     string mAskReaskKind; //"named_row" | "no_pass" (#W50-Y D9)
+    //#W60-M (B3): the cleanup-discard channel's own one re-ask. Keyed on the
+    //ask TEXT (the hand and the count are in it), cleared when the discard
+    //completes. The discard prompt states it is the only ask for those cards,
+    //so a reply that repeats an index and lands short had no recovery at all.
+    string mDiscardReaskKey;
+    string mDiscardReaskLine;
+    //#W60-M (B13c): true when askModel answered from the K10 latch or the
+    //state+question cache - a window the model was NOT shown. The declined-list
+    //counter (and anything else reporting what the MODEL did) must not count it.
+    bool mAskAnswerReserved;
     //#W51-C (D3): the rows of the LAST consumed window (priority or ask). An
     //in-range index whose parenthetical names no row on THIS menu is a stale
     //echo only when the name echoes one of these rows; otherwise it is an
