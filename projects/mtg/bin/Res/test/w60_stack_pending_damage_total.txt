@@ -1,0 +1,48 @@
+#NAME: The stack block totals the damage already aimed at the seat (W60-L B2)
+#DESC: Wave-59 deck146 HIGH-1. `146v162` seq 26 (T15 Draw, Your life: 5) listed
+#DESC: four unresolved triggers - two Ob Nixilis, two Underworld Dreams - for
+#DESC: four damage, and printed no total anywhere on the page. The seat worked
+#DESC: it out unaided nine records later (seq 37: "I am dead."). Census for that
+#DESC: deck: 13 of 77 stack renders carried damage aimed at the seat, 6 at life
+#DESC: <= 7 and 3 at life 1. Every other price in this engine is a finished
+#DESC: subtraction; this one was left to the model.
+#DESC: No zone assertion can see it: the defect is entirely in the words over a
+#DESC: stack whose contents the suite does not otherwise read, and the trigger
+#DESC: resolves normally either way. TestSuiteAI::Act runs the PRODUCTION calls
+#DESC: (stackObjectLifeLossToSeat -> pendingStackDamageLine, the same two the
+#DESC: prompt's stack block runs) through stackAbilityRegister, so a red here is
+#DESC: a red render rather than a red copy of one.
+#DESC: P1 controls Underworld Dreams (`auto=@drawfoeof(player):damage:1 opponent`,
+#DESC: Oracle-faithful: "Whenever an opponent draws a card, Underworld Dreams
+#DESC: deals 1 damage to them"); P2's own draw step puts one damage on the stack
+#DESC: aimed at P2, so P2's chair is where the total is pinned. P1 is the
+#DESC: NEGATIVE: the same stack, the other seat, and no total is claimed for a
+#DESC: player the damage is not aimed at.
+#DESC: PRE-FIX both seats read only "on the stack: ability: Underworld Dreams's
+#DESC: deal 1 damage [from their Underworld Dreams]" and no ON THE STACK: line
+#DESC: existed at all.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+inplay:Underworld Dreams
+library:mountain,mountain
+[PLAYER2]
+library:swamp,swamp
+[DO]
+goto upkeep
+goto draw
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:Underworld Dreams
+library:mountain,mountain
+nonarration:ON THE STACK: 1 damage to you
+[PLAYER2]
+life:19
+hand:swamp
+library:swamp
+narration:on the stack: ability: Underworld Dreams's deal 1 damage
+narration:ON THE STACK: 1 damage to you - you would be at 19
+[END]

@@ -3254,9 +3254,13 @@ static string stackAbilityName(const string& sourceName, const string& menuText)
 //read off the live object (triggered / activated / plain "ability"); the kind
 //is passed in rather than guessed here so this function stays pure and never
 //asserts a trigger it did not observe.
+//#W60-L (B2): and when the label DOES degenerate to the kind, the effect the
+//caller read off the live ability rides beside it, so no row is ever a bare
+//"triggered ability" while another row on the same stack spells its effect out.
 static string stackAbilityLine(const string& grantorName, const string& menuText,
                                const string& victimName, bool grantorMine,
-                               const string& genericKind)
+                               const string& genericKind,
+                               const string& effectNote = "")
 {
     if (grantorName.empty())
         return stackAbilityName(string(), menuText);
@@ -3264,7 +3268,11 @@ static string stackAbilityLine(const string& grantorName, const string& menuText
     const string kind = genericKind.empty() ? string("ability") : genericKind;
     string label = menuText.empty() ? string() : renderAbilityLabel(menuText);
     if (label.empty() || w42Lower(label) == w42Lower(grantorName))
+    {
         label = kind; //#W54-E (D19): never the source name twice
+        if (!effectNote.empty())
+            label += " (" + effectNote + ")"; //#W60-L (B2)
+    }
     o << "ability: " << grantorName << "'s ";
     o << label;
     if (!victimName.empty())
@@ -3273,12 +3281,156 @@ static string stackAbilityLine(const string& grantorName, const string& menuText
     return o.str();
 }
 
+//#W60-L (B2, wave-59 deck146 HIGH-1): the effect phrase a stack row shows when
+//its own label degenerates to the bare kind. `146v162` seq 26 (T15 Draw, life
+//5) listed four rows for four damage: rows 2/4 read
+//`Underworld Dreams's deal 1 damage`, rows 1/3 read
+//`Ob Nixilis, the Hate-Twisted's triggered ability` - the label is the source
+//name, so #W54-E (D19) replaces it with the kind and the effect is nowhere on
+//the page. Pure over (amount, who) so both directions are provable.
+static string stackDamagePhrase(int amount, bool toMe)
+{
+    if (amount <= 0)
+        return "";
+    std::ostringstream o;
+    o << "deals " << amount << " damage to " << (toMe ? "you" : "them");
+    return o.str();
+}
+
+//The life half of the same row (`life:-3 opponent` and its mirror). A negative
+//delta is a loss, a positive one a gain; pure over (delta, who).
+static string stackLifePhrase(int delta, bool toMe)
+{
+    if (delta == 0)
+        return "";
+    std::ostringstream o;
+    if (delta < 0)
+        o << (toMe ? "you lose " : "they lose ") << (-delta) << " life";
+    else
+        o << (toMe ? "you gain " : "they gain ") << delta << " life";
+    return o.str();
+}
+
+//#W60-L (B2): the arithmetic the four rows above never carried. `146v162` seq
+//26 put four damage in front of a seat at 5 life and printed no total; the
+//seat worked it out unaided nine records later (seq 37, `I am dead.`). Same
+//finished-subtraction register as INCOMING THIS COMBAT and the crack-back
+//line, so the claim shape is the one the pilot already reads. Pure over
+//(total, life).
+static string pendingStackDamageLine(int dmgToMe, int myLife)
+{
+    if (dmgToMe <= 0 || myLife < 0)
+        return "";
+    std::ostringstream o;
+    o << "ON THE STACK: " << dmgToMe << " damage to you - you would be at "
+      << (myLife - dmgToMe);
+    if (myLife - dmgToMe <= 0)
+        o << "; that would KILL you";
+    return o.str();
+}
+
+//#W60-L (B1/B2): the life a resolving ability takes off a seat, read off the
+//LIVE ability objects rather than from its text. AADamager and AALifer are the
+//two engine classes that move a player's life total; NestedAbility/MultiAbility
+//are walked so a `damage:1 opponent && draw:1 controller` rider is counted once
+//and its siblings are not lost. `rand` magnitudes are never evaluated (WParsedInt
+//would draw the game RNG - the same exclusion the option-magnitude emitter
+//applies), and a source-less ability is skipped because getTarget() resolves
+//CONTROLLER/OPPONENT through source->controller().
+static void scanStackAbilityLife(MTGAbility * a, Player * seat, int depth,
+                                 int & lossToMe, string * phrase)
+{
+    if (!a || depth > 5)
+        return;
+    if (AADamager * ad = dynamic_cast<AADamager *>(a))
+    {
+        if (ad->source && ad->d.find("rand") == string::npos)
+        {
+            const int dmg = ad->getDamage();
+            Player * tp = dynamic_cast<Player *>(ad->getTarget());
+            if (dmg > 0 && tp)
+            {
+                const bool toMe = (tp == seat);
+                if (toMe)
+                    lossToMe += dmg;
+                if (phrase && phrase->empty())
+                    *phrase = stackDamagePhrase(dmg, toMe);
+            }
+        }
+    }
+    else if (AALifer * al = dynamic_cast<AALifer *>(a))
+    {
+        if (al->source && al->life_s.find("rand") == string::npos)
+        {
+            const int delta = al->getLife();
+            Player * tp = dynamic_cast<Player *>(al->getTarget());
+            if (delta != 0 && tp)
+            {
+                const bool toMe = (tp == seat);
+                if (toMe && delta < 0)
+                    lossToMe += -delta;
+                if (phrase && phrase->empty())
+                    *phrase = stackLifePhrase(delta, toMe);
+            }
+        }
+    }
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        scanStackAbilityLife(na->ability, seat, depth + 1, lossToMe, phrase);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            scanStackAbilityLife(ma->abilities[i], seat, depth + 1, lossToMe, phrase);
+}
+
+//One stack object's life cost to `seat`, plus the effect phrase its row prints.
+static int stackObjectLifeLossToSeat(Interruptible * it, Player * seat, string * phrase)
+{
+    int loss = 0;
+    if (StackAbility * sa = dynamic_cast<StackAbility *>(it))
+        scanStackAbilityLife(sa->ability, seat, 0, loss, phrase);
+    return loss;
+}
+
+//#W60-L (B1): the life already committed against `seat` by the stack objects
+//that resolve BEFORE `below`. Ordering matters and is the whole point: an
+//object ABOVE another on the stack resolves first, so a target ask for an
+//ability already on the stack is priced against everything above it, while a
+//spell being CAST goes on top of everything and nothing already there precedes
+//it (returns 0, which is why the `130v146` seq 44 fold is driven by the cast
+//surcharge and not by this).
+static int stackLifeLossBefore(GameObserver * observer, Player * seat, MTGCardInstance * below)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return 0;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return 0;
+    int belowIdx = -1;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (it && below && it->source == below)
+            belowIdx = (int) i;
+    }
+    if (belowIdx < 0)
+        return -1; //not on the stack at all - the caller prices the cast instead
+    int total = 0;
+    for (size_t i = (size_t)(belowIdx + 1); i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        total += stackObjectLifeLossToSeat(it, seat, NULL);
+    }
+    return total;
+}
+
 //#W53-P (D4): the ability half of one stack line, read off the LIVE object.
 //The emitter and the test-suite register share it, so a fixture that goes red
 //points at the shipped render rather than at a re-implementation of it.
 //StackAbility never sets Interruptible::source (only MTGAbility::source is set),
 //which is why every ability line used to fall to the anonymous menu-text branch.
-static string stackAbilityBody(Interruptible * it, Player * seat)
+static string stackAbilityBody(Interruptible * it, Player * seat,
+                               const string& effectNote = "") //#W60-L (B2)
 {
     if (!it)
         return "";
@@ -3326,7 +3478,7 @@ static string stackAbilityBody(Interruptible * it, Player * seat)
             kind = "triggered ability";
         else if (dynamic_cast<ActivatedAbility *>(sa->ability))
             kind = "activated ability";
-        return stackAbilityLine(grantor, menu, victim, grantorMine, kind);
+        return stackAbilityLine(grantor, menu, victim, grantorMine, kind, effectNote);
     }
     return stackAbilityName(srcName, menu);
 }
@@ -3692,6 +3844,59 @@ static string attackerBlockerCountLine(int blockers)
       << (blockers == 1 ? "" : "s") << " able to block; declaring more than "
       << blockers << " attackers leaves at least (your attackers - " << blockers
       << ") of them unblocked.\n";
+    return o.str();
+}
+
+//#W60-L (B11, wave-59 deck123 I1): the ATTACKERS ask carried per-attacker tags
+//and the blocker COUNT line above, and nothing else - no total power, no damage,
+//no resulting life. The blockers ask has exactly that line
+//(`INCOMING THIS COMBAT: N attackers, X unblocked damage - you would be at Y;
+//this KILLS you`), so the seat that must decide an alpha strike was the one seat
+//made to do the arithmetic itself: `123v126` s71 offered 31 attackers into a
+//22-life opponent with the count line as the whole of the maths, and the
+//neighbouring cast window s69 spent 431,938 ms and 4,049 characters computing it
+//by hand. This is the mirror, and it is COMPUTED from the rows above it - it
+//adds no fact the emitter did not already hold.
+//Two numbers, deliberately different in kind, in the same register the incoming
+//line uses. `totalPower` with none blocked is the CEILING (they choose whether
+//to block, so it is stated conditionally and claims no kill). `guaranteed` is a
+//FLOOR proven by counting: at most `blockers` of the attackers can be blocked at
+//all, so the smallest powers among the blockable ones plus every attacker no
+//untapped creature of theirs may legally block land whatever they do - and a
+//floor at or past their life is a kill no block prevents. Pure over the five
+//counts. `guaranteed < 0` = not computed, and nothing is said.
+static string attackTotalLine(int attackers, int totalPower, int oppLife,
+                              int blockers, int guaranteed)
+{
+    if (attackers <= 0 || oppLife < 0)
+        return "";
+    std::ostringstream o;
+    o << "ATTACK TOTAL: " << attackers << " attacker"
+      << (attackers == 1 ? "" : "s") << " listed, " << totalPower
+      << " total power - declaring all of them with none blocked puts them at "
+      << (oppLife - totalPower) << ".";
+    if (guaranteed >= 0)
+    {
+        if (guaranteed <= 0)
+            o << " Their " << blockers << " untapped blocker"
+              << (blockers == 1 ? "" : "s") << " can cover every attacker you could"
+                 " send, so none of that damage is guaranteed.";
+        else
+        {
+            //#W60-L (B11): the floor is stated WITHOUT a cause. Two different
+            //constraints produce it - their blocker count cannot cover every
+            //attacker, and an attacker nothing of theirs may legally block - and
+            //a live probe printed "at most 3 of them can be blocked at all" over
+            //ONE unblockable attacker, where the count was true and not the
+            //reason. The blocker-count line directly above already states the cap.
+            o << " At least " << guaranteed << " damage lands whatever they block -"
+                 " they would be at " << (oppLife - guaranteed);
+            if (oppLife - guaranteed <= 0)
+                o << "; that KILLS them whatever they block";
+            o << ".";
+        }
+    }
+    o << "\n";
     return o.str();
 }
 
@@ -15664,6 +15869,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     {
         ActionStack * stack = observer->mLayers->stackLayer();
         std::vector<string> items;
+        int stackDamageToMe = 0; //#W60-L (B2)
         for (size_t i = 0; i < stack->mObjects.size(); i++)
         {
             Interruptible * it = (Interruptible *) stack->mObjects[i];
@@ -15678,6 +15884,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             if (!stackObjectIsRespondable(it->source != NULL,
                                           it->source && it->source->hasType(Subtypes::TYPE_EMBLEM)))
                 continue;
+            //#W60-L (B2): what this object does to THIS seat's life, once per
+            //object - the row's effect phrase and the window's running total.
+            string itEffect;
+            stackDamageToMe += stackObjectLifeLossToSeat(it, this, &itEffect);
             std::ostringstream line;
             Player * ctrl = it->source ? it->source->controller() : NULL;
             line << (ctrl == this ? "your " : (ctrl ? "opponent's " : ""));
@@ -15690,7 +15900,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //is not a game object the model can reason about, and it spent
                 //a whole window deciding whether the stack entry was real.
                 //Build the label from what we know here instead.
-                line << stackAbilityBody(it, this) << " [triggered/activated ability]";
+                line << stackAbilityBody(it, this, itEffect)
+                     << " [triggered/activated ability]";
             }
             else
                 //W39-STACKFACTS: type, mana cost and P/T at the object the
@@ -15733,6 +15944,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             int n = 1;
             for (int i = (int) items.size() - 1; i >= 0; i--, n++)
                 out << "  " << n << (n == 1 ? " (top): " : ": ") << items[i] << "\n";
+            //#W60-L (B2): the total, finished, under the rows it sums.
+            const string pend = pendingStackDamageLine(stackDamageToMe, this->life);
+            if (!pend.empty())
+                out << pend << "\n";
         }
     }
     //Honest mana line: the pool being empty between actions is normal (the
@@ -18154,6 +18369,33 @@ string damagePlaneswalkerVerdict(int dmg, int loyalty)
         o << "SURVIVES (loyalty " << loyalty << ", " << (loyalty - dmg) << " left)}";
     return o.str();
 }
+//#W60-L (B1, wave-59 engine-seat HIGH-1 / deck130 HIGH-1): a win fold is a
+//claim about the END of the game, so it is false whenever the pilot stops
+//being alive first. `130v146` seq 43/44 (turn 26, life 1 vs 2): the cast row
+//priced its own surcharge in the same sentence
+//(`[NAMED BY THEIR Silverquill Silencer: casting this costs you 3 life - you
+//would be at -2; this KILLS you]`) and then ended
+//`- and 3 to the opponent at life 2 WINS THE GAME`, and the target menu one
+//window later printed the win with no death clause at all. The seat took it
+//and the `gameend` two records later reads `life -2, lost`. Rules basis: the
+//surcharge is a cast-time price (paid on announcement) and the Silencer
+//trigger goes on the stack ABOVE the spell, so both resolve before the damage
+//that would win - the win never happens. So the fold subtracts the life the
+//pilot is already committed to lose BEFORE this effect resolves and, when
+//that reaches 0, says which of the two happens first instead of claiming the
+//win. Pure over (my life, the loss that lands first) so both branches are
+//provable without a board; `lifeLossFirst <= 0` returns "" and every existing
+//win string stays byte-identical.
+static string winFoldBlockedTail(int myLife, int lifeLossFirst)
+{
+    if (lifeLossFirst <= 0 || myLife < 0 || myLife - lifeLossFirst > 0)
+        return "";
+    std::ostringstream o;
+    o << "WOULD win, but you lose " << lifeLossFirst << " life first - you would be at "
+      << (myLife - lifeLossFirst) << ": YOU LOSE BEFORE THIS RESOLVES";
+    return o.str();
+}
+
 //#W54-C (D4, wave-53 ledger HIGH, part iii): every CREATURE row of a damage
 //spell's target ask carried a survival verdict and the PLAYER rows carried
 //nothing - `130v162` seq 63 printed SURVIVES on two creatures and left
@@ -18161,7 +18403,8 @@ string damagePlaneswalkerVerdict(int dmg, int loyalty)
 //aimed the spell at a planeswalker and died 0 to 1 four records later. Same
 //register as damageTargetVerdict; a player's answer is their life total.
 //Pure over (magnitude, life, whose row it is).
-string damagePlayerVerdict(int dmg, int life, bool isMe)
+string damagePlayerVerdict(int dmg, int life, bool isMe,
+                          int myLife = -1, int lifeLossFirst = 0) //#W60-L (B1)
 {
     std::ostringstream o;
     o << " {right now: takes " << dmg << " damage - ";
@@ -18175,7 +18418,12 @@ string damagePlayerVerdict(int dmg, int life, bool isMe)
     {
         o << "they would be at " << (life - dmg);
         if (life - dmg <= 0)
-            o << "; THIS WINS THE GAME";
+        {
+            //#W60-L (B1): the win is claimed only if the pilot is still alive
+            //to have it.
+            const string blocked = winFoldBlockedTail(myLife, lifeLossFirst);
+            o << "; " << (blocked.empty() ? string("THIS WINS THE GAME") : blocked);
+        }
     }
     o << "}";
     return o.str();
@@ -18203,14 +18451,20 @@ static string toLowerCopy(const string & s);
 //row at all. Two additive corrections: the denominator says CREATURE, and when
 //a player is on the same enumeration the damage that reaches them is stated
 //with its consequence. Pure over its inputs.
-static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife)
+static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife,
+                                  int myLife = -1, int lifeLossFirst = 0) //#W60-L (B1)
 {
     if (dmg <= 0 || !oppTargetable || oppLife < 0)
         return "";
     std::ostringstream o;
     o << " - and " << dmg << " to the opponent at life " << oppLife;
     if (oppLife - dmg <= 0)
-        o << " WINS THE GAME";
+    {
+        //#W60-L (B1): this row's own cast-time life price, subtracted before
+        //the row is allowed to promise a win.
+        const string blocked = winFoldBlockedTail(myLife, lifeLossFirst);
+        o << " " << (blocked.empty() ? string("WINS THE GAME") : blocked);
+    }
     else
         o << " leaves them at " << (oppLife - dmg);
     return o.str();
@@ -18576,15 +18830,24 @@ string stackAbilityRegister(GameObserver * observer, Player * seat)
         return "";
     std::ostringstream o;
     bool any = false;
+    int dmgToSeat = 0; //#W60-L (B2)
     for (size_t i = 0; i < stack->mObjects.size(); i++)
     {
         Interruptible * it = (Interruptible *) stack->mObjects[i];
         if (!it || it->state != NOT_RESOLVED || it->type != ACTION_ABILITY)
             continue;
-        o << (any ? " | " : "") << stackAbilityBody(it, seat);
+        //#W60-L (B2): the register runs the SAME two production calls the stack
+        //block runs - the per-row effect note and the window total - so a fixture
+        //red here is a red render and not a red copy of one.
+        string note;
+        dmgToSeat += stackObjectLifeLossToSeat(it, seat, &note);
+        o << (any ? " | " : "") << stackAbilityBody(it, seat, note);
         any = true;
     }
-    return any ? "on the stack: " + o.str() : string("");
+    if (!any)
+        return "";
+    const string pend = pendingStackDamageLine(dmgToSeat, seat->life); //#W60-L (B2)
+    return "on the stack: " + o.str() + (pend.empty() ? string("") : " || " + pend);
 }
 
 string exileCastRegister(Player * seat)
@@ -19111,6 +19374,31 @@ static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draw
       << " is on the battlefield, so declining now does not make it go away";
     o << "]";
     return o.str();
+}
+
+//#W60-L (B1): the same scan the cast row prints, as a NUMBER, for the target
+//ask that follows it. At `130v146` seq 44 the spell was not yet on the stack
+//(the prompt carries no ON THE STACK section at all), so the only thing
+//standing between the seat and its win was this unpaid surcharge - re-derived
+//here from the opponent's battlefield rather than carried across the two asks.
+static int namedCastLifeSurcharge(Player * me, MTGCardInstance * card)
+{
+    if (!me || !card || card->isLand())
+        return 0;
+    Player * opp = me->opponent();
+    MTGGameZone * obf = (opp && opp->game) ? opp->game->inPlay : NULL;
+    for (int ni = 0; obf && ni < obf->nb_cards; ni++)
+    {
+        MTGCardInstance * nc = obf->cards[ni];
+        if (!nc || nc->chooseaname.empty()
+            || toLowerCopy(nc->chooseaname) != toLowerCopy(card->name))
+            continue;
+        int nLife = 0, nDraw = 0;
+        if (!namedCastPenaltyScan(nc->magicText, nLife, nDraw))
+            continue;
+        return nLife > 0 ? nLife : 0;
+    }
+    return 0;
 }
 
 static string spellRemovalVerb(MTGCardInstance * src)
@@ -24189,6 +24477,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //enter. Counted off this seat's battlefield with the same creature
         //predicate the board header uses, so the row cannot contradict the
         //"of which N are creatures" line the pilot reads above it.
+        //#W60-L (B1): the life this row's own cast will cost the pilot BEFORE
+        //the spell resolves - the naming permanent's surcharge and the pain the
+        //payment plan will take. Accumulated here and handed to the win fold
+        //below so the row cannot price its own death and then promise a win.
+        int rowSelfLifeCost = 0;
         if (card->hasType(Subtypes::TYPE_EQUIPMENT))
         {
             int ownCreatures = 0;
@@ -24223,6 +24516,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     continue;
                 o << namedCastPriceTag(nc->getDisplayName() + instanceHandle(nc),
                                        nLife, nDraw, life);
+                if (nLife > 0)
+                    rowSelfLifeCost += nLife; //#W60-L (B1)
                 break;
             }
         }
@@ -24333,6 +24628,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             }
             //#W52-K D7: the life this payment plan spends, and where it leaves you.
             o << paymentLifeCostClause(painNames, painDamage, life);
+            //#W60-L (B1): same subtraction, into the row's win fold.
+            for (size_t pdi = 0; pdi < painDamage.size(); pdi++)
+                if (painDamage[pdi] > 0)
+                    rowSelfLifeCost += painDamage[pdi];
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -24519,7 +24818,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             //PLAYER on the same enumeration, and what it means.
                             Player * oppP = this->opponent();
                             string playerTail = castPlayerDamageTail(
-                                castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1);
+                                castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1,
+                                life, rowSelfLifeCost); //#W60-L (B1)
                             o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
                                                     killedMine); //#W55-C (D15)
                         }
@@ -27179,6 +27479,18 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     //all. deck152 answered it at 11 life and again at 6 with the number invisible.
     //The standing rule is that the deciding fact rides the seat where the choice
     //commits, so the identical "(costs you N life)" fragment is emitted here too.
+    //#W60-L (B1, wave-59 engine-seat HIGH-1): the life this seat loses BEFORE the
+    //object being targeted resolves. Two disjoint cases, decided by where the
+    //object is: already on the stack -> everything ABOVE it resolves first; not
+    //on the stack (a spell whose targets are chosen at cast time, which is the
+    //`130v146` seq 44 shape) -> nothing already on the stack precedes it, but its
+    //unpaid cast surcharge does. Handed to the player rows' win fold below.
+    int perilBeforeResolve = 0;
+    {
+        MTGCardInstance * psrc = tc ? tc->source : NULL;
+        const int above = stackLifeLossBefore(observer, this, psrc);
+        perilBeforeResolve = (above >= 0) ? above : namedCastLifeSurcharge(this, psrc);
+    }
     bool lifeCostPerTarget = false;
     if (tc && tc->source)
     {
@@ -27272,7 +27584,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 //verdict, and the row that won the game was the bare one.
                 if (dmgAmount > 0)
                     if (Player * dtp = dynamic_cast<Player *>(t))
-                        tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this);
+                        tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this,
+                                                     this->life, perilBeforeResolve); //#W60-L (B1)
                 //#W54-C (D4): and a planeswalker's answer is its loyalty - the
                 //helper existed and only the ability path was calling it, so
                 //`130v162` seq 63's Ob Nixilis row was bare too.
@@ -29856,8 +30169,13 @@ int AIPlayerGPT::chooseAttackers()
     vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
     CombatWindowCache cw; //#W54-M (A22): per-window memo of the per-creature facts
     const bool oppLifeLoop = playerHasLifeLoop(opponent()); //#W54-M (A22): a board fact, once per window
+    //#W60-L (B11): the parts of the aggregate line, gathered from the same pass
+    //that builds the rows - the totals can never disagree with the rows above them.
+    std::vector<int> rowPower;
+    std::vector<bool> rowNoLegalBlock;
     for (size_t j = 0; j < attackers.size(); j++)
     {
+        bool noLegalBlockForThisRow = false; //#W60-L (B11)
         std::ostringstream ln;
         //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
         //emitter below can collapse a run of rows that agree in every rendered
@@ -30088,12 +30406,19 @@ int AIPlayerGPT::chooseAttackers()
             ln << pb;
             if (noneCouldBlock && minB < 2)
                 ln << noPotentialBlockersTag();
+            //#W60-L (B11): after the menace clearing, an empty candidate set IS
+            //"no untapped creature of theirs may legally block this attacker" -
+            //the same predicate the two tags above print, so the floor below and
+            //the rows agree by construction.
+            noLegalBlockForThisRow = entries.empty();
         }
         if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
             ln << kLifeLoopAttackerRowTag;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
+        rowPower.push_back(attackers[j]->power > 0 ? attackers[j]->power : 0); //#W60-L (B11)
+        rowNoLegalBlock.push_back(noLegalBlockForThisRow);
         //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
         //option list, not the rendered prompt.
         {
@@ -30127,6 +30452,29 @@ int AIPlayerGPT::chooseAttackers()
             }
         }
         tail << attackerBlockerCountLine(blockerCount);
+        //#W60-L (B11): and the arithmetic that count line stops one step short
+        //of. `guaranteed` counts every attacker nothing of theirs may block, then
+        //the SMALLEST powers among the rest that their blocker count cannot
+        //cover - the worst case for the attacker, so the number is a proven floor.
+        {
+            int totalPower = 0, guaranteed = 0;
+            std::vector<int> blockablePowers;
+            for (size_t j = 0; j < rowPower.size(); j++)
+            {
+                totalPower += rowPower[j];
+                if (j < rowNoLegalBlock.size() && rowNoLegalBlock[j])
+                    guaranteed += rowPower[j];
+                else
+                    blockablePowers.push_back(rowPower[j]);
+            }
+            std::sort(blockablePowers.begin(), blockablePowers.end());
+            const int freeCount = (int) blockablePowers.size() - blockerCount;
+            for (int k = 0; k < freeCount && k < (int) blockablePowers.size(); k++)
+                guaranteed += blockablePowers[k];
+            Player * oppL = opponent();
+            tail << attackTotalLine((int) rowPower.size(), totalPower,
+                                    oppL ? oppL->life : -1, blockerCount, guaranteed);
+        }
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
     //the two facts that decide it, so the model derived them from scratch - one
@@ -49636,6 +49984,142 @@ static const char * kW50Y_r94 =
               " index outside this menu is refused");
         CHECK(!repeatAskAnswerStands("", "", "p", "p", 25, 25, 1, 2),
               "#W59-J K10 NEGATIVE nothing latched, nothing re-served");
+    }
+
+
+    cout << "\n[W60-L] B1 the win fold subtracts what kills the pilot first\n";
+    {
+        //`130v146` s43: the cast row's own surcharge, in front of the win it claimed.
+        CHECK(castPlayerDamageTail(3, true, 2, 1, 3)
+              == " - and 3 to the opponent at life 2 WOULD win, but you lose 3 life"
+                 " first - you would be at -2: YOU LOSE BEFORE THIS RESOLVES",
+              "#W60-L B1 the cast row's win fold names the death that happens first");
+        //`130v146` s44: the same subtraction on the target menu's player row.
+        CHECK(damagePlayerVerdict(3, 2, false, 1, 3)
+              == " {right now: takes 3 damage - they would be at -1; WOULD win, but you"
+                 " lose 3 life first - you would be at -2: YOU LOSE BEFORE THIS RESOLVES}",
+              "#W60-L B1 the target menu's player row carries the same fold");
+        //Exactly lethal is lethal: 0 life is dead.
+        CHECK(winFoldBlockedTail(3, 3).find("you would be at 0") != string::npos,
+              "#W60-L B1 a surcharge that takes the pilot to exactly 0 blocks the win");
+        //NEGATIVE: a pilot that survives the price still gets the win token, and
+        //no branch of the new fold appears anywhere in it.
+        CHECK(castPlayerDamageTail(3, true, 2, 5, 3)
+              == " - and 3 to the opponent at life 2 WINS THE GAME"
+              && damagePlayerVerdict(3, 2, false, 5, 3)
+                 == " {right now: takes 3 damage - they would be at -1; THIS WINS THE GAME}",
+              "#W60-L B1 NEGATIVE a survivable price never suppresses the win");
+        CHECK(winFoldBlockedTail(1, 0).empty() && winFoldBlockedTail(-1, 3).empty()
+              && winFoldBlockedTail(5, 3).empty(),
+              "#W60-L B1 NEGATIVE no price, no known life, or a survivable price says nothing");
+        //REGRESSION: every pre-wave-60 call site passes no peril and is byte-identical.
+        CHECK(castPlayerDamageTail(3, true, 1) == " - and 3 to the opponent at life 1 WINS THE GAME"
+              && castPlayerDamageTail(3, true, 5) == " - and 3 to the opponent at life 5 leaves them at 2"
+              && damagePlayerVerdict(3, 2, false)
+                 == " {right now: takes 3 damage - they would be at -1; THIS WINS THE GAME}"
+              && damagePlayerVerdict(3, 1, true)
+                 == " {right now: takes 3 damage - you would be at -2; this KILLS you}",
+              "#W60-L B1 REGRESSION the defaulted form is byte-identical to wave 54");
+        //ECHO SHAPE: the fold stays inside the row's existing brace pair - no new
+        //bracketed or braced annotation is introduced for the model to echo.
+        {
+            const string v = damagePlayerVerdict(3, 2, false, 1, 3);
+            size_t braces = 0, brackets = 0;
+            for (size_t i = 0; i < v.size(); i++)
+            {
+                if (v[i] == '{' || v[i] == '}') braces++;
+                if (v[i] == '[' || v[i] == ']') brackets++;
+            }
+            CHECK(braces == 2 && brackets == 0 && v[1] == '{' && v[v.size() - 1] == '}',
+                  "#W60-L B1 ECHO the blocked-win row is still one {...} pair and no bracket");
+        }
+    }
+
+    cout << "\n[W60-L] B2 pending damage on the stack is totalled and every row names its effect\n";
+    {
+        //`146v162` s26: four damage in front of a seat at 5 life, no total printed.
+        CHECK(pendingStackDamageLine(4, 5) == "ON THE STACK: 4 damage to you - you would be at 1",
+              "#W60-L B2 the stack total is a finished subtraction");
+        CHECK(pendingStackDamageLine(4, 4)
+              == "ON THE STACK: 4 damage to you - you would be at 0; that would KILL you",
+              "#W60-L B2 a total at or past the life total says so");
+        CHECK(pendingStackDamageLine(0, 5).empty() && pendingStackDamageLine(4, -1).empty(),
+              "#W60-L B2 NEGATIVE nothing pending, or no known life, prints nothing");
+        //The effect phrases the rows carry.
+        CHECK(stackDamagePhrase(1, true) == "deals 1 damage to you"
+              && stackDamagePhrase(3, false) == "deals 3 damage to them",
+              "#W60-L B2 the damage phrase names the amount and the seat");
+        CHECK(stackLifePhrase(-3, true) == "you lose 3 life"
+              && stackLifePhrase(2, false) == "they gain 2 life",
+              "#W60-L B2 the life phrase names the direction");
+        CHECK(stackDamagePhrase(0, true).empty() && stackDamagePhrase(-2, true).empty()
+              && stackLifePhrase(0, true).empty(),
+              "#W60-L B2 NEGATIVE a zero magnitude is not an effect");
+        //`146v162` s26 rows 1/3: the label degenerates to the kind, so the effect
+        //rides beside it instead of the row saying nothing at all.
+        CHECK(stackAbilityLine("Ob Nixilis, the Hate-Twisted", "Ob Nixilis, the Hate-Twisted",
+                               "", false, "triggered ability", "deals 1 damage to you")
+              == "ability: Ob Nixilis, the Hate-Twisted's triggered ability (deals 1 damage"
+                 " to you) [from their Ob Nixilis, the Hate-Twisted]",
+              "#W60-L B2 a degenerate label carries the effect the row is about");
+        //NEGATIVE: a row that already names its effect is untouched (rows 2/4).
+        CHECK(stackAbilityLine("Underworld Dreams", "deal 1 damage", "", false,
+                               "triggered ability", "deals 1 damage to you")
+              == "ability: Underworld Dreams's deal 1 damage [from their Underworld Dreams]",
+              "#W60-L B2 NEGATIVE a real effect label is never decorated");
+        //REGRESSION: no note supplied, the wave-54 form stands byte-identical.
+        CHECK(stackAbilityLine("Ob Nixilis, the Hate-Twisted", "Ob Nixilis, the Hate-Twisted",
+                               "", false, "triggered ability")
+              == "ability: Ob Nixilis, the Hate-Twisted's triggered ability"
+                 " [from their Ob Nixilis, the Hate-Twisted]",
+              "#W60-L B2 REGRESSION the un-noted form is byte-identical to wave 54");
+        //ECHO SHAPE: the stack block is a plain narration line - no brace or bracket
+        //annotation is added by either new string.
+        CHECK(pendingStackDamageLine(4, 5).find('{') == string::npos
+              && pendingStackDamageLine(4, 5).find('[') == string::npos
+              && stackDamagePhrase(1, true).find('{') == string::npos,
+              "#W60-L B2 ECHO the stack total introduces no bracketed annotation");
+    }
+
+    cout << "\n[W60-L] B11 the attackers ask gets the aggregate the blockers ask has\n";
+    {
+        //`123v126` s71: 31 attackers into a 22-life opponent, with the blocker
+        //count line as the whole of the arithmetic offered.
+        CHECK(attackTotalLine(5, 20, 22, 3, 6)
+              == "ATTACK TOTAL: 5 attackers listed, 20 total power - declaring all of them"
+                 " with none blocked puts them at 2. At least 6 damage lands whatever they"
+                 " block - they would be at 16.\n",
+              "#W60-L B11 the ceiling and the proven floor, in that order");
+        CHECK(attackTotalLine(5, 20, 5, 3, 6).find("they would be at -1; that KILLS them"
+                                                   " whatever they block.") != string::npos,
+              "#W60-L B11 a floor at or past their life is a kill no block prevents");
+        CHECK(attackTotalLine(2, 4, 20, 3, 0)
+              == "ATTACK TOTAL: 2 attackers listed, 4 total power - declaring all of them"
+                 " with none blocked puts them at 16. Their 3 untapped blockers can cover"
+                 " every attacker you could send, so none of that damage is guaranteed.\n",
+              "#W60-L B11 a fully coverable attack promises nothing");
+        CHECK(attackTotalLine(1, 3, 20, 1, 0).find("Their 1 untapped blocker can") != string::npos,
+              "#W60-L B11 the blocker noun agrees with its count");
+        //NEGATIVE (live probe 2026-09-04, deck123 vs deck126 t? attackers window):
+        //ONE attacker no untapped creature of theirs could legally block printed
+        //"At most 3 of them can be blocked at all" - a true count offered as the
+        //reason for a floor it did not cause. The floor now names no cause at all.
+        CHECK(attackTotalLine(1, 3, 23, 3, 3).find("can be blocked at all") == string::npos
+              && attackTotalLine(1, 3, 23, 3, 3).find("At least 3 damage lands whatever they"
+                                                      " block - they would be at 20.") != string::npos,
+              "#W60-L B11 NEGATIVE the floor states the number, never a cause for it");
+        //NEGATIVE: nothing to declare, or no known opponent life, says nothing;
+        //and an uncomputed floor prints the ceiling alone.
+        CHECK(attackTotalLine(0, 0, 20, 3, 6).empty() && attackTotalLine(5, 20, -1, 3, 6).empty(),
+              "#W60-L B11 NEGATIVE no attackers or no known life prints nothing");
+        CHECK(attackTotalLine(5, 20, 22, 3, -1)
+              == "ATTACK TOTAL: 5 attackers listed, 20 total power - declaring all of them"
+                 " with none blocked puts them at 2.\n",
+              "#W60-L B11 NEGATIVE an uncomputed floor claims no floor");
+        //ECHO SHAPE: a prompt line, not an annotation - no brace, no bracket.
+        CHECK(attackTotalLine(5, 20, 22, 3, 6).find('{') == string::npos
+              && attackTotalLine(5, 20, 22, 3, 6).find('[') == string::npos,
+              "#W60-L B11 ECHO the aggregate line introduces no bracketed annotation");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
