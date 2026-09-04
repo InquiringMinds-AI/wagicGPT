@@ -61,3 +61,23 @@ DROP — Claude's inventions (not run in wave 58 unless the owner re-adds them):
 Cost consequence: step three = 7 deck agents + 1 synthesis; step one = as many lanes as there are
 known bugs and judged-worthwhile improvements. Model routing (Codex-first for mechanical lanes) is
 a separate owner call, unchanged by this statement.
+
+## Owner clarification (verbatim, 2026-09-03, minutes later)
+"im not saying it has to be done the way i envisioned it. the goal is to fix problems and improve
+the llms ability to operate as an opponent, then test those changes, then evaluate the test
+results, and then to repeat."
+
+## Wave-58 operating shape (Claude's judgment under that goal; not the owner's words)
+- Step one: lanes for KNOWN BUGS ranked by player/opponent cost — the wave-57 HIGH items (pay-3-life
+  row lethality verdict; false NO LIVE CAST ROW header; rowSaysNoOp `exiles 0`; wrong
+  assignable-remainder number; `[<- best trade:` endorsing a 1-for-5; lowercased MDFC tokens in
+  narration) + open owner Vita items. Fixture RED->GREEN discipline KEPT (it is what makes engine
+  findings real). Hermetic gate KEPT. ONE lane on Codex as a trial (owner's Codex-first posture,
+  2026-07-30), the rest on Opus this wave; Codex expands only if it passes the same gate.
+- Step two: the 21-game corpus, unchanged.
+- Step three: the engine seat KEPT (corrected the harvest twice; found the false header); SEVEN
+  lean per-deck agents (read own transcripts, compare to guide, edit only if needed, elevate
+  engine items; no four-file mandate, no prediction tables); synthesis only when proposals exist.
+  DROPPED: boundary pass, docket/prediction/carry bookkeeping, numbered amendment ledgers,
+  six-lane quota, literal audits.
+- Orchestrator compacts at each wave boundary. Target ~1.5-2 M Opus tokens per wave (was 5.9 M).
