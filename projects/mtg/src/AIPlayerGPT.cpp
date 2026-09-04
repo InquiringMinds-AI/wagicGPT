@@ -9326,23 +9326,73 @@ static int xBestFreeKillX(const std::vector<XDamVictim>& victims, int capX)
 //kill set only grows with X, so that same row also carries the smallest YOURS
 //of the maximal set - which is exactly what the marker's words claim. Returns
 //-1 when no affordable X kills anything of theirs. Pure over the survey.
-static int xBestTradeX(const std::vector<XDamVictim>& victims, int capX)
+//#W58-B (D5, wave-57 ledger MED-HIGH): the selection rule counted only THEIRS.
+//`130v152` s33 marked `X = 4 {kills THEIRS: Sigarda; YOURS: Dwarven Blastminer,
+//Siege-Gang Commander, Goblin x3}` - a 1-for-5 - as "the most of THEIRS at the
+//smallest cost to YOURS", and the marker is the most reliably followed
+//annotation this render produces (marked-row takes 6 of 9, 7 of 9, 4 of 7).
+//The words already name both sides; the arithmetic now uses both. Counts at an
+//X, over the same survey the rows print from. Pure.
+static void xTradeCountsAt(const std::vector<XDamVictim>& victims, int x,
+                           int & theirs, int & mine)
 {
-    int bestX = -1, bestKills = 0;
+    theirs = 0;
+    mine = 0;
+    for (size_t i = 0; i < victims.size(); i++)
+    {
+        const XDamVictim & v = victims[i];
+        if (v.isPlayer || v.lethalX <= 0 || v.lethalX > x)
+            continue;
+        if (v.mine)
+            mine++;
+        else
+            theirs++;
+    }
+}
+//The trade X. Both counts are monotone non-decreasing in X (the kill set only
+//grows), so the FIRST X reaching the maximal THEIRS also carries the smallest
+//YOURS of that set - which is exactly what the marker's words claim. The rule
+//the wave-57 record broke: an X whose cost to YOURS exceeds what it takes of
+//THEIRS is never endorsed. When no X trades at or better than even, the menu
+//still has a kill on it and saying "nothing dies" would be false - so that X is
+//returned with `lopsided` set and the marker states the price instead of
+//endorsing it. -1 only when no affordable X kills anything of theirs.
+static int xBestTradeX(const std::vector<XDamVictim>& victims, int capX,
+                       int * theirsOut = NULL, int * mineOut = NULL,
+                       bool * lopsidedOut = NULL)
+{
+    int bestX = -1, bestT = 0, bestM = 0; //even-or-better: mine <= theirs
+    int anyX = -1, anyT = 0, anyM = 0;    //any kill of theirs at all
     for (int x = 0; x <= capX; x++) //ascending: a tie keeps the cheapest X
     {
-        int theirs = 0;
-        for (size_t i = 0; i < victims.size(); i++)
-            if (!victims[i].isPlayer && !victims[i].mine
-                && victims[i].lethalX > 0 && victims[i].lethalX <= x)
-                theirs++;
-        if (theirs > bestKills)
+        int theirs = 0, mine = 0;
+        xTradeCountsAt(victims, x, theirs, mine);
+        if (theirs <= 0)
+            continue;
+        if (anyX < 0 || theirs > anyT)
         {
-            bestKills = theirs;
+            anyX = x;
+            anyT = theirs;
+            anyM = mine;
+        }
+        if (mine > theirs)
+            continue;
+        if (theirs > bestT)
+        {
             bestX = x;
+            bestT = theirs;
+            bestM = mine;
         }
     }
-    return bestKills > 0 ? bestX : -1;
+    const bool lop = (bestX < 0);
+    const int pick = lop ? anyX : bestX;
+    if (lopsidedOut)
+        *lopsidedOut = lop;
+    if (theirsOut)
+        *theirsOut = lop ? anyT : bestT;
+    if (mineOut)
+        *mineOut = lop ? anyM : bestM;
+    return pick;
 }
 
 //#W55-C (D6 b): the row the marker lands on is, by both rules above, the
@@ -9372,6 +9422,22 @@ static const char * kXMostKillsMarker =
 //the row that spends nothing, and is never an instruction to take that row.
 static const char * kXBestTradeMarker =
     " [<- best trade: the most of THEIRS at the smallest cost to YOURS]";
+//#W58-B (D5): the fourth member. The trade marker now carries its two counts
+//inline, so the claim and its evidence cannot part company, and a menu whose
+//ONLY kill of theirs costs more of yours gets a marker that prices it rather
+//than one that endorses it. Both built from the constants above, so the
+//wording cannot drift from the family. Pure over (theirs, mine, lopsided).
+static const char * kXLopsidedTradeMarker =
+    " [<- the only X that kills anything of THEIRS costs you more of YOURS than it takes]";
+static string xTradeMarker(int theirs, int mine, bool lopsided)
+{
+    string base(lopsided ? kXLopsidedTradeMarker : kXBestTradeMarker);
+    if (!base.empty() && base[base.size() - 1] == ']')
+        base.erase(base.size() - 1);
+    std::ostringstream o;
+    o << base << " - THEIRS " << theirs << " / YOURS " << mine << "]";
+    return o.str();
+}
 static const char * kXNoKillsMarker =
     " [<- no X on this menu kills anything of THEIRS]";
 
@@ -9387,10 +9453,13 @@ static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& 
         markerOut = kXMostKillsMarker;
         return freeX;
     }
-    int tradeX = xBestTradeX(victims, capX);
+    int tradeTheirs = 0, tradeMine = 0;
+    bool tradeLopsided = false;
+    int tradeX = xBestTradeX(victims, capX, &tradeTheirs, &tradeMine, &tradeLopsided);
     if (tradeX >= 0)
     {
-        markerOut = kXBestTradeMarker;
+        //#W58-B (D5): endorsed only at or better than even; otherwise priced.
+        markerOut = xTradeMarker(tradeTheirs, tradeMine, tradeLopsided);
         return tradeX;
     }
     markerOut = kXNoKillsMarker;
@@ -14916,10 +14985,28 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
     //#W57-B (D24): the assignable remainder, from the same counts. Only ever
     //printed where a legal assignment exists to price - with no bodies, or no
     //legal block at all, the parenthetical above already says so.
+    //#W58-B (D7): the two claims are different KINDS of number and no longer
+    //share a sentence. With every attacker exactly preventable the matching is
+    //a proven maximum, so the life it names is the best reachable one and a
+    //non-positive value is certain death. With a trampler or a menace attacker
+    //in the total the number is a FLOOR on the damage that lands (their damage
+    //is counted as landing and their would-be blockers stay free for the rest),
+    //so it is stated as a floor - "or better" - and claims no death it cannot
+    //prove. The old wording asserted an achievable assignment it did not have.
     if (haveBodies && bestCaseDamage >= 0)
-        o << (bestCaseOptimal ? " - best case with every blocker assigned: you would be at "
-                              : " - one legal assignment gets you to ")
-          << (myLife - bestCaseDamage);
+    {
+        if (bestCaseOptimal)
+        {
+            o << " - best case with every blocker assigned: you would be at "
+              << (myLife - bestCaseDamage);
+            if (myLife - bestCaseDamage <= 0)
+                o << "; no block saves you";
+        }
+        else
+            o << " - at least " << bestCaseDamage << " of that lands whatever you block"
+                 " (trample/menace counted as unblocked): you would be at "
+              << (myLife - bestCaseDamage) << " or better";
+    }
     return o.str();
 }
 
@@ -15015,8 +15102,22 @@ static bool assignableAugment(int j, const vector<vector<char> >& can,
     return false;
 }
 
+//#W58-B (D7, wave-57 ledger MED-HIGH): the caller used to hide a trampler by
+//passing its damage as 0, which removed it from the BASELINE too - so the
+//number this returns was the remainder of a board that did not include the
+//damage nobody could stop. `126v152` seq 14 printed `one legal assignment gets
+//you to 1` at 5 life on a board whose true floor was -5. A bound is the one
+//class of number where the direction of the error decides whether trust is
+//safe, so the split is now explicit: `damage[j]` is ALWAYS the face damage
+//attacker j deals, and `preventable[j]` (when supplied) says whether a single
+//legal block removes all of it. An unpreventable attacker counts in the total
+//and is never matched, so its damage always lands - and the blockers it would
+//have absorbed stay free for the rest, which can only INCREASE the prevented
+//total. The result is therefore an over-estimate of prevention, i.e. a true
+//floor on the damage that lands: never optimistic in the lethal direction.
 static int assignableRemainderDamage(const vector<int>& damage,
-                                     const vector<vector<char> >& can)
+                                     const vector<vector<char> >& can,
+                                     const vector<char> * preventable = NULL)
 {
     const int nb = (int) can.size();
     const int na = (int) damage.size();
@@ -15044,6 +15145,10 @@ static int assignableRemainderDamage(const vector<int>& damage,
     {
         const int j = order[k];
         if (damage[j] <= 0)
+            continue;
+        //#W58-B (D7): trample / menace damage is in the total and out of the
+        //matching - a block cannot be relied on to remove any of it.
+        if (preventable && j < (int) preventable->size() && !(*preventable)[j])
             continue;
         vector<char> seen(nb, 0);
         if (assignableAugment(j, can, seen, matchOfBlocker))
@@ -15555,7 +15660,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             const int nowTurn = observer ? observer->turn : -1;
             int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
             int ableAttackers = 0, ableDamage = 0;
-            vector<int> faceDamage; //#W57-B (D24): per declared attacker, priced or 0
+            vector<int> faceDamage; //#W57-B (D24): per declared attacker, face damage
+            vector<char> facePreventable; //#W58-B (D7): does one block remove it all
+            int trampleOverflow = 0; //#W58-B (D7): already-blocked trample excess
             vector<MTGCardInstance *> declared;
             bool exactAssignment = true; //#W57-B (D24)
             for (int ai = 0; ai < opp->game->inPlay->nb_cards; ai++)
@@ -15578,7 +15685,27 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 ableAttackers++;
                 ableDamage += pw;
                 if (!ac->blockers.empty())
-                    continue; //already blocked: its damage is not aimed at the face
+                {
+                    //#W58-B (D7): a blocked TRAMPLER is not off the face. Its
+                    //excess over its blockers' toughness still lands, and the
+                    //wave-57 baseline dropped it entirely. Full toughness is
+                    //used (not remaining), which under-states the excess - the
+                    //conservative side of a floor.
+                    if (ac->basicAbilities[Constants::TRAMPLE] && pw > 0)
+                    {
+                        int soak = 0;
+                        for (list<MTGCardInstance *>::iterator bit = ac->blockers.begin();
+                             bit != ac->blockers.end(); ++bit)
+                            if (*bit && (*bit)->toughness > 0)
+                                soak += (*bit)->toughness;
+                        if (pw - soak > 0)
+                        {
+                            trampleOverflow += pw - soak;
+                            exactAssignment = false;
+                        }
+                    }
+                    continue; //already blocked: the rest is not aimed at the face
+                }
                 inDamage += pw;
                 declared.push_back(ac);
                 //#W57-B (D24): a trampler still pushes damage past its blocker
@@ -15589,7 +15716,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                    && ac->minBlockersRequired() <= 1;
                 if (!exact && pw > 0)
                     exactAssignment = false;
-                faceDamage.push_back(exact ? pw : 0);
+                //#W58-B (D7): the damage is always the damage; preventability
+                //is its own column, so the baseline can no longer lose it.
+                faceDamage.push_back(pw);
+                facePreventable.push_back(exact ? 1 : 0);
                 if (ac->potentialBlockerCount() <= 0)
                 {
                     inUnblockable++;
@@ -15621,7 +15751,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                         if (any)
                             can.push_back(row);
                     }
-                    bestCase = assignableRemainderDamage(faceDamage, can);
+                    bestCase = assignableRemainderDamage(faceDamage, can, &facePreventable);
+                    //#W58-B (D7): the blocked-trampler excess is damage no
+                    //assignment of the remaining blockers can touch.
+                    if (bestCase >= 0)
+                        bestCase += trampleOverflow;
                 }
                 mIncomingCombatTurn = nowTurn; //latched for the rest of this combat
                 mIncomingCombatAttackers = inAttackers;
@@ -16229,7 +16363,12 @@ static string stripNarrationDecoration(const string& in)
                 //decision-time pricing - true while the row is offered, spent
                 //the moment the land is on the battlefield.
                 || (in.compare(i, 17, "{taking this row ") == 0)
-                || (in.compare(i, 18, "{it enters TAPPED ") == 0);
+                || (in.compare(i, 18, "{it enters TAPPED ") == 0)
+                //#W58-B (D1): the life-payment verdict is the same species -
+                //it prices THIS window's payment against the life the frame
+                //prints, and the record keeps what was paid, not the forecast.
+                || (in.compare(i, 25, "{this payment puts you at") == 0)
+                || (in.compare(i, 12, "{you are at ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -24520,6 +24659,57 @@ static bool isTapOption(const string & opt)
     //longer option that merely starts with "tap ..."
     return toLowerCopy(opt) == "tap";
 }
+//#W58-B (D1, wave-57 ledger HIGH): the pay-life row is the only menu row in
+//the game that can end the game on the spot, and it was the only row with no
+//number. `146v130` seq 20: a seat at 1 life took `pay 3 life - Emeria,
+//Shattered Skyclave enters UNTAPPED [usable ...]` and the next record in the
+//file is `gameend` at -2. The arrival clause prices USABILITY; nothing priced
+//the LIFE. Every other menu in this engine prints its subtraction finished
+//(`they would be at K`, `this KILLS you`), and this one is the one that loses
+//games. The amount is on the row's own label, so the verdict is pure over
+//(life, cost) and rides EVERY life-payment row, not just the shockland shape.
+//The row is never removed - a legal choice stands, badged.
+static bool payLifeAmountFromOption(const string & opt, int & amount)
+{
+    if (!isPayLifeOption(opt))
+        return false;
+    string lo = toLowerCopy(opt);
+    size_t p = 4; //past "pay "
+    while (p < lo.size() && isspace((unsigned char) lo[p]))
+        p++;
+    const size_t s = p;
+    int v = 0;
+    while (p < lo.size() && isdigit((unsigned char) lo[p]))
+    {
+        v = v * 10 + (lo[p] - '0');
+        p++;
+        if (v > 999999)
+            return false;
+    }
+    if (p == s)
+        return false; //"pay half your life" and friends: no computable amount
+    while (p < lo.size() && isspace((unsigned char) lo[p]))
+        p++;
+    //the digits must be the amount of the LIFE clause itself - "pay 2 mana ...
+    //life" is a different payment and is left alone.
+    if (lo.compare(p, 4, "life") != 0)
+        return false;
+    amount = v;
+    return v > 0;
+}
+//The verdict, in the same finished-subtraction shape the cast rows carry. A
+//payment that reaches 0 or less is badged as lethal; the row still stands.
+static string lifePaymentVerdict(int life, int cost)
+{
+    std::ostringstream o;
+    const int after = life - cost;
+    if (after > 0)
+        o << " {this payment puts you at " << after << "}";
+    else
+        o << " {you are at " << life << " life: paying " << cost << " puts you at "
+          << after << " and you LOSE the game}";
+    return o.str();
+}
 //N-139q (wave-36): the pay-life consequence is CONDITIONAL. When the land was
 //PUT onto the battlefield tapped by another effect (Arboreal Grazer's "put a
 //land ... tapped"), the shock replacement still asks, but paying does NOT
@@ -25782,6 +25972,15 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                     act.choice = (int) i;
                     return 0;
                 }
+    }
+    //#W58-B (D1): every life-payment row on this menu carries the subtraction,
+    //appended LAST so the option short name (and the echo anchor) is untouched
+    //and the brace channel keeps it out of the narrated record.
+    for (size_t li = 0; li < opts.size(); li++)
+    {
+        int lifeCostRow = 0;
+        if (payLifeAmountFromOption(opts[li], lifeCostRow))
+            opts[li] += lifePaymentVerdict(life, lifeCostRow);
     }
     //Recover the subject name for the header. Some ETB menus arm on an instance
     //whose own name is cleared (getDisplayName() empty) but whose card TEMPLATE
@@ -45478,8 +45677,11 @@ static const char * kW50Y_r94 =
               "#W55-C D6 the trade X is the CHEAPEST X whose THEIRS list is maximal");
         {
             string mk;
-            CHECK(xMenuMarkX(lost, 4, mk) == 4 && mk == string(kXBestTradeMarker),
-                  "#W55-C D6 (a) with nothing free the trade marker lands on X=4");
+            CHECK(xMenuMarkX(lost, 4, mk) == 4
+                  && mk.find(" [<- best trade: the most of THEIRS at the smallest cost"
+                             " to YOURS - THEIRS 3 / YOURS 3]") == 0,
+                  "#W55-C D6 (a) with nothing free the trade marker lands on X=4"
+                  " (#W58-B D5: an even trade is still endorsed, now with its counts)");
             CHECK(mk.find("best trade") != string::npos
                   && mk.find("costs you nothing") == string::npos,
                   "#W55-C D6 (a) NEGATIVE the trade marker never claims the row is free");
@@ -46368,11 +46570,16 @@ static const char * kW50Y_r94 =
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, true)
                   == "INCOMING THIS COMBAT: 4 attackers, 16 unblocked damage - you would be at -8;"
                      " this KILLS you (of that, 10 from 2 attackers none of your creatures can"
-                     " block) - best case with every blocker assigned: you would be at -5",
-                  "#W57-B D24 the seat no longer has to do the subtraction the header raises");
+                     " block) - best case with every blocker assigned: you would be at -5;"
+                     " no block saves you",
+                  "#W57-B D24 the seat no longer has to do the subtraction the header raises"
+                  " (#W58-B D7: a provably lethal maximum is now badged)");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
-                  .find("- one legal assignment gets you to -5") != string::npos,
-                  "#W57-B D24 with a trampler or a menace attacker in the total the claim drops to achievable");
+                  .find("- at least 13 of that lands whatever you block"
+                        " (trample/menace counted as unblocked): you would be at -5 or better")
+                  != string::npos,
+                  "#W57-B D24 with a trampler or a menace attacker in the total the claim drops to"
+                  " a FLOOR (#W58-B D7: it used to assert an assignment it did not have)");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false).find("best case") == string::npos,
                   "#W57-B D24 NEGATIVE no optimality is claimed where the matching cannot prove it");
             CHECK(incomingCombatLine(3, 11, 10, false, 0, 0, 5, true)
@@ -47657,6 +47864,271 @@ static const char * kW50Y_r94 =
         CHECK(AIPlayerGPT::inFlightAbandonMsFor(900000) > 900000,
               "#W57-U the bound is always STRICTLY past the deadline - a call inside its own"
               " deadline is never abandoned");
+    }
+
+    cout << "\n[#W58-B] D1 the life-payment verdict, D5 the trade marker's two"
+            " counts, D7 the assignable bound as a true floor\n";
+    {
+        // ---- D1: `146v130` seq 20. A seat at 1 life took `pay 3 life` and the
+        // next record in the file is gameend at -2. The amount is on the row.
+        CHECK(lifePaymentVerdict(1, 3)
+              == " {you are at 1 life: paying 3 puts you at -2 and you LOSE the game}",
+              "#W58-B D1 the exact window that killed the deck146 seat, priced on its own row");
+        CHECK(lifePaymentVerdict(3, 3)
+              == " {you are at 3 life: paying 3 puts you at 0 and you LOSE the game}",
+              "#W58-B D1 zero is a loss, not a survivable number");
+        CHECK(lifePaymentVerdict(20, 3) == " {this payment puts you at 17}",
+              "#W58-B D1 a survivable payment states the finished subtraction and nothing more");
+        CHECK(lifePaymentVerdict(20, 3).find("LOSE") == string::npos,
+              "#W58-B D1 NEGATIVE no death claim while the subtraction is positive");
+        {
+            int amt = 0;
+            CHECK(payLifeAmountFromOption("pay 3 life", amt) && amt == 3,
+                  "#W58-B D1 the live lowercase engine label yields its amount");
+            amt = 0;
+            CHECK(payLifeAmountFromOption("Pay 2 life", amt) && amt == 2,
+                  "#W58-B D1 the auto-script capitalized form too");
+            amt = 0;
+            CHECK(payLifeAmountFromOption("pay 3 life - Emeria, Shattered Skyclave enters"
+                                          " UNTAPPED [usable (tap for mana / attack) this turn]",
+                                          amt) && amt == 3,
+                  "#W58-B D1 an already-annotated shockland row is still recognised");
+            amt = -1;
+            CHECK(!payLifeAmountFromOption("tap", amt),
+                  "#W58-B D1 NEGATIVE the decline row is not a payment");
+            amt = -1;
+            CHECK(!payLifeAmountFromOption("pay half your life, rounded up", amt),
+                  "#W58-B D1 NEGATIVE an uncomputable amount gets no number invented for it");
+            amt = -1;
+            CHECK(!payLifeAmountFromOption("pay 2 mana and 3 life", amt),
+                  "#W58-B D1 NEGATIVE the digits must belong to the LIFE clause itself");
+            amt = -1;
+            CHECK(!payLifeAmountFromOption("pay 0 life", amt),
+                  "#W58-B D1 NEGATIVE a zero payment is not priced");
+        }
+        {
+            // The whole rendered row, in the order the menu builds it: arrival
+            // clause first (short name + bracket), verdict last.
+            vector<string> row;
+            row.push_back("pay 3 life");
+            row.push_back("tap");
+            CHECK(annotateEtbPayOrTapMenu(row, "Emeria, Shattered Skyclave"),
+                  "#W58-B D1 the pay-or-tap shape still arms the arrival clause");
+            int amt = 0;
+            CHECK(payLifeAmountFromOption(row[0], amt) && amt == 3,
+                  "#W58-B D1 and the verdict pass still finds the amount after it");
+            row[0] += lifePaymentVerdict(1, amt);
+            CHECK(row[0] == "pay 3 life - Emeria, Shattered Skyclave enters UNTAPPED"
+                            " [usable (tap for mana / attack) this turn]"
+                            " {you are at 1 life: paying 3 puts you at -2 and you LOSE the game}",
+                  "#W58-B D1 the row that killed the seat, as it renders now");
+            CHECK(row[0].compare(0, 10, "pay 3 life") == 0,
+                  "#W58-B D1 the option SHORT NAME is untouched - the echo anchor still leads");
+            CHECK(!payLifeAmountFromOption(row[1], amt) || row[1].find("LOSE") == string::npos,
+                  "#W58-B D1 NEGATIVE the decline row carries no payment verdict");
+            // Echo shape: the brace channel leaves no trace in the record, and
+            // an answer that copies the whole row still binds to it.
+            CHECK(stripNarrationDecoration(row[0])
+                  == "pay 3 life - Emeria, Shattered Skyclave enters UNTAPPED",
+                  "#W58-B D1 echo: the verdict is decision-time only, like every other brace");
+            {
+                vector<string> menu;
+                menu.push_back(row[0]);
+                menu.push_back(row[1]);
+                bool stale = false;
+                CHECK(parseChoice("CHOICE: 1 (pay 3 life)", 2, &menu, &stale) == 1,
+                      "#W58-B D1 echo: the natural short echo still binds to the priced row");
+            }
+        }
+
+        // ---- D5: `130v152` s33. One of THEIRS for five of YOURS, marked
+        // "the most of THEIRS at the smallest cost to YOURS".
+        {
+            std::vector<XDamVictim> oneForFive;
+            {
+                XDamVictim t;
+                t.baseName = t.name = "Sigarda, Champion of Light";
+                t.mine = false;
+                t.lethalX = 4;
+                oneForFive.push_back(t);
+                const char * mn[5] = { "Dwarven Blastminer", "Siege-Gang Commander",
+                                       "Goblin", "Goblin", "Goblin" };
+                for (int i = 0; i < 5; i++)
+                {
+                    XDamVictim m;
+                    m.baseName = m.name = mn[i];
+                    m.mine = true;
+                    m.lethalX = 1;
+                    oneForFive.push_back(m);
+                }
+            }
+            int th = 0, mi = 0;
+            bool lop = false;
+            CHECK(xBestTradeX(oneForFive, 4, &th, &mi, &lop) == 4 && th == 1 && mi == 5 && lop,
+                  "#W58-B D5 the corpus row's real counts, and the trade is flagged lopsided");
+            string mk;
+            CHECK(xMenuMarkX(oneForFive, 4, mk) == 4,
+                  "#W58-B D5 the row is still named - a kill of theirs exists and hiding it would lie");
+            CHECK(mk == " [<- the only X that kills anything of THEIRS costs you more of YOURS"
+                        " than it takes - THEIRS 1 / YOURS 5]",
+                  "#W58-B D5 and the marker PRICES the trade instead of endorsing it");
+            CHECK(mk.find("best trade") == string::npos,
+                  "#W58-B D5 NEGATIVE the endorsement wording never reaches a 1-for-5");
+            CHECK(mk.find("no X on this menu kills anything of THEIRS") == string::npos,
+                  "#W58-B D5 NEGATIVE nor is a real kill of theirs denied");
+        }
+        {
+            // An even-or-better trade is endorsed, and the counts ride the
+            // words that make the claim.
+            std::vector<XDamVictim> fair;
+            {
+                const char * tn[2] = { "Wall of Omens", "Sigarda" };
+                int tx[2] = { 2, 4 };
+                for (int i = 0; i < 2; i++)
+                {
+                    XDamVictim t;
+                    t.baseName = t.name = tn[i];
+                    t.mine = false;
+                    t.lethalX = tx[i];
+                    fair.push_back(t);
+                }
+                XDamVictim m;
+                m.baseName = m.name = "Goblin";
+                m.mine = true;
+                m.lethalX = 1; //no X on this ladder is free
+                fair.push_back(m);
+            }
+            int th = 0, mi = 0;
+            bool lop = true;
+            CHECK(xBestTradeX(fair, 4, &th, &mi, &lop) == 4 && th == 2 && mi == 1 && !lop,
+                  "#W58-B D5 two of theirs for one of ours is a trade the marker may endorse");
+            string mk;
+            CHECK(xMenuMarkX(fair, 4, mk) == 4
+                  && mk == " [<- best trade: the most of THEIRS at the smallest cost to YOURS"
+                           " - THEIRS 2 / YOURS 1]",
+                  "#W58-B D5 the endorsed form carries both counts inline");
+            // The rule bites only where it must: with a free kill on the
+            // ladder the wave-48 marker still outranks every trade form.
+            {
+                std::vector<XDamVictim> freeLadder;
+                XDamVictim t;
+                t.baseName = t.name = "Wall of Omens";
+                t.mine = false;
+                t.lethalX = 2;
+                freeLadder.push_back(t);
+                XDamVictim m;
+                m.baseName = m.name = "Rorix Bladewing";
+                m.mine = true;
+                m.lethalX = 5;
+                freeLadder.push_back(m);
+                string mk2;
+                CHECK(xMenuMarkX(freeLadder, 3, mk2) == 2 && mk2 == string(kXMostKillsMarker),
+                      "#W58-B D5 NEGATIVE a free kill is untouched by the trade rule");
+            }
+        }
+        {
+            // Nothing of theirs dies at any X: unchanged verdict, on X=0.
+            std::vector<XDamVictim> mineOnly;
+            XDamVictim m;
+            m.baseName = m.name = "Goblin";
+            m.mine = true;
+            m.lethalX = 1;
+            mineOnly.push_back(m);
+            string mk;
+            CHECK(xMenuMarkX(mineOnly, 4, mk) == 0 && mk == string(kXNoKillsMarker),
+                  "#W58-B D5 NEGATIVE the no-kill verdict is byte-identical to wave 55");
+        }
+        // Echo shape: both trade forms are bracketed, so neither reaches the
+        // narrated record, and a copied tail still binds to its row.
+        CHECK(stripNarrationDecoration(string("X = 4") + xTradeMarker(1, 5, true)) == "X = 4"
+              && stripNarrationDecoration(string("X = 4") + xTradeMarker(2, 1, false)) == "X = 4",
+              "#W58-B D5 echo: neither trade form reaches the append-only log");
+        {
+            std::vector<string> menu;
+            menu.push_back("X = 4");
+            menu.push_back(string("X = 3") + xTradeMarker(1, 5, true));
+            bool stale = false;
+            CHECK(parseChoice(string("CHOICE: 2 (X = 3") + xTradeMarker(1, 5, true) + ")",
+                              2, &menu, &stale) == 2,
+                  "#W58-B D5 echo: a copied priced marker still binds to its row");
+        }
+        // The cast row inherits the fix by construction - it is built from the
+        // menu marker's own text (#W57-E), so the two screens cannot disagree.
+        CHECK(xCastRowMarkerFrom(xTradeMarker(1, 5, true), 4, true)
+              == " [<- best X for this cast: X=4 - the only X that kills anything of THEIRS"
+                 " costs you more of YOURS than it takes - THEIRS 1 / YOURS 5]",
+              "#W58-B D5 the sibling cast-row marker inherits the counts and the wording");
+        CHECK(xCastRowMarkerFrom(xTradeMarker(1, 5, true), 4, true).find("best trade")
+              == string::npos,
+              "#W58-B D5 NEGATIVE and it does not re-acquire the endorsement one screen earlier");
+
+        // ---- D7: `126v152` seq 14. 5 life, printed "gets you to 1", floor -5.
+        {
+            // Two attackers: a 6-power TRAMPLER and a 3-power vanilla, one
+            // blocker legal on both. The wave-57 baseline passed the trampler
+            // as 0 damage, which dropped it from the total as well: 3 - 3 = 0.
+            vector<int> dmg;
+            dmg.push_back(6); dmg.push_back(3);
+            vector<vector<char> > can(1, vector<char>(2, 1));
+            vector<char> prev;
+            prev.push_back(0); prev.push_back(1); //the trampler is not preventable
+            vector<int> oldStyle;
+            oldStyle.push_back(0); oldStyle.push_back(3);
+            CHECK(assignableRemainderDamage(oldStyle, can) == 0,
+                  "#W58-B D7 the wave-57 shape: the trampler's 6 was absent from the baseline");
+            CHECK(assignableRemainderDamage(dmg, can, &prev) == 6,
+                  "#W58-B D7 the floor keeps it: the block removes 3, the trample's 6 still lands");
+            CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
+                                     assignableRemainderDamage(dmg, can, &prev), false)
+                  .find("at least 6 of that lands whatever you block"
+                        " (trample/menace counted as unblocked): you would be at -1 or better")
+                  != string::npos,
+                  "#W58-B D7 a seat at 5 life is no longer told a lethal board gets it to 1");
+            CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
+                                     assignableRemainderDamage(dmg, can, &prev), false)
+                  .find("gets you to") == string::npos,
+                  "#W58-B D7 NEGATIVE the achievable-assignment claim is gone from the floor form");
+        }
+        {
+            // Per damage keyword. FIRST STRIKE and DEATHTOUCH change nothing
+            // about face damage - a block still removes all of it - so those
+            // attackers stay preventable and the number stays a proven maximum.
+            vector<int> dmg;
+            dmg.push_back(4); dmg.push_back(2);
+            vector<vector<char> > can(2, vector<char>(2, 1));
+            vector<char> allPrev(2, 1);
+            CHECK(assignableRemainderDamage(dmg, can, &allPrev) == 0
+                  && assignableRemainderDamage(dmg, can) == 0,
+                  "#W58-B D7 first-strike / deathtouch attackers are fully preventable: the map"
+                  " with every column set matches the no-map call exactly");
+            CHECK(incomingCombatLine(2, 6, 5, true, 0, 0, 0, true)
+                  .find("best case with every blocker assigned: you would be at 5") != string::npos,
+                  "#W58-B D7 and a proven maximum still says 'best case'");
+            // MENACE: one body cannot block it, so it is unpreventable here.
+            vector<char> menace(2, 1);
+            menace[0] = 0;
+            CHECK(assignableRemainderDamage(dmg, can, &menace) == 4,
+                  "#W58-B D7 a menace attacker's damage is in the total and out of the matching");
+            // The lethal badge the exact branch can prove.
+            CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, true)
+                  .find("you would be at 0; no block saves you") != string::npos,
+                  "#W58-B D7 a provably lethal maximum is badged as lethal");
+            CHECK(incomingCombatLine(2, 6, 9, true, 0, 0, 4, true).find("no block saves you")
+                  == string::npos,
+                  "#W58-B D7 NEGATIVE no death claim while the proven maximum survives");
+            CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, false).find("no block saves you")
+                  == string::npos,
+                  "#W58-B D7 NEGATIVE the FLOOR form never claims a death it cannot prove");
+            // The 32-a-side cap and the no-pairing case still yield no number.
+            vector<vector<char> > none(2, vector<char>(2, 0));
+            CHECK(assignableRemainderDamage(dmg, none, &allPrev) == -1,
+                  "#W58-B D7 NEGATIVE no legal pairing still yields no number, not a zero");
+            CHECK(incomingCombatLine(2, 6, 5, true, 0, 0, -1, false).find("at least") == string::npos,
+                  "#W58-B D7 NEGATIVE an uncomputed bound prints nothing at all");
+        }
+        CHECK(incomingCombatLine(2, 9, 5, true, 0, 0, 6, false).find('[') == string::npos
+              && incomingCombatLine(2, 9, 5, true, 0, 0, 6, false).find('{') == string::npos,
+              "#W58-B D7 NEGATIVE the floor stays a board fact - no bracket, no brace channel");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
