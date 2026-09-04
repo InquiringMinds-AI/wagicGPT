@@ -709,6 +709,23 @@ private:
     //#W54-D (D8b): asks whose entire option list rendered as one
     //interchangeable, ordinal-free row and were answered without a model call.
     int mIdenticalOptionAsksResolved;
+    //#W59-J (K10, wave-58 deck126 HIGH-2): the REPEATED ask. While a decided
+    //Sanguine Bond / Exquisite Blood drain resolved, the seat was handed the
+    //same two-row menu 32 times in one turn's upkeep (20 more in a second
+    //game): byte-identical rows, byte-identical plan, only the life totals in
+    //the header moving - and every one of them was a model round trip, because
+    //the state-plus-question cache keys on the rendered BOARD and the board
+    //moved every iteration. This is the same answer, re-served: the latch holds
+    //the seat's OWN last answer for this turn, this phase, this decision and
+    //this exact printed row list, and is dropped the instant any of them moves.
+    //Not a cache of the board (the doctrine's blind cache): a row whose price
+    //changed is a different row list, and a plan the model has since rewritten
+    //re-opens the question. mRepeatAskTurn < 0 = nothing latched.
+    string mRepeatAskKey;
+    string mRepeatAskPlan;
+    int mRepeatAskTurn;
+    int mRepeatAskChoice;   //the CALLER's 1-based index, exactly as returned
+    int mRepeatAskAnswersReserved; //gameend report field
     //#W50-Z (D12): the "turn:phase" step in which THIS seat last took a mana
     //activation of its own choosing. Floating mana keeps a mana-only window
     //open only in that step (the seat is mid-float by its own decision); mana

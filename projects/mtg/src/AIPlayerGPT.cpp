@@ -11230,7 +11230,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -12054,6 +12054,11 @@ void AIPlayerGPT::logGameEnd()
         //#W54-D (D8b): asks whose whole option list rendered as one
         //interchangeable row and were resolved without a model call.
         {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
+        //#W59-J (K10): asks answered from the seat's own last answer to the
+        //byte-identical row list, in the same turn, phase and decision, with
+        //the plan unchanged. A window the model answered once and was then
+        //asked again unchanged - not a window removed.
+        {"identical_ask_answers_reserved", mRepeatAskAnswersReserved},
         //#W55-E (D23): deadline misses that spent this seat's one retry, and how
         //many of them were abandoned before any decision record could consume
         //them. Written always, present or zero, so a seat review divides rather
@@ -12074,6 +12079,8 @@ void AIPlayerGPT::logGameEnd()
                << "; mana-only windows auto-passed: " << mManaOnlyWindowsSkipped
                << "; interchangeable-option asks resolved without a call: "
                << mIdenticalOptionAsksResolved
+               << "; repeated identical asks re-served from the seat's own answer: "
+               << mRepeatAskAnswersReserved
                << "; deadline misses: " << mWallMissEvents
                << " (" << mWallMissUnrecorded << " unrecorded)");
     if (mTransLog.is_open())
@@ -15244,6 +15251,56 @@ static int incomingCombatForm(bool oppActive, int phase, int liveAttackers,
     return 4;
 }
 
+//#W59-J (K8, wave-58 deck123 HIGH / general R319): D9 shipped the incoming
+//total for the OPPONENT's turn only, so on the seat's OWN turn no crack-back
+//number rendered at any life total - `123v162` s23 declared 13 power into a
+//20-life opponent at 3 life, facing four bodies whose printed tag was
+//`[tapped - cannot attack or block this turn]`, and `123v152` s12 spent a
+//Main-1 window at 5 life against 17 power of the same kind. A "can attack
+//right now" count renders 0 on exactly the board that kills the pilot,
+//because on the seat's own turn NOTHING of theirs can attack: the number the
+//pilot needs is the one that arrives after their untap step. So the body
+//predicate is the untap step's own (MTGInPlay::untapAll): a tapped body still
+//counts unless it does not untap, and an untapped one always counts.
+static bool crackBackBodyUntaps(bool tapped, bool doesNotUntap, bool shackler, bool frozen)
+{
+    if (!tapped)
+        return true;
+    return !doesNotUntap && !shackler && !frozen;
+}
+
+//The line itself. Same claim shape as D9's forecast and the same under-claim
+//rule: an upper bound over the bodies that will be able to attack, with no
+//trample carry-over claim and no blocker assigned - the seat's own blocks are
+//not priced here, because on this turn the seat has not yet decided which of
+//its bodies will still be untapped. Pure over the counts.
+static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife)
+{
+    if (ableAttackers <= 0 || maxDamage <= 0)
+        return "";
+    std::ostringstream o;
+    o << "CRACK-BACK NEXT TURN: " << ableAttackers << " of their creatures will be able to attack"
+         " (tapped ones untap first), for up to " << maxDamage
+      << " - you would be at " << (myLife - maxDamage);
+    if (myLife - maxDamage <= 0)
+        o << "; that would KILL you";
+    return o.str();
+}
+
+//Which of the seat's OWN windows earn it: the attackers seam (the window the
+//fatal declaration is made in) and both main phases (the windows where mana is
+//still spendable about it). The seat's untap, upkeep, draw, the rest of its
+//combat and its end steps stay silent - D9's discipline: a line on every window
+//is a line nobody reads. Pure, so the whole turn is walkable in PARSETEST.
+static bool crackBackNextTurnDue(bool selfActive, int phase, int ableAttackers, int maxDamage)
+{
+    if (!selfActive || ableAttackers <= 0 || maxDamage <= 0)
+        return false;
+    return phase == (int) MTG_PHASE_FIRSTMAIN
+           || phase == (int) MTG_PHASE_COMBATATTACKERS
+           || phase == (int) MTG_PHASE_SECONDMAIN;
+}
+
 //#W57-B (D24): the best legal blocker assignment, as damage that still lands.
 //`damage[j]` is what attacker j puts on the face if it goes unblocked and 0
 //for an attacker whose block prevention is not exactly computable (a trampler:
@@ -15827,6 +15884,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         {
             const int gp = observer ? (int) observer->getCurrentGamePhase() : (int) MTG_PHASE_INVALID;
             const int nowTurn = observer ? observer->turn : -1;
+            //#W59-J (K8): the crack-back half, counted in the same walk.
+            const bool crackBackSeat = (activeSeat == this);
+            int nextTurnAttackers = 0, nextTurnDamage = 0;
             int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
             int ableAttackers = 0, ableDamage = 0;
             vector<int> faceDamage; //#W57-B (D24): per declared attacker, face damage
@@ -15840,6 +15900,22 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 if (!ac || !ac->isCreature())
                     continue;
                 const int pw = ac->power > 0 ? ac->power : 0;
+                //#W59-J (K8): what will be able to attack the seat NEXT turn.
+                //The restriction-free predicate (the same one the board header
+                //uses off the active seat's turn) plus the untap step's own
+                //rule, so a tapped body counts and a body that does not untap
+                //does not. Summoning sickness is deliberately not a filter: a
+                //creature that arrived this turn attacks on their next one.
+                if (crackBackSeat && pw > 0
+                    && boardCreatureCanAttackNow(ac, false)
+                    && crackBackBodyUntaps(ac->isTapped() != 0,
+                                           ac->basicAbilities[(int) Constants::DOESNOTUNTAP],
+                                           ac->basicAbilities[(int) Constants::SHACKLER],
+                                           ac->frozen >= 1))
+                {
+                    nextTurnAttackers++;
+                    nextTurnDamage += pw;
+                }
                 if (!ac->isAttacker())
                 {
                     //#W57-B (D6): the forecast half - what they could declare.
@@ -15941,6 +16017,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 out << "\n" << incomingCombatForecastLine(ableAttackers, ableDamage, life);
             else if (form == 4)
                 out << "\n" << kNoAttackThisCombatLine;
+            //#W59-J (K8): the seat's own turn. Never the same window as the
+            //forms above - those require the opponent to be the active seat -
+            //so this adds a line, replaces none.
+            if (crackBackNextTurnDue(crackBackSeat, gp, nextTurnAttackers, nextTurnDamage))
+                out << "\n" << crackBackNextTurnLine(nextTurnAttackers, nextTurnDamage, life);
         }
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
@@ -23137,6 +23218,39 @@ static string askExemplar(const vector<string>& options)
     return "CHOICE: 1 (" + core + ")";
 }
 
+//#W59-J (K10): may the seat's own last answer stand for this window? Every
+//clause is a fact about what the MODEL was shown, never about the board the
+//engine holds: the same turn and phase, the same decision, the same printed
+//rows byte for byte (`nowKey` carries all four), and the same plan it wrote
+//that answer under. A valid answer only - a fallback is never re-served. The
+//miss direction is asking again, which is the wave-49 default and costs a
+//round trip, so every doubt resolves to false. Pure, so PARSETEST can walk a
+//whole loop of windows without a game.
+static bool repeatAskAnswerStands(const string& heldKey, const string& nowKey,
+                                  const string& heldPlan, const string& nowPlan,
+                                  int heldTurn, int nowTurn, int heldChoice, int nOptions)
+{
+    if (heldTurn < 0 || nowTurn < 0 || heldTurn != nowTurn)
+        return false;
+    if (heldChoice < 1 || heldChoice > nOptions)
+        return false;
+    if (heldKey.empty() || heldKey != nowKey)
+        return false;
+    return heldPlan == nowPlan;
+}
+
+//#W59-J (K10): the key - turn, phase, the decision line and the printed rows,
+//joined with a separator no row can contain.
+static string repeatAskKey(int turn, int phase, const string& decision,
+                           const vector<string>& rows)
+{
+    std::ostringstream o;
+    o << turn << '\x1f' << phase << '\x1f' << decision;
+    for (size_t i = 0; i < rows.size(); i++)
+        o << '\x1f' << rows[i];
+    return o.str();
+}
+
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsIn, bool narrateChoice,
                           const string& pendingSourceName, bool askEvenIfSingle,
                           bool suppressPlanRequest)
@@ -23276,6 +23390,25 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
+    //#W59-J (K10): the same question, asked again with the board moved under it.
+    //The cache above wants the board too, and a resolving drain loop moves it
+    //every iteration - 32 identical windows in one upkeep, all answered by the
+    //model, all with the same answer. Re-serve the seat's own answer while the
+    //rows and the plan are untouched, and count it onto the gameend record the
+    //way hold_windows_skipped is, so a corpus can still see the window.
+    const string nowRepeatKey = repeatAskKey(observer ? observer->turn : -1,
+                                             observer ? (int) observer->getCurrentGamePhase() : -1,
+                                             decision, optionsIn);
+    if (repeatAskAnswerStands(mRepeatAskKey, nowRepeatKey, mRepeatAskPlan, mCurrentPlan,
+                              mRepeatAskTurn, observer ? observer->turn : -1,
+                              mRepeatAskChoice, (int) optionsIn.size()))
+    {
+        mRepeatAskAnswersReserved++;
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the same ask again, unchanged - re-serving"
+                   " this seat's own answer " << mRepeatAskChoice << " of " << optionsIn.size()
+                   << " (" << mRepeatAskAnswersReserved << " this game): " << decision);
+        return mRepeatAskChoice - 1;
+    }
 
     string userTail = tailStr;
     if (!promptOnlyNote.empty() && askOptionsEnd <= userTail.size())
@@ -23455,6 +23588,20 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     if (askReordered && choice >= 1 && choice <= (int) askOrder.size())
         callerChoice = (int) askOrder[choice - 1] + 1;
     mAskCache[askKey] = callerChoice;
+    //#W59-J (K10): latch the answer for a re-ask of this exact window. Only a
+    //VALID choice: a fallback is not an answer and is never re-served.
+    if (callerChoice >= 1 && callerChoice <= (int) optionsIn.size())
+    {
+        mRepeatAskKey = nowRepeatKey;
+        mRepeatAskPlan = mCurrentPlan;
+        mRepeatAskTurn = observer ? observer->turn : -1;
+        mRepeatAskChoice = callerChoice;
+    }
+    else
+    {
+        mRepeatAskTurn = -1;
+        mRepeatAskKey.clear();
+    }
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
         const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content)))));
@@ -29141,6 +29288,119 @@ static bool combatLineIsClean(const string& line, const vector<string> * rosterA
 //(the caller's under-pick fallback then answers, announced), a name consistent
 //with its index (or ambiguous but including it) keeps it. Off for the ATTACK
 //grammar, whose parentheticals are free-form.
+//#W59-J (K9, wave-58 deck125 HIGH-2): the reply protocol REQUIRES a name gloss
+//on a CHOICE: line ("CHOICE: 1 (Cast Supreme Verdict)"), and a model that has
+//learned that habit writes it on a PUT: line too - once, at the end, over the
+//whole list: `125v130` s83 answered `PUT: 9, 1 (Supreme Verdict, Fall of the
+//Gavel)`, the exact required form plus the gloss, and it scored unparsed_reply
+//while the heuristic picked the discards. The #W52-G echo reconciler reads a
+//parenthetical as the echo of the ONE index in front of it, so a two-name gloss
+//matched no single row and the index it followed was dropped as a stale echo.
+//Split the shape off before any pass reads it: a trailing parenthetical whose
+//comma-separated parts number EXACTLY the bare indices on the line is the
+//list's gloss, so it leaves the line the numbers are read from and is handed
+//back to the caller as names. Nothing is silently trusted: the caller
+//reconciles those names against the rows, and the CHOICE rule still decides a
+//disagreement (names win over indices). A gloss that does not pair 1:1 - a
+//different count, a nested parenthetical, a prose tail, a numeric part - is
+//left exactly where the model wrote it and the wave-51 rules judge it. Pure, so
+//PARSETEST walks the whole grammar without a reply.
+static string stripTrailingListGloss(const string& line, vector<string> * namesOut)
+{
+    size_t end = line.find_last_not_of(" \t\r");
+    if (end == string::npos || line[end] != ')')
+        return line;
+    int depth = 0;
+    size_t open = string::npos;
+    for (size_t i = end + 1; i-- > 0; )
+    {
+        if (line[i] == ')')
+            depth++;
+        else if (line[i] == '(')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                open = i;
+                break;
+            }
+        }
+        if (i == 0)
+            break;
+    }
+    if (open == string::npos || open == 0)
+        return line;
+    const string gloss = line.substr(open + 1, end - open - 1);
+    if (gloss.find('(') != string::npos || gloss.find(')') != string::npos)
+        return line; //a nested parenthetical is not a flat list of names
+    vector<string> parts;
+    {
+        size_t start = 0;
+        for (size_t i = 0; i <= gloss.size(); i++)
+        {
+            if (i != gloss.size() && gloss[i] != ',')
+                continue;
+            string t = gloss.substr(start, i - start);
+            start = i + 1;
+            size_t a = t.find_first_not_of(" \t");
+            size_t b = t.find_last_not_of(" \t");
+            if (a == string::npos)
+                return line; //an empty part: not a name list
+            t = t.substr(a, b - a + 1);
+            bool alpha = false;
+            for (size_t z = 0; z < t.size() && !alpha; z++)
+                alpha = isalpha((unsigned char) t[z]) != 0;
+            if (!alpha)
+                return line; //a number or punctuation, not a card name
+            parts.push_back(t);
+        }
+    }
+    if (parts.size() < 2)
+        return line; //one name is the per-index echo #W52-G already reconciles
+    const string head = line.substr(0, open);
+    size_t indices = 0;
+    for (size_t i = 0; i < head.size(); i++)
+    {
+        if (!isdigit((unsigned char) head[i]))
+            continue;
+        const char prev = i ? head[i - 1] : ' ';
+        size_t j = i;
+        while (j < head.size() && isdigit((unsigned char) head[j]))
+            j++;
+        if (!isalnum((unsigned char) prev) && prev != '/' && prev != '#' && prev != '+'
+            && (j >= head.size() || head[j] != '/'))
+            indices++;
+        i = j - 1;
+    }
+    if (indices != parts.size())
+        return line; //not one name per index: say nothing about it
+    if (namesOut)
+        for (size_t k = 0; k < parts.size(); k++)
+            namesOut->push_back(parts[k]);
+    string out = head;
+    while (!out.empty() && isspace((unsigned char) out[out.size() - 1]))
+        out.erase(out.size() - 1);
+    return out + line.substr(end + 1);
+}
+
+//#W59-J (K9): the same, per LINE - a reply may state its answer on one line and
+//ramble on the next, and a gloss only ever glosses its own line.
+static string stripTrailingListGlossLines(const string& reply, vector<string> * namesOut)
+{
+    string out;
+    size_t start = 0;
+    for (size_t i = 0; i <= reply.size(); i++)
+    {
+        if (i != reply.size() && reply[i] != '\n')
+            continue;
+        out += stripTrailingListGloss(reply.substr(start, i - start), namesOut);
+        if (i != reply.size())
+            out += '\n';
+        start = i + 1;
+    }
+    return out;
+}
+
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
                             const vector<string> * optionNames, bool echoBinds)
 {
@@ -29150,7 +29410,12 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     //W41-13: the INDEX and NAME passes read the de-annotated reply; the
     //decline detection below still reads the ORIGINAL, so a bracketed
     //"[none]" is still an explicit decline rather than an unusable reply.
-    const string scan = stripAnnotationBrackets(content);
+    //#W59-J (K9): the PUT: grammars only (echoBinds) - the ATTACK grammar's
+    //parentheticals are free-form prose and are not echoes of anything.
+    vector<string> listGloss;
+    const string scan = stripAnnotationBrackets(echoBinds
+                                                ? stripTrailingListGlossLines(content, &listGloss)
+                                                : content);
     for (size_t i = 0; i < scan.size(); i++)
     {
         //Accept "A3" or a bare "3"; skip digits that are part of a P/T echo
@@ -29366,6 +29631,35 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
                 named--;
             }
             //ambiguous and foreign to the index: no better information, the index stands
+        }
+    }
+    //#W59-J (K9): the list gloss, reconciled. It is a per-index echo written
+    //once, so it is judged as a SET and not by position: every part must name
+    //exactly one row, and only then may it speak. Agreeing with the indices it
+    //changes nothing (the common case, and the `125v130` s83 shape); naming a
+    //different set it wins, which is the CHOICE grammar's own echo rule; naming
+    //anything the rows do not hold it is dropped and the indices stand.
+    if (!listGloss.empty() && optionNames && named > 0)
+    {
+        const size_t limit = optionNames->size() < nAttackers ? optionNames->size() : nAttackers;
+        vector<bool> byName(nAttackers, false);
+        size_t matched = 0;
+        for (size_t g = 0; g < listGloss.size(); g++)
+        {
+            vector<string> words;
+            significantWords(listGloss[g], words);
+            if (words.empty())
+                break;
+            const int m = uniqueNameMatch(words, *optionNames, limit, NULL, nameOrdinal(listGloss[g]));
+            if (m < 0 || byName[m])
+                break;
+            byName[m] = true;
+            matched++;
+        }
+        if (matched == listGloss.size() && byName != out)
+        {
+            out = byName;
+            named = (int) matched;
         }
     }
     if (named > 0)
@@ -48938,6 +49232,222 @@ static const char * kW50Y_r94 =
         CHECK(mdfcLandFaceRow("Play Land", "", "{W}", "") == "Play Land",
               "#W59-I K7 NEGATIVE with no face name to state, the engine's row is returned"
               " untouched - the emitter never invents one");
+    }
+
+    // ==================== #W59-J (wave-58 known bugs K8/K9/K10) ====================
+    cout << "\n[W59-J] K8 the crack-back number on the seat's OWN turn\n";
+    {
+        // `123v162` s23's own board: 3 life, four opposing bodies of which the
+        // two relevant ones are TAPPED, 8 power arriving after their untap.
+        CHECK(crackBackNextTurnLine(2, 8, 3)
+              == "CRACK-BACK NEXT TURN: 2 of their creatures will be able to attack"
+                 " (tapped ones untap first), for up to 8 - you would be at -5;"
+                 " that would KILL you",
+              "#W59-J K8 `123v162` s23: the number that was on nobody's screen when the seat"
+              " attacked away its blockers at 3 life");
+        CHECK(crackBackNextTurnLine(4, 17, 5)
+              == "CRACK-BACK NEXT TURN: 4 of their creatures will be able to attack"
+                 " (tapped ones untap first), for up to 17 - you would be at -12;"
+                 " that would KILL you",
+              "#W59-J K8 `123v152` s12's Main-1 window: 5 life, 17 power untapping");
+        CHECK(crackBackNextTurnLine(2, 8, 20).find("KILL") == string::npos
+              && crackBackNextTurnLine(2, 8, 20).find("you would be at 12") != string::npos,
+              "#W59-J K8 NEGATIVE a survivable crack-back finishes the subtraction and claims"
+              " no death");
+        CHECK(crackBackNextTurnLine(0, 0, 3).empty() && crackBackNextTurnLine(2, 0, 3).empty(),
+              "#W59-J K8 NEGATIVE no body, or no power, no line");
+        // The untap rule is the untap step's own.
+        CHECK(crackBackBodyUntaps(true, false, false, false)
+              && crackBackBodyUntaps(false, true, true, true),
+              "#W59-J K8 a TAPPED body counts (it untaps first), and an untapped one always does");
+        CHECK(!crackBackBodyUntaps(true, true, false, false)
+              && !crackBackBodyUntaps(true, false, true, false)
+              && !crackBackBodyUntaps(true, false, false, true),
+              "#W59-J K8 NEGATIVE a tapped body that does not untap - Rorix's clause, a shackler,"
+              " a frozen permanent - is not in next turn's attack");
+        // The windows. The seat's own turn only, and only where it can act.
+        CHECK(crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_COMBATATTACKERS, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_SECONDMAIN, 2, 8),
+              "#W59-J K8 the attackers seam and both mains - the windows the fatal declaration and"
+              " the casting decisions are made in");
+        CHECK(!crackBackNextTurnDue(false, (int) MTG_PHASE_FIRSTMAIN, 2, 8),
+              "#W59-J K8 NEGATIVE the OPPONENT's turn is D9's, and D9's forms are not touched");
+        CHECK(!crackBackNextTurnDue(true, (int) MTG_PHASE_UNTAP, 2, 8)
+              && !crackBackNextTurnDue(true, (int) MTG_PHASE_UPKEEP, 2, 8)
+              && !crackBackNextTurnDue(true, (int) MTG_PHASE_COMBATBLOCKERS, 2, 8)
+              && !crackBackNextTurnDue(true, (int) MTG_PHASE_ENDOFTURN, 2, 8)
+              && !crackBackNextTurnDue(true, (int) MTG_PHASE_CLEANUP, 2, 8),
+              "#W59-J K8 NEGATIVE the seat's other windows stay silent");
+        CHECK(!crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 0, 0)
+              && !crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 2, 0),
+              "#W59-J K8 NEGATIVE a creatureless or powerless board claims nothing");
+        CHECK(crackBackNextTurnLine(2, 8, 3).find("INCOMING THIS COMBAT") == string::npos,
+              "#W59-J K8 NEGATIVE the crack-back is not a claim about a combat: a corpus counting"
+              " D9's line never counts this one");
+    }
+
+    cout << "\n[W59-J] K9 the PUT: line accepts the name gloss the protocol requires\n";
+    {
+        vector<string> names;
+        names.push_back("Fall of the Gavel");
+        names.push_back("Island");
+        names.push_back("Sphinx's Revelation");
+        names.push_back("Azorius Charm");
+        names.push_back("Plains");
+        names.push_back("Detention Sphere");
+        names.push_back("Dissipate");
+        names.push_back("Hallowed Fountain");
+        names.push_back("Supreme Verdict");
+        {
+            vector<string> gloss;
+            CHECK(stripTrailingListGloss("PUT: 9, 1 (Supreme Verdict, Fall of the Gavel)", &gloss)
+                      == "PUT: 9, 1"
+                  && gloss.size() == 2 && gloss[0] == "Supreme Verdict"
+                  && gloss[1] == "Fall of the Gavel",
+                  "#W59-J K9 `125v130` s83: the one-per-index gloss leaves the line the numbers"
+                  " are read from, and is handed on as names");
+        }
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet("PUT: 9, 1 (Supreme Verdict, Fall of the Gavel)",
+                                           names.size(), send, &names, true);
+            CHECK(r == 2 && send.size() == 9 && send[8] && send[0],
+                  "#W59-J K9 the discard the heuristic took over is now the answer the model"
+                  " wrote: rows 9 and 1");
+        }
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet("PUT: 9, 1 (Fall of the Gavel, Supreme Verdict)",
+                                           names.size(), send, &names, true);
+            CHECK(r == 2 && send[8] && send[0],
+                  "#W59-J K9 the gloss is judged as a SET - a listing order of its own names the"
+                  " same two rows");
+        }
+        {
+            // the CHOICE grammar's echo rule, on this shape: the names win.
+            vector<bool> send;
+            const int r = parseAttackerSet("PUT: 2, 5 (Supreme Verdict, Fall of the Gavel)",
+                                           names.size(), send, &names, true);
+            CHECK(r == 2 && send[8] && send[0] && !send[1] && !send[4],
+                  "#W59-J K9 a gloss that names a DIFFERENT set wins over the indices - the same"
+                  " rule parseChoice applies to `CHOICE: n (name)`");
+        }
+        {
+            // ... and a gloss the row list does not hold says nothing.
+            vector<bool> send;
+            const int r = parseAttackerSet("PUT: 2, 5 (Shivan Dragon, Black Lotus)",
+                                           names.size(), send, &names, true);
+            CHECK(r == 2 && send[1] && send[4] && !send[8] && !send[0],
+                  "#W59-J K9 NEGATIVE names that match no row are dropped and the indices stand -"
+                  " a hallucinated gloss never loses the answer");
+        }
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet("PUT: 9, 1", names.size(), send, &names, true);
+            CHECK(r == 2 && send[8] && send[0],
+                  "#W59-J K9 REGRESSION the bare form the prompt asks for is unchanged");
+            vector<bool> send2;
+            const int r2 = parseAttackerSet("PUT: 3 (Sphinx's Revelation)", names.size(), send2,
+                                            &names, true);
+            CHECK(r2 == 1 && send2[2],
+                  "#W59-J K9 REGRESSION a single per-index echo still binds the way #W52-G left it");
+            vector<bool> send3;
+            const int r3 = parseAttackerSet("PUT: none", names.size(), send3, &names, true);
+            CHECK(r3 == 0, "#W59-J K9 REGRESSION the explicit decline is still a decline");
+        }
+        {
+            vector<string> gloss;
+            CHECK(stripTrailingListGloss("PUT: 2, 5", &gloss) == "PUT: 2, 5"
+                  && stripTrailingListGloss("", &gloss) == ""
+                  && stripTrailingListGloss("PUT: none", &gloss) == "PUT: none"
+                  && gloss.empty(),
+                  "#W59-J K9 NEGATIVE a line with no gloss is returned byte-identical and names"
+                  " nothing");
+            CHECK(stripTrailingListGloss("PUT: 9, 1, 4 (Supreme Verdict, Fall of the Gavel)", &gloss)
+                      == "PUT: 9, 1, 4 (Supreme Verdict, Fall of the Gavel)"
+                  && gloss.empty(),
+                  "#W59-J K9 NEGATIVE three indices and two names do not pair: nothing is said"
+                  " about a gloss that does not fit");
+            CHECK(stripTrailingListGloss("PUT: 9, 1 (they are both dead cards)", &gloss)
+                      == "PUT: 9, 1 (they are both dead cards)"
+                  && gloss.empty(),
+                  "#W59-J K9 NEGATIVE a prose tail is one part, not a list, and is left alone");
+            CHECK(stripTrailingListGloss("PUT: 9, 1 (Supreme Verdict (a sweeper), Fall of the"
+                                         " Gavel)", &gloss)
+                      == "PUT: 9, 1 (Supreme Verdict (a sweeper), Fall of the Gavel)"
+                  && gloss.empty(),
+                  "#W59-J K9 NEGATIVE a nested parenthetical is not a flat name list");
+            CHECK(stripTrailingListGloss("PUT: 9, 1 (9, 1)", &gloss) == "PUT: 9, 1 (9, 1)"
+                  && gloss.empty(),
+                  "#W59-J K9 NEGATIVE a part with no letter in it is not a card name");
+            CHECK(stripTrailingListGlossLines("PLAN: hold the sweeper.\n"
+                                              "PUT: 9, 1 (Supreme Verdict, Fall of the Gavel)",
+                                              &gloss)
+                      == "PLAN: hold the sweeper.\nPUT: 9, 1"
+                  && gloss.size() == 2,
+                  "#W59-J K9 a gloss only ever glosses its own line - the plan line is untouched");
+        }
+        {
+            // the ATTACK grammar is not touched: its parentheticals are prose.
+            vector<string> atk;
+            atk.push_back("Thraben Doomsayer");
+            atk.push_back("Bloodline Keeper");
+            vector<bool> send;
+            const int r = parseAttackerSet("ATTACK: A1, A2 (they cannot block both)",
+                                           atk.size(), send, &atk, false);
+            CHECK(r == 2 && send[0] && send[1],
+                  "#W59-J K9 NEGATIVE echoBinds off (the ATTACK grammar) strips no gloss and"
+                  " reconciles no names");
+        }
+    }
+
+    cout << "\n[W59-J] K10 the same ask, again, unchanged\n";
+    {
+        vector<string> rows;
+        rows.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures -"
+                       " at 0 this does nothing}");
+        rows.push_back("Cast nothing right now");
+        const string k = repeatAskKey(25, (int) MTG_PHASE_UPKEEP, "Choose an option:", rows);
+        CHECK(repeatAskAnswerStands(k, k, "drain them out", "drain them out", 25, 25, 2, 2),
+              "#W59-J K10 `126v130` seq 56-87: the same turn, phase, decision, rows and plan - the"
+              " seat's own answer stands and the 32nd window costs no round trip");
+        CHECK(!repeatAskAnswerStands(k, k, "drain them out", "cast the sweeper first", 25, 25, 2, 2),
+              "#W59-J K10 NEGATIVE the model rewrote its plan: the question is re-opened");
+        {
+            vector<string> repriced;
+            repriced.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 1 creature"
+                               " - Rorix Bladewing (6/5) is sacrificed}");
+            repriced.push_back("Cast nothing right now");
+            const string k2 = repeatAskKey(25, (int) MTG_PHASE_UPKEEP, "Choose an option:", repriced);
+            CHECK(!repeatAskAnswerStands(k, k2, "p", "p", 25, 25, 2, 2),
+                  "#W59-J K10 NEGATIVE a row whose printed price moved is a row the model has not"
+                  " seen - the window re-opens (the #W56-A D1 rule, on the ask key)");
+            vector<string> grown(rows);
+            grown.push_back("Hold priority for the rest of this turn");
+            CHECK(!repeatAskAnswerStands(k, repeatAskKey(25, (int) MTG_PHASE_UPKEEP,
+                                                         "Choose an option:", grown),
+                                          "p", "p", 25, 25, 2, 2),
+                  "#W59-J K10 NEGATIVE a newly offered row re-opens the window");
+        }
+        CHECK(!repeatAskAnswerStands(k, repeatAskKey(25, (int) MTG_PHASE_FIRSTMAIN,
+                                                     "Choose an option:", rows),
+                                      "p", "p", 25, 25, 2, 2),
+              "#W59-J K10 NEGATIVE the same rows in another PHASE are another question");
+        CHECK(!repeatAskAnswerStands(k, repeatAskKey(25, (int) MTG_PHASE_UPKEEP,
+                                                     "Choose a card to discard:", rows),
+                                      "p", "p", 25, 25, 2, 2),
+              "#W59-J K10 NEGATIVE another decision over the same rows is another question");
+        CHECK(!repeatAskAnswerStands(k, k, "p", "p", 25, 26, 2, 2)
+              && !repeatAskAnswerStands(k, k, "p", "p", -1, 25, 2, 2),
+              "#W59-J K10 NEGATIVE the latch never crosses a turn boundary");
+        CHECK(!repeatAskAnswerStands(k, k, "p", "p", 25, 25, 0, 2)
+              && !repeatAskAnswerStands(k, k, "p", "p", 25, 25, -1, 2)
+              && !repeatAskAnswerStands(k, k, "p", "p", 25, 25, 3, 2),
+              "#W59-J K10 NEGATIVE a fallback is not an answer and is never re-served, and an"
+              " index outside this menu is refused");
+        CHECK(!repeatAskAnswerStands("", "", "p", "p", 25, 25, 1, 2),
+              "#W59-J K10 NEGATIVE nothing latched, nothing re-served");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
