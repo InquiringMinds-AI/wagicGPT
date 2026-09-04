@@ -224,7 +224,10 @@ public:
         //seat that stops being interactive the moment its call lands would get
         //the heuristic budget applied to a hold the LLM branch had allowed.
         return (suite->mAiPendingSeat == this && suite->mAiPendingInteractive)
-               || getenv("WAGIC_REVEAL_TEST_ASYNC") != NULL;
+               || getenv("WAGIC_REVEAL_TEST_ASYNC") != NULL
+               //#W58-G (F2): the per-fixture form drives the same interactive reveal path
+               //without leaking a process-global setting into sibling tests.
+               || (observer && !observer->mRevealTestAsyncPicks.empty());
     }
     //#W54-R: a model call in flight. Both latches OUTLIVE the frozen span -
     //the fixture clears them with its own `aipending 0 0 0` - because the
