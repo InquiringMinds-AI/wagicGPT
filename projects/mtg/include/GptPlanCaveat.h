@@ -609,6 +609,29 @@ inline std::string planCarryBound(const std::string& plan, size_t maxChars)
     return out + planTruncationMarker();
 }
 
+// #W60-Q (R8). THE COMPOSED PATH. planCarryBound's marker ends in ']', and the
+// caller's next pass - a stump trim for a max_tokens cut - reads any tail that
+// is not '.', '!' or '?' as an unfinished sentence and truncates back through
+// the last terminator past the midpoint. On a bounded plan that terminator is
+// inside the carried text, so the trim deleted the marker the bound had just
+// promised: the model was shortened and never told. Composed here so the pair
+// is one testable function rather than two correct halves in the wrong order.
+// A plan the bound did not touch keeps the trim exactly as it was.
+inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
+{
+    std::string out = planCarryBound(plan, maxChars);
+    if (out != plan)
+        return out; // the bound chose the cut and marked it; nothing to trim
+    char last = out.empty() ? '.' : out[out.size() - 1];
+    if (last != '.' && last != '!' && last != '?')
+    {
+        size_t dot = out.find_last_of(".!?");
+        if (dot != std::string::npos && dot > out.size() / 2)
+            out = out.substr(0, dot + 1);
+    }
+    return out;
+}
+
 // #W60-M (B13a). THE CONTRADICTION. A plan that DENIES a permanent the pilot's
 // own battlefield line prints is not a stale plan, it is a false one - and the
 // trust doctrine makes it worse than useless, because the model is instructed

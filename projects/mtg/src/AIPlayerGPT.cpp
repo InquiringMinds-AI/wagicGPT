@@ -1600,6 +1600,25 @@ static string sweeperVictimName(MTGCardInstance * c)
     return o.str();
 }
 
+//#W60-Q (R6): a creature that can regenerate IS destroyed - its controller may
+//pay to return it. So it stays in the count and the roster and is marked as a
+//card that MAY survive, never removed. Scoped to `destroy` (destroyKind 1):
+//`bury` gives no regeneration window, and CANTREGEN closes it outright. Read
+//off the engine's own script text, which is what the engine enforces.
+static string sweeperRegenerationTail(MTGCardInstance * c, int destroyKind)
+{
+    if (!c || destroyKind != 1)
+        return "";
+    if (c->basicAbilities[Constants::CANTREGEN])
+        return "";
+    string mt = c->magicText;
+    for (size_t i = 0; i < mt.size(); i++)
+        mt[i] = (char) tolower((unsigned char) mt[i]);
+    if (mt.find("regenerate") == string::npos)
+        return "";
+    return " (may survive: it can regenerate)";
+}
+
 static string sweeperRosterTail(const std::vector<std::string>& theirNames,
                                 const std::vector<std::string>& myNames)
 {
@@ -1620,10 +1639,36 @@ static string sweeperRosterTail(const std::vector<std::string>& theirNames,
     return o.str();
 }
 
+//#W60-Q (R6): the roster named every creature on the board as something the
+//spell DESTROYS, including the ones it cannot. An indestructible creature is
+//not destroyed by `destroy all(creature)` at all - naming it as a victim is the
+//same class of false claim the win fold was pulled up for - so it leaves the
+//count and the roster and is stated for what it is: a creature that STAYS. A
+//regenerating creature is a different case (it is destroyed and its controller
+//may pay to bring it back), so it stays in the count and is marked as a card
+//that MAY survive rather than removed from the roster. Empty on both = the
+//wave-60 lane-O string, byte for byte.
+static string sweeperSurvivorTail(const std::vector<std::string>& theirSurvivors,
+                                  const std::vector<std::string>& mySurvivors)
+{
+    if (theirSurvivors.empty() && mySurvivors.empty())
+        return "";
+    std::ostringstream o;
+    o << " - NOT DESTROYED (indestructible), stays on the battlefield: ";
+    bool first = true;
+    for (size_t i = 0; i < theirSurvivors.size(); i++, first = false)
+        o << (first ? "" : ", ") << "THEIRS " << theirSurvivors[i];
+    for (size_t i = 0; i < mySurvivors.size(); i++, first = false)
+        o << (first ? "" : ", ") << "YOURS " << mySurvivors[i];
+    return o.str();
+}
+
 static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine,
                             bool liveScope = false,
                             const std::vector<std::string>& theirNames = std::vector<std::string>(),
-                            const std::vector<std::string>& myNames = std::vector<std::string>())
+                            const std::vector<std::string>& myNames = std::vector<std::string>(),
+                            const std::vector<std::string>& theirSurvivors = std::vector<std::string>(),
+                            const std::vector<std::string>& mySurvivors = std::vector<std::string>())
 {
     std::ostringstream o;
     o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s") << " (";
@@ -1635,6 +1680,7 @@ static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttac
           << (liveScope ? " able to attack right now" : " without a restriction against attacking");
     o << "), " << mine << " of yours";
     o << sweeperRosterTail(theirNames, myNames); //#W60-O (B7)
+    o << sweeperSurvivorTail(theirSurvivors, mySurvivors); //#W60-Q (R6)
     return o.str();
 }
 
@@ -1659,7 +1705,16 @@ static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live); //defined
 static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & theirsAttack, int & mine,
                                 MTGCardInstance ** theirOnly, bool * liveScope = NULL,
                                 std::vector<std::string> * theirNames = NULL,
-                                std::vector<std::string> * myNames = NULL) //#W60-O (B7)
+                                std::vector<std::string> * myNames = NULL, //#W60-O (B7)
+                                //#W60-Q (R6): destroyKind 0 = not a destruction
+                                //sweeper (an exile sweeper takes indestructible
+                                //creatures like any other); 1 = destroy
+                                //(regeneration is a live out); 2 = bury (it is
+                                //not). Indestructible creatures leave the
+                                //counts and the roster and are listed here.
+                                int destroyKind = 0,
+                                std::vector<std::string> * theirSurvivors = NULL,
+                                std::vector<std::string> * mySurvivors = NULL)
 {
     theirs = theirsAttack = mine = 0;
     if (theirOnly)
@@ -1678,21 +1733,37 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
         MTGCardInstance * c = opp->game->inPlay->cards[i];
         if (!c || !c->isCreature())
             continue;
+        //#W60-Q (R6): a creature this spell cannot destroy is not a victim.
+        if (destroyKind && c->basicAbilities[Constants::INDESTRUCTIBLE])
+        {
+            if (theirSurvivors)
+                theirSurvivors->push_back(sweeperVictimName(c));
+            continue;
+        }
         theirs++;
         if (theirOnly)
             *theirOnly = c;
         if (theirNames) //#W60-O (B7)
-            theirNames->push_back(sweeperVictimName(c));
+            theirNames->push_back(sweeperVictimName(c)
+                                  + sweeperRegenerationTail(c, destroyKind));
         if (boardCreatureCanAttackNow(c, live))
             theirsAttack++;
     }
     for (int i = 0; i < me->game->inPlay->nb_cards; i++)
-        if (me->game->inPlay->cards[i] && me->game->inPlay->cards[i]->isCreature())
+    {
+        MTGCardInstance * mc = me->game->inPlay->cards[i];
+        if (!mc || !mc->isCreature())
+            continue;
+        if (destroyKind && mc->basicAbilities[Constants::INDESTRUCTIBLE])
         {
-            mine++;
-            if (myNames) //#W60-O (B7)
-                myNames->push_back(sweeperVictimName(me->game->inPlay->cards[i]));
+            if (mySurvivors)
+                mySurvivors->push_back(sweeperVictimName(mc));
+            continue;
         }
+        mine++;
+        if (myNames) //#W60-O (B7)
+            myNames->push_back(sweeperVictimName(mc) + sweeperRegenerationTail(mc, destroyKind));
+    }
     return true;
 }
 
@@ -1798,8 +1869,17 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
     //#W60-O (B7): the sweeper branch names its victims; the edict and
     //attack-punisher branches take the rosters they already did (none).
     std::vector<std::string> theirNames, myNames;
+    //#W60-Q (R6): a DESTRUCTION sweeper does not take an indestructible
+    //creature, and `bury` gives no regeneration window that `destroy` does.
+    std::vector<std::string> theirSurvivors, mySurvivors;
+    int destroyKind = 0;
+    if (sweepVerb && strcmp(sweepVerb, "destroys") == 0)
+        destroyKind = lowText.find("bury all(creature)") != string::npos ? 2 : 1;
     if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only, &live,
-                             sweepVerb ? &theirNames : NULL, sweepVerb ? &myNames : NULL))
+                             sweepVerb ? &theirNames : NULL, sweepVerb ? &myNames : NULL,
+                             destroyKind,
+                             sweepVerb ? &theirSurvivors : NULL,
+                             sweepVerb ? &mySurvivors : NULL))
         return "";
     if (edict)
     {
@@ -1867,7 +1947,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
              + stackTail + selfClause;
     }
     if (sweepVerb)
-        return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames);
+        return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames,
+                             theirSurvivors, mySurvivors); //#W60-Q (R6)
     return attackPunisherClause(theirsAttack);
 }
 
@@ -4077,16 +4158,42 @@ static string attackerBlockerCountLine(int blockers)
 //untapped creature of theirs may legally block land whatever they do - and a
 //floor at or past their life is a kill no block prevents. Pure over the five
 //counts. `guaranteed < 0` = not computed, and nothing is said.
+//#W60-Q (R4): POWER IS NOT LIFE LOSS. The line equated the two, so an unblocked
+//1/1 with infect was reported as "puts them at 9" when combat leaves their life
+//at 10 and gives one poison counter, and a double striker was under-counted by
+//exactly its own power. Both are engine-provable, so both are handled rather
+//than hedged: an infect attacker is EXCLUDED from the life arithmetic and the
+//exclusion is NAMED (the D6 under-claim rule - a fact removed silently reads as
+//a fact that does not exist), and a double striker contributes twice, which is
+//what it deals. `damageSuppressed` is the opponent being unable to lose life at
+//all (CANTLOSE / CANTLIFELOSE): no life claim of any kind survives that, so the
+//whole arithmetic is withheld and the reason given.
 static string attackTotalLine(int attackers, int totalPower, int oppLife,
-                              int blockers, int guaranteed)
+                              int blockers, int guaranteed,
+                              int infectExcluded = 0, bool damageSuppressed = false)
 {
     if (attackers <= 0 || oppLife < 0)
         return "";
     std::ostringstream o;
+    if (damageSuppressed)
+    {
+        o << "ATTACK TOTAL: " << attackers << " attacker"
+          << (attackers == 1 ? "" : "s") << " listed. No resulting-life figure is"
+             " given: an effect on them means their life total cannot go down"
+             " from this damage, so no amount of it is a clock.\n";
+        return o.str();
+    }
     o << "ATTACK TOTAL: " << attackers << " attacker"
       << (attackers == 1 ? "" : "s") << " listed, " << totalPower
-      << " total power - declaring all of them with none blocked puts them at "
-      << (oppLife - totalPower) << ".";
+      << " total combat damage to a player - declaring all of them with none"
+         " blocked puts them at " << (oppLife - totalPower) << ".";
+    if (infectExcluded > 0)
+        o << " " << infectExcluded << " of them "
+          << (infectExcluded == 1 ? "has" : "have")
+          << " infect and "
+          << (infectExcluded == 1 ? "is" : "are")
+          << " NOT counted in that number or in the floor below: infect damage to"
+             " a player is poison counters, it does not reduce their life at all.";
     if (guaranteed >= 0)
     {
         if (guaranteed <= 0)
@@ -9090,16 +9197,23 @@ static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDis
     const int over = handAfterDraw - limit;
     const int cost = over * perDiscard;
     std::ostringstream o;
+    //#W60-Q (R3): this is a CEILING, not a guaranteed number. It is computed
+    //from the hand as it stands, and the cleanup step is phases away: every
+    //card played, cast or discarded before then removes one of these discards.
+    //Stating it as a certainty made a green PARSETEST case protect a false
+    //promise. It is still worth printing at full size - the worst case is what
+    //kills - so the number stays and only its MODALITY changes.
     o << label << ": that leaves " << handAfterDraw << " cards in hand against a"
-         " maximum hand size of " << limit << ", so the cleanup step forces " << over
+         " maximum hand size of " << limit << ", so unless you spend cards before"
+         " then the cleanup step forces up to " << over
       << " discard" << (over == 1 ? "" : "s") << " you cannot decline, and the"
          " opponent's " << punishers << punisherVerb(punishers) << " every discard for "
-      << perDiscard << " life each = " << cost << " life";
+      << perDiscard << " life each = up to " << cost << " life";
     if (life >= 0)
     {
-        o << " - you would be at " << (life - cost);
+        o << " - at worst you would be at " << (life - cost);
         if (life - cost <= 0)
-            o << "; this KILLS you";
+            o << "; at worst this KILLS you";
     }
     return o.str();
 }
@@ -9703,14 +9817,17 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
     if (handAfterCast >= 0 && cards > 0)
         cleanup = cleanupDiscardPriceClause(handAfterCast + cards, handLimit, perDiscard,
                                             discardPunishers);
+    bool ceiling = false; //#W60-Q (R3): a cleanup price folded in is a ceiling
     if (!cleanup.empty())
     {
         const int over = (handAfterCast + cards) - handLimit;
         cost += over * perDiscard;
         o << "; " << cleanup;
+        ceiling = true;
     }
     if (cost > 0)
-        o << " - NET " << (gain - cost) << " life for this cast";
+        o << " - NET " << (ceiling ? "at worst " : "") << (gain - cost)
+          << " life for this cast";
     o << "}";
     return o.str();
 }
@@ -11065,6 +11182,21 @@ const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
         return "transport_error";
     return noAnswerClassFor(staleLivelock, timedOut, hasReasoning, httpStatus);
 }
+//#W60-Q (R9): a body ARRIVED and the client could not read an answer out of it.
+//Ranked below the livelock give-up, the deadline and a curl-level failure (all
+//of which explain the missing body outright) and ABOVE the http/model split,
+//because it is the only class that distinguishes "the endpoint answered with
+//something we cannot parse" from "the model returned nothing". A 200 with an
+//unparsable or empty-schema body is a protocol fault, not a silent model.
+const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                           bool hasReasoning, long httpStatus, long curlCode,
+                                           bool badReply)
+{
+    if (badReply && !staleLivelock && !timedOut && curlCode <= 0
+        && (httpStatus == 0 || httpStatus == 200))
+        return "bad_reply";
+    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning, httpStatus, curlCode);
+}
 
 //#W59-H (K1): ONE retry is offered only for transport-shaped failures. A 4xx
 //is a completed client error and an empty HTTP 200 is an answered empty body;
@@ -11120,7 +11252,7 @@ static void gptTracePromptDrift(const string& inflight, const string& rebuilt)
 const char * AIPlayerGPT::noAnswerClass() const
 {
     return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty(),
-                            mLastHttpStatus, mLastCurlResult);
+                            mLastHttpStatus, mLastCurlResult, mLastBadReply);
 }
 
 //#W54-B (D9). noAnswerClassFor above is the branch this item does NOT cover:
@@ -11311,6 +11443,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
+                mLastBadReply = false; //#W60-Q (R9): re-decided per consume
                 //A consumed answer is forward progress: the livelock streak
                 //resets here and ONLY here.
                 mStaleDropStreak = 0;
@@ -11367,8 +11500,16 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     }
                     catch (json::exception&)
                     {
+                        //#W60-Q (R9): the endpoint sent SOMETHING and it is not
+                        //an answer. Recorded as its own class rather than
+                        //cleared into the empty-reply bucket.
                         content.clear();
+                        mLastBadReply = true;
                     }
+                    //A 200 that parses but carries no answer shape at all
+                    //(`{"choices":[]}`, an error envelope) is the same fault.
+                    if (content.empty() && fieldReasoning.empty())
+                        mLastBadReply = true;
                 }
                 //PATH 2 (unconditional, whatever path 1 found): an inline
                 //"<think> ... </think>" the server did not parse out. Strip it
@@ -12039,7 +12180,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false),
       mWallMissPending(false), mWallMissEvents(0), mWallMissUnrecorded(0),
-      mLastTimeout(false), mRecoverySeq(-1),
+      mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
       mPlanEchoCount(0),
@@ -12074,6 +12215,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     //possibly while the previous duel's detached worker was still in libcurl).
     gptCurlInit();
     mLastHttpStatus = 0; //audit-L (A24)
+    mLastBadReply = false; //#W60-Q (R9)
     mLastCurlResult = -1; //#W59-H (K1)
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
@@ -14590,16 +14732,20 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //400 characters and the 1,236-character one produced an off-menu
         //CHOICE. kPlanCarryMaxChars is the plan the NEXT decision is asked to
         //act on, not a transcript of how this one was reached.
-        plan = gptcaveat::planCarryBound(plan, kPlanCarryMaxChars);
+        //#W60-Q (R8): COMPOSE the two passes, do not run them blind. The bound
+        //appends a marker that ends in ']', which the stump trim below then
+        //reads as an unfinished sentence and cuts back through - deleting the
+        //very marker the bound promised, on any plan over the bound with a
+        //sentence end past its midpoint (the common case). The stump trim
+        //exists for a max_tokens cut, and a plan the bound already ended at a
+        //chosen boundary is not that: when the bound fired, its marker IS the
+        //terminator and the trim is skipped.
         //A reply cut off by max_tokens leaves a mid-word stump ("...value
-        //by sac", observed live); trim back to the last complete sentence.
-        char last = plan.empty() ? '.' : plan[plan.size() - 1];
-        if (last != '.' && last != '!' && last != '?')
-        {
-            size_t dot = plan.find_last_of(".!?");
-            if (dot != string::npos && dot > plan.size() / 2)
-                plan = plan.substr(0, dot + 1);
-        }
+        //by sac", observed live); trim back to the last complete sentence -
+        //but only when the bound above did not already choose the cut and mark
+        //it. Both passes now live in planCarryCompose, so the composed result
+        //is what PARSETEST checks.
+        plan = gptcaveat::planCarryCompose(plan, kPlanCarryMaxChars);
         //#W49-U D7: count verbatim echoes of the plan already carried.
         mPlanEchoCount = (plan == mCurrentPlan) ? mPlanEchoCount + 1 : 0;
         //#W53-N (D12a): the model WROTE a plan line here, whatever it says -
@@ -16324,13 +16470,35 @@ static void exileHostagesOf(MTGCardInstance * card, vector<MTGCardInstance *> & 
 
 //How one hostage reads on a row. Possession follows the OWNER, because that is
 //the side ABlink::returnCardIntoPlay puts it back on.
+//#W60-Q (R7): the P/T is the one the card comes back with, not the one the
+//exiled object is carrying. ABlink::returnCardIntoPlay does
+//`spell->source->counters->init()` on the returning permanent, so every counter
+//- and every point of power or toughness derived from one - is gone before it
+//touches the battlefield. Reading the exile copy's live values advertised a
+//body that never arrives (a 1/1 exiled holding a +1/+1 counter rendered "2/2"
+//and returned 1/1), and the crack-back power below inherited the same lie.
+//Printed values, exactly as printedPTTag defines printed.
+static int exileHostagePower(MTGCardInstance * held)
+{
+    if (!held)
+        return 0;
+    return (cardShowsOtherFace(held) > 0) ? held->origpower : held->basepower;
+}
+
+static int exileHostageToughness(MTGCardInstance * held)
+{
+    if (!held)
+        return 0;
+    return (cardShowsOtherFace(held) > 0) ? held->origtoughness : held->basetoughness;
+}
+
 static string exileHostageDescriptor(MTGCardInstance * held, Player * me)
 {
     if (!held)
         return "";
     std::ostringstream o;
     o << ((me && held->owner == me) ? "your " : "their ") << held->getDisplayName()
-      << " (" << held->power << "/" << held->toughness << ")";
+      << " (" << exileHostagePower(held) << "/" << exileHostageToughness(held) << ")";
     return o.str();
 }
 
@@ -17015,7 +17183,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                         if (!heldHere[hi]->isCreature() || heldHere[hi]->owner == this)
                             continue;
                         exileReturnCount++;
-                        exileReturnPower += heldHere[hi]->power > 0 ? heldHere[hi]->power : 0;
+                        //#W60-Q (R7): the power it comes BACK with. Counters
+                        //are cleared on return (ABlink::returnCardIntoPlay),
+                        //so the exile copy's live power is not what attacks.
+                        exileReturnPower += exileHostagePower(heldHere[hi]) > 0
+                                            ? exileHostagePower(heldHere[hi]) : 0;
                     }
                 }
             int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
@@ -20195,6 +20367,7 @@ static int namedCastLifeSurcharge(Player * me, MTGCardInstance * card)
         return 0;
     Player * opp = me->opponent();
     MTGGameZone * obf = (opp && opp->game) ? opp->game->inPlay : NULL;
+    int total = 0;
     for (int ni = 0; obf && ni < obf->nb_cards; ni++)
     {
         MTGCardInstance * nc = obf->cards[ni];
@@ -20204,9 +20377,16 @@ static int namedCastLifeSurcharge(Player * me, MTGCardInstance * card)
         int nLife = 0, nDraw = 0;
         if (!namedCastPenaltyScan(nc->magicText, nLife, nDraw))
             continue;
-        return nLife > 0 ? nLife : 0;
+        //#W60-Q (R1): SUM, never first-match. Two permanents naming the same
+        //card charge their triggers independently, so a first-match return
+        //under-prices the cast by every punisher after the first - and the win
+        //fold this number feeds then promises a win the pilot does not live to
+        //see (two Silverquill Silencers naming Lightning Bolt at 4 life: the
+        //true price is 6, the old answer was 3).
+        if (nLife > 0)
+            total += nLife;
     }
-    return 0;
+    return total;
 }
 
 static string spellRemovalVerb(MTGCardInstance * src)
@@ -20517,7 +20697,18 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
 //name(<label>) target(<type>|opponentbattlefield) tap`), never guessed from the
 //label's words; a label the script does not carry gets nothing. Pure over
 //(script, label) so the real primitive can be replayed in PARSETEST.
-string tapUntapBranchTag(const string& script, const string& optionLabel)
+//#W60-Q (R5): the tag asserted ENGINE CONSEQUENCES from the branch's card TYPE
+//alone. Two engine states falsify it outright: CANBLOCKTAPPED (a tapped
+//creature that blocks anyway - "a tapped creature CANNOT BLOCK" is then simply
+//false of the live target) and DOESNOTUNTAP ("it UNTAPS in THEIR untap step" is
+//false of a permanent under a does-not-untap effect, and that is the case where
+//tapping it is WORTH the most). The target is not chosen yet at this menu, so
+//the honest form is not a per-target claim but a scoped one: the caller counts
+//how many of the candidates on that side carry each state, and the tag says
+//"normally X, but N of theirs..." rather than stating the general rule as a fact
+//about the one they are about to pick. Both counts 0 renders byte-identically.
+string tapUntapBranchTag(const string& script, const string& optionLabel,
+                         int candidatesCanBlockTapped = 0, int candidatesDoNotUntap = 0)
 {
     if (optionLabel.empty())
         return "";
@@ -20573,12 +20764,28 @@ string tapUntapBranchTag(const string& script, const string& optionLabel)
     {
         o << "TAPS their " << type << " - ";
         if (type.find("creature") != string::npos)
-            o << "a tapped creature CANNOT BLOCK, so this takes it out of blocking for"
-                 " the rest of THIS turn. But it UNTAPS in THEIR untap step at the start"
+        {
+            o << "a tapped creature normally CANNOT BLOCK, so this takes it out of blocking for"
+                 " the rest of THIS turn";
+            if (candidatesCanBlockTapped > 0)
+                o << " - EXCEPT that " << candidatesCanBlockTapped << " of the creatures you"
+                     " could pick here can block while tapped, and tapping one of those denies"
+                     " them nothing";
+            o << ". ";
+        }
+        else
+            o << "it cannot be tapped again for the rest of THIS turn. ";
+        if (candidatesDoNotUntap > 0)
+            o << "It normally UNTAPS in THEIR untap step at the start of their next turn - but "
+              << candidatesDoNotUntap << " of the permanents you could pick here do not untap"
+                 " during their controller's untap step, and tapping one of those keeps it"
+                 " tapped past this turn";
+        else if (type.find("creature") != string::npos)
+            o << "But it UNTAPS in THEIR untap step at the start"
                  " of their next turn, so it does NOT stop it from attacking you on"
                  " their turn";
         else
-            o << "it cannot be tapped again for the rest of THIS turn. But it UNTAPS in"
+            o << "But it UNTAPS in"
                  " THEIR untap step at the start of their next turn, so it denies them"
                  " nothing from their own turn onward";
     }
@@ -25521,11 +25728,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 int nLife = 0, nDraw = 0;
                 if (!namedCastPenaltyScan(nc->magicText, nLife, nDraw))
                     continue;
+                //#W60-Q (R1): every naming permanent prices this cast, not
+                //just the first one found. Each tag is rendered against the
+                //life the pilot has left AFTER the punishers already counted,
+                //so the "you would be at" figures read as the sequence the
+                //triggers actually resolve in and the last one is the truth.
                 o << namedCastPriceTag(nc->getDisplayName() + instanceHandle(nc),
-                                       nLife, nDraw, life);
+                                       nLife, nDraw, life >= 0 ? life - rowSelfLifeCost : life);
                 if (nLife > 0)
                     rowSelfLifeCost += nLife; //#W60-L (B1)
-                break;
             }
         }
         //#W47 (R14b): what this cast LEAVES UP, from the engine's own auto-tap
@@ -27330,9 +27541,31 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                             shownModes[mi] += " {DEAD right now: no legal object for this mode}";
                 }
             //#W60-O (B8): which branch taps what, and the untap-step timing.
+            //#W60-Q (R5): with the two engine states that falsify its general
+            //rule counted off the OPPONENT's battlefield (the side a "TAPS
+            //theirs" branch can pick from). Counted here, not asserted there.
             if (ctx)
+            {
+                int canBlockTapped = 0, doNotUntap = 0;
+                Player * oppT = opponent();
+                if (oppT && oppT->game && oppT->game->inPlay)
+                {
+                    MTGGameZone * tz = oppT->game->inPlay;
+                    for (int ti = 0; ti < tz->nb_cards; ti++)
+                    {
+                        MTGCardInstance * tc2 = tz->cards[ti];
+                        if (!tc2)
+                            continue;
+                        if (tc2->isCreature() && tc2->basicAbilities[Constants::CANBLOCKTAPPED])
+                            canBlockTapped++;
+                        if (tc2->basicAbilities[Constants::DOESNOTUNTAP])
+                            doNotUntap++;
+                    }
+                }
                 for (size_t mi = 0; mi < shownModes.size() && mi < req.optionTexts.size(); mi++)
-                    shownModes[mi] += tapUntapBranchTag(ctx->magicText, req.optionTexts[mi]);
+                    shownModes[mi] += tapUntapBranchTag(ctx->magicText, req.optionTexts[mi],
+                                                        canBlockTapped, doNotUntap);
+            }
         }
         string modeHeader;
         if (req.nameChoiceMenu)
@@ -31318,6 +31551,7 @@ int AIPlayerGPT::chooseAttackers()
     //#W60-L (B11): the parts of the aggregate line, gathered from the same pass
     //that builds the rows - the totals can never disagree with the rows above them.
     std::vector<int> rowPower;
+    std::vector<bool> rowInfect; //#W60-Q (R4): damage that is poison, not life
     std::vector<bool> rowNoLegalBlock;
     for (size_t j = 0; j < attackers.size(); j++)
     {
@@ -31574,7 +31808,23 @@ int AIPlayerGPT::chooseAttackers()
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
-        rowPower.push_back(attackers[j]->power > 0 ? attackers[j]->power : 0); //#W60-L (B11)
+        //#W60-Q (R4): what this attacker takes off a LIFE TOTAL if it connects.
+        //Infect takes nothing (poison), double strike takes it twice.
+        {
+            int rp = attackers[j]->power > 0 ? attackers[j]->power : 0;
+            if (attackers[j]->basicAbilities[Constants::INFECT])
+            {
+                rowInfect.push_back(true);
+                rp = 0;
+            }
+            else
+            {
+                rowInfect.push_back(false);
+                if (attackers[j]->basicAbilities[Constants::DOUBLESTRIKE])
+                    rp *= 2;
+            }
+            rowPower.push_back(rp); //#W60-L (B11)
+        }
         rowNoLegalBlock.push_back(noLegalBlockForThisRow);
         //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
         //option list, not the rendered prompt.
@@ -31614,10 +31864,15 @@ int AIPlayerGPT::chooseAttackers()
         //the SMALLEST powers among the rest that their blocker count cannot
         //cover - the worst case for the attacker, so the number is a proven floor.
         {
-            int totalPower = 0, guaranteed = 0;
+            int totalPower = 0, guaranteed = 0, infectExcluded = 0;
             std::vector<int> blockablePowers;
             for (size_t j = 0; j < rowPower.size(); j++)
             {
+                if (j < rowInfect.size() && rowInfect[j])
+                {
+                    infectExcluded++; //#W60-Q (R4): out of the life arithmetic
+                    continue;
+                }
                 totalPower += rowPower[j];
                 if (j < rowNoLegalBlock.size() && rowNoLegalBlock[j])
                     guaranteed += rowPower[j];
@@ -31629,8 +31884,19 @@ int AIPlayerGPT::chooseAttackers()
             for (int k = 0; k < freeCount && k < (int) blockablePowers.size(); k++)
                 guaranteed += blockablePowers[k];
             Player * oppL = opponent();
+            //#W60-Q (R4): a player who cannot lose life gets no life claim.
+            bool suppressed = false;
+            if (oppL && oppL->game && oppL->game->inPlay)
+                for (int si = 0; si < oppL->game->inPlay->nb_cards && !suppressed; si++)
+                {
+                    MTGCardInstance * sc = oppL->game->inPlay->cards[si];
+                    if (sc && (sc->basicAbilities[Constants::CANTLOSE]
+                               || sc->basicAbilities[Constants::CANTLIFELOSE]))
+                        suppressed = true;
+                }
             tail << attackTotalLine((int) rowPower.size(), totalPower,
-                                    oppL ? oppL->life : -1, blockerCount, guaranteed);
+                                    oppL ? oppL->life : -1, blockerCount, guaranteed,
+                                    infectExcluded, suppressed);
         }
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
@@ -45313,19 +45579,40 @@ static const char * kW50Y_r94 =
         //the cast, X=9 draws 9 -> 18 against a limit of 7 -> 11 discards at 4.
         string cp = cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress #1, Liliana's Caress #2", 13);
         CHECK(cp == "CLEANUP PRICE: that leaves 18 cards in hand against a maximum hand size of 7,"
-                    " so the cleanup step forces 11 discards you cannot decline, and the opponent's"
+                    " so unless you spend cards before then the cleanup step forces up to 11 discards"
+                    " you cannot decline, and the opponent's"
                     " Liliana's Caress #1, Liliana's Caress #2 punish every discard for 4 life each"
-                    " = 44 life - you would be at -31; this KILLS you",
-              "#W60-N B5 THE DECIDING FACT: the 44 life the 'NET 0' row never priced");
+                    " = up to 44 life - at worst you would be at -31; at worst this KILLS you",
+              "#W60-Q R3 THE DECIDING FACT, priced as the CEILING it is (the wave-60 case pinned"
+              " it as a guarantee; cards cast between now and cleanup reduce it)");
+        //#W60-Q (R3) MUST-NOT-MATCH: the guaranteed phrasing is gone from every branch.
+        CHECK(cp.find("forces 11 discards you cannot decline") == string::npos
+                  && cp.find("= 44 life - you would be at") == string::npos
+                  && cp.find("; this KILLS you") == string::npos,
+              "#W60-Q R3 MUST-NOT-MATCH the row never states the cleanup discard count, its price"
+              " or its kill as a certainty");
+        //#W60-Q (R3) the composed X row carries the same modality on its NET.
+        {
+            const string netCeil = xLifeDrawRowCore(9, 0, 1, 0, "", 9, 7, 4,
+                                                    "Liliana's Caress #1, Liliana's Caress #2");
+            CHECK(netCeil.find("NET at worst ") != string::npos
+                      && netCeil.find("up to 11 discards") != string::npos,
+                  "#W60-Q R3 the X row's NET is a worst case whenever a cleanup ceiling is in it");
+            const string netFlat = xLifeDrawRowCore(2, 0, 1, 3, "Underworld Dreams");
+            CHECK(netFlat.find("NET -6 life for this cast") != string::npos
+                      && netFlat.find("at worst") == string::npos,
+                  "#W60-Q R3 NEGATIVE a row whose whole cost is guaranteed draw-punisher life is"
+                  " byte-identical to before");
+        }
         CHECK(cleanupDiscardPriceClause(7, 7, 4, "Liliana's Caress").empty()
                   && cleanupDiscardPriceClause(18, -1, 4, "Liliana's Caress").empty()
                   && cleanupDiscardPriceClause(18, 7, 0, "Liliana's Caress").empty()
                   && cleanupDiscardPriceClause(18, 7, 4, "").empty(),
               "#W60-N B5 NEGATIVE no overflow, no hand limit, no price and no punisher each render nothing");
-        CHECK(cleanupDiscardPriceClause(9, 7, 1, "Megrim").find("forces 2 discards you cannot decline") != string::npos
+        CHECK(cleanupDiscardPriceClause(9, 7, 1, "Megrim").find("forces up to 2 discards you cannot decline") != string::npos
                   && cleanupDiscardPriceClause(9, 7, 1, "Megrim").find("you would be at") == string::npos,
               "#W60-N B5 singular/plural and the 'life not supplied' branch");
-        CHECK(cleanupDiscardPriceClause(8, 7, 1, "Megrim", 5).find("forces 1 discard you cannot decline") != string::npos,
+        CHECK(cleanupDiscardPriceClause(8, 7, 1, "Megrim", 5).find("forces up to 1 discard you cannot decline") != string::npos,
               "#W60-N B5 one card over is 'discard', not 'discards'");
         //(4) the X row's NET, with the discard half folded in.
         vector<string> rows;
@@ -45334,8 +45621,9 @@ static const char * kW50Y_r94 =
         CHECK(rows[0].find("you gain 9 life and draw 9 cards") != string::npos
                   && rows[0].find("those draws cost you 18 life") != string::npos
                   && rows[0].find("CLEANUP PRICE: that leaves 18 cards in hand") != string::npos
-                  && rows[0].find("NET -53 life for this cast}") != string::npos,
-              "#W60-N B5 the X=9 row's NET is the draw price AND the forced cleanup discard");
+                  && rows[0].find("NET at worst -53 life for this cast}") != string::npos,
+              "#W60-N B5 the X=9 row's NET is the draw price AND the forced cleanup discard"
+              " (#W60-Q R3: stated as the worst case it is - the cleanup half is a ceiling)");
         CHECK(rows[0].find("NET 0 life for this cast") == string::npos,
               "#W60-N B5 MUST-NOT-MATCH: the row that lost the 162 game can no longer read NET 0");
         vector<string> plain;
@@ -46529,6 +46817,22 @@ static const char * kW50Y_r94 =
               "#W53-Q D24 NEGATIVE an executed answer (incl. a deliberate pass) never latches one");
         CHECK(!handedToHeuristic(-1, NULL) && !handedToHeuristic(-1, ""),
               "#W53-Q D24 NEGATIVE no fallback class means no handoff to record");
+        //#W60-Q (R9): a 200 that CARRIED a body the client could not read is a
+        //protocol fault, not a silent model.
+        CHECK(string(noAnswerClassFor(false, false, false, 200, 0, true)) == "bad_reply",
+              "#W60-Q R9 POSITIVE a 200 with an unparsable / empty-schema body is 'bad_reply'");
+        CHECK(string(noAnswerClassFor(false, false, false, 0, 0, true)) == "bad_reply",
+              "#W60-Q R9 a body with no status back (the Codex path) classes the same way");
+        CHECK(string(noAnswerClassFor(false, false, false, 200, 0, false)) == "empty_reply",
+              "#W60-Q R9 MUST-NOT-MATCH a genuinely empty 200 is still 'empty_reply'");
+        CHECK(string(noAnswerClassFor(false, true, false, 200, 0, true)) == "timeout"
+                  && string(noAnswerClassFor(true, false, false, 200, 0, true)) == "stale_livelock"
+                  && string(noAnswerClassFor(false, false, false, 200, 28, true)) == "transport_error"
+                  && string(noAnswerClassFor(false, false, false, 500, 0, true)) == "http_error",
+              "#W60-Q R9 NEGATIVE every explaining class outranks it - a bad body cannot mask a"
+              " deadline, a give-up, a transport failure or a non-200");
+        CHECK(string(noAnswerClassFor(false, false, true, 200, 0, false)) == "reasoning_only",
+              "#W60-Q R9 NEGATIVE a reasoning-only reply is unchanged");
     }
     // ---- #W53-P: D4 stack naming + edict-on-stack, D7 ability-menu grouping,
     // D8 stamped exile cause, D11 second-copy verdict, D14 header land count ----
@@ -51522,7 +51826,7 @@ static const char * kW50Y_r94 =
         //`123v126` s71: 31 attackers into a 22-life opponent, with the blocker
         //count line as the whole of the arithmetic offered.
         CHECK(attackTotalLine(5, 20, 22, 3, 6)
-              == "ATTACK TOTAL: 5 attackers listed, 20 total power - declaring all of them"
+              == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
                  " with none blocked puts them at 2. At least 6 damage lands whatever they"
                  " block - they would be at 16.\n",
               "#W60-L B11 the ceiling and the proven floor, in that order");
@@ -51530,7 +51834,7 @@ static const char * kW50Y_r94 =
                                                    " whatever they block.") != string::npos,
               "#W60-L B11 a floor at or past their life is a kill no block prevents");
         CHECK(attackTotalLine(2, 4, 20, 3, 0)
-              == "ATTACK TOTAL: 2 attackers listed, 4 total power - declaring all of them"
+              == "ATTACK TOTAL: 2 attackers listed, 4 total combat damage to a player - declaring all of them"
                  " with none blocked puts them at 16. Their 3 untapped blockers can cover"
                  " every attacker you could send, so none of that damage is guaranteed.\n",
               "#W60-L B11 a fully coverable attack promises nothing");
@@ -51549,10 +51853,27 @@ static const char * kW50Y_r94 =
         CHECK(attackTotalLine(0, 0, 20, 3, 6).empty() && attackTotalLine(5, 20, -1, 3, 6).empty(),
               "#W60-L B11 NEGATIVE no attackers or no known life prints nothing");
         CHECK(attackTotalLine(5, 20, 22, 3, -1)
-              == "ATTACK TOTAL: 5 attackers listed, 20 total power - declaring all of them"
+              == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
                  " with none blocked puts them at 2.\n",
               "#W60-L B11 NEGATIVE an uncomputed floor claims no floor");
         //ECHO SHAPE: a prompt line, not an annotation - no brace, no bracket.
+        //#W60-Q (R4): power is not life loss.
+        CHECK(attackTotalLine(3, 6, 10, 0, 6, 1)
+                  .find("1 of them has infect and is NOT counted in that number") != string::npos,
+              "#W60-Q R4 POSITIVE an infect attacker is excluded from the life arithmetic and the"
+              " exclusion is named");
+        CHECK(attackTotalLine(1, 0, 10, 0, 0, 1).find("puts them at 10") != string::npos
+                  && attackTotalLine(1, 0, 10, 0, 0, 1).find("puts them at 9") == string::npos,
+              "#W60-Q R4 MUST-NOT-MATCH a lone unblocked 1/1 infect attacker never claims their"
+              " life moves");
+        CHECK(attackTotalLine(2, 8, 20, 1, 0, 0, true).find("cannot go down") != string::npos
+                  && attackTotalLine(2, 8, 20, 1, 0, 0, true).find("puts them at") == string::npos
+                  && attackTotalLine(2, 8, 4, 1, 4, 0, true).find("KILLS them") == string::npos,
+              "#W60-Q R4 MUST-NOT-MATCH an opponent who cannot lose life gets no resulting-life"
+              " figure and no kill claim");
+        CHECK(attackTotalLine(5, 20, 22, 3, 6, 0, false) == attackTotalLine(5, 20, 22, 3, 6),
+              "#W60-Q R4 NEGATIVE with no infect and no suppression the line is byte-identical"
+              " to the wave-59 shape");
         CHECK(attackTotalLine(5, 20, 22, 3, 6).find('{') == string::npos
               && attackTotalLine(5, 20, 22, 3, 6).find('[') == string::npos,
               "#W60-L B11 ECHO the aggregate line introduces no bracketed annotation");
@@ -51757,6 +52078,34 @@ static const char * kW50Y_r94 =
                   "#W60-M B13a NEGATIVE the truncation marker never appears on an uncut plan");
             CHECK(gptcaveat::planCarryBound(s48, 0) == s48,
                   "#W60-M B13a NEGATIVE maxChars 0 disables the length bound entirely");
+            //#W60-Q (R8): the COMPOSED path - the bound plus the caller's stump
+            //trim. The wave-60 shape: a plan over the bound whose carried text
+            //ends on a sentence past its midpoint. POSITIVE: the marker
+            //survives. MUST-NOT-MATCH: the composed result never ends on the
+            //bare sentence the trim used to cut back to.
+            {
+                const string longPlan = string("Cast Sorin and hold the removal for their"
+                    " flier. Then attack with everything once the Bond is online.")
+                    + string(700, 'x') + string(" And that is the plan.");
+                const string composed = gptcaveat::planCarryCompose(longPlan, kPlanCarryMaxChars);
+                CHECK(composed.size() < longPlan.size()
+                          && composed.find(gptcaveat::planTruncationMarker()) != string::npos,
+                      "#W60-Q R8 POSITIVE the truncation marker survives the caller's trim pass");
+                const string markerless = gptcaveat::planCarryBound(longPlan, kPlanCarryMaxChars);
+                CHECK(composed == markerless,
+                      "#W60-Q R8 a bounded plan is carried exactly as the bound left it");
+                CHECK(composed[composed.size() - 1] == ']',
+                      "#W60-Q R8 MUST-NOT-MATCH the composed plan never ends on a bare '.'"
+                      " where the marker should be");
+                //NEGATIVE: an UNbounded plan still gets the stump trim.
+                const string stump = "I will hold up the counterspell. Then cast the thing by sac";
+                CHECK(gptcaveat::planCarryCompose(stump, kPlanCarryMaxChars)
+                          == "I will hold up the counterspell.",
+                      "#W60-Q R8 NEGATIVE a short mid-word stump is still trimmed to its last sentence");
+                const string clean = "Hold the removal. Attack next turn.";
+                CHECK(gptcaveat::planCarryCompose(clean, kPlanCarryMaxChars) == clean,
+                      "#W60-Q R8 NEGATIVE a short complete plan is carried byte-identically");
+            }
             CHECK(gptcaveat::planCarryBound("", kPlanCarryMaxChars).empty(),
                   "#W60-M B13a NEGATIVE an empty plan stays empty");
         }
@@ -51862,6 +52211,34 @@ static const char * kW50Y_r94 =
               "#W60-O B7 both sides are named, in the order the board lists them");
         CHECK(sweeperRosterTail(std::vector<std::string>(), std::vector<std::string>()).empty(),
               "#W60-O B7 NEGATIVE an empty board adds no tail at all");
+        //#W60-Q (R6): a destruction sweeper does not destroy what it cannot.
+        {
+            std::vector<std::string> victims, none, theirSurv, mySurv;
+            victims.push_back("Grizzly Bears (2/2)");
+            theirSurv.push_back("Darksteel Myr (0/1) [indestructible]");
+            const string withSurv = sweeperClause("destroys", 1, 1, 0, false, victims, none,
+                                                  theirSurv, mySurv);
+            CHECK(withSurv.find("NOT DESTROYED (indestructible), stays on the battlefield:"
+                                " THEIRS Darksteel Myr (0/1) [indestructible]") != string::npos,
+                  "#W60-Q R6 POSITIVE an indestructible creature is named as a survivor, not a victim");
+            CHECK(withSurv.compare(0, 34, "destroys 1 of their creature (1 wi") == 0
+                      && withSurv.find("destroys 2 of their creatures") == string::npos,
+                  "#W60-Q R6 MUST-NOT-MATCH the indestructible creature is not in the destroyed count");
+            CHECK(sweeperClause("destroys", 1, 1, 0, false, victims, none)
+                      == sweeperClause("destroys", 1, 1, 0, false, victims, none, none, none),
+                  "#W60-Q R6 NEGATIVE with no survivors the clause is byte-identical to lane O's");
+            CHECK(sweeperSurvivorTail(none, none).empty(),
+                  "#W60-Q R6 NEGATIVE no survivors adds no tail at all");
+            std::vector<std::string> mine2;
+            mine2.push_back("Blightsteel Colossus (11/11) [indestructible]");
+            CHECK(sweeperClause("destroys", 1, 1, 0, false, victims, none, none, mine2)
+                      .find("YOURS Blightsteel Colossus (11/11) [indestructible]") != string::npos,
+                  "#W60-Q R6 the seat's own indestructible creature is named on its own side");
+            CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b} {right now: "
+                      + withSurv + "}") == "Cast Damnation {2}{b}{b}",
+                  "#W60-Q R6 ECHO the survivor tail rides inside the same {right now: ...} brace"
+                  " and the narration strip removes the whole annotation");
+        }
         CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b} {right now: "
                   + sweeperClause("destroys", 1, 1, 0, false, theirs, mine) + "}")
                   == "Cast Damnation {2}{b}{b}",
@@ -51921,8 +52298,26 @@ static const char * kW50Y_r94 =
             " target(creature|myBattlefield) untap _ choice name(Choose opponent creature)"
             " target(creature|opponentbattlefield) tap!$ controller";
         CHECK(tapUntapBranchTag(creatureScript, "Choose opponent creature")
-                  .find("a tapped creature CANNOT BLOCK") != string::npos,
-              "#W60-O B8 the creature branch states what tapping actually buys this turn");
+                  .find("a tapped creature normally CANNOT BLOCK") != string::npos,
+              "#W60-O B8 the creature branch states what tapping actually buys this turn"
+              " (#W60-Q R5: 'normally', because CANBLOCKTAPPED exists)");
+        //#W60-Q (R5): the two engine states the tag used to assert away.
+        CHECK(tapUntapBranchTag(creatureScript, "Choose opponent creature", 2, 0)
+                  .find("2 of the creatures you could pick here can block while tapped") != string::npos
+              && tapUntapBranchTag(creatureScript, "Choose opponent creature", 2, 0)
+                     .find("a tapped creature CANNOT BLOCK") == string::npos,
+              "#W60-Q R5 POSITIVE with CANBLOCKTAPPED creatures on their board the tag stops"
+              " claiming a tapped creature cannot block");
+        CHECK(tapUntapBranchTag(creatureScript, "Choose opponent creature", 0, 1)
+                  .find("do not untap during their controller's untap step") != string::npos
+              && tapUntapBranchTag(creatureScript, "Choose opponent creature", 0, 1)
+                     .find("But it UNTAPS in THEIR untap step") == string::npos,
+              "#W60-Q R5 POSITIVE a does-not-untap permanent on their board stops the"
+              " unconditional 'it UNTAPS next turn' claim");
+        CHECK(tapUntapBranchTag(creatureScript, "Choose opponent creature", 0, 0)
+                  == tapUntapBranchTag(creatureScript, "Choose opponent creature"),
+              "#W60-Q R5 NEGATIVE with neither state on their board the tag is byte-identical"
+              " to the wave-60 lane-O shape");
         CHECK(tapUntapBranchTag(teferiScript, "Choose your creature").empty()
               && tapUntapBranchTag(teferiScript, "").empty()
               && tapUntapBranchTag("", "Choose your land").empty(),

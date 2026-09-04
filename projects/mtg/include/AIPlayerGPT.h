@@ -467,6 +467,15 @@ private:
                                          bool hasReasoning, long httpStatus);
     static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
                                          bool hasReasoning, long httpStatus, long curlCode);
+    //#W60-Q (R9): the transport delivered a body and the CLIENT could not make
+    //an answer out of it - a 200 whose JSON does not parse, or parses to a
+    //shape with no message content (`{"choices":[]}`). curl is 0, the status is
+    //200 and the body was not empty, so every existing class was false: it
+    //filed as `empty_reply` and read as "the model said nothing", hiding a
+    //protocol/schema failure that no amount of retrying the same endpoint fixes.
+    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                         bool hasReasoning, long httpStatus, long curlCode,
+                                         bool badReply);
     static bool retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody);
     static long remainingTransportRetryMs(long deadlineMs, long firstLatencyMs);
     static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody);
@@ -1260,6 +1269,11 @@ private:
     //by the one-retry gate. A retry is fired ONCE per decision; a second wall
     //hit hands the decision to the heuristic with the stderr line printed.
     bool mLastTimeout;
+    //#W60-Q (R9): the last consumed reply CARRIED a body that yielded no
+    //content - JSON that would not parse, or a schema with no
+    //choices[0].message.content. Set on consume, cleared by any reply that
+    //produced content, read by noAnswerClass.
+    bool mLastBadReply;
     //#W57-U (D-U, the vpk16 in-flight softlock): the last poll ABANDONED a
     //request that had been in flight past its own deadline plus a grace with
     //nothing published. Latched in SECONDS so the translog record for the

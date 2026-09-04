@@ -543,10 +543,45 @@ void MTGRevealingCards::Render()
 //built on `source`). A chooser armed by anything else - the opponent's edict
 //resolving against this seat while a stale reveal display is still open - must
 //never be finalized, cancelled, or read as option one by this reveal.
+//#W60-Q (R2): SOURCE IDENTITY IS NOT OWNERSHIP. Option one and option two are
+//built on this reveal's `source`, but so is every other ability that card has -
+//a second targeted trigger from the same permanent arms a chooser whose
+//`tc->source` matches this reveal exactly. Reading that as "mine" let the
+//reveal driver click reveal-zone cards into a foreign chooser, and (through
+//drivingFor) made the seat's own action pass withhold a LEGAL targeting window
+//from its normal driver until the structural force-close. The elements this
+//reveal actually owns are enumerable: itself, its two ability wrappers, and the
+//MayAbility CLONES those wrappers fire (the clone is what arms the chooser -
+//MayAbility::reactToTargetClick does `mClone = ability->clone(); mClone->addToGame()`,
+//measured on the w58G fixture). Nothing else is this reveal's business.
+bool MTGRevealingCards::ownsWaitingAction()
+{
+    if (!observer || !observer->mLayers)
+        return false;
+    ActionLayer * al = observer->mLayers->actionLayer();
+    if (!al)
+        return false;
+    ActionElement * wait = al->isWaitingForAnswer();
+    if (!wait)
+        return false;
+    if (wait == (ActionElement *) this || wait == abilityFirst || wait == abilitySecond)
+        return true;
+    MayAbility * m1 = dynamic_cast<MayAbility *>(abilityFirst);
+    if (m1 && m1->mClone && wait == (ActionElement *) m1->mClone)
+        return true;
+    MayAbility * m2 = dynamic_cast<MayAbility *>(abilitySecond);
+    if (m2 && m2->mClone && wait == (ActionElement *) m2->mClone)
+        return true;
+    return false;
+}
+
 TargetChooser * MTGRevealingCards::ownChooser()
 {
     TargetChooser * tc = observer->mLayers->actionLayer()->getCurrentTargetChooser();
     if (tc && tc->source && tc->source != source)
+        return NULL;
+    //#W60-Q (R2): and the waiting element must be one of this reveal's own.
+    if (tc && !ownsWaitingAction())
         return NULL;
     return tc;
 }
@@ -910,8 +945,18 @@ bool MTGRevealingCards::drivingFor(GameObserver * g, MTGCardInstance * card)
         if (!r || r->source != card || r->mAIDriveDone || !r->revealDisplay)
             continue;
         Player * ctrl = r->source ? r->source->controller() : NULL;
-        if ((ctrl && ctrl->isInteractiveAI()) || revealTestAsyncActive(g))
-            return true;
+        if (!((ctrl && ctrl->isInteractiveAI()) || revealTestAsyncActive(g)))
+            continue;
+        //#W60-Q (R2): a live reveal from this card is NOT enough. The gate
+        //WITHHOLDS a legal targeting window from the seat's own action pass, so
+        //it must prove the waiting chooser belongs to this reveal's driver -
+        //otherwise a second targeted ability from the same source is parked
+        //until the structural force-close (the wave-58 hang class). When the
+        //chooser is foreign the branch falls through and the seat answers it
+        //normally; the reveal's own chooser is still protected.
+        if (!r->ownsWaitingAction())
+            continue;
+        return true;
     }
     return false;
 }

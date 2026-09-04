@@ -1355,3 +1355,4 @@ w57V_block_profitable_trade_control.txt
 w58F_stale_menu_compaction.txt
 intrepid_adversary_repeated_payment.txt
 w60_stack_pending_damage_total.txt
+w60Q_reveal_gate_foreign_chooser.txt

@@ -1,0 +1,105 @@
+# #W60-Q (R2): a live interactive reveal and a SECOND targeted ability from the
+# same source card, in one turn, must both reach an outcome.
+#
+# W60-P's drivingFor() gate makes AIPlayerBaka::computeActions leave the current
+# target chooser alone while an async reveal from tc->source is live, proving
+# only SOURCE IDENTITY. W60Q Twin Trigger Angel (test primitive 2100000900) is
+# the shape that separates identity from ownership: one card, two
+# @combat(attacking) triggers - a targeted exile and the Sigarda-shaped
+# interactive reveal - so both choosers carry tc->source == the Angel.
+#
+# What this pins: the exile trigger resolves (Wall of Wood reaches exile), the
+# reveal is driven to its own outcome (five cards back on the bottom, library 7)
+# and the turn ENDS. It is a regression pin on the gate's scope, not a RED
+# repro: see wave60/lane-Q.md - with the display open the reveal element is
+# itself the action layer's waiting action, so the second ability's chooser was
+# never observed as the CURRENT one, and the gate now proves ownership rather
+# than relying on that.
+FORCEABILITY
+AICALLS 400
+[INIT]
+firstmain
+[PLAYER1]
+inplay:2100000900,hill giant,eager cadet
+library:millstone,juggernaut,devoted retainer,gold myr,silver myr,iron myr,darksteel citadel
+[PLAYER2]
+inplay:wall of wood
+[DO]
+revealasync <model-failure>
+revealasyncticks 2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+goto end
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:*,*,*
+library:*,*,*,*,*,*,*
+[PLAYER2]
+exile:wall of wood
+life:12
+[END]

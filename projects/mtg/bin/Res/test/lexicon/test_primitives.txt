@@ -6392,3 +6392,16 @@ auto={0}:name(First row) life:1 controller
 auto={0}:name(Last row) life:1 controller
 text=Test-only: exposes two activated rows for stale menu compaction.
 [/card]
+[card]
+id=2100000900
+name=W60Q Twin Trigger Angel
+rarity=C
+mana={1}{W}
+type=Creature
+subtype=Angel
+power=4
+toughness=4
+auto=@combat(attacking) source(this):target(creature|opponentbattlefield) moveto(exile)
+auto=@combat(attacking) source(this):name(Look top 5 cards) reveal:5 optionone name(Get a human) target(<upto:1>human|reveal) moveto(hand) optiononeend optiontwo name(put on bottom) target(*|reveal) bottomoflibrary and!( all(*|reveal) bottomoflibrary )! optiontwoend revealend
+text=Test-only (#W60-Q R2): two attack triggers from ONE source - a targeted pump and an interactive reveal. The pump's target chooser has the same tc->source as the reveal, which is exactly the shape a source-identity ownership test cannot tell apart.
+[/card]

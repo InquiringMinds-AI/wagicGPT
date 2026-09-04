@@ -155,6 +155,10 @@ public:
     //not be built while that clone is still in the action layer.
     bool optionOneCloneArmed();
     bool buildOptionTwo();
+    //#W60-Q (R2): is the action layer's CURRENT waiting element one of THIS
+    //reveal's own? Source identity is not ownership - a second targeted
+    //ability from the same card arms a chooser this reveal must never claim.
+    bool ownsWaitingAction();
     //#W60-P (B14b): true while an async reveal driver from `card` is live -
     //a seat's generic action pass must leave that reveal's chooser alone.
     static bool drivingFor(GameObserver * g, MTGCardInstance * card);
