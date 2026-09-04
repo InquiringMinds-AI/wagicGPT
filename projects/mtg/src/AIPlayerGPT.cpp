@@ -3178,6 +3178,49 @@ static string w42Capitalize(const string& s)
     return o;
 }
 
+//#W58-D (D45): THE NARRATION'S CASING SEAM. The primitive parser lower-cases
+//every value it reads (MTGDeck.cpp), so a card script's `name(...)` reaches the
+//engine lower-cased - and when that name IS a card, as it is for every MDFC /
+//Pathway back face, the log narrated "boulderloft pathway" while the row head,
+//the decklist, `chosen_text`, the board block and the "You played" line all
+//printed "Boulderloft Pathway". Wave-57 D45 measured 698 occurrences across 422
+//prompts; the same object under two casings reads as two objects, which is the
+//confabulation seam. `printed` is the COLLECTION's own casing for the same
+//string, resolved by the caller. The substitution fires only when the label is
+//ALREADY all lower case AND differs from `printed` by CASE ALONE, so a label
+//the script author cased himself, and any label whose printed form is a
+//different string, is handed back byte-identical. Pure: provable in PARSETEST,
+//which runs before any card database exists.
+static string restoreScriptTokenCase(const string& label, const string& printed)
+{
+    if (label.empty() || printed.empty())
+        return label;
+    if (label != w42Lower(label))
+        return label; //the author cased it: not a parser artefact
+    if (w42Lower(printed) != label)
+        return label; //a different string, not a re-casing
+    return printed;
+}
+
+//#W58-D (D45), the impure half: ask the collection what the token's printed
+//name is. Scoped to the source card's own set first - getCardByName falls
+//through to the global search when that set holds no such name - so a back face
+//resolves to the same printing the row head resolved (mdfcRowHead). A label
+//that names no card never survives restoreScriptTokenCase's guard: in the
+//wave-57 corpus 30 distinct lower-case labels / 9,261 occurrences ("cycling",
+//"choose a land", "sacrifice a creature or planeswalker") name no card and are
+//untouched, while exactly 6 labels / 708 occurrences ARE card names and are the
+//defect.
+static string scriptTokenDisplayCase(const string& label, MTGCardInstance * ctx)
+{
+    if (label.empty() || label != w42Lower(label))
+        return label;
+    MTGCard * c = MTGCollection()->getCardByName(label, ctx ? ctx->setId : -1);
+    if (c && c->data)
+        return restoreScriptTokenCase(label, c->data->name);
+    return label;
+}
+
 //N-166d: the stack line's label for a triggered/activated ability. See the
 //emitter for the defect; pure so all three branches are provable.
 static string stackAbilityName(const string& sourceName, const string& menuText)
@@ -3242,6 +3285,14 @@ static string stackAbilityBody(Interruptible * it, Player * seat)
     StackAbility * sa = dynamic_cast<StackAbility *>(it);
     string srcName = it->source ? it->source->getDisplayName() : string("");
     string menu = (sa && sa->ability) ? sa->ability->getMenuText() : string("");
+    //#W58-D (D45): the same casing seam as the activation line. The stack row
+    //printed `ability: Branchloft Pathway's boulderloft pathway [from your
+    //Branchloft Pathway]` - the grantor named twice, once in each casing.
+    {
+        MTGCardInstance * menuCtx = (sa && sa->ability && sa->ability->source)
+                                    ? sa->ability->source : it->source;
+        menu = scriptTokenDisplayCase(menu, menuCtx);
+    }
     string grantor, victim;
     bool grantorMine = false;
     if (sa && sa->ability)
@@ -14614,7 +14665,13 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         string handle;
         if (!owningName.empty() && owningName == e->source->getDisplayName())
             handle = instanceHandle(e->source);
-        return abilityActivationNarration(mine, e->abilityText, owningName + handle,
+        //#W58-D (D45): the ability label arrives as the script's own token, which
+        //the primitive parser lower-cased. When that token IS a card - the MDFC
+        //back faces - print the collection's casing, so this line names the same
+        //object the row head, `chosen_text` and the board block name.
+        return abilityActivationNarration(mine,
+                                          scriptTokenDisplayCase(e->abilityText, e->source),
+                                          owningName + handle,
                                           targetListPhrase(this, e->targets, false));
     }
 
@@ -38563,6 +38620,66 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(abilityActivationNarration(true, "Cycling", "Forgotten Cave")
               == "You used: Cycling with Forgotten Cave",
               "W43-LOW NEGATIVE a real label beside its card is untouched");
+        // ---- #W58-D (D45): the lower-cased script token in narration ----
+        // The parser lower-cases every script value, so an ability NAMED after a
+        // card (every MDFC / Pathway back face) narrated in a casing no other
+        // surface used: 698 occurrences / 422 prompts in the wave-57 corpus.
+        // POSITIVE: the mixed-case printed name replaces the token.
+        CHECK(restoreScriptTokenCase("boulderloft pathway", "Boulderloft Pathway")
+              == "Boulderloft Pathway",
+              "#W58-D (D45) the collection's casing replaces the lower-cased script token");
+        CHECK(restoreScriptTokenCase("agadeem, the undercrypt", "Agadeem, the Undercrypt")
+              == "Agadeem, the Undercrypt",
+              "#W58-D (D45) a multi-word MDFC back face with internal lower-case words");
+        // The ECHO SHAPE the log now carries, both chairs, subject swapped only.
+        CHECK(abilityActivationNarration(true,
+                  restoreScriptTokenCase("boulderloft pathway", "Boulderloft Pathway"),
+                  "Branchloft Pathway")
+              == "You used: Boulderloft Pathway with Branchloft Pathway",
+              "#W58-D (D45) the narrated activation names the printed face");
+        CHECK(abilityActivationNarration(false,
+                  restoreScriptTokenCase("boulderloft pathway", "Boulderloft Pathway"),
+                  "Branchloft Pathway")
+              == "Opponent used: Boulderloft Pathway with Branchloft Pathway",
+              "#W58-D (D45) the peer's copy is the same sentence, subject swapped");
+        // NEGATIVE 1: a genuinely lower-case ENGLISH label names no card, so the
+        // lookup hands back nothing and the label is byte-identical. These are
+        // the corpus majority (30 labels / 9,261 occurrences).
+        CHECK(restoreScriptTokenCase("cycling", "") == "cycling",
+              "#W58-D (D45) NEGATIVE a label that names no card is untouched");
+        CHECK(restoreScriptTokenCase("sacrifice a creature or planeswalker", "")
+              == "sacrifice a creature or planeswalker",
+              "#W58-D (D45) NEGATIVE a whole lower-case English phrase is untouched");
+        CHECK(abilityActivationNarration(true,
+                  restoreScriptTokenCase("cycling", ""), "Forgotten Cave")
+              == "You used: cycling with Forgotten Cave",
+              "#W58-D (D45) NEGATIVE the untouched label still renders verbatim");
+        // NEGATIVE 2: the author cased it himself - never overwritten.
+        CHECK(restoreScriptTokenCase("Flip Side", "flip side") == "Flip Side",
+              "#W58-D (D45) NEGATIVE an author-cased label is never re-cased");
+        // NEGATIVE 3: a printed name that differs by more than case is a
+        // DIFFERENT string, not a re-casing, and is refused.
+        CHECK(restoreScriptTokenCase("agadeem, the undercrypt", "Agadeem's Awakening")
+              == "agadeem, the undercrypt",
+              "#W58-D (D45) NEGATIVE only a case-only difference is a re-casing");
+        CHECK(restoreScriptTokenCase("boulderloft pathway", "") == "boulderloft pathway"
+              && restoreScriptTokenCase("", "Boulderloft Pathway").empty(),
+              "#W58-D (D45) NEGATIVE an empty side of the pair changes nothing");
+        // The W43-LOW self-named guard still fires AFTER the re-casing (the
+        // comparison is case-insensitive on both sides).
+        CHECK(abilityActivationNarration(true,
+                  restoreScriptTokenCase("mistgate pathway", "Mistgate Pathway"),
+                  "Mistgate Pathway")
+              == "You used: an ability with Mistgate Pathway",
+              "#W58-D (D45) a re-cased self-named label still collapses to 'an ability'");
+        // The stack row carries the same fix: the grantor is named once in its
+        // printed casing and the label once in its own.
+        CHECK(stackAbilityLine("Branchloft Pathway",
+                  restoreScriptTokenCase("boulderloft pathway", "Boulderloft Pathway"),
+                  "", true, "activated ability")
+              == "ability: Branchloft Pathway's Boulderloft Pathway"
+                 " [from your Branchloft Pathway]",
+              "#W58-D (D45) the stack row's label is the printed face too");
     }
 
     // ---- #W43-11: run collapse, and day/night as a designation ----
