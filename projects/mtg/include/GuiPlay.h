@@ -106,6 +106,7 @@ protected:
     bool stacksPinnedNow();
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     void stackProbe(double ms);
+    void churnProbe(); //#W58-E (D42)
 #endif
 
 public:
@@ -113,6 +114,10 @@ public:
     GuiPlay(DuelLayers*);
     ~GuiPlay();
     virtual void Render();
+    //#W58-E (D42): the xN pile badges, drawn by DuelLayers AFTER every layer so
+    //nothing can paint over them (the owner's "indicators are not remaining on
+    //top"). Public because DuelLayers::Render is the only caller.
+    void RenderStackBadges();
     void Replace();
     void Update(float dt);
     virtual int receiveEventPlus(WEvent * e);

@@ -148,6 +148,18 @@ public:
     EnumDefinition * def;
 };
 
+//#W58-E (D42): GameOptionEnum's own write() refuses anything outside
+//[1, values.size()) because it treats the stored number as an INDEX; our third
+//value would never be saved. It also has no migration path, and the boolean
+//this option replaces is already sitting in the owner's profile. This subclass
+//supplies both: names on the way out, names OR the legacy boolean on the way in.
+class GameOptionBoardGrouping : public GameOptionEnum
+{
+public:
+    virtual bool write(std::ofstream * file, string name);
+    virtual bool read(string input);
+};
+
 class GameOptionAward : public GameOption
 {
 public:
@@ -333,6 +345,32 @@ public:
 private:
     OptionKicker();
     static OptionKicker mDef;
+};
+
+//#W58-E (D42): board grouping is a three-state setting on the owner's ask
+//("give it a setting to apply only to tokens"). The values start at 1 on
+//purpose: GameOption::write treats number==0 as "absolutely default" and never
+//writes it, so a 0-valued Off could not have been saved - the pre-existing
+//boolean had exactly that defect, and turning grouping off never survived a
+//restart. 0 now means "no value in this profile" and reads as the default.
+class OptionBoardGrouping : public EnumDefinition
+{
+public:
+    enum
+    {
+        OFF = 1,
+        TOKENS = 2,
+        ALL = 3,
+    };
+
+    static EnumDefinition * getInstance()
+    {
+        return &mDef;
+    }
+
+private:
+    OptionBoardGrouping();
+    static OptionBoardGrouping mDef;
 };
 
 class OptionEconDifficulty : public EnumDefinition

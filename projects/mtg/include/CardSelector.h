@@ -57,6 +57,11 @@ public:
     {
         return false;
     }
+    //#W58-E (D42): true while the selector is drawing its BIG card preview over
+    //the board. DuelLayers uses it to hold the pile badges back for that frame -
+    //the preview is 200x285 at the screen centre and little xN badges floating
+    //on top of it would read as a glitch.
+    virtual bool isShowingBigCard() { return false; }
     virtual int GetDrawMode()
     {
         return mDrawMode;
@@ -68,6 +73,9 @@ protected:
 
 class CardSelector: public CardSelectorBase
 {
+public:
+    virtual bool isShowingBigCard(); //#W58-E (D42)
+
 public:
     struct SelectorMemory
     {

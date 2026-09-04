@@ -12,6 +12,7 @@ class GuiHandSelf;
 class GuiHandOpponent;
 class GuiCombat;
 class GuiAvatars;
+class GuiPlay; //#W58-E (D42)
 class CardSelectorBase;
 struct Pos;
 class MTGGamePhase;
@@ -31,6 +32,9 @@ protected:
     MTGGamePhase* phaseHandler;
     int mPlayerViewIndex;
     CardSelectorBase* mCardSelector;
+    //#W58-E (D42): the battlefield layer, kept so Render() can ask it for its
+    //pile badges after every other layer has drawn.
+    GuiPlay* mPlayLayer;
 
 public:
     DuelLayers(GameObserver* go, int playerViewIndex = 0);

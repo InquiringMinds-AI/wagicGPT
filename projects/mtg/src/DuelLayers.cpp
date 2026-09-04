@@ -85,7 +85,7 @@ GuiAvatars * DuelLayers::GetAvatars()
 }
 
 DuelLayers::DuelLayers(GameObserver* go, int playerViewIndex) :
-    nbitems(0), mPlayerViewIndex(playerViewIndex)
+    nbitems(0), mPlayerViewIndex(playerViewIndex), mPlayLayer(NULL) //#W58-E (D42)
 {
     observer = go;
     observer->mLayers = this;
@@ -106,7 +106,7 @@ DuelLayers::DuelLayers(GameObserver* go, int playerViewIndex) :
     Add(hand = NEW GuiHandSelf(go, getRenderedPlayer()->game->hand));
     Add(avatars = NEW GuiAvatars(this));
     Add(NEW GuiHandOpponent(go, getRenderedPlayerOpponent()->game->hand));
-    Add(NEW GuiPlay(this));
+    Add(mPlayLayer = NEW GuiPlay(this)); //#W58-E (D42)
     Add(NEW GuiPhaseBar(this));
     Add(NEW GuiBackground(go));
 }
@@ -152,7 +152,21 @@ void DuelLayers::Render()
             focusMakesItThrough = false;
     }
     for (int i = nbitems - 1; i >= 0; --i)
+    {
         objects[i]->Render();
+        //#W58-E (D42): the pile badges are drawn HERE, immediately after the
+        //card selector, not from inside GuiPlay::Render. Layers render
+        //back-to-front (this loop counts down) and GuiPlay is only the third of
+        //twelve, so a badge drawn with its card was painted over by the hands,
+        //the avatars and - the case the owner named - CardSelector's re-render
+        //of the FOCUSED card. After the selector, every badge is above every
+        //card on the board and above that re-render. The panels that render
+        //later still cover it, and should: the action layer, GuiCombat, the
+        //stack and the mana bars are deliberate foreground, not board clutter.
+        if (mPlayLayer && objects[i] == (GuiLayer *) mCardSelector
+            && !mCardSelector->isShowingBigCard())
+            mPlayLayer->RenderStackBadges();
+    }
 }
 
 int DuelLayers::receiveEvent(WEvent * e)

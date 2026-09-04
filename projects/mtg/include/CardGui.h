@@ -45,6 +45,13 @@ bool wagicRenderCacheOff();
 //a lie about the board and the trust doctrine forbids that. It is render-side
 //only; no engine code reads it.
 bool wagicBoardGroupingEnabled();
+//#W58-E (D42): the boolean became a three-state setting on the owner's ask
+//("give it a setting to apply only to tokens"). The values are the profile
+//option's own numbers, deliberately starting at 1: GameOption::write treats 0
+//as "absolutely default" and never writes it, so a 0 could not have persisted
+//an explicit Off. 1 = Off, 2 = Tokens only (the default), 3 = All permanents.
+enum WagicBoardGroupingMode { WBG_OFF = 1, WBG_TOKENS = 2, WBG_ALL = 3 };
+int wagicBoardGroupingMode();
 std::string wagicBoardStackKey(MTGCardInstance * card);
 //==== end #W57-G ====
 
@@ -79,6 +86,9 @@ public:
     //drawn and share the drawn member's slot, so the cursor cannot reach them
     //until the group expands. Both are 1/false for an ungrouped card, which is
     //exactly what the pre-D42 board is.
+    //#W58-E (D42): the xN badge for this pile is NOT drawn by CardGui::Render
+    //any more - GuiPlay::RenderStackBadges() draws every badge after the whole
+    //duel has rendered. See that function for why.
     int mStackCount;
     bool mStackHidden;
     //Fan offset of an expanded group's member: 0 = this card owns a layout

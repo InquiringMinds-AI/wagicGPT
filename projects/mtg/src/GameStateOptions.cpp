@@ -162,8 +162,10 @@ void GameStateOptions::Start()
     optionsList->Add(NEW OptionInteger(Options::DISABLECARDS, "Disable card images"));
     optionsList->Add(NEW OptionInteger(Options::TRANSITIONS, "Disable screen transitions"));
     optionsList->Add(NEW OptionInteger(Options::OSD, "Display InGame extra information"));
-    //#W57-G (D42)
-    optionsList->Add(NEW OptionInteger(Options::BOARDGROUPING, "Stack identical permanents"));
+    //#W57-G (D42) / #W58-E (D42): three states, Off / Tokens only / All
+    //permanents, defaulting to Tokens only.
+    optionsList->Add(NEW WDecoEnum(NEW OptionInteger(Options::BOARDGROUPING, "Stack identical permanents",
+                    OptionBoardGrouping::ALL, 1, OptionBoardGrouping::TOKENS, "", OptionBoardGrouping::OFF)));
     optionsTabs->Add(optionsList);
 
 #ifdef WITH_GPT_AI

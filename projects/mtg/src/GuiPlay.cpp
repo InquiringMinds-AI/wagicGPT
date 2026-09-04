@@ -200,12 +200,15 @@ GuiPlay::GuiPlay(DuelLayers* view) :
 }
 
 //#W57-G (D42): the "do not move anything under the player" predicate.
-//A live TargetChooser, an ability waiting for an answer, or ANY unresolved
-//stack entry all mean a decision is in flight whose memory aid is positional -
-//the owner's words, 2026-09-03: "since all the cards maintain positioning, the
-//user remembers what they have targeted". While any of those hold, the board
-//renders exactly as it did before this lane existed: every permanent in its
-//own slot. It re-collapses only once the stack is empty and no chooser is up.
+//A live TargetChooser, an ability waiting for an answer, or one of the two
+//combat declaration windows means a decision is in flight whose memory aid is
+//positional - the owner's words, 2026-09-03: "since all the cards maintain
+//positioning, the user remembers what they have targeted". While any of those
+//hold, the board renders exactly as it did before this lane existed: every
+//permanent in its own slot.
+//#W58-E (D42): the fourth condition, "anything unresolved on the stack", was
+//REMOVED - it fired on every spell either player cast and is the mechanism
+//behind the owner's stacking/unstacking report. See below.
 bool GuiPlay::stacksPinnedNow()
 {
     if (!observer)
@@ -216,8 +219,32 @@ bool GuiPlay::stacksPinnedNow()
     {
         if (observer->mLayers->actionLayer() && observer->mLayers->actionLayer()->isWaitingForAnswer())
             return true;
-        if (observer->mLayers->stackLayer() && observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0)
-            return true;
+        //#W58-E (D42): the "anything unresolved on the stack" condition USED to
+        //pin here as well, and it is the mechanism behind the owner's report
+        //that "it's stacking and unstacking the opponents land when they arent
+        //manipulating those lands". Measured on one headless Baka-vs-Baka game
+        //with WAGIC_BOARDGROUP_CHURN=1: 205 board-shape changes, 160 of them
+        //pin flips, and 76 of the 80 pin-ONs had stack=1 with no chooser, no
+        //waiting ability and no combat flag. Every spell either seat cast blew
+        //the WHOLE board open - every land of both players - and re-collapsed
+        //it on resolution, none of which is a change in any land's own state.
+        //The positional-memory rule it was defending is kept where it belongs:
+        //a chooser, a waiting ability and the two combat windows still pin (the
+        //player is choosing), and a pile whose members are currently MARKED as
+        //a stack entry's targets expands on its own (see computeStacks) - the
+        //target rims lane G added are per-card state, so they split and expand
+        //exactly the cards the player aimed at instead of the whole board.
+        //The old condition is kept behind a development-only env switch so the
+        //counterfactual is one variable rather than a build swap.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+        {
+            static int legacy = -1;
+            if (legacy < 0) legacy = getenv("WAGIC_BOARDGROUP_STACKPIN") ? 1 : 0;
+            if (legacy && observer->mLayers->stackLayer()
+                && observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0)
+                return true;
+        }
+#endif
     }
     for (iterator it = cards.begin(); it != cards.end(); ++it)
     {
@@ -245,7 +272,8 @@ void GuiPlay::computeStacks()
 
     const bool pinned = stacksPinnedNow();
     mStacksPinned = pinned;
-    const bool grouping = wagicBoardGroupingEnabled() && !pinned;
+    const int mode = wagicBoardGroupingMode(); //#W58-E (D42)
+    const bool grouping = (mode != WBG_OFF) && !pinned;
 
     //Baseline: everything draws itself, in its own slot. This IS the pre-D42
     //board, and it is also what an unpinned-but-option-off board must be, so
@@ -261,7 +289,12 @@ void GuiPlay::computeStacks()
             cv->mStackForceExpand = false;
     }
     if (!grouping)
+    {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+        churnProbe(); //#W58-E (D42)
+#endif
         return;
+    }
 
     //Group in cards[] order, so the drawn member of a pile is the one that was
     //already leftmost - the pile does not jump when its composition changes.
@@ -279,6 +312,14 @@ void GuiPlay::computeStacks()
         //Cards still fading in are click-invisible to the selector (closest()
         //drops actA < 32); stacking them would hide an arrival mid-animation.
         if (cv->actA < 32)
+            continue;
+        //#W58-E (D42): "Tokens only" - the owner's chosen default. A non-token
+        //permanent then renders EXACTLY as it does with grouping Off (it never
+        //becomes a leader and never becomes a member), while tokens keep the
+        //full unique-state split: the key is unchanged, this only decides who
+        //is offered to it. isToken is the engine's own flag, set by Token's
+        //constructors and by the copy path, and it is already a key field.
+        if (mode == WBG_TOKENS && !cv->card->isToken)
             continue;
         const std::string key = wagicBoardStackKey(cv->card);
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
@@ -312,9 +353,19 @@ void GuiPlay::computeStacks()
         //are part of the stack key, so every member agrees).
         //Focus is the only in-place expansion left: combat windows and choosers
         //pin the whole board instead (see stacksPinnedNow).
-        bool expand = lead->mHasFocus || lead->mStackForceExpand;
+        //#W58-E (D42): ...and a pile that is currently MARKED by a stack entry
+        //(forcedBorderA on a target, forcedBorderB on the source - Spell and
+        //StackAbility set these every frame they render) expands too. That is
+        //what replaces the old whole-board pin for an unresolved stack: the
+        //cards the player aimed at stay individually visible and in their own
+        //slots for as long as the entry is on the stack, and nothing else on
+        //the board moves. Both flags are already in the stack key, so a marked
+        //card has split out of its unmarked siblings before we get here.
+        bool expand = lead->mHasFocus || lead->mStackForceExpand
+            || (lead->card && (lead->card->forcedBorderA || lead->card->forcedBorderB));
         for (size_t i = 0; i < rest.size() && !expand; ++i)
-            if (rest[i]->mHasFocus || rest[i]->mStackForceExpand)
+            if (rest[i]->mHasFocus || rest[i]->mStackForceExpand
+                || (rest[i]->card && (rest[i]->card->forcedBorderA || rest[i]->card->forcedBorderB)))
                 expand = true;
 
         if (expand)
@@ -339,7 +390,113 @@ void GuiPlay::computeStacks()
             }
         }
     }
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    churnProbe(); //#W58-E (D42)
+#endif
 }
+
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+//#W58-E (D42): the CHURN instrument. The owner's report is that piles form and
+//come apart while nobody is touching those permanents, so the question is not
+//"how fast is a frame" but "what made this group change". WAGIC_BOARDGROUP_CHURN=1
+//prints one line every time the drawn SHAPE of the board changes, with the cause
+//broken out: the pin flipping (and which of its conditions), the focus moving, or
+//a specific card's stack key moving (with the field group that moved, named).
+//Compile-time gated - it must not exist in a release build.
+static const char * w58eKeyField(size_t i)
+{
+    static const char * n[] = { "name", "printing", "modelname", "controller", "owner",
+        "tap/sick/phase", "P/T", "combat", "face/flip", "counters", "keywords", "types",
+        "colors", "displayflags", "riders", "pending", "links", "abilitycount", "attachments" };
+    return (i < sizeof(n) / sizeof(n[0])) ? n[i] : "?";
+}
+
+static void w58eSplitKey(const std::string& k, std::vector<std::string>& out)
+{
+    out.clear();
+    std::string cur;
+    for (size_t i = 0; i < k.size(); ++i)
+    {
+        if (k[i] == '|') { out.push_back(cur); cur.clear(); }
+        else cur += k[i];
+    }
+    out.push_back(cur);
+}
+
+void GuiPlay::churnProbe()
+{
+    static int on = -1;
+    if (on < 0) on = getenv("WAGIC_BOARDGROUP_CHURN") ? 1 : 0;
+    if (!on) return;
+
+    static std::map<const void *, std::string> lastKey;
+    static std::string lastShape;
+    static int lastPinned = -1;
+    static const void * lastFocus = (const void *) -1;
+
+    std::ostringstream shape;
+    const void * focus = NULL;
+    std::map<const void *, std::string> nowKey;
+    for (iterator it = cards.begin(); it != cards.end(); ++it)
+    {
+        CardView * cv = *it;
+        if (!cv || !cv->card) continue;
+        if (cv->mHasFocus && !focus) focus = (const void *) cv;
+        shape << cv->card->getName() << (cv->mStackHidden ? 'h' : (cv->mStackFanIndex ? 'f' : 'd'))
+              << cv->mStackCount << ';';
+        if (!cv->card->target && cv->actA >= 32)
+            nowKey[(const void *) cv] = wagicBoardStackKey(cv->card);
+    }
+    const std::string nowShape = shape.str();
+    if (nowShape == lastShape && lastPinned == (mStacksPinned ? 1 : 0))
+    {
+        lastKey = nowKey;
+        lastFocus = focus;
+        return;
+    }
+
+    fprintf(stderr, "#W58-E churn t%d ph%d: shape now [%s]\n",
+            observer ? observer->turn : -1,
+            observer ? (int) observer->getCurrentGamePhase() : -1, nowShape.c_str());
+    if (lastPinned != (mStacksPinned ? 1 : 0))
+    {
+        int combatflag = 0, forced = 0;
+        for (iterator it = cards.begin(); it != cards.end(); ++it)
+        {
+            if (!(*it)) continue;
+            if ((*it)->mStackForceExpand) forced = 1;
+            if ((*it)->card && ((*it)->card->canAttackNow || (*it)->card->canBlockNow)) combatflag = 1;
+        }
+        fprintf(stderr, "#W58-E   cause=PIN %d->%d (tc=%d wait=%d stack=%d combatflags=%d forced=%d)\n",
+                lastPinned, mStacksPinned ? 1 : 0,
+                (observer && observer->getCurrentTargetChooser()) ? 1 : 0,
+                (observer && observer->mLayers && observer->mLayers->actionLayer()
+                    && observer->mLayers->actionLayer()->isWaitingForAnswer()) ? 1 : 0,
+                (observer && observer->mLayers && observer->mLayers->stackLayer())
+                    ? observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) : -1,
+                combatflag, forced);
+    }
+    if (focus != lastFocus)
+        fprintf(stderr, "#W58-E   cause=FOCUS %p->%p\n", lastFocus, focus);
+    for (std::map<const void *, std::string>::iterator it = nowKey.begin(); it != nowKey.end(); ++it)
+    {
+        std::map<const void *, std::string>::iterator o = lastKey.find(it->first);
+        if (o == lastKey.end() || o->second == it->second) continue;
+        std::vector<std::string> a, b;
+        w58eSplitKey(o->second, a);
+        w58eSplitKey(it->second, b);
+        for (size_t i = 0; i < a.size() && i < b.size(); ++i)
+            if (a[i] != b[i])
+                fprintf(stderr, "#W58-E   cause=KEY %s field=%s '%s' -> '%s'\n",
+                        b[0].c_str(), w58eKeyField(i), a[i].c_str(), b[i].c_str());
+    }
+    fflush(stderr);
+    lastShape = nowShape;
+    lastPinned = mStacksPinned ? 1 : 0;
+    lastFocus = focus;
+    lastKey = nowKey;
+}
+#endif
 
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
 //#W57-G (D42): the before/after instrument. WAGIC_BOARDGROUP_PROBE=1 prints one
@@ -616,6 +773,58 @@ void GuiPlay::Render()
     }
 #endif
 }
+//#W58-E (D42): the pile badges, drawn by DuelLayers::Render right after the
+//card selector rather than from inside GuiPlay::Render.
+//The owner's report: "the indicators are not remaining on top, so sometimes not
+//visible, especially when targeting the stack". Two occlusion mechanisms, both
+//real, both proven by the render order rather than guessed:
+//  1. Inside this layer. The badge sits in the gutter at actX+12..+25 (scaled),
+//     but a card is only 28 wide and slots are 31 apart, so the next slot's
+//     card covers actX+17..+45. cards[] is arrival order, not left-to-right, so
+//     roughly half the time the neighbour is drawn later and erases the badge's
+//     right half - hence "sometimes".
+//  2. Between layers. DuelLayers::Render walks its layers back-to-front and
+//     GuiPlay is only the third of twelve; GuiHandOpponent, GuiAvatars,
+//     GuiHandSelf, CardSelector (which re-renders the FOCUSED card on top - the
+//     castableNow lesson from wave 56, and the "especially when targeting"
+//     half of the report), the action layer, GuiCombat and the whole ActionStack
+//     all paint over GuiPlay afterwards.
+//Drawing the badges from here, called by DuelLayers::Render immediately after
+//the card selector, puts every badge above every card of its own pile AND above
+//the focused card's re-render, which is the requirement. Layers that render
+//later - the action layer, GuiCombat, the stack, the mana bars - still cover
+//them, and should: those are deliberate foreground panels. It is a separate
+//pass over the same views, so it costs one extra walk of the battlefield and no
+//extra state.
+void GuiPlay::RenderStackBadges()
+{
+    JRenderer * renderer = JRenderer::GetInstance();
+    WResourceManager * rm = observer ? observer->getResourceManager() : WResourceManager::Instance();
+    WFont * f = rm ? rm->GetWFont(Fonts::MAIN_FONT) : NULL;
+    if (!f)
+        return;
+    for (iterator it = cards.begin(); it != cards.end(); ++it)
+    {
+        CardView * cv = *it;
+        if (!cv || cv->mStackHidden || cv->mStackCount <= 1)
+            continue;
+        char sbuf[32];
+        sprintf(sbuf, "x%i", cv->mStackCount);
+        //dark plate first: at 480x272 white glyphs over card art are unreadable
+        //on half the printings. In the GUTTER off the card's top-right corner,
+        //not on the face - a 28x40 card has no free corner (top-left is the
+        //printed name, the bottom the P/T box) and a badge over either HIDES
+        //information. Position unchanged from wave 57; only its z-order moved.
+        renderer->FillRect(cv->actX + 12.0f * cv->actZ, cv->actY - 21.0f * cv->actZ,
+                           13.0f * cv->actZ, 9.0f * cv->actZ, ARGB(225, 10, 10, 10));
+        f->SetColor(ARGB(255, 255, 235, 140));
+        f->SetScale(cv->actZ);
+        f->DrawString(sbuf, cv->actX + 13.0f * cv->actZ, cv->actY - (20.6f * cv->actZ));
+        f->SetScale(1);
+        f->SetColor(ARGB(255, 255, 255, 255));
+    }
+}
+
 void GuiPlay::Update(float dt)
 {
     //#W57-G (D42): the two inputs to stacking that arrive WITHOUT a game event -

@@ -400,6 +400,12 @@ void CardSelector::Update(float dt)
     timer -= 1;
 }
 
+//#W58-E (D42): see the header. Mirrors the condition Render() uses below.
+bool CardSelector::isShowingBigCard()
+{
+    return active && timer > 0 && dynamic_cast<CardView*>(active) != NULL;
+}
+
 void CardSelector::Render()
 {
     if (active)

@@ -163,22 +163,36 @@ bool wagicRenderCacheOff()
 //then generalises - "only items with identical names and states should stack."
 //An over-inclusive key costs one un-merged pile; an under-inclusive one tells
 //the player a lie about the board, so when in doubt a field goes IN.
-bool wagicBoardGroupingEnabled()
+//#W58-E (D42): the three-state read. The profile option stores 1/2/3 (see
+//WagicBoardGroupingMode); 0 means the profile has never been written, and the
+//GameOptions factory mints WBG_TOKENS for that case, so a 0 arriving here can
+//only be a profile from before this option existed - treat it as the default
+//too rather than as Off.
+int wagicBoardGroupingMode()
 {
     //Env override first, and only in a development build - the shipping switch
-    //is the profile option, which defaults ON (GameOptions.cpp mints the 1;
-    //an unset option would otherwise read 0 and ship the feature dead).
+    //is the profile option. Takes the same 1/2/3 values as the option, and
+    //accepts a legacy 0 as Off.
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     static int state = -1;
     if (state < 0)
     {
         const char * e = getenv("WAGIC_BOARD_GROUPING");
-        state = e ? (atoi(e) ? 1 : 0) : -2;
+        state = e ? atoi(e) : -2;
+        if (state == 0) state = WBG_OFF;
     }
-    if (state >= 0)
-        return state == 1;
+    if (state >= WBG_OFF)
+        return (state > WBG_ALL) ? WBG_ALL : state;
 #endif
-    return options[Options::BOARDGROUPING].number != 0;
+    const int n = options[Options::BOARDGROUPING].number;
+    if (n < WBG_OFF || n > WBG_ALL)
+        return WBG_TOKENS;
+    return n;
+}
+
+bool wagicBoardGroupingEnabled()
+{
+    return wagicBoardGroupingMode() != WBG_OFF;
 }
 
 static void appendStackAttachments(std::ostringstream& k, MTGCardInstance * card)
@@ -977,31 +991,16 @@ void CardGui::Render()
         }
     }
 
-    //#W57-G (D42): the pile badge. Drawn last so nothing overpaints it, and
-    //only on the one member that stands in for a group - a lone card never
-    //shows it, so the badge itself means "there are more of these here".
-    if (mStackCount > 1)
-    {
-        char sbuf[32];
-        sprintf(sbuf, "x%i", mStackCount);
-        //dark plate first: at 480x272 white glyphs over card art are unreadable
-        //on half the printings.
-        //In the GUTTER off the card's top-right corner, not on the face. A
-        //28x40 card at 480x272 has no free corner: the top-left is the printed
-        //name, the bottom the P/T box - a badge over either HIDES information
-        //(the first placement clipped the toughness digit, which is worse than
-        //no badge at all). Slots are 31 apart, so this lands in the ~3px gap
-        //plus the neighbouring pile's left rim, next to the offset plates that
-        //already read as "there is more than one here".
-        JRenderer::GetInstance()->FillRect(actX + 12.0f * actZ, actY - 21.0f * actZ,
-                                           13.0f * actZ, 9.0f * actZ, ARGB(225, 10, 10, 10));
-        mFont->SetColor(ARGB(255, 255, 235, 140));
-        mFont->SetScale(actZ);
-        mFont->DrawString(sbuf, actX + 13.0f * actZ, actY - (20.6f * actZ));
-        mFont->SetScale(1);
-        mFont->SetColor(ARGB(255, 255, 255, 255));
-    }
-
+    //#W58-E (D42): the xN badge used to be drawn here, "last so nothing
+    //overpaints it" - but LAST WITHIN ONE CARD is not last on screen. GuiPlay
+    //is the third layer DuelLayers renders, so the hand, the avatars, the
+    //CardSelector's re-render of the focused card, the action layer, GuiCombat
+    //and the stack all paint over it afterwards; and even inside GuiPlay's own
+    //loop the badge sits in the gutter at actX+12..+25 while the next slot's
+    //card spans actX+17..+45, so whichever neighbour happens to come later in
+    //cards[] erases half of it. That is the owner's report ("the indicators are
+    //not remaining on top, so sometimes not visible"). The badge is now drawn
+    //by GuiPlay::RenderStackBadges(), after the entire duel has rendered.
     PlayGuiObject::Render();
 }
 

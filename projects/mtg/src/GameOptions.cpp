@@ -562,9 +562,16 @@ GameOption * GameOptions::get(int optionID)
         //An unset option reads 0 whatever the menu advertises, so the default
         //has to be minted here or the feature would ship dead for every
         //profile that never opened the options screen.
+        //#W58-E (D42): and the default is now "Tokens only" (the owner's choice
+        //for the next build), on the three-state enum that replaced the boolean.
         case Options::BOARDGROUPING:
-            go = NEW GameOption(1);
+        {
+            GameOptionBoardGrouping * goBg = NEW GameOptionBoardGrouping();
+            goBg->def = OptionBoardGrouping::getInstance();
+            goBg->number = OptionBoardGrouping::TOKENS;
+            go = goBg;
             break;
+        }
         // First-launch defaults; without these the audio gate stays at 0.
         case Options::MUSICVOLUME:
             go = NEW GameOption(50);
@@ -1139,6 +1146,50 @@ OptionEconDifficulty::OptionEconDifficulty()
 }
 ;
 OptionKicker OptionKicker::mDef;
+//#W58-E (D42)
+OptionBoardGrouping OptionBoardGrouping::mDef;
+OptionBoardGrouping::OptionBoardGrouping()
+{
+    mDef.values.push_back(EnumDefinition::assoc(OptionBoardGrouping::OFF, "Off"));
+    mDef.values.push_back(EnumDefinition::assoc(OptionBoardGrouping::TOKENS, "Tokens only"));
+    mDef.values.push_back(EnumDefinition::assoc(OptionBoardGrouping::ALL, "All permanents"));
+}
+
+bool GameOptionBoardGrouping::write(std::ofstream * file, string name)
+{
+    //Every one of the three values is written, Off included - see the header
+    //for why the value space starts at 1.
+    if (!file || !def)
+        return false;
+    if (number < OptionBoardGrouping::OFF || number > OptionBoardGrouping::ALL)
+        return false;
+    (*file) << name << "=" << menuStr() << endl;
+    return true;
+}
+
+bool GameOptionBoardGrouping::read(string input)
+{
+    //Migration. The wave-57 shipping value was a plain boolean written as a
+    //number; this option now writes NAMES, so a numeric value in a profile can
+    //only be that boolean. 1 (grouping was on) becomes "Tokens only", which is
+    //the owner's choice for the next build, and 0 becomes Off.
+    bool numeric = input.size() > 0;
+    for (size_t i = 0; i < input.size(); ++i)
+        if (!isdigit(input[i]))
+            numeric = false;
+    if (numeric)
+    {
+        number = atoi(input.c_str()) ? OptionBoardGrouping::TOKENS : OptionBoardGrouping::OFF;
+        return true;
+    }
+    if (GameOptionEnum::read(input))
+        return true;
+    //An unreadable value must not become 0 - that is "unset", and it would
+    //silently re-arm the default on a profile the player has configured.
+    number = OptionBoardGrouping::TOKENS;
+    return false;
+}
+
 OptionKicker::OptionKicker()
 {
     mDef.values.push_back(EnumDefinition::assoc(Constants::KICKER_ALWAYS, "Always Pay"));
