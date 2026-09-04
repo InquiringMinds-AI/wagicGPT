@@ -142,6 +142,13 @@ std::string gptHttpGet(const std::string& url, long timeoutMs, const std::string
                        long * httpCode, std::string * errBody);
 std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs,
                         const std::string& bearer, long * httpCode, std::string * errBody);
+//#W59-H (K1): the decision transport also needs libcurl's result code. HTTP 0
+//alone cannot distinguish a connect timeout from a platform without curl.
+//`curlCode` is -1 where libcurl is not the active transport, otherwise the
+//numeric CURLcode (0 = CURLE_OK).
+std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs,
+                        const std::string& bearer, long * httpCode, std::string * errBody,
+                        long * curlCode);
 //Log "http error <code> from <url>: <body head>" once per distinct (url, code).
 void gptNoteHttpFailure(const std::string& url, long code, const std::string& bodyHead);
 //gptLogLine, suppressed when the line equals the previous once-line (a run
