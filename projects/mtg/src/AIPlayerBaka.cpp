@@ -3687,6 +3687,16 @@ int AIPlayerBaka::computeActions()
     TargetChooser * currentTc = observer->getCurrentTargetChooser();
     if(currentTc)
     {
+        //#W60-P (B14b): a chooser armed by an interactive reveal that this
+        //engine's async driver is CURRENTLY driving is the driver's decision,
+        //not this generic pass's. With the model call in flight the pass took
+        //option one ("Get a human") on a reveal the model then DECLINED - the
+        //W50-W double-consumer, producing a wrong outcome rather than a hang
+        //(measured at revealasyncticks 2: library 6 / hand 1, deterministic).
+        //Take no action this tick; the driver acts, and the reveal's own stall
+        //guard force-closes anything that cannot finish, so nothing is parked.
+        if (currentTc->source && MTGRevealingCards::drivingFor(observer, currentTc->source))
+            return 1;
         int targetResult = currentTc->Owner == this? chooseTarget():0;
         if (targetResult)
             return 1;

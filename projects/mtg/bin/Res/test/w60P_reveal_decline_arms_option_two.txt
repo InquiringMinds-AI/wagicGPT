@@ -1,0 +1,66 @@
+# #W60-P (B14a): after a DECLINE on an interactive reveal's option one, option
+# TWO must actually arm and run - the reveal finishes on its own, with no help
+# from the stall guard.
+#
+# MECHANISM (measured, not assumed). Option one is a MayAbility; the element
+# that arms this reveal's target chooser is its CLONE
+# (MayAbility::reactToTargetClick does `mClone = ability->clone();
+# mClone->addToGame()`). The decline branch retires the MayAbility but leaves
+# that clone in the action layer for a few more ticks, and while it sits there
+# it is a live claimant for any menu built on the reveal's SOURCE: the menu
+# answer meant for option two lands on the clone instead, option two's own
+# MayAbility is never clicked (its mClone stays NULL), MayAbility::testDestroy
+# reaps it as an unanswered may, and the reveal has no reachable outcome left.
+# A HUMAN never sees this - the decline path hands the game an extra Update
+# tick before building option two; the AI path skips that tick.
+#
+# This fixture deliberately does NOT set revealstallbudget: the shipped budget
+# (20000 ticks plus a wall floor) cannot be reached inside a script, so the
+# stall guard - lane G's floor, which is what makes w58G_reveal_decline_advances
+# pass on base - has no window here. What is left is whether the reveal can
+# finish BY ITSELF.
+#
+# RED on base: five of the seven library cards stay stranded in the open reveal
+# zone (library reads 2, not 7).
+# GREEN after: option two arms, takes the five revealed cards to the bottom of
+# the library, and the reveal closes; library is whole (7).
+FORCEABILITY
+AICALLS 20
+[INIT]
+firstmain
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:millstone,juggernaut,devoted retainer,gold myr,silver myr,iron myr,darksteel citadel
+[PLAYER2]
+[DO]
+revealasync <model-failure>
+revealasyncticks 0
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:*,*,*,*,*,*,*
+[PLAYER2]
+life:11
+[END]

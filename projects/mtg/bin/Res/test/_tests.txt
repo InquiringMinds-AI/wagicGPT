@@ -1048,6 +1048,8 @@ generic/valorous_stance_family.txt
 generic/collected_conjuring_i1085.txt
 generic/sigarda_col_coven_i1085.txt
 w58G_reveal_decline_advances.txt
+w60P_reveal_decline_arms_option_two.txt
+w60P_reveal_decline_not_consumed_by_seat.txt
 generic/jack_in_the_mox_i1085.txt
 generic/cytoplast_manipulator_i1085.txt
 generic/entrapment_maneuver_i1085.txt

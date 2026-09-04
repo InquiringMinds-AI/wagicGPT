@@ -1,0 +1,83 @@
+# #W60-P (B14b): the seat's generic action pass must not spend a chooser that
+# this engine's own async reveal driver is driving.
+#
+# With the model call in flight (revealasyncticks 2 stands in for two poll
+# ticks), AIPlayerBaka::computeActions' target branch reached option one's
+# chooser first and committed it - the seat took "Get a human" on a reveal the
+# model then DECLINED. That is the W50-W (D2) double-consumer producing a WRONG
+# OUTCOME rather than a hang. Fix: computeActions leaves a chooser alone while
+# MTGRevealingCards::drivingFor says the async driver owns that reveal. The
+# driver clicks its own picks through observer->cardClick, so it is not gated by
+# this, and the reveal's stall guard still force-closes anything that cannot
+# finish - no window is removed and nothing is capped.
+#
+# RED on base: Devoted Retainer is taken to hand anyway (library 6, hand 1),
+# deterministic.
+# GREEN after: the decline stands - hand 0, library 7 (option two put the five
+# revealed cards back on the bottom).
+FORCEABILITY
+AICALLS 20
+[INIT]
+firstmain
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:millstone,juggernaut,devoted retainer,gold myr,silver myr,iron myr,darksteel citadel
+[PLAYER2]
+[DO]
+revealasync <model-failure>
+revealasyncticks 2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+goto end
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:*,*,*,*,*,*,*
+[PLAYER2]
+life:11
+[END]
