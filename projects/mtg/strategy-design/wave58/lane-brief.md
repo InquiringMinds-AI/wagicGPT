@@ -97,3 +97,69 @@ card's display name; cover every narration emitter that writes a script token (A
 `resolved and entered`, `created ->`, cast lines). PARSETEST: the echo shape with a mixed-case
 MDFC name, and a negative that a genuinely lowercase card word is untouched. If D45 lists other
 LOW items in its cluster, take only the narration-case one.
+
+## Lane E — D42 board grouping: two owner-reported implementation bugs + a tokens-only setting
+Worktree: worktrees/lanes/w58-E (base master 4581580f5). Feature under repair = lane G's wave-57
+board grouping (`#W57-G (D42)` tags in GuiPlay.cpp, CardGui.cpp, CardSelector.cpp, ActionStack.cpp,
+GameOptions.cpp/.h, GameStateOptions.cpp; `Options::BOARDGROUPING`, menu label "Stack identical
+permanents", default ON for the human seat; `WAGIC_BOARDGROUP_PROBE=1` before/after instrument).
+Read `projects/mtg/strategy-design/wave57/lane-G.md` first, then
+`wave58/owner-decisions.md` (the owner's verbatim reports; on the Vita, vpk18, human seat vs
+the heuristic AI, token decks).
+Owner's instruction, verbatim: "well, fix the bugs. and.. give it a setting to apply only to
+tokens. ill try it like that."
+1. G1 — "it's stacking and unstacking the opponents land when they arent manipulating those
+   lands." Find the actual mechanism (do not guess from the suspects list in owner-decisions.md —
+   they are the orchestrator's guesses): what changes in the grouping key or the regroup trigger
+   for lands nobody is touching. A likely class is transient state (tap during the AI's mana
+   payment, a `castableNow`/focus/hover flag, summoning-sickness expiry, or regrouping on every
+   render). A group must change only when a member's GROUPING state actually changes; prove it
+   with a probe (compile-time gated) that logs every regroup with its cause, then show the
+   cause is gone.
+2. G2 — "the indicators are not remaining on top, so sometimes not visible, especially when
+   targeting the stack." The stack-count indicator must render above every card of its pile
+   and above the focused/targeted card's re-render (CardSelector re-renders the focused card
+   after the row; wave-56's castableNow flag learned the same lesson — draw as part of the
+   card's own Render at the right z-order, or after the selector's re-render, not as a
+   row-time overlay). Verify in a windowed run if you can (WAYLAND_DISPLAY=wayland-1
+   SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy), otherwise by the render-order proof.
+3. Setting — replace the boolean with a three-state option: Off / Tokens only / All permanents,
+   DEFAULT = Tokens only (his choice for the next build). "Tokens only" = only token permanents
+   (MTGCardInstance::isToken or the engine's equivalent — verify) are ever stacked; non-token
+   permanents render exactly as with grouping Off. Keep the existing unique-state split (tapped,
+   summoning sick, attached equipment, counters, etc. never stack together) in both modes. Keep
+   the option persisting through the existing GameOptions save path; migrate a saved boolean 1
+   to "Tokens only" and 0 to Off (say what you did).
+Constraints: Vita/PSP builds compile this code — any Vita-only include under `#ifdef VITA`, C++14
+only (no C++17 constructs); no PARSETEST cases needed unless you touch AIPlayerGPT strings;
+suite must stay 1245/0 at THREADS=1 (or 2-known at 16) — run it. Human-facing: this is a
+GUI change judged by the owner's eyes; ship a short `wave58/lane-E.md` telling him exactly what
+to look for on the Vita for each of the three changes. Tag comments `#W58-E (D42)`.
+
+## Lane F — F1 (SIGABRT: stale menu id indexes past ActionLayer::mObjects)
+Worktree: worktrees/lanes/w58-F (base master a3f0700d3 or later). Read
+`projects/mtg/strategy-design/wave58/engine-findings.md` §F1 in full — it has the backtrace, the
+site (src/DecisionContract.cpp:367) and the stderr context. The core file is at
+<wt>/projects/mtg/strategy-design/wave58/ab4-core (binary that produced it =
+/home/magi/Projects/wagicGPT/archives/wagic-027db3b09-w57V; `gdb -batch -ex 'bt' -ex 'frame 5'
+-ex 'info locals' <binary> <core>` works; do NOT commit the core). Establish the mechanism (why
+the id exceeds the vector: which abilities were removed, and who built the menu) before fixing.
+Fix EVERY site that maps a menu id to `mObjects` (grep `abilitiesMenu->mObjects` and
+`->GetId()]` across src/), so a stale menu yields "no decision this tick" and never an index;
+ship a suite fixture RED on base (a synthetic test-only card via WAGIC_TEST_PRIMITIVES_FILE is
+acceptable if Nadaar + Lost Mine cannot be driven in a fixture; say which) and GREEN after. Tag
+`#W58-F (F1)`. Suite must read 0 failed at THREADS=1; PARSETEST unchanged (3455/0) unless you
+touch AIPlayerGPT strings.
+
+## Lane G — F2 (engine hang after an AI menu answer of -1 on Sigarda, Champion of Light)
+Worktree: worktrees/lanes/w58-G. Read `wave58/engine-findings.md` §F2 in full, then the evidence
+files it names (read-only: the corpus directory must not be modified), then wave57/lane-S.md,
+lane-T.md and lane-F.md (the softlock tooling and the orphan-chooser breaker). Establish the
+mechanism: reproduce with a fixture (lane S's `aiseat` DSL, `WAGIC_STALLPROBE=1`, a synthetic
+test card if Sigarda's Coven trigger cannot be driven directly) that hangs on base — bound every
+probe run with `timeout 120` and the memory cap — then fix the ENGINE so the game always advances
+(a -1/cancel on a may-menu must resolve the ability as declined and release every chooser it
+owns), never by capping or removing the menu. Also answer: why did this menu produce no translog
+record, and should it (a decision with no receipt is invisible to the corpus)? Fixture RED (hang
+= timeout) on base, GREEN after; suite 0 failed at THREADS=1; PARSETEST unchanged unless you touch
+AIPlayerGPT strings. Tag `#W58-G (F2)`.
