@@ -149,6 +149,21 @@ std::string gptHttpPost(const std::string& url, const std::string& body, long ti
 std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs,
                         const std::string& bearer, long * httpCode, std::string * errBody,
                         long * curlCode);
+//#W60-M (B4): connection setup's own budget, as a bounded fraction of the
+//request deadline. Wave 59 (#W59-H K1) set it EQUAL to the deadline, so a
+//connect that never completed spent the whole 900 s decision wall, was
+//classified as a deadline miss rather than a transport fault (the worker's
+//test is "empty body at or past 95% of the deadline"), and took the wall-miss
+//retry arm's fresh full deadline. These three constants state the fraction and
+//its ends; gptConnectTimeoutMs is pure over them and is pinned in PARSETEST.
+//  share  = deadline / kGptConnectShareDiv
+//  bounds = [kGptConnectTimeoutMinMs, kGptConnectTimeoutCapMs], and never more
+//           than half the deadline (so it can never reach the 95% mark alone)
+//  no deadline given -> kGptConnectTimeoutCapMs (stated, never libcurl's 0)
+static const long kGptConnectTimeoutCapMs = 20000L;
+static const long kGptConnectTimeoutMinMs = 5000L;
+static const long kGptConnectShareDiv     = 8L;
+long gptConnectTimeoutMs(long timeoutMs);
 //Log "http error <code> from <url>: <body head>" once per distinct (url, code).
 void gptNoteHttpFailure(const std::string& url, long code, const std::string& bodyHead);
 //gptLogLine, suppressed when the line equals the previous once-line (a run

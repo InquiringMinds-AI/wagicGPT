@@ -564,6 +564,131 @@ inline bool planTargetAbsent(const std::string& planRaw, const std::string& opts
     return anyTarget;
 }
 
+// #W60-M (B13a). THE BOUND. The carried plan is the one part of the prompt the
+// engine copies back to the model verbatim and unvetted, so its size is a
+// direct decision-value-per-token cost and its content competes with the true
+// surfaces beside it. Wave 59, one seat (126v125): 410 plan echoes, 148 over
+// 400 characters, longest 1,599, and 46 carrying live deliberation markers.
+// s48's 1,236-character stream ("...Wait, I have Sorin. ... No Sanguine Bond.
+// No Exquisite Blood...") produced `CHOICE: 4` on a THREE-row menu, a
+// named_row_reask and two extra model calls (137.0 s).
+//
+// The bound is the plan's FIRST PARAGRAPH (planParagraphBound, #W54-A, already
+// applied at the emit site) and then `maxChars`, cut at the last sentence end
+// at or below it. Nothing is silently dropped: a plan that was cut carries the
+// marker, so the model can see that its own words were shortened and restate
+// them. `maxChars < 1` disables the length bound and returns the plan as given.
+inline const char * planTruncationMarker()
+{
+    return " [...the rest of your plan was not carried - restate it if you still mean it]";
+}
+
+inline std::string planCarryBound(const std::string& plan, size_t maxChars)
+{
+    if (maxChars < 1 || plan.size() <= maxChars)
+        return plan;
+    // Prefer a sentence boundary; a mid-sentence stump re-served every decision
+    // reads like an instruction fragment. Only accept one past the halfway mark,
+    // so a plan whose first sentence is itself longer than the bound is cut at
+    // the bound rather than back to almost nothing.
+    size_t cut = plan.find_last_of(".!?", maxChars);
+    if (cut != std::string::npos && cut + 1 > maxChars / 2)
+        cut = cut + 1;
+    else
+    {
+        // Otherwise cut at the last word break at or below the bound.
+        cut = plan.find_last_of(" \t\n", maxChars);
+        if (cut == std::string::npos || cut < maxChars / 2)
+            cut = maxChars;
+    }
+    std::string out = plan.substr(0, cut);
+    size_t e = out.find_last_not_of(" \t\r\n");
+    out = (e == std::string::npos) ? std::string() : out.substr(0, e + 1);
+    if (out.empty())
+        return plan; // nothing survived the cut: carry the plan as it stands
+    return out + planTruncationMarker();
+}
+
+// #W60-M (B13a). THE CONTRADICTION. A plan that DENIES a permanent the pilot's
+// own battlefield line prints is not a stale plan, it is a false one - and the
+// trust doctrine makes it worse than useless, because the model is instructed
+// to believe what the prompt says and this prompt then says two things.
+// 126v125 s48 carried "No Sanguine Bond. No Exquisite Blood." into a window
+// whose battlefield line ended `...; Exquisite Blood {4}{b} [enchantment]...`.
+//
+// Detected NARROWLY, on the shape that was observed: a bare negation
+// immediately governing the permanent's name ("no X", "not have X", "don't have
+// X", "lack X") or a copular denial after it ("X is not on the battlefield").
+// Two things keep it from firing on a TRUE sentence: a qualifier between the
+// negation and the name ("no SECOND Sanguine Bond") does not match at all, and
+// a zone qualifier following the name ("no Sanguine Bond IN HAND") is a
+// different, true claim and is excluded explicitly. `inPlayNames` is the
+// PILOT'S OWN battlefield only - a denial about the opponent's board is not
+// contradicted by the pilot's.
+inline bool planDeniesOwnPermanent(const std::string& planRaw,
+                                   const std::vector<std::string>& inPlayNames,
+                                   std::string& deniedOut)
+{
+    const std::string plan = toLower(planRaw);
+    if (plan.empty())
+        return false;
+    static const char * kPre[] = { "no ", "not have ", "n't have ", "lack ", "lacks ",
+                                   "without ", "missing " };
+    static const char * kPost[] = { " is not on the battlefield", " isn't on the battlefield",
+                                    " is not in play", " isn't in play",
+                                    " is not on my battlefield", " isn't on my battlefield" };
+    static const char * kZone[] = { " in hand", " in my hand", " in your hand",
+                                    " in the graveyard", " in my graveyard",
+                                    " in the library", " in my library", " in exile",
+                                    " in my deck", " in the deck" };
+    for (size_t n = 0; n < inPlayNames.size(); n++)
+    {
+        const std::string full = toLower(inPlayNames[n]);
+        if (full.size() < 5)
+            continue; // too short to name a permanent unambiguously in prose
+        std::vector<std::string> forms;
+        planNameForms(full, forms);
+        for (size_t f = 0; f < forms.size(); f++)
+        {
+            const std::string& nm = forms[f];
+            if (nm.size() < 5)
+                continue;
+            size_t pos = 0;
+            while ((pos = plan.find(nm, pos)) != std::string::npos)
+            {
+                const size_t after = pos + nm.size();
+                // the name must end here (not be a prefix of a longer word)
+                bool wordEnd = (after >= plan.size()
+                                || !(std::isalnum((unsigned char) plan[after])
+                                     || plan[after] == '\''));
+                bool zoneScoped = false;
+                for (size_t z = 0; z < sizeof(kZone) / sizeof(kZone[0]) && !zoneScoped; z++)
+                    zoneScoped = (plan.compare(after, std::strlen(kZone[z]), kZone[z]) == 0);
+                if (wordEnd && !zoneScoped)
+                {
+                    for (size_t k = 0; k < sizeof(kPre) / sizeof(kPre[0]); k++)
+                    {
+                        const size_t len = std::strlen(kPre[k]);
+                        if (pos >= len && plan.compare(pos - len, len, kPre[k]) == 0)
+                        {
+                            deniedOut = inPlayNames[n];
+                            return true;
+                        }
+                    }
+                    for (size_t k = 0; k < sizeof(kPost) / sizeof(kPost[0]); k++)
+                        if (plan.compare(after, std::strlen(kPost[k]), kPost[k]) == 0)
+                        {
+                            deniedOut = inPlayNames[n];
+                            return true;
+                        }
+                }
+                pos = after;
+            }
+        }
+    }
+    return false;
+}
+
 } // namespace gptcaveat
 
 #endif

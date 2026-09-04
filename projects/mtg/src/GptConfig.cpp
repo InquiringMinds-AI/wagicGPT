@@ -641,6 +641,45 @@ size_t gptPresetForUrl(const string& url)
     return 0;
 }
 
+//#W60-M (B4): connection setup is a BOUNDED FRACTION of the decision deadline,
+//never the whole of it. Wave 59's K1 fix removed a hardcoded 2.5 s connect cap
+//by making connect setup as generous as the request (gptConnectTimeoutMs =
+//timeoutMs); the wave-59 corpus shows what that cost. A `curl=28` connect
+//failure then consumed the ENTIRE 900 s deadline (130v162 seq 21:
+//latency_ms 900020, still handed to the heuristic), and because the worker's
+//own deadline test is "empty body at or past 95% of the deadline", such a
+//failure was CLASSIFIED as a wall miss - so `transport_error` fired 0 times in
+//3,005 decisions, and the retry took the wall-miss arm's fresh full deadline
+//instead of the transport arm's remainder (123v146 seq 7 finished at
+//deadline_pct 108.6).
+//
+//The bound restores all three at once: a connect that cannot complete inside
+//kGptConnectShareDiv-th of the deadline (capped at kGptConnectTimeoutCapMs,
+//floored at kGptConnectTimeoutMinMs, and never more than HALF the deadline)
+//returns while the deadline is mostly unspent - so the elapsed time is far
+//below the 95% mark, the outcome classifies as `transport_error`, and the one
+//retry is bought with `remainingTransportRetryMs`, inside one deadline.
+//Generous by doctrine (tens of seconds, not 2.5 s), finite, and stated rather
+//than inherited: libcurl reads 0 as "the built-in default".
+long gptConnectTimeoutMs(long timeoutMs)
+{
+    if (timeoutMs <= 0)
+        return kGptConnectTimeoutCapMs; //no deadline given: the stated ceiling
+    long ms = timeoutMs / kGptConnectShareDiv;
+    if (ms > kGptConnectTimeoutCapMs)
+        ms = kGptConnectTimeoutCapMs;
+    if (ms < kGptConnectTimeoutMinMs)
+        ms = kGptConnectTimeoutMinMs;
+    //A deadline smaller than twice the floor would otherwise let connection
+    //setup reach the deadline test's 95% mark on its own, which is the exact
+    //confusion this item removes. Half is the hard ceiling in that regime.
+    if (ms > timeoutMs / 2)
+        ms = timeoutMs / 2;
+    if (ms < 1)
+        ms = 1; //never 0: libcurl reads 0 as "no connect timeout at all"
+    return ms;
+}
+
 #ifdef WAGIC_HTTP_JNI
 //--- Android transport ------------------------------------------------------
 //
@@ -801,20 +840,6 @@ string httpRequestImpl(const string&, const string&, long, const string&, long *
 #else
 namespace
 {
-//#W59-H (K1): the connect phase gets the SAME window as the request it is
-//opening. F3: a hardcoded 2.5 s cap turned every connect that queued behind
-//21 concurrent games into an empty body indistinguishable from a model that
-//said nothing - 89 of 2,270 wave-58 decisions, all played by the heuristic.
-//A connect deadline is not a decision deadline, so there is no reason for it
-//to be the smaller of the two. The floor only covers a caller that passes no
-//deadline at all: generous by doctrine, and finite (libcurl reads 0 as "the
-//built-in default"), so it is stated rather than inherited.
-static const long kGptConnectTimeoutFloorMs = 30000L;
-static long gptConnectTimeoutMs(long timeoutMs)
-{
-    return timeoutMs > 0 ? timeoutMs : kGptConnectTimeoutFloorMs;
-}
-
 size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -840,9 +865,9 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    //#W59-H (K1): connection setup owns the same generous window as the whole
-    //request. The former 2.5 s cap was not a decision deadline and failed in
-    //bursts under concurrent games before Spark could accept the connection.
+    //#W60-M (B4): connection setup owns a bounded fraction of the request's
+    //deadline - generous (tens of seconds), but small enough that a connect
+    //failure is distinguishable from a wall miss and leaves the retry a budget.
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, gptConnectTimeoutMs(timeoutMs));
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
