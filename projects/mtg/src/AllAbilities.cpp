@@ -179,6 +179,7 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAITestTicks = 0;
     mAIGraceTicks = 0;
     mAISecondRebuilt = false;
+    mAIOptionTwoDeferred = false; //#W60-P (B14)
     mAIStallTicks = 0;     //#W54-F (D7a)
     mAIStallSig = 0;
     mAIStallSince = 0;
@@ -595,18 +596,14 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
                 if (!this->source->controller()->isAI())
                 game->Update(0);
                 
-                if (zone->cards.size())//generally only want to add ability 2 if anything is left in the zone.
-                {
-                    repeat = false;
-                    abilitySecond = contructAbility(abilityTwo);
-                    game->addObserver(abilitySecond);
-                    //An addObserver'd one-shot never resolves on its own (same
-                    //disease documented in toResolve/fireOneShot): Manifest Dread's
-                    //optiontwo "all(*|reveal) moveto(mygraveyard)" left the
-                    //un-manifested card stranded in the reveal zone. Fire it here,
-                    //exactly as toResolve() does for the no-valid-target branch.
-                    fireOneShot(abilitySecond);
-                }
+                //#W60-P (B14): the build is DEFERRED while option one's fired
+                //clone still holds the action layer (see buildOptionTwo). An
+                //addObserver'd one-shot never resolves on its own (same disease
+                //documented in toResolve/fireOneShot): Manifest Dread's optiontwo
+                //"all(*|reveal) moveto(mygraveyard)" left the un-manifested card
+                //stranded in the reveal zone - buildOptionTwo fires it, exactly as
+                //toResolve() does for the no-valid-target branch.
+                buildOptionTwo();
             }
             else if (tc->source)
             {
@@ -629,15 +626,11 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
             if (!this->source->controller()->isAI())
             game->Update(1);
 
-            if (zone->cards.size())
-            {
-                repeat = false;
-                abilitySecond = contructAbility(abilityTwo);
-                game->addObserver(abilitySecond);
-                //See note above: fire the one-shot optiontwo so its mover runs
-                //(Manifest Dread mills the un-manifested card here).
-                fireOneShot(abilitySecond);
-            }
+            //See note above: buildOptionTwo fires the one-shot optiontwo so its
+            //mover runs (Manifest Dread mills the un-manifested card here), and
+            //#W60-P (B14) defers the build while option one's clone is still on
+            //the action layer.
+            buildOptionTwo();
 
         }
     }
@@ -844,6 +837,83 @@ bool revealStructParked(int ticks, long secs, int fixtureTicks, long deadlineMs)
     int  sTicks = fixtureTicks ? fixtureTicks : kRevealStallStructTicks;
     long sSecs  = fixtureTicks ? 0 : revealStallStructSecsFor(deadlineMs);
     return ticks >= sTicks && secs >= sSecs;
+}
+
+//#W60-P (B14): option one is a MayAbility, and the element that actually arms
+//this reveal's target chooser is its CLONE - MayAbility::reactToTargetClick
+//does `mClone = ability->clone(); mClone->addToGame();`. Retiring the MayAbility
+//(what the decline/accept branches above do) leaves that clone in the action
+//layer for a few more ticks, and while it is there it is a live claimant for
+//any menu built on this reveal's SOURCE: the menu answer meant for option two
+//lands on the clone instead, so option two's MayAbility is never clicked
+//(its own mClone stays NULL), MayAbility::testDestroy then reaps it as an
+//unanswered may, and the reveal has no reachable outcome left (measured, w58G
+//fixture: wait == abilityFirst->mClone, on the layer, while abilitySecond's
+//clone stayed NULL and the reveal ran to the stall guard). A HUMAN never sees
+//this because the decline path hands the game an extra Update tick before the
+//build; the AI path skips that tick.
+//True while option one's fired clone is still in the action layer.
+bool MTGRevealingCards::optionOneCloneArmed()
+{
+    MayAbility * may = dynamic_cast<MayAbility *>(abilityFirst);
+    if (!may || !may->mClone)
+        return false;
+    return observer->mLayers->actionLayer()->getIndexOf(may->mClone) != -1;
+}
+
+//#W60-P (B14): build option two - or DEFER it for a tick while option one's
+//clone still holds the layer. The deferral is taken ONLY on the async-drive
+//path, whose driver re-issues the build from phase 3; nothing else would come
+//back for it, so the human and heuristic paths keep their exact old timing.
+//Nothing is capped and no window is removed: option two is built by the same
+//call one or two ticks later, and a clone that never leaves is still answerable
+//to the stall guard.
+bool MTGRevealingCards::buildOptionTwo()
+{
+    if (abilitySecond || !zone || !zone->cards.size())
+        return false; //nothing left to give option two (or it already exists)
+    Player * ctrl = source ? source->controller() : NULL;
+    bool asyncDrive = (ctrl && ctrl->isInteractiveAI()) || revealTestAsyncActive(game);
+    if (asyncDrive && optionOneCloneArmed())
+    {
+        mAIOptionTwoDeferred = true;
+        REVEAL_DBG("option two DEFERRED: option one's clone still holds the action layer");
+        return false;
+    }
+    mAIOptionTwoDeferred = false;
+    repeat = false;
+    abilitySecond = contructAbility(abilityTwo);
+    game->addObserver(abilitySecond);
+    fireOneShot(abilitySecond);
+    return true;
+}
+
+//#W60-P (B14b): is an interactive reveal from `card` being driven RIGHT NOW by
+//this engine's own async reveal driver? A seat's generic action pass must not
+//spend that reveal's target chooser: with the model call in flight the seat's
+//chooseTarget committed option one ("Get a human") on a decision the model then
+//DECLINED (measured, revealasyncticks 2: library 6 / hand 1, deterministic).
+//The driver clicks its own picks through observer->cardClick, so it is not
+//gated by this. Deliberately a live scan of the action layer rather than a
+//stamp: MTGRevealingCards is itself an ActionElement, so its presence there IS
+//its lifetime and no ownership flag can go stale behind it.
+bool MTGRevealingCards::drivingFor(GameObserver * g, MTGCardInstance * card)
+{
+    if (!g || !card || !g->mLayers)
+        return false;
+    ActionLayer * al = g->mLayers->actionLayer();
+    if (!al)
+        return false;
+    for (size_t i = 0; i < al->mObjects.size(); i++)
+    {
+        MTGRevealingCards * r = dynamic_cast<MTGRevealingCards *>((ActionElement *) al->mObjects[i]);
+        if (!r || r->source != card || r->mAIDriveDone || !r->revealDisplay)
+            continue;
+        Player * ctrl = r->source ? r->source->controller() : NULL;
+        if ((ctrl && ctrl->isInteractiveAI()) || revealTestAsyncActive(g))
+            return true;
+    }
+    return false;
 }
 
 void MTGRevealingCards::driveInteractiveReveal()
@@ -1246,6 +1316,16 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         }
         if (!abilitySecond)
         {
+            //#W60-P (B14): the decline/accept already ran and only the BUILD was
+            //deferred - re-issuing it through CheckUserInput would click the
+            //source again and re-fire option one. Retry the build itself.
+            if (mAIOptionTwoDeferred)
+            {
+                REVEAL_DBG("phase3: retrying the deferred option-two build (zone="
+                           << zone->nb_cards << ")");
+                buildOptionTwo();
+                return;
+            }
             REVEAL_DBG("phase3: building option two (zone=" << zone->nb_cards << ")");
             CheckUserInput(JGE_BTN_NEXT); //build option two; re-enter until armed
             return;

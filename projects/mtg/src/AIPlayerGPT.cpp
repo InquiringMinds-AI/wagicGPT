@@ -15393,12 +15393,96 @@ static bool crackBackBodyUntaps(bool tapped, bool doesNotUntap, bool shackler, b
     return !doesNotUntap && !shackler && !frozen;
 }
 
+//#W60-P (B9, wave-59 deck152 HIGH-2): a creature the SEAT controls can be
+//holding one of THEIRS in exile "until this creature leaves the battlefield"
+//(Brutal Cathar's `(blink)forsrc`). The engine keeps that as a live ABlink on
+//the action layer whose `source` is the exiler and whose `Blinked` is the
+//hostage - and nothing in the render ever read it. `152v146` s35: the seat
+//chump-blocked with Brutal Cathar under a printed `you would be at 6`, the
+//block returned the Nadaar, Selfless Paladin (4/4) the Cathar had exiled, and
+//s43's crack-back then counted four attackers for 14 - Nadaar among them - for
+//the game. The board said "1 fewer blocker"; it never said "and a 4/4 of theirs
+//comes back". Collects the hostages `card` is holding RIGHT NOW (still in
+//exile; once one is back there is nothing to say).
+static void exileHostagesOf(MTGCardInstance * card, vector<MTGCardInstance *> & out)
+{
+    if (!card)
+        return;
+    GameObserver * g = card->getObserver();
+    if (!g || !g->mLayers)
+        return;
+    ActionLayer * al = g->mLayers->actionLayer();
+    if (!al)
+        return;
+    for (size_t i = 0; i < al->mObjects.size(); i++)
+    {
+        ABlink * b = dynamic_cast<ABlink *>((ActionElement *) al->mObjects[i]);
+        if (!b || !b->blinkForSource || b->source != card)
+            continue;
+        MTGCardInstance * held = b->Blinked;
+        if (!held || !held->blinked || !held->owner || !held->owner->game)
+            continue;
+        if (held->currentZone != held->owner->game->exile)
+            continue; //already back on the battlefield - no claim to make
+        out.push_back(held);
+    }
+}
+
+//How one hostage reads on a row. Possession follows the OWNER, because that is
+//the side ABlink::returnCardIntoPlay puts it back on.
+static string exileHostageDescriptor(MTGCardInstance * held, Player * me)
+{
+    if (!held)
+        return "";
+    std::ostringstream o;
+    o << ((me && held->owner == me) ? "your " : "their ") << held->getDisplayName()
+      << " (" << held->power << "/" << held->toughness << ")";
+    return o.str();
+}
+
+//The row clause. Condition FIRST (the annotation-wording rule: a reader must
+//not be able to latch an affirmative substring), then what comes back and to
+//whose side. Pure over the descriptors so PARSETEST pins the wording with no
+//board.
+static string exileHostageRowTag(const vector<string> & held)
+{
+    if (held.empty())
+        return "";
+    std::ostringstream o;
+    o << " {if this leaves the battlefield: ";
+    for (size_t i = 0; i < held.size(); i++)
+    {
+        if (i)
+            o << ", ";
+        o << held[i];
+    }
+    o << (held.size() == 1 ? " comes" : " come") << " back from exile}";
+    return o.str();
+}
+
+//#W60-P (B9): the crack-back's CONDITIONAL half. A hostage is not on the
+//battlefield, so it is not in the unconditional count the line above states -
+//folding it in there would be a claim about a board that does not exist yet.
+//It rides its own clause with its own condition, so the total stays true and
+//the number the seat is one block away from is still on the page. Pure.
+static string crackBackExileReturnClause(int count, int power)
+{
+    if (count <= 0 || power <= 0)
+        return "";
+    std::ostringstream o;
+    o << " - and " << count << " more of theirs (" << power << " power) comes back from"
+         " exile as soon as the creature holding " << (count == 1 ? "it" : "them")
+      << " leaves the battlefield";
+    return o.str();
+}
+
 //The line itself. Same claim shape as D9's forecast and the same under-claim
 //rule: an upper bound over the bodies that will be able to attack, with no
 //trample carry-over claim and no blocker assigned - the seat's own blocks are
 //not priced here, because on this turn the seat has not yet decided which of
 //its bodies will still be untapped. Pure over the counts.
-static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife)
+static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife,
+                                    int exileReturnCount = 0, int exileReturnPower = 0)
 {
     if (ableAttackers <= 0 || maxDamage <= 0)
         return "";
@@ -15408,6 +15492,7 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
       << " - you would be at " << (myLife - maxDamage);
     if (myLife - maxDamage <= 0)
         o << "; that would KILL you";
+    o << crackBackExileReturnClause(exileReturnCount, exileReturnPower); //#W60-P (B9)
     return o.str();
 }
 
@@ -16011,6 +16096,24 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //#W59-J (K8): the crack-back half, counted in the same walk.
             const bool crackBackSeat = (activeSeat == this);
             int nextTurnAttackers = 0, nextTurnDamage = 0;
+            //#W60-P (B9): what THEY get back if one of the seat's own exilers
+            //leaves the battlefield. Counted off the SEAT's battlefield - the
+            //exilers are ours and the hostages are in exile, so they appear in
+            //no board walk at all - and kept in its own conditional clause.
+            int exileReturnCount = 0, exileReturnPower = 0;
+            if (crackBackSeat)
+                for (int mi = 0; mi < game->inPlay->nb_cards; mi++)
+                {
+                    vector<MTGCardInstance *> heldHere;
+                    exileHostagesOf(game->inPlay->cards[mi], heldHere);
+                    for (size_t hi = 0; hi < heldHere.size(); hi++)
+                    {
+                        if (!heldHere[hi]->isCreature() || heldHere[hi]->owner == this)
+                            continue;
+                        exileReturnCount++;
+                        exileReturnPower += heldHere[hi]->power > 0 ? heldHere[hi]->power : 0;
+                    }
+                }
             int inAttackers = 0, inDamage = 0, inUnblockable = 0, inUnblockableDmg = 0;
             int ableAttackers = 0, ableDamage = 0;
             vector<int> faceDamage; //#W57-B (D24): per declared attacker, face damage
@@ -16145,7 +16248,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //forms above - those require the opponent to be the active seat -
             //so this adds a line, replaces none.
             if (crackBackNextTurnDue(crackBackSeat, gp, nextTurnAttackers, nextTurnDamage))
-                out << "\n" << crackBackNextTurnLine(nextTurnAttackers, nextTurnDamage, life);
+                out << "\n" << crackBackNextTurnLine(nextTurnAttackers, nextTurnDamage, life,
+                                                     exileReturnCount, exileReturnPower);
         }
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
@@ -30091,6 +30195,17 @@ int AIPlayerGPT::chooseAttackers()
         }
         if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
             ln << kLifeLoopAttackerRowTag;
+        //#W60-P (B9): an attacker holding one of theirs in exile can die in
+        //this combat and hand it straight back. Same fact the blocker rows
+        //carry, on the window where the seat chooses to expose the body.
+        {
+            vector<MTGCardInstance *> heldA;
+            exileHostagesOf(attackers[j], heldA);
+            vector<string> heldDesc;
+            for (size_t hi = 0; hi < heldA.size(); hi++)
+                heldDesc.push_back(exileHostageDescriptor(heldA[hi], this));
+            ln << exileHostageRowTag(heldDesc);
+        }
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
@@ -30892,6 +31007,17 @@ int AIPlayerGPT::chooseBlockers()
         }
         if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
             ln << kLifeLoopAttackerRowTag;
+        //#W60-P (B9): an attacker holding one of theirs in exile can die in
+        //this combat and hand it straight back. Same fact the blocker rows
+        //carry, on the window where the seat chooses to expose the body.
+        {
+            vector<MTGCardInstance *> heldA;
+            exileHostagesOf(attackers[j], heldA);
+            vector<string> heldDesc;
+            for (size_t hi = 0; hi < heldA.size(); hi++)
+                heldDesc.push_back(exileHostageDescriptor(heldA[hi], this));
+            ln << exileHostageRowTag(heldDesc);
+        }
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
@@ -31080,6 +31206,18 @@ int AIPlayerGPT::chooseBlockers()
             ln << renderMayBlockList(mbLabels, mbParens, &mbRange);
             if (mbRange)
                 anyMayBlockRange = true;
+        }
+        //#W60-P (B9): the fact the `152v146` s35 chump had no way to know -
+        //this body is holding one of theirs in exile, and losing it here gives
+        //it back. A ROW-level clause, not a per-attacker one: the return does
+        //not depend on which attacker it blocks.
+        {
+            vector<MTGCardInstance *> heldB;
+            exileHostagesOf(blockers[i], heldB);
+            vector<string> heldDesc;
+            for (size_t hi = 0; hi < heldB.size(); hi++)
+                heldDesc.push_back(exileHostageDescriptor(heldB[hi], this));
+            ln << exileHostageRowTag(heldDesc);
         }
         rowName.push_back(blockers[i]->name);
         rowHandle.push_back(instanceHandle(blockers[i]));
@@ -49636,6 +49774,95 @@ static const char * kW50Y_r94 =
               " index outside this menu is refused");
         CHECK(!repeatAskAnswerStands("", "", "p", "p", 25, 25, 1, 2),
               "#W59-J K10 NEGATIVE nothing latched, nothing re-served");
+    }
+
+
+    // ==================== #W60-P (B9): the exile hostage the render withheld ====================
+    cout << "\n[#W60-P] B9 a creature held in exile 'until this leaves the battlefield'"
+            " is named on the row that would hand it back, and priced conditionally\n";
+    {
+        // `152v146` s35 verbatim shape: Brutal Cathar (2/2) chump-blocking while
+        // holding Nadaar, Selfless Paladin (4/4) in exile.
+        vector<string> one;
+        one.push_back("their Nadaar, Selfless Paladin (4/4)");
+        const string tag = exileHostageRowTag(one);
+        CHECK(tag == " {if this leaves the battlefield: their Nadaar, Selfless Paladin (4/4)"
+                     " comes back from exile}",
+              "#W60-P B9 the row clause names the hostage, its body, and the condition");
+        CHECK(tag.compare(0, 32, " {if this leaves the battlefield") == 0,
+              "#W60-P B9 the condition is FIRST - no affirmative substring to latch before it");
+        // NEGATIVE: no hostage, no clause. A row must not gain an empty brace.
+        CHECK(exileHostageRowTag(vector<string>()).empty(),
+              "#W60-P B9 NEGATIVE a creature holding nothing prints no clause at all");
+        // NEGATIVE: the clause never claims the body is on the battlefield now,
+        // and never claims the exiler dies.
+        CHECK(tag.find("returns to the battlefield") == string::npos
+              && tag.find("if this dies") == string::npos
+              && tag.find("will attack") == string::npos,
+              "#W60-P B9 NEGATIVE the clause claims a RETURN on a condition, not a death and not"
+              " an attack - a bounced or sacrificed exiler hands it back the same way");
+        // Two hostages agree with their own verb.
+        vector<string> two(one);
+        two.push_back("their Grizzly Bears (2/2)");
+        CHECK(exileHostageRowTag(two)
+              == " {if this leaves the battlefield: their Nadaar, Selfless Paladin (4/4),"
+                 " their Grizzly Bears (2/2) come back from exile}",
+              "#W60-P B9 two hostages are listed on one clause, with the plural verb");
+        // ---- the crack-back's conditional half ----
+        // s43 verbatim numbers: 4 attackers for 14 at 10 life. Before the block,
+        // the same board was 3 for 10 with a 4/4 in exile.
+        const string cb = crackBackNextTurnLine(3, 10, 10, 1, 4);
+        CHECK(cb.find("CRACK-BACK NEXT TURN: 3 of their creatures will be able to attack"
+                      " (tapped ones untap first), for up to 10 - you would be at 0;"
+                      " that would KILL you") == 0,
+              "#W60-P B9 the unconditional total is untouched - the hostage is NOT folded into it");
+        CHECK(cb.find(" - and 1 more of theirs (4 power) comes back from exile as soon as the"
+                      " creature holding it leaves the battlefield") != string::npos,
+              "#W60-P B9 the hostage rides its own clause, with its own condition");
+        CHECK(crackBackNextTurnLine(3, 10, 10) == crackBackNextTurnLine(3, 10, 10, 0, 0),
+              "#W60-P B9 REGRESSION a board with no hostage renders byte-identically to the"
+              " wave-59 line");
+        CHECK(crackBackNextTurnLine(3, 10, 10, 1, 0) == crackBackNextTurnLine(3, 10, 10)
+              && crackBackNextTurnLine(3, 10, 10, 0, 4) == crackBackNextTurnLine(3, 10, 10),
+              "#W60-P B9 NEGATIVE a 0-power hostage and a 0-count claim print nothing");
+        CHECK(crackBackNextTurnLine(3, 10, 10, 2, 7)
+                  .find(" - and 2 more of theirs (7 power) comes back from exile as soon as the"
+                        " creature holding them leaves the battlefield") != string::npos,
+              "#W60-P B9 the plural condition agrees with the count");
+        CHECK(crackBackExileReturnClause(1, 4).find("you would be at") == string::npos,
+              "#W60-P B9 NEGATIVE the conditional clause never restates a life total the"
+              " unconditional half already stated for a different board");
+        // ---- ECHO shape: a reply that echoes the annotated row still binds ----
+        {
+            vector<bool> send;
+            int r = parseAttackerSet(string("ATTACK: A1 ") + tag, 1, send, NULL);
+            CHECK(r >= 0 && send.size() == 1 && send[0],
+                  "#W60-P B9 echo: an ATTACK line trailing the hostage clause still binds A1");
+        }
+        {
+            vector<int> outB;
+            int pairs = parseBlockAssignments(string("B1:A1") + tag, 1, 1, outB);
+            //`out` carries the 1-based attacker label, 0 for an unassigned blocker.
+            CHECK(pairs == 1 && outB.size() == 1 && outB[0] == 1,
+                  "#W60-P B9 echo: a BLOCK reply trailing the hostage clause still binds B1 to A1");
+            //And the clause is no harder on the parser than the clause already
+            //shipping beside it on the same row.
+            vector<int> oX;
+            const int pX = parseBlockAssignments(string("B1:A1 {")
+                                                 + afterCombatBlockerCostText(2) + "}", 1, 1, oX);
+            CHECK(pX == pairs && oX == outB,
+                  "#W60-P B9 echo: the hostage clause parses exactly as the wave-56 block-cost"
+                  " clause it renders beside");
+        }
+        {
+            // The clause carries digits (the P/T and the power); a blocker reply
+            // that echoes it must not read them as labels.
+            vector<int> outB;
+            parseBlockAssignments(string("B1:none") + tag, 1, 1, outB);
+            CHECK(outB.size() == 1 && outB[0] <= 0,
+                  "#W60-P B9 NEGATIVE echo: the (4/4) inside the clause is not read as an"
+                  " assignment - a declined block stays declined");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

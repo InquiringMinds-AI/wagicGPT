@@ -114,6 +114,9 @@ public:
     int mAITestTicks;                      //TESTSUITE-only: in-flight tick counter
                                            //for the forced-async reveal repro hook
     bool mAISecondRebuilt;                 //W54-X: option two has been rebuilt once
+    bool mAIOptionTwoDeferred;             //#W60-P (B14): option two's build is
+                                           //waiting for option one's fired clone
+                                           //to leave the action layer
                                            //after its window was consumed early
     //#W54-F (D7a): STALL GUARD. An open reveal display holds every phase-advance
     //path, so a driver phase that can never make progress freezes the whole game
@@ -147,6 +150,14 @@ public:
     void driveInteractiveRevealStep();     //the state machine itself
     size_t revealProgressSignature(bool withPolls); //what "progress" means, in one value
     void forceCloseStalledReveal(const char * why);
+    //#W60-P (B14): option one is a MayAbility; its CLONE is what arms the
+    //reveal's chooser and claims menus built on this source. Option two must
+    //not be built while that clone is still in the action layer.
+    bool optionOneCloneArmed();
+    bool buildOptionTwo();
+    //#W60-P (B14b): true while an async reveal driver from `card` is live -
+    //a seat's generic action pass must leave that reveal's chooser alone.
+    static bool drivingFor(GameObserver * g, MTGCardInstance * card);
     TargetChooser * ownChooser();          //the current chooser iff it is THIS reveal's
     //Input arming. False from the moment the display opens until it has been
     //through one full Render, so no button can answer a display the player has
