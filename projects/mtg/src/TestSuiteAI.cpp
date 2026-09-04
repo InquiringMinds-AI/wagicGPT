@@ -15,6 +15,7 @@
 #include "MTGDeck.h"
 #include "AIPlayerBaka.h"
 #include "AIPlayerGPT.h" //W40 #3: counterMarkerMatches + zoneChangeNarration
+#include "DecisionContract.h"
 #include "WEvent.h"
 #include "Subtypes.h"
 #ifdef QT_CONFIG
@@ -1277,6 +1278,73 @@ int TestSuiteAI::Act(float)
                 std::cerr << "TESTSUITE assertabilitycount:   '" << gotTexts[i] << "'" << std::endl;
             suite->commandAssertFailures++;
         }
+        return 1;
+    }
+    else if (action.find("assertstalemenu ") == 0)
+    {
+        //#W58-F (F1): reproduce the action-layer compaction that left a
+        //SimpleMenu row holding an obsolete mObjects index. The removed row is
+        //deliberately the highest-index reacting ability, making the old
+        //DecisionManager lookup index exactly one past the compacted vector.
+        string cname = action.substr(16);
+        MTGCardInstance * card = getCard(cname);
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (!card)
+        {
+            std::cerr << "TESTSUITE assertstalemenu: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        al->setMenuObject(card);
+        //The row with the HIGHEST mObjects index is the one to remove: erasing
+        //it leaves the old id exactly one past the compacted vector, which is
+        //the F1 abort shape (index 175, size 175).
+        int staleSlot = -1;
+        int liveRows = 0;
+        for (size_t i = 0; i < al->abilitiesMenu->mObjects.size(); i++)
+        {
+            int slot = al->abilitiesMenu->mObjects[i]->GetId();
+            if (slot <= 0)
+                continue;
+            liveRows++;
+            if (slot > staleSlot)
+                staleSlot = slot;
+        }
+        if (staleSlot <= 0 || (size_t) staleSlot >= al->mObjects.size())
+        {
+            std::cerr << "TESTSUITE assertstalemenu: could not arm a real ability row for '"
+                      << cname << "' [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //Read the doomed row's label BEFORE it leaves the game.
+        string goneText = ((MTGAbility *) al->mObjects[staleSlot])->getMenuText();
+        al->moveToGarbage((ActionElement *) al->mObjects[staleSlot]);
+        DecisionRequest req;
+        bool built = DecisionManager::buildMenuChoice(this, req);
+        int expected = liveRows - 1;
+        bool ok = true;
+        if (expected == 0)
+            ok = !built; //nothing left to offer
+        else
+            ok = built && (int) req.optionTexts.size() == expected;
+        for (size_t i = 0; ok && i < req.optionTexts.size(); i++)
+            if (req.optionTexts[i] == goneText)
+                ok = false; //the removed ability must not still be offered
+        if (!ok)
+        {
+            std::cerr << "TESTSUITE assertstalemenu: expected " << expected
+                      << " live option(s) without '" << goneText << "', got "
+                      << (built ? (int) req.optionTexts.size() : -1)
+                      << " for '" << cname << "' [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        //Disarm the probe menu so the rest of the script runs normally.
+        al->menuObject = NULL;
+        al->currentActionCard = NULL;
+        al->menuObjectName.clear();
+        al->modal = 0;
         return 1;
     }
     else if (action.find("assertpt ") == 0)

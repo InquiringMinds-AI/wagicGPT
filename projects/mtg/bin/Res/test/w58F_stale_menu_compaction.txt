@@ -1,0 +1,16 @@
+#W58-F (F1): a menu row used to store only its ActionLayer::mObjects index. Removing
+# that ability while the menu remained armed compacted mObjects, leaving the
+# row's old index one past the vector and aborting DecisionManager's next poll.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[DO]
+assertstalemenu W58 Stale Menu Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[END]

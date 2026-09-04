@@ -1350,3 +1350,4 @@ w57V_block_first_strike_trade.txt
 w57V_block_double_strike_trade.txt
 w57V_block_deathtouch_blocker_kills.txt
 w57V_block_profitable_trade_control.txt
+w58F_stale_menu_compaction.txt

@@ -6381,3 +6381,14 @@ toughness=4
 auto={B}{B}{discard(*|myhand)}:name(Proliferate) notatarget(proliferation) proliferate
 text=Test-only comma-free stand-in for the proliferate half of Yawgmoth, Thran Physician ({B}{B}, Discard a card: Proliferate). The engine's suite zone lists are comma-separated, so the real card's name cannot be placed by a fixture.
 [/card]
+
+[card]
+id=2100000603
+name=W58 Stale Menu Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:name(First row) life:1 controller
+auto={0}:name(Last row) life:1 controller
+text=Test-only: exposes two activated rows for stale menu compaction.
+[/card]
