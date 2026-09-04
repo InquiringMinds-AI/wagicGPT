@@ -492,6 +492,132 @@ string boardEffectSnippet(const string& raw, size_t maxLen)
     return o.str();
 }
 
+//#W60-O (B8, wave-59 deck152 HIGH-1; 27 renders in six games, 60 corpus-wide).
+//The budget above protects the LAST clause and shares the rest evenly, so the
+//clause a row is ACTUALLY ACTIVATING is truncated exactly like any other.
+//Teferi, Who Slows the Sunset's +1 rendered "+1: Choose up to one target
+//artifact, up to one target creature, and..." every single time: the cut lands
+//one word before "Untap the chosen permanents you control. Tap the chosen
+//permanents you don't control.", which is the entire meaning of the ability
+//being activated. Nothing false is printed - the cut is visible - but the
+//operative sentence never is, and the seat wrote four consecutive plans
+//claiming the +1 would stop an attacker, then died to all four.
+//So when the row KNOWS which clause it activates (a loyalty ability's menu text
+//names itself with the same token its printed clause starts with: "+1:", "-2:",
+//"-7:"), that clause's allowance is spent FIRST and at the whole-tag budget,
+//exactly as `last` already is. The other clauses share what is left, the
+//omission stays COUNTED, and the printed clause ORDER is preserved. An empty
+//prefix - or one that matches no clause - returns boardEffectSnippet byte for
+//byte, so every other row in the corpus is untouched. Pure.
+const size_t kBoardEffectFocusFactor = 2;
+
+string clauseLeadTrim(const string& s)
+{
+    size_t bgn = s.find_first_not_of(" \t");
+    return (bgn == string::npos) ? string() : s.substr(bgn);
+}
+
+//A loyalty ability names itself in its menu text ("+1: Tap or untap
+//permanents"); the printed clause it belongs to starts with the same token.
+//Returns "+1:" / "-2:" / "0:", or "" for any label that is not that shape.
+string loyaltyClausePrefix(const string& menuText)
+{
+    size_t i = 0;
+    while (i < menuText.size() && (menuText[i] == ' ' || menuText[i] == '\t'))
+        i++;
+    size_t bgn = i;
+    if (i < menuText.size() && (menuText[i] == '+' || menuText[i] == '-'))
+        i++;
+    size_t d = i;
+    while (i < menuText.size() && isdigit((unsigned char) menuText[i]))
+        i++;
+    if (i == d || i >= menuText.size() || menuText[i] != ':')
+        return "";
+    return menuText.substr(bgn, i - bgn + 1);
+}
+
+string boardEffectSnippetFocus(const string& raw, size_t maxLen, const string& focusPrefix)
+{
+    if (focusPrefix.empty())
+        return boardEffectSnippet(raw, maxLen);
+    string flat = raw;
+    for (size_t i = 0; i < flat.size(); i++)
+        if (flat[i] == '\n')
+            flat[i] = ' ';
+    vector<string> parts;
+    {
+        const string sep = " -- ";
+        size_t at = 0;
+        for (;;)
+        {
+            size_t k = flat.find(sep, at);
+            if (k == string::npos)
+            {
+                parts.push_back(flat.substr(at));
+                break;
+            }
+            parts.push_back(flat.substr(at, k - at));
+            at = k + sep.size();
+        }
+    }
+    if (parts.size() < 2 || flat.size() <= maxLen)
+        return boardEffectSnippet(raw, maxLen);
+    size_t f = parts.size();
+    for (size_t i = 0; i < parts.size() && f == parts.size(); i++)
+    {
+        string lead = clauseLeadTrim(parts[i]);
+        if (lead.size() >= focusPrefix.size() && lead.compare(0, focusPrefix.size(), focusPrefix) == 0)
+            f = i;
+    }
+    if (f == parts.size())
+        return boardEffectSnippet(raw, maxLen);
+    vector<string> shownText(parts.size());
+    shownText[f] = textSnippetCore(parts[f], maxLen * kBoardEffectFocusFactor);
+    size_t budget = maxLen * kBoardEffectClauseFactor;
+    const size_t lastIdx = parts.size() - 1;
+    if (lastIdx != f)
+    {
+        shownText[lastIdx] = textSnippetCore(parts[lastIdx], maxLen);
+        budget = budget > shownText[lastIdx].size() ? budget - shownText[lastIdx].size() : 0;
+    }
+    size_t remaining = 0;
+    for (size_t i = 0; i < parts.size(); i++)
+        if (shownText[i].empty())
+            remaining++;
+    for (size_t i = 0; i < parts.size() && remaining; i++)
+    {
+        if (!shownText[i].empty())
+            continue;
+        if (budget < kBoardEffectClauseFloor)
+            break;
+        size_t per = budget / remaining;
+        if (per < kBoardEffectClauseFloor)
+            per = kBoardEffectClauseFloor;
+        shownText[i] = textSnippetCore(parts[i], per);
+        budget = budget > shownText[i].size() + 4 ? budget - shownText[i].size() - 4 : 0;
+        remaining--;
+    }
+    size_t skipped = 0;
+    for (size_t i = 0; i < parts.size(); i++)
+        if (shownText[i].empty())
+            skipped++;
+    std::ostringstream o;
+    bool marked = false;
+    int shown = 0;
+    for (size_t i = 0; i < parts.size(); i++)
+    {
+        if (!shownText[i].empty())
+            o << (shown++ ? " -- " : "") << shownText[i];
+        else if (!marked)
+        {
+            o << (shown++ ? " -- " : "") << "[" << skipped << " more clause"
+              << (skipped == 1 ? "" : "s") << " of this card's text not shown]";
+            marked = true;
+        }
+    }
+    return o.str();
+}
+
 //The emitted clause. `moreCopies` is true when this battlefield holds more than
 //one permanent of this name: the clause rides the FIRST copy only, and says so,
 //so a later untagged copy reads as "same card" and not as "this one is inert"
@@ -516,7 +642,8 @@ string boardEffectTag(const string& snippet, bool moreCopies)
 //while looking complete. Each face gets its own clause-aware budget, so no face
 //can be the one that falls off, and the omission inside a face stays COUNTED
 //("[N more clauses ... not shown]") rather than silent.
-string optionCardTextCore(const string& raw, size_t maxLen)
+string optionCardTextCore(const string& raw, size_t maxLen,
+                          const string& focusPrefix = "") //#W60-O (B8)
 {
     string flat = raw;
     for (size_t i = 0; i < flat.size(); i++)
@@ -539,7 +666,7 @@ string optionCardTextCore(const string& raw, size_t maxLen)
         }
     }
     if (faces.size() < 2)
-        return boardEffectSnippet(flat, maxLen); //one face: the clause budget alone
+        return boardEffectSnippetFocus(flat, maxLen, focusPrefix); //one face: the clause budget alone
     std::ostringstream o;
     int shown = 0;
     for (size_t i = 0; i < faces.size(); i++)
@@ -549,7 +676,7 @@ string optionCardTextCore(const string& raw, size_t maxLen)
         string one = (b == string::npos) ? string() : faces[i].substr(b, e - b + 1);
         if (one.empty())
             continue;
-        string face = boardEffectSnippet(one, maxLen);
+        string face = boardEffectSnippetFocus(one, maxLen, focusPrefix); //#W60-O (B8)
         //#W49-U D12 (wave-48 ledger, MED; 118 blocks ended on a bare `// <name>`).
         //A transforming/modal card's `text=` carries its BACK face as the bare
         //name after the `//` (the back face's own text lives on the transformed
@@ -564,7 +691,7 @@ string optionCardTextCore(const string& raw, size_t maxLen)
             face += " (text omitted)";
         o << (shown++ ? " // " : "") << face;
     }
-    return shown ? o.str() : boardEffectSnippet(flat, maxLen);
+    return shown ? o.str() : boardEffectSnippetFocus(flat, maxLen, focusPrefix);
 }
 
 
@@ -1353,6 +1480,11 @@ static string highestMvEdictClause(const vector<std::pair<string, int> >& theirs
 
 string instanceHandle(MTGCardInstance * card); //defined below (#N-166a)
 string keywordList(MTGCardInstance * card); //defined below - #W53-O (D13) victim facts
+//#W60-O (B7): the sweeper roster prints the same printed-P/T tail the board
+//snapshot does, from the same helper - defined below.
+static string printedPTTag(int power, int toughness, int basepower, int basetoughness,
+                           int origpower, int origtoughness, int showsOtherFace);
+static int cardShowsOtherFace(MTGCardInstance * card);
 //The live board behind the clause: the opponent's creatures and planeswalkers
 //with their mana values, handles included so tied copies stay distinct.
 static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string, int> >& out,
@@ -1440,8 +1572,58 @@ static bool edictVictimAlreadyOnStack(MTGCardInstance * card, const vector<MTGCa
 //now rides the header's own scope rule (boardCreatureCanAttackNow: live
 //predicate on the active player's board, static restrictions elsewhere) and
 //SAYS which scope it is, so the row's K and the header's K agree.
+//#W60-O (B7, wave-59 deck125 HIGH-2): the count was the whole clause. 180
+//`{right now: destroys/exiles N of their creature ...}` renders across the
+//wave-59 corpus, 0 of them naming a creature, while every Path to Exile row
+//already carries the `{removes: <name>}` roster removalVictimTag builds. The
+//deciding fact is the IDENTITY: deck125's own guide branches on "exactly 1
+//creature, and that creature is tagged [defender], or shows printed power 0 or
+//1", which needs a name and a printed P/T carried from the board list down to
+//the option row - and the seat failed to do that 5 times in one corpus (twice
+//consecutively in a game it lost by 4 life). So the sweeper row names what it
+//would take, on BOTH sides, in the same facts shape the board snapshot and the
+//edict clause use (display name + copy handle + live P/T + the `(printed X/Y)`
+//tail when they differ + the live keyword set). Same count, same scope wording,
+//same order: with both rosters empty the string is BYTE-IDENTICAL to before.
+static string sweeperVictimName(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    std::ostringstream o;
+    o << c->getDisplayName() << instanceHandle(c)
+      << " (" << c->power << "/" << c->toughness << ")"
+      << printedPTTag(c->power, c->toughness, c->basepower, c->basetoughness,
+                      c->origpower, c->origtoughness, cardShowsOtherFace(c));
+    string kw = keywordList(c);
+    if (!kw.empty())
+        o << " [" << kw << "]";
+    return o.str();
+}
+
+static string sweeperRosterTail(const std::vector<std::string>& theirNames,
+                                const std::vector<std::string>& myNames)
+{
+    if (theirNames.empty() && myNames.empty())
+        return "";
+    std::ostringstream o;
+    o << " - THEIRS: ";
+    if (theirNames.empty())
+        o << "none";
+    for (size_t i = 0; i < theirNames.size(); i++)
+        o << (i ? ", " : "") << theirNames[i];
+    if (!myNames.empty())
+    {
+        o << "; YOURS: ";
+        for (size_t i = 0; i < myNames.size(); i++)
+            o << (i ? ", " : "") << myNames[i];
+    }
+    return o.str();
+}
+
 static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine,
-                            bool liveScope = false)
+                            bool liveScope = false,
+                            const std::vector<std::string>& theirNames = std::vector<std::string>(),
+                            const std::vector<std::string>& myNames = std::vector<std::string>())
 {
     std::ostringstream o;
     o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s") << " (";
@@ -1452,6 +1634,7 @@ static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttac
         o << theirsAbleToAttack
           << (liveScope ? " able to attack right now" : " without a restriction against attacking");
     o << "), " << mine << " of yours";
+    o << sweeperRosterTail(theirNames, myNames); //#W60-O (B7)
     return o.str();
 }
 
@@ -1474,7 +1657,9 @@ static string attackPunisherClause(int theirsAbleToAttack)
 static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live); //defined below (#W47 R14a)
 
 static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & theirsAttack, int & mine,
-                                MTGCardInstance ** theirOnly, bool * liveScope = NULL)
+                                MTGCardInstance ** theirOnly, bool * liveScope = NULL,
+                                std::vector<std::string> * theirNames = NULL,
+                                std::vector<std::string> * myNames = NULL) //#W60-O (B7)
 {
     theirs = theirsAttack = mine = 0;
     if (theirOnly)
@@ -1496,12 +1681,18 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
         theirs++;
         if (theirOnly)
             *theirOnly = c;
+        if (theirNames) //#W60-O (B7)
+            theirNames->push_back(sweeperVictimName(c));
         if (boardCreatureCanAttackNow(c, live))
             theirsAttack++;
     }
     for (int i = 0; i < me->game->inPlay->nb_cards; i++)
         if (me->game->inPlay->cards[i] && me->game->inPlay->cards[i]->isCreature())
+        {
             mine++;
+            if (myNames) //#W60-O (B7)
+                myNames->push_back(sweeperVictimName(me->game->inPlay->cards[i]));
+        }
     return true;
 }
 
@@ -1604,7 +1795,11 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
     if (!edict && !sweepVerb && !attackPunisher)
         return "";
     bool live = false;
-    if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only, &live))
+    //#W60-O (B7): the sweeper branch names its victims; the edict and
+    //attack-punisher branches take the rosters they already did (none).
+    std::vector<std::string> theirNames, myNames;
+    if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only, &live,
+                             sweepVerb ? &theirNames : NULL, sweepVerb ? &myNames : NULL))
         return "";
     if (edict)
     {
@@ -1672,7 +1867,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
              + stackTail + selfClause;
     }
     if (sweepVerb)
-        return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live);
+        return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames);
     return attackPunisherClause(theirsAttack);
 }
 
@@ -4863,7 +5058,8 @@ string pileAwareCardText(MTGCardInstance * c, size_t maxLen)
 //The option/target emitters' text: mutate-pile aware (unchanged), and
 //clause/face-aware for every single card. Engine token bookkeeping still
 //renders nothing at all (isEngineTokenText).
-string optionCardText(MTGCardInstance * c, size_t maxLen)
+string optionCardText(MTGCardInstance * c, size_t maxLen,
+                      const string& focusPrefix = "") //#W60-O (B8)
 {
     if (!c)
         return "";
@@ -4876,7 +5072,7 @@ string optionCardText(MTGCardInstance * c, size_t maxLen)
     }
     if (isEngineTokenText(c->text))
         return "";
-    return optionCardTextCore(c->text, maxLen);
+    return optionCardTextCore(c->text, maxLen, focusPrefix);
 }
 
 //W41-8 (wave-40 seat125 §5.2): when exactly ONE target is legal the engine
@@ -20013,6 +20209,107 @@ static string removalVictimTag(const string& verb, const std::vector<std::string
     return o.str();
 }
 
+//#W60-O (B10, wave-59 deck152 HIGH-3, deck130 MED): the header for a FORCED
+//SACRIFICE of one of the deciding player's OWN creatures. `126` seq 34 rendered
+//Tribute to Hunger as a generic `TARGET CHOICE for Tribute to Hunger - its
+//"gain life equal to its toughness" ability ... Pick the ONE target it will
+//affect`, over seven rows carrying a P/T and nothing else. The primitive
+//(mtg.txt Tribute to Hunger: `notaTarget(creature|mybattlefield) ...
+//toughnesslifegain targetopponent ... sacrifice`) and Scryfall's Oracle
+//("Target opponent sacrifices a creature of their choice. You gain life equal
+//to that creature's toughness.") agree on both halves the ask did not say: the
+//creatures on the list are the seat's OWN and it is DESTROYING one of them, and
+//the other player is paid that creature's TOUGHNESS. The generic wording
+//("pick the target it will affect") inverts the value ordering, and the seat
+//picked its 7/7 while writing "denying them life gain". Pure.
+static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent, int gain)
+{
+    std::ostringstream q;
+    q << "FORCED SACRIFICE OF ONE OF YOUR OWN CREATURES: ";
+    if (byOpponent)
+        q << "the opponent's effect (" << effectName << ") forces YOU to sacrifice";
+    else
+        q << "your own effect (" << effectName << ") makes you sacrifice";
+    q << " a creature YOU control. Every row below is a creature you will LOSE off"
+         " the battlefield - it is NOT a target you attack or affect, and there is"
+         " no decline: one of them dies whichever row you pick.";
+    if (gain == 1)
+        q << " THE PRICE: the OPPONENT gains life equal to the sacrificed creature's"
+             " TOUGHNESS, so a high-toughness body pays them twice - each row states"
+             " what it would give them.";
+    else if (gain == 2)
+        q << " THE PRICE: YOU gain life equal to the sacrificed creature's TOUGHNESS -"
+             " each row states what it would give you.";
+    q << " Pick the creature you can best AFFORD TO LOSE (usually your least useful"
+         " body, and - where the rows differ - the one that pays the least), and"
+         " answer with the chosen creature's name.";
+    return q.str();
+}
+
+//The per-row price. `gain` 0 names no beneficiary (the script did not say who),
+//1 the other player, 2 the deciding seat. Pure.
+static string forcedSacrificeRowTag(int gain, int toughness)
+{
+    std::ostringstream o;
+    o << " [you SACRIFICE this";
+    if (gain == 1)
+        o << "; they gain " << toughness << " life (its toughness)";
+    else if (gain == 2)
+        o << "; you gain " << toughness << " life (its toughness)";
+    o << "]";
+    return o.str();
+}
+
+//#W60-O (B12, wave-59 deck146 HIGH-2; 11 of 11 venture asks, second wave in a
+//row): the venture ask named no source, and on Acererak the Archlich the source
+//IS the decision. Its primitive (borderline.txt: `if type(Tomb of
+//Annihilation[dungeoncompleted]|myzones)~equalto~0 then ... moveTo(hand)`) and
+//its verbatim Oracle text ("When Acererak the Archlich enters, if you have not
+//completed the dungeon Tomb of Annihilation, return Acererak the Archlich to
+//its owner's hand and venture into the dungeon.") condition on ONE named
+//dungeon; the seat answered Lost Mine and Acererak bounced on every cast for
+//the rest of the game. Pull the SENTENCE of the source's own printed text that
+//names the dungeon, so the row carries the clause rather than a claim this code
+//invented. Bounded and single-line.
+static string sentenceNaming(const string& text, const string& needle, size_t maxLen)
+{
+    if (needle.empty())
+        return "";
+    string flat = text;
+    for (size_t i = 0; i < flat.size(); i++)
+        if (flat[i] == '\n' || flat[i] == '\r')
+            flat[i] = ' ';
+    size_t at = flat.find(needle);
+    if (at == string::npos)
+        return "";
+    size_t bgn = 0;
+    for (size_t k = 0; k + 1 < at; k++)
+        if ((flat[k] == '.' && flat[k + 1] == ' ') || (flat.compare(k, 4, " -- ") == 0))
+            bgn = (flat[k] == '.') ? k + 2 : k + 4;
+    size_t end = flat.size();
+    for (size_t k = at + needle.size(); k + 1 < flat.size(); k++)
+        if (flat[k] == '.' && flat[k + 1] == ' ')
+        {
+            end = k + 1;
+            break;
+        }
+        else if (flat.compare(k, 4, " -- ") == 0)
+        {
+            end = k;
+            break;
+        }
+    if (end <= bgn)
+        return "";
+    return textSnippetCore(flat.substr(bgn, end - bgn), maxLen);
+}
+
+static string ventureSourceDungeonTag(const string& sourceName, const string& sentence)
+{
+    if (sourceName.empty() || sentence.empty())
+        return "";
+    return " [" + sourceName + "'s own text names THIS dungeon: \"" + sentence + "\"]";
+}
+
 //#W54-C (D5, wave-53 ledger HIGH): all 28 `Cast Silverquill Command` rows in
 //the corpus printed the mana remainder and the card text and NOTHING about
 //which printed mode has a legal object right now; at s240 the reply asserted
@@ -20104,6 +20401,90 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
     }
     return out.size() >= 2;
 }
+//#W60-O (B8, wave-59 deck152 HIGH-1, the second half): the sub-menus Teferi's
+//+1 fans into ("Choose your land" / "Choose opponent land", and the same pair
+//for artifact and creature) reached the model as those bare labels. Which
+//branch UNTAPS and which TAPS is the entire content of the choice, and the
+//timing fact underneath it - a permanent tapped on your turn untaps in its
+//controller's own untap step, before they attack - is what the seat got wrong:
+//it wrote in four consecutive plans that tapping now "stops one of the 4
+//attackers", and died to all four. Read the branch off the SCRIPT the menu was
+//built from (`choice name(<label>) target(<type>|mybattlefield) untap _ choice
+//name(<label>) target(<type>|opponentbattlefield) tap`), never guessed from the
+//label's words; a label the script does not carry gets nothing. Pure over
+//(script, label) so the real primitive can be replayed in PARSETEST.
+string tapUntapBranchTag(const string& script, const string& optionLabel)
+{
+    if (optionLabel.empty())
+        return "";
+    const string low = toLowerCopy(script);
+    const string want = "name(" + toLowerCopy(optionLabel) + ")";
+    size_t at = low.find(want);
+    if (at == string::npos)
+        return "";
+    size_t bgn = at + want.size();
+    size_t end = low.find(" choice ", bgn);
+    if (end == string::npos)
+        end = low.size();
+    string seg = low.substr(bgn, end - bgn);
+    //the branch's own target spec: the type, and whose battlefield
+    size_t tp = seg.find("target(");
+    if (tp == string::npos)
+        return "";
+    size_t tclose = seg.find(')', tp + 7);
+    if (tclose == string::npos)
+        return "";
+    string spec = seg.substr(tp + 7, tclose - (tp + 7));
+    size_t gt = spec.rfind('>');
+    if (gt != string::npos)
+        spec = spec.substr(gt + 1);
+    size_t bar = spec.find('|');
+    string type = (bar == string::npos) ? spec : spec.substr(0, bar);
+    string zone = (bar == string::npos) ? string() : spec.substr(bar + 1);
+    if (type.empty() || zone.empty())
+        return "";
+    bool theirs = zone.find("opponentbattlefield") != string::npos;
+    bool mine = zone.find("mybattlefield") != string::npos;
+    if (theirs == mine)
+        return "";
+    //`untap` contains `tap`: decide untap first, then look for a tap that is
+    //not part of an untap.
+    string scan = seg;
+    bool untaps = scan.find("untap") != string::npos;
+    for (size_t k = scan.find("untap"); k != string::npos; k = scan.find("untap"))
+        scan.erase(k, 5);
+    bool taps = scan.find("tap") != string::npos;
+    if (!untaps && !taps)
+        return "";
+    std::ostringstream o;
+    o << " [";
+    if (untaps && mine)
+        o << "UNTAPS your " << type << " - it becomes usable again THIS turn (a"
+             " creature can block; a land or artifact can be tapped for its ability)."
+             " It is yours: this readies your own permanent, it takes nothing from them";
+    else if (untaps && theirs)
+        o << "UNTAPS their " << type << " - it becomes usable by THEM again; this"
+             " helps them, it does not deny them anything";
+    else if (taps && theirs)
+    {
+        o << "TAPS their " << type << " - ";
+        if (type.find("creature") != string::npos)
+            o << "a tapped creature CANNOT BLOCK, so this takes it out of blocking for"
+                 " the rest of THIS turn. But it UNTAPS in THEIR untap step at the start"
+                 " of their next turn, so it does NOT stop it from attacking you on"
+                 " their turn";
+        else
+            o << "it cannot be tapped again for the rest of THIS turn. But it UNTAPS in"
+                 " THEIR untap step at the start of their next turn, so it denies them"
+                 " nothing from their own turn onward";
+    }
+    else
+        o << "TAPS your own " << type << " - you lose its use for the rest of this turn;"
+             " it untaps in your own untap step";
+    o << "]";
+    return o.str();
+}
+
 //#W55-D (D22): the card-NAME menu's own header. `chooseaname` arrives at the
 //seat as a CHOOSE_MODE request (the engine builds it as a MenuAbility like any
 //modal), so nine corpus records rendered "Choose one mode for Silverquill
@@ -20783,7 +21164,12 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //W41-4: pile-aware (this emitter serves battlefield activations, where a
         //mutate pile is a legal source).
         //#W48 D5: clause/face-aware - this is an OPTION row.
-        string txt = optionCardText(src, 140);
+        //#W60-O (B8): this row activates ONE of the card's clauses - spend that
+        //clause's allowance first so the verbs the decision turns on cannot be
+        //the half that falls off the budget.
+        string txt = optionCardText(src, 140,
+                                    action.ability ? loyaltyClausePrefix(action.ability->getMenuText())
+                                                   : string());
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
         out << dynamicMagnitudes(src);
@@ -26839,6 +27225,10 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                         if (toLowerCopy(deadM[di]) == low)
                             shownModes[mi] += " {DEAD right now: no legal object for this mode}";
                 }
+            //#W60-O (B8): which branch taps what, and the untap-step timing.
+            if (ctx)
+                for (size_t mi = 0; mi < shownModes.size() && mi < req.optionTexts.size(); mi++)
+                    shownModes[mi] += tapUntapBranchTag(ctx->magicText, req.optionTexts[mi]);
         }
         string modeHeader;
         if (req.nameChoiceMenu)
@@ -28272,6 +28662,71 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             }
         }
 
+        //#W60-O (B10): the FORCED SACRIFICE shape. Independent of the
+        //forced-loss detection above, which reads the effect NAME and the
+        //ability's menu verb and never fired here (the waiting ability's label
+        //is the life-gain rider, not the sacrifice). Read it off the acting
+        //SCRIPT instead - a `sacrifice` over `notatarget(creature|mybattlefield)`
+        //- and require that every candidate really is one of THIS seat's own
+        //battlefield creatures, so nothing else can be re-framed. The
+        //beneficiary of a `toughnesslifegain` rider is taken from the script's
+        //own target word and left UNNAMED when it says neither (a silent
+        //omission beats a wrong claim about who is paid). Representation only:
+        //the offered set, its ORDER and the apply path are untouched.
+        bool forcedSacrifice = false;
+        bool sacByOpponent = true;
+        int sacGain = 0; //0 = beneficiary not named, 1 = the opponent, 2 = this seat
+        if (!forcedSelfLoss && !forcedSelfGain && !targets.empty())
+        {
+            vector<MTGCardInstance *> chain;
+            MTGCardInstance * sc = tc->source;
+            for (int d = 0; sc && d < 4; d++, sc = sc->storedSourceCard)
+                chain.push_back(sc);
+            MTGAbility * wsac = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+            sc = wsac ? wsac->source : NULL;
+            for (int d = 0; sc && d < 4; d++, sc = sc->storedSourceCard)
+                chain.push_back(sc);
+            string script;
+            for (size_t ci = 0; ci < chain.size() && script.empty(); ci++)
+            {
+                string low = toLowerCopy(chain[ci]->magicText);
+                if (low.find("sacrifice") != string::npos
+                    && low.find("notatarget(creature|mybattlefield)") != string::npos)
+                    script = low;
+            }
+            if (!script.empty())
+            {
+                bool allMineCreatures = true;
+                for (size_t ti = 0; ti < targets.size() && allMineCreatures; ti++)
+                {
+                    MTGCardInstance * mc = dynamic_cast<MTGCardInstance *>(targets[ti]);
+                    if (!mc || !mc->isCreature() || mc->controller() != this
+                        || !game || mc->currentZone != game->inPlay)
+                        allMineCreatures = false;
+                }
+                forcedSacrifice = allMineCreatures;
+                if (forcedSacrifice)
+                {
+                    if (script.find("toughnesslifegain targetopponent") != string::npos)
+                        sacGain = 1;
+                    else if (script.find("toughnesslifegain targetcontroller") != string::npos)
+                        sacGain = 2;
+                    //whose effect is forcing it: the first card in the chain
+                    //that names itself (the ability$! dummies are nameless).
+                    for (size_t ci = 0; ci < chain.size(); ci++)
+                        if (!chain[ci]->getDisplayName().empty())
+                        {
+                            sacByOpponent = chain[ci]->controller() != this;
+                            break;
+                        }
+                }
+            }
+        }
+        if (forcedSacrifice)
+            for (size_t ti = 0; ti < targets.size() && ti < opts.size(); ti++)
+                if (MTGCardInstance * vc = dynamic_cast<MTGCardInstance *>(targets[ti]))
+                    opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness);
+
         //#W54-D (D25, R185): the forced-loss list is ordered cheapest-first, so
         //the header's own advice ("usually your LEAST valuable: a spare land")
         //and the list agree. targets / opts / narrOpts stay index-parallel and
@@ -28314,6 +28769,41 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             MTGCardInstance * dc = dynamic_cast<MTGCardInstance *>(targets[i]);
             if (!dc || !dc->hasType(Subtypes::TYPE_DUNGEON))
                 dungeonSelect = false;
+        }
+        //#W60-O (B12): the source's own text, when it conditions on ONE of the
+        //dungeons on this menu by name, rides that dungeon's row. Read off the
+        //printed text of the card that is venturing (walked through the
+        //ability$! payload dummies the same way effectName is), never asserted
+        //from this code - if no offered dungeon appears in that text, no row
+        //moves. Append-only: the option ORDER, the answer index and the apply
+        //path are untouched.
+        if (dungeonSelect && !effectName.empty() && effectName != "this effect")
+        {
+            string srcText;
+            {
+                vector<MTGCardInstance *> chain;
+                MTGCardInstance * sc = tc->source;
+                for (int d = 0; sc && d < 4; d++, sc = sc->storedSourceCard)
+                    chain.push_back(sc);
+                MTGAbility * wv = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+                sc = wv ? wv->source : NULL;
+                for (int d = 0; sc && d < 4; d++, sc = sc->storedSourceCard)
+                    chain.push_back(sc);
+                for (size_t ci = 0; ci < chain.size(); ci++)
+                    if (chain[ci]->getDisplayName() == effectName && !chain[ci]->text.empty())
+                    {
+                        srcText = chain[ci]->text;
+                        break;
+                    }
+            }
+            if (!srcText.empty())
+                for (size_t i = 0; i < targets.size() && i < opts.size(); i++)
+                    if (MTGCardInstance * dc = dynamic_cast<MTGCardInstance *>(targets[i]))
+                    {
+                        string s = sentenceNaming(srcText, dc->getDisplayName(), 220);
+                        if (!s.empty())
+                            opts[i] += ventureSourceDungeonTag(effectName, s);
+                    }
         }
 
         //N-139a (wave-29 deck139): the mutate cast is a scrambled multi-ask
@@ -28379,9 +28869,18 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                          " was your stated intent.";
             }
         }
+        else if (forcedSacrifice)
+        {
+            q << buildForcedSacrificeAsk(effectName, sacByOpponent, sacGain);
+        }
         else if (dungeonSelect)
         {
-            q << "VENTURE - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon"
+            //#W60-O (B12): name the venturing SOURCE. Eleven of eleven venture
+            //asks across two waves rendered this header with no source at all.
+            q << "VENTURE";
+            if (!effectName.empty() && effectName != "this effect")
+                q << " with " << effectName;
+            q << " - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon"
                  " to venture into, NOT targeting a permanent). Each option below is a"
                  " dungeon; its tag shows the room count and the completion reward, and"
                  " its full room path follows. Weigh how many rooms to completion and"
@@ -51202,6 +51701,147 @@ static const char * kW50Y_r94 =
               " append-only semantics hold, the collapse only ever states a count that happened");
         CHECK(collapsedRunNarration("", 5, -1).empty(),
               "#W60-M B13b NEGATIVE nothing to collapse stays nothing");
+    }
+
+    //#W60-O (B7): the sweeper roster.
+    {
+        CHECK(sweeperClause("destroys", 1, 1, 0)
+                  == "destroys 1 of their creature (1 without a restriction against attacking), 0 of yours",
+              "#W60-O B7 with no roster the clause is BYTE-IDENTICAL to wave-59 (180 corpus rows)");
+        std::vector<std::string> theirs, mine;
+        theirs.push_back("Luminarch Aspirant (2/2) (printed 1/1)");
+        CHECK(sweeperClause("destroys", 1, 1, 0, false, theirs, mine)
+                  == "destroys 1 of their creature (1 without a restriction against attacking),"
+                     " 0 of yours - THEIRS: Luminarch Aspirant (2/2) (printed 1/1)",
+              "#W60-O B7 `152` seq18: the count row now names the creature and its printed P/T -"
+              " the two facts deck125's guide branches on");
+        mine.push_back("Bloodghast (2/1) [haste]");
+        theirs.push_back("Katilda, Dawnhart Prime (3/3) [flying]");
+        CHECK(sweeperClause("exiles", 2, 0, 1, true, theirs, mine)
+                  == "exiles 2 of their creatures (all of them carry a restriction against attacking),"
+                     " 1 of yours - THEIRS: Luminarch Aspirant (2/2) (printed 1/1), Katilda,"
+                     " Dawnhart Prime (3/3) [flying]; YOURS: Bloodghast (2/1) [haste]",
+              "#W60-O B7 both sides are named, in the order the board lists them");
+        CHECK(sweeperRosterTail(std::vector<std::string>(), std::vector<std::string>()).empty(),
+              "#W60-O B7 NEGATIVE an empty board adds no tail at all");
+        CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b} {right now: "
+                  + sweeperClause("destroys", 1, 1, 0, false, theirs, mine) + "}")
+                  == "Cast Damnation {2}{b}{b}",
+              "#W60-O B7 echo shape: the roster rides INSIDE the existing {right now: ...} brace"
+              " and the narration strip still removes the whole annotation");
+    }
+    //#W60-O (B8): the activated clause is the one that survives the budget.
+    {
+        const string teferi =
+            "+1: Choose up to one target artifact, up to one target creature, and up to one target"
+            " land. Untap the chosen permanents you control. Tap the chosen permanents you don't"
+            " control. You gain 2 life. -- -2: Look at the top three cards of your library. Put one"
+            " of them into your hand and the rest on the bottom of your library in any order."
+            " -- -7: You get an emblem with \"Untap all permanents you control during each"
+            " opponent's untap step\" and \"You draw a card during each opponent's draw step.\"";
+        const string w59 = boardEffectSnippet(teferi, 140);
+        CHECK(w59.find("Untap the chosen permanents you control") == string::npos,
+              "#W60-O B8 RED-on-base: wave-59's budget cuts Teferi's +1 before its verbs"
+              " (60 corpus renders)");
+        const string w60 = boardEffectSnippetFocus(teferi, 140, "+1:");
+        CHECK(w60.find("Untap the chosen permanents you control.") != string::npos
+              && w60.find("Tap the chosen permanents you don't control.") != string::npos,
+              "#W60-O B8 the activated clause prints its operative sentence in full");
+        CHECK(w60.compare(0, 3, "+1:") == 0 && w60.find(" -- -7: You get an emblem") != string::npos,
+              "#W60-O B8 printed clause ORDER is preserved and the ultimate is still protected");
+        CHECK(boardEffectSnippetFocus(teferi, 140, "") == w59
+              && boardEffectSnippetFocus(teferi, 140, "-9:") == w59,
+              "#W60-O B8 NEGATIVE no prefix, or a prefix no clause carries, is byte-identical"
+              " to boardEffectSnippet - every other row in the corpus is untouched");
+        CHECK(loyaltyClausePrefix("+1: Tap or untap permanents") == "+1:"
+              && loyaltyClausePrefix("-7: Get untap and draw emblem") == "-7:"
+              && loyaltyClausePrefix("0: Do a thing") == "0:",
+              "#W60-O B8 a loyalty label names its own clause");
+        CHECK(loyaltyClausePrefix("Put in Play").empty()
+              && loyaltyClausePrefix("Cycle").empty()
+              && loyaltyClausePrefix("+X: nope").empty(),
+              "#W60-O B8 NEGATIVE a non-loyalty label yields no prefix, so nothing re-budgets");
+    }
+    //#W60-O (B8): the tap/untap sub-menu branches. Script verbatim from
+    //planeswalkers.txt (Teferi, Who Slows the Sunset), Oracle-verified.
+    {
+        const string teferiScript =
+            "@counteradded(0/0.1.TeferiEffect) from(this) restriction{type(land|battlefield)~morethan~0}:"
+            "may name(Choose a land) ability$!name(Choose land) choice name(Choose your land)"
+            " target(land|myBattlefield) untap _ choice name(Choose opponent land)"
+            " target(land|opponentbattlefield) tap!$ controller";
+        const string yours = tapUntapBranchTag(teferiScript, "Choose your land");
+        const string theirs = tapUntapBranchTag(teferiScript, "Choose opponent land");
+        CHECK(yours.find("UNTAPS your land") != string::npos,
+              "#W60-O B8 the own-side branch says it UNTAPS, and whose permanent");
+        CHECK(theirs.find("TAPS their land") != string::npos
+              && theirs.find("UNTAPS in THEIR untap step") != string::npos,
+              "#W60-O B8 `146` s38-42: the opponent branch says it TAPS and states the untap-step"
+              " timing the seat got wrong four plans running");
+        const string creatureScript =
+            "ability$!name(Choose creature) choice name(Choose your creature)"
+            " target(creature|myBattlefield) untap _ choice name(Choose opponent creature)"
+            " target(creature|opponentbattlefield) tap!$ controller";
+        CHECK(tapUntapBranchTag(creatureScript, "Choose opponent creature")
+                  .find("a tapped creature CANNOT BLOCK") != string::npos,
+              "#W60-O B8 the creature branch states what tapping actually buys this turn");
+        CHECK(tapUntapBranchTag(teferiScript, "Choose your creature").empty()
+              && tapUntapBranchTag(teferiScript, "").empty()
+              && tapUntapBranchTag("", "Choose your land").empty(),
+              "#W60-O B8 NEGATIVE a label this script does not carry gets no tag - the branch is"
+              " read off the script, never guessed from the words");
+    }
+    //#W60-O (B10): the forced-sacrifice ask and its per-row price.
+    {
+        const string ask = buildForcedSacrificeAsk("Tribute to Hunger", true, 1);
+        CHECK(ask.compare(0, 45, "FORCED SACRIFICE OF ONE OF YOUR OWN CREATURES") == 0
+              && ask.find("the opponent's effect (Tribute to Hunger) forces YOU to sacrifice")
+                     != string::npos,
+              "#W60-O B10 `126` seq34: the ask is headed as the forced sacrifice it is, not as a"
+              " TARGET CHOICE for the life-gain rider");
+        CHECK(ask.find("the OPPONENT gains life equal to the sacrificed creature's TOUGHNESS")
+                  != string::npos,
+              "#W60-O B10 the Oracle's second sentence is on the header");
+        CHECK(buildForcedSacrificeAsk("Fleshbag Marauder", false, 0)
+                  .find("your own effect (Fleshbag Marauder) makes you sacrifice") != string::npos,
+              "#W60-O B10 a self-inflicted edict keeps the self framing and claims no beneficiary");
+        CHECK(forcedSacrificeRowTag(1, 7) == " [you SACRIFICE this; they gain 7 life (its toughness)]",
+              "#W60-O B10 the row states what THIS pick costs - the seat took its 7/7 while"
+              " writing \"denying them life gain\"");
+        CHECK(forcedSacrificeRowTag(2, 3) == " [you SACRIFICE this; you gain 3 life (its toughness)]"
+              && forcedSacrificeRowTag(0, 3) == " [you SACRIFICE this]",
+              "#W60-O B10 NEGATIVE with no beneficiary in the script the row names none");
+        CHECK(stripNarrationDecoration("Rorix Bladewing (6/5) [flying]" + forcedSacrificeRowTag(1, 5))
+                  == "Rorix Bladewing (6/5)",
+              "#W60-O B10 echo shape: the new bracket tail is decision-time guidance and never"
+              " reaches history (the W35 rule strips EVERY bracket)");
+    }
+    //#W60-O (B12): the venture ask names its source, and the source's own clause.
+    {
+        const string acererak =
+            "When Acererak the Archlich enters, if you have not completed the dungeon Tomb of"
+            " Annihilation, return Acererak the Archlich to its owner's hand and venture into the"
+            " dungeon. -- Whenever Acererak the Archlich attacks, for each opponent, you create a"
+            " 2/2 black Zombie creature token unless that player sacrifices a creature.";
+        const string s = sentenceNaming(acererak, "Tomb of Annihilation", 220);
+        CHECK(s.compare(0, 34, "When Acererak the Archlich enters,") == 0
+              && s.find("venture into the dungeon.") != string::npos
+              && s.find("Whenever Acererak the Archlich attacks") == string::npos,
+              "#W60-O B12 the clause pulled is the SENTENCE that names the dungeon, not the"
+              " card's whole text");
+        CHECK(sentenceNaming(acererak, "Lost Mine of Phandelver", 220).empty()
+              && sentenceNaming(acererak, "", 220).empty(),
+              "#W60-O B12 NEGATIVE a dungeon the source does not name gets no clause (10 of the"
+              " corpus's 11 venture asks had no such clause to print)");
+        CHECK(ventureSourceDungeonTag("Acererak the Archlich", s)
+                  == " [Acererak the Archlich's own text names THIS dungeon: \"" + s + "\"]",
+              "#W60-O B12 echo shape of the new bracketed annotation");
+        CHECK(ventureSourceDungeonTag("", s).empty() && ventureSourceDungeonTag("X", "").empty(),
+              "#W60-O B12 NEGATIVE nothing to name, nothing printed");
+        CHECK(stripNarrationDecoration("Tomb of Annihilation [dungeon]"
+                  + ventureSourceDungeonTag("Acererak the Archlich", s))
+                  == "Tomb of Annihilation",
+              "#W60-O B12 the tag strips off an anchored candidate like every other bracket tail");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
