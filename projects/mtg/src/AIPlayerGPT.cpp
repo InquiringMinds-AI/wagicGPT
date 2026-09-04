@@ -3479,8 +3479,9 @@ static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyM
                    " whose A-line states a two-or-more requirement this creature"
                    " alone does not block it at all, so it stops NOTHING there;"
                    " against the others it stops the blocked attacker's damage"
-                   " except what a trampler pushes through - each A-line above"
-                   " says how much]";
+                   " except what a trampler pushes through - this row's own"
+                   " \"may block\" note for that attacker says how much still"
+                   " tramples to your face]";
         return " [deals 0 - this block kills nothing, and against any attacker"
                " whose A-line states a two-or-more requirement this creature"
                " alone does not block it at all, so it stops NOTHING there;"
@@ -3498,9 +3499,19 @@ static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyM
         return " [deals 0 - this block kills nothing, but it STOPS all of the"
                " damage from whichever attacker it blocks THIS COMBAT - each"
                " A-line above says how much]";
+    //#W59-I (K5, wave-58 deck162 HIGH-2): the pointer named the wrong place.
+    //`162v152` seq 19: B2 read "... each A-line above says how much" while A2
+    //read only "Sigarda, Champion of Light (4/4) deals 4" - the trample-through
+    //amount ("2 tramples to your face") is on THIS row's own per-attacker
+    //may-block note, never on the A-line. The seat summed the A-lines, missed
+    //the 2, computed "I survive with 2 life" and died at 0. A pointer to a fact
+    //that is not where it says it is, at the seam that decided the game. The
+    //non-trample rungs keep "each A-line above": there the number IS the
+    //attacker's printed damage and the A-line does carry it.
     return " [deals 0 - this block kills nothing; it stops the blocked"
-           " attacker's damage except what a trampler pushes through -"
-           " each A-line above says how much]";
+           " attacker's damage except what a trampler pushes through - this"
+           " row's own \"may block\" note for that attacker says how much still"
+           " tramples to your face]";
 }
 
 //W39-UNREACHABLE (wave-39 ledger #6). The B-lines carry a POSITIVE "may block
@@ -15107,8 +15118,18 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
     //non-positive value is certain death. With a trampler or a menace attacker
     //in the total the number is a FLOOR on the damage that lands (their damage
     //is counted as landing and their would-be blockers stay free for the rest),
-    //so it is stated as a floor - "or better" - and claims no death it cannot
-    //prove. The old wording asserted an achievable assignment it did not have.
+    //so it is stated as a floor and claims no death it cannot prove. The old
+    //wording asserted an achievable assignment it did not have.
+    //#W59-I (K5, wave-58 deck162 HIGH-1): and then it inverted the floor. A
+    //floor on the DAMAGE is a CEILING on the LIFE, so `myLife - bestCaseDamage`
+    //printed with "or better" asserted the opposite of what it proves.
+    //`162v152` seq 19, turn 13, 18 life vs 5 attackers for 20: "at least 15 of
+    //that lands ... you would be at 3 or better" - the seat's actual legal
+    //block landed it at 0 and it died that combat, on a line that positively
+    //told it the floor was survivable. Two corrections, both pessimistic:
+    //the value is worded as the ceiling it is, and a non-positive ceiling is
+    //PROVEN death, so it carries the same `no block saves you` badge the exact
+    //branch has (a floor of D at life <= D means no assignment survives).
     if (haveBodies && bestCaseDamage >= 0)
     {
         if (bestCaseOptimal)
@@ -15119,9 +15140,14 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                 o << "; no block saves you";
         }
         else
+        {
             o << " - at least " << bestCaseDamage << " of that lands whatever you block"
                  " (trample/menace counted as unblocked): you would be at "
-              << (myLife - bestCaseDamage) << " or better";
+              << (myLife - bestCaseDamage)
+              << " AT BEST (no assignment of your blockers does better)";
+            if (myLife - bestCaseDamage <= 0)
+                o << "; no block saves you";
+        }
     }
     return o.str();
 }
@@ -16246,6 +16272,20 @@ static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
     s += ".";
     s += arrivalTag; //#W57-D (D26)
     return s;
+}
+
+//#W59-I (K7): the whole decorated land-drop ROW, so the front face's row and
+//the test that pins it are the same code. Pure over the engine's own label and
+//the face's facts; the label is kept in the head (mdfcRowHead) so the bare
+//token still binds an echo, and the tag is appended in the bracket channel
+//every other menu tail uses.
+static string mdfcLandFaceRow(const string& menuLabel, const string& faceName,
+                              const string& faceMana, const string& arrivalTag)
+{
+    if (faceName.empty())
+        return menuLabel;
+    return mdfcRowHead(faceName, menuLabel) + " ["
+         + mdfcLandPlayRowTag(faceName, faceMana, string(), arrivalTag).substr(4) + "]";
 }
 
 //#W49-U D6 (b): the cards an ACTIVATION draws for its controller, read off
@@ -26022,6 +26062,54 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                            " is where you cast, and it offers the other face as an"
                            " alternative-cost cast - you do not need this.]";
         }
+    //#W59-I (K7, wave-58 deck146 HIGH-2): the two land-drop rows on this one
+    //menu were rendered by different emitters, so the BACK face carried the
+    //full wave-57 treatment and the FRONT face rendered as a bare "Play Land".
+    //`146v123` seq 3, turn 1, verbatim:
+    //  1. Grimclimb Pathway [PLAY THIS AS A LAND: puts "Grimclimb Pathway" onto
+    //     the battlefield as a land (taps for {B}). ... USES YOUR LAND DROP ...]
+    //  2. Play Land
+    //  3. Decline - do nothing
+    //Row 2 IS Brightclimb Pathway, which taps for {W}: no name, no colour, no
+    //land-drop note, on a row taken 13 times across the corpus's 32 renders of
+    //it. A rendered row that names nothing is the silent-omission half of the
+    //trust doctrine - the model confabulates into the gap, and here the gap is
+    //WHICH LAND it is playing. Same emitter as the sibling row (mdfcRowHead +
+    //mdfcLandPlayRowTag + the D26 arrival clause), so the two halves of one
+    //menu cannot drift again. Facts are read off the card the row actually
+    //plays: the shown face by name, falling back to this hand card's own
+    //script. Append-only text - the engine's option vector, the answer INDEX
+    //and req.optionTexts (the staleness key) are untouched, and the "Play Land"
+    //token stays in the row head so a bare-token echo still binds.
+    //`curFace` is non-empty only on the land-face menu (landFaceMenu &&
+    //ctx->isLand()), which is this shape and no other.
+    if (!curFace.empty())
+        for (size_t i = 0; i < opts.size(); i++)
+        {
+            const string raw = (req.optionTexts.size() > i) ? req.optionTexts[i] : opts[i];
+            if (raw != "Play Land")
+                continue;
+            string faceMana = curMana, faceArrival;
+            int flife = 0;
+            MTGCard * fc = MTGCollection()->getCardByName(curFace, ctx->setId);
+            if (fc && fc->data && fc->data->isLand())
+            {
+                if (faceMana.empty())
+                    faceMana = landTapMana(fc->data->text);
+                faceArrival = mdfcLandArrivalTag(
+                    mdfcLandArrivalClass(fc->data->magicText, flife), flife);
+            }
+            else
+                faceArrival = mdfcLandArrivalTag(
+                    mdfcLandArrivalClass(ctx->magicText, flife), flife);
+            //Anything an earlier pass appended to this row is preserved: only
+            //the head is rewritten and the tag is appended after it.
+            const string extra = (opts[i].compare(0, raw.size(), raw) == 0)
+                                     ? opts[i].substr(raw.size()) : string();
+            opts[i] = mdfcLandFaceRow(raw, curFace, faceMana, faceArrival);
+            if (!extra.empty())
+                opts[i] += extra;
+        }
     //#W56-D (D8): the OTHER row on that same click menu - the `{0}` entry that
     //puts the card's LAND back face onto the battlefield. The engine labels it
     //with nothing but the back face's NAME, which reads like a card reference
@@ -31752,6 +31840,25 @@ string discardDeadTargetClause(int legalTargets)
 //verdict that states a real magnitude prints as `{right now: ...}`. rowSaysNoOp
 //is the engine's own zero-predicate, so the two surfaces cannot disagree about
 //what "dead" means. Pure over the rendered clause.
+//#W59-I (K4, wave-58 engine-seat HIGH-1): the rebadge folded the zero-predicate
+//over the WHOLE verdict string, which is not one statement but a LIST of
+//per-scope verdicts joined by `;`, each carrying its own parenthetical
+//qualifier. 11 of the corpus's 139 dead badges named a live kill:
+//`123v126` s12 badged Devour Flesh `{dead right now: they control 1 creature -
+//Overgrown Battlement (0/4) [defender] is sacrificed, they gain 4 - the
+//sacrificing player gains, not you; YOU control 0 creatures - targeting
+//yourself does nothing}` (the SELF scope's "does nothing" matched while the
+//OPPONENT scope named a body dying), and `123v130` s17/s18 badged Tragic Slip
+//whose operative `-1/-1` stands OUTSIDE the Morbid qualifier the predicate
+//matched. Both cards were verified against their primitives - the scripts are
+//right and the badge was the liar, at a discard where the seat is told the
+//removal it is about to pitch does nothing. Lane C's `verdictReadsZero` is the
+//per-scope fold the cast-menu header already uses; the two surfaces now apply
+//the same predicate to the same units. `rowSaysNoOp` is unchanged and nothing
+//is removed: a verdict that is not all-zero simply prints as `{right now: ...}`
+//instead of `{dead right now: ...}`. The clause carries a LEADING SPACE here
+//(it is appended to a row), which verdictReadsZero's anchor does not, so the
+//space is dropped before the fold.
 string discardBoardVerdictTag(const string& rightNowClause)
 {
     const string open = " {right now: ";
@@ -31761,7 +31868,8 @@ string discardBoardVerdictTag(const string& rightNowClause)
         || rightNowClause.compare(0, open.size(), open) != 0
         || rightNowClause[rightNowClause.size() - 1] != '}')
         return "";
-    if (!AIPlayerGPT::rowSaysNoOp(rightNowClause))
+    //#W59-I (K4): per SCOPE, not over the whole string.
+    if (!AIPlayerGPT::verdictReadsZero(rightNowClause.substr(1)))
         return rightNowClause;
     return " {dead right now: " + rightNowClause.substr(open.size());
 }
@@ -47032,10 +47140,12 @@ static const char * kW50Y_r94 =
                   " (#W58-B D7: a provably lethal maximum is now badged)");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
                   .find("- at least 13 of that lands whatever you block"
-                        " (trample/menace counted as unblocked): you would be at -5 or better")
+                        " (trample/menace counted as unblocked): you would be at -5 AT BEST"
+                        " (no assignment of your blockers does better); no block saves you")
                   != string::npos,
                   "#W57-B D24 with a trampler or a menace attacker in the total the claim drops to"
-                  " a FLOOR (#W58-B D7: it used to assert an assignment it did not have)");
+                  " a FLOOR (#W58-B D7: it used to assert an assignment it did not have;"
+                  " #W59-I K5: and the floor names a life CEILING, so -5 is a proven death)");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false).find("best case") == string::npos,
                   "#W57-B D24 NEGATIVE no optimality is claimed where the matching cannot prove it");
             CHECK(incomingCombatLine(3, 11, 10, false, 0, 0, 5, true)
@@ -48537,9 +48647,11 @@ static const char * kW50Y_r94 =
             CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
                                      assignableRemainderDamage(dmg, can, &prev), false)
                   .find("at least 6 of that lands whatever you block"
-                        " (trample/menace counted as unblocked): you would be at -1 or better")
+                        " (trample/menace counted as unblocked): you would be at -1 AT BEST"
+                        " (no assignment of your blockers does better); no block saves you")
                   != string::npos,
-                  "#W58-B D7 a seat at 5 life is no longer told a lethal board gets it to 1");
+                  "#W58-B D7 a seat at 5 life is no longer told a lethal board gets it to 1"
+                  " (#W59-I K5: and is now told the board is lethal at all)");
             CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
                                      assignableRemainderDamage(dmg, can, &prev), false)
                   .find("gets you to") == string::npos,
@@ -48572,9 +48684,17 @@ static const char * kW50Y_r94 =
             CHECK(incomingCombatLine(2, 6, 9, true, 0, 0, 4, true).find("no block saves you")
                   == string::npos,
                   "#W58-B D7 NEGATIVE no death claim while the proven maximum survives");
-            CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, false).find("no block saves you")
+            //#W59-I (K5) SUPERSEDES the wave-58 negative here: a floor of 4 at 4
+            //life proves that no assignment ends above 0, so the death IS
+            //provable and withholding it was the deck162 defect.
+            CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, false)
+                  .find("you would be at 0 AT BEST (no assignment of your blockers does better);"
+                        " no block saves you") != string::npos,
+                  "#W59-I K5 a damage FLOOR at or above the seat's life proves death, and the"
+                  " floor form now says so (was: the form claimed no death at all)");
+            CHECK(incomingCombatLine(2, 6, 9, true, 0, 0, 4, false).find("no block saves you")
                   == string::npos,
-                  "#W58-B D7 NEGATIVE the FLOOR form never claims a death it cannot prove");
+                  "#W59-I K5 NEGATIVE a survivable floor still claims no death");
             // The 32-a-side cap and the no-pairing case still yield no number.
             vector<vector<char> > none(2, vector<char>(2, 0));
             CHECK(assignableRemainderDamage(dmg, none, &allPrev) == -1,
@@ -48688,6 +48808,136 @@ static const char * kW50Y_r94 =
                   .find("dropping stale") == string::npos,
               "#W58-C D4 NEGATIVE the record token is not the stderr sentence - a corpus counting"
               " one never double-counts the other");
+    }
+
+    // ================= wave-59 lane I =================
+    cout << "\n[W59-I] K4 the cleanup-discard dead badge folds PER SCOPE\n";
+    {
+        // `123v126` seq 12, verbatim: the OPPONENT scope names a body dying,
+        // the SELF scope says "does nothing". The whole-string predicate
+        // matched the second and badged the row dead.
+        const string devour =
+            " {right now: they control 1 creature - Overgrown Battlement (0/4) [defender] is"
+            " sacrificed, they gain 4 - the sacrificing player gains, not you; YOU control 0"
+            " creatures - targeting yourself does nothing}";
+        CHECK(discardBoardVerdictTag(devour) == devour,
+              "#W59-I K4 Devour Flesh naming a real kill keeps the LIVE `{right now: ...}` tag");
+        CHECK(discardBoardVerdictTag(devour).find("dead right now") == string::npos,
+              "#W59-I K4 NEGATIVE and it is never badged dead");
+        // `123v130` seq 17/18: the operative -1/-1 stands outside the Morbid
+        // qualifier the old predicate matched.
+        const string slip = " {right now: -1/-1 (no creature has died this turn, so Morbid does"
+                            " NOT apply)}";
+        CHECK(discardBoardVerdictTag(slip) == slip,
+              "#W59-I K4 Tragic Slip's live -1/-1 survives its own parenthetical qualifier");
+        // POSITIVE: the all-zero verdicts still rebadge, byte for byte.
+        CHECK(discardBoardVerdictTag(" {right now: destroys 0 of their creatures"
+                                     " (0 without a restriction against attacking), 0 of yours}")
+              == " {dead right now: destroys 0 of their creatures"
+                 " (0 without a restriction against attacking), 0 of yours}",
+              "#W59-I K4 REGRESSION the Damnation/Supreme Verdict shape still rebadges dead");
+        CHECK(discardBoardVerdictTag(" {right now: they control 0 creatures - at 0 this does"
+                                     " nothing; YOU control 0 creatures - targeting yourself"
+                                     " does nothing}")
+                  .compare(0, strlen(" {dead right now: "), " {dead right now: ") == 0,
+              "#W59-I K4 a compound verdict whose EVERY scope reads zero is still dead");
+        // The clause SHAPE guards are unchanged: a non-verdict yields nothing.
+        CHECK(discardBoardVerdictTag(" {right now: }").empty()
+              && discardBoardVerdictTag("").empty()
+              && discardBoardVerdictTag(" {spare: you control 3 lands already}").empty(),
+              "#W59-I K4 NEGATIVE an empty payload, an empty string and another brace channel are"
+              " none of them a verdict");
+        // The discard channel and the cast-menu header now answer the same way
+        // about the same string - the asymmetry that produced 11 false badges.
+        CHECK(AIPlayerGPT::verdictReadsZero(devour.substr(1)) == false
+              && discardBoardVerdictTag(devour).find("dead") == string::npos,
+              "#W59-I K4 the two surfaces apply ONE predicate to the same units");
+    }
+
+    cout << "\n[W59-I] K5 the assignable floor is a life CEILING, and its trample pointer\n";
+    {
+        // `162v152` seq 19 verbatim: 18 life, 5 attackers, 20 unblocked, floor 15.
+        const string s = incomingCombatLine(5, 20, 18, true, 0, 0, 15, false);
+        CHECK(s.find("at least 15 of that lands whatever you block (trample/menace counted as"
+                     " unblocked): you would be at 3 AT BEST (no assignment of your blockers"
+                     " does better)") != string::npos,
+              "#W59-I K5 the deck162 line states a CEILING on life, not a floor");
+        CHECK(s.find("or better") == string::npos,
+              "#W59-I K5 NEGATIVE the inverted wording is gone from the floor form");
+        CHECK(s.find("no block saves you") == string::npos,
+              "#W59-I K5 NEGATIVE at 18 life against a floor of 15 no death is claimed");
+        // The safe case the wave-58 phrasing looked validated on (same file
+        // seq 14: floor 4, 20 life) still reads as a survivable ceiling.
+        CHECK(incomingCombatLine(2, 4, 20, true, 0, 0, 4, false)
+                  .find("you would be at 16 AT BEST (no assignment of your blockers does better)")
+              != string::npos,
+              "#W59-I K5 the non-lethal floor keeps its number and gains no death claim");
+        // The exact branch is untouched, byte for byte.
+        CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, true)
+                  .find("best case with every blocker assigned: you would be at -5;"
+                        " no block saves you") != string::npos,
+              "#W59-I K5 REGRESSION the proven-maximum branch is unchanged");
+        // K5 (b): the trample rungs point at the row that carries the number.
+        const string tr = zeroPowerBlockerTag(4, 4, true);
+        CHECK(tr.find("this row's own \"may block\" note for that attacker says how much still"
+                      " tramples to your face") != string::npos,
+              "#W59-I K5 the trample rung points at the B-row note that prints the carry-over");
+        CHECK(tr.find("each A-line above") == string::npos,
+              "#W59-I K5 NEGATIVE it no longer promises a number the A-line does not print");
+        const string trm = zeroPowerBlockerTag(4, 4, true, true);
+        CHECK(trm.find("this row's own \"may block\" note") != string::npos
+              && trm.find("each A-line above") == string::npos,
+              "#W59-I K5 the menace+trample rung is corrected the same way");
+        // NEGATIVE: the non-trample rungs keep the A-line pointer, where the
+        // number really is the attacker's printed damage.
+        CHECK(zeroPowerBlockerTag(2, 4, false).find("each A-line above says how much")
+                  != string::npos
+              && zeroPowerBlockerTag(2, 4, false).find("may block\" note") == string::npos,
+              "#W59-I K5 NEGATIVE the non-trample rung still points at the A-lines");
+        CHECK(zeroPowerBlockerTag(3, 3, false)
+              == " [deals 0 - this block kills nothing, but it STOPS all 3 damage from reaching"
+                 " you THIS COMBAT]",
+              "#W59-I K5 REGRESSION the single-power rung is byte-identical");
+    }
+
+    cout << "\n[W59-I] K7 both land-drop rows of the MDFC menu are named\n";
+    {
+        // `146v123` seq 3: row 2 was a bare "Play Land" beside a fully
+        // annotated back-face row. Same emitter, same shape, both faces.
+        const string front = mdfcLandFaceRow("Play Land", "Brightclimb Pathway", "{W}", "");
+        CHECK(front == "Brightclimb Pathway (menu text: Play Land) [PLAY THIS AS A LAND: puts"
+                       " \"Brightclimb Pathway\" onto the battlefield as a land (taps for {W})."
+                       " It costs no mana and uses no stack, and it USES YOUR LAND DROP for this"
+                       " turn.]",
+              "#W59-I K7 the front-face row carries its printed name, its colour and the land drop");
+        CHECK(front.find("Play Land") != string::npos,
+              "#W59-I K7 the engine's own menu token stays on the row so a bare echo still binds");
+        const string back = mdfcRowHead("Grimclimb Pathway", "grimclimb pathway")
+                          + " [" + mdfcLandPlayRowTag("Grimclimb Pathway", "{B}",
+                                                      string(), string()).substr(4) + "]";
+        CHECK(back == "Grimclimb Pathway [PLAY THIS AS A LAND: puts \"Grimclimb Pathway\" onto the"
+                      " battlefield as a land (taps for {B}). It costs no mana and uses no stack,"
+                      " and it USES YOUR LAND DROP for this turn.]",
+              "#W59-I K7 REGRESSION the wave-57 back-face row is byte-identical");
+        CHECK(front.substr(front.find('[')).compare(0, strlen("[PLAY THIS AS A LAND: puts"),
+                                                    "[PLAY THIS AS A LAND: puts") == 0
+              && back.substr(back.find('[')).compare(0, strlen("[PLAY THIS AS A LAND: puts"),
+                                                     "[PLAY THIS AS A LAND: puts") == 0,
+              "#W59-I K7 the two rows of one menu open with the same emitter's own sentence");
+        // The arrival clause rides the front row too, when the face has one.
+        const string tapped = mdfcLandFaceRow("Play Land", "Shatterskull, the Hammer Pass",
+                                             "{R}",
+                                             mdfcLandArrivalTag(kMdfcArrivalPayOrTap, 3));
+        CHECK(tapped.find("{taking this row then ASKS you to pay 3 life: pay and it enters"
+                          " UNTAPPED and makes mana this turn, decline and it enters TAPPED}")
+              != string::npos,
+              "#W59-I K7 a front face with a pay-or-tap arrival prints the same D26 clause");
+        // NEGATIVE: nothing on this row is a bare token any more.
+        CHECK(front != "Play Land" && front.find("Play Land [") == string::npos,
+              "#W59-I K7 NEGATIVE the bare, nameless row is gone");
+        CHECK(mdfcLandFaceRow("Play Land", "", "{W}", "") == "Play Land",
+              "#W59-I K7 NEGATIVE with no face name to state, the engine's row is returned"
+              " untouched - the emitter never invents one");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
