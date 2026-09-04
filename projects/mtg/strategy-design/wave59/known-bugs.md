@@ -29,3 +29,13 @@ MED (candidates, take only with a HIGH lane's spare capacity): venture ask never
 (deck130 E3); Teferi +1 = 7 round trips, text truncated before its verbs (deck152 HIGH-3/MED); search rows
 unpriced (deck126 MED); Lightmine rows print damage but no kill count (deck125 MED); `[<- largest
 affordable X]` ignores NET life on its row (deck125 MED); menace gang-block result unprinted (deck126 MED).
+
+Added after lane G (F2) landed, from its report (`wave58/lane-G.md`):
+12. After a DECLINE on an interactive reveal's option one, option two never arms: option one's nested
+    target ability stays `currentWaitingAction` (removeFromGame returns early once it is out of
+    mObjects) and option two is allocated at the freed address. Lane G fixed the EXIT (the stall guard
+    now force-closes and writes `reveal_stall_forced`), not the cause; cards return to the library
+    instead of its bottom. Needs the identity of the nested waiting element.
+13. At `revealasyncticks 2` the seat's generic action pass consumes option one's chooser and takes
+    "Get a human" AFTER a decline (library 6, hand 1, deterministic 3/3) — the W50-W (D2)
+    double-consumer, wrong outcome not a hang.
