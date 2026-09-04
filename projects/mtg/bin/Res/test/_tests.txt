@@ -1047,6 +1047,7 @@ generic/doomsday_i1085.txt
 generic/valorous_stance_family.txt
 generic/collected_conjuring_i1085.txt
 generic/sigarda_col_coven_i1085.txt
+w58G_reveal_decline_advances.txt
 generic/jack_in_the_mox_i1085.txt
 generic/cytoplast_manipulator_i1085.txt
 generic/entrapment_maneuver_i1085.txt

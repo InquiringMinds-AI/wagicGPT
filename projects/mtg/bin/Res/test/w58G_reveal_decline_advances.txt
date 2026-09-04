@@ -1,0 +1,58 @@
+# #W58-G (F2): a DECLINED interactive reveal must never park the game.
+# Sigarda's Coven trigger looks at the top 5; the forced-async seam answers
+# with the live empty-reply value (-1 = decline), so no Human is taken and
+# every revealed card belongs to option two ("put on bottom").
+# ON BASE the decline leaves its own option one as the action layer's waiting
+# action: option two is added but never arms, the driver spends option two's
+# clicks on the dead chooser, and phase 5 sets mAIDriveDone REGARDLESS - which
+# retires the reveal's stall guard. The display then sits open over a full
+# reveal zone for ever, and GameObserver::Update returns early on every tick
+# for as long as that is true (GameObserver.cpp, "OpenedDisplay && reveal
+# cards"): the game stops advancing with no receipt. Base leaves 5 of the 7
+# library cards stranded in the reveal zone (library reads 2, not 7).
+# AFTER the fix the driver stays accountable while the reveal is unfinished,
+# the stall guard force-closes it, and the revealed cards go back to the
+# library - so the game advances and the library is whole again.
+# revealstallbudget shrinks the guard's no-progress budget so the force-close
+# lands inside the script; the stall itself is real.
+FORCEABILITY
+AICALLS 20
+[INIT]
+firstmain
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:millstone,juggernaut,devoted retainer,gold myr,silver myr,iron myr,darksteel citadel
+[PLAYER2]
+[DO]
+revealasync <model-failure>
+revealasyncticks 0
+revealstallbudget 10
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:*,*,*,*,*,*,*
+[PLAYER2]
+life:11
+[END]

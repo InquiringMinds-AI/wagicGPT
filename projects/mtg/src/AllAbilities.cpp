@@ -940,7 +940,6 @@ void MTGRevealingCards::driveInteractiveRevealStep()
     }
 
     TargetChooser * tc = ownChooser();
-
     //Option one is a real look-and-choose only when it is a targeted move
     //(surveil: <upto:N> to the graveyard). A non-targeted first option makes no
     //selection - drive to completion without a model call (the "only one
@@ -1202,6 +1201,12 @@ void MTGRevealingCards::driveInteractiveRevealStep()
     }
     case 3: //WAIT for option one to resolve, then arm option two (or finish)
     {
+        REVEAL_DBG("phase3 enter: tc=" << (void*) tc << " second=" << (void*) abilitySecond
+                   << " zone=" << zone->nb_cards << " sel=" << mAIGraveSel.size()
+                   << " grace=" << mAIGraceTicks << " onLayer="
+                   << (abilitySecond ? observer->mLayers->actionLayer()->getIndexOf(abilitySecond) : -99)
+                   << " secondTc=" << (void*) (abilitySecond ? abilitySecond->getActionTc() : NULL)
+                   << " firstTc=" << (void*) (abilityFirst ? abilityFirst->getActionTc() : NULL));
         //Option one's moveto is deferred one Update after BTN_NEXT. If picks
         //were made, wait until the reveal zone shrinks (they left it) before
         //acting - racing ahead built option two while the picks were still in
@@ -1281,6 +1286,10 @@ void MTGRevealingCards::driveInteractiveRevealStep()
     }
     case 4: //CLICK the remainder into option two, one card per tick
     {
+        REVEAL_DBG("phase4: tc=" << (void*) tc << " idx=" << mAIClickIdx
+                   << "/" << mAIRemainder.size() << " zone=" << zone->nb_cards
+                   << " wait=" << (void*) observer->mLayers->actionLayer()->isWaitingForAnswer()
+                   << " first=" << (void*) abilityFirst << " second=" << (void*) abilitySecond);
         if (!tc)
         {
             mAIPhase = 5;
@@ -1303,9 +1312,23 @@ void MTGRevealingCards::driveInteractiveRevealStep()
     case 5: //FINALIZE option two
     default:
     {
+        REVEAL_DBG("phase5: tc=" << (void*) tc << " zone=" << zone->nb_cards
+                   << " display=" << (void*) revealDisplay);
         CheckUserInput(JGE_BTN_NEXT);
         mAIPhase = 6;
-        mAIDriveDone = true;
+        //#W58-G (F2): DONE means the reveal is OVER, not that the driver ran out
+        //of steps. mAIDriveDone is the first line of driveInteractiveReveal, so
+        //setting it retires the stall guard - the only thing in the engine that
+        //can force-close a reveal nothing else will finish. Set unconditionally,
+        //a phase-5 BTN_NEXT that moved nothing left the display open over a full
+        //reveal zone with no guard behind it, and GameObserver::Update returns
+        //early for as long as an OpenedDisplay sits over a non-empty reveal
+        //zone - the game stops advancing, for ever, with no receipt (F2, corpus
+        //20260904 152v126: 3640 s, no tick, process alive). Retire only on a
+        //finished reveal; otherwise stay accountable, so a reveal that cannot
+        //finish is force-closed and SAYS so.
+        if (!zone->cards.size() || !revealDisplay)
+            mAIDriveDone = true;
         return;
     }
     }
