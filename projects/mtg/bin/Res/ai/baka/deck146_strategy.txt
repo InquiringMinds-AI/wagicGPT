@@ -148,6 +148,9 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   NEVER PAY AT 3 LIFE OR LESS: three life is the whole payment and the game ends the moment you
   answer it. The pay row does not warn you about that; "Your life:" is printed two lines above the
   menu and reading it is your job.
+  REMOVE THIS FLOOR WHEN the "pay 3 life" row prints its own life verdict - re-verify by counting
+  "pay 3 life" option rows carrying "{this payment puts you at" in the corpus; it was 0 of 12 such
+  rows (104 prompts named the payment) in wave 57, and the docket asks for that verdict (D1).
   Pelakka Caverns is not on this rule - its row reads "{it enters TAPPED ... and no menu follows}",
   it makes no mana the turn it arrives, and no plan may spend that mana this turn.
   WHAT THIS COST, in BOTH of this deck's -2 losses this corpus, and nothing else did: at `vs130`
@@ -634,8 +637,10 @@ The row costs you nothing you would have taken: it says so on its own face, and 
 the window the moment anything on the board changes.
 WHAT THIS COST, wave 55: 190 windows across three of this pool's decks carried that declined line
 with the HOLD row on the menu, and not one of them took it - 85 in a single game, the same two-row
-Dictate menu re-asked eight to ten times a turn for eleven turns. WHAT IT IS NOW, wave 56: this
-deck took it 5 of 20 - the rule is working and the number is the measurement, not the story.
+Dictate menu re-asked eight to ten times a turn for eleven turns. WHAT IT IS NOW, wave 57: this
+deck took it 15 of 101 offered rows overall, and 0 of the 8 windows where the declined line read N
+of 2 or more - the rule's own key had eight windows and took none of them, so the wide denominator
+is the only place it is working. The number is the measurement, not the story.
 
 DECIDING SITUATIONS (recognize -> do):
 - A cast row carries "[DRAW PRICE: casting this draws YOU N cards (their <card>), and their

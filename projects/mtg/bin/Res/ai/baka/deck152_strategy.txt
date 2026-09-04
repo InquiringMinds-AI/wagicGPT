@@ -446,10 +446,7 @@ is a real buff from counters or a lord - "Wolf (3/3) (printed 2/2)" is a 3/3. A 
 such tag is exactly the size shown. A "{0}" printed next to a permanent's name is a display
 artifact, not a cost you can pay - it never means a card is free to cast.
 
-"FLIP SIDE" - ONE narrow use on LANDS; ignore it everywhere else:
-- On BRUTAL CATHAR and TOVOLAR'S HUNTMASTER (in hand or anywhere), "Flip Side" is a pure DISPLAY
-  TOGGLE. Those cards are never cast as their other face - they only transform on the
-  battlefield through daybound/nightbound. Never spend a decision on it there.
+PATHWAY LANDS - READ THE COLOUR ON EACH ROW BEFORE YOU SPEND THE LAND DROP:
 - Your PATHWAY lands each carry TWO land faces, and BOTH FACES NOW HAVE THEIR OWN ROW ON THE SAME
   MENU. "Play Land" plays the face currently shown; a second row reading
   "<other face name> [PLAY THIS AS A LAND: ... (taps for {X})]" plays the other one. Either row is
@@ -704,7 +701,7 @@ take no action AND the prompt carries the line "[you declined this exact list N 
 turn]", answer the HOLD row rather than "Cast nothing right now". HOLD is never worse: its own row
 says you give up no cast, and any change to the board re-opens the window at once.
 WHAT THAT LINE DOES AND DOES NOT MEAN. It counts identical OPTION LISTS, not identical boards. At
-this deck's seats this corpus, 73 windows carried it with N of 2 or more, and in NOT ONE of them was
+this deck's seats in wave 57, 73 windows carried it with N of 2 or more, and in NOT ONE of them was
 the "--- CURRENT SITUATION ---" block the same as the window before: the stack was resolving under
 you, life was moving, a permanent had arrived. So the 66 of them answered "Cast nothing right now"
 did NOT cost you a repeated window - HOLD would have been re-opened by the same change. Never read
