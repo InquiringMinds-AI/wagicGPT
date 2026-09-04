@@ -686,10 +686,12 @@ void gptAndroidCacheClass(JNIEnv * env)
 namespace
 {
 string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer,
-                       long * codeOut, string * errBodyOut)
+                       long * codeOut, string * errBodyOut, long * curlCodeOut)
 {
     if (codeOut)
         *codeOut = 0; //audit-L (A24): no status until the transport reports one
+    if (curlCodeOut)
+        *curlCodeOut = -1; //#W59-H (K1): Android has no libcurl result
     if (errBodyOut)
         errBodyOut->clear();
     if (!gGptJvm || !gGptActivityClass)
@@ -785,10 +787,13 @@ namespace
 //Platforms without any wired transport: the request reports failure, which
 //every GPT seam already treats as "fall back to Baka" - the same behavior as
 //an unreachable endpoint.
-string httpRequestImpl(const string&, const string&, long, const string&, long * codeOut, string * errBodyOut)
+string httpRequestImpl(const string&, const string&, long, const string&, long * codeOut,
+                       string * errBodyOut, long * curlCodeOut)
 {
     if (codeOut)
         *codeOut = 0;
+    if (curlCodeOut)
+        *curlCodeOut = -1; //#W59-H (K1): no libcurl transport on this platform
     if (errBodyOut)
         errBodyOut->clear();
     return "";
@@ -796,6 +801,20 @@ string httpRequestImpl(const string&, const string&, long, const string&, long *
 #else
 namespace
 {
+//#W59-H (K1): the connect phase gets the SAME window as the request it is
+//opening. F3: a hardcoded 2.5 s cap turned every connect that queued behind
+//21 concurrent games into an empty body indistinguishable from a model that
+//said nothing - 89 of 2,270 wave-58 decisions, all played by the heuristic.
+//A connect deadline is not a decision deadline, so there is no reason for it
+//to be the smaller of the two. The floor only covers a caller that passes no
+//deadline at all: generous by doctrine, and finite (libcurl reads 0 as "the
+//built-in default"), so it is stated rather than inherited.
+static const long kGptConnectTimeoutFloorMs = 30000L;
+static long gptConnectTimeoutMs(long timeoutMs)
+{
+    return timeoutMs > 0 ? timeoutMs : kGptConnectTimeoutFloorMs;
+}
+
 size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -803,10 +822,12 @@ size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * user
 }
 
 string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer,
-                       long * codeOut, string * errBodyOut)
+                       long * codeOut, string * errBodyOut, long * curlCodeOut)
 {
     if (codeOut)
         *codeOut = 0; //audit-L (A24): no status until the transport reports one
+    if (curlCodeOut)
+        *curlCodeOut = CURLE_FAILED_INIT; //#W59-H (K1): truthful if init fails
     if (errBodyOut)
         errBodyOut->clear();
     CURL * curl = curl_easy_init();
@@ -819,7 +840,10 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2500L);
+    //#W59-H (K1): connection setup owns the same generous window as the whole
+    //request. The former 2.5 s cap was not a decision deadline and failed in
+    //bursts under concurrent games before Spark could accept the connection.
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, gptConnectTimeoutMs(timeoutMs));
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -852,6 +876,8 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
     //empty return - the code is what tells a wrong key from a dead host.
     if (codeOut)
         *codeOut = (res == CURLE_OK) ? httpCode : 0;
+    if (curlCodeOut)
+        *curlCodeOut = (long) res; //#W59-H (K1): preserve the transport cause
     if (res != CURLE_OK || httpCode != 200)
     {
         if (errBodyOut && res == CURLE_OK)
@@ -865,25 +891,33 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
 
 string gptHttpGet(const string& url, long timeoutMs, const string& bearer)
 {
-    return httpRequestImpl(url, "", timeoutMs, bearer, NULL, NULL);
+    return httpRequestImpl(url, "", timeoutMs, bearer, NULL, NULL, NULL);
 }
 
 string gptHttpPost(const string& url, const string& body, long timeoutMs, const string& bearer)
 {
-    return httpRequestImpl(url, body, timeoutMs, bearer, NULL, NULL);
+    return httpRequestImpl(url, body, timeoutMs, bearer, NULL, NULL, NULL);
 }
 
 //audit-L (A24)
 string gptHttpGet(const string& url, long timeoutMs, const string& bearer,
                   long * httpCode, string * errBody)
 {
-    return httpRequestImpl(url, "", timeoutMs, bearer, httpCode, errBody);
+    return httpRequestImpl(url, "", timeoutMs, bearer, httpCode, errBody, NULL);
 }
 
 string gptHttpPost(const string& url, const string& body, long timeoutMs, const string& bearer,
                    long * httpCode, string * errBody)
 {
-    return httpRequestImpl(url, body, timeoutMs, bearer, httpCode, errBody);
+    return httpRequestImpl(url, body, timeoutMs, bearer, httpCode, errBody, NULL);
+}
+
+//#W59-H (K1): decision calls retain both layers of the outcome. Probe/UI
+//callers keep the older overload because they do not write decision records.
+string gptHttpPost(const string& url, const string& body, long timeoutMs, const string& bearer,
+                   long * httpCode, string * errBody, long * curlCode)
+{
+    return httpRequestImpl(url, body, timeoutMs, bearer, httpCode, errBody, curlCode);
 }
 
 //--- Full-control POST (ChatGPT-subscription transport) ---------------------
@@ -923,7 +957,10 @@ string httpRequestFull(const string& url, const string& postBody, long timeoutMs
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curlHeaderToString);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &respHeaders);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);
+    //#W59-H (K1): this sibling transport follows the same rule: connection
+    //setup may spend the request's deadline, not an unrelated small cap (it
+    //carried 5000 ms). Same floor, same reason.
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, gptConnectTimeoutMs(timeoutMs));
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

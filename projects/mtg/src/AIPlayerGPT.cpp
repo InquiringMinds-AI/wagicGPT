@@ -9744,6 +9744,9 @@ struct AIPlayerGPT::AsyncState
     //4xx/5xx used to come back as an empty body indistinguishable from an
     //unreachable server; the code is what tells a wrong key from a dead host.
     long httpStatus;
+    //#W59-H (K1): libcurl result for the same attempt. -1 means this platform
+    //used another transport; 0 is CURLE_OK.
+    long curlResult;
     //#W57-U: the request GENERATION. A request the GAME THREAD abandons (in
     //flight past its deadline plus a grace - see reapWedgedRequests) bumps
     //this, and the worker publishes only under the generation it launched in.
@@ -9754,7 +9757,7 @@ struct AIPlayerGPT::AsyncState
     //requirement on Vita, where the worker is a native sceKernel thread the
     //game cannot join or cancel.
     unsigned int gen;
-    AsyncState() : status(0), timedOut(false), httpStatus(0), gen(0) {}
+    AsyncState() : status(0), timedOut(false), httpStatus(0), curlResult(-1), gen(0) {}
 };
 
 //WAGIC_PADLOG (Android: flag file User/padlog.on): async-lifecycle slice of
@@ -9821,6 +9824,7 @@ void AIPlayerGPT::WorkerMain(void * p)
 #endif
     string body;
     long httpCode = 0; //audit-L (A24)
+    long curlCode = -1; //#W59-H (K1): non-curl transports say unavailable
     if (ctx->codex)
     {
         //The subscription backend answers in the Responses shape over SSE.
@@ -9852,10 +9856,21 @@ void AIPlayerGPT::WorkerMain(void * p)
         //is logged once per distinct (url, code) - the WHY of a match that
         //plays on the heuristic - and rides the state to the record.
         string errBody;
-        body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key, &httpCode, &errBody);
+        body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key,
+                           &httpCode, &errBody, &curlCode);
         if (body.empty() && httpCode != 0 && httpCode != 200)
             gptNoteHttpFailure(ctx->url, httpCode, errBody);
     }
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W59-H (K1): every empty/non-200 round trip says what both transport
+    //layers observed. This is deliberately not emitted by release builds.
+    if (body.empty() || httpCode != 200)
+    {
+        fprintf(stderr, "AIPlayerGPT: transport outcome curl=%ld http=%ld empty=%d\n",
+                curlCode, httpCode, body.empty() ? 1 : 0);
+        fflush(stderr);
+    }
+#endif
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
         //#W57-U: was this round trip abandoned while it ran? The game thread
@@ -9871,6 +9886,7 @@ void AIPlayerGPT::WorkerMain(void * p)
             return;
         }
         ctx->state->httpStatus = httpCode; //audit-L (A24)
+        ctx->state->curlResult = curlCode; //#W59-H (K1)
         //#W53-Q (D10): the deadline test, on the 95% mark so a wall hit is not
         //missed by scheduling jitter between the client's clock and curl's.
         //An empty body under that mark is a refusal/error, not a timeout.
@@ -10341,6 +10357,52 @@ const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
     return noAnswerClassFor(staleLivelock, timedOut, hasReasoning);
 }
 
+//#W59-H (K1): a curl failure is transport, not a model's empty answer. HTTP
+//errors retain their existing, more specific class. Platforms without curl
+//report -1 and fall through to the HTTP/body facts.
+//ORDER MATTERS, and it is the reason this is a table and not an if-chain in
+//the caller: a request killed at its own deadline ALSO reports a nonzero
+//CURLcode (28, CURLE_OPERATION_TIMEDOUT), so the deadline fact is asked first
+//or every wall miss would be renamed "transport_error" and #W53-Q (D10)'s
+//"the clock ran out" class - the one the seat reviews read - would vanish.
+//What is left for transport_error is exactly the F3 shape: a round trip that
+//died BEFORE the deadline (connect refused/timed out, DNS, TLS, reset).
+const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                           bool hasReasoning, long httpStatus, long curlCode)
+{
+    if (!staleLivelock && !timedOut && curlCode > 0)
+        return "transport_error";
+    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning, httpStatus);
+}
+
+//#W59-H (K1): ONE retry is offered only for transport-shaped failures. A 4xx
+//is a completed client error and an empty HTTP 200 is an answered empty body;
+//neither is made more legal by buying the same request again.
+bool AIPlayerGPT::retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody)
+{
+    return curlCode > 0 || httpStatus >= 500
+           || (emptyBody && httpStatus == 0);
+}
+
+//#W59-H (K1): the second attempt receives only what the first left. This is
+//the bound that makes the retry one decision deadline rather than two.
+long AIPlayerGPT::remainingTransportRetryMs(long deadlineMs, long firstLatencyMs)
+{
+    if (deadlineMs <= 0 || firstLatencyMs < 0 || firstLatencyMs >= deadlineMs)
+        return 0;
+    return deadlineMs - firstLatencyMs;
+}
+
+//#W59-H (K1): stable scalar shape for the translog field. Keeping curl and
+//HTTP beside one another prevents a status 0 from erasing CURLE_OPERATION_TIMEDOUT.
+string AIPlayerGPT::transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody)
+{
+    std::ostringstream o;
+    o << "curl=" << curlCode << ",http=" << httpStatus
+      << ",empty=" << (emptyBody ? 1 : 0);
+    return o.str();
+}
+
 //#W55-E (D5b): stale-drop prompt-drift localiser. Prints the first byte at which
 //the rebuilt prompt diverges from the one in flight, both neighbourhoods, and
 //both lengths - which is enough to name the SECTION (narration / situation
@@ -10367,7 +10429,7 @@ static void gptTracePromptDrift(const string& inflight, const string& rebuilt)
 const char * AIPlayerGPT::noAnswerClass() const
 {
     return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty(),
-                            mLastHttpStatus);
+                            mLastHttpStatus, mLastCurlResult);
 }
 
 //#W54-B (D9). noAnswerClassFor above is the branch this item does NOT cover:
@@ -10512,6 +10574,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         content.clear();
         mLastTimeout = false;   //nothing came back at all: not a deadline miss
         mLastHttpStatus = 0;    //and no round trip was consumed here
+        mLastCurlResult = -1;   //#W59-H (K1): no transport outcome either
         mLastLatencyMs = -1;
         return 0;               //empty reply -> the seam's heuristic answers
     }
@@ -10547,6 +10610,13 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 slot->timedOut = false;
                 mLastHttpStatus = slot->httpStatus; //audit-L (A24)
                 slot->httpStatus = 0;
+                mLastCurlResult = slot->curlResult; //#W59-H (K1)
+                slot->curlResult = -1;
+                //#W59-H (K1): retain every failed attempt, including the
+                //first attempt when the bounded retry later succeeds.
+                if (body.empty() || mLastHttpStatus != 200)
+                    mLastTransportOutcomes.push_back(
+                        transportOutcomeStamp(mLastCurlResult, mLastHttpStatus, body.empty()));
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -10797,11 +10867,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->response.clear();
         state->timedOut = false; //#W53-Q (D10): the worker decides this one
         state->httpStatus = 0;   //audit-L (A24): likewise
+        state->curlResult = -1;  //#W59-H (K1): likewise
         state->started = std::chrono::steady_clock::now();
         genAtLaunch = state->gen; //#W57-U
     }
     GPTASYNCLOG("gpt spawn ask prompt=%zu endpoint=%s\n", userMsg.size(), mEndpoint.c_str());
     long timeoutMs = mTimeoutMs;
+    //#W59-H (K1): a TRANSPORT retry spends the decision deadline's remainder
+    //(mRetryBudgetMs, computed and bounded where the retry was armed), never a
+    //fresh full deadline. A wall-miss retry leaves the budget 0 and keeps the
+    //full deadline it has always had. Never 0 here: 0 is libcurl's "no
+    //timeout at all", which is how a transport stall becomes a hung seat.
+    if (userMsg.compare(0, strlen(kTimeoutRetryTag), kTimeoutRetryTag) == 0
+        && mRetryBudgetMs > 0)
+        timeoutMs = mRetryBudgetMs;
     //The worker runs through gptSpawnWorker - the platform threading seam.
     //On Vita that is a native sceKernelCreateThread (std::thread construction
     //throws there - no active gthreads layer); elsewhere it is a detached
@@ -10847,6 +10926,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         content.clear();
         mLastTimeout = false; //#W53-Q (D10): a refused thread, not a deadline
         mLastHttpStatus = 0;  //audit-L (A24)
+        mLastCurlResult = -1; //#W59-H (K1): no curl attempt existed
         DebugTrace("AIPlayerGPT: could not start the worker thread; falling back to the heuristic AI");
         //Log this ONCE. A platform that refuses one thread refuses all of them,
         //so the message is identical every time and repeats once per decision -
@@ -11116,6 +11196,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             mRetryBase.clear();
             mForceClosePrefill.clear();
             mRetryFirstLatencyMs = -1;
+            mRetryBudgetMs = 0; //#W59-H (K1): consumed with the retry
             mLastRetry = true;
             //#W53-Q (D10): the retry ALSO came back empty at the wall. This is
             //the handoff the seat review needs named - the retry below can no
@@ -11130,6 +11211,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         mRetryBase.clear();
         mForceClosePrefill.clear();
         mRetryFirstLatencyMs = -1;
+        mRetryBudgetMs = 0; //#W59-H (K1): abandoned with the retry
     }
 
     int r = pollCompletion(userMsg, content);
@@ -11178,28 +11260,56 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
         return kChoicePending; //next tick polls the forced-close request
     }
-    //DEADLINE RETRY (#W53-Q, D10). The wall hit with nothing back: the ask was
-    //never answered, so there is no answer to double-consume and re-sending it
+    //DEADLINE/TRANSPORT RETRY (#W53-Q, D10; #W59-H K1). The ask was never
+    //answered, so there is no answer to double-consume and re-sending it
     //is not a re-ask on a drifted board - the staleness gate above still owns
     //that question (a decision that moved while this was in flight abandons the
     //retry at the top of this function, exactly as the other two retries do).
     //ONE, gated by mRetryDoneBase like every other retry here, and only when
     //the reply is EMPTY: a reply that came back and merely failed to parse has
     //its own classes and must not be spent on a second round trip.
-    if (content.empty() && mLastTimeout && userMsg != mRetryDoneBase)
+    //#W59-H (K1) adds the SECOND way in, beside the wall miss: the round trip
+    //never reached the model at all (F3 - a 2.5 s connect cap that fired 89
+    //times in the wave-58 corpus, all filed as `empty_reply` and played by the
+    //heuristic). That is not the model declining to answer, and the decision's
+    //deadline is still mostly unspent, so the ask is bought again inside what
+    //is LEFT of it - which is what keeps this one retry, not a loop, and keeps
+    //the seat's total wait at one deadline. The wall-miss arm below is
+    //unchanged: it still gets the full deadline and still opens the wall_miss
+    //account.
+    const bool transportFailure = retryableTransportFailure(
+        mLastCurlResult, mLastHttpStatus, content.empty());
+    const long transportBudgetMs = remainingTransportRetryMs(mTimeoutMs, mLastLatencyMs);
+    if (content.empty() && userMsg != mRetryDoneBase
+        && (mLastTimeout
+            || (transportFailure && !mLastStaleLivelock && transportBudgetMs > 0)))
     {
         mRetryFirstLatencyMs = mLastLatencyMs;
+        //A wall miss has nothing left of its deadline by definition; 0 means
+        //"the full deadline again", which is exactly what D10 shipped.
+        mRetryBudgetMs = mLastTimeout ? 0 : transportBudgetMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
-        //#W55-E (D23): arm the wall-miss account on THIS prompt. Whichever comes
+        //#W55-E (D23): arm the wall-miss account on a DEADLINE miss. Whichever comes
         //first closes it: the record that consumes this prompt stamps wall_miss,
         //or the decision is abandoned and flushWallMissRecord writes it down.
-        mWallMissPending = true;
-        mWallMissBase = userMsg;
-        mWallMissEvents++;
-        setNotice("no reply from the model - asking once more", 3.0f);
-        DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
-                   << "s - one retry");
+        //A transport miss never reached the wall and opens no such account.
+        if (mLastTimeout)
+        {
+            mWallMissPending = true;
+            mWallMissBase = userMsg;
+            mWallMissEvents++;
+            setNotice("no reply from the model - asking once more", 3.0f);
+            DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
+                       << "s - one retry");
+        }
+        else
+        {
+            setNotice("the connection failed - asking once more", 3.0f);
+            DebugTrace("AIPlayerGPT: transport failed (curl=" << mLastCurlResult
+                       << ", http=" << mLastHttpStatus << ") - one retry with "
+                       << transportBudgetMs << " ms of the deadline left");
+        }
         return kChoicePending; //next tick polls the retry
     }
     //The retry was already spent (or could not run) and the wall was reached
@@ -11230,7 +11340,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -11273,6 +11383,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     //possibly while the previous duel's detached worker was still in libcurl).
     gptCurlInit();
     mLastHttpStatus = 0; //audit-L (A24)
+    mLastCurlResult = -1; //#W59-H (K1)
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
     mConfigUrls = cfg.urls;
@@ -11674,6 +11785,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //this clear catches anything that reached it before the path was known.
         mNarrationPending.clear();
         mLastHttpStatus = 0; //audit-L (A24): consumed even when logging is off
+        mLastCurlResult = -1; //#W59-H (K1): consumed with the attempt
+        mLastTransportOutcomes.clear(); //#W59-H (K1): never leak to a later record
         mLastRepeatN = 0;    //#W57-A (D4): likewise, so it cannot leak forward
         return;
     }
@@ -11710,6 +11823,15 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //it (a 200 says nothing new and is not written; 0 = no status came back).
     if (mLastHttpStatus != 0 && mLastHttpStatus != 200)
         rec["http_status"] = mLastHttpStatus;
+    //#W59-H (K1): every non-200/empty attempt, not merely the final attempt.
+    //A scalar keeps the schema simple; `;` separates the bounded retry pair.
+    if (!mLastTransportOutcomes.empty())
+    {
+        string transport;
+        for (size_t i = 0; i < mLastTransportOutcomes.size(); i++)
+            transport += (i ? ";" : "") + mLastTransportOutcomes[i];
+        rec["transport"] = transport;
+    }
     //Answer-locked decode-garbage retry: mark the record and note the first
     //(garbage) attempt's latency separately; latency_ms above already carries the
     //SUMMED first+retry round trip (set in pollCompletionRetry).
@@ -11742,6 +11864,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
     mLastHttpStatus = 0; //audit-L (A24): consumed with it
+    mLastCurlResult = -1; //#W59-H (K1): consumed with it
+    mLastTransportOutcomes.clear(); //#W59-H (K1): consumed with it
     //NATIVE REASONING (wave-34 #1b(A)): the model's own thinking for THIS
     //decision, from message.reasoning_content or from an inline <think> block -
     //captured on both paths because the server decides which one we get. This
@@ -45997,6 +46121,70 @@ static const char * kW50Y_r94 =
               && string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0)) == "timeout"
               && string(AIPlayerGPT::noAnswerClassFor(false, false, true, 0)) == "reasoning_only",
               "audit-L A24 NEGATIVE no status = the three-fact table, unchanged");
+    }
+    // ---- #W59-H (K1): transport classification, bounded retry, record shape ----
+    cout << "\n[#W59-H K1] transport failures retain their cause and retry inside one deadline\n";
+    {
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, 28))
+                  == "transport_error"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, 7))
+                  == "transport_error",
+              "#W59-H K1 POSITIVE curl timeout/connect failures classify as transport_error");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 503, 0))
+                  == "http_error",
+              "#W59-H K1 POSITIVE HTTP 5xx retains the http_error class");
+        //A request killed AT its own deadline also reports CURLE_OPERATION_TIMEDOUT
+        //(28). The deadline fact is asked first, so #W53-Q (D10)'s class survives
+        //this item - otherwise every wall miss would be renamed transport_error.
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0, 28))
+                  == "timeout"
+              && string(AIPlayerGPT::noAnswerClassFor(false, true, true, 0, 28))
+                  == "timeout",
+              "#W59-H K1 MUST-NOT: a wall miss carrying curl 28 is still `timeout`");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(true, false, false, 0, 28))
+                  == "stale_livelock",
+              "#W59-H K1 MUST-NOT: the livelock breaker still wins over the transport");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, -1))
+                  == "empty_reply"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, 0))
+                  == "empty_reply",
+              "#W59-H K1 MUST-NOT: CURLE_OK and a curl-less platform are not transport_error");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 200, 0))
+                  == "empty_reply"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, true, 200, 0))
+                  == "reasoning_only",
+              "#W59-H K1 MUST-NOT: an empty HTTP 200 is not called a transport failure");
+        CHECK(AIPlayerGPT::retryableTransportFailure(28, 0, true)
+              && AIPlayerGPT::retryableTransportFailure(7, 0, true)
+              && AIPlayerGPT::retryableTransportFailure(0, 503, true)
+              && AIPlayerGPT::retryableTransportFailure(-1, 0, true),
+              "#W59-H K1 POSITIVE curl failures, 5xx, and statusless empty bodies earn one retry");
+        CHECK(!AIPlayerGPT::retryableTransportFailure(0, 401, true)
+              && !AIPlayerGPT::retryableTransportFailure(0, 200, true)
+              && !AIPlayerGPT::retryableTransportFailure(0, 200, false),
+              "#W59-H K1 MUST-NOT: 4xx and HTTP 200 outcomes do not spend a retry");
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(30000, 2500) == 27500
+              && AIPlayerGPT::remainingTransportRetryMs(30000, 30000) == 0
+              && AIPlayerGPT::remainingTransportRetryMs(30000, 31000) == 0,
+              "#W59-H K1 retry receives only the decision deadline's remaining budget");
+        //The F3 shape at the corpus's own numbers: a 2.5 s connect miss under a
+        //120 s decision deadline leaves 117.5 s - a real second attempt, and the
+        //two attempts together still fit inside ONE deadline.
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(120000, 2502) == 117498
+              && AIPlayerGPT::remainingTransportRetryMs(120000, 2558) == 117442,
+              "#W59-H K1 POSITIVE the F3 connect miss leaves nearly the whole deadline");
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(0, 2500) == 0
+              && AIPlayerGPT::remainingTransportRetryMs(30000, -1) == 0,
+              "#W59-H K1 MUST-NOT: no budget is invented from an absent deadline or latency");
+        const string transport = AIPlayerGPT::transportOutcomeStamp(28, 0, true);
+        CHECK(transport == "curl=28,http=0,empty=1",
+              "#W59-H K1 transport field shape names curl result, HTTP status, and empty body");
+        CHECK(transport.find("http=200") == string::npos
+              && transport.find("curl=0") == string::npos,
+              "#W59-H K1 MUST-NOT: the timeout stamp cannot echo a successful transport");
+        json transportEcho = {{"transport", transport}};
+        CHECK(json::parse(transportEcho.dump())["transport"].get<string>() == transport,
+              "#W59-H K1 ECHO: the translog transport field round-trips byte-exactly");
     }
     cout << "\n[audit-L] L10 narration trim arithmetic\n";
     {

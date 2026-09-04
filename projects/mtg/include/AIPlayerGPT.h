@@ -458,8 +458,18 @@ private:
     //back: transport-level failure or the Codex path; 200 = answered). Read by
     //noAnswerClass, stamped on the record as http_status, consumed once.
     long mLastHttpStatus;
+    long mLastCurlResult; //#W59-H (K1): result for the last consumed attempt
+    //#W59-H (K1): every failed transport attempt for the current decision,
+    //including an attempt recovered by the one retry. Joined into the
+    //translog's `transport` field and consumed with that decision record.
+    std::vector<std::string> mLastTransportOutcomes;
     static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
                                          bool hasReasoning, long httpStatus);
+    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                         bool hasReasoning, long httpStatus, long curlCode);
+    static bool retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody);
+    static long remainingTransportRetryMs(long deadlineMs, long firstLatencyMs);
+    static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody);
     //L4: one translog stream per seat, opened on the first record (after the
     //-vs- rename), flushed per record, closed by the game-end record.
     std::ofstream mTransLog;
@@ -1205,6 +1215,12 @@ private:
     string mRetryBase;
     string mRetryDoneBase;
     long mRetryFirstLatencyMs;
+    //#W59-H (K1): the deadline the retry currently in flight must run under.
+    //0 = the ordinary full decision deadline (the D10 wall-miss retry and the
+    //force-close/answer-lock retries all keep that); a POSITIVE value is the
+    //remainder of this decision's deadline, which is what a TRANSPORT retry
+    //gets so that first attempt plus retry never exceed one deadline.
+    long mRetryBudgetMs;
     bool mLastRetry;
 
     //NATIVE REASONING (wave-34 #1a/#1b). With the post-answer scratch block
