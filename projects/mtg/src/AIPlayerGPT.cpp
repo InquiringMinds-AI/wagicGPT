@@ -19852,26 +19852,101 @@ bool AIPlayerGPT::latchedRowMismatch(const string& reply, int choice, int option
     return true;
 }
 
-//#W54-B (D14), first half: does the chosen row's OWN annotation say the
-//action does nothing? These are the engine's own words, computed by the render
-//from the live board - "{right now: they control 0 creatures - at 0 this does
-//nothing}", "deals 0", "destroys 0 of their creatures", "kills 0 of the",
-//"no creature has died this turn, so Morbid does NOT apply". A row that
-//states a REAL magnitude ("drains 3", "destroys 2 of their creatures") says
-//nothing of the kind and must never match. Pure.
+//#W58-A (D3): read the computed numbers in the verdict grammar instead of
+//maintaining a list of English verbs. The emitters currently produce drains,
+//damage, life, draws, prevents, destroys, exiles and deals; this predicate also
+//covers the next `<verb> 0` form without another whitelist edit. A second live
+//magnitude, including the sweeper's bare `, N of yours`, keeps the row live.
+//Only the computed core before ` - ` is scanned: later numbers explain the
+//result (remaining life, toughness, and so on), rather than adding an effect.
+static bool rightNowComputedMagnitudesAreZero(const string& row)
+{
+    string clause = rowVerdictClause(row);
+    if (clause.empty())
+        return false;
+    for (size_t i = 0; i < clause.size(); i++)
+        clause[i] = (char) tolower((unsigned char) clause[i]);
+    size_t colon = clause.find(':');
+    if (colon == string::npos)
+        return false;
+    size_t end = clause.find(" - ", colon + 1);
+    if (end == string::npos)
+        end = clause.size();
+    bool found = false;
+    size_t segment = colon + 1;
+    while (segment < end)
+    {
+        while (segment < end && isspace((unsigned char) clause[segment]))
+            segment++;
+        size_t next = clause.find(',', segment);
+        if (next == string::npos || next > end)
+            next = end;
+        size_t number = segment;
+        if (number < next && !isdigit((unsigned char) clause[number])
+            && clause[number] != '+' && clause[number] != '-')
+        {
+            size_t first = number;
+            while (number < next && isalpha((unsigned char) clause[number]))
+                number++;
+            string firstWord = clause.substr(first, number - first);
+            while (number < next && isspace((unsigned char) clause[number]))
+                number++;
+            //#W58-A (D3): only a subject-led fact (`they control 0`, `you
+            //control 0`) has two words before its magnitude. An emitter such
+            //as `makes a 0/0` describes a real object and must stay live.
+            if ((firstWord == "they" || firstWord == "you") && number < next
+                && !isdigit((unsigned char) clause[number])
+                && clause[number] != '+' && clause[number] != '-')
+            {
+                while (number < next && isalpha((unsigned char) clause[number]))
+                    number++;
+                while (number < next && isspace((unsigned char) clause[number]))
+                    number++;
+            }
+        }
+        if (number < next && (clause[number] == '+' || clause[number] == '-'))
+            number++;
+        if (number < next && isdigit((unsigned char) clause[number]))
+        {
+            found = true;
+            while (number < next && isdigit((unsigned char) clause[number]))
+            {
+                if (clause[number] != '0')
+                    return false;
+                number++;
+            }
+        }
+        size_t arrow = clause.find("->", segment);
+        if (arrow != string::npos && arrow < next)
+        {
+            arrow += 2;
+            while (arrow < next && !isdigit((unsigned char) clause[arrow]))
+                arrow++;
+            while (arrow < next && isdigit((unsigned char) clause[arrow]))
+            {
+                found = true;
+                if (clause[arrow] != '0')
+                    return false;
+                arrow++;
+            }
+        }
+        segment = next + 1;
+    }
+    return found;
+}
+
+//#W58-A (D3), preserving #W54-B (D14): an explicit renderer conclusion and
+//the Morbid status remain semantic no-op facts; computed verdicts use the
+//number grammar above. A real magnitude must never match. Pure.
 bool AIPlayerGPT::rowSaysNoOp(const string& row)
 {
     string low = row;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
-    static const char * kNoOp[] = {
-        "does nothing", "deals 0", "destroys 0", "kills 0", "removes 0",
-        "drains 0", "does not apply", "gains 0", "draws 0"
-    };
-    for (size_t i = 0; i < sizeof(kNoOp) / sizeof(kNoOp[0]); i++)
-        if (low.find(kNoOp[i]) != string::npos)
-            return true;
-    return false;
+    if (low.find("does nothing") != string::npos
+        || low.find("does not apply") != string::npos)
+        return true;
+    return rightNowComputedMagnitudesAreZero(row);
 }
 
 //#W54-B (D14), second half: does the reply's PLAN argue against the row the
@@ -44439,6 +44514,68 @@ static const char * kW50Y_r94 =
         ann.push_back("Cast Overgrown Battlement {1}{g}");
         CHECK(AIPlayerGPT::latchedRowMismatch("CHOICE: 2 (Idyllic Tutor)", 1, 2, &ann),
               "#W54-B D13 a parenthetical present ONLY inside row 1's annotation does not name row 1 (annotation-stripped core, D15)");
+    }
+
+    // ---- #W58-A (D3): computed-zero verdict grammar, not a verb whitelist ----
+    cout << "\n[#W58-A D3] every rendered computed-zero verb reads as a no-op\n";
+    {
+        static const char * zeroRows[] = {
+            "Cast Gray Merchant {3}{b}{b} {right now: drains 0}",
+            "Cast Fireball {x}{r} {right now: damage 0}",
+            "Cast Sign in Blood {b}{b} {right now: life 0}",
+            "Cast Divination {2}{u} {right now: draws 0}",
+            "Cast Healing Salve {w} {right now: prevents 0}",
+            "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours}",
+            "Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours}",
+            "Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker}"
+        };
+        static const char * liveRows[] = {
+            "Cast Gray Merchant {3}{b}{b} {right now: drains 2}",
+            "Cast Fireball {x}{r} {right now: damage 2}",
+            "Cast Sign in Blood {b}{b} {right now: life 2}",
+            "Cast Divination {2}{u} {right now: draws 2}",
+            "Cast Healing Salve {w} {right now: prevents 2}",
+            "Cast Damnation {2}{b}{b} {right now: destroys 2 of their creatures (2 without a restriction against attacking), 0 of yours}",
+            "Cast Final Judgment {4}{w}{w} {right now: exiles 2 of their creatures (2 without a restriction against attacking), 0 of yours}",
+            "Cast Lightmine Field {2}{w}{w} {right now: they control 2 creatures able to attack - deals 2 to each if all 2 attack}"
+        };
+        for (size_t i = 0; i < sizeof(zeroRows) / sizeof(zeroRows[0]); i++)
+        {
+            CHECK(AIPlayerGPT::rowSaysNoOp(zeroRows[i]),
+                  "#W58-A D3 POSITIVE every computed-zero verb emitted by the renderer is a no-op");
+            CHECK(!AIPlayerGPT::rowSaysNoOp(liveRows[i]),
+                  "#W58-A D3 NEGATIVE every same-shape real magnitude must NOT match");
+        }
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 2 of yours}"),
+              "#W58-A D3 NEGATIVE a sweeper that takes only your creatures still changes the board");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Profane Command {x}{b}{b} {right now: life 0, drains 2}"),
+              "#W58-A D3 NEGATIVE one zero magnitude does not erase another live effect");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Memnite {0} {right now: makes a 0/0 creature}"),
+              "#W58-A D3 NEGATIVE a zero inside an object description is not a computed magnitude");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Amass {2}{b} {right now: Army 0/0 -> 2/2}"),
+              "#W58-A D3 NEGATIVE a zero starting a transition does not hide its live result");
+        CHECK(discardBoardVerdictTag(
+                  " {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours}")
+                  == " {dead right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours}",
+              "#W58-A D3 the discard-menu badge consumes the same computed-zero verdict");
+        vector<string> deadMenu;
+        deadMenu.push_back(zeroRows[6]);
+        CHECK(everyCastRowDead(deadMenu)
+              && allCastRowsDeadNote(true, 1).find("all 1 cast row below") != string::npos,
+              "#W58-A D3 the cast-menu header consumes the same computed-zero verdict");
+        vector<string> menu;
+        menu.push_back(zeroRows[6]);
+        bool stale = false; string src;
+        CHECK(stripNarrationDecoration(menu[0]) == "Cast Final Judgment {4}{w}{w}",
+              "#W58-A D3 echo shape: the {right now: exiles 0 ...} annotation leaves no narration residue");
+        CHECK(AIPlayerGPT::parseChoice(
+                  "CHOICE: 1 (Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours})",
+                  1, &menu, &stale, &src) == 1 && !stale,
+              "#W58-A D3 echo shape: the complete computed-zero annotation still binds to its row");
     }
 
     // ---- #W54-B (D14): a no-op row taken against the reply's own PLAN ----
