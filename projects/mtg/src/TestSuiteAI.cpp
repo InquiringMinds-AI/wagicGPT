@@ -426,6 +426,7 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 11, "releasekey ") == 0
                              || action.compare(0, 10, "aipending ") == 0          //#W54-R
                              || action.compare(0, 7, "aiseat ") == 0                       //#W57-S
+                             || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -481,7 +482,8 @@ int TestSuiteAI::Act(float)
             //cancelcost declines the OPEN pay-or-decline menu itself (choosing
             //the unpaid branch) - it must reach the menu, not be pre-answered
             //by the suite default (which would commit to the paid branch).
-            && action.compare("cancelcost") != 0)
+            && action.compare("cancelcost") != 0
+            && action.compare(0, 18, "assertmanasources ") != 0) //#W59-K (K6)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -498,6 +500,7 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
                 || action.compare(0, 10, "aipending ") == 0 //#W54-R
                 || action.compare(0, 7, "aiseat ") == 0 //#W57-S
+                || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -929,6 +932,34 @@ int TestSuiteAI::Act(float)
             DebugTrace("TESTSUITE cancelcost: no pending pay prompt [" << suite->filename << "]");
         }
     }
+    else if (action.compare("aipaycost") == 0)
+    {
+        //#W59-K (K6): drive the AI's real optional-mana payment path so a
+        //fixture can distinguish its queued producer clicks from human auto-tap.
+        ExtraCosts * ep = observer->mExtraPayment;
+        ExtraManaCost * leg = ep && ep->costs.size()
+            ? dynamic_cast<ExtraManaCost *>(ep->costs[0]) : NULL;
+        TestSuiteAI * payer = leg && leg->source
+            ? dynamic_cast<TestSuiteAI *>(leg->source->controller()) : NULL;
+        if (!payer || !leg->costToPay)
+        {
+            std::cerr << "TESTSUITE aipaycost: no pending AI mana payment (state unchanged) ["
+                      << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        vector<MTGAbility*> plan = payer->canPayMana(leg->source, leg->costToPay,
+                                                     leg->source->has(Constants::ANYTYPEOFMANAABILITY));
+        payer->payTheManaCost(leg->costToPay,
+                              leg->source->has(Constants::ANYTYPEOFMANAABILITY),
+                              leg->source, plan);
+        while (!payer->clickstream.empty())
+        {
+            AIAction * a = payer->clickstream.front();
+            payer->clickstream.pop();
+            a->Act();
+            SAFE_DELETE(a);
+        }
+    }
     else if (action.compare("paycost") == 0)
     {
         //Complete a pending mExtraPayment (the pay leg of a pay-or-decline
@@ -1125,6 +1156,21 @@ int TestSuiteAI::Act(float)
         {
             std::cerr << "TESTSUITE assertinterrupting: expected " << want << " got " << got
                       << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
+    else if (action.compare(0, 18, "assertmanasources ") == 0)
+    {
+        //#W59-K (K6): pin the same distinct-source count that renders the
+        //"Mana available" line while a repeated optional payment is underway.
+        int expect = atoi(action.substr(18).c_str());
+        ManaEngine::FreeProducerPolicy policy;
+        ManaCost colors;
+        int got = ManaEngine::potentialColorReach(this, policy, &colors);
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertmanasources: expected " << expect
+                      << " sources got " << got << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }
     }
