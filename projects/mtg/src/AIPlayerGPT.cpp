@@ -10390,6 +10390,37 @@ static string asyncSlotDriftKind(const string& oldKey, const string& newKey)
     return "board";
 }
 
+//#W58-C (D4): what a drop DID with the decision. Two exits and no third: the
+//livelock breaker hands this decision to the bounded heuristic, or the answer
+//is bought again. Pure.
+static const char * asyncDropOutcome(bool gaveUpToHeuristic)
+{
+    return gaveUpToHeuristic ? "gave-up-to-heuristic" : "re-asked";
+}
+
+//#W58-C (D4): the drop's RECORD token - arm, which half of the slot key moved,
+//and what the drop did. The wave-57 corpus took 108 drops (0.82 h of inference)
+//and left one stderr line each, naming the arm and nothing else; the outcome
+//had to be recovered by reading the next `AIPlayerGPT:` line, and a build
+//without DebugTrace left no trace at all. This string is what the translog
+//carries, so the price of the drops is a field rather than an archaeology pass.
+//Pure.
+static string asyncDropStamp(const char * arm, const string& driftKind, const char * outcome)
+{
+    return string(arm ? arm : "?") + "/" + (driftKind.empty() ? "unknown" : driftKind)
+           + "/" + (outcome ? outcome : "?");
+}
+
+//#W58-C (D4): the stderr line for the same drop. The leading literal and the
+//arm parenthetical are byte-identical to wave 57's - every existing census keys
+//on them - and the outcome is appended in its own bracket. Pure.
+static string asyncDropTraceLine(const char * arm, const string& driftKind, const char * outcome)
+{
+    return "AIPlayerGPT: dropping stale async answer (" + string(arm ? arm : "?")
+           + " arm; the " + (driftKind.empty() ? "unknown" : driftKind)
+           + " moved) [outcome: " + (outcome ? outcome : "?") + "]";
+}
+
 string AIPlayerGPT::asyncSlotKey(const string& userMsg)
 {
     return asyncSlotKeyOf(userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0,
@@ -10611,10 +10642,13 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //corpus can separate a genuinely moved board from a second
             //cross-arm displacement without an archaeology pass. The leading
             //literal is UNCHANGED - every existing census keys on it.
-            DebugTrace("AIPlayerGPT: dropping stale async answer (" << armName
-                       << " arm; the "
-                       << asyncSlotDriftKind(slot->slotKey, asyncSlotKey(userMsg))
-                       << " moved)");
+            //#W58-C (D4): the drift kind is computed ONCE, here, and the line
+            //is written after the drop's own decision is known - so one line
+            //carries both halves and no census has to pair it with the next
+            //`AIPlayerGPT:` line of the stderr. The leading literal and the
+            //arm parenthetical are byte-identical to wave 57's: every existing
+            //count keys on them.
+            const string driftKind = asyncSlotDriftKind(slot->slotKey, asyncSlotKey(userMsg));
             //#W55-E (D5b): WHERE the prompt moved. A stale drop says only that
             //the rebuilt prompt differs from the one in flight; the wave-54
             //reveal livelock (146v123 s15) then needed an archaeology pass over
@@ -10648,6 +10682,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     mStaleDropStreak = 0;
                 }
             }
+            //#W58-C (D4): the drop's OUTCOME - what this drop did with the
+            //decision, decided here and stated on the drop's own line. Two
+            //exits exist and both are named: the breaker hands THIS decision
+            //to the heuristic, or the answer is bought again from the model.
+            //Wave 57 could tell them apart only by reading the following
+            //stderr lines, and 108 drops of it were 0.82 h of inference with
+            //no per-drop record of where any of it went.
+            const char * dropOutcome =
+                asyncDropOutcome(mStaleDropStreak + 1 >= kStaleLivelockLimit);
+            DebugTrace(asyncDropTraceLine(armName, driftKind, dropOutcome));
+            //The RECORD half, and it is not diagnostics: one token per drop on
+            //the next translog record this seat writes, so the corpus can price
+            //the drops without a stderr at all.
+            mAsyncDropStamps.push_back(asyncDropStamp(armName, driftKind, dropOutcome));
             if (++mStaleDropStreak >= kStaleLivelockLimit)
             {
                 DebugTrace("AIPlayerGPT: " << mStaleDropStreak
@@ -11817,6 +11865,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mRevealStallSecs = 0;
         mRevealStallPhase = -1;
         mRevealStallParked = false;
+    }
+    //#W58-C (D4): the stale drops this seat took since its last record. One
+    //token per drop, "<arm>/<slot-key half that moved>/<outcome>", and the
+    //list is CONSUMED here so a drop is stamped exactly once. Unconditional -
+    //this is the record, not a diagnostic, and it is the only evidence a
+    //release build (or a console) leaves of an answer bought twice.
+    if (!mAsyncDropStamps.empty())
+    {
+        rec["async_drops"] = (int) mAsyncDropStamps.size();
+        rec["async_drop_events"] = mAsyncDropStamps;
+        mAsyncDropStamps.clear();
     }
     //#W55-E (D23): this record answers a prompt that had already missed the wall.
     if (mWallMissPending && !userMsg.empty() && userMsg == mWallMissBase)
@@ -15061,17 +15120,44 @@ static const char * const kNoAttackThisCombatLine =
 //(live attacker flags, recompute), 2 = the latched total in the settled form,
 //3 = the pre-declaration forecast, 4 = the declaration closed with no attack,
 //0 = nothing. Pure so PARSETEST can walk a whole combat.
+//#W58-C (D9, wave-57 ledger MED): the gate was the opponent's COMBAT phases, so
+//the number that ends games was withheld from every window before their combat
+//began - 20 opponent-turn windows in the wave-57 corpus carried attackers ready
+//and no total (Main 1 x10, Upkeep x6, Draw x4). `125v146` s23 is the sharpest:
+//the seat at 3 life, 7 power able to attack, and no line, at the window where a
+//response was still affordable. The gate is now the opponent's TURN from upkeep
+//through end of turn, and each form stays true where it prints: before the
+//declaration the FORECAST ("not declared yet - N can attack, for up to M"), so
+//upkeep, draw and main 1 read the same bound the pre-combat windows already
+//read; after their combat the latched total in the settled form, or the closed
+//"they declared no attackers" - never the forecast, which would be a false
+//claim about a combat that is over. Untap and cleanup stay silent. The
+//declared form (1) still requires the combat phases: an attacker flag outside
+//them is not a declaration this window can price. D6's under-claim rule is
+//untouched - the forecast is an upper bound over able attackers and makes no
+//trample carry-over claim. Pure, so a whole opponent turn is walkable in
+//PARSETEST without a board.
 static int incomingCombatForm(bool oppActive, int phase, int liveAttackers,
                               int latchTurn, int turn, int ableAttackers)
 {
-    if (!oppActive || phase < (int) MTG_PHASE_COMBATBEGIN || phase > (int) MTG_PHASE_COMBATEND)
+    if (!oppActive || phase < (int) MTG_PHASE_UPKEEP || phase > (int) MTG_PHASE_ENDOFTURN)
         return 0;
-    if (liveAttackers > 0)
+    const bool inCombat = (phase >= (int) MTG_PHASE_COMBATBEGIN
+                           && phase <= (int) MTG_PHASE_COMBATEND);
+    if (inCombat && liveAttackers > 0)
         return 1;
     if (latchTurn == turn)
         return 2;
     if (phase <= (int) MTG_PHASE_COMBATATTACKERS)
         return ableAttackers > 0 ? 3 : 0;
+    //Past their combat with nothing latched: the declaration closed with no
+    //attack. Inside the combat phases that is worth saying whatever their board
+    //holds - the step the seat is holding mana through just closed. In their
+    //post-combat windows it is only news when they HAD an attack to declare;
+    //otherwise the board frame's "0 of them able to attack right now" already
+    //says it and this would be a line on every window of a creatureless game.
+    if (!inCombat && ableAttackers <= 0)
+        return 0;
     return 4;
 }
 
@@ -18440,6 +18526,91 @@ static void applyDuplicateEffectTags(std::vector<std::string>& rows,
     }
 }
 
+//#W58-C (D2): the header's fold over ONE row's printed verdict. A `{right now:}`
+//clause is a LIST of per-scope verdicts separated by `;` - Devour Flesh renders
+//"they control 1 creature - Rorix Bladewing (6/5) [flying, haste, ...] is
+//sacrificed, they gain 5 ...; YOU control 0 creatures - targeting yourself does
+//nothing" - and the zero-predicate applied to the WHOLE string matched the
+//second scope's "does nothing" and read the row as dead while the row itself
+//named a kill. That is how `NO LIVE CAST ROW ON THIS MENU` came out FALSE on 8
+//of its 497 wave-57 renders (`123v130` s45/s49/s50 among them; the pilot obeyed
+//it three times under a 6/5 flier). A header is a FOLD over the rows, so it has
+//to fold over the same units the row prints: every scope must read zero, and a
+//scope's operative magnitude is what stands OUTSIDE its parenthetical qualifier
+//("destroys 0 of their creatures (0 without a restriction against attacking)"
+//is dead; "-1/-1 (no creature has died this turn, so Morbid does NOT apply)"
+//states -1/-1 and is not). A scope that strips to nothing is not a zero either -
+//the miss direction is the header staying SILENT, which can never contradict a
+//row. `rowSaysNoOp` stays the engine's single zero-predicate; this only decides
+//what it is applied to. Pure over the rendered clause.
+static string verdictScopeOperative(const string& scope)
+{
+    string out;
+    int depth = 0;
+    for (size_t i = 0; i < scope.size(); i++)
+    {
+        const char c = scope[i];
+        if (c == '(')
+        {
+            depth++;
+            continue;
+        }
+        if (c == ')')
+        {
+            if (depth > 0)
+                depth--;
+            continue;
+        }
+        if (!depth)
+            out += c;
+    }
+    const size_t a = out.find_first_not_of(" \t");
+    if (a == string::npos)
+        return "";
+    return out.substr(a, out.find_last_not_of(" \t") - a + 1);
+}
+
+bool AIPlayerGPT::verdictReadsZero(const string& verdictClause)
+{
+    const string open = "{right now:";
+    if (verdictClause.size() <= open.size() + 1
+        || verdictClause.compare(0, open.size(), open) != 0
+        || verdictClause[verdictClause.size() - 1] != '}')
+        return false;
+    const string body = verdictClause.substr(open.size(),
+                                             verdictClause.size() - open.size() - 1);
+    int depth = 0;
+    string scope;
+    bool any = false;
+    for (size_t i = 0; i <= body.size(); i++)
+    {
+        //A virtual ';' past the end closes the last scope, so the single-scope
+        //verdict and the compound one run the same code.
+        const char c = (i < body.size()) ? body[i] : ';';
+        if (c == '{' || c == '[' || c == '(')
+            depth++;
+        else if (c == '}' || c == ']' || c == ')')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        if (c == ';' && !depth)
+        {
+            const string op = verdictScopeOperative(scope);
+            //#W58 merge (A x C): rowSaysNoOp reads the number grammar of a
+            //`{right now: ...}` clause (#W58-A), so each scope is re-wrapped
+            //as its own one-scope verdict before it is asked.
+            if (op.empty() || !AIPlayerGPT::rowSaysNoOp("{right now: " + op + "}"))
+                return false;
+            any = true;
+            scope.clear();
+            continue;
+        }
+        scope += c;
+    }
+    return any;
+}
+
 //#W57-C (D12, wave-56 ledger MED): the highest-frequency inference the prompt
 //asks for, and it is a multi-row scan. deck123 faced 85 all-dead casting menus
 //of 197 and performed the scan correctly 84 times (`123v125` s45 is the miss);
@@ -18455,8 +18626,9 @@ static bool everyCastRowDead(const std::vector<std::string>& rows)
         return false;
     for (size_t i = 0; i < rows.size(); i++)
     {
+        //#W58-C (D2): the fold, per SCOPE of the row's own verdict.
         const string v = rowVerdictClause(rows[i]);
-        if (v.empty() || !AIPlayerGPT::rowSaysNoOp(v))
+        if (v.empty() || !AIPlayerGPT::verdictReadsZero(v))
             return false;
     }
     return true;
@@ -46689,10 +46861,40 @@ static const char * kW50Y_r94 =
         }
         CHECK(incomingCombatForm(false, (int) MTG_PHASE_COMBATBLOCKERS, 3, 7, 7, 3) == 0,
               "#W57-B D6 NEGATIVE nothing is claimed about the seat's OWN combat");
-        CHECK(incomingCombatForm(true, (int) MTG_PHASE_FIRSTMAIN, 3, 7, 7, 3) == 0
-              && incomingCombatForm(true, (int) MTG_PHASE_SECONDMAIN, 0, 7, 7, 3) == 0
-              && incomingCombatForm(true, (int) MTG_PHASE_UPKEEP, 0, -1, 7, 3) == 0,
-              "#W57-B D6 NEGATIVE the line stays inside their combat - no main-phase or upkeep window");
+        //#W58-C (D9) SUPERSEDES the wave-57 negative that pinned this line inside
+        //their combat phases: that gate is the defect - 20 opponent-turn windows
+        //carried attackers ready and no total, `125v146` s23 at 3 life facing 7
+        //power at Main 1. The forecast now covers their pre-combat windows.
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_UPKEEP, 0, -1, 7, 3) == 3
+              && incomingCombatForm(true, (int) MTG_PHASE_DRAW, 0, -1, 7, 3) == 3
+              && incomingCombatForm(true, (int) MTG_PHASE_FIRSTMAIN, 0, -1, 7, 3) == 3,
+              "#W58-C D9 their upkeep, draw and main 1 carry the FORECAST - the windows where a"
+              " response is still affordable");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_FIRSTMAIN, 3, -1, 7, 3) == 3,
+              "#W58-C D9 an attacker flag outside their combat phases is not a declaration this"
+              " window may price - the forecast stands, never the declared total");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_SECONDMAIN, 0, 7, 7, 3) == 2
+              && incomingCombatForm(true, (int) MTG_PHASE_ENDOFTURN, 0, 7, 7, 3) == 2,
+              "#W58-C D9 their post-combat windows re-render the LATCHED total, not a forecast for"
+              " a combat that is over");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_SECONDMAIN, 0, -1, 7, 3) == 4,
+              "#W58-C D9 bodies that could have attacked and did not: the closed form");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_FIRSTMAIN, 0, -1, 7, 0) == 0
+              && incomingCombatForm(true, (int) MTG_PHASE_SECONDMAIN, 0, -1, 7, 0) == 0,
+              "#W58-C D9 NEGATIVE nothing able to attack claims nothing - no line on any window of"
+              " a creatureless board");
+        CHECK(incomingCombatForm(true, (int) MTG_PHASE_UNTAP, 0, -1, 7, 3) == 0
+              && incomingCombatForm(true, (int) MTG_PHASE_CLEANUP, 0, 7, 7, 3) == 0
+              && incomingCombatForm(true, (int) MTG_PHASE_AFTER_EOT, 0, 7, 7, 3) == 0,
+              "#W58-C D9 NEGATIVE untap and the post-end steps stay silent - the gate is upkeep"
+              " through end of turn");
+        CHECK(incomingCombatForm(false, (int) MTG_PHASE_UPKEEP, 0, -1, 7, 3) == 0
+              && incomingCombatForm(false, (int) MTG_PHASE_FIRSTMAIN, 0, -1, 7, 3) == 0,
+              "#W58-C D9 NEGATIVE nothing is claimed about the seat's OWN turn");
+        CHECK(incomingCombatForecastLine(3, 7, 3)
+              == "INCOMING THIS COMBAT: not declared yet - 3 of their creatures can attack,"
+                 " for up to 7 - you would be at -4; that would KILL you",
+              "#W58-C D9 `125v146` s23's own numbers: 3 life, 7 power, and the window says so");
 
         // ---- D24: the assignable remainder. `123v152` seq 23.
         {
@@ -48266,6 +48468,109 @@ static const char * kW50Y_r94 =
         CHECK(incomingCombatLine(2, 9, 5, true, 0, 0, 6, false).find('[') == string::npos
               && incomingCombatLine(2, 9, 5, true, 0, 0, 6, false).find('{') == string::npos,
               "#W58-B D7 NEGATIVE the floor stays a board fact - no bracket, no brace channel");
+    }
+
+    // ================= wave-58 lane C =================
+    cout << "\n[W58-C] D2 the no-live-cast-row header folds over EVERY scope of a row's verdict\n";
+    {
+        // `123v130` seq 45, verbatim: one verdict, two target scopes. The
+        // opponent scope names a 6/5 flier being sacrificed; the self scope
+        // says targeting yourself does nothing. The whole-string predicate
+        // matched the second and the header claimed the menu was dead.
+        const string devour =
+            "Cast Devour Flesh {1}{b} {right now: they control 1 creature - Rorix Bladewing (6/5)"
+            " [flying, haste, doesn't untap during its controller's untap step] is sacrificed,"
+            " they gain 5 - the sacrificing player gains, not you; YOU control 0 creatures -"
+            " targeting yourself does nothing}";
+        CHECK(!AIPlayerGPT::verdictReadsZero(rowVerdictClause(devour)),
+              "#W58-C D2 a verdict naming a kill in ONE scope does not read zero because another"
+              " scope of it does");
+        vector<string> falseHeader;
+        falseHeader.push_back(devour);
+        falseHeader.push_back("Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this"
+                              " turn, so Morbid does NOT apply)}");
+        CHECK(!everyCastRowDead(falseHeader),
+              "#W58-C D2 `123v130` s45's own menu: the header does not fire, and cannot contradict"
+              " the row three lines below it");
+        CHECK(allCastRowsDeadNote(everyCastRowDead(falseHeader), (int) falseHeader.size()).empty(),
+              "#W58-C D2 echo: no fold, no header token - and the rows are untouched either way");
+        // The Tragic Slip class on its own: the operative magnitude is -1/-1
+        // and the parenthetical only says why Morbid is off.
+        CHECK(!AIPlayerGPT::verdictReadsZero("{right now: -1/-1 (no creature has died this turn,"
+                                             " so Morbid does NOT apply)}"),
+              "#W58-C D2 a qualifier inside parentheses never overrides the magnitude outside it");
+        // POSITIVE, and the 472 of 497 wave-57 windows that were TRUE stay true.
+        CHECK(AIPlayerGPT::verdictReadsZero("{right now: destroys 0 of their creatures"
+                                            " (0 without a restriction against attacking),"
+                                            " 0 of yours}"),
+              "#W58-C D2 the Supreme Verdict/Damnation shape still reads zero - the parenthetical"
+              " is stripped and `destroys 0` stands");
+        CHECK(AIPlayerGPT::verdictReadsZero("{right now: they control 0 creatures - at 0 this does"
+                                            " nothing; YOU control 0 creatures - targeting"
+                                            " yourself does nothing}"),
+              "#W58-C D2 a compound verdict whose EVERY scope reads zero still reads zero");
+        vector<string> allDead;
+        allDead.push_back("Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures"
+                          " (0 without a restriction against attacking), 0 of yours}");
+        allDead.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures -"
+                          " at 0 this does nothing}");
+        CHECK(everyCastRowDead(allDead)
+              && allCastRowsDeadNote(true, 2).find("all 2 cast rows below") != string::npos,
+              "#W58-C D2 REGRESSION the all-dead menu still fires the shipped header, byte for byte");
+        // NEGATIVES on the shape of the clause itself.
+        CHECK(!AIPlayerGPT::verdictReadsZero("{right now: }")
+              && !AIPlayerGPT::verdictReadsZero("{right now: (destroys 0 of their creatures)}")
+              && !AIPlayerGPT::verdictReadsZero("destroys 0 of their creatures")
+              && !AIPlayerGPT::verdictReadsZero(""),
+              "#W58-C D2 NEGATIVE an empty verdict, a verdict that is ALL qualifier, and a bare"
+              " sentence with no clause around it are none of them a computed zero");
+        CHECK(!AIPlayerGPT::verdictReadsZero("{right now: deals 3}")
+              && !AIPlayerGPT::verdictReadsZero("{right now: deals 0; drains 3}"),
+              "#W58-C D2 NEGATIVE a real magnitude in any scope keeps the row live");
+        // A ';' inside a bracketed keyword list is not a scope boundary.
+        CHECK(AIPlayerGPT::verdictReadsZero("{right now: destroys 0 of their creatures"
+                                            " [flying; trample]}"),
+              "#W58-C D2 the scope split is depth-aware - a ';' inside [] does not open a scope");
+    }
+
+    cout << "\n[W58-C] D4 every stale drop states its drift kind AND its outcome\n";
+    {
+        CHECK(string(asyncDropOutcome(false)) == "re-asked"
+              && string(asyncDropOutcome(true)) == "gave-up-to-heuristic",
+              "#W58-C D4 a drop has exactly two exits and both are named");
+        const string castTail = "Casting decision (Main phase 1, opponent's turn)";
+        const string board = "=BOARD=";
+        const string k1 = asyncSlotKeyOf(false, 13, 4, castTail, board);
+        const string k2 = asyncSlotKeyOf(false, 14, 4, castTail, board);
+        const string kind = asyncSlotDriftKind(k1, k2);
+        CHECK(kind == "question (or turn/phase)",
+              "#W58-C D4 the wave-57 drift kind is unchanged - this lane adds the outcome, it does"
+              " not re-classify the drift");
+        CHECK(asyncDropTraceLine("casting", kind, asyncDropOutcome(false))
+              == "AIPlayerGPT: dropping stale async answer (casting arm; the question (or"
+                 " turn/phase) moved) [outcome: re-asked]",
+              "#W58-C D4 the stderr line keeps wave-57's leading literal and arm parenthetical and"
+              " gains the outcome");
+        CHECK(asyncDropTraceLine("land-drop", "board", asyncDropOutcome(true))
+              == "AIPlayerGPT: dropping stale async answer (land-drop arm; the board moved)"
+                 " [outcome: gave-up-to-heuristic]",
+              "#W58-C D4 the land arm and the breaker exit read the same way");
+        CHECK(asyncDropStamp("casting", kind, asyncDropOutcome(false))
+              == "casting/question (or turn/phase)/re-asked",
+              "#W58-C D4 the translog token is arm/drift/outcome - the record half, which ships"
+              " with no DebugTrace in the build");
+        CHECK(asyncDropStamp("land-drop", "", asyncDropOutcome(true))
+              == "land-drop/unknown/gave-up-to-heuristic",
+              "#W58-C D4 a drop with no classifiable key still carries a kind literal - the field"
+              " is never absent on a drop");
+        CHECK(asyncDropTraceLine("casting", kind, asyncDropOutcome(false))
+                  .compare(0, strlen("AIPlayerGPT: dropping stale async answer ("),
+                           "AIPlayerGPT: dropping stale async answer (") == 0,
+              "#W58-C D4 NEGATIVE the census literal is at byte 0 - no wave-57 count is invalidated");
+        CHECK(asyncDropStamp("casting", kind, asyncDropOutcome(false))
+                  .find("dropping stale") == string::npos,
+              "#W58-C D4 NEGATIVE the record token is not the stderr sentence - a corpus counting"
+              " one never double-counts the other");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

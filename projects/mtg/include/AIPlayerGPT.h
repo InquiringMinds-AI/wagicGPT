@@ -1287,6 +1287,11 @@ public:
     //Two surfaces that disagree about what "dead" means are the exact asymmetry
     //D8 was filed against, so they read ONE function.
     static bool rowSaysNoOp(const string& row);
+    //#W58-C (D2): the MENU-level fold. A `{right now:}` verdict is a list of
+    //per-scope verdicts; the header may claim a row reads zero only when EVERY
+    //scope of it does, judged on the text outside each scope's parenthetical
+    //qualifier. PUBLIC so PARSETEST pins it without a board.
+    static bool verdictReadsZero(const string& verdictClause);
 private:
     static bool planArguesAgainstRow(const string& reply, const string& row);
     //#W54-F (D7b): an engine-answered decision (no prompt, no reply, nothing
@@ -1334,6 +1339,17 @@ private:
     //the board every tick) is the async design working, and restarts the count.
     string mStaleDropBoard;
     bool mLastStaleLivelock; //the last no-answer was the breaker firing
+    //#W58-C (D4): every stale drop since the last record was written, one
+    //token each: "<arm>/<which half of the slot key moved>/<what the drop
+    //did>". The wave-57 corpus took 108 drops (0.82 h of inference, the
+    //largest sink after the identical-declined runs) and the ONLY evidence
+    //anywhere was a stderr line naming the arm - so a drop's outcome could be
+    //recovered only by reading the next `AIPlayerGPT:` line of a 40 KB stderr,
+    //and a release build (no DebugTrace) recorded nothing at all. The stderr
+    //line is diagnostics; this is the RECORD, and it ships unconditionally on
+    //the next translog record for this seat. Consumed when written, so a drop
+    //is stamped exactly once.
+    std::vector<std::string> mAsyncDropStamps;
     //#W55-E (D5a): reveal-driver stall figures for the record being written.
     int mRevealStallTicks;
     long mRevealStallSecs;
