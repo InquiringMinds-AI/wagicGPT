@@ -1,0 +1,46 @@
+# W59-K (K6): a mana ability GRANTED by Katilda, Dawnhart Prime ("Human creatures you control
+# have {T}: Add one mana of any of this creature's colors") is paid by the HUMAN that has it,
+# not by Katilda. Intrepid Adversary's repeated {1}{W} must therefore finish all six payments
+# from the twelve sources, and the render-facing source count must still report six untapped
+# sources halfway through.
+# PRE-FIX (verified RED on 35c9b85bf + this harness command): every grantee's TapCost still
+# named KATILDA, so TapCost::isPaymentSet() answered 0 for the whole team as soon as Katilda
+# was tapped - only the five Plains and Katilda ever tapped (6 of 12), and assertmanasources
+# read 0 with six untapped grantees on the board.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains,Plains,Plains,Plains,535024,Luminarch Aspirant,Luminarch Aspirant,Augur of Autumn,Elite Spellbinder,Elite Spellbinder,Intrepid Adversary
+hand:Intrepid Adversary
+manapool:{W}{W}
+[PLAYER2]
+life:20
+[DO]
+Intrepid Adversary
+choice 6
+choice 0
+aipaycost
+choice 0
+aipaycost
+choice 0
+aipaycost
+assertmanasources 6
+choice 0
+aipaycost
+choice 0
+aipaycost
+choice 0
+aipaycost
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains,Plains,Plains,Plains,535024,Luminarch Aspirant,Luminarch Aspirant,Augur of Autumn,Elite Spellbinder,Elite Spellbinder,Intrepid Adversary,Intrepid Adversary
+tappedinplay:12
+narration:paid {1}{w} with plains #5; katilda, dawnhart prime
+[PLAYER2]
+[END]

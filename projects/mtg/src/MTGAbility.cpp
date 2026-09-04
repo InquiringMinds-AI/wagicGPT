@@ -7958,6 +7958,27 @@ void MTGAbility::propagateSource(MTGAbility * a, MTGCardInstance * newSource)
     if (!a || !newSource)
         return;
     a->source = newSource;
+    //#W59-K (K6): a GRANTED ability's costs are paid by the card that HAS the
+    //ability, never by the card that granted it (CR 113.6 - the grantee is the
+    //ability's source). The clone's ManaCost is deep-copied (ExtraCosts::clone),
+    //but its ExtraCost::source still named the GRANTER, and TapCost answers
+    //isPaymentSet() 0 whenever THAT card is tapped or summoning-sick. So every
+    //`lord(...) {T}:...` grant (Katilda, Dawnhart Prime's "Human creatures you
+    //control have {T}: Add one mana of any of this creature's colors", ~60 more
+    //cards) went unpayable for the whole team the moment the granter tapped -
+    //Intrepid Adversary's repeated {1}{W} stopped at 4 of 6 affordable payments
+    //and the mana line then read "0 total (no untapped sources)" with six
+    //untapped grantees on the board. Repointing the cost's sources here fixes
+    //the payability gate, the render's source count, and doPay's victim (a
+    //TapCost taps ExtraCost::source) in one place, for every grant path.
+    if (ManaCost * gcost = a->getCost())
+        if (gcost->extraCosts)
+        {
+            gcost->extraCosts->source = newSource;
+            for (size_t ec = 0; ec < gcost->extraCosts->costs.size(); ++ec)
+                if (gcost->extraCosts->costs[ec])
+                    gcost->extraCosts->costs[ec]->setSource(newSource);
+        }
     //Wrappers (GenericActivatedAbility & co) hold the real effect nested
     //inside; resolve() forwards target but reads source from the child.
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
