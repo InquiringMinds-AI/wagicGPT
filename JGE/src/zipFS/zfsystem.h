@@ -294,7 +294,15 @@ inline void izfstream::close() {
 }
 
 inline bool izfstream::is_open() const {
-	return static_cast<zbuffer *>(rdbuf())->is_open();
+	// rdbuf() is NULL after filesystem::unuse() on a non-zipped stream. The
+	// buffer is a plain std::filebuf for a loose file and a zbuffer only for an
+	// entry inside a zip - casting a filebuf to zbuffer read m_Opened from past
+	// the end of the object (undefined; seen as a NULL-dereference crash in
+	// AttachZipFile on Android when set images are zipped and a set is missing).
+	std::streambuf * buf = rdbuf();
+	if (!buf) return false;
+	if (!m_Zipped) return static_cast<std::filebuf *>(buf)->is_open();
+	return static_cast<zbuffer *>(buf)->is_open();
 }
 
 inline bool izfstream::Zipped() const {

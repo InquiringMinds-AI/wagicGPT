@@ -443,6 +443,10 @@ bool JFileSystem::AttachZipFile(const string &zipfile, char *password /* = NULL 
                      zipfile.c_str(), e);
             zipDiagLog(this, line);
         }
+        // The failed open released the previous stream buffer; without this the
+        // next AttachZipFile would treat the dead stream as still attached and
+        // dereference a NULL rdbuf() in is_open().
+        mZipAvailable = false;
         return false;
     }
 
