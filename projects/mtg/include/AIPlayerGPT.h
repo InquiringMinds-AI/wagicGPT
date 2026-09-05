@@ -458,6 +458,10 @@ private:
     //these; a seam still calling the one-argument forms is unchanged.
     string serializeGameStatePair(const string& tail, string * keyVariant);
     string assemblePrompt(const string& tail, const string * situation);
+    //#W62-fix (wave-61 corpus livelock): keyTail, when given, is what mPromptTail
+    //(the seam half of the async slot key) is set to instead of `tail` - the
+    //question and options WITHOUT the prompt-only notes spliced after them.
+    string assemblePrompt(const string& tail, const string * situation, const string * keyTail);
     string serializeGameStateImpl(const std::string * optionText, std::string * keyVariant);
     //A24: HTTP status of the last consumed round trip (0 = no status came
     //back: transport-level failure or the Codex path; 200 = answered). Read by
@@ -1229,6 +1233,11 @@ private:
     string holdReopenNote(const char * seam, const std::vector<string>& rows);
     std::map<string, std::set<string> > mLastMenuRows; //per seam, previous window
     std::map<string, int> mMenuRepeatRun;              //consecutive unchanged windows
+    //#W62-fix: the translog seq at which each seam's note was last MEASURED. A
+    //prompt is rebuilt every tick while an answer is in flight; the same window
+    //re-rendered (same seq, same rows) must return the same note, not count.
+    std::map<string, int> mMenuRepeatSeq;
+    std::map<string, string> mMenuRepeatNote;
     string mCastHoldNote;                              //measured once per cast window
     //#W53-N (D2): record the model's hold answer at this seam.
     void takeHold(const char * seam, const std::vector<string>& rows);

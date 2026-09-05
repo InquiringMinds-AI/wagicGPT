@@ -14599,9 +14599,21 @@ static string planWithdrawnBlock(const string& ageClause, const string& absentCl
 
 string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
 {
+    return assemblePrompt(tail, situation, NULL);
+}
+
+string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
+                                   const string * keyTail)
+{
     //#W56-A (D18): the SEAM half of the async slot key - the question and its
     //numbered option list, exactly as this prompt will carry them.
-    mPromptTail = tail;
+    //#W62-fix (wave-61 corpus, 15,900 stale drops in 11 h): a caller that
+    //splices prompt-only notes into the tail hands the note-free tail as
+    //keyTail. The declined count and the hold check are by design outside the
+    //ask key; they were inside THIS key, and the hold check's counter moved on
+    //every rebuild, so every in-flight answer was stale and the livelock
+    //breaker gave 6 round trips per decision to the heuristic.
+    mPromptTail = keyTail ? *keyTail : tail;
     std::ostringstream u;
     //W41-3(c): a bulk move that ran right up to the decision point must be in
     //the log the model reads, not stranded in the accumulator.
@@ -19927,6 +19939,16 @@ static string holdRowLine()
 //window at this seam) rather than a second, looser one. Prompt-only, like the
 //declined count and for the same reason: a number that moves with every answer
 //must never enter the ask key. Pure over (unseen rows, repeat run).
+//#W62-fix: is this rebuild the SAME window the note was last measured at? The
+//prompt is rebuilt every tick while an answer is in flight; a window closes by
+//writing a translog record (seq moves). Same seq + no unseen row = same window,
+//and measuring it again would count rebuilds as windows (the wave-61 corpus
+//printed "132 windows in a row" for one Cleanup window) and move the slot key.
+static bool holdNoteSameWindow(bool first, int unseenRows, int measuredSeq, int nowSeq)
+{
+    return !first && unseenRows == 0 && measuredSeq == nowSeq;
+}
+
 static string holdReopenNoteText(int unseenRows, int repeats)
 {
     if (repeats < 1 && unseenRows < 1)
@@ -19957,6 +19979,9 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
         for (size_t i = 0; i < rows.size(); i++)
             if (!it->second.count(rows[i]))
                 unseen++;
+    std::map<string, int>::iterator sq = mMenuRepeatSeq.find(seam);
+    if (holdNoteSameWindow(first, unseen, sq == mMenuRepeatSeq.end() ? -1 : sq->second, mTransSeq))
+        return mMenuRepeatNote[seam]; //#W62-fix: a rebuild of the window already measured
     int& run = mMenuRepeatRun[seam];
     if (first)
         run = 0;
@@ -19965,6 +19990,8 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
     else
         run++;
     const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : run);
+    mMenuRepeatSeq[seam] = mTransSeq;
+    mMenuRepeatNote[seam] = note;
     std::set<string>& mem = mLastMenuRows[seam];
     mem.clear();
     for (size_t i = 0; i < rows.size(); i++)
@@ -25927,7 +25954,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForPriority(shownLines, logWindowStackRespondable());
-    string userMsg = assemblePrompt(userTail);
+    string userMsg = assemblePrompt(userTail, NULL, &tailStr); //#W62-fix: notes stay out of the slot key
     bool unchanged = (askKey == mLastAskKey);
 
     //Deadlock breaker: priority is decided every AI tick. If the game state
@@ -26675,7 +26702,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         userTail = userTail.substr(0, askOptionsEnd) + promptOnlyNote + userTail.substr(askOptionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForAsk(decision, options);
-    string userMsg = assemblePrompt(userTail);
+    string userMsg = assemblePrompt(userTail, NULL, &tailStr); //#W62-fix: notes stay out of the slot key
     string content;
     if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
@@ -55657,6 +55684,18 @@ static const char * kW50Y_r94 =
         CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b}" + holdReopenNoteText(0, 3))
                   .find("hold check") == string::npos,
               "#W61-U C14 echo shape: the note is a bracket and never reaches the narration");
+        // #W62-fix (wave-61 corpus): the counter counts WINDOWS, not rebuilds.
+        // A rebuild while an answer is in flight has the same seq and no new
+        // row; measuring it again moved the async slot key every tick (15,900
+        // stale drops, 11 h, every late decision handed to the heuristic).
+        CHECK(holdNoteSameWindow(false, 0, 41, 41),
+              "#W62-fix the same window rebuilt (same seq, no new row) is not measured again");
+        CHECK(!holdNoteSameWindow(false, 0, 41, 42),
+              "#W62-fix NEGATIVE a record written since means a new window: measure");
+        CHECK(!holdNoteSameWindow(false, 1, 41, 41),
+              "#W62-fix NEGATIVE a new row is a new menu even at the same seq: measure");
+        CHECK(!holdNoteSameWindow(true, 0, -1, 0),
+              "#W62-fix NEGATIVE the first window at a seam is always measured");
         // ---- the record's copy of a runaway reply (deck162 MED) ----
         {
             const string committed = "CHOICE: 1 (Cast Fate Unraveler)\nPLAN: land, then Ob Nixilis.\n";
