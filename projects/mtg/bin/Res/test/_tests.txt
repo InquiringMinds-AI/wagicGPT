@@ -1357,3 +1357,4 @@ intrepid_adversary_repeated_payment.txt
 w60_stack_pending_damage_total.txt
 w60Q_reveal_gate_foreign_chooser.txt
 w61R_stack_anytarget_total.txt
+w62Z_designation_marker_not_a_permanent.txt

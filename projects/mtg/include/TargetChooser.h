@@ -67,6 +67,15 @@ public:
     int targetsReadyCheck();
     virtual int addTarget(Targetable * target);
     virtual bool canTarget(Targetable * _target,bool withoutProtections = false);
+    //#W62-Z (D16). A day/night, monarch, initiative or ring DESIGNATION is not a
+    //permanent (CR 114.1: an emblem has no characteristics but its abilities and
+    //is in no zone), but the engine models each as a type=Emblem card parked on a
+    //battlefield so the daybound/monarch machinery can find it. Any chooser that
+    //selects permanents from a battlefield therefore saw one. Only a chooser that
+    //explicitly names the Emblem type may pick it up; everything else - which is
+    //every "*", "creature", "permanent" and "artifact" chooser in the primitives -
+    //answers false here and never offers one.
+    virtual bool acceptsDesignationMarkers() const { return false; }
 
     //returns true if tc is equivalent to this TargetChooser
     //Two targetchoosers are equivalent if they target exactly the same cards
@@ -131,6 +140,10 @@ public:
     bool withoutProtections;
     CardTargetChooser(GameObserver *observer, MTGCardInstance * card, MTGCardInstance * source, int * zones = NULL, int nbzones = 0);
     virtual bool canTarget(Targetable * target,bool withoutProtections = false);
+    //#W62-Z (D16): this chooser is bound to ONE named card object, so it never
+    //offers a menu of permanents; if that object is a designation marker the
+    //script asked for it by name and the exclusion does not apply.
+    virtual bool acceptsDesignationMarkers() const { return true; }
     virtual CardTargetChooser * clone() const;
     virtual bool equals(TargetChooser * tc);
 };
@@ -139,6 +152,7 @@ class TypeTargetChooser: public TargetZoneChooser
 {
 public:
     int nbtypes;
+    virtual bool acceptsDesignationMarkers() const; //#W62-Z (D16): only when the type is named
     int types[10];
     bool withoutProtections;
     TypeTargetChooser(GameObserver *observer, const char * _type, MTGCardInstance * card = NULL, int _maxtargets = 1, bool other = false, bool targetMin = false);
