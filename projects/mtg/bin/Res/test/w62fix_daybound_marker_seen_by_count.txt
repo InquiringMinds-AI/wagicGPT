@@ -1,0 +1,27 @@
+#NAME: daybound - a Night marker in play is SEEN by Brutal Cathar's day/night count
+#Wave-62 corpus 152v125 HUNG (88,232 Day/Night stack adds, 265k live card instances):
+#lane Z's designation-marker exclusion (TargetChooser::canTarget) also hid the marker
+#from `type(*[day;night]|battlefield)~equalto~0`, so casting Brutal Cathar with a Night
+#marker already in play cast a SECOND, opposite marker and the two flipped each other's
+#permanents forever. Fixed: a chooser that names a marker (Emblem type, marker name,
+#or its negation) accepts markers.
+#The markers are invisible to zone asserts and the harness gives the Cathar's ETB no
+#target, so the assert alone cannot tell the trees apart: measured on this probe, the
+#pre-fix body produced 71 "Action added to stack: Day/Night" lines, the fix 2 (the one
+#marker's own traffic). The corpus hang (88,232) is the RED; this file is the guard
+#that the cast still resolves and the Cathar sits in play with a marker already out.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Brutal Cathar
+manapool:{2}{W}
+[PLAYER2]
+inplay:Night
+[DO]
+Brutal Cathar
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Brutal Cathar
+[PLAYER2]
+[END]

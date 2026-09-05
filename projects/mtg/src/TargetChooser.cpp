@@ -1,4 +1,5 @@
 #include "PrecompiledHeader.h"
+#include <algorithm>
 
 #include "TargetChooser.h"
 #include "CardDescriptor.h"
@@ -1901,10 +1902,38 @@ void TypeTargetChooser::addType(int type)
 }
 
 //#W62-Z (D16): a chooser that names the Emblem type meant it.
+//#W62-fix (wave-62 corpus 152v125 HUNG, 88,232 Day/Night stack adds): the type
+//chooser also matches a type entry against the card's NAME (canTarget below), and
+//that is exactly how the daybound machinery finds its markers - Brutal Cathar's
+//`if type(*[day;night]|battlefield)~equalto~0 then ... castcard(Day)`, the
+//markers' own `type(*[nonight]|battlefield)`. Refusing markers to those choosers
+//made the count read zero with a Night marker in play, so a second, opposite
+//marker was cast and the two flipped each other's permanents forever. A chooser
+//that names a marker - by the Emblem type, by the marker's name, or by its
+//negation ("nonight") - meant it; every other chooser still never sees one.
+static bool typeNamesDesignationMarker(int typeId)
+{
+    if (typeId == Subtypes::TYPE_EMBLEM)
+        return true;
+    string n = MTGAllCards::findType((unsigned int) typeId);
+    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+    if (n.compare(0, 2, "no") == 0 && n.size() > 2)
+        n = n.substr(2);
+    //The Emblem-typed cards in the primitives: Day, Night, The Monarch, The Initiative,
+    //The Ring, City's Blessing (plus bare forms a script may use).
+    static const char * const markers[] = { "emblem", "day", "night", "the monarch", "monarch",
+                                            "the initiative", "initiative", "the ring", "ring",
+                                            "city's blessing", "citys blessing", NULL };
+    for (int i = 0; markers[i]; i++)
+        if (n == markers[i])
+            return true;
+    return false;
+}
+
 bool TypeTargetChooser::acceptsDesignationMarkers() const
 {
     for (int i = 0; i < nbtypes; i++)
-        if (types[i] == Subtypes::TYPE_EMBLEM)
+        if (typeNamesDesignationMarker(types[i]))
             return true;
     return false;
 }
