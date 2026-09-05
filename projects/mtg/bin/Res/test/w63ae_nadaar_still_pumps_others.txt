@@ -1,0 +1,24 @@
+# W63-AE (E12) guard for the sibling regression: dropping Nadaar from its own lord must
+# not drop the OTHER creatures too. With a dungeon completed, Grizzly Bears (printed 2/2)
+# is 3/3 and survives Shock's 2 damage. GREEN on base and after - it fails only if the
+# lord stops applying to other creatures.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+dungeoncompleted:1
+inplay:527314,Grizzly Bears,Mountain
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:527314,Grizzly Bears,Mountain
+graveyard:Shock
+[PLAYER2]
+life:20
+[END]

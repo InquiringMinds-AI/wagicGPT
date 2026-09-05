@@ -2793,6 +2793,26 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     endState.cleanup(this);
 
     isOK = load();
+    //#W63-AE (E17): pin the RNG BEFORE the game is started, so the library
+    //shuffle this fixture runs on is the same one every run. Without it the
+    //GameObserver ctor's time(0) seed decided the shuffle, and a fixture whose
+    //assertion names interchangeable copies ("plains #5") saw a different
+    //permutation run to run - the intrepid_adversary_repeated_payment
+    //intermittent. Named seeds still win; nothing else changes.
+    if (observer)
+        observer->resetSeed(suiteSeed());
+}
+
+//#W63-AE (E17): declared seed, else a stable djb2 of the fixture name (never 0,
+//which xorshift32 cannot use as state, and never the clock).
+unsigned int TestSuiteGame::suiteSeed() const
+{
+    if (seed)
+        return seed;
+    unsigned int h = 5381u;
+    for (size_t i = 0; i < filename.size(); i++)
+        h = ((h << 5) + h) + (unsigned char) filename[i];
+    return h ? h : 5381u;
 }
 
 void TestSuiteGame::ResetManapools()
@@ -2818,6 +2838,10 @@ void TestSuiteGame::initGame()
         p->forceBestAbilityUse = forceAbility;
         p->life = initState.players[i]->life;
         p->poisonCount = initState.players[i]->poisonCount;
+        //#W63-AE (E12): carry the fixture's completed-dungeon count into the
+        //live seat, the same way life and poison are carried - without it the
+        //parsed `dungeoncompleted:` key would be dropped on the floor.
+        p->dungeonCompleted = initState.players[i]->dungeonCompleted;
         stringstream stream;
         initState.players[i]->getRandomGenerator()->saveLoadedRandValues(stream);
         p->getRandomGenerator()->loadRandValues(stream.str());

@@ -1,0 +1,29 @@
+# W63-AE (E12): Nadaar, Selfless Paladin. Oracle (Scryfall, api.scryfall.com/cards/named
+# ?exact=Nadaar,+Selfless+Paladin, read 2026-09-05): "Vigilance -- Whenever Nadaar enters
+# or attacks, venture into the dungeon. -- OTHER creatures you control get +1/+1 as long
+# as you've completed a dungeon." Printed 3/3.
+# borderline.txt:75387 scripted the lord as lord(creature|myBattlefield), which includes
+# Nadaar itself, so with a dungeon completed Nadaar read 4/4 alone (deck130 HIGH).
+# The card script now says lord(other creature|myBattlefield); no engine change.
+# RED ON BASE: a 4/4 Nadaar survives Lightning Bolt's 3 damage and the assert finds it
+# still on the battlefield instead of in the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+dungeoncompleted:1
+inplay:527314,Mountain
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Lightning Bolt
+527314
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+graveyard:Lightning Bolt,527314
+[PLAYER2]
+life:20
+[END]
