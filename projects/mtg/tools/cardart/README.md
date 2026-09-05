@@ -53,3 +53,14 @@ further setup. Thumbnails are always derived from the full-size pool art.
 **Card scans are WotC-derived content: fetch them for your own use. They are
 never committed to this repository and never included in a release
 artifact.**
+
+## Set symbols (shop booster pack emblem)
+
+```
+./fetch-symbols.py             # Scryfall set icons (Keyrune fallback) -> User/sets/<SET>/symbol.png
+./fetch-symbols.py --dry-run   # show which source each set resolves to, no downloads
+```
+64 px-high PNGs rasterized from the SVGs (rsvg-convert or ImageMagick). Scryfall serves the
+icons under the WotC Fan Content Policy; Keyrune's glyphs are GPL-3.0 / SIL OFL. pack-*.sh
+copies symbol.png into each platform's set zip. The shop draws it on the procedural booster
+pack; sets without one get a generated emblem. Misses -> symbols-misses.txt.

@@ -406,6 +406,19 @@ bool CardSelector::isShowingBigCard()
     return active && timer > 0 && dynamic_cast<CardView*>(active) != NULL;
 }
 
+//#W62-owner (D42): where Render() below draws the preview (npos: bigpos.x,
+//bigpos.y-4, zoom*4/5; CardGui draws a card as 168 x 239.4 at zoom 1, centred).
+const float * CardSelector::bigCardRect()
+{
+    static float r[4];
+    if (!isShowingBigCard())
+        return NULL;
+    const float z = bigpos.zoom - (bigpos.zoom / 5);
+    r[2] = 168.f * z; r[3] = 239.4f * z;
+    r[0] = bigpos.x - r[2] / 2; r[1] = (bigpos.y - 4.f) - r[3] / 2;
+    return r;
+}
+
 void CardSelector::Render()
 {
     if (active)

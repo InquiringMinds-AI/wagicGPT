@@ -161,10 +161,137 @@ void GameStateShop::Start()
     load();
 }
 
-string GameStateShop::descPurchase(int controlId, bool tiny)
+//---- Procedural booster pack (shop art area) ---------------------------------
+//No pack art ships with the game (Wizards' copyright, and unlike card scans there
+//is no established user-side source yet). The shop draws a pack instead: a
+//wrapper in a colour derived from the set code, crimped bands, an emblem, the
+//set's full name. If the user has dropped real files in, they win:
+//  sets/<CODE>/pack.jpg   - drawn scaled into the pack rectangle
+//  sets/<CODE>/symbol.png - drawn as the emblem
+static unsigned packHash(const string& s)
+{
+    unsigned h = 2166136261u;
+    for (size_t i = 0; i < s.size(); i++) { h ^= (unsigned char) s[i]; h *= 16777619u; }
+    return h;
+}
+
+static PIXEL_TYPE packHsv(float hue, float sat, float val, int alpha = 255)
+{
+    float c = val * sat, x = c * (1 - fabsf(fmodf(hue / 60.f, 2.f) - 1)), m = val - c;
+    float r = 0, g = 0, b = 0;
+    if (hue < 60) { r = c; g = x; } else if (hue < 120) { r = x; g = c; } else if (hue < 180) { g = c; b = x; }
+    else if (hue < 240) { g = x; b = c; } else if (hue < 300) { r = x; b = c; } else { r = c; b = x; }
+    return ARGB(alpha, (int)((r + m) * 255), (int)((g + m) * 255), (int)((b + m) * 255));
+}
+
+static void packWrap(WFont * font, const string& text, float maxW, vector<string>& lines)
+{
+    string cur, word;
+    std::istringstream ws(text);
+    while (ws >> word)
+    {
+        string trial = cur.empty() ? word : cur + " " + word;
+        if (!cur.empty() && font->GetStringWidth(trial.c_str()) > maxW) { lines.push_back(cur); cur = word; }
+        else cur = trial;
+    }
+    if (!cur.empty()) lines.push_back(cur);
+}
+
+//Draws the pack centred on (cx, cy); w x h is the wrapper size.
+static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& booster, float cx, float cy, float w, float h)
+{
+    MTGSetInfo * mainSet = booster.getMainSet();
+    MTGSetInfo * altSet = booster.getAltSet();
+    string code = mainSet ? mainSet->id : string("PACK");
+    string names = booster.getSetNames();
+    unsigned hash = packHash(code);
+    float hue = (float) (hash % 360);
+    float x0 = cx - w / 2, y0 = cy - h / 2;
+    const float band = 16.f;
+
+    //Real pack art, if the user supplied it.
+    JQuadPtr art;
+    if (mainSet && !altSet)
+        art = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/pack.jpg", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
+    if (art.get())
+    {
+        r->FillRoundRect(x0 - 2, y0 - 2, w + 4, h + 4, 6.f, ARGB(255, 10, 10, 10));
+        r->RenderQuad(art.get(), x0, y0, 0, w / art->mWidth, h / art->mHeight);
+        return;
+    }
+
+    //Wrapper: shadow, body, crimped bands with a zigzag edge.
+    r->FillRoundRect(x0 + 3, y0 + 4, w, h, 8.f, ARGB(160, 0, 0, 0));
+    r->FillRoundRect(x0, y0, w, h, 8.f, packHsv(hue, 0.55f, 0.55f));
+    //A diagonal foil sheen.
+    for (int i = 0; i < 6; i++)
+        r->DrawLine(x0 + 10 + i * 6, y0 + band, x0 + 40 + i * 6, y0 + h - band, packHsv(hue, 0.25f, 0.85f, 40));
+    r->FillRect(x0, y0, w, band, packHsv(hue, 0.7f, 0.30f));
+    r->FillRect(x0, y0 + h - band, w, band, packHsv(hue, 0.7f, 0.30f));
+    PIXEL_TYPE tooth = packHsv(hue, 0.55f, 0.55f);
+    for (float tx = x0; tx < x0 + w - 6; tx += 8)
+    {
+        float xs[3] = { tx, tx + 4, tx + 8 }, ysTop[3] = { y0 + band, y0 + band - 5, y0 + band };
+        r->FillPolygon(xs, ysTop, 3, tooth);
+        float ysBot[3] = { y0 + h - band, y0 + h - band + 5, y0 + h - band };
+        r->FillPolygon(xs, ysBot, 3, tooth);
+    }
+    r->DrawRect(x0, y0, w, h, ARGB(255, 20, 20, 20));
+
+    //Emblem: the set symbol file if present, else a polygon whose side count comes from the code.
+    float ex = cx, ey = y0 + band + 34;
+    JQuadPtr sym;
+    if (mainSet)
+        sym = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/symbol.png", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
+    if (sym.get())
+    {
+        //fetch-symbols.py rasterizes the glyph WHITE on transparency, so it tints
+        //at render time: a pale glyph on a disc in the wrapper's own dark shade
+        //(owner, vpk23: black was the wrong colour).
+        r->FillCircle(ex, ey, 30, packHsv(hue, 0.75f, 0.28f));
+        r->DrawCircle(ex, ey, 30, packHsv(hue, 0.25f, 0.85f));
+        float s = 46.f / (sym->mHeight > sym->mWidth ? sym->mHeight : sym->mWidth);
+        sym->SetColor(packHsv(hue, 0.08f, 1.0f));
+        r->RenderQuad(sym.get(), ex - sym->mWidth * s / 2, ey - sym->mHeight * s / 2, 0, s, s);
+        sym->SetColor(ARGB(255, 255, 255, 255));
+    }
+    else
+    {
+        int sides = 5 + (int) ((hash >> 8) % 4);
+        r->FillPolygon(ex, ey, 24, sides, 90, packHsv(hue, 0.35f, 0.95f));
+        r->FillPolygon(ex, ey, 17, sides, 90, packHsv(hue, 0.8f, 0.35f));
+        r->FillCircle(ex, ey, 7, packHsv(hue, 0.2f, 1.0f));
+    }
+
+    //Name panel: larger pale text on a panel in the wrapper's dark shade
+    //(owner, vpk23: the font was too small and the black text wrong).
+    const float baseScale = font->GetScale();
+    font->SetScale(baseScale * 1.35f);
+    vector<string> lines;
+    packWrap(font, names, w - 20, lines);
+    float lh = font->GetHeight() + 3;
+    float py = ey + 38;
+    r->FillRoundRect(x0 + 8, py - 5, w - 16, lh * lines.size() + 10, 4.f, packHsv(hue, 0.75f, 0.22f, 225));
+    font->SetColor(packHsv(hue, 0.06f, 1.0f));
+    for (size_t i = 0; i < lines.size(); i++)
+        font->DrawString(lines[i].c_str(), cx, py + lh * i, JGETEXT_CENTER);
+    //Card count and, in the bottom band, code + year.
+    font->SetScale(baseScale * 1.15f);
+    font->SetColor(ARGB(255, 245, 245, 245));
+    font->DrawString(_("15 cards").c_str(), cx, py + lh * lines.size() + 12, JGETEXT_CENTER);
+    char foot[64];
+    if (mainSet && mainSet->year > 0) snprintf(foot, sizeof(foot), "%s  %d", code.c_str(), mainSet->year);
+    else snprintf(foot, sizeof(foot), "%s", code.c_str());
+    font->SetColor(ARGB(255, 235, 235, 235));
+    font->DrawString(foot, cx, y0 + h - band + 1, JGETEXT_CENTER);
+    font->SetScale(baseScale);
+}
+
+string GameStateShop::descPurchase(int controlId, bool tiny, int fit)
 {
     char buffer[4096];
     string name;
+    int thisPrint = -1;
     if (controlId < BOOSTER_SLOTS)
     {
         name = mBooster[controlId].getName();
@@ -175,6 +302,8 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
         if (!c)
             return "";
         name = _(c->data->getName());
+        //Owned copies of THIS printing (set + art), beside the by-name total.
+        thisPrint = myCollection ? myCollection->count(c) : 0;
     }
     if (mInventory[controlId] <= 0)
     {
@@ -190,27 +319,59 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
         if (controlId < BOOSTER_SLOTS || mCounts[controlId] == 0)
             return name;
 
-        sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
+        if (thisPrint >= 0 && thisPrint != mCounts[controlId])
+            sprintf(buffer, _("%s (%i/%i)").c_str(), name.c_str(), mCounts[controlId], thisPrint);
+        else
+            sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
         return buffer;
+    }
+    //"(3)" when every owned copy is this printing; "(3 owned, 1 of this print)" otherwise.
+    char owned[128];
+    owned[0] = 0;
+    if (mCounts[controlId] >= 1)
+    {
+        if (thisPrint >= 0 && thisPrint != mCounts[controlId])
+        {
+            if (fit <= 0)
+                snprintf(owned, sizeof(owned), _(" (%i owned, %i of this print)").c_str(), mCounts[controlId], thisPrint);
+            else if (fit == 1)
+                snprintf(owned, sizeof(owned), _(" (%i, this print %i)").c_str(), mCounts[controlId], thisPrint);
+            else
+                snprintf(owned, sizeof(owned), _(" (%i/%i)").c_str(), mCounts[controlId], thisPrint);
+        }
+        else
+            snprintf(owned, sizeof(owned), _(" (%i)").c_str(), mCounts[controlId]);
     }
     switch (options[Options::ECON_DIFFICULTY].number)
     {
     case Constants::ECON_HARD:
     case Constants::ECON_NORMAL:
-        if (mCounts[controlId] < 1)
-            sprintf(buffer, _("%s").c_str(), name.c_str());
-        else
-            sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
+        sprintf(buffer, "%s%s", name.c_str(), owned);
         break;
     default:
-        if (mCounts[controlId] < 1)
-            sprintf(buffer, _("%s : %i credits").c_str(), name.c_str(), mPrices[controlId]);
-        else
-            sprintf(buffer, _("%s (%i) : %i credits").c_str(), name.c_str(), mCounts[controlId], mPrices[controlId]);
+        sprintf(buffer, _("%s%s : %i credits").c_str(), name.c_str(), owned, mPrices[controlId]);
         break;
     }
     return buffer;
 }
+//The info-bar line, sized to the span the buttons leave free (owner, vpk23: the
+//full wording ran under the Show List button on the Vita).
+string GameStateShop::descPurchaseFit(int controlId, float maxWidth)
+{
+    WFont * f = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    string s;
+    for (int fit = 0; fit <= 2; fit++)
+    {
+        s = descPurchase(controlId, false, fit);
+        if (!f || f->GetStringWidth(s.c_str()) <= maxWidth)
+            return s;
+    }
+    //Still too wide: trim the tail with an ellipsis.
+    while (s.size() > 4 && f->GetStringWidth((s + "...").c_str()) > maxWidth)
+        s.erase(s.size() - 1);
+    return s + "...";
+}
+
 void GameStateShop::beginPurchase(int controlId)
 {
     WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MENU_FONT);
@@ -757,6 +918,13 @@ void GameStateShop::Render()
             else
                 bigDisplay->setSource(NULL);
             bigDisplay->Render();
+            //A booster has no card art: draw a procedural pack where the art would be.
+            if (bigDisplay->mOffset.getPos() < 0)
+            {
+                int slot = bigSync.getPos();
+                if (slot >= 0 && slot < BOOSTER_SLOTS)
+                    renderProceduralPack(r, mFont, mBooster[slot], 385, 135, 150, 225);
+            }
             float elp = srcCards->getElapsed();
             //Render the card list overlay.
             if (bListCards || elp > LIST_FADEIN)
@@ -802,8 +970,17 @@ void GameStateShop::Render()
     enableButtons();
 #endif
     
-    mFont->SetColor(ARGB(255,255,255,0));
-    mFont->DrawString(descPurchase(bigSync.getPos()).c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT - 14, JGETEXT_CENTER);
+    {
+        //Centre the purchase line in the span between the credits and the buttons.
+        float left = 5 + mFont->GetStringWidth(stream.str().c_str()) + 10;
+#ifndef TOUCH_ENABLED
+        float right = SCREEN_WIDTH - len - 16;
+#else
+        float right = SCREEN_WIDTH_F - 170 - 8;
+#endif
+        mFont->SetColor(ARGB(255,255,255,0));
+        mFont->DrawString(descPurchaseFit(bigSync.getPos(), right - left).c_str(), (left + right) / 2, SCREEN_HEIGHT - 14, JGETEXT_CENTER);
+    }
     mFont->SetColor(ARGB(255,255,255,255));
 
     if (mStage == STAGE_SHOP_TASKS && taskList)
@@ -936,6 +1113,20 @@ string ShopBooster::getName()
     else if (mainSet)
         snprintf(buffer, sizeof(buffer), _("%s Booster (15 Cards)").c_str(), mainSet->id.c_str());
     return buffer;
+}
+
+string ShopBooster::getSetNames()
+{
+    if (!mainSet && pack)
+        return pack->getName();
+    if (altSet == mainSet)
+        altSet = NULL;
+    string s;
+    if (mainSet)
+        s = mainSet->name.empty() ? mainSet->id : mainSet->name;
+    if (altSet)
+        s += string(" & ") + (altSet->name.empty() ? altSet->id : altSet->name);
+    return s;
 }
 
 void ShopBooster::randomize(MTGPacks * packlist)

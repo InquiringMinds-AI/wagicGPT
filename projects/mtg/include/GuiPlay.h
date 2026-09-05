@@ -104,6 +104,7 @@ protected:
     vector<pair<CardView*, CardView*> > mStackFollowers; //follower, drawn card
     void computeStacks();
     bool stacksPinnedNow();
+    TargetChooser * liveChooser(); //#W62-owner (D42): the chooser a decision waits on, else NULL
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     void stackProbe(double ms);
     void churnProbe(); //#W58-E (D42)
@@ -117,7 +118,8 @@ public:
     //#W58-E (D42): the xN pile badges, drawn by DuelLayers AFTER every layer so
     //nothing can paint over them (the owner's "indicators are not remaining on
     //top"). Public because DuelLayers::Render is the only caller.
-    void RenderStackBadges();
+    //rect = {x,y,w,h} of the selector's big-card preview, or NULL: badges under it are skipped.
+    void RenderStackBadges(const float * rect = NULL);
     void Replace();
     void Update(float dt);
     virtual int receiveEventPlus(WEvent * e);

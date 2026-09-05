@@ -62,6 +62,7 @@ public:
     //the preview is 200x285 at the screen centre and little xN badges floating
     //on top of it would read as a glitch.
     virtual bool isShowingBigCard() { return false; }
+    virtual const float * bigCardRect() { return NULL; } //#W62-owner (D42): {x,y,w,h} or NULL
     virtual int GetDrawMode()
     {
         return mDrawMode;
@@ -75,6 +76,7 @@ class CardSelector: public CardSelectorBase
 {
 public:
     virtual bool isShowingBigCard(); //#W58-E (D42)
+    virtual const float * bigCardRect(); //#W62-owner (D42): the preview's screen rect while shown
 
 public:
     struct SelectorMemory

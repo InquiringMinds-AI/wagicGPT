@@ -43,6 +43,10 @@ class ShopBooster
 public:
     ShopBooster();
     string getName();
+    //Long set name(s) for the art area: "Tenth Edition" or "Ravnica & Guildpact"; empty when unknown.
+    string getSetNames();
+    MTGSetInfo * getMainSet() { return mainSet; }
+    MTGSetInfo * getAltSet() { return altSet == mainSet ? NULL : altSet; }
     void randomize(MTGPacks * packlist);
     int basePrice();
     int maxInventory();
@@ -108,7 +112,10 @@ private:
     void cancelCard(int controlId);
     void cancelBooster(int controlId);
     int purchasePrice(int offset);
-    string descPurchase(int controlId, bool tiny = false);
+    //fit: 0 = full wording, 1 = medium, 2 = compact "(4/0)" - the info bar picks
+    //the longest that fits between the credits and the buttons.
+    string descPurchase(int controlId, bool tiny = false, int fit = 0);
+    string descPurchaseFit(int controlId, float maxWidth);
 public:
     GameStateShop(GameApp* parent);
     virtual ~GameStateShop();

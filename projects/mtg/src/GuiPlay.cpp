@@ -209,16 +209,17 @@ GuiPlay::GuiPlay(DuelLayers* view) :
 //#W58-E (D42): the fourth condition, "anything unresolved on the stack", was
 //REMOVED - it fired on every spell either player cast and is the mechanism
 //behind the owner's stacking/unstacking report. See below.
+//#W62-owner (D42, Vita vpk23 report: "when i use earthcraft to target the untapped
+//token, all the tapped tokens are expanding"): a live chooser no longer pins
+//the WHOLE board. Piles with a legal target of the open chooser fan in place so
+//every legal member is reachable (computeStacks); every other pile keeps its
+//stack - which is what "the cards maintain positioning" asks for.
 bool GuiPlay::stacksPinnedNow()
 {
     if (!observer)
         return true;
-    if (observer->getCurrentTargetChooser())
-        return true;
     if (observer->mLayers)
     {
-        if (observer->mLayers->actionLayer() && observer->mLayers->actionLayer()->isWaitingForAnswer())
-            return true;
         //#W58-E (D42): the "anything unresolved on the stack" condition USED to
         //pin here as well, and it is the mechanism behind the owner's report
         //that "it's stacking and unstacking the opponents land when they arent
@@ -250,8 +251,8 @@ bool GuiPlay::stacksPinnedNow()
     {
         if (!(*it))
             continue;
-        if ((*it)->mStackForceExpand)
-            return true;
+        //#W62-owner (D42): a marked pile expands on its own in computeStacks; it
+        //no longer unstacks the rest of the board.
         //Declare-attackers and declare-blockers are live click prompts that need
         //ONE specific body, and the board is at its widest exactly then. The
         //first cut fanned the affected piles in place, which is cramped and -
@@ -264,6 +265,19 @@ bool GuiPlay::stacksPinnedNow()
             return true;
     }
     return false;
+}
+
+//#W62-owner (D42): the chooser a decision is waiting on, if any - the one whose
+//legal targets must stay reachable while everything else keeps its pile.
+TargetChooser * GuiPlay::liveChooser()
+{
+    if (!observer)
+        return NULL;
+    if (TargetChooser * tc = observer->getCurrentTargetChooser())
+        return tc;
+    if (observer->mLayers && observer->mLayers->actionLayer())
+        return observer->mLayers->actionLayer()->getCurrentTargetChooser();
+    return NULL;
 }
 
 void GuiPlay::computeStacks()
@@ -338,6 +352,7 @@ void GuiPlay::computeStacks()
             members[f->second].push_back(cv);
     }
 
+    TargetChooser * tc = liveChooser(); //#W62-owner (D42)
     for (std::map<CardView*, vector<CardView*> >::iterator g = members.begin(); g != members.end(); ++g)
     {
         CardView * lead = g->first;
@@ -362,10 +377,12 @@ void GuiPlay::computeStacks()
         //the board moves. Both flags are already in the stack key, so a marked
         //card has split out of its unmarked siblings before we get here.
         bool expand = lead->mHasFocus || lead->mStackForceExpand
-            || (lead->card && (lead->card->forcedBorderA || lead->card->forcedBorderB));
+            || (lead->card && (lead->card->forcedBorderA || lead->card->forcedBorderB))
+            || (tc && lead->card && tc->canTarget(lead->card));
         for (size_t i = 0; i < rest.size() && !expand; ++i)
             if (rest[i]->mHasFocus || rest[i]->mStackForceExpand
-                || (rest[i]->card && (rest[i]->card->forcedBorderA || rest[i]->card->forcedBorderB)))
+                || (rest[i]->card && (rest[i]->card->forcedBorderA || rest[i]->card->forcedBorderB))
+                || (tc && rest[i]->card && tc->canTarget(rest[i]->card)))
                 expand = true;
 
         if (expand)
@@ -796,7 +813,7 @@ void GuiPlay::Render()
 //them, and should: those are deliberate foreground panels. It is a separate
 //pass over the same views, so it costs one extra walk of the battlefield and no
 //extra state.
-void GuiPlay::RenderStackBadges()
+void GuiPlay::RenderStackBadges(const float * rect)
 {
     JRenderer * renderer = JRenderer::GetInstance();
     WResourceManager * rm = observer ? observer->getResourceManager() : WResourceManager::Instance();
@@ -815,8 +832,13 @@ void GuiPlay::RenderStackBadges()
         //not on the face - a 28x40 card has no free corner (top-left is the
         //printed name, the bottom the P/T box) and a badge over either HIDES
         //information. Position unchanged from wave 57; only its z-order moved.
-        renderer->FillRect(cv->actX + 12.0f * cv->actZ, cv->actY - 21.0f * cv->actZ,
-                           13.0f * cv->actZ, 9.0f * cv->actZ, ARGB(225, 10, 10, 10));
+        const float bx = cv->actX + 12.0f * cv->actZ, by = cv->actY - 21.0f * cv->actZ;
+        const float bw = 13.0f * cv->actZ, bh = 9.0f * cv->actZ;
+        //#W62-owner (D42): a badge the big-card preview would cover is left out
+        //rather than painted over the preview; every other badge draws.
+        if (rect && bx < rect[0] + rect[2] && bx + bw > rect[0] && by < rect[1] + rect[3] && by + bh > rect[1])
+            continue;
+        renderer->FillRect(bx, by, bw, bh, ARGB(225, 10, 10, 10));
         f->SetColor(ARGB(255, 255, 235, 140));
         f->SetScale(cv->actZ);
         f->DrawString(sbuf, cv->actX + 13.0f * cv->actZ, cv->actY - (20.6f * cv->actZ));
