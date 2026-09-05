@@ -1,0 +1,45 @@
+#NAME: The stack total prices a target(anytarget) ability aimed at the seat (W61-R C4)
+#DESC: Wave-60 engine-seat HIGH-2. `130v125` seq 118 (t35, life 18) rendered
+#DESC: "1 (top): ability: Staff of Nin's deal 1 damage [from their Staff of Nin]
+#DESC: [triggered/activated ability]" and NO `ON THE STACK:` total; the very
+#DESC: next record's log read "Opponent's Staff of Nin dealt 1 damage to you
+#DESC: (now 16)". Four such renders in the corpus (deck130 s118/s139, deck125
+#DESC: s66, deck152 s77), Staff of Nin every time - a repeat-every-turn clock,
+#DESC: so the miss is systematic. Cause: Staff of Nin's primitive is
+#DESC: `auto={T}:damage:1 target(anytarget)` (mtg.txt:112427), and for a CHOSEN
+#DESC: target `TargetAbility::resolve` is where `ability->target = t` happens -
+#DESC: until it resolves the pick lives in the WRAPPER's own TargetChooser, so
+#DESC: the B2 scan's `getTarget()` saw nothing and priced 0.
+#DESC: No zone assertion can see this: the ability resolves identically either
+#DESC: way and the defect is entirely in the words over the stack.
+#DESC: TestSuiteAI::Act runs the production emitters through
+#DESC: stackAbilityRegister, so a red here is a red render.
+#DESC: P1 taps Staff of Nin at P2. P2 is where the total is pinned; P1 is the
+#DESC: NEGATIVE - the same stack, the other seat, no total claimed for a player
+#DESC: the damage is not aimed at.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Staff of Nin
+[PLAYER2]
+inplay:Mountain
+hand:Shock
+[DO]
+Staff of Nin
+p2
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:Staff of Nin
+nonarration:ON THE STACK: 1 damage to you
+[PLAYER2]
+life:19
+inplay:Mountain
+hand:Shock
+narration:ON THE STACK: 1 damage to you - you would be at 19
+[END]

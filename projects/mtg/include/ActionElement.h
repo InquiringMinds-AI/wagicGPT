@@ -27,6 +27,13 @@ protected:
     Activity activity;
     TargetChooser * tc;
 public:
+    //#W61-R (C4): read-only access to the chooser an element is holding. A
+    //TargetAbility keeps the pilot's picks here until `TargetAbility::resolve`
+    //copies them into the payload ability's `target`, so an ability sitting on
+    //the stack has its chosen targets HERE and nowhere else - which is what the
+    //prompt's ON THE STACK total needs to price a `target(anytarget)` ping.
+    //Const-correct and non-owning; nothing outside may replace or free it.
+    TargetChooser * chosenTargets() const { return tc; }
     GamePhase currentPhase;
     GamePhase newPhase;
     int modal;

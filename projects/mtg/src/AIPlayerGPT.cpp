@@ -3630,8 +3630,26 @@ static string pendingStackDamageLine(int dmgToMe, int myLife)
 //would draw the game RNG - the same exclusion the option-magnitude emitter
 //applies), and a source-less ability is skipped because getTarget() resolves
 //CONTROLLER/OPPONENT through source->controller().
+//#W61-R (C4, wave-60 engine-seat HIGH-2): the scan read `getTarget()` on the
+//payload ability, and for a CHOSEN target that field is empty until the
+//ability resolves. `TargetAbility::resolve` is where `ability->target = t`
+//happens (MTGAbility.cpp), and until then the pick lives in the WRAPPER's own
+//TargetChooser - the same place `ActivatedAbility::activateAbility` reads it
+//from to name the targets in its activation event (#W43-10, which also records
+//why `ability->target` is not a usable fallback: the MTGAbility ctor seeds it
+//with the SOURCE card). So a `{T}:damage:1 target(anytarget)` aimed at the
+//seat contributed 0 to the total and printed no effect phrase: `130v125` s118
+//and s139, `125` s66, `152` s77 - Staff of Nin every time, a repeat-every-turn
+//clock, and the very next record logged the damage landing. The chooser's
+//picks are threaded down as `chosen` and consulted ONLY where the payload's
+//own `who` is UNSET, which is exactly the branch whose getTarget() returns
+//`target`: an ability whose `who` names CONTROLLER/OPPONENT/OWNER resolves its
+//player itself and a sibling `target(creature)` pick must not be read as that
+//player. Every target in the list is priced, because that is what
+//`TargetAbility::resolve`'s oneShot loop does with them.
 static void scanStackAbilityLife(MTGAbility * a, Player * seat, int depth,
-                                 int & lossToMe, string * phrase)
+                                 int & lossToMe, string * phrase,
+                                 const vector<Targetable *> * chosen = NULL)
 {
     if (!a || depth > 5)
         return;
@@ -3640,14 +3658,22 @@ static void scanStackAbilityLife(MTGAbility * a, Player * seat, int depth,
         if (ad->source && ad->d.find("rand") == string::npos)
         {
             const int dmg = ad->getDamage();
-            Player * tp = dynamic_cast<Player *>(ad->getTarget());
-            if (dmg > 0 && tp)
+            vector<Targetable *> tgts; //#W61-R (C4)
+            if (ad->who == TargetChooser::UNSET && chosen && !chosen->empty())
+                tgts = *chosen;
+            else if (Targetable * one = ad->getTarget())
+                tgts.push_back(one);
+            for (size_t ti = 0; ti < tgts.size(); ti++)
             {
-                const bool toMe = (tp == seat);
-                if (toMe)
-                    lossToMe += dmg;
-                if (phrase && phrase->empty())
-                    *phrase = stackDamagePhrase(dmg, toMe);
+                Player * tp = dynamic_cast<Player *>(tgts[ti]);
+                if (dmg > 0 && tp)
+                {
+                    const bool toMe = (tp == seat);
+                    if (toMe)
+                        lossToMe += dmg;
+                    if (phrase && phrase->empty())
+                        *phrase = stackDamagePhrase(dmg, toMe);
+                }
             }
         }
     }
@@ -3656,22 +3682,43 @@ static void scanStackAbilityLife(MTGAbility * a, Player * seat, int depth,
         if (al->source && al->life_s.find("rand") == string::npos)
         {
             const int delta = al->getLife();
-            Player * tp = dynamic_cast<Player *>(al->getTarget());
-            if (delta != 0 && tp)
+            vector<Targetable *> tgts; //#W61-R (C4)
+            if (al->who == TargetChooser::UNSET && chosen && !chosen->empty())
+                tgts = *chosen;
+            else if (Targetable * one = al->getTarget())
+                tgts.push_back(one);
+            for (size_t ti = 0; ti < tgts.size(); ti++)
             {
-                const bool toMe = (tp == seat);
-                if (toMe && delta < 0)
-                    lossToMe += -delta;
-                if (phrase && phrase->empty())
-                    *phrase = stackLifePhrase(delta, toMe);
+                Player * tp = dynamic_cast<Player *>(tgts[ti]);
+                if (delta != 0 && tp)
+                {
+                    const bool toMe = (tp == seat);
+                    if (toMe && delta < 0)
+                        lossToMe += -delta;
+                    if (phrase && phrase->empty())
+                        *phrase = stackLifePhrase(delta, toMe);
+                }
             }
         }
     }
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
-        scanStackAbilityLife(na->ability, seat, depth + 1, lossToMe, phrase);
+    {
+        //#W61-R (C4): a wrapper's own chooser overrides an outer one for the
+        //subtree below it - the innermost chooser is the one whose picks
+        //resolve into the payload. An empty chooser changes nothing.
+        vector<Targetable *> own;
+        const vector<Targetable *> * pass = chosen;
+        if (a->chosenTargets())
+        {
+            own = a->chosenTargets()->getTargetsFrom();
+            if (!own.empty())
+                pass = &own;
+        }
+        scanStackAbilityLife(na->ability, seat, depth + 1, lossToMe, phrase, pass);
+    }
     if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
         for (size_t i = 0; i < ma->abilities.size(); i++)
-            scanStackAbilityLife(ma->abilities[i], seat, depth + 1, lossToMe, phrase);
+            scanStackAbilityLife(ma->abilities[i], seat, depth + 1, lossToMe, phrase, chosen);
 }
 
 //One stack object's life cost to `seat`, plus the effect phrase its row prints.
@@ -4168,9 +4215,95 @@ static string attackerBlockerCountLine(int blockers)
 //what it deals. `damageSuppressed` is the opponent being unable to lose life at
 //all (CANTLOSE / CANTLIFELOSE): no life claim of any kind survives that, so the
 //whole arithmetic is withheld and the reason given.
+//#W61-R (C1b/C3): script scans below run over the card's own `magicText`,
+//whose case follows whatever the primitive author typed (`Damage:2` and
+//`damage:1` both occur). Local so it cannot collide with the file's later
+//toLowerCopy, which is declared in a different namespace scope.
+static string scriptLower(const string & s)
+{
+    string o(s);
+    for (size_t i = 0; i < o.size(); i++)
+        o[i] = (char) tolower((unsigned char) o[i]);
+    return o;
+}
+
+//#W61-R (C1b): permanents whose script punishes the ATTACK DECLARATION with
+//damage aimed at the attacking creatures. Lightmine Field's engine line is
+//`@each blockers:foreach(creature[attacking]|Battlefield) damage:1
+//all(creature[attacking]|Battlefield)` (mtg.txt:67059) - a phase trigger, not
+//an `@combat(attacking)` one, so the predicate is the SHAPE of the effect and
+//not the trigger word: a triggered line (leading `@`) that deals damage to a
+//SET of attacking creatures. Fails closed - an unreadable line is not evidence
+//a punisher exists, and the failure being fixed here is a missing NAME, never
+//an invented one. Returns the names, comma-joined, for the clause that scopes
+//the totals; the amounts are deliberately not read (they depend on the
+//declaration being decided).
+static string attackDeclarationPunishers(Player * opp)
+{
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return "";
+    std::ostringstream o;
+    int n = 0;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        const string mt = scriptLower(c->magicText);
+        size_t lp = 0;
+        bool hit = false;
+        while (!hit && lp <= mt.size())
+        {
+            size_t nl = mt.find('\n', lp);
+            string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+            lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+            if (line.empty() || line[0] != '@')
+                continue;
+            if (line.find("damage:") == string::npos)
+                continue;
+            if (line.find("creature[attacking]") == string::npos)
+                continue;
+            //a SET effect, not a single target: `all(...)` / `foreach(...)`
+            if (line.find("all(") == string::npos && line.find("foreach(") == string::npos)
+                continue;
+            hit = true;
+        }
+        if (!hit)
+            continue;
+        if (n)
+            o << ", ";
+        o << c->getDisplayName();
+        n++;
+    }
+    return o.str();
+}
+
+//#W61-R (C1, wave-60 deck152 HIGH-1 + deck126 HIGH-2): the floor stated a
+//RESULTING LIFE TOTAL, and two classes of visible trigger move that total in
+//the opposite direction from the damage.
+//(a) BLOCKING-TRIGGER LIFE GAIN. `152v126` s48/s58/s66: floors of 43/57/71
+//against actual 66/80/94, +23 every time, 3 of 3 swings - and it decided
+//deck152's only loss (opponent life 20 -> 95 on the seat's OWN attacks).
+//Perimeter Captain gains per BLOCKING DEFENDER, so the per-attacker tags the
+//same prompt already prints are each a ONE-blocker figure and their sum is not
+//the price either. `blockGain` is the ceiling over the blockers they actually
+//have: every one of them may block (a gang block puts them all in front of one
+//attacker), so it is a proven maximum and voiced as one. With it on the board
+//the floor no longer names a bare resulting life - it names the damage, the
+//life that damage alone would leave, and the gain that can put them back up -
+//and the kill claim survives only where the gain cannot save them.
+//(b) ATTACK-TRIGGERED PUNISHERS. `126`'s `125` s121: Lightmine Field rendered
+//on the opponent's battlefield line, ATTACK TOTAL promised 2 damage, and both
+//1/1 attackers died to the declaration trigger for 0 damage dealt. How many
+//die depends on how many are DECLARED, which is the very choice being made, so
+//nothing here is computed: the punisher is NAMED, both numbers are re-scoped
+//to "before their attack triggers", and every kill claim is withheld (an
+//unproven kill claim is the one error direction that cannot be tolerated).
 static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               int blockers, int guaranteed,
-                              int infectExcluded = 0, bool damageSuppressed = false)
+                              int infectExcluded = 0, bool damageSuppressed = false,
+                              int blockGain = 0, const string& attackPunishers = "")
 {
     if (attackers <= 0 || oppLife < 0)
         return "";
@@ -4208,13 +4341,39 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             //a live probe printed "at most 3 of them can be blocked at all" over
             //ONE unblockable attacker, where the count was true and not the
             //reason. The blocker-count line directly above already states the cap.
-            o << " At least " << guaranteed << " damage lands whatever they block -"
-                 " they would be at " << (oppLife - guaranteed);
-            if (oppLife - guaranteed <= 0)
-                o << "; that KILLS them whatever they block";
+            o << " At least " << guaranteed << " damage lands whatever they block -";
+            //#W61-R (C1a): the damage is a floor; the LIFE it leaves is not,
+            //because the blocks that let it through are the same blocks that
+            //pay them. Both numbers, in the order the combat produces them.
+            if (blockGain > 0)
+            {
+                o << " that damage alone puts them at " << (oppLife - guaranteed)
+                  << ", but every blocker they declare also fires the blocking"
+                     " triggers tagged on the rows above - up to " << blockGain
+                  << " life back across their " << blockers << " blocker"
+                  << (blockers == 1 ? "" : "s") << ", so blocking can leave them"
+                     " as high as " << (oppLife - guaranteed + blockGain);
+                if (oppLife - guaranteed + blockGain <= 0 && attackPunishers.empty())
+                    o << "; that KILLS them whatever they block, gain included";
+            }
+            else
+            {
+                o << " they would be at " << (oppLife - guaranteed);
+                //#W61-R (C1b): no kill claim survives an unpriced punisher.
+                if (oppLife - guaranteed <= 0 && attackPunishers.empty())
+                    o << "; that KILLS them whatever they block";
+            }
             o << ".";
         }
     }
+    //#W61-R (C1b): the declaration itself can be punished, and how much depends
+    //on how many you declare - so the punisher is named and both figures above
+    //are re-scoped rather than re-computed.
+    if (!attackPunishers.empty())
+        o << " Both figures are BEFORE their attack triggers: " << attackPunishers
+          << " fires on the declaration, before any combat damage, and can kill"
+             " your attackers first - how much it deals depends on how many you"
+             " declare, so it is not folded into either number.";
     o << "\n";
     return o.str();
 }
@@ -16254,11 +16413,28 @@ string theirConverterBodyTag(int toughness, const std::vector<std::string>& thei
 //`bestCaseOptimal` says whether that number is a proven maximum - a trample
 //attacker in the total makes it merely ACHIEVABLE, and the wording drops from
 //"best case" to "one legal assignment" rather than over-claiming.
+//#W61-R (C2, wave-60 engine-seat HIGH-1 + deck126 MED-2): the parenthetical
+//`(your creatures may legally block every attacker in that total)` is a
+//per-attacker legality statement printed as an aggregate promise, and it fired
+//over ONE blocker against 47 attackers (`162v123` s18) and at 1-vs-2, 1-vs-3,
+//1-vs-6 (`126`'s `146` s9/s17/s22, where it sat in the same sentence as
+//`no block saves you`). 32 such renders corpus-wide. This is the exact
+//counterpart of what B11 fixed on the attackers side, and the fix is the same
+//kind of number: `matchedAttackers` is the size of the maximum legal blocker-
+//to-attacker matching over the ENGINE's own pairwise map (the assignment the
+//`best case` clause below already solves), so the aggregate claim is made only
+//where a full assignment provably exists, and where it does not the line says
+//how many of them can be blocked AT ONCE instead of implying all of them.
+//`assignableAttackers` is the denominator that claim is about - the attackers
+//still unblocked, which is what the matching is built over. Both < 0 means the
+//matching was not computed and the old wording is kept.
 static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                                  bool haveBodies, int unblockableAttackers,
                                  int unblockableDamage,
                                  int bestCaseDamage = -1,
-                                 bool bestCaseOptimal = true)
+                                 bool bestCaseOptimal = true,
+                                 int matchedAttackers = -1,
+                                 int assignableAttackers = -1)
 {
     if (attackers <= 0)
         return "";
@@ -16277,6 +16453,14 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
               << unblockableAttackers << " attacker"
               << (unblockableAttackers == 1 ? "" : "s")
               << " none of your creatures can block)";
+        //#W61-R (C2): the aggregate promise, only where a full assignment is
+        //proven; otherwise the count-respecting fact, in the same register the
+        //attackers ask's floor uses.
+        else if (matchedAttackers >= 0 && assignableAttackers > 0
+                 && matchedAttackers < assignableAttackers)
+            o << " (your creatures can legally block at most " << matchedAttackers
+              << " of those " << assignableAttackers << " attackers at once, so at least "
+              << (assignableAttackers - matchedAttackers) << " of them go unblocked)";
         else
             o << " (your creatures may legally block every attacker in that total)";
     }
@@ -16538,22 +16722,160 @@ static string crackBackExileReturnClause(int count, int power)
     return o.str();
 }
 
+//#W61-R (C3, wave-60 deck125 HIGH-1 + deck126 MED-1): the three classes of
+//board fact that made "for up to N" a FALSE ceiling on 6 of 26 turns at a seat
+//that runs no creatures and reads this line as its only tap-out instrument.
+//Each is pre-computable from the permanents the prompt already prints, and
+//each is voiced as its own clause rather than folded into N: a number the seat
+//cannot re-derive from the board is worse than a named fact it can.
+//(a) ANIMATORS. `125v146` s40: "1 of their creatures ... for up to 1", Hive of
+//the Eye Tyrant on the same rendered line, and turn 21 read "becomes beholder"
+//then "dealt 3 damage to you". The engine line is an ACTIVATED
+//`becomes(Creature Beholder^3/3^black^menace)` (borderline.txt:53394), so both
+//the existence and the power are readable; a permanent already a creature is
+//in the census and is not repeated here.
+//(b) ACTIVATED DIRECT DAMAGE. `125v130` s21: "for up to 5 - you would be at
+//15", and turn 14 dealt 9 because Siege-Gang Commander sacrificed two of the
+//attacking Goblins for 2 each (`{1}{R}{S(goblin|myBattlefield)}:Damage:2
+//target(anytarget)`, mtg.txt:105073). No block stops it and no combat number
+//contains it. The per-activation figure is stated and the count of activations
+//is NOT guessed - it depends on their mana and their sacrifice fodder.
+//(c) PUMP TRIGGERS. `125v152` s45: "for up to 4" against a Luminarch Aspirant
+//that attacked as a 6/6 (its own beginning-of-combat counter plus Ranger
+//Class's attack trigger). Named, not counted: which creature they target is
+//their choice and is made after this window.
+//Fails CLOSED in all three - an unreadable line is not evidence a source
+//exists.
+static string crackBackFloorSources(Player * opp)
+{
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return "";
+    string animators, pingers, pumps;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        const string mt = scriptLower(c->magicText);
+        size_t lp = 0;
+        while (lp <= mt.size())
+        {
+            size_t nl = mt.find('\n', lp);
+            string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+            lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+            if (line.empty())
+                continue;
+            const bool triggered = (line[0] == '@');
+            if (!triggered && !c->isCreature())
+            {
+                //(a) an activated animation, with the printed body it becomes
+                size_t b = line.find("becomes(creature");
+                if (b != string::npos)
+                {
+                    int pw = -1;
+                    size_t caret = line.find('^', b);
+                    if (caret != string::npos && caret + 1 < line.size()
+                        && line[caret + 1] >= '0' && line[caret + 1] <= '9')
+                        pw = atoi(line.c_str() + caret + 1);
+                    if (!animators.empty())
+                        animators += ", ";
+                    animators += c->getDisplayName();
+                    if (pw >= 0)
+                    {
+                        std::ostringstream pp;
+                        pp << " (" << pw << " power once animated)";
+                        animators += pp.str();
+                    }
+                }
+            }
+            if (!triggered)
+            {
+                //(b) an activated ability whose damage can be aimed at a player
+                size_t dp = line.find("damage:");
+                const bool atPlayer = line.find("anytarget") != string::npos
+                                      || line.find("target(player") != string::npos
+                                      || line.find(" opponent") != string::npos;
+                if (dp != string::npos && atPlayer
+                    && dp + 7 < line.size() && line[dp + 7] >= '1' && line[dp + 7] <= '9')
+                {
+                    std::ostringstream pp;
+                    pp << c->getDisplayName() << " (" << atoi(line.c_str() + dp + 7)
+                       << " per activation)";
+                    if (!pingers.empty())
+                        pingers += ", ";
+                    pingers += pp.str();
+                }
+            }
+            else
+            {
+                //(c) a trigger that grows a creature at or before their attack
+                const bool combatTiming = line.find("my combatbegins") != string::npos
+                                          || line.find("my attackers") != string::npos
+                                          || line.find("my blockers") != string::npos
+                                          || line.find("@combat(attacking)") != string::npos;
+                size_t cp = line.find("counter(");
+                if (combatTiming && cp != string::npos
+                    && cp + 8 < line.size() && line[cp + 8] >= '1' && line[cp + 8] <= '9')
+                {
+                    if (!pumps.empty())
+                        pumps += ", ";
+                    pumps += c->getDisplayName();
+                }
+            }
+        }
+    }
+    std::ostringstream o;
+    int n = 0;
+    if (!animators.empty())
+        o << (n++ ? "; " : "") << "noncreature permanents of theirs that can animate and"
+             " attack are not in that count - " << animators;
+    if (!pingers.empty())
+        o << (n++ ? "; " : "") << "they can also aim ability damage at you that no block"
+             " stops - " << pingers;
+    if (!pumps.empty())
+        o << (n++ ? "; " : "") << "triggers on their board add power before damage - " << pumps;
+    return o.str();
+}
+
 //The line itself. Same claim shape as D9's forecast and the same under-claim
 //rule: an upper bound over the bodies that will be able to attack, with no
 //trample carry-over claim and no blocker assigned - the seat's own blocks are
 //not priced here, because on this turn the seat has not yet decided which of
 //its bodies will still be untapped. Pure over the counts.
+//#W61-R (C3): two additions, both from the same board the count is read off.
+//`floorSources` non-empty turns the CEILING into a FLOOR and says so in the
+//head clause rather than leaving "for up to" to carry a claim it cannot make;
+//the kill clause survives that change because a floor at or past the seat's
+//life is still a kill. `evasive*` is the sub-total deck126 MED-1 asked for -
+//51 of 51 renders at that seat priced a 20-creature board of which 19 were
+//fliers against an all-ground defence and netted nothing. It is stated only
+//where the seat HAS bodies, for the reason the INCOMING split uses: with none,
+//"nothing you control can block it" is true of every attacker and says nothing.
 static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife,
-                                    int exileReturnCount = 0, int exileReturnPower = 0)
+                                    int exileReturnCount = 0, int exileReturnPower = 0,
+                                    int evasiveAttackers = 0, int evasiveDamage = 0,
+                                    bool haveBodies = false,
+                                    const string& floorSources = "")
 {
     if (ableAttackers <= 0 || maxDamage <= 0)
         return "";
     std::ostringstream o;
     o << "CRACK-BACK NEXT TURN: " << ableAttackers << " of their creatures will be able to attack"
-         " (tapped ones untap first), for up to " << maxDamage
-      << " - you would be at " << (myLife - maxDamage);
+         " (tapped ones untap first), for up to " << maxDamage;
+    if (!floorSources.empty())
+        o << " from combat as their board stands - you would be at "
+          << (myLife - maxDamage) << " or lower";
+    else
+        o << " - you would be at " << (myLife - maxDamage);
     if (myLife - maxDamage <= 0)
         o << "; that would KILL you";
+    if (haveBodies && evasiveAttackers > 0 && evasiveDamage > 0)
+        o << " - of that, " << evasiveDamage << " from " << evasiveAttackers
+          << " attacker" << (evasiveAttackers == 1 ? "" : "s")
+          << " nothing you control can legally block";
+    if (!floorSources.empty())
+        o << " - and that number is a FLOOR, not a ceiling: " << floorSources;
     o << crackBackExileReturnClause(exileReturnCount, exileReturnPower); //#W60-P (B9)
     return o.str();
 }
@@ -16612,13 +16934,43 @@ static bool assignableAugment(int j, const vector<vector<char> >& can,
 //have absorbed stay free for the rest, which can only INCREASE the prevented
 //total. The result is therefore an over-estimate of prevention, i.e. a true
 //floor on the damage that lands: never optimistic in the lethal direction.
+//#W61-R (C2): the size of a maximum legal matching over the same map, which
+//is what "can your creatures block every attacker in that total" actually
+//asks. Same greedy augmenting search as the remainder above, with every
+//attacker weighted equally (cardinality, not damage) - so the claim is about
+//LEGALITY and blocker count, exactly as the sentence reads. -1 = not computed.
+static int assignableMatchedAttackers(int attackerCount,
+                                      const vector<vector<char> >& can)
+{
+    const int nb = (int) can.size();
+    if (nb <= 0 || attackerCount <= 0 || nb > 256 || attackerCount > 256)
+        return -1;
+    vector<int> matchOfBlocker(nb, -1);
+    int matched = 0;
+    for (int j = 0; j < attackerCount; j++)
+    {
+        vector<char> seen(nb, 0);
+        if (assignableAugment(j, can, seen, matchOfBlocker))
+            matched++;
+    }
+    return matched;
+}
+
 static int assignableRemainderDamage(const vector<int>& damage,
                                      const vector<vector<char> >& can,
                                      const vector<char> * preventable = NULL)
 {
     const int nb = (int) can.size();
     const int na = (int) damage.size();
-    if (nb <= 0 || na <= 0 || nb > 32 || na > 32)
+    //#W61-R (C2): the 32/32 cap silently deleted the clause on exactly the
+    //windows where the arithmetic decides the game - `162v123` s18 is 47
+    //attackers, so the one record whose blockers ask mattered most is the one
+    //that printed no `best case with every blocker assigned` figure at all
+    //(31 of the other 32 renders carry it). The matching is O(V*E) over a
+    //char map; 256 x 256 is 64 KB and a few hundred thousand steps in the
+    //worst case, which is nothing beside the model call this prompt precedes.
+    //The bound stays only so a pathological board cannot run unbounded.
+    if (nb <= 0 || na <= 0 || nb > 256 || na > 256)
         return -1;
     int total = 0;
     bool anyPair = false;
@@ -17168,6 +17520,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //#W59-J (K8): the crack-back half, counted in the same walk.
             const bool crackBackSeat = (activeSeat == this);
             int nextTurnAttackers = 0, nextTurnDamage = 0;
+            int nextTurnEvasive = 0, nextTurnEvasiveDamage = 0; //#W61-R (C3)
             //#W60-P (B9): what THEY get back if one of the seat's own exilers
             //leaves the battlefield. Counted off the SEAT's battlefield - the
             //exilers are ours and the hostages are in exile, so they appear in
@@ -17218,6 +17571,31 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 {
                     nextTurnAttackers++;
                     nextTurnDamage += pw;
+                    //#W61-R (C3): and how much of it nothing this seat owns may
+                    //legally stop. `canBlockPairwise` is the engine's own
+                    //evasion predicate (flying/reach, shadow, protection,
+                    //landwalk, cantBeBlockedBy, ...) and deliberately NOT
+                    //`canBlock(attacker)`, which additionally tests the tapped
+                    //state and the attacker flag - neither of which holds for a
+                    //combat that has not happened yet. Menace is folded through
+                    //minBlockersRequired: too few legal bodies is unblockable.
+                    {
+                        int legal = 0;
+                        for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
+                        {
+                            MTGCardInstance * bc = game->inPlay->cards[bi];
+                            if (!bc || !bc->isCreature()
+                                || bc->basicAbilities[(int) Constants::CANTBLOCK])
+                                continue;
+                            if (bc->canBlockPairwise(ac))
+                                legal++;
+                        }
+                        if (legal < ac->minBlockersRequired())
+                        {
+                            nextTurnEvasive++;
+                            nextTurnEvasiveDamage += pw;
+                        }
+                    }
                 }
                 if (!ac->isAttacker())
                 {
@@ -17281,6 +17659,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //#W57-B (D24): the assignable remainder, over the ENGINE's own
                 //pairwise legality map for the bodies this seat actually has.
                 int bestCase = -1;
+                int matchedAtk = -1; //#W61-R (C2)
                 {
                     vector<vector<char> > can;
                     for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
@@ -17304,6 +17683,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                     //assignment of the remaining blockers can touch.
                     if (bestCase >= 0)
                         bestCase += trampleOverflow;
+                    //#W61-R (C2): the same map, asked how many of them can be
+                    //blocked at once.
+                    matchedAtk = assignableMatchedAttackers((int) declared.size(), can);
                 }
                 mIncomingCombatTurn = nowTurn; //latched for the rest of this combat
                 mIncomingCombatAttackers = inAttackers;
@@ -17311,7 +17693,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 out << "\n" << incomingCombatLine(inAttackers, inDamage, life,
                                                   myCreatures > 0, inUnblockable,
                                                   inUnblockableDmg, bestCase,
-                                                  exactAssignment);
+                                                  exactAssignment, matchedAtk,
+                                                  (int) declared.size()); //#W61-R (C2)
             }
             else if (form == 2)
                 out << "\n" << incomingCombatSettledLine(mIncomingCombatAttackers,
@@ -17325,7 +17708,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //so this adds a line, replaces none.
             if (crackBackNextTurnDue(crackBackSeat, gp, nextTurnAttackers, nextTurnDamage))
                 out << "\n" << crackBackNextTurnLine(nextTurnAttackers, nextTurnDamage, life,
-                                                     exileReturnCount, exileReturnPower);
+                                                     exileReturnCount, exileReturnPower,
+                                                     nextTurnEvasive, nextTurnEvasiveDamage,
+                                                     myCreatures > 0,
+                                                     crackBackFloorSources(opp)); //#W61-R (C3)
         }
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
@@ -31894,9 +32280,29 @@ int AIPlayerGPT::chooseAttackers()
                                || sc->basicAbilities[Constants::CANTLIFELOSE]))
                         suppressed = true;
                 }
+            //#W61-R (C1a): the life every blocker they own can gain them by
+            //blocking, over the SAME `canBlock()` set the count line above
+            //states - so the aggregate and the cap cannot disagree. Both the
+            //certain and the "may" halves are in the ceiling because a "may"
+            //is theirs to take and this number is what the seat must survive.
+            int blockGain = 0;
+            if (oppB && oppB->game && oppB->game->inPlay)
+            {
+                MTGGameZone * bfG = oppB->game->inPlay;
+                for (int i = 0; i < bfG->nb_cards; i++)
+                {
+                    MTGCardInstance * c = bfG->cards[i];
+                    if (!c || !c->isCreature() || !c->canBlock())
+                        continue;
+                    int sure = 0, may = 0;
+                    blockTriggeredLifeFor(c, sure, may);
+                    blockGain += sure + may;
+                }
+            }
             tail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
-                                    infectExcluded, suppressed);
+                                    infectExcluded, suppressed, blockGain,
+                                    attackDeclarationPunishers(oppL)); //#W61-R (C1)
         }
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
@@ -52463,6 +52869,227 @@ static const char * kW50Y_r94 =
                   "#W60-P B9 NEGATIVE echo: the (4/4) inside the clause is not read as an"
                   " assignment - a declined block stays declined");
         }
+    }
+
+    // ============ #W61-R (C1): the ATTACK TOTAL folds what the rows already price ============
+    cout << "\n[#W61-R] C1 ATTACK TOTAL stops naming a resulting life the visible"
+            " triggers falsify - blocking-trigger life gain folded, attack punishers named\n";
+    {
+        // `152v126` s48 verbatim shape: 3 attackers for 9, opponent at 52, two
+        // Perimeter Captains + Pride Guardian among 5 blockers. The floor said
+        // 43; the combat ended at 66.
+        const string base = attackTotalLine(3, 9, 52, 5, 9);
+        CHECK(base.find("At least 9 damage lands whatever they block - they would be at 43")
+                  != string::npos,
+              "#W61-R C1 REGRESSION with no blocking trigger on their board the floor is the"
+              " wave-60 line, byte for byte");
+        const string gained = attackTotalLine(3, 9, 52, 5, 9, 0, false, 23);
+        CHECK(gained.find("that damage alone puts them at 43, but every blocker they declare"
+                          " also fires the blocking triggers tagged on the rows above - up to"
+                          " 23 life back across their 5 blockers, so blocking can leave them"
+                          " as high as 66") != string::npos,
+              "#W61-R C1 the +23 error is on the page: the damage floor, the life it alone"
+              " leaves, and the gain that puts them back");
+        CHECK(gained.find("they would be at 43.") == string::npos,
+              "#W61-R C1 NEGATIVE the bare resulting-life claim is GONE from the floor once a"
+              " blocking-trigger gain exists - it is the sentence the seat obeyed");
+        // The CEILING is conditional on NO blocks, so no blocking trigger fires
+        // in it and it is untouched by the gain.
+        CHECK(gained.find("declaring all of them with none blocked puts them at 43")
+                  != string::npos,
+              "#W61-R C1 the none-blocked ceiling is unchanged - a trigger that rides a BLOCK"
+              " cannot fire in the branch where nothing blocks");
+        // A kill claim survives only where the gain cannot save them.
+        CHECK(attackTotalLine(3, 9, 9, 5, 9, 0, false, 0)
+                  .find("that KILLS them whatever they block") != string::npos
+              && attackTotalLine(3, 9, 9, 5, 9, 0, false, 23)
+                     .find("KILLS them") == string::npos,
+              "#W61-R C1 a floor that kills before the gain does NOT kill after it, and the"
+              " claim is withdrawn");
+        CHECK(attackTotalLine(3, 40, 9, 5, 40, 0, false, 3)
+                  .find("that KILLS them whatever they block, gain included") != string::npos,
+              "#W61-R C1 a floor that outruns the whole gain keeps the kill claim and names"
+              " the gain as included");
+        // (b) the attack-declaration punisher: `126`'s `125` s121 (Lightmine Field).
+        const string punished = attackTotalLine(2, 2, 31, 3, 2, 0, false, 0, "Lightmine Field");
+        CHECK(punished.find("Both figures are BEFORE their attack triggers: Lightmine Field"
+                            " fires on the declaration, before any combat damage, and can kill"
+                            " your attackers first") != string::npos,
+              "#W61-R C1 the punisher is NAMED and both numbers are re-scoped, because how many"
+              " attackers die depends on how many are declared");
+        CHECK(punished.find("how much it deals depends on how many you declare, so it is not"
+                            " folded into either number") != string::npos,
+              "#W61-R C1 the reason it is not a number is stated - a silent omission is the"
+              " shape the model confabulates into");
+        CHECK(attackTotalLine(2, 4, 4, 3, 4, 0, false, 0, "Lightmine Field")
+                  .find("KILLS them") == string::npos
+              && attackTotalLine(2, 4, 4, 3, 4).find("KILLS them") != string::npos,
+              "#W61-R C1 NEGATIVE no kill claim survives an unpriced punisher, and the same"
+              " board without one still makes it");
+        CHECK(attackTotalLine(3, 9, 52, 5, 9, 0, false, 0, "") == base,
+              "#W61-R C1 REGRESSION both new arguments at their defaults render the wave-60"
+              " line byte for byte");
+        CHECK(gained.find('{') == string::npos && gained.find('[') == string::npos
+              && punished.find('{') == string::npos && punished.find('[') == string::npos,
+              "#W61-R C1 echo shape: ATTACK TOTAL is a prompt LINE and introduces no braced or"
+              " bracketed annotation for a reply to echo");
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet("ATTACK: A1, A2\n" + gained, 2, send, NULL);
+            CHECK(r >= 0 && send.size() == 2 && send[0] && send[1],
+                  "#W61-R C1 echo: a reply that quotes the folded total still binds A1 and A2 -"
+                  " its many digits are not read as labels");
+        }
+    }
+
+    // ============ #W61-R (C2): the blockers ask stops promising a block it cannot make ======
+    cout << "\n[#W61-R] C2 INCOMING THIS COMBAT gets the blocker-count-respecting verdict the"
+            " attackers ask already has\n";
+    {
+        // `162v123` s18: 47 attackers, 140 damage, life 20, ONE blocker.
+        const string lie = incomingCombatLine(47, 140, 20, true, 0, 0);
+        CHECK(lie.find("(your creatures may legally block every attacker in that total)")
+                  != string::npos,
+              "#W61-R C2 the wave-60 wording is what a NOT-COMPUTED matching still prints -"
+              " nothing is claimed from a number that was never derived");
+        const string honest = incomingCombatLine(47, 140, 20, true, 0, 0, -1, true, 1, 47);
+        CHECK(honest.find("(your creatures can legally block at most 1 of those 47 attackers at"
+                          " once, so at least 46 of them go unblocked)") != string::npos,
+              "#W61-R C2 one blocker against 47 attackers reads as one blocker");
+        CHECK(honest.find("may legally block every attacker") == string::npos,
+              "#W61-R C2 NEGATIVE the aggregate promise is gone from exactly that window");
+        CHECK(incomingCombatLine(3, 11, 20, true, 0, 0, -1, true, 3, 3)
+                  .find("(your creatures may legally block every attacker in that total)")
+                  != string::npos,
+              "#W61-R C2 a matching that covers every attacker keeps the promise - it is TRUE"
+              " there, and the claim is about a proven full assignment");
+        CHECK(incomingCombatLine(3, 11, 20, true, 1, 4, -1, true, 2, 2)
+                  .find("of that, 4 from 1 attacker none of your creatures can block")
+                  != string::npos,
+              "#W61-R C2 the unblockable split still wins the parenthetical - it is the sharper"
+              " fact and the two never both print");
+        CHECK(incomingCombatLine(3, 11, 20, true, 0, 0, -1, true, -1, -1)
+                  == incomingCombatLine(3, 11, 20, true, 0, 0),
+              "#W61-R C2 REGRESSION an uncomputed matching renders the wave-60 line byte for"
+              " byte");
+        // The `best case` clause: the 32-attacker cap deleted it on the one window
+        // where the arithmetic decided the game.
+        {
+            vector<int> dmg(47, 3);
+            vector<vector<char> > can(1, vector<char>(47, 1));
+            CHECK(assignableRemainderDamage(dmg, can) == 138,
+                  "#W61-R C2 the assignment is priced at 47 attackers - the old 32 cap returned"
+                  " -1 and the `best case with every blocker assigned` clause silently dropped");
+            CHECK(assignableMatchedAttackers(47, can) == 1,
+                  "#W61-R C2 the matching over that same map is ONE, which is the number the"
+                  " parenthetical now prints");
+            vector<vector<char> > three(3, vector<char>(4, 1));
+            CHECK(assignableMatchedAttackers(4, three) == 3
+                  && assignableMatchedAttackers(2, three) == 2,
+                  "#W61-R C2 the matching is capped by blockers and by attackers, whichever"
+                  " binds first");
+            vector<vector<char> > none(2, vector<char>(3, 0));
+            CHECK(assignableMatchedAttackers(3, none) == 0
+                  && assignableMatchedAttackers(0, none) == -1,
+                  "#W61-R C2 NEGATIVE no legal pairing matches nothing, and no attacker at all"
+                  " is not computed rather than reported as zero");
+        }
+        CHECK(honest.find('{') == string::npos && honest.find('[') == string::npos,
+              "#W61-R C2 echo shape: the verdict stays a prompt LINE with no new annotation");
+        {
+            vector<int> outB;
+            const int pairs = parseBlockAssignments("B1:A1\n" + honest, 1, 47, outB);
+            CHECK(pairs == 1 && outB.size() == 1 && outB[0] == 1,
+                  "#W61-R C2 echo: a reply quoting the new verdict still binds B1 to A1 - the"
+                  " 47/46/1 digits in it are not read as assignments");
+        }
+    }
+
+    // ============ #W61-R (C3): CRACK-BACK stops calling a floor a ceiling ============
+    cout << "\n[#W61-R] C3 CRACK-BACK NEXT TURN nets evasion and names the three board sources"
+            " that put the true number above its own \"up to\"\n";
+    {
+        const string plain = crackBackNextTurnLine(4, 5, 20);
+        CHECK(plain == "CRACK-BACK NEXT TURN: 4 of their creatures will be able to attack"
+                       " (tapped ones untap first), for up to 5 - you would be at 15",
+              "#W61-R C3 REGRESSION a board with no evasion and no floor source renders the"
+              " wave-59 line byte for byte");
+        // `125v130` s21: Siege-Gang Commander turned "up to 5" into 9.
+        const string floored = crackBackNextTurnLine(4, 5, 20, 0, 0, 0, 0, false,
+                                                     "they can also aim ability damage at you"
+                                                     " that no block stops - Siege-Gang"
+                                                     " Commander (2 per activation)");
+        CHECK(floored.find("for up to 5 from combat as their board stands - you would be at 15"
+                           " or lower") != string::npos,
+              "#W61-R C3 the head clause says what the number covers and which direction it can"
+              " only move - the seat reads this line to decide whether to tap out");
+        CHECK(floored.find("- and that number is a FLOOR, not a ceiling: they can also aim"
+                           " ability damage at you that no block stops - Siege-Gang Commander"
+                           " (2 per activation)") != string::npos,
+              "#W61-R C3 the source is named with its per-activation figure, and the number of"
+              " activations is not guessed");
+        CHECK(floored.find("for up to 5 - you would be at 15") == string::npos,
+              "#W61-R C3 NEGATIVE the bare ceiling wording is gone from exactly the boards that"
+              " falsify it");
+        // A floor that already kills still kills - more damage cannot save the seat.
+        CHECK(crackBackNextTurnLine(4, 20, 12, 0, 0, 0, 0, false, "x")
+                  .find("; that would KILL you") != string::npos,
+              "#W61-R C3 the kill claim survives the ceiling-to-floor change: a floor at or"
+              " past the seat's life is still a proven death");
+        // `123v126` s20: 19 of their 20 attackers were fliers over an all-ground board.
+        const string evade = crackBackNextTurnLine(20, 41, 21, 0, 0, 19, 38, true);
+        CHECK(evade.find("- of that, 38 from 19 attackers nothing you control can legally block")
+                  != string::npos,
+              "#W61-R C3 the evasion sub-total is stated in the same register the blockers ask"
+              " uses - 51 of 51 renders at deck126 netted nothing");
+        CHECK(crackBackNextTurnLine(20, 41, 21, 0, 0, 19, 38, false)
+                  == crackBackNextTurnLine(20, 41, 21),
+              "#W61-R C3 NEGATIVE with no bodies of its own the split says nothing: 'nothing you"
+              " control can block it' is true of every attacker and carries no decision");
+        CHECK(crackBackNextTurnLine(20, 41, 21, 0, 0, 0, 0, true)
+                  == crackBackNextTurnLine(20, 41, 21),
+              "#W61-R C3 NEGATIVE a board where every attacker is blockable prints no split");
+        CHECK(crackBackNextTurnLine(3, 10, 10, 2, 7, 0, 0, false, "")
+                  == crackBackNextTurnLine(3, 10, 10, 2, 7),
+              "#W61-R C3 REGRESSION the wave-60 exile-hostage clause is untouched by the four"
+              " new arguments at their defaults");
+        CHECK(crackBackNextTurnLine(4, 5, 20, 2, 7, 1, 2, true, "x")
+                  .find("comes back from exile") != string::npos,
+              "#W61-R C3 the conditional exile clause still comes LAST, after the unconditional"
+              " numbers and the floor sources");
+        CHECK(evade.find('{') == string::npos && evade.find('[') == string::npos
+              && floored.find('{') == string::npos && floored.find('[') == string::npos,
+              "#W61-R C3 echo shape: CRACK-BACK is a prompt LINE and adds no annotation");
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet("ATTACK: A2\n" + evade, 3, send, NULL);
+            CHECK(r >= 0 && send.size() == 3 && !send[0] && send[1] && !send[2],
+                  "#W61-R C3 echo: a reply quoting the netted line still binds A2 alone");
+        }
+    }
+
+    // ============ #W61-R (C4): the stack total prices a CHOSEN player target ============
+    cout << "\n[#W61-R] C4 ON THE STACK prices target(anytarget) abilities aimed at the pilot\n";
+    {
+        // The scan itself needs live ability objects and is pinned by the suite
+        // fixture w61R_stack_anytarget_total.txt; what PARSETEST owns is the
+        // line the scan feeds and the shape it renders in.
+        CHECK(pendingStackDamageLine(1, 18) == "ON THE STACK: 1 damage to you - you would be at 17",
+              "#W61-R C4 `130v125` s118: one Staff of Nin ping at 18 life is one damage and a"
+              " resulting life, in the same finished-subtraction register as every other price");
+        CHECK(pendingStackDamageLine(2, 2)
+                  == "ON THE STACK: 2 damage to you - you would be at 0; that would KILL you",
+              "#W61-R C4 two of them at 2 life is a death, and it is said");
+        CHECK(pendingStackDamageLine(0, 18).empty(),
+              "#W61-R C4 NEGATIVE an ability aimed at the OPPONENT contributes nothing and the"
+              " line is not printed - Lightmine Field damages creatures and stays excluded");
+        CHECK(stackDamagePhrase(1, true) == "deals 1 damage to you"
+              && stackDamagePhrase(1, false) == "deals 1 damage to them",
+              "#W61-R C4 the effect phrase names the side, so a row that had degenerated to a"
+              " bare kind now says what it does");
+        CHECK(pendingStackDamageLine(1, 18).find('{') == string::npos
+              && pendingStackDamageLine(1, 18).find('[') == string::npos,
+              "#W61-R C4 echo shape: the total is a prompt LINE and adds no annotation");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
