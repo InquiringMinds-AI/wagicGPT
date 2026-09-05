@@ -62,6 +62,9 @@ using json = nlohmann::json;
 //scope, because the header lives inside the anonymous namespace below and a
 //declaration there would name a different function.
 static string landTapMana(const string& text);
+//#W62-X (D8): same reason - the loop scan is defined far below and outside the
+//anonymous namespace, and a declaration inside it would name a different function.
+static bool playerHasLifeLoop(Player * p);
 
 namespace
 {
@@ -1367,6 +1370,22 @@ static int lifeToDamageConverterTake(const string& magicText, int gain)
     }
     return 0;
 }
+//#W62-X (D8, deck126 engine HIGH-2): the SYMMETRIC verdict. Every row that can
+//kill the pilot carries "this KILLS you"; no row in the whole corpus ever said
+//it WINS while the loop banner printed, and at `126v162` seq 37 the seat's own
+//plan named a win no row on the screen would claim. With BOTH halves of a life
+//LOOP on the PILOT's side the banner's own rule - "any life you gain, or any
+//life they lose, chains until they are at 0" - makes any KNOWN positive gain,
+//and any known life loss of theirs, lethal to them at any life total. Pure over
+//the two facts, and empty when either fails: an amount that is not known to be
+//positive claims nothing.
+static string lifeLoopWinTail(bool myLoopClosed, bool amountKnownPositive)
+{
+    if (!myLoopClosed || !amountKnownPositive)
+        return "";
+    return " - and both halves of YOUR life LOOP are in play, so that chains"
+           " without limit until they are at 0: THIS WINS THE GAME";
+}
 //The clause itself. Pure over (name, amount, life), so PARSETEST proves it.
 static string lifeLoopDrainClause(const string& converterName, int takes, int life)
 {
@@ -1381,7 +1400,8 @@ static string lifeLoopDrainClause(const string& converterName, int takes, int li
 }
 static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness,
                           bool targetGains = false, const string& onlyFacts = "",
-                          const string& converterName = "", int converterTakes = 0, int myLife = -1)
+                          const string& converterName = "", int converterTakes = 0, int myLife = -1,
+                          bool myLifeLoop = false, int minToughness = 0) //#W62-X (D8)
 {
     std::ostringstream o;
     if (theirCreatures <= 0)
@@ -1395,10 +1415,20 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
             o << ", they gain " << onlyToughness << " - the sacrificing player gains, not you"
               << lifeLoopDrainClause(converterName, converterTakes, myLife);
         else if (gainsToughness)
-            o << ", you gain " << onlyToughness;
+            o << ", you gain " << onlyToughness
+              << lifeLoopWinTail(myLifeLoop, onlyToughness > 0); //#W62-X (D8)
         return o.str();
     }
     o << "they control " << theirCreatures << " creatures - they choose which one";
+    //#W62-X (D8): at N > 1 the victim is theirs to pick, so the gain is not
+    //determined - but its FLOOR is: they cannot hand over less than their
+    //smallest toughness. That floor is what makes the row's verdict provable
+    //(`126v162` seq 37: Shield Sphere 0/6 and Master of the Feast 5/5 against a
+    //closed loop of the seat's own, opponent on 4, row 1 bare). Printed only
+    //when a gain is what this edict does and the floor is a real number.
+    if (gainsToughness && !targetGains && minToughness > 0)
+        o << " - you gain at least " << minToughness
+          << " (their smallest toughness)" << lifeLoopWinTail(myLifeLoop, true);
     return o.str();
 }
 
@@ -2071,9 +2101,31 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
             victim.push_back(only);
             stackTail = edictOnlyVictimOnStackClause(edictVictimAlreadyOnStack(card, victim));
         }
+        //#W62-X (D8): the gain FLOOR at N > 1 (their smallest toughness - the
+        //victim is their pick) and whether the PILOT's own life loop is closed,
+        //which is what turns any positive gain into a proven win.
+        int minTough = 0;
+        bool myLoopClosed = false;
+        if (card && card->controller())
+        {
+            myLoopClosed = playerHasLifeLoop(card->controller());
+            Player * themP = card->controller()->opponent();
+            MTGGameZone * tbf2 = (themP && themP->game) ? themP->game->inPlay : NULL;
+            for (int ti = 0; tbf2 && ti < tbf2->nb_cards; ti++)
+            {
+                MTGCardInstance * tc2 = tbf2->cards[ti];
+                if (!tc2 || !tc2->isCreature())
+                    continue;
+                if (!minTough || tc2->toughness < minTough)
+                    minTough = tc2->toughness;
+            }
+            if (minTough < 0)
+                minTough = 0;
+        }
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
-                           targetGains, facts, convName, convTakes, myLife)
+                           targetGains, facts, convName, convTakes, myLife,
+                           myLoopClosed, minTough) //#W62-X (D8)
              + stackTail + selfClause;
     }
     if (sweepVerb)
@@ -4447,7 +4499,8 @@ static string attackDeclarationPunishers(Player * opp)
 static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               int blockers, int guaranteed,
                               int infectExcluded = 0, bool damageSuppressed = false,
-                              int blockGain = 0, const string& attackPunishers = "")
+                              int blockGain = 0, const string& attackPunishers = "",
+                              bool oppLifeLoop = false) //#W62-X (D2)
 {
     if (attackers <= 0 || oppLife < 0)
         return "";
@@ -4495,10 +4548,30 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                   << ", but every blocker they declare also fires the blocking"
                      " triggers tagged on the rows above - up to " << blockGain
                   << " life back across their " << blockers << " blocker"
-                  << (blockers == 1 ? "" : "s") << ", so blocking can leave them"
-                     " as high as " << (oppLife - guaranteed + blockGain);
-                if (oppLife - guaranteed + blockGain <= 0 && attackPunishers.empty())
-                    o << "; that KILLS them whatever they block, gain included";
+                  << (blockers == 1 ? "" : "s");
+                //#W62-X (D2, deck123 HIGH-1 / C1 repro): with BOTH halves of a
+                //life loop on their side, blockGain is not a ceiling at all -
+                //Sanguine Bond + Exquisite Blood turn the first point a blocking
+                //trigger gains them into an unbounded chain that resolves in
+                //declare-blockers, BEFORE any of the combat damage this figure
+                //counts (`123v126` seq 52 printed "KILLS them whatever they
+                //block, gain included" beside the loop banner; seq 73 -> gameend
+                //ran the seat 19 -> 0 and them 20 -> 39 off a single point).
+                //Fail closed exactly as C1b does for an unpriced attack
+                //punisher: no kill claim, and the reason is named rather than
+                //left as a gap to confabulate into.
+                if (oppLifeLoop)
+                    o << ", and that is NOT a ceiling: both halves of their life"
+                         " LOOP are in play, so any life a block gains them chains"
+                         " without limit and resolves before this damage. No kill"
+                         " claim is made from these figures";
+                else
+                {
+                    o << ", so blocking can leave them as high as "
+                      << (oppLife - guaranteed + blockGain);
+                    if (oppLife - guaranteed + blockGain <= 0 && attackPunishers.empty())
+                        o << "; that KILLS them whatever they block, gain included";
+                }
             }
             else
             {
@@ -9964,14 +10037,26 @@ static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const strin
 //step pays it. `extras` are the OPPONENT's additional-draw permanents (the
 //same scan, seats swapped); a Puzzle Box entry labelled for the drawer's own
 //hand is relabelled for this chair. Pure.
+//#W62-X (D8, deck126 engine HIGH-1): "next" and no verdict. `126v162` seq 37
+//rendered "your NEXT draw step draws 13 cards ... = 26 life" in phase Draw with
+//all four draw triggers ALREADY on the stack, two lines under "Your life: 20" -
+//a step the seat read as still ahead of it, and a cost above its life that
+//carried none of the KILLS-you verdict every other lethal figure on that screen
+//carries. `stepIsNow` drops the tense; `holderLife` >= 0 prints the resulting
+//life and the verdict. The verdict is deliberately CONDITIONAL on the forecast
+//resolving as printed ("if it resolves as forecast") - the step's own card may
+//already be drawn, so the count is a forecast and is not re-derived here.
 static string theirDrawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
-                                        int perDraw, const string& loopCaution = "") //#W60-N (B6)
+                                        int perDraw, const string& loopCaution = "", //#W60-N (B6)
+                                        bool stepIsNow = false, int holderLife = -1) //#W62-X (D8)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
         k += extras[i].second;
     std::ostringstream o;
-    o << "DRAW FORECAST (theirs): their next draw step draws " << k << " card" << (k == 1 ? "" : "s");
+    o << "DRAW FORECAST (theirs): their "
+      << (stepIsNow ? "draw step, resolving NOW," : "next draw step")
+      << " draws " << k << " card" << (k == 1 ? "" : "s");
     if (!extras.empty())
     {
         o << " (" << base;
@@ -9986,20 +10071,33 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
         o << ")";
     }
     if (perDraw > 0)
+    {
         o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to you from your punishers above";
+        if (holderLife >= 0) //#W62-X (D8)
+        {
+            o << " - if it resolves as forecast they would be at " << (holderLife - k * perDraw);
+            if (holderLife - k * perDraw <= 0)
+                o << "; that KILLS them";
+        }
+    }
     o << ".";
     o << loopCaution; //#W60-N (B6)
     return o.str();
 }
 
+//#W62-X (D8): the pilot's own half, same two additions - this is the render the
+//review names.
 static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
-                                   int perDraw, const string& loopCaution = "") //#W60-N (B6)
+                                   int perDraw, const string& loopCaution = "", //#W60-N (B6)
+                                   bool stepIsNow = false, int holderLife = -1) //#W62-X (D8)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
         k += extras[i].second;
     std::ostringstream o;
-    o << "DRAW FORECAST: your next draw step draws " << k << " card" << (k == 1 ? "" : "s");
+    o << "DRAW FORECAST: your "
+      << (stepIsNow ? "draw step, resolving NOW," : "next draw step")
+      << " draws " << k << " card" << (k == 1 ? "" : "s");
     if (!extras.empty())
     {
         o << " (" << base;
@@ -10008,7 +10106,15 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
         o << ")";
     }
     if (perDraw > 0)
+    {
         o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to the punishers above";
+        if (holderLife >= 0) //#W62-X (D8)
+        {
+            o << " - if it resolves as forecast you would be at " << (holderLife - k * perDraw);
+            if (holderLife - k * perDraw <= 0)
+                o << "; that KILLS you";
+        }
+    }
     o << ".";
     o << loopCaution; //#W60-N (B6)
     return o.str();
@@ -17655,6 +17761,17 @@ static int activationManaCost(const string& head)
         i = close + 1;
         if (sym.empty())
             continue;
+        //#W62-X (D6, engine HIGH-2): a LOYALTY cost head is not a mana cost at
+        //all. `{C(0/0,-8,Loyalty)}` (Lolth, Spider Queen's -8, planeswalkers.txt
+        //:2170) was read as one generic mana by the `numeric ? ... : 1` fallback
+        //below, so `crackBackCostAffordable` found an ability needing 8 loyalty
+        //FREE on a permanent standing at 1 - 17 windows over-stated the incoming
+        //crack-back by 8 from a source that can never fire. A counter cost is
+        //not priceable against mana, so refuse the head outright and let the
+        //caller make no claim.
+        if (sym.find("loyalty") != string::npos || sym.find("LOYALTY") != string::npos
+            || sym.find("Loyalty") != string::npos)
+            return -1;
         //Sacrifice / exile / tap clauses carry no mana.
         if (sym[0] == 's' || sym[0] == 'S' || sym[0] == 'e' || sym[0] == 'E'
             || sym == "t" || sym == "T" || sym == "q" || sym == "Q")
@@ -17690,6 +17807,44 @@ static bool crackBackCostAffordable(const string& costHead, bool sourceStaysTapp
     return oppReach >= 0 && mana <= oppReach;
 }
 
+//#W62-X (D6, engine HIGH-2, second and third errors on the same render): the
+//amount and the delivery. `damage:8minusoplifelostminusend opponent` starts with
+//a digit, so the old `line[dp+7] >= '1'` test passed it and the render printed a
+//flat "8" for an EXPRESSION lane R's own scope note said it skips. And that
+//damage sits inside `emblem transforms((,newability[@combatdamagefoeof(player)
+//... ]))` - it is an emblem's TRIGGERED rider on their creatures' combat damage,
+//so the clause's own promise "that no block stops" is exactly backwards: a block
+//is what stops it. Both are pure string facts about the script line.
+//The amount: every character from `damage:` to the next delimiter must be a
+//digit, or nothing is claimed. Returns 0 when the amount is not a plain number.
+static int crackBackFlatDamageAmount(const string& line, size_t damagePos)
+{
+    size_t i = damagePos + 7; //past "damage:"
+    if (i >= line.size())
+        return 0;
+    size_t start = i;
+    while (i < line.size() && isdigit((unsigned char) line[i]))
+        i++;
+    if (i == start)
+        return 0;
+    //Anything but a delimiter after the digits means the amount is an
+    //expression (`8minusoplifelostminusend`, `2plusx`), not a number.
+    if (i < line.size() && line[i] != ' ' && line[i] != '\t' && line[i] != ')'
+        && line[i] != ']' && line[i] != ',' && line[i] != '\r')
+        return 0;
+    return atoi(line.c_str() + start);
+}
+//The delivery: an `@` hook anywhere between the cost head and the damage means
+//the damage is what some LATER trigger does, not what this activation aims. The
+//clause is only true of damage the activation itself deals.
+static bool crackBackDamageIsDirect(const string& line, size_t costColon, size_t damagePos)
+{
+    if (costColon == string::npos || damagePos <= costColon)
+        return false;
+    return line.find('@', costColon) == string::npos
+           || line.find('@', costColon) > damagePos;
+}
+
 static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size_t effectPos,
                                    int oppReach)
 {
@@ -17705,6 +17860,49 @@ static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size
     return crackBackCostAffordable(line.substr(0, colon), staysTapped, oppReach);
 }
 
+//#W62-X (D6): how many distinct mana SOURCES they will have untapped on their
+//own next turn - the same one-per-source unit `potentialColorReach` returns and
+//the same FreeProducerPolicy, with the tapped gate replaced by the untap step's
+//own rule (a tapped permanent untaps unless it does not untap or is frozen).
+//Summoning sickness is deliberately not a filter, for the reason the crack-back
+//body count gives: a source that arrived this turn is usable on their next one.
+//-1 means the layer could not be read, and the caller then keeps the old figure.
+static int oppNextTurnManaReach(Player * opp)
+{
+    if (!opp || !opp->game || !opp->game->inPlay || !opp->getObserver()
+        || !opp->getObserver()->mLayers)
+        return -1;
+    ActionLayer * al = opp->getObserver()->mLayers->actionLayer();
+    if (!al)
+        return -1;
+    ManaEngine::FreeProducerPolicy policy;
+    std::set<MTGCardInstance *> seen;
+    for (size_t i = 0; i < al->manaObjects.size(); i++)
+    {
+        MTGAbility * a = (MTGAbility *) al->manaObjects[i];
+        AManaProducer * amp = dynamic_cast<AManaProducer*>(a);
+        if (!amp)
+        {
+            GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a);
+            if (gmp)
+                if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
+                    amp = dynamic_cast<AManaProducer*>(fmp->ability);
+        }
+        if (!amp || !policy.canHandle(a) || !amp->source)
+            continue;
+        MTGCardInstance * src = amp->source;
+        if (!opp->game->inPlay->hasCard(src) || src->isPhased)
+            continue;
+        if (src->has(Constants::NOACTIVATED) || src->has(Constants::NOMANA))
+            continue;
+        if (src->isTapped()
+            && (src->basicAbilities[Constants::DOESNOTUNTAP] || src->frozen >= 1))
+            continue;
+        seen.insert(src);
+    }
+    return (int) seen.size();
+}
+
 static string crackBackFloorSources(Player * opp)
 {
     if (!opp || !opp->game || !opp->game->inPlay)
@@ -17716,8 +17914,17 @@ static string crackBackFloorSources(Player * opp)
     //cannot disagree about what they can afford.
     ManaEngine::FreeProducerPolicy crackBackPolicy;
     ManaCost * crackBackPotential = NEW ManaCost();
-    const int oppReach = ManaEngine::potentialColorReach(opp, crackBackPolicy, crackBackPotential);
+    const int openNow = ManaEngine::potentialColorReach(opp, crackBackPolicy, crackBackPotential);
     SAFE_DELETE(crackBackPotential);
+    //#W62-X (D6, R6 FAIL): this line forecasts THEIR NEXT TURN, and their lands
+    //untap in their untap step - pricing a next-turn activation against THIS
+    //turn's open mana dropped 53 TRUE clauses in the wave-61 corpus (Hive of the
+    //Eye Tyrant 40, Siege-Gang Commander 13, each against 0-3 untapped sources).
+    //The gate is split: next-turn mana for a next-turn claim. The walk falls
+    //back to the open-mana figure when the action layer cannot be read, which is
+    //the wave-61 behaviour exactly - no clause appears that did not appear then.
+    const int nextTurn = oppNextTurnManaReach(opp);
+    const int oppReach = (nextTurn >= 0) ? nextTurn : openNow;
     MTGGameZone * bf = opp->game->inPlay;
     for (int i = 0; i < bf->nb_cards; i++)
     {
@@ -17763,13 +17970,18 @@ static string crackBackFloorSources(Player * opp)
                 const bool atPlayer = line.find("anytarget") != string::npos
                                       || line.find("target(player") != string::npos
                                       || line.find(" opponent") != string::npos;
-                if (dp != string::npos && atPlayer
-                    && dp + 7 < line.size() && line[dp + 7] >= '1' && line[dp + 7] <= '9'
+                //#W62-X (D6): a plain number, and damage this activation itself
+                //deals - not an expression, and not an emblem's combat-damage
+                //rider a block would stop.
+                const int flatDmg = (dp == string::npos) ? 0
+                                    : crackBackFlatDamageAmount(line, dp);
+                if (dp != string::npos && atPlayer && flatDmg > 0
+                    && crackBackDamageIsDirect(line, line.find(':'), dp)
                     //#W61-V (R6): only a source they can actually activate.
                     && crackBackAbilityUsable(c, line, dp, oppReach))
                 {
                     std::ostringstream pp;
-                    pp << c->getDisplayName() << " (" << atoi(line.c_str() + dp + 7)
+                    pp << c->getDisplayName() << " (" << flatDmg
                        << " per activation)";
                     if (!pingers.empty())
                         pingers += ", ";
@@ -17861,6 +18073,64 @@ static bool crackBackNextTurnDue(bool selfActive, int phase, int ableAttackers, 
     return phase == (int) MTG_PHASE_FIRSTMAIN
            || phase == (int) MTG_PHASE_COMBATATTACKERS
            || phase == (int) MTG_PHASE_SECONDMAIN;
+}
+
+//#W62-X (D19, deck130 HIGH-2): the crack-back total and a removal row are on
+//the SAME screen and were never connected - `130v152` s18 printed "for up to 10
+//from combat ... you would be at -1 or lower; that would KILL you" over a target
+//list where killing the 2/2 leaves the seat at 1 and killing the 1/1 leaves it
+//at 0, and the seat did the subtraction nowhere. What each row is worth is a
+//number the engine already has.
+//The per-body half of the crack-back walk, extracted so the total the line
+//prints and the total a row subtracts from are literally the same arithmetic.
+//Returns the power this body contributes, or 0 if it is not in that count.
+static int crackBackBodyContribution(MTGCardInstance * ac)
+{
+    if (!ac || !ac->isCreature())
+        return 0;
+    const int pw = ac->power > 0 ? ac->power : 0;
+    if (pw <= 0 || !boardCreatureCanAttackNow(ac, false))
+        return 0;
+    if (!crackBackBodyUntaps(ac->isTapped() != 0,
+                             ac->basicAbilities[(int) Constants::DOESNOTUNTAP],
+                             ac->basicAbilities[(int) Constants::SHACKLER],
+                             ac->frozen >= 1))
+        return 0;
+    return pw;
+}
+//The whole total, over their battlefield.
+static int crackBackTotalOver(Player * opp, int * attackersOut)
+{
+    int total = 0, n = 0;
+    if (opp && opp->game && opp->game->inPlay)
+        for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+        {
+            const int pw = crackBackBodyContribution(opp->game->inPlay->cards[i]);
+            if (pw > 0) { total += pw; n++; }
+        }
+    if (attackersOut)
+        *attackersOut = n;
+    return total;
+}
+//The clause a removal row carries. `floorTotal` is true when the printed total
+//rides the FLOOR wording, and then surviving the remainder is NOT a promise -
+//the clause says so rather than handing the seat a false all-clear. Pure over
+//the four numbers, so both branches and every silent case are provable.
+static string crackBackReliefClause(int total, int removed, int myLife, bool floorTotal)
+{
+    if (total <= 0 || removed <= 0 || myLife < 0 || removed > total)
+        return "";
+    const int after = total - removed;
+    std::ostringstream o;
+    o << " {removes " << removed << " from the CRACK-BACK total above: " << total
+      << " -> " << after << " - you would be at " << (myLife - after);
+    if (myLife - after <= 0)
+        o << "; that still KILLS you";
+    else if (floorTotal)
+        o << ", but that total is a FLOOR, not a ceiling - surviving it is not"
+             " guaranteed";
+    o << "}";
+    return o.str();
 }
 
 //#W57-B (D24): the best legal blocker assignment, as damage that still lands.
@@ -18659,12 +18929,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //rule, so a tapped body counts and a body that does not untap
                 //does not. Summoning sickness is deliberately not a filter: a
                 //creature that arrived this turn attacks on their next one.
-                if (crackBackSeat && pw > 0
-                    && boardCreatureCanAttackNow(ac, false)
-                    && crackBackBodyUntaps(ac->isTapped() != 0,
-                                           ac->basicAbilities[(int) Constants::DOESNOTUNTAP],
-                                           ac->basicAbilities[(int) Constants::SHACKLER],
-                                           ac->frozen >= 1))
+                //#W62-X (D19): one predicate, shared with the removal rows.
+                if (crackBackSeat && crackBackBodyContribution(ac) > 0)
                 {
                     nextTurnAttackers++;
                     nextTurnDamage += pw;
@@ -18888,7 +19154,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             {
                 std::vector<std::pair<std::string, int> > extras;
                 drawStepExtrasScan(this, opp, extras);
-                out << "\n" << drawStepForecastText(1, extras, theirsPer, loopCaution);
+                //#W62-X (D8): whose draw step is happening RIGHT NOW, and the
+                //life the forecast is priced against.
+                const bool myDrawNow = observer
+                    && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW
+                    && activeSeat == this;
+                out << "\n" << drawStepForecastText(1, extras, theirsPer, loopCaution,
+                                                   myDrawNow, life); //#W62-X (D8)
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -18896,7 +19168,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             {
                 std::vector<std::pair<std::string, int> > theirExtras;
                 drawStepExtrasScan(opp, this, theirExtras);
-                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer, loopCaution);
+                const bool theirDrawNow = observer
+                    && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW
+                    && activeSeat == opp;
+                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer, loopCaution,
+                                                        theirDrawNow, opp->life); //#W62-X (D8)
             }
         }
     }
@@ -20971,7 +21247,8 @@ static string winFoldBlockedTail(int myLife, int lifeLossFirst)
 //register as damageTargetVerdict; a player's answer is their life total.
 //Pure over (magnitude, life, whose row it is).
 string damagePlayerVerdict(int dmg, int life, bool isMe,
-                          int myLife = -1, int lifeLossFirst = 0) //#W60-L (B1)
+                          int myLife = -1, int lifeLossFirst = 0, //#W60-L (B1)
+                          bool myLifeLoop = false) //#W62-X (D8)
 {
     std::ostringstream o;
     o << " {right now: takes " << dmg << " damage - ";
@@ -20991,6 +21268,12 @@ string damagePlayerVerdict(int dmg, int life, bool isMe,
             const string blocked = winFoldBlockedTail(myLife, lifeLossFirst);
             o << "; " << (blocked.empty() ? string("THIS WINS THE GAME") : blocked);
         }
+        //#W62-X (D8): a hit that leaves them standing still ends the game when
+        //the PILOT holds both halves of a life loop - the loss chains. Same
+        //survival guard as the direct claim above: a win the seat does not live
+        //to collect is not a win.
+        else if (myLifeLoop && dmg > 0 && winFoldBlockedTail(myLife, lifeLossFirst).empty())
+            o << lifeLoopWinTail(true, true);
     }
     o << "}";
     return o.str();
@@ -30609,6 +30892,24 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         else if (!ad)
             dmgAmount = spellSingleDamageAmount(tc->source, dmgDeathtouch);
     }
+    //#W62-X (D19): the crack-back total THIS screen prints, if it prints one.
+    //Gated on exactly the render's own conditions (`crackBackNextTurnDue` over
+    //the same phase and the same seat), so a row never points at a line that is
+    //not above it; and it uses `crackBackTotalOver`, which is the same walk the
+    //line itself is built from.
+    int crackTotal = 0, crackAttackers = 0;
+    bool crackIsFloor = false;
+    {
+        Player * cbOpp = opponent();
+        GameObserver * cbObs = getObserver();
+        const int cbPhase = cbObs ? (int) cbObs->getCurrentGamePhase() : (int) MTG_PHASE_INVALID;
+        const bool cbSeat = cbObs && cbObs->currentPlayer == this;
+        crackTotal = crackBackTotalOver(cbOpp, &crackAttackers);
+        if (!crackBackNextTurnDue(cbSeat, cbPhase, crackAttackers, crackTotal))
+            crackTotal = 0;
+        else
+            crackIsFloor = !crackBackFloorSources(cbOpp).empty();
+    }
     for (;;)
     {
         vector<Targetable *> targets;
@@ -30640,22 +30941,43 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
                         if (dtc->isCreature() && dtc->controller() && dtc->controller()->game
                             && dtc->currentZone == dtc->controller()->game->inPlay)
+                        {
                             tdesc += damageTargetVerdict(dmgAmount, dtc->toughness, dtc->life,
                                                          dtc->basicAbilities[Constants::INDESTRUCTIBLE],
                                                          dmgDeathtouch);
+                            //#W62-X (D19): what killing it takes off the
+                            //crack-back total the same screen printed. Only on
+                            //a row whose verdict is DIES, and only for a body
+                            //that is actually IN that total.
+                            if (damageKillsTarget(dmgAmount, dtc->life,
+                                                  dtc->basicAbilities[Constants::INDESTRUCTIBLE],
+                                                  dmgDeathtouch))
+                                tdesc += crackBackReliefClause(crackTotal,
+                                             dtc->controller() == opponent()
+                                                 ? crackBackBodyContribution(dtc) : 0,
+                                             life, crackIsFloor);
+                        }
                 //#W52-L (D15): the shrink verdict rides the creature target line.
                 if (ptDrop > 0 && !dmgAmount)
                     if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
                         if (dtc->isCreature() && dtc->controller() && dtc->controller()->game
                             && dtc->currentZone == dtc->controller()->game->inPlay)
+                        {
                             tdesc += ptDropTargetVerdict(ptDrop, dtc->toughness, dtc->life);
+                            if (ptDropKillsTarget(ptDrop, dtc->life)) //#W62-X (D19)
+                                tdesc += crackBackReliefClause(crackTotal,
+                                             dtc->controller() == opponent()
+                                                 ? crackBackBodyContribution(dtc) : 0,
+                                             life, crackIsFloor);
+                        }
                 //#W54-C (D4 part iii): the PLAYER rows of the same ask. They
                 //carried nothing while their creature siblings carried a
                 //verdict, and the row that won the game was the bare one.
                 if (dmgAmount > 0)
                     if (Player * dtp = dynamic_cast<Player *>(t))
                         tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this,
-                                                     this->life, perilBeforeResolve); //#W60-L (B1)
+                                                     this->life, perilBeforeResolve, //#W60-L (B1)
+                                                     playerHasLifeLoop(this)); //#W62-X (D8)
                 //#W54-C (D4): and a planeswalker's answer is its loyalty - the
                 //helper existed and only the ability path was calling it, so
                 //`130v162` seq 63's Ob Nixilis row was bare too.
@@ -33781,7 +34103,8 @@ int AIPlayerGPT::chooseAttackers()
             tail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
                                     infectExcluded, suppressed, blockGain,
-                                    attackDeclarationPunishers(oppL)); //#W61-R (C1)
+                                    attackDeclarationPunishers(oppL),
+                                    playerHasLifeLoop(oppL)); //#W62-X (D2)
         }
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
@@ -55728,6 +56051,225 @@ static const char * kW50Y_r94 =
                   "#W61-U C14 NEGATIVE an overrun under the threshold is stored untouched");
             CHECK(recordReplyTrimmed(full, 0) == full && recordReplyTrimmed("", 5000).empty(),
                   "#W61-U C14 NEGATIVE no measured overrun, no trim");
+        }
+    }
+
+
+    cout << "\n[#W62-X D2] the ATTACK TOTAL kill claim under an opposing life LOOP\n";
+    {
+        // REPRO `123v126` seq 52 in miniature: a guaranteed floor that would
+        // otherwise be fatal even after the bounded blockGain, on a board where
+        // BOTH halves of their loop are in play. The bounded ceiling is a lie
+        // there - Sanguine Bond + Exquisite Blood resolve in declare-blockers,
+        // before any of this damage - so no kill claim survives.
+        const string looped = attackTotalLine(97, 98, 20, 2, 95, 0, false, 4, "", true);
+        const string plain  = attackTotalLine(97, 98, 20, 2, 95, 0, false, 4, "", false);
+        CHECK(plain.find("KILLS them whatever they block, gain included") != string::npos,
+              "#W62-X D2 base: with no loop the bounded-gain kill claim still prints");
+        CHECK(looped.find("KILLS them") == string::npos,
+              "#W62-X D2 REPRO: a life LOOP on their side withholds the kill claim");
+        CHECK(looped.find("NOT a ceiling: both halves of their life LOOP are in play")
+                  != string::npos
+              && looped.find("resolves before this damage") != string::npos,
+              "#W62-X D2 and the reason is NAMED, not left as a gap");
+        CHECK(looped.find("so blocking can leave them as high as") == string::npos,
+              "#W62-X D2 the bounded ceiling figure is withheld with the claim it fed");
+        // The damage floor itself is untouched: it is what the seat still knows.
+        CHECK(looped.find("At least 95 damage lands whatever they block") != string::npos
+              && looped.find("that damage alone puts them at -75") != string::npos,
+              "#W62-X D2 the damage floor and the life it alone leaves still print");
+        // NEGATIVE 1: no blocking gain, no change - a loop a block cannot start
+        // is not this line's business.
+        CHECK(attackTotalLine(5, 20, 5, 3, 6, 0, false, 0, "", true)
+                  == attackTotalLine(5, 20, 5, 3, 6, 0, false, 0, "", false),
+              "#W62-X D2 NEGATIVE blockGain 0: the loop flag changes nothing");
+        // NEGATIVE 2: the default argument keeps every wave-61 render byte-identical.
+        CHECK(attackTotalLine(3, 9, 52, 5, 9, 0, false, 23)
+                  == attackTotalLine(3, 9, 52, 5, 9, 0, false, 23, "", false),
+              "#W62-X D2 NEGATIVE the added parameter defaults to the wave-61 wording");
+        // ECHO: the annotated line carries no bracket or brace a reply could latch.
+        CHECK(looped.find('{') == string::npos && looped.find('[') == string::npos,
+              "#W62-X D2 echo shape: the clause adds no bracketed annotation");
+    }
+
+    cout << "\n[#W62-X D6] the crack-back ability gate: loyalty, expressions, and triggered riders\n";
+    {
+        // REPRO `146v152` seq 41: Lolth, Spider Queen's -8 emblem, 17 renders.
+        // The cost head is LOYALTY, not mana - it must not price as one generic.
+        CHECK(activationManaCost("{c(0/0,-8,loyalty)}") == -1,
+              "#W62-X D6 REPRO a loyalty cost head is not priceable as mana");
+        CHECK(!crackBackCostAffordable("{c(0/0,-8,loyalty)}", false, 9),
+              "#W62-X D6 REPRO so Lolth's -8 is never affordable, at any reach");
+        // NEGATIVE: the mana heads wave 61 pinned are unchanged.
+        CHECK(activationManaCost("{t}") == 0
+              && activationManaCost("{1}{r}{s(goblin|myBattlefield)}") == 2
+              && activationManaCost("{2}{b}{u}") == 4,
+              "#W62-X D6 NEGATIVE real mana cost heads keep their wave-61 answers");
+        // The amount: a flat number is read, an expression is refused outright.
+        {
+            const string emblem =
+                "{c(0/0,-8,loyalty)}:name(-8: get emblem on combat damage) emblem"
+                " transforms((,newability[@combatdamagefoeof(player) damage:8minusoplifelostminusend opponent]))";
+            const string staff = "{t}:damage:1 target(anytarget)";
+            const string gang  = "{1}{r}{s(goblin|mybattlefield)}:damage:2 target(anytarget)";
+            CHECK(crackBackFlatDamageAmount(emblem, emblem.find("damage:")) == 0,
+                  "#W62-X D6 REPRO an expression amount is NOT a flat 8");
+            CHECK(crackBackFlatDamageAmount(staff, staff.find("damage:")) == 1
+                  && crackBackFlatDamageAmount(gang, gang.find("damage:")) == 2,
+                  "#W62-X D6 POSITIVE a plain number still reads as itself");
+            CHECK(crackBackFlatDamageAmount("damage:2)", 0) == 2
+                  && crackBackFlatDamageAmount("damage:2plusx opponent", 0) == 0
+                  && crackBackFlatDamageAmount("damage:x opponent", 0) == 0,
+                  "#W62-X D6 the delimiter rule: digits then a delimiter, or nothing");
+            // The delivery: an @ hook between the cost head and the damage means
+            // a TRIGGER deals it, so "no block stops it" is backwards.
+            CHECK(!crackBackDamageIsDirect(emblem, emblem.find(':'), emblem.find("damage:")),
+                  "#W62-X D6 REPRO an emblem's combat-damage rider is not direct damage");
+            CHECK(crackBackDamageIsDirect(staff, staff.find(':'), staff.find("damage:"))
+                  && crackBackDamageIsDirect(gang, gang.find(':'), gang.find("damage:")),
+                  "#W62-X D6 POSITIVE Staff of Nin and Siege-Gang still aim damage directly");
+            CHECK(!crackBackDamageIsDirect(staff, string::npos, staff.find("damage:")),
+                  "#W62-X D6 NEGATIVE no cost head, no activated-damage claim");
+        }
+    }
+
+    cout << "\n[#W62-X D8] the DRAW FORECAST tense and its missing verdict\n";
+    {
+        std::vector<std::pair<std::string, int> > extras;
+        extras.push_back(std::make_pair(std::string("Dictate of Kruphix #1"), 1));
+        extras.push_back(std::make_pair(std::string("Howling Mine"), 1));
+        // REPRO `126v162` seq 37 shape: phase Draw, the triggers already on the
+        // stack, 20 life in front of a step that costs more than that.
+        const string now = drawStepForecastText(11, extras, 2, "", true, 20);
+        CHECK(now.find("DRAW FORECAST: your draw step, resolving NOW, draws 13 cards")
+                  == 0,
+              "#W62-X D8 REPRO the tense drops \"next\" once the seat is in its draw step");
+        CHECK(now.find("= 13 x 2 = 26 life to the punishers above") != string::npos
+              && now.find("if it resolves as forecast you would be at -6") != string::npos
+              && now.find("that KILLS you") != string::npos,
+              "#W62-X D8 REPRO a forecast past printed life carries the resulting life and the verdict");
+        // POSITIVE: survivable, so a resulting life and NO verdict.
+        const string live = drawStepForecastText(1, extras, 2, "", false, 20);
+        CHECK(live.find("your next draw step draws 3 cards") != string::npos
+              && live.find("you would be at 14") != string::npos
+              && live.find("KILLS you") == string::npos,
+              "#W62-X D8 POSITIVE a survivable forecast prints the life and no verdict");
+        // NEGATIVE 1: no life supplied, no life claim - the wave-49 wording exactly.
+        CHECK(drawStepForecastText(1, extras, 2)
+                  == "DRAW FORECAST: your next draw step draws 3 cards"
+                     " (1 + Dictate of Kruphix #1 1 + Howling Mine 1) = 3 x 2 = 6 life"
+                     " to the punishers above.",
+              "#W62-X D8 NEGATIVE the defaulted call is byte-identical to wave 49");
+        // NEGATIVE 2: no punishers, no arithmetic to verdict.
+        CHECK(drawStepForecastText(1, extras, 0, "", true, 1).find("KILLS") == string::npos,
+              "#W62-X D8 NEGATIVE with no per-draw price there is no verdict to print");
+        // The mirror moves with it, or the two surfaces drift apart.
+        const string theirs = theirDrawStepForecastText(1, extras, 2, "", true, 4);
+        CHECK(theirs.find("DRAW FORECAST (theirs): their draw step, resolving NOW, draws 3 cards")
+                  == 0
+              && theirs.find("if it resolves as forecast they would be at -2") != string::npos
+              && theirs.find("that KILLS them") != string::npos,
+              "#W62-X D8 the punisher seat's mirror carries the same tense and verdict");
+        CHECK(theirDrawStepForecastText(1, extras, 2).find("their next draw step") != string::npos,
+              "#W62-X D8 NEGATIVE the mirror's defaulted call keeps the wave-50 wording");
+        // ECHO: neither line introduces a bracketed annotation.
+        CHECK(now.find('{') == string::npos && now.find('[') == string::npos
+              && theirs.find('{') == string::npos && theirs.find('[') == string::npos,
+              "#W62-X D8 echo shape: the forecast stays annotation-free");
+    }
+
+    cout << "\n[#W62-X D8] the winning row is tagged when the pilot's own life LOOP proves it\n";
+    {
+        CHECK(lifeLoopWinTail(true, true)
+                  == " - and both halves of YOUR life LOOP are in play, so that chains"
+                     " without limit until they are at 0: THIS WINS THE GAME",
+              "#W62-X D8 the win tail, in the banner's own register");
+        CHECK(lifeLoopWinTail(false, true).empty() && lifeLoopWinTail(true, false).empty(),
+              "#W62-X D8 NEGATIVE no closed loop or no known-positive amount claims nothing");
+        // REPRO `126v162` seq 37 row 1: Tribute to Hunger, they control 2
+        // creatures (Shield Sphere 0/6 and Master of the Feast 5/5), the seat
+        // holds both halves. The gain floor is their SMALLEST toughness.
+        const string row = edictClause(2, "", 0, true, false, "", "", 0, -1, true, 5);
+        CHECK(row.find("they control 2 creatures - they choose which one") == 0
+              && row.find("you gain at least 5 (their smallest toughness)") != string::npos
+              && row.find("THIS WINS THE GAME") != string::npos,
+              "#W62-X D8 REPRO the multi-creature edict states its gain floor and the win");
+        // NEGATIVE 1: no loop, so the floor prints and the win does not.
+        const string noLoop = edictClause(2, "", 0, true, false, "", "", 0, -1, false, 5);
+        CHECK(noLoop.find("you gain at least 5") != string::npos
+              && noLoop.find("WINS THE GAME") == string::npos,
+              "#W62-X D8 NEGATIVE without the loop the floor is stated and nothing is won");
+        // NEGATIVE 2: the gain goes to THEM, so none of this is the pilot's.
+        CHECK(edictClause(2, "", 0, true, true, "", "", 0, -1, true, 5).find("you gain")
+                  == string::npos,
+              "#W62-X D8 NEGATIVE a target-gains edict claims no gain for the pilot");
+        // NEGATIVE 3: an edict that grants no life at all is unchanged, and so
+        // is every wave-53 defaulted call.
+        CHECK(edictClause(2, "", 0, false, false, "", "", 0, -1, true, 5)
+                  == "they control 2 creatures - they choose which one"
+              && edictClause(2, "", 0, true) == "they control 2 creatures - they choose which one",
+              "#W62-X D8 NEGATIVE no lifegain clause, and the defaulted call is byte-identical");
+        // The determined victim keeps its own wording and gains the tail.
+        CHECK(edictClause(1, "Wolf", 2, true, false, " (2/2)", "", 0, -1, true, 2)
+                  == "they control 1 creature - Wolf (2/2) is sacrificed, you gain 2"
+                     " - and both halves of YOUR life LOOP are in play, so that chains"
+                     " without limit until they are at 0: THIS WINS THE GAME",
+              "#W62-X D8 the N=1 branch carries the same tail off its determined gain");
+        // The damage row's half: a hit that leaves them standing still ends it.
+        const string hit = damagePlayerVerdict(3, 17, false, 9, 0, true);
+        CHECK(hit.find("they would be at 14") != string::npos
+              && hit.find("THIS WINS THE GAME") != string::npos,
+              "#W62-X D8 a non-lethal hit on the opponent wins under a closed loop of yours");
+        CHECK(damagePlayerVerdict(3, 17, false, 9, 0, false)
+                  == damagePlayerVerdict(3, 17, false, 9, 0),
+              "#W62-X D8 NEGATIVE the added flag defaults to the wave-60 verdict exactly");
+        CHECK(damagePlayerVerdict(3, 17, false, 2, 5, true).find("WINS") == string::npos,
+              "#W62-X D8 NEGATIVE a win the seat does not live to collect is not claimed");
+        CHECK(damagePlayerVerdict(3, 20, true, 20, 0, true).find("WINS") == string::npos,
+              "#W62-X D8 NEGATIVE the pilot's OWN row is never a win row");
+    }
+
+    cout << "\n[#W62-X D19] a removal row priced against the crack-back total above it\n";
+    {
+        // REPRO `130v152` s18: life 9, CRACK-BACK 10 over four bodies. Killing
+        // the 2/2 leaves 8 and the seat at 1; killing a 1/1 leaves 9 and the
+        // seat at 0. The seat had to subtract, and did not.
+        CHECK(crackBackReliefClause(10, 2, 9, false)
+                  == " {removes 2 from the CRACK-BACK total above: 10 -> 8 - you would be at 1}",
+              "#W62-X D19 REPRO killing the 2/2 is priced and survivable");
+        CHECK(crackBackReliefClause(10, 1, 9, false)
+                  == " {removes 1 from the CRACK-BACK total above: 10 -> 9 - you would be at 0;"
+                     " that still KILLS you}",
+              "#W62-X D19 REPRO killing the 1/1 is priced and still lethal");
+        // The s18 total rode the FLOOR wording (Luminarch Aspirant, Ranger
+        // Class), so surviving the remainder is not a promise.
+        CHECK(crackBackReliefClause(10, 2, 9, true).find("that total is a FLOOR, not a ceiling"
+                                                         " - surviving it is not guaranteed")
+                  != string::npos,
+              "#W62-X D19 a FLOOR total does not hand the seat a false all-clear");
+        CHECK(crackBackReliefClause(10, 1, 9, true).find("FLOOR") == string::npos,
+              "#W62-X D19 and a still-lethal row states the death, not the hedge");
+        // NEGATIVE: no printed total, a body outside the count, an unknown life,
+        // and a removal bigger than the total all claim nothing.
+        CHECK(crackBackReliefClause(0, 2, 9, false).empty()
+              && crackBackReliefClause(10, 0, 9, false).empty()
+              && crackBackReliefClause(10, 2, -1, false).empty()
+              && crackBackReliefClause(10, 12, 9, false).empty(),
+              "#W62-X D19 NEGATIVE no total, no contribution, no life, no over-removal");
+        // ECHO: the clause is a {...} annotation like every other row tag, and a
+        // reply naming the row still binds it.
+        {
+            vector<string> menu;
+            menu.push_back("Wolf (2/2) [opponent's battlefield]"
+                           + damageTargetVerdict(3, 2, 2, false, false)
+                           + crackBackReliefClause(10, 2, 9, false));
+            menu.push_back("The opponent (player, life 17)");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Wolf)", (int) menu.size(), &menu, &stale,
+                              NULL, NULL, false) == 1,
+                  "#W62-X D19 echo: the row carrying the relief clause still answers as row 1");
+            CHECK(menu[0].find("- DIES} {removes 2 from the CRACK-BACK total above") != string::npos,
+                  "#W62-X D19 echo shape: the clause is its own brace group after the verdict");
         }
     }
 
