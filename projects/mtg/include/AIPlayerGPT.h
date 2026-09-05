@@ -266,7 +266,10 @@ protected:
                              const string& optOneEffect,
                              vector<int>& selForOptionOne,
                              const vector<bool>& eligibleForOptionOne = vector<bool>(),
-                             int revealSource = 0, bool pickExactlyOne = false);
+                             int revealSource = 0, bool pickExactlyOne = false,
+                             //#W61-T (C8): single-pick, but the pick is optional
+                             //("you MAY choose a card") - see Player::decideReveal.
+                             bool singlePickOptional = false);
 
     //Pre-game (opening-hand) decisions, driven by PreGamePhase before turn 1.
     //Each routes through the model with the AIPlayerBaka heuristic as the

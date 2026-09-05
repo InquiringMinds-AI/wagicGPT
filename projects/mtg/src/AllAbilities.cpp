@@ -1160,7 +1160,31 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         //Arity from option one's own chooser (eligTc), consistent with the
         //eligibility source above (a fixed <1> chooser = choose-ONE framing).
         bool pickExactlyOne = (eligTc && eligTc->maxtargets == 1 && eligTc->targetMin);
-        SAFE_DELETE(oneTc); //eligible[] + pickExactlyOne captured; done with it
+        //#W61-T (C8, wave-60 deck146 HIGH): the gate above also required
+        //targetMin, which ONLY a `<N>` arity prefix sets (TargetChooser.cpp:
+        //`targetMin = true` when a `<...>` carries no "upto:"). A BARE
+        //`target(...)` - the shape of every "you may choose a card" reveal -
+        //parses to maxtargets 1 with targetMin FALSE, so Pelakka Predation
+        //(`optionone name(Choose a card) target(*[manacost>=3]|reveal) reject`,
+        //borderline.txt:82652) fell to the multi-select branch: the ask told the
+        //model to answer `PUT: 1, 3`, it did, the engine's chooser auto-fired on
+        //the first click and took ONE card, and decideReveal - whose trim to the
+        //first pick is gated on this same flag - then narrated a two-card take
+        //that never happened, carried in every later prompt (146v125 s18/s19).
+        //The chooser's ARITY is what the seam must read: maxtargets 1 means at
+        //most one card can go to option one whatever targetMin says. Widen the
+        //gate to the arity and keep the mandatory/optional distinction as its
+        //own flag so the wording stays truthful ("you MAY choose" is not "choose
+        //the ONE"). Only widened for a chooser built from abilityOne's OWN
+        //target() (oneTc): the defensive `tc` fallback keeps the prior test, so
+        //no reveal whose option one has no target() spec changes shape.
+        bool singlePickOptional = false;
+        if (!pickExactlyOne && oneTc && oneTc->maxtargets == 1 && !oneTc->targetMin)
+        {
+            pickExactlyOne = true;
+            singlePickOptional = true;
+        }
+        SAFE_DELETE(oneTc); //eligible[] + the two arity flags captured; done with it
         vector<int> sel;
         int r;
         mAIPollTicks++; //#W54-F (D7a): a model poll IS progress for the stall guard
@@ -1170,7 +1194,8 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         else
 #endif
             r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel,
-                                   eligible, revealSource, pickExactlyOne);
+                                   eligible, revealSource, pickExactlyOne,
+                                   singlePickOptional); //#W61-T (C8)
         if (r == 0)
             return; //model call in flight; act on no card this tick
         REVEAL_DBG("phase0 decided r=" << r << " picks=" << sel.size()

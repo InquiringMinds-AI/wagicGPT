@@ -4,6 +4,7 @@
 
 #include "AIPlayerGPT.h"
 #include "LegalActions.h"
+#include "PlayRestrictions.h" //#W61-T (C7): the cast oracle's play-restriction gate
 #include "GptPlanCaveat.h"
 #include "DecisionContract.h"
 #include <chrono>
@@ -6548,7 +6549,10 @@ bool optionRowMentions(const string& optionText, const string& name)
 //an OPTION row - see the own-battlefield call site. NULL suppresses nothing.
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
                        const char * copyScope = "your hand", bool effectText = false,
-                       const std::set<string> * effectSkip = NULL)
+                       const std::set<string> * effectSkip = NULL,
+                       //#W61-T (C7): display name -> castability verdict, for the
+                       //HAND renders only. NULL annotates nothing.
+                       const std::map<string, string> * castTags = NULL)
 {
     vector<string> entNames, entHandles, entTails;
     //audit-L (A20): battlefield renders take handles and attachments from one
@@ -6846,6 +6850,16 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                     out << boardEffectTag(boardEffectSnippet(card->text, effectLen),
                                           ec->second > 1);
             }
+        }
+        //#W61-T (C7): the castability verdict, LAST on the entry so a card's
+        //identifying facts are unchanged and two copies of one card still carry
+        //byte-identical tails (the collapse is unaffected).
+        if (castTags && !withStatus)
+        {
+            std::map<string, string>::const_iterator ct =
+                castTags->find(card->getDisplayName());
+            if (ct != castTags->end())
+                out << ct->second;
         }
         entTails.push_back(out.str());
     }
@@ -10950,6 +10964,89 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
     return true;
 }
 
+//#W61-T (C9, wave-60 deck146 HIGH): the dungeon row priced the printed ROOM
+//LIST length, and the ask then told the model to "weigh how many rooms to
+//completion" off it. The two are different quantities: a dungeon's rooms
+//BRANCH, so Lost Mine of Phandelver lists 7 rooms and completes on the FOURTH
+//venture, Tomb of Annihilation lists 5 and completes on the fourth (a branch
+//through the Oubliette completes on the third), Dungeon of the Mad Mage lists 9
+//and completes on the seventh. The corpus's own narration confirms it: 146v126
+//seq 26 finished Lost Mine on "venture step 4 of that run". So the one number
+//the prompt names as the decision input was false in scope on all three rows,
+//and it inverted the ordering it exists to serve.
+//The engine already holds the true number: every dungeon's completion is an
+//`autocommandzone` line carrying `completedungeon` under
+//`restriction{compare(hascntexplore)~equalto~N}` - N ventures. Read it off THAT
+//ladder (the same script the engine ticks), never off the room list. A dungeon
+//with more than one completion line has more than one path length: report the
+//longest as the count and name the shortest branch, since both are true and the
+//difference is exactly what a value pick weighs. A script this cannot parse
+//returns 0 and the caller keeps the wave-59 room-count shape byte for byte.
+int dungeonVenturesToCompletion(const string& commandZoneScript, int * shortest)
+{
+    if (shortest)
+        *shortest = 0;
+    int longest = 0, least = 0;
+    const string key = "compare(hascntexplore)~equalto~";
+    size_t pos = 0;
+    while (pos <= commandZoneScript.size())
+    {
+        size_t eol = commandZoneScript.find('\n', pos);
+        string line = commandZoneScript.substr(pos, eol == string::npos
+                                                    ? string::npos : eol - pos);
+        if (eol == string::npos)
+            pos = commandZoneScript.size() + 1;
+        else
+            pos = eol + 1;
+        if (line.find("completedungeon") == string::npos)
+            continue;
+        size_t k = line.find(key);
+        if (k == string::npos)
+            continue;
+        k += key.size();
+        int n = 0;
+        bool digits = false;
+        while (k < line.size() && line[k] >= '0' && line[k] <= '9')
+        {
+            n = n * 10 + (line[k] - '0');
+            k++;
+            digits = true;
+        }
+        if (!digits || n <= 0)
+            continue;
+        if (n > longest)
+            longest = n;
+        if (!least || n < least)
+            least = n;
+    }
+    if (shortest)
+        *shortest = least;
+    return longest;
+}
+
+//#W61-T (C9): the dungeon row itself. `ventures` 0 (no parsable ladder) keeps
+//the wave-59 string byte-identical - PARSETEST pins that - so a dungeon this
+//code cannot read loses nothing it used to have. Pure over the five facts.
+string dungeonRowTag(int rooms, int ventures, int shortestVentures,
+                     const string& finalRoom, const string& finalReward)
+{
+    std::ostringstream o;
+    o << " [dungeon: ";
+    if (ventures > 0)
+    {
+        o << "completes after " << ventures << " venture"
+          << (ventures == 1 ? "" : "s");
+        if (shortestVentures > 0 && shortestVentures < ventures)
+            o << " (one branch of its room path completes at " << shortestVentures << ")";
+        o << "; " << rooms << " room" << (rooms == 1 ? "" : "s")
+          << " printed on its paths";
+    }
+    else
+        o << rooms << " room" << (rooms == 1 ? "" : "s");
+    o << "; completion reward (\"" << finalRoom << "\"): " << finalReward << "]";
+    return o.str();
+}
+
 //W43-R1 (owner report, verbatim: "'Seachrome Coast enters tapped unless you
 //control two or fewer other lands. -- {T}: Add {W} or {U}.' doesn't need to be
 //in historic log").
@@ -11010,8 +11107,18 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
         parseDungeonRooms(c->text, rooms);
         if (!rooms.empty())
         {
-            o << " [dungeon: " << rooms.size() << " rooms; completion reward (\""
-              << rooms.back().first << "\"): " << rooms.back().second << "]";
+            //#W61-T (C9): ventures-to-completion off the engine's own explore
+            //ladder, not the printed room-list length.
+            int shortestVentures = 0;
+            int ventures = 0;
+            {
+                std::map<string, string>::const_iterator cz =
+                    c->magicTexts.find("commandzone");
+                if (cz != c->magicTexts.end())
+                    ventures = dungeonVenturesToCompletion(cz->second, &shortestVentures);
+            }
+            o << dungeonRowTag((int) rooms.size(), ventures, shortestVentures,
+                               rooms.back().first, rooms.back().second);
             if (decisionSurface)
                 o << " - full room path: \"" << c->text << "\"";
             return o.str();
@@ -17512,6 +17619,74 @@ static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3]
 //down; the board-hash callers pass nothing). It is read for one purpose - to
 //tell a permanent that already explains itself on an option row from one that
 //does not - and never rendered.
+//#W61-T (C7, wave-60 deck123 H1 + deck162 HIGH-1, fourth wave): the hand line
+//carried cost, type and P/T and NEVER why a card had no cast row. Five of
+//deck123's six fallbacks and both of deck162's were one shape - the model named
+//a hand card that was not on the menu (`CHOICE: 3 (Cast Fate Unraveler)` where
+//row 3 was HOLD) - and where no re-ask fired it corrupted the PLAN silently
+//(deck162 vs130 seq 18 built a whole lethal line on an Ob Nixilis it could not
+//pay for). Guide prose has been tried for two waves and the count went 2 -> 5.
+//So: state the verdict on the hand line, with the REASON printed rather than
+//implied. The reasons are the cast oracle's own gates, evaluated in the oracle's
+//own order against the same willingness policy and the same untapped-source
+//count the "Mana available:" line three lines above is built from - one
+//prompt cannot then contradict itself. Pure, so every shape is provable.
+enum HandCastVerdict
+{
+    kHandCastableNow = 0,
+    kHandNeedsMana,      //converted cost exceeds the untapped sources
+    kHandNeedsColours,   //enough sources by count, the payment still does not assemble
+    kHandSorcerySpeed,   //timing, not resources
+    kHandNoLegalTarget,  //CR 601.2c: a mandatory target with none on the board
+    kHandRestricted      //a play restriction forbids the cast
+};
+string handCastabilityTag(int verdict, int need, int sources, const string& cost)
+{
+    std::ostringstream o;
+    switch (verdict)
+    {
+    case kHandCastableNow:
+        return " [castable now]";
+    case kHandNeedsMana:
+        o << " [cannot pay now: needs " << need << " mana, you have " << sources
+          << " untapped source" << (sources == 1 ? "" : "s") << "]";
+        return o.str();
+    case kHandNeedsColours:
+        o << " [cannot pay now: needs " << cost << ", your " << sources
+          << " untapped source" << (sources == 1 ? "" : "s") << " cannot pay it]";
+        return o.str();
+    case kHandSorcerySpeed:
+        return " [no cast row now: sorcery speed - only in your own main phase"
+               " with an empty stack]";
+    case kHandNoLegalTarget:
+        return " [no cast row now: it must have a target and there is no legal"
+               " target on the board]";
+    case kHandRestricted:
+        return " [no cast row now: a play restriction forbids casting it]";
+    default:
+        break;
+    }
+    return "";
+}
+
+namespace
+{
+    //Willingness policy for the oracle: same as the inherited heuristic's
+    //(canHandleCost may pre-choose extra-cost payments).
+    class GptManaPolicy : public ManaEngine::ManaPolicy
+    {
+    public:
+        GptManaPolicy(AIPlayerBaka * _ai) : ai(_ai) {}
+        int canHandle(MTGAbility * producer) { return ai->canHandleCost(producer); }
+    private:
+        AIPlayerBaka * ai;
+    };
+}
+
+//#W61-T (C7): moved up from the cast seam unchanged - the hand listing's
+//castability marker must run the cast menu's OWN willingness policy, or the
+//two surfaces could disagree about the same card in the same prompt.
+
 string AIPlayerGPT::serializeGameState(const std::string * optionText)
 {
     return serializeGameStateImpl(optionText, NULL);
@@ -17833,7 +18008,67 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         int myHandCount = game->hand->nb_cards;
         out << "Your hand (" << myHandCount << " card" << (myHandCount == 1 ? "" : "s") << "): ";
     }
-    describeZoneCards(out, game->hand, false);
+    //#W61-T (C7): one verdict per distinct hand card, from the CAST MENU's own
+    //oracle (LegalActionsOracle::legalCasts under the cast seam's willingness
+    //policy) so the hand line and the cast rows in the same prompt cannot
+    //disagree, and with the reason PRINTED rather than implied. Lands are left
+    //alone: the land drop is its own decision with its own row (C7's other half).
+    std::map<string, string> handCastTags;
+    if (game && game->hand && game->hand->nb_cards > 0 && observer && observer->mLayers)
+    {
+        const int phase = observer->getCurrentGamePhase();
+        const bool stackEmpty =
+            observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0;
+        //CR 307.1 / 601.3a as the oracle applies it: a sorcery-speed card has a
+        //cast row only in your own main phase with an empty stack. This is the
+        //same `instantSpeedOnly` switch FindCardToPlay passes.
+        const bool sorcerySpeedOk = (observer->currentPlayer == this)
+            && (phase == (int) MTG_PHASE_FIRSTMAIN || phase == (int) MTG_PHASE_SECONDMAIN)
+            && stackEmpty;
+        GptManaPolicy castPolicy(this);
+        ManaCost * castPool = ManaEngine::potentialMana(this, castPolicy);
+        std::set<string> castableNow;
+        {
+            vector<LegalActionsOracle::Cast> casts =
+                LegalActionsOracle::legalCasts(this, castPolicy, castPool, !sorcerySpeedOk);
+            for (size_t ci = 0; ci < casts.size(); ci++)
+                if (casts[ci].card && casts[ci].zoneLabel.empty())
+                    castableNow.insert(casts[ci].card->getDisplayName());
+        }
+        for (int hi = 0; hi < game->hand->nb_cards; hi++)
+        {
+            MTGCardInstance * hc = game->hand->cards[hi];
+            if (!hc || hc->isLand())
+                continue;
+            const string nm = hc->getDisplayName();
+            if (handCastTags.find(nm) != handCastTags.end())
+                continue;
+            ManaCost * cost = hc->getManaCost();
+            const int need = cost ? cost->getConvertedCost() : 0;
+            const string costStr = cost ? cost->toString() : string();
+            int verdict;
+            //The oracle's own gate ORDER, so the reason named is the FIRST one
+            //that actually stops the cast.
+            if (castableNow.find(nm) != castableNow.end())
+                verdict = kHandCastableNow;
+            else if (!sorcerySpeedOk && !hc->hasType(Subtypes::TYPE_INSTANT)
+                     && !hc->has(Constants::FLASH) && !hc->has(Constants::ASFLASH))
+                verdict = kHandSorcerySpeed;
+            else if (game->playRestrictions
+                     && game->playRestrictions->canPutIntoZone(hc, game->stack)
+                        == PlayRestriction::CANT_PLAY)
+                verdict = kHandRestricted;
+            else if (!LegalActionsOracle::payable(this, castPolicy, hc, castPool))
+                verdict = (need > sources) ? kHandNeedsMana : kHandNeedsColours;
+            else
+                //Every gate the oracle checks before its name dedupe has passed,
+                //so the remaining one is 601.2c: a mandatory target, none legal.
+                verdict = kHandNoLegalTarget;
+            handCastTags[nm] = handCastabilityTag(verdict, need, sources, costStr);
+        }
+        SAFE_DELETE(castPool);
+    }
+    describeZoneCards(out, game->hand, false, "your hand", false, NULL, &handCastTags);
     out << yourHandDisplacedClause(myHandInReveal);
     //Surfaced creature COUNTS: a cluttered board line studded with
     //artifacts and [tapped] flags gets miscounted (wave-7 deck140: every
@@ -21420,6 +21655,16 @@ static string sentenceNaming(const string& text, const string& needle, size_t ma
     if (end <= bgn)
         return "";
     return textSnippetCore(flat.substr(bgn, end - bgn), maxLen);
+}
+
+//#W61-T (C9): the other half of B12's clause - the row the source does NOT
+//name. Printed only on a menu where at least one row IS named, so a venture
+//with no dungeon-naming source stays byte-identical to wave 60.
+string ventureSourceSilentTag(const string& sourceName)
+{
+    if (sourceName.empty())
+        return "";
+    return " [" + sourceName + "'s own text does NOT name this dungeon]";
 }
 
 static string ventureSourceDungeonTag(const string& sourceName, const string& sentence)
@@ -26077,20 +26322,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     return (callerChoice >= 1) ? callerChoice - 1 : -1; //0 or parse-fail: defer to caller
 }
 
-namespace
-{
-    //Willingness policy for the oracle: same as the inherited heuristic's
-    //(canHandleCost may pre-choose extra-cost payments).
-    class GptManaPolicy : public ManaEngine::ManaPolicy
-    {
-    public:
-        GptManaPolicy(AIPlayerBaka * _ai) : ai(_ai) {}
-        int canHandle(MTGAbility * producer) { return ai->canHandleCost(producer); }
-    private:
-        AIPlayerBaka * ai;
-    };
-}
-
 //Hybrid-pip affordability clarifier for a cast option line. Cross-seat the
 //model misreads hybrid mana pips and declines an OFFERED, payable cast - it
 //reads {u/b} as needing BOTH colors, or a colored pip as generic (deck109
@@ -26248,6 +26479,58 @@ static string mutateAltCostLabel(bool hasMutate, const string& alternativeName)
     return "alternative cost";
 }
 
+//#W61-T (C7, wave-60 deck123 H2): the land-drop row never said a land enters
+//tapped. `123v152` seq 18 offered `1. Play Arcane Sanctum` under a parenthetical
+//that reads as a promise the land is available now ("playing a land ... does not
+//reduce what you can cast this turn" - true, and beside the point), the seat
+//wrote "Cast Thraben Doomsayer turn 6" into its plan off that window, and turn 6
+//opened on two sources with a three-mana creature in hand: four windows spent on
+//a card that had no row. The engine has known the answer since the primitive was
+//parsed - `auto=tap(noevent)` - and the conditional shape carries its condition
+//in the same script (`Isolated Chapel`: `aslongas(plains,swamp|myBattlefield)
+//tap(noevent) <1 oneshot`, printed "enters tapped unless you control a Plains or
+//Swamp"). Read the branch off the SCRIPT and quote the CARD for the condition;
+//this code asserts neither. A land whose script has no tap(noevent) gets nothing,
+//so every untapped land's row is byte-identical to wave 60.
+string landEntersTappedTag(const string& script, const string& printedText)
+{
+    bool found = false, conditional = false;
+    size_t pos = 0;
+    while (pos <= script.size() && !found)
+    {
+        size_t eol = script.find('\n', pos);
+        string line = script.substr(pos, eol == string::npos ? string::npos : eol - pos);
+        if (eol == string::npos)
+            pos = script.size() + 1;
+        else
+            pos = eol + 1;
+        size_t at = line.find("tap(noevent)");
+        if (at == string::npos)
+            continue;
+        found = true;
+        const string before = line.substr(0, at);
+        conditional = before.find("aslongas") != string::npos
+                      || before.find("if(") != string::npos
+                      || before.find("restriction") != string::npos;
+    }
+    if (!found)
+        return "";
+    string sentence = sentenceNaming(printedText, "enters tapped", 200);
+    if (sentence.empty())
+        sentence = sentenceNaming(printedText, "enters the battlefield tapped", 200);
+    std::ostringstream o;
+    o << " [";
+    if (conditional)
+        o << "enters tapped UNLESS its own condition holds, so it may make no mana"
+             " this turn";
+    else
+        o << "enters TAPPED - it makes no mana this turn";
+    if (!sentence.empty())
+        o << ": \"" << sentence << "\"";
+    o << "]";
+    return o.str();
+}
+
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
 {
     //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
@@ -26305,7 +26588,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //is nearly always right - decline goes LAST, house ordering rule).
         vector<string> opts;
         for (size_t li = 0; li < lands.size(); li++)
-            opts.push_back("Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel);
+            opts.push_back("Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel
+                           //#W61-T (C7): the tapped-land fact, on the row that plays it.
+                           + landEntersTappedTag(lands[li].card->magicText,
+                                                 lands[li].card->text));
         opts.push_back(lands.size() == 1
                        ? "Hold " + lands[0].card->getDisplayName() + " - do not play it now"
                        : "Play no land right now");
@@ -29993,14 +30279,39 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                         break;
                     }
             }
+            //#W61-T (C9): B12's clause RENDERS (wave-60 engine seat: 1 of 1 on
+            //the Acererak ask) and the seat still took Lost Mine of Phandelver
+            //14 of 14. The clause is not absent and it is not on the wrong row -
+            //it is ASYMMETRIC: exactly one row carried a quote and the other two
+            //carried nothing, and an annotation that appears on one row of three
+            //reads as decoration rather than as a fact about the menu. Same
+            //shape as the #W57-C discard finding ("while two dead cards render
+            //differently no guide can teach which row is the keep"). So when the
+            //venturing source's text names ANY offered dungeon, every offered
+            //dungeon says which side of that line it is on. Still append-only,
+            //still quoted from the card and never asserted by this code.
             if (!srcText.empty())
-                for (size_t i = 0; i < targets.size() && i < opts.size(); i++)
+            {
+                vector<string> ventureSentences(targets.size());
+                bool anyNamed = false;
+                for (size_t i = 0; i < targets.size(); i++)
                     if (MTGCardInstance * dc = dynamic_cast<MTGCardInstance *>(targets[i]))
                     {
-                        string s = sentenceNaming(srcText, dc->getDisplayName(), 220);
-                        if (!s.empty())
-                            opts[i] += ventureSourceDungeonTag(effectName, s);
+                        ventureSentences[i] = sentenceNaming(srcText, dc->getDisplayName(), 220);
+                        if (!ventureSentences[i].empty())
+                            anyNamed = true;
                     }
+                if (anyNamed)
+                    for (size_t i = 0; i < targets.size() && i < opts.size(); i++)
+                    {
+                        if (!dynamic_cast<MTGCardInstance *>(targets[i]))
+                            continue;
+                        if (!ventureSentences[i].empty())
+                            opts[i] += ventureSourceDungeonTag(effectName, ventureSentences[i]);
+                        else
+                            opts[i] += ventureSourceSilentTag(effectName);
+                    }
+            }
         }
 
         //N-139a (wave-29 deck139): the mutate cast is a scrambled multi-ask
@@ -30077,11 +30388,18 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             q << "VENTURE";
             if (!effectName.empty() && effectName != "this effect")
                 q << " with " << effectName;
+            //#W61-T (C9): the header used to tell the model to weigh "how many
+            //rooms to completion" against a tag that carried the printed ROOM
+            //LIST length - a different quantity, because a dungeon's rooms
+            //branch. The tag now states VENTURES to completion off the engine's
+            //explore ladder; the instruction names that same quantity.
             q << " - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon"
                  " to venture into, NOT targeting a permanent). Each option below is a"
-                 " dungeon; its tag shows the room count and the completion reward, and"
-                 " its full room path follows. Weigh how many rooms to completion and"
-                 " whether the completion payoff and the rooms en route fit your plan"
+                 " dungeon; its tag shows how many VENTURES complete it and what the"
+                 " completion reward is, and its full room path follows. A dungeon's"
+                 " rooms BRANCH, so the number of rooms printed is not the number of"
+                 " ventures it takes. Weigh the ventures to completion and whether the"
+                 " completion payoff and the rooms en route fit your plan"
                  " (a dungeon whose completion turns on your payoffs is usually worth"
                  " the shorter path). Pick the ONE dungeon to venture into, and answer"
                  " with its name.";
@@ -34292,6 +34610,10 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
                                  const string& optOneEffect,
                                  const vector<bool>& eligibleForOptionOne,
                                  int revealSource, bool pickExactlyOne,
+                                 //#W61-T (C8): single-pick whose pick is OPTIONAL
+                                 //("You may choose a card from it ..."). Ignored
+                                 //unless pickExactlyOne is set.
+                                 bool singlePickOptional,
                                  bool wholeLibrary,
                                  //#W55-D (D18): the permutation the collapse used, so the
                                  //caller can map the reply's positions back to `revealed`.
@@ -34321,11 +34643,22 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
              << " (" << revealed.size() << " card"
              << (revealed.size() == 1 ? "" : "s") << ").\n";
         if (pickExactlyOne)
-            tail << "Choose the ONE card to send to \"" << optOneLabel
+            //#W61-T (C8): the optional branch states what the ENGINE's chooser
+            //accepts (one card, or a decline) and claims nothing about whether
+            //the card's own text says "may" - Scryfall's current Oracle for
+            //Pelakka Predation reads "You choose", while the engine's chooser
+            //carries no minimum, so only the answer surface is described here.
+            tail << (singlePickOptional ? "Choose ONE card to send to \""
+                                        : "Choose the ONE card to send to \"")
+                 << optOneLabel
                  << "\" - that is the card "
                  << (selfHand ? "you discard" : "they discard")
                  << "; every other card stays in "
-                 << (selfHand ? "your" : "their") << " hand.\n";
+                 << (selfHand ? "your" : "their") << " hand."
+                 << (singlePickOptional ? " This is a ONE-card choice: you can never take"
+                                          " two, and \"PUT: none\" declines."
+                                        : "")
+                 << "\n";
         else
             tail << "Decide, in ONE reply, which cards go to \"" << optOneLabel
                  << "\"; every card you do NOT pick goes to \"" << optTwoLabel
@@ -34348,8 +34681,14 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
             tail << "Reveal: you looked at the top " << revealed.size()
                  << " card" << (revealed.size() == 1 ? "" : "s") << " of your library.";
         if (pickExactlyOne)
-            tail << " Choose the ONE card that goes to \"" << optOneLabel
-                 << "\"; every other card goes to \"" << optTwoLabel << "\".\n";
+            tail << (singlePickOptional ? " Choose ONE card that goes to \""
+                                        : " Choose the ONE card that goes to \"")
+                 << optOneLabel
+                 << "\"; every other card goes to \"" << optTwoLabel << "\"."
+                 << (singlePickOptional ? " This is a ONE-card choice: you can never take"
+                                          " two, and \"PUT: none\" declines."
+                                        : "")
+                 << "\n";
         else
             tail << " Decide, in ONE reply, which of them go to \"" << optOneLabel
                  << "\"; every card you do NOT pick goes to \"" << optTwoLabel
@@ -34426,8 +34765,12 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
     }
     if (pickExactlyOne)
         tail << "On the FIRST line write PUT: followed by the ONE card number you"
-                " choose (e.g. \"PUT: 2\")"
-             << (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : "")
+                " choose (e.g. \"PUT: 2\") - ONE number, never a list"
+             //#W61-T (C8): when the pick itself is optional, declining is always
+             //legal - state it whether or not the filter emptied the list. The
+             //mandatory branch keeps the wave-20 wording byte for byte.
+             << (singlePickOptional ? ", or exactly \"PUT: none\" to choose no card"
+                                    : (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : ""))
              << "; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     else
         tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
@@ -34447,7 +34790,8 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                               const string& optOneEffect,
                               vector<int>& selForOptionOne,
                               const vector<bool>& eligibleForOptionOne,
-                              int revealSource, bool pickExactlyOne)
+                              int revealSource, bool pickExactlyOne,
+                              bool singlePickOptional) //#W61-T (C8)
 {
     selForOptionOne.clear();
     if (mEndpoint.empty() || revealed.empty())
@@ -34499,6 +34843,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     string userMsg = assemblePrompt(
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
                            eligibleForOptionOne, revealSource, pickExactlyOne,
+                           singlePickOptional, //#W61-T (C8)
                            //N-166p: a search empties the library zone into the
                            //reveal zone; a top-of-library look does not.
                            revealSource == 0 && game->library->nb_cards == 0
@@ -34895,13 +35240,34 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
 //sent both Fall of the Gavel - its only answers to a noncreature - and died two
 //turns later. Every other ask kind prices its rows; this one did not. Three
 //clauses, each pure over facts the emitter already computes elsewhere.
-string discardSpareLandClause(int myLands)
+//#W61-T (C11, wave-60 deck130 HIGH): the clause printed on EVERY land row
+//whenever myLands >= 1, with no comparison against what the hand still costs.
+//`130v123` seq 9 (turn 4, TWO lands down, Siege-Gang Commander {3}{r}{r} in
+//hand) marked all three land rows `{spare: you control 2 lands already}` and
+//the seat pitched two of them - the emitter marked exactly the cards the deck
+//guide protects and marked nothing else, and the bait was taken 1/1.
+//`myLands` is a FACT; "spare" is a VERDICT, and it is only true when the lands
+//already down outrun what the hand can still need. So: gate the WORD on that
+//comparison (lands down must EXCEED the most expensive card in hand plus one -
+//the next drop the curve still wants) and print the same two numbers as a bare
+//FACT otherwise. Nothing is withheld and no row loses its count; only the
+//verdict word is conditioned. `haveHandCost` false = no non-land card in hand
+//to compare against, so no verdict is available either way.
+string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCost)
 {
     if (myLands <= 0)
         return "";
+    bool spare = haveHandCost && highestHandCost >= 0
+                 && myLands > highestHandCost + 1;
     std::ostringstream o;
-    o << " {spare: you control " << myLands << " land" << (myLands == 1 ? "" : "s")
-      << " already}";
+    o << " {";
+    if (spare)
+        o << "spare: ";
+    o << "you control " << myLands << " land" << (myLands == 1 ? "" : "s")
+      << " already";
+    if (haveHandCost && highestHandCost >= 0)
+        o << "; the most expensive card in your hand costs " << highestHandCost;
+    o << "}";
     return o.str();
 }
 //The dead-right-now clause names the COUNT the engine's own target chooser
@@ -35059,6 +35425,23 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         if (!bc->isToken)
             myBattlefieldNames.insert(bc->name);
     }
+    //#W61-T (C11): the other half of the spare comparison - the most expensive
+    //card this hand still has to pay for. Lands and cards with no cost carry no
+    //demand; a hand with no such card leaves the verdict unavailable (the count
+    //still prints).
+    int highestHandCost = -1;
+    bool haveHandCost = false;
+    for (size_t hc = 0; hc < hand.size(); hc++)
+    {
+        if (!hand[hc] || hand[hc]->hasType(Subtypes::TYPE_LAND) || !hand[hc]->getManaCost())
+            continue;
+        int cc = hand[hc]->getManaCost()->getConvertedCost();
+        if (cc <= 0)
+            continue;
+        haveHandCost = true;
+        if (cc > highestHandCost)
+            highestHandCost = cc;
+    }
     vector<string> discardRows;
     bool anyVerdict = false; //#W57-C (D8): does the legend below have anything to explain?
     for (size_t j = 0; j < hand.size(); j++)
@@ -35089,7 +35472,7 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         //a spell whose own target spec sees nothing on the board says that,
         //and a spell that targets the STACK is never given the clause.
         if (hand[j]->hasType(Subtypes::TYPE_LAND))
-            row << discardSpareLandClause(myLands);
+            row << discardSpareLandClause(myLands, highestHandCost, haveHandCost);
         else
         {
             if (myBattlefieldNames.count(hand[j]->name))
@@ -39286,19 +39669,19 @@ void AIPlayerGPT::runParseSelfTest()
     {
         vector<bool> noElig;
         vector<MTGCardInstance*> none;
-        string search = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, true);
+        string search = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, true);
         cout << "     " << search.substr(0, 120) << "\n";
         CHECK(search.find("Search: you are searching your ENTIRE library") != string::npos,
               "W35-N166p a whole-library reveal is called a search");
         CHECK(search.find("not a look at the top of your library") != string::npos,
               "W35-N166p the line rules out the top-of-library reading it used to assert");
         // NEGATIVE: a genuine top-of-library look keeps its wording exactly.
-        string look = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false);
+        string look = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, false);
         CHECK(look.find("Reveal: you looked at the top") != string::npos
               && look.find("Search:") == string::npos,
               "W35-N166p NEGATIVE a real top-of-library look is byte-unchanged");
         // NEGATIVE: a HAND reveal is neither.
-        string hand = buildRevealAskText(none, "Discard", "Hand", "", noElig, 2, true, false);
+        string hand = buildRevealAskText(none, "Discard", "Hand", "", noElig, 2, true, false, false);
         CHECK(hand.find("You revealed your hand") != string::npos
               && hand.find("Search:") == string::npos,
               "W35-N166p NEGATIVE the hand-reveal branch is untouched");
@@ -49567,12 +49950,28 @@ static const char * kW50Y_r94 =
     }
     cout << "\n[#W55-D] D9 the cleanup discard row's verdicts\n";
     {
-        CHECK(discardSpareLandClause(9) == " {spare: you control 9 lands already}",
-              "#W55-D D9 the land row states the lands already down");
-        CHECK(discardSpareLandClause(1) == " {spare: you control 1 land already}",
-              "#W55-D D9 singular at one");
-        CHECK(discardSpareLandClause(0).empty(),
-              "#W55-D D9 NEGATIVE no land on the battlefield, no spare clause");
+        //#W61-T (C11): the wave-55 cases are UPDATED, not deleted - the count
+        //they pinned still prints on every land row; the verdict word is now
+        //conditioned on the hand's own cost top (see discardSpareLandClause).
+        CHECK(discardSpareLandClause(9, 3, true)
+                  == " {spare: you control 9 lands already; the most expensive card in your hand costs 3}",
+              "#W55-D D9 / #W61-T C11 the land row states the lands already down, and 9 lands"
+              " against a 3-drop top IS spare");
+        CHECK(discardSpareLandClause(1, 0, false) == " {you control 1 land already}",
+              "#W55-D D9 / #W61-T C11 singular at one; no non-land card in hand, so no verdict");
+        CHECK(discardSpareLandClause(0, 3, true).empty(),
+              "#W55-D D9 NEGATIVE no land on the battlefield, no clause at all");
+        //#W61-T (C11) POSITIVE: the deck130 repro - 2 lands, a 5-drop in hand.
+        CHECK(discardSpareLandClause(2, 5, true)
+                  == " {you control 2 lands already; the most expensive card in your hand costs 5}",
+              "#W61-T C11 the 130v123 seq 9 board prints the COUNT and both numbers");
+        //#W61-T (C11) MUST-NOT-MATCH: that row must not carry the verdict word.
+        CHECK(discardSpareLandClause(2, 5, true).find("spare") == string::npos
+              && discardSpareLandClause(4, 3, true).find("spare") == string::npos,
+              "#W61-T C11 NEGATIVE 'spare' never prints at or below highest-cost + 1"
+              " (2 lands vs a 5-drop; 4 lands vs a 3-drop)");
+        CHECK(discardSpareLandClause(5, 3, true).compare(0, 9, " {spare: ") == 0,
+              "#W61-T C11 the verdict returns the moment the lands EXCEED highest cost + 1");
         CHECK(discardDeadTargetClause(0) == " {dead right now: 0 legal targets on the board for it}",
               "#W55-D D9 a spell whose own chooser sees nothing says so");
         CHECK(discardDeadTargetClause(1).empty() && discardDeadTargetClause(7).empty(),
@@ -49583,7 +49982,7 @@ static const char * kW50Y_r94 =
               "#W55-D D9 NEGATIVE nothing of that name on the battlefield, no clause");
         //the echo shape: the clauses strip off an anchored candidate
         vector<string> menu;
-        menu.push_back("Island (land)" + discardSpareLandClause(9));
+        menu.push_back("Island (land)" + discardSpareLandClause(9, 3, true));
         menu.push_back("Fall of the Gavel {3}{u}{w} (instant)");
         CHECK(stripNarrationDecoration(menu[0]) == "Island (land)",
               "#W55-D D9 echo: the spare clause leaves no residue in the narrated record");
@@ -53823,6 +54222,224 @@ static const char * kW50Y_r94 =
                   && closed.find("chains until they are at 0") != string::npos,
                   "#W61-S C5 the seat's own closed pair is NAMED as a loop (wave-60 HIGH-3 refuted)");
         }
+    }
+    //#W61-T (C7): the hand listing's castability verdict.
+    cout << "\n[#W61-T] C7 the hand line states castability, with the reason printed\n";
+    {
+        CHECK(handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}") == " [castable now]",
+              "#W61-T C7 a card with a cast row on this window says so");
+        //deck162 vs130 seq 18 verbatim: Ob Nixilis {3}{b}{b} = 5, three sources.
+        CHECK(handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}")
+                  == " [cannot pay now: needs 5 mana, you have 3 untapped sources]",
+              "#W61-T C7 the 162v130 seq 18 hand card states the arithmetic that stopped it");
+        CHECK(handCastabilityTag(kHandNeedsMana, 2, 1, "{1}{w}")
+                  == " [cannot pay now: needs 2 mana, you have 1 untapped source]",
+              "#W61-T C7 singular at one source");
+        //deck123 vs152 seq 19: Thraben Doomsayer {1}{w}{w} at 2 sources - the
+        //COUNT is enough, the payment still does not assemble.
+        CHECK(handCastabilityTag(kHandNeedsColours, 3, 3, "{1}{w}{w}")
+                  == " [cannot pay now: needs {1}{w}{w}, your 3 untapped sources cannot pay it]",
+              "#W61-T C7 a colour/production failure names the COST, not just a count");
+        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}")
+                  .find("sorcery speed") != string::npos,
+              "#W61-T C7 timing is named as timing, not as a mana problem");
+        CHECK(handCastabilityTag(kHandNoLegalTarget, 1, 9, "{b}")
+                  .find("no legal target on the board") != string::npos,
+              "#W61-T C7 CR 601.2c: a mandatory target with none legal is stated");
+        CHECK(handCastabilityTag(kHandRestricted, 1, 9, "{b}")
+                  .find("play restriction") != string::npos,
+              "#W61-T C7 a play restriction is named as one");
+        //MUST-NOT-MATCH: the castable tag never carries a refusal, an unpayable
+        //tag never claims castability, and an unknown verdict annotates nothing.
+        CHECK(handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}").find("cannot") == string::npos
+              && handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}").find("no cast row") == string::npos,
+              "#W61-T C7 NEGATIVE the castable verdict carries no refusal wording");
+        CHECK(handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}").find("castable now") == string::npos
+              && handCastabilityTag(kHandSorcerySpeed, 5, 3, "").find("castable now") == string::npos,
+              "#W61-T C7 NEGATIVE no unpayable/untimely verdict contains 'castable now'");
+        CHECK(handCastabilityTag(999, 5, 3, "{3}{b}{b}").empty(),
+              "#W61-T C7 NEGATIVE an unknown verdict annotates nothing");
+        //ECHO shape: the bracket leaves no residue in the narrated record, and a
+        //hand entry carrying it still reads as the card it names.
+        CHECK(stripNarrationDecoration("Thraben Doomsayer {1}{w}{w} (2/2) [creature]"
+                  + handCastabilityTag(kHandNeedsColours, 3, 2, "{1}{w}{w}"))
+                  == "Thraben Doomsayer {1}{w}{w} (2/2)",
+              "#W61-T C7 ECHO the castability bracket strips out of the narrated record");
+    }
+    //#W61-T (C7): the land-drop row's tapped-land fact. Scripts and printed text
+    //verbatim from the primitives (mtg.txt:4934 Arcane Sanctum,
+    //mtg.txt:59410 Isolated Chapel); Oracle-confirmed on Scryfall.
+    cout << "\n[#W61-T] C7 the land-drop row says a land enters tapped\n";
+    {
+        const string sanctumScript = "tap(noevent)\n{T}:Add{W}\n{T}:Add{U}\n{T}:Add{B}";
+        const string sanctumText = "Arcane Sanctum enters tapped. -- {T}: Add {W}, {U}, or {B}.";
+        const string sanctum = landEntersTappedTag(sanctumScript, sanctumText);
+        CHECK(sanctum == " [enters TAPPED - it makes no mana this turn:"
+                         " \"Arcane Sanctum enters tapped.\"]",
+              "#W61-T C7 the 123v152 seq 18 land states the fact its row withheld");
+        const string chapelScript =
+            "aslongas(plains,swamp|myBattlefield) tap(noevent) <1 oneshot\n{T}:Add{W}\n{T}:Add{B}";
+        const string chapelText =
+            "Isolated Chapel enters tapped unless you control a Plains or Swamp."
+            " -- {T}: Add {W} or {B}.";
+        const string chapel = landEntersTappedTag(chapelScript, chapelText);
+        CHECK(chapel.find("enters tapped UNLESS its own condition holds") != string::npos
+              && chapel.find("\"Isolated Chapel enters tapped unless you control a Plains"
+                             " or Swamp.\"") != string::npos,
+              "#W61-T C7 a CONDITIONAL tapped land quotes its own condition");
+        CHECK(chapel.find("enters TAPPED -") == string::npos,
+              "#W61-T C7 NEGATIVE the conditional land is never stated as flatly tapped");
+        //MUST-NOT-MATCH: a land with no tap(noevent) in its script gets nothing.
+        CHECK(landEntersTappedTag("{T}:Add{R}", "({T}: Add {R}.)").empty(),
+              "#W61-T C7 NEGATIVE a basic Mountain's row is byte-identical to wave 60");
+        CHECK(landEntersTappedTag("", "").empty()
+              && landEntersTappedTag("{T}:Add{G}\nmay tap(2)", "Something else.").empty(),
+              "#W61-T C7 NEGATIVE an empty script, and a tap that is not tap(noevent),"
+              " annotate nothing");
+        //A tapped land whose printed text does not say so still states the fact.
+        CHECK(landEntersTappedTag("tap(noevent)", "").find("enters TAPPED") != string::npos
+              && landEntersTappedTag("tap(noevent)", "").find("\"") == string::npos,
+              "#W61-T C7 with no quotable sentence the row states the fact and quotes nothing");
+        //ECHO shape: the row still binds to its own number and strips clean.
+        {
+            vector<string> menu;
+            menu.push_back("Play Arcane Sanctum" + sanctum);
+            menu.push_back("Hold Arcane Sanctum - do not play it now");
+            bool stale = false;
+            string src;
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Play Arcane Sanctum)",
+                                           (int) menu.size(), &menu, &stale, &src) == 1 && !stale,
+                  "#W61-T C7 ECHO the land row still binds by name with the tag on it");
+            CHECK(stripNarrationDecoration(menu[0]) == "Play Arcane Sanctum",
+                  "#W61-T C7 ECHO the tag leaves no residue in the narrated record");
+        }
+    }
+    //#W61-T (C8): a choose-ONE reveal renders a single-pick protocol.
+    cout << "\n[#W61-T] C8 a choose-ONE reveal is asked as one\n";
+    {
+        vector<bool> noElig;
+        vector<MTGCardInstance*> none;
+        //RED-on-base: Pelakka Predation's option one is a BARE target() -
+        //maxtargets 1, targetMin FALSE - so wave 60 took the subset branch and
+        //printed the "PUT: 1, 3" protocol the model then obeyed (146v125 s18).
+        const string w60 = buildRevealAskText(none, "Choose a card", "put back", "",
+                                              noElig, 1, false, false, false);
+        CHECK(w60.find("comma-separated (e.g. \"PUT: 1, 3\")") != string::npos,
+              "#W61-T C8 RED-on-base: the subset branch is what a bare target() reached,"
+              " and it instructs a multi-card answer");
+        const string w61 = buildRevealAskText(none, "Choose a card", "put back", "",
+                                              noElig, 1, true, true, false);
+        CHECK(w61.find("Choose ONE card to send to \"Choose a card\"") != string::npos
+              && w61.find("you can never take two, and \"PUT: none\" declines") != string::npos,
+              "#W61-T C8 the optional single-pick shape frames a ONE-card choice and states"
+              " the decline the engine's chooser accepts");
+        CHECK(w61.find("the ONE card number you choose (e.g. \"PUT: 2\") - ONE number,"
+                       " never a list") != string::npos
+              && w61.find("or exactly \"PUT: none\" to choose no card") != string::npos,
+              "#W61-T C8 the reply protocol asks for one number, and states the legal decline");
+        //MUST-NOT-MATCH: the single-pick shape never carries the subset grammar.
+        CHECK(w61.find("comma-separated") == string::npos
+              && w61.find("which cards go to") == string::npos,
+              "#W61-T C8 NEGATIVE the single-pick ask contains no multi-select instruction");
+        //NEGATIVE: the MANDATORY <1> shape (Thoughtseize-class) is byte-unchanged
+        //from wave 60 - only the new optional flag adds wording.
+        const string mandatory = buildRevealAskText(none, "Discard", "Hand", "",
+                                                    noElig, 1, true, false, false);
+        CHECK(mandatory.find("Choose the ONE card to send to \"Discard\"") != string::npos
+              && mandatory.find("never take two") == string::npos
+              && mandatory.find("declines") == string::npos,
+              "#W61-T C8 NEGATIVE a fixed <1> chooser keeps the wave-20 choose-ONE wording");
+        //ECHO shape: the one-number reply the protocol asks for.
+        {
+            vector<string> names;
+            names.push_back("Supreme Verdict");
+            names.push_back("Final Judgment");
+            names.push_back("Island");
+            vector<bool> send;
+            int r = parseAttackerSet("PUT: 2", names.size(), send, &names);
+            CHECK(r == 1 && send.size() == 3 && !send[0] && send[1] && !send[2],
+                  "#W61-T C8 ECHO 'PUT: 2' selects exactly one revealed card");
+        }
+    }
+    //#W61-T (C9): the dungeon row prices VENTURES to completion.
+    //Ladders verbatim from borderline.txt (Lost Mine of Phandelver 67540-67549,
+    //Tomb of Annihilation, Dungeon of the Mad Mage).
+    cout << "\n[#W61-T] C9 dungeon rows price ventures, not printed rooms\n";
+    {
+        int shortest = -1;
+        const string lostMine =
+            "@counteradded(0/0,1,Explore) from(Lost Mine of Phandelver|mycommandzone)"
+            " restriction{compare(hascntexplore)~equalto~1}:ability$!name(Cave Entrance) _SCRY1_!$ controller\n"
+            "@counteradded(0/0,1,Explore) from(Lost Mine of Phandelver|mycommandzone)"
+            " restriction{compare(hascntexplore)~equalto~4}:choice name(Dungeon completed)"
+            " all(Lost Mine of Phandelver|mycommandzone) completedungeon:1 controller";
+        CHECK(dungeonVenturesToCompletion(lostMine, &shortest) == 4 && shortest == 4,
+              "#W61-T C9 Lost Mine of Phandelver completes on the FOURTH venture"
+              " (its printed room list is 7 long)");
+        const string madMage =
+            "@counteradded(0/0,1,Explore) from(Dungeon of the Mad Mage|mycommandzone)"
+            " restriction{compare(hascntexplore)~equalto~7}:choice name(Dungeon completed)"
+            " completedungeon:1 controller";
+        CHECK(dungeonVenturesToCompletion(madMage, NULL) == 7,
+              "#W61-T C9 Dungeon of the Mad Mage completes on the seventh (9 rooms printed)");
+        //Tomb of Annihilation has TWO completion lines - a branch at 3, the long
+        //way at 4. Both are true; the row reports the count and names the branch.
+        const string tomb =
+            "@counteradded(0/0,1,Explore) from(Tomb of Annihilation|mycommandzone)"
+            " restriction{compare(hascntexplore)~equalto~3,compare(hascntoubliette)~equalto~1}:"
+            "choice name(Dungeon completed) completedungeon:1 controller\n"
+            "@counteradded(0/0,1,Explore) from(Tomb of Annihilation|mycommandzone)"
+            " restriction{compare(hascntexplore)~equalto~4}:choice name(Dungeon completed)"
+            " completedungeon:1 controller";
+        CHECK(dungeonVenturesToCompletion(tomb, &shortest) == 4 && shortest == 3,
+              "#W61-T C9 a dungeon with two completion paths reports both lengths");
+        //MUST-NOT-MATCH: a ladder line with no completedungeon, and a script with
+        //no ladder at all, contribute nothing.
+        CHECK(dungeonVenturesToCompletion("@counteradded(0/0,1,Explore) restriction{compare"
+                                          "(hascntexplore)~equalto~9}:draw:1 controller", NULL) == 0
+              && dungeonVenturesToCompletion("", NULL) == 0,
+              "#W61-T C9 NEGATIVE an explore line that does not COMPLETE the dungeon is not"
+              " a completion length");
+        CHECK(dungeonRowTag(5, 0, 0, "Cradle of the Death God", "Draw a card.")
+                  == " [dungeon: 5 rooms; completion reward (\"Cradle of the Death God\"):"
+                     " Draw a card.]",
+              "#W61-T C9 NEGATIVE an unparsable ladder keeps the wave-59 room-count row"
+              " byte for byte");
+        CHECK(dungeonRowTag(7, 4, 4, "Temple of Dumathoin", "Draw a card.")
+                  == " [dungeon: completes after 4 ventures; 7 rooms printed on its paths;"
+                     " completion reward (\"Temple of Dumathoin\"): Draw a card.]",
+              "#W61-T C9 the row states ventures first and keeps the room count as a fact");
+        CHECK(dungeonRowTag(5, 4, 3, "Tomb of the Nine Gods", "Draw a card.")
+                  .find("(one branch of its room path completes at 3)") != string::npos,
+              "#W61-T C9 the shorter branch is named when there is one");
+        CHECK(dungeonRowTag(7, 4, 4, "Temple of Dumathoin", "Draw a card.")
+                  .find("one branch") == string::npos,
+              "#W61-T C9 NEGATIVE no branch clause when every completion path is the same length");
+        //ECHO shape: the row still binds by name and strips clean.
+        {
+            vector<string> menu;
+            menu.push_back("Lost Mine of Phandelver"
+                           + dungeonRowTag(7, 4, 4, "Temple of Dumathoin", "Draw a card."));
+            menu.push_back("Tomb of Annihilation"
+                           + dungeonRowTag(5, 4, 3, "Tomb of the Nine Gods", "Draw a card."));
+            bool stale = false;
+            string src;
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 2 (Tomb of Annihilation)",
+                                           (int) menu.size(), &menu, &stale, &src) == 2 && !stale,
+                  "#W61-T C9 ECHO the dungeon row binds by name with the venture tag on it");
+            CHECK(stripNarrationDecoration(menu[0]) == "Lost Mine of Phandelver",
+                  "#W61-T C9 ECHO the venture tag leaves no residue in the narrated record");
+        }
+        //#W61-T (C9): B12's source clause, and its other half.
+        CHECK(ventureSourceSilentTag("Acererak the Archlich")
+                  == " [Acererak the Archlich's own text does NOT name this dungeon]",
+              "#W61-T C9 a dungeon the venturing source does not name says so");
+        CHECK(ventureSourceSilentTag("").empty(),
+              "#W61-T C9 NEGATIVE an unnameable source annotates nothing");
+        CHECK(stripNarrationDecoration("Lost Mine of Phandelver"
+                  + ventureSourceSilentTag("Acererak the Archlich"))
+                  == "Lost Mine of Phandelver",
+              "#W61-T C9 ECHO the silent-source clause strips out of the narrated record");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
