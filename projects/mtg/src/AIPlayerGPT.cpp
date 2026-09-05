@@ -8956,7 +8956,15 @@ static const char * punisherVerb(const string& punishers)
 //rows stated a life cost with no resulting total, while the guides now teach
 //"read the number after `you would be at`". Same tail, same rails, same
 //"life < 0 means not supplied" convention as castDrawPriceRowTag.
-static string drawPriceRowTag(int cards, int perDraw, const string& punishers, int life = -1)
+//#W61-S (C6, wave-60 deck126 HIGH-1, the row the seat took): when a row carries
+//BOTH draw-price clauses they folded off the SAME base life, so `126v162` seq 16
+//(t13, life 23) printed "you would be at 22" and "you would be at 16" on one row
+//whose true price was 8. Neither figure was the answer. `deferTotal` hands the
+//resulting life to the clause that follows, which folds both charges once; the
+//cost this clause states is unchanged, and every single-clause row is
+//byte-identical.
+static string drawPriceRowTag(int cards, int perDraw, const string& punishers, int life = -1,
+                              bool deferTotal = false)
 {
     if (cards <= 0 || perDraw <= 0 || punishers.empty())
         return "";
@@ -8965,7 +8973,10 @@ static string drawPriceRowTag(int cards, int perDraw, const string& punishers, i
     o << " [DRAW PRICE: this draws " << cards << " card" << (cards == 1 ? "" : "s")
       << ", and the opponent's " << punishers << punisherVerb(punishers)
       << " every draw, so taking it costs you " << dealt << " life right now";
-    if (life >= 0)
+    if (deferTotal)
+        o << " (this row carries a SECOND draw price below; the two are added there"
+             " and the resulting life is stated once)";
+    else if (life >= 0)
     {
         o << " - you would be at " << (life - dealt);
         if (life - dealt <= 0)
@@ -9067,8 +9078,14 @@ static void castTriggerDrawScan(Player * opp, std::vector<std::string>& names, i
 //arithmetic's consequence ("- you would be at K - this KILLS you") - so the
 //draw-price total gets the same tail, with the seat's life as the only new
 //input. life < 0 means "not supplied" and prints nothing.
+//#W61-S (C6): `priorCharge` is the life the OTHER draw-price clause on this same
+//row already costs. When it is supplied this clause folds the two SEQUENTIALLY
+//from one base and states one resulting life - the sum - instead of a second
+//contradictory "you would be at". 0 means there is no earlier clause and every
+//byte is as before.
 static string castDrawPriceRowTag(int perCast, const string& castNames,
-                                  int perDraw, const string& punishers, int life = -1)
+                                  int perDraw, const string& punishers, int life = -1,
+                                  int priorCharge = 0)
 {
     if (perCast <= 0 || castNames.empty())
         return "";
@@ -9080,12 +9097,246 @@ static string castDrawPriceRowTag(int perCast, const string& castNames,
         int dealt = perCast * perDraw;
         o << ", and their " << punishers << (punishers.find(", ") == string::npos ? " deals" : " deal")
           << " you " << dealt;
+        const int total = dealt + (priorCharge > 0 ? priorCharge : 0);
+        if (priorCharge > 0)
+            o << "; added to the " << priorCharge << " life the draw price above costs you,"
+                 " this ROW costs " << total << " life in total";
         if (life >= 0)
         {
-            o << " - you would be at " << (life - dealt);
-            if (life - dealt <= 0)
+            o << " - you would be at " << (life - total);
+            if (life - total <= 0)
                 o << "; this KILLS you";
         }
+    }
+    o << "]";
+    return o.str();
+}
+
+//#W61-S (C12, wave-60 deck162 HIGH-2 - the misplay that ended a game): a
+//ONE-SHOT draw grant carried NO converter count and NO punisher price while the
+//three OTHER draw rows on the SAME menu carried both. `162v146` seq 23 (t14, 3
+//life) offered `Cast Peer into the Abyss {4}{b}{b}{b} {right now: if you choose
+//"the opponent": life -7, draws 20; ...}` beside three rows each reading
+//`converters on your battlefield: 0`; the seat took it, writing that Underworld
+//Dreams would turn those 20 draws into 20 damage - Underworld Dreams was on
+//NOBODY'S battlefield in that prompt. Peer is `choice name(Target opponent)
+//draw:halfuptype:*:opponentlibrary opponent && life:-halfupopponentlifetotal
+//opponent` (mtg.txt:82571), so it is neither an `@each` per-turn grant
+//(opponentExtraDrawPerTurn) nor a cast trigger (castTriggerDrawCount) - the two
+//scans that feed every other draw row - and it fell through both.
+//
+//The amount is not a number in the script, so it is EVALUATED with the same
+//WParsedInt the `{right now: ...}` magnitudes use, on the same rails: never a
+//script that draws the RNG, never `x` (the X ladder prices that), never a
+//resolution-time-only variable, and a branch whose amount will not evaluate is
+//named as not fixed rather than guessed. A MODAL card is scanned per BRANCH and
+//each clause carries the engine's own branch label, so a per-branch amount can
+//never be read as unconditional.
+struct OneShotDrawBranch
+{
+    string label;    //"" on a non-modal card
+    int oppDraws;    //cards this branch hands the OPPONENT, now
+    int selfDraws;   //cards this branch draws for the PILOT, now (evaluated only)
+    bool variable;   //an amount this render will not claim
+    OneShotDrawBranch() : oppDraws(0), selfDraws(0), variable(false) {}
+};
+
+//Whose draw a `draw:<expr> <who>` payload is. The engine's default drawer is the
+//controller; only the two explicit player tokens are read, and anything else
+//(targetedplayer) is left unclaimed.
+static void oneShotDrawGrantScan(MTGCardInstance * card, std::vector<OneShotDrawBranch>& out)
+{
+    out.clear();
+    if (!card)
+        return;
+    const string& raw = card->magicText;
+    size_t lp = 0;
+    while (lp <= raw.size())
+    {
+        size_t nl = raw.find('\n', lp);
+        const string rawLine = raw.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? raw.size() + 1 : nl + 1;
+        string low = rawLine;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        const size_t s = low.find_first_not_of(" \t\r");
+        if (s == string::npos || low[s] == '@')
+            continue; //a trigger line is not a "right now" grant
+        if (low.find("rand") != string::npos)
+            continue; //never evaluate an expression that draws the game RNG
+        //A die-roll branch is a CONDITIONAL grant, not a magnitude this window
+        //can state; the card text on the same row says it in full.
+        if (low.find("rolld") != string::npos)
+            continue;
+        //Nor is anything else that does not happen simply because the spell
+        //resolves. Each of these was found in the primitives while scoping the
+        //blast radius, and each would have made this clause assert a draw that
+        //may not occur: an ACTIVATED ability (a `{cost}:` prefix - Bonder's
+        //Ornament), a CONDITIONAL (`if ... then ...` - Channeled Force), a
+        //nested sub-ability blob (`ability$!` - Browbeat), an ALTERNATIVE cast
+        //mode (Baleful Mastery), and a macro-gated trigger line (`_DIES_`).
+        {
+            const size_t fc = low.find(':');
+            if (fc != string::npos && low.find('{') != string::npos && low.find('{') < fc)
+                continue; //a `{cost}:` prefix ahead of the first payload
+        }
+        if (low.find("ability$!") != string::npos
+            || low.find("aslongas(") != string::npos //Depopulate: gated on THEIR board
+            || low.find("foreach(") != string::npos  //Nature's Resurgence: per-object, not once
+            || low.find("delayed") != string::npos   //Nissa's Revelation: not on resolution
+            || low.find(" then ") != string::npos
+            || low.compare(s, 2, "if") == 0
+            || low.compare(s, 11, "alternative") == 0
+            || low[s] == '_')
+            continue;
+        OneShotDrawBranch b;
+        b.label = playerBranchLabel(choiceBranchLabel(rawLine));
+        if (b.label == rawLine)
+            b.label.clear(); //not a choice line at all
+        size_t pos = 0;
+        while ((pos = low.find("draw:", pos)) != string::npos)
+        {
+            const size_t st = pos + 5;
+            pos = st;
+            const size_t e = low.find_first_of(" \t\r", st);
+            const string expr = low.substr(st, e == string::npos ? string::npos : e - st);
+            if (expr.empty())
+                continue;
+            //An OPTIONAL draw ("may draw:N") is not a draw this row can price.
+            if (pos >= 9 && low.compare(pos - 9, 4, "may ") == 0)
+                continue;
+            //A `draw:` inside a `newability[...]` payload is an ability this
+            //card GRANTS, not something it does on resolution - the granted
+            //ability carries its own row when it is activated. Skipped by
+            //bracket depth, so a payload fragment can never be read as an
+            //amount (`draw:1]))` is not a number).
+            {
+                const size_t nb = low.rfind("newability[", pos);
+                if (nb != string::npos && low.find(']', nb) > pos)
+                    continue;
+            }
+            bool numeric = !expr.empty();
+            for (size_t k = 0; k < expr.size(); k++)
+                if (!isdigit((unsigned char) expr[k]))
+                    numeric = false;
+            //The evaluable charset: an engine amount token, nothing else. Any
+            //punctuation means the slice ran into surrounding script.
+            {
+                bool clean = true;
+                for (size_t k = 0; k < expr.size(); k++)
+                {
+                    const char ch = expr[k];
+                    if (!(isalnum((unsigned char) ch) || ch == ':' || ch == '*'
+                          || ch == '_' || ch == '-'))
+                        clean = false;
+                }
+                if (!clean)
+                    continue;
+            }
+            if (expr == "x" || expr == "-x" || expr == "xx")
+                continue; //the {X pricing:} ladder prices this row already
+            if (magnitudeExprIsResolutionTimeOnly(expr))
+                continue;
+            //The same two rails appendVerbMagnitudes applies to every other
+            //evaluated magnitude: a source's own P/T is unevaluable on a
+            //non-creature, and `manacost` on a targeted spell means the
+            //TARGET's mana value, which is unknown at option-build time.
+            if ((expr == "power" || expr == "toughness") && !card->isCreature())
+                continue;
+            if (expr.find("manacost") != string::npos && !card->spellTargetType.empty())
+                continue;
+            const size_t w = (e == string::npos) ? string::npos
+                                                 : low.find_first_not_of(" \t\r", e);
+            const bool toOpp = (w != string::npos && low.compare(w, 8, "opponent") == 0);
+            const bool toSelf = (w == string::npos || low.compare(w, 10, "controller") == 0
+                                 || low.compare(w, 2, "&&") == 0);
+            if (!toOpp && !toSelf)
+                continue; //targetedplayer and friends: not knowable here
+            //A NUMERIC self-draw is already priced by drawPriceRowTag on this
+            //same row (scriptSelfDrawCount reads exactly that shape), so it is
+            //not restated here - every such row stays byte-identical.
+            if (toSelf && numeric)
+                continue;
+            int n = 0;
+            if (numeric)
+                n = atoi(expr.c_str());
+            else
+            {
+                WParsedInt val(expr, NULL, card);
+                n = val.getValue();
+            }
+            if (n <= 0)
+            {
+                b.variable = true;
+                continue;
+            }
+            if (toOpp)
+                b.oppDraws += n;
+            else
+                b.selfDraws += n;
+        }
+        if ((b.oppDraws > 0 || b.selfDraws > 0 || b.variable) && out.size() < 4)
+            out.push_back(b);
+    }
+}
+
+//The row clause. Bracketed, so stripNarrationDecoration keeps it out of the
+//append-only record. Pure over its inputs.
+static string oneShotDrawGrantTag(const std::vector<OneShotDrawBranch>& branches,
+                                  const std::vector<std::string>& converters,
+                                  int minePerDraw, int theirsPerDraw,
+                                  const string& theirPunishers, int life = -1)
+{
+    bool any = false;
+    for (size_t i = 0; i < branches.size(); i++)
+        if (branches[i].oppDraws > 0 || branches[i].selfDraws > 0 || branches[i].variable)
+            any = true;
+    if (!any)
+        return "";
+    std::ostringstream o;
+    o << " [DRAW GRANT (one-shot, on resolution):";
+    for (size_t i = 0; i < branches.size(); i++)
+    {
+        const OneShotDrawBranch& b = branches[i];
+        o << (i ? " |" : "");
+        if (!b.label.empty())
+            o << " if you choose \"" << b.label << "\":";
+        bool said = false;
+        if (b.oppDraws > 0)
+        {
+            o << " they draw " << b.oppDraws << " card" << (b.oppDraws == 1 ? "" : "s")
+              << " now; converters on your battlefield: " << converters.size();
+            for (size_t k = 0; k < converters.size(); k++)
+                o << (k ? ", " : " - ") << converters[k];
+            if (converters.empty() || minePerDraw <= 0)
+                o << " (nothing of yours punishes their draws, so those " << b.oppDraws
+                  << " draws take 0 off them)";
+            else
+                o << ", so those " << b.oppDraws << " draws take "
+                  << (b.oppDraws * minePerDraw) << " off them";
+            said = true;
+        }
+        if (b.selfDraws > 0)
+        {
+            o << (said ? ";" : "") << " YOU draw " << b.selfDraws << " card"
+              << (b.selfDraws == 1 ? "" : "s") << " now";
+            if (theirsPerDraw > 0 && !theirPunishers.empty())
+            {
+                const int dealt = b.selfDraws * theirsPerDraw;
+                o << ", and their " << theirPunishers << punisherVerb(theirPunishers)
+                  << " every draw, so that costs you " << dealt << " life";
+                if (life >= 0)
+                {
+                    o << " - you would be at " << (life - dealt);
+                    if (life - dealt <= 0)
+                        o << "; this KILLS you";
+                }
+            }
+            said = true;
+        }
+        if (b.variable)
+            o << (said ? ";" : "") << " and an amount this render will not claim"
+                                      " (read the card text on this row)";
     }
     o << "]";
     return o.str();
@@ -9932,6 +10183,41 @@ static string xLifeDrawEffectClause(int lifePerX, int drawPerX)
 //leaves BEFORE its own draws (the spell itself has left it); `handLimit` is the
 //maximum hand size. Both < 0 means "not supplied", and every branch of the old
 //shape then renders byte-identical.
+//#W61-S (C10, wave-60 deck125 HIGH-2): the ladder marker was computed from
+//AFFORDABILITY alone and endorsed X=2 on a row whose own text one clause
+//earlier read `NET -2 life for this cast` at my_life 2 (`125v162` seq 41/42,
+//t15 - the seat took row 1 and died; X=1 is NET -1 and survives at 1). This is
+//the row's NET arithmetic pulled out as ONE function so the badge and the row
+//text cannot disagree; PARSETEST pins the two against each other over a matrix
+//rather than trusting two copies of the same sum. `priced` is false when the
+//row prints no NET at all (the cast has no life cost), in which case nothing is
+//folded into the marker.
+static int xNetLifeForX(int x, int lifePerX, int drawPerX,
+                        int punisherPerDraw, const string& punishers,
+                        int handAfterCast, int handLimit, int perDiscard,
+                        const string& discardPunishers, bool * priced = NULL)
+{
+    if (priced)
+        *priced = false;
+    if (x <= 0)
+        return 0;
+    const int gain = x * lifePerX;
+    const int cards = x * drawPerX;
+    int cost = 0;
+    if (cards > 0 && punisherPerDraw > 0 && !punishers.empty())
+        cost += cards * punisherPerDraw;
+    if (handAfterCast >= 0 && cards > 0
+        && !cleanupDiscardPriceClause(handAfterCast + cards, handLimit, perDiscard,
+                                      discardPunishers).empty())
+        cost += ((handAfterCast + cards) - handLimit) * perDiscard;
+    if (priced)
+        *priced = cost > 0;
+    return gain - cost;
+}
+
+//#W61-S (C10): "no NET was supplied" - a sentinel no life total can equal.
+static const int kXNetNotSupplied = -1000000;
+
 static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
                                int punisherPerDraw, const string& punishers,
                                int handAfterCast = -1, int handLimit = -1,
@@ -10000,7 +10286,12 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
 //what it does, and nothing listed does more. It is deliberately NOT an
 //instruction to take it - holding mana up is exactly the trade the fit clause
 //(D7 a) now prices, and the pilot's own guide rung answers X on this card. Pure.
-static string xMonotoneMarker(int capX, int lifePerX, int drawPerX)
+//#W61-S (C10): `netAtCap` / `life` fold the row's OWN NET into the badge, and
+//`safeX` / `netAtSafeX` name the largest listed X that survives it. All four
+//default to "not supplied", in which case every byte is as before.
+static string xMonotoneMarker(int capX, int lifePerX, int drawPerX,
+                              int netAtCap = kXNetNotSupplied, int life = -1,
+                              int safeX = -1, int netAtSafeX = kXNetNotSupplied)
 {
     if (capX < 1 || (lifePerX <= 0 && drawPerX <= 0))
         return "";
@@ -10014,7 +10305,22 @@ static string xMonotoneMarker(int capX, int lifePerX, int drawPerX)
     }
     if (drawPerX > 0)
         o << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
-    o << "; no listed X does more]";
+    o << "; no listed X does more";
+    //#W61-S (C10): a badge is the most obeyed annotation this render produces
+    //(6 of 6 X menus in the wave-60 corpus), so it must never endorse an X that
+    //kills the pilot in silence. The row already prints the NET; the badge now
+    //carries the same number to its conclusion, and names the rung that lives.
+    if (netAtCap != kXNetNotSupplied && life >= 0 && life + netAtCap <= 0)
+    {
+        o << " - but NET " << netAtCap << " life for this cast puts you at "
+          << (life + netAtCap) << "; this KILLS you";
+        if (safeX >= 1 && netAtSafeX != kXNetNotSupplied)
+            o << ". X=" << safeX << " is the largest listed X whose NET (" << netAtSafeX
+              << ") leaves you alive, at " << (life + netAtSafeX);
+        else
+            o << ". No listed X leaves you alive";
+    }
+    o << "]";
     return o.str();
 }
 
@@ -10067,7 +10373,9 @@ static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool names
 
 //Board-facing half of the same item: defined below xMenuMarkX (the ranking it
 //shares with the menu), declared here because the cast row is emitted above it.
-static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX);
+static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX,
+                                  int netAtCap = kXNetNotSupplied, int life = -1,
+                                  int safeX = -1, int netAtSafeX = kXNetNotSupplied); //#W61-S (C10)
 
 //Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
 //Returns "" for a non-X spell (every other cast line is byte-identical to
@@ -10076,6 +10384,49 @@ static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int dra
 static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * opp,
                                 int& handAfterCast, int& limit, int& perDiscard,
                                 string& discardPunishers);
+
+//#W61-S (C10): the ladder's NET verdict for the badge - the NET at the cap and
+//the largest listed X whose NET still leaves the pilot alive. Reads the same
+//two scans the ROW reads (drawPunisherScan, forcedCleanupInputs), so the badge
+//can only ever restate a number the row already printed. Returns netAtCap
+//unsupplied when the row prints no NET.
+static void xNetLadder(MTGCardInstance * card, Player * me, int capX,
+                       int lifePerX, int drawPerX,
+                       int& netAtCap, int& safeX, int& netAtSafeX)
+{
+    netAtCap = kXNetNotSupplied;
+    safeX = -1;
+    netAtSafeX = kXNetNotSupplied;
+    if (!card || !me || capX < 1 || drawPerX <= 0)
+        return;
+    Player * opp = me->opponent();
+    vector<string> mineP, theirsP;
+    int minePer = 0, theirsPer = 0;
+    drawPunisherScan(me, opp, mineP, minePer, theirsP, theirsPer);
+    std::ostringstream pn;
+    for (size_t ni = 0; ni < theirsP.size(); ni++)
+        pn << (ni ? ", " : "") << theirsP[ni];
+    int handAfterCast = -1, handLimit = -1, perDiscard = 0;
+    string discardPunishers;
+    forcedCleanupInputs(card, me, opp, handAfterCast, handLimit, perDiscard, discardPunishers);
+    bool priced = false;
+    const int n = xNetLifeForX(capX, lifePerX, drawPerX, theirsPer, pn.str(),
+                               handAfterCast, handLimit, perDiscard, discardPunishers, &priced);
+    if (!priced)
+        return;
+    netAtCap = n;
+    for (int x = capX - 1; x >= 1; x--)
+    {
+        const int nx = xNetLifeForX(x, lifePerX, drawPerX, theirsPer, pn.str(),
+                                    handAfterCast, handLimit, perDiscard, discardPunishers);
+        if (me->life + nx > 0)
+        {
+            safeX = x;
+            netAtSafeX = nx;
+            break;
+        }
+    }
+}
 
 string xSpellPricing(MTGCardInstance * card, Player * me)
 {
@@ -10130,7 +10481,11 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
                 }
             }
             base += "}";
-            base += xCastRowBestXMarker(sv, lifePerX, drawPerX); //#W57-E (D20)
+            //#W61-S (C10): the badge carries the row's own NET to its conclusion.
+            int netAtCap = kXNetNotSupplied, safeX = -1, netAtSafeX = kXNetNotSupplied;
+            xNetLadder(card, me, sv.maxX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX);
+            base += xCastRowBestXMarker(sv, lifePerX, drawPerX, netAtCap,
+                                        me ? me->life : -1, safeX, netAtSafeX); //#W57-E (D20)
         }
         return base;
     }
@@ -10495,12 +10850,15 @@ static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * op
 //survey (ManaEngine::maxAnnounceableX), which is the number that builds the
 //menu one screen later. Nothing is marked when there is no ladder to rank
 //(maxX <= 0: the row already says the mana affords only X=0).
-static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX)
+static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX,
+                                  int netAtCap, int life, int safeX, int netAtSafeX)
 {
     if (sv.maxX <= 0)
         return "";
     if (!sv.priceable)
-        return xCastRowMarkerFrom(xMonotoneMarker(sv.maxX, lifePerX, drawPerX), sv.maxX, true);
+        return xCastRowMarkerFrom(xMonotoneMarker(sv.maxX, lifePerX, drawPerX, netAtCap,
+                                                  life, safeX, netAtSafeX),
+                                  sv.maxX, true); //#W61-S (C10)
     string mk;
     int mx = xMenuMarkX(sv.victims, sv.maxX, mk);
     //The no-kill verdict is a fact about the whole ladder and names no X, so it
@@ -10556,7 +10914,11 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         //the same one-row-marked plumbing the kill families use.
         if (markX && markerText)
         {
-            string mm = xMonotoneMarker(capX, lifePerX, drawPerX);
+            //#W61-S (C10): the same fold on the menu the badge is obeyed on.
+            int netAtCap = kXNetNotSupplied, safeX = -1, netAtSafeX = kXNetNotSupplied;
+            xNetLadder(card, me, capX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX);
+            string mm = xMonotoneMarker(capX, lifePerX, drawPerX, netAtCap,
+                                        me ? me->life : -1, safeX, netAtSafeX);
             if (!mm.empty())
             {
                 *markX = capX;
@@ -16170,8 +16532,19 @@ string loopCautionClause(const string& converter, const string& mirror, bool the
 //frame from the moment both facts are known. It claims nothing about when the
 //card will be cast - only that the pair is one resolution from closing. Pure
 //over the two names and the place-name.
+//#W61-S (C5, wave-60 deck126 MED-3): the banner urged closing a pair whose
+//other half could not be cast in that window. `126v146` seq 20 (t14) read "the
+//pair is one resolution from closing" with Sanguine Bond {3}{B}{B} on the hand
+//line, six untapped sources listed and exactly one of them able to make {B} -
+//and no Cast row for it anywhere on the menu, with no reason given. A banner
+//that says a resolution is available when it is not is a false surface under
+//the trust doctrine, and the guide's release condition is written against it.
+//`affordClause` is the seat's own castability verdict for the held half (empty
+//when the half is in a zone the seat cannot cast from at all, in which case
+//every byte is as before).
 string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
-                              const string& seenWhere, bool theirs)
+                              const string& seenWhere, bool theirs,
+                              const string& affordClause = "")
 {
     if (inPlayHalf.empty() || seenHalf.empty() || seenWhere.empty())
         return "";
@@ -16186,6 +16559,50 @@ string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
                 " than expensive."
               : " any life THEY lose, and any life you gain, chains until they are"
                 " at 0.");
+    if (!affordClause.empty()) //#W61-S (C5)
+        o << " " << affordClause;
+    return o.str();
+}
+
+//#W61-S (C5): the clause itself. `castableNow` is LegalActionsOracle::
+//castableForDisplay's verdict for that exact card - the same oracle that builds
+//the Cast rows, so the banner and the menu cannot disagree about whether the
+//closing resolution is on offer. The mana facts are stated as facts, never as a
+//guess at WHICH of cost or timing is the blocker. Pure over its inputs.
+string loopHalfAffordabilityClause(const string& half, const string& cost, bool castableNow,
+                                   int untappedSources, const string& colours)
+{
+    if (half.empty())
+        return "";
+    std::ostringstream o;
+    if (castableNow)
+    {
+        o << "You CAN cast " << half << " in this window";
+        if (!cost.empty())
+            o << " (" << cost << ")";
+        o << " - the closing resolution is on your menu right now.";
+        return o.str();
+    }
+    o << "You CANNOT cast " << half << " in this window: it is not among your legal"
+         " casts right now";
+    if (!cost.empty() || untappedSources >= 0)
+    {
+        o << " (";
+        bool said = false;
+        if (!cost.empty())
+        {
+            o << "its cost is " << cost;
+            said = true;
+        }
+        if (untappedSources >= 0)
+        {
+            o << (said ? "; " : "") << "your untapped sources: " << untappedSources;
+            if (untappedSources > 0 && !colours.empty())
+                o << ", colours you could make: " << colours;
+        }
+        o << ")";
+    }
+    o << ". The pair cannot close until that changes.";
     return o.str();
 }
 
@@ -16355,7 +16772,39 @@ static string loopPendingSituationLine(Player * me, Player * opp,
         }
         if (found.empty())
             continue;
-        return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0);
+        //#W61-S (C5): when the held half is in the SEAT'S OWN hand, the banner
+        //states whether the closing resolution is actually available - read off
+        //the same castability oracle the Cast rows are built from.
+        string afford;
+        if (side != 0 && where == "in your hand" && pl->game->hand)
+        {
+            MTGCardInstance * held = NULL;
+            for (int i = 0; i < pl->game->hand->nb_cards; i++)
+            {
+                MTGCardInstance * c = pl->game->hand->cards[i];
+                if (c && c->name == found)
+                {
+                    held = c;
+                    break;
+                }
+            }
+            if (held)
+            {
+                std::set<MTGCardInstance *> ok = LegalActionsOracle::castableForDisplay(pl);
+                ManaEngine::FreeProducerPolicy pol;
+                ManaCost * potential = NEW ManaCost();
+                const int sources = ManaEngine::potentialColorReach(pl, pol, potential);
+                const string colours = manaColourSetText(potential);
+                SAFE_DELETE(potential);
+                string cost;
+                if (held->getManaCost())
+                    cost = held->getManaCost()->toString();
+                afford = loopHalfAffordabilityClause(found, cost,
+                                                     ok.find(held) != ok.end(),
+                                                     sources, colours);
+            }
+        }
+        return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0, afford);
     }
     return "";
 }
@@ -26616,36 +27065,41 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //draws. The summary line on the same screen states the standing rate;
         //the row that incurs it carries the number (deck130 G47-5's general
         //principle, applied to the cast row).
-        {
-            int drawn = scriptSelfDrawCount(card->magicText);
-            if (drawn > 0)
-            {
-                vector<string> mineP, theirsP;
-                int minePer = 0, theirsPer = 0;
-                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
-                std::ostringstream pn;
-                for (size_t ni = 0; ni < theirsP.size(); ni++)
-                    pn << (ni ? ", " : "") << theirsP[ni];
-                o << drawPriceRowTag(drawn, theirsPer, pn.str(), life); //#W54-C (D10)
-            }
-        }
         //#W49-U D6 (c): and what CASTING it makes the caster draw, when an
         //opposing permanent punishes the cast that way (Forced Fruition).
+        //#W61-S (C6): the two clauses are emitted from ONE block so the second
+        //can fold the first's charge into a single resulting life. Both clauses
+        //still print in full; only the "you would be at" is resolved once.
         {
+            const int drawn = scriptSelfDrawCount(card->magicText);
             std::vector<std::string> castNames;
             int perCast = 0;
             castTriggerDrawScan(opponent(), castNames, perCast);
+            vector<string> mineP, theirsP;
+            int minePer = 0, theirsPer = 0;
+            if (drawn > 0 || perCast > 0)
+                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+            std::ostringstream pn;
+            for (size_t ni = 0; ni < theirsP.size(); ni++)
+                pn << (ni ? ", " : "") << theirsP[ni];
+            //The second clause states a life total only when it prices punishers
+            //too; if it will not, the first clause must keep its own total.
+            const bool secondFolds = (perCast > 0 && !castNames.empty()
+                                      && theirsPer > 0 && !theirsP.empty());
+            int firstCharge = 0;
+            if (drawn > 0)
+            {
+                const bool defer = secondFolds && theirsPer > 0 && !theirsP.empty();
+                o << drawPriceRowTag(drawn, theirsPer, pn.str(), life, defer); //#W54-C (D10)
+                if (defer)
+                    firstCharge = drawn * theirsPer;
+            }
             if (perCast > 0)
             {
-                vector<string> mineP, theirsP;
-                int minePer = 0, theirsPer = 0;
-                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
-                std::ostringstream cn, pn;
+                std::ostringstream cn;
                 for (size_t ni = 0; ni < castNames.size(); ni++)
                     cn << (ni ? ", " : "") << castNames[ni];
-                for (size_t ni = 0; ni < theirsP.size(); ni++)
-                    pn << (ni ? ", " : "") << theirsP[ni];
-                o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str(), life);
+                o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str(), life, firstCharge);
             }
         }
         //#W51-F D11: and what casting it FEEDS the opponent, with the count of
@@ -26662,6 +27116,26 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 handConverterScan(this, handConv, handDiscConv);
                 o << feedsRowTag(perTurn, variable, perCastFed, conv, handConv,
                                  discConv, handDiscConv);
+            }
+        }
+        //#W61-S (C12): and the ONE-SHOT draw grant, which neither of the two
+        //scans above sees. Same two numbers every other draw row prints - the
+        //converter count on the pilot's own battlefield, and what the draws are
+        //worth against it - on the row where the cast is decided.
+        {
+            std::vector<OneShotDrawBranch> grants;
+            oneShotDrawGrantScan(card, grants);
+            if (!grants.empty())
+            {
+                std::vector<std::string> conv, discConv;
+                converterScan(this, conv, discConv);
+                vector<string> mineP, theirsP;
+                int minePer = 0, theirsPer = 0;
+                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+                std::ostringstream pn;
+                for (size_t ni = 0; ni < theirsP.size(); ni++)
+                    pn << (ni ? ", " : "") << theirsP[ni];
+                o << oneShotDrawGrantTag(grants, conv, minePer, theirsPer, pn.str(), life);
             }
         }
         //#W57-C (D7): and, on a CREATURE row, what a converter of THEIRS turns
@@ -43891,7 +44365,7 @@ void AIPlayerGPT::runParseSelfTest()
             menu.push_back("Cast Supreme Verdict {1}{w}{w}{u}" + leavesUntappedTag(7, 4));
             menu.push_back("Cast nothing this window");
             bool stale = false; string src;
-            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale);
             CHECK(c == 1 && !stale, "#W47-R14b echo: the whole annotated row binds to index 1");
             CHECK(stripNarrationDecoration(menu[0]).find("leaves 3") == string::npos,
                   "#W47-R14b echo: the annotation leaves no residue in the narrated record");
@@ -44509,7 +44983,7 @@ void AIPlayerGPT::runParseSelfTest()
                            + optionCardTextCore(doomsayer, 140) + "\"}");
             menu.push_back("Pass priority");
             bool stale = false; string src;
-            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale);
             CHECK(c == 1 && !stale, "#W48-D5 echo: the whole annotated row binds to index 1");
             CHECK(stripNarrationDecoration(menu[0]).find("Fateful hour") == string::npos,
                   "#W48-D5 echo: the card-text blob leaves no residue in the narrated record");
@@ -44544,7 +45018,7 @@ void AIPlayerGPT::runParseSelfTest()
             menu.push_back(playerBranchLabel("Target opponent"));
             menu.push_back(playerBranchLabel("Target controller"));
             bool stale = false; string src;
-            CHECK(parseChoice("CHOICE: 2 (you)", 2, &menu, &stale, &src) == 2 && !stale,
+            CHECK(parseChoice("CHOICE: 2 (you)", 2, &menu, &stale) == 2 && !stale,
                   "#W48-D6 echo: the mapped label binds to its own index");
         }
     }
@@ -44637,7 +45111,7 @@ void AIPlayerGPT::runParseSelfTest()
             menu.push_back("X = 5");
             menu.push_back(string("X = 4") + kXMostKillsMarker);
             bool stale = false; string src;
-            int pick = parseChoice(string("CHOICE: 2 (X = 4") + kXMostKillsMarker + ")", 2, &menu, &stale, &src);
+            int pick = parseChoice(string("CHOICE: 2 (X = 4") + kXMostKillsMarker + ")", 2, &menu, &stale);
             CHECK(pick == 2 && !stale, "#W48-D9 echo: the marked row binds to index 2");
         }
     }
@@ -46371,9 +46845,9 @@ static const char * kW50Y_r94 =
                            + paymentLifeCostClause(pn, pd, 1));
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
-            int pick = parseChoice("CHOICE: 1 (Cast Spark Spray)", 2, &menu, &stale, &src);
+            int pick = parseChoice("CHOICE: 1 (Cast Spark Spray)", 2, &menu, &stale);
             CHECK(pick == 1 && !stale, "#W52-K D7 echo: the bare row name binds with the life clause on the row");
-            pick = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            pick = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale);
             CHECK(pick == 1 && !stale, "#W52-K D7 echo: the whole row incl. the life clause binds");
             CHECK(stripNarrationDecoration(menu[0]).find("costs you") == string::npos
                   && stripNarrationDecoration(menu[0]).find("Cast Spark Spray {r}") == 0,
@@ -46467,9 +46941,9 @@ static const char * kW50Y_r94 =
             menu.push_back("Cast Idyllic Tutor {4}{w} [from exile]" + fromExileClause(true, false, "Elite Spellbinder", true, 2));
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
-            CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 2, &menu, &stale, &src) == 1 && !stale,
+            CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 2, &menu, &stale) == 1 && !stale,
                   "#W52-K D11 echo: the bare name binds with the exile clause on the row");
-            CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src) == 1 && !stale,
+            CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale) == 1 && !stale,
                   "#W52-K D11 echo: the whole row incl. the exile clause binds");
             CHECK(stripNarrationDecoration(menu[0]).find("castable from exile") == string::npos,
                   "#W52-K D11 the exile clause leaves no residue in history");
@@ -46822,7 +47296,7 @@ static const char * kW50Y_r94 =
             bool stale = false; string src;
             CHECK(parseChoice("CHOICE: 1 (Cast Essence Scatter {1}{u} [DRAW PRICE: casting this draws YOU 7"
                               " cards (their Forced Fruition), and their Underworld Dreams deals you 7 -"
-                              " you would be at -4; this KILLS you])", 2, &menu, &stale, &src) == 1 && !stale,
+                              " you would be at -4; this KILLS you])", 2, &menu, &stale) == 1 && !stale,
                   "#W53-O D3 echo: a reply parroting the whole tagged row still binds to row 1");
             CHECK(stripNarrationDecoration(menu[0]) == "Cast Essence Scatter {1}{u}",
                   "#W53-O D3 echo: the tail leaves no residue in the narrated record");
@@ -47725,7 +48199,7 @@ static const char * kW50Y_r94 =
                            + damageTargetVerdict(3, 6, 6, false, false));
             bool stale = false; string src;
             CHECK(parseChoice("CHOICE: 1 (The opponent (player, life 1) {right now: takes 3 damage"
-                              " - they would be at -2; THIS WINS THE GAME})", 2, &menu, &stale, &src) == 1
+                              " - they would be at -2; THIS WINS THE GAME})", 2, &menu, &stale) == 1
                   && !stale,
                   "#W54-C D4 echo: a reply parroting the whole annotated player row binds to row 1");
             CHECK(stripNarrationDecoration(menu[0]) == "The opponent (player, life 1)",
@@ -47757,7 +48231,7 @@ static const char * kW50Y_r94 =
             menu.push_back("Cycle Barren Moor {2}" + lethal);
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
-            CHECK(parseChoice("CHOICE: 1 (Cycle Barren Moor {2}" + lethal + ")", 2, &menu, &stale, &src) == 1
+            CHECK(parseChoice("CHOICE: 1 (Cycle Barren Moor {2}" + lethal + ")", 2, &menu, &stale) == 1
                   && !stale,
                   "#W54-C D10 echo: a reply parroting the tailed cost row binds to row 1");
             CHECK(stripNarrationDecoration(menu[0]) == "Cycle Barren Moor {2}",
@@ -47939,7 +48413,7 @@ static const char * kW50Y_r94 =
             menu.push_back("Cast Silverquill Command {2}{b}{w}" + modalModesTag(live, dead));
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
-            CHECK(parseChoice("CHOICE: 1 (Cast Silverquill Command {2}{b}{w})", 2, &menu, &stale, &src) == 1
+            CHECK(parseChoice("CHOICE: 1 (Cast Silverquill Command {2}{b}{w})", 2, &menu, &stale) == 1
                   && !stale,
                   "#W54-C D5 echo: the short-name reply still binds past the new clause");
             CHECK(stripNarrationDecoration(menu[0]) == "Cast Silverquill Command {2}{b}{w}",
@@ -53090,6 +53564,265 @@ static const char * kW50Y_r94 =
         CHECK(pendingStackDamageLine(1, 18).find('{') == string::npos
               && pendingStackDamageLine(1, 18).find('[') == string::npos,
               "#W61-R C4 echo shape: the total is a prompt LINE and adds no annotation");
+    }
+
+
+    // ---- #W61-S: C5 loop-half affordability, C6 the sequential draw-price fold,
+    //      C12 the one-shot draw grant, C10 the best-X badge's NET fold ----
+    cout << "\n[#W61-S] C6 one resulting life per row; C12 the one-shot draw grant;"
+            " C10 the badge's NET; C5 the pending loop half's affordability\n";
+    {
+        // ---- C6: two DRAW PRICE clauses on one row, folded SEQUENTIALLY ----
+        // REPRO `126v162` seq 16 (t13, life 23, Wall of Omens): the row printed
+        // "you would be at 22" AND "you would be at 16"; the true price was 8.
+        const string first = drawPriceRowTag(1, 1, "Underworld Dreams", 23, true);
+        const string second = castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams",
+                                                  23, 1);
+        cout << "     " << first << second << "\n";
+        CHECK(first == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                       " punishes every draw, so taking it costs you 1 life right now (this row"
+                       " carries a SECOND draw price below; the two are added there and the"
+                       " resulting life is stated once)]",
+              "#W61-S C6 POSITIVE the first clause states its cost and defers the total");
+        CHECK(second == " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition),"
+                        " and their Underworld Dreams deals you 7; added to the 1 life the draw"
+                        " price above costs you, this ROW costs 8 life in total - you would be at 15]",
+              "#W61-S C6 POSITIVE the second clause folds both charges into ONE resulting life");
+        CHECK((first + second).find("you would be at 22") == string::npos
+              && (first + second).find("you would be at 16") == string::npos,
+              "#W61-S C6 NEGATIVE the two wave-60 figures (22 and 16) are both gone from the row");
+        {
+            // Exactly one resulting life on the folded row, and it is the sum.
+            const string row = first + second;
+            size_t at = 0, n = 0;
+            while ((at = row.find("you would be at", at)) != string::npos) { n++; at += 3; }
+            CHECK(n == 1, "#W61-S C6 exactly one 'you would be at' survives on a two-clause row");
+        }
+        // The lethal tail folds off the SUM, not off either half.
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 8, 1)
+                  .find("you would be at 0; this KILLS you") != string::npos,
+              "#W61-S C6 the kill verdict is computed on the folded total");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 8, 0)
+                  .find("KILLS") == string::npos,
+              "#W61-S C6 NEGATIVE at the same life the UNFOLDED row is not lethal - the fold is"
+              " what makes it one");
+        // NEGATIVE: a single-clause row is byte-identical to wave 60.
+        CHECK(drawPriceRowTag(1, 3, "Underworld Dreams", 3)
+                  == drawPriceRowTag(1, 3, "Underworld Dreams", 3, false)
+              && drawPriceRowTag(1, 3, "Underworld Dreams", 3)
+                  == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                     " punishes every draw, so taking it costs you 3 life right now - you would"
+                     " be at 0; this KILLS you]",
+              "#W61-S C6 NEGATIVE the one-clause row keeps every wave-60 byte");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 20)
+                  == castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 20, 0),
+              "#W61-S C6 NEGATIVE priorCharge 0 is the wave-60 shape exactly");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 0, "", 23, 1)
+                  .find("in total") == string::npos,
+              "#W61-S C6 NEGATIVE a second clause that prices no punisher folds nothing"
+              " (the first clause then keeps its own total)");
+        // ECHO SHAPE: the folded row still binds, and strips out of the record.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Wall of Omens {1}{w}" + first + second);
+            menu.push_back("Hold priority for the rest of this turn");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale) == 1 && !stale,
+                  "#W61-S C6 echo: the folded two-clause row echoed in full still binds to 1");
+            CHECK(stripNarrationDecoration(menu[0]).find("DRAW PRICE") == string::npos
+                  && stripNarrationDecoration(menu[0]).find("in total") == string::npos,
+                  "#W61-S C6 echo: neither clause leaves residue in the narrated record");
+        }
+
+        // ---- C12: the one-shot draw grant (Peer into the Abyss) ----
+        // REPRO `162v146` seq 23 (t14, 3 life): row 3 carried no converter
+        // clause while rows 1/2/4 each read "converters on your battlefield: 0".
+        vector<OneShotDrawBranch> peer;
+        OneShotDrawBranch bOpp; bOpp.label = "the opponent"; bOpp.oppDraws = 20;
+        OneShotDrawBranch bMe; bMe.label = "you"; bMe.selfDraws = 21;
+        peer.push_back(bOpp); peer.push_back(bMe);
+        vector<string> noConv;
+        const string peerTag = oneShotDrawGrantTag(peer, noConv, 0, 0, "", 3);
+        cout << "     " << peerTag << "\n";
+        CHECK(peerTag == " [DRAW GRANT (one-shot, on resolution): if you choose \"the opponent\":"
+                         " they draw 20 cards now; converters on your battlefield: 0 (nothing of"
+                         " yours punishes their draws, so those 20 draws take 0 off them) |"
+                         " if you choose \"you\": YOU draw 21 cards now]",
+              "#W61-S C12 POSITIVE the seq-23 board: the converter count the row omitted, per branch");
+        CHECK(peerTag.find("Underworld Dreams") == string::npos,
+              "#W61-S C12 NEGATIVE the tag never names a punisher that is on nobody's"
+              " battlefield - the exact belief the seat formed on this row");
+        {
+            vector<string> conv2;
+            conv2.push_back("Underworld Dreams #1");
+            conv2.push_back("Fate Unraveler #1");
+            const string armed = oneShotDrawGrantTag(peer, conv2, 2, 0, "", 30);
+            CHECK(armed.find("converters on your battlefield: 2 - Underworld Dreams #1,"
+                             " Fate Unraveler #1, so those 20 draws take 40 off them") != string::npos,
+                  "#W61-S C12 POSITIVE with converters out the row states what the grant is WORTH");
+        }
+        {
+            // The pilot-side branch under THEIR punishers carries the same
+            // arithmetic and the same lethal verdict the cast rows carry.
+            const string selfSide = oneShotDrawGrantTag(peer, noConv, 0, 1, "Underworld Dreams", 3);
+            CHECK(selfSide.find("YOU draw 21 cards now, and their Underworld Dreams punishes"
+                                " every draw, so that costs you 21 life - you would be at -18;"
+                                " this KILLS you") != string::npos,
+                  "#W61-S C12 POSITIVE the self-draw branch prices the punishers and names the kill");
+        }
+        {
+            vector<OneShotDrawBranch> flat;
+            OneShotDrawBranch b; b.oppDraws = 2;
+            flat.push_back(b);
+            CHECK(oneShotDrawGrantTag(flat, noConv, 0, 0, "", 10)
+                      == " [DRAW GRANT (one-shot, on resolution): they draw 2 cards now;"
+                         " converters on your battlefield: 0 (nothing of yours punishes their"
+                         " draws, so those 2 draws take 0 off them)]",
+                  "#W61-S C12 a non-modal grant carries no branch label");
+            vector<OneShotDrawBranch> varOnly;
+            OneShotDrawBranch v; v.variable = true;
+            varOnly.push_back(v);
+            CHECK(oneShotDrawGrantTag(varOnly, noConv, 0, 0, "", 10)
+                      .find("an amount this render will not claim") != string::npos,
+                  "#W61-S C12 an unevaluable amount is NAMED as unclaimed, never guessed");
+            vector<OneShotDrawBranch> empty;
+            CHECK(oneShotDrawGrantTag(empty, noConv, 0, 0, "", 10).empty(),
+                  "#W61-S C12 NEGATIVE a card that grants no one-shot draw carries no tag");
+            vector<OneShotDrawBranch> zero;
+            zero.push_back(OneShotDrawBranch());
+            CHECK(oneShotDrawGrantTag(zero, noConv, 0, 0, "", 10).empty(),
+                  "#W61-S C12 NEGATIVE an all-zero branch list carries no tag");
+        }
+        // ECHO SHAPE.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Peer into the Abyss {4}{b}{b}{b}" + peerTag);
+            menu.push_back("Cast nothing right now");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale) == 1 && !stale,
+                  "#W61-S C12 echo: the Peer row echoed with its DRAW GRANT still binds to 1");
+            CHECK(stripNarrationDecoration(menu[0]).find("DRAW GRANT") == string::npos,
+                  "#W61-S C12 echo: the bracketed grant leaves no residue in the record");
+        }
+
+        // ---- C10: the best-X badge folds the NET its own row printed ----
+        // REPRO `125v162` seq 41/42 (t15, my_life 2): X=2 is NET -2.
+        {
+            bool priced = false;
+            const int netAt2 = xNetLifeForX(2, 1, 1, 2, "Underworld Dreams, Ob Nixilis",
+                                            -1, -1, 0, "", &priced);
+            const int netAt1 = xNetLifeForX(1, 1, 1, 2, "Underworld Dreams, Ob Nixilis",
+                                            -1, -1, 0, "");
+            CHECK(priced && netAt2 == -2 && netAt1 == -1,
+                  "#W61-S C10 the seq-41 ladder: X=2 is NET -2, X=1 is NET -1");
+            // The badge and the ROW read one arithmetic - pin them against each
+            // other so a change to either cannot drift.
+            for (int x = 1; x <= 4; x++)
+            {
+                bool pr = false;
+                const int n = xNetLifeForX(x, 1, 1, 2, "Underworld Dreams, Ob Nixilis",
+                                           -1, -1, 0, "", &pr);
+                std::ostringstream want;
+                want << "NET " << n << " life for this cast";
+                const string row = xLifeDrawRowCore(x, 1, 1, 2, "Underworld Dreams, Ob Nixilis");
+                CHECK(pr && row.find(want.str()) != string::npos,
+                      "#W61-S C10 xNetLifeForX equals the NET the row itself prints");
+            }
+            const string badge = xMonotoneMarker(2, 1, 1, netAt2, 2, 1, netAt1);
+            cout << "     " << badge << "\n";
+            CHECK(badge == " [<- largest affordable X - X=2 gains 2 life and draws 2 cards;"
+                           " no listed X does more - but NET -2 life for this cast puts you at 0;"
+                           " this KILLS you. X=1 is the largest listed X whose NET (-1) leaves"
+                           " you alive, at 1]",
+                  "#W61-S C10 POSITIVE the badge says so, and names the rung that lives");
+            CHECK(xMonotoneMarker(2, 1, 1, netAt2, 2, -1, kXNetNotSupplied)
+                      .find("No listed X leaves you alive") != string::npos,
+                  "#W61-S C10 with no surviving rung the badge says that instead of naming one");
+            // NEGATIVE (must NOT match): a survivable NET leaves wave-60 bytes.
+            CHECK(xMonotoneMarker(2, 1, 1, netAt2, 20, 1, netAt1) == xMonotoneMarker(2, 1, 1)
+                  && xMonotoneMarker(12, 1, 1) == " [<- largest affordable X - X=12 gains 12 life"
+                                                  " and draws 12 cards; no listed X does more]",
+                  "#W61-S C10 NEGATIVE a NET the pilot survives changes not one byte");
+            CHECK(xMonotoneMarker(2, 1, 1, kXNetNotSupplied, 2) == xMonotoneMarker(2, 1, 1),
+                  "#W61-S C10 NEGATIVE an unsupplied NET changes not one byte");
+            CHECK(xMonotoneMarker(2, 1, 1, netAt2, -1) == xMonotoneMarker(2, 1, 1),
+                  "#W61-S C10 NEGATIVE an unsupplied life changes not one byte");
+            // The CAST-row form carries the same fold through xCastRowMarkerFrom.
+            CHECK(xCastRowMarkerFrom(badge, 2, true)
+                      == " [<- best X for this cast: X=2 - largest affordable X - X=2 gains 2"
+                         " life and draws 2 cards; no listed X does more - but NET -2 life for"
+                         " this cast puts you at 0; this KILLS you. X=1 is the largest listed X"
+                         " whose NET (-1) leaves you alive, at 1]",
+                  "#W61-S C10 the cast-row badge carries the same verdict as the menu badge");
+            // ECHO SHAPE: an X row echoed with the badge still binds.
+            {
+                vector<string> menu;
+                menu.push_back("X = 2" + xLifeDrawRowCore(2, 1, 1, 2, "Underworld Dreams, Ob Nixilis")
+                               + badge);
+                menu.push_back("X = 1" + xLifeDrawRowCore(1, 1, 1, 2, "Underworld Dreams, Ob Nixilis"));
+                bool stale = false;
+                CHECK(parseChoice("CHOICE: 2 (" + menu[1] + ")", 2, &menu, &stale) == 2 && !stale,
+                      "#W61-S C10 echo: the UNbadged surviving rung still binds to 2");
+                CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale) == 1 && !stale,
+                      "#W61-S C10 echo: the badged row echoed in full still binds to 1");
+                CHECK(stripNarrationDecoration(menu[0]).find("largest affordable X") == string::npos,
+                      "#W61-S C10 echo: the badge leaves no residue in the narrated record");
+            }
+        }
+
+        // ---- C5: the pending loop half's affordability ----
+        // REPRO `126v146` seq 20 (t14): "one resolution from closing" with
+        // Sanguine Bond {3}{B}{B} in hand and one {B} source among six.
+        {
+            const string no = loopHalfAffordabilityClause("Sanguine Bond", "{3}{B}{B}", false,
+                                                          6, "{w}{u}{b}");
+            cout << "     " << no << "\n";
+            CHECK(no == "You CANNOT cast Sanguine Bond in this window: it is not among your legal"
+                        " casts right now (its cost is {3}{B}{B}; your untapped sources: 6,"
+                        " colours you could make: {w}{u}{b}). The pair cannot close until that"
+                        " changes.",
+                  "#W61-S C5 POSITIVE the seq-20 board: the banner carries the blocking fact");
+            CHECK(loopHalfAffordabilityClause("Sanguine Bond", "{3}{B}{B}", true, 7, "{b}")
+                      == "You CAN cast Sanguine Bond in this window ({3}{B}{B}) - the closing"
+                         " resolution is on your menu right now.",
+                  "#W61-S C5 POSITIVE the affordable case says so rather than going silent");
+            CHECK(loopHalfAffordabilityClause("", "{3}{B}{B}", false, 6, "{b}").empty(),
+                  "#W61-S C5 NEGATIVE no half named, no clause");
+            CHECK(loopHalfAffordabilityClause("Sanguine Bond", "", false, -1, "")
+                      == "You CANNOT cast Sanguine Bond in this window: it is not among your"
+                         " legal casts right now. The pair cannot close until that changes.",
+                  "#W61-S C5 with neither cost nor mana supplied the verdict still stands alone");
+            const string banner = pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond",
+                                                         "in your hand", false, no);
+            CHECK(banner.find("one resolution from closing") != string::npos
+                  && banner.find("You CANNOT cast Sanguine Bond in this window") != string::npos,
+                  "#W61-S C5 the banner keeps its wave-60 body and adds the availability verdict");
+            // NEGATIVE: every zone the seat cannot cast from is byte-identical.
+            CHECK(pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "in their hand", true)
+                      == pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond",
+                                                "in their hand", true, ""),
+                  "#W61-S C5 NEGATIVE an opponent-side pending half keeps every wave-60 byte");
+            CHECK(pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "in your hand",
+                                          false, no).find("LIFE-TO-DAMAGE CONVERTER") == string::npos,
+                  "#W61-S C5 NEGATIVE the pending banner still never claims the loop is closed");
+        }
+        // C5, the OTHER half of the wave-60 finding, recorded as REFUTED: the
+        // closed-pair render is NOT silent. converterSummaryText already names
+        // both halves and the loop when they stand on the seat's own board (24
+        // renders carry it in the wave-60 corpus, including `126v130` seq 18,
+        // the record the finding was written from - the quotation there stops
+        // one sentence short). Pinned so nobody removes it as "missing".
+        {
+            vector<string> conv; conv.push_back("Sanguine Bond");
+            vector<string> mir; mir.push_back("Exquisite Blood");
+            vector<string> none;
+            const string closed = converterSummaryText(conv, none, mir, none);
+            CHECK(closed.find("Both halves of a life LOOP are on YOUR battlefield"
+                              " (Sanguine Bond + Exquisite Blood)") != string::npos
+                  && closed.find("without limit") != string::npos
+                  && closed.find("chains until they are at 0") != string::npos,
+                  "#W61-S C5 the seat's own closed pair is NAMED as a loop (wave-60 HIGH-3 refuted)");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
