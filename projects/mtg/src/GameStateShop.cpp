@@ -245,6 +245,9 @@ static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& boost
         sym = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/symbol.png", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
     if (sym.get())
     {
+        //Set icons are black paths on transparency: give them a light disc to sit on.
+        r->FillCircle(ex, ey, 28, packHsv(hue, 0.12f, 0.97f));
+        r->DrawCircle(ex, ey, 28, packHsv(hue, 0.7f, 0.30f));
         float s = 44.f / (sym->mHeight > sym->mWidth ? sym->mHeight : sym->mWidth);
         r->RenderQuad(sym.get(), ex - sym->mWidth * s / 2, ey - sym->mHeight * s / 2, 0, s, s);
     }
