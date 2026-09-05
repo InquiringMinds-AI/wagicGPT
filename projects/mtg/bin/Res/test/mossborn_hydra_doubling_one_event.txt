@@ -1,0 +1,28 @@
+#NAME: Mossborn Hydra - landfall doubling is ONE counter event
+#Oracle (Scryfall, 2026-09-05): "Landfall - Whenever a land you control enters, double the number
+#of +1/+1 counters on this creature." Owner, Vita vpk26: "branching evolution is going on the stack
+#a ton of times in response to mossborn hydra triggering its ability one time. this should only be
+#one event of counters being added to a creature."
+#The script was `thisforeach(counter{1/1.1}) counter(1/1)` - N separate one-counter events, so every
+#counter-added replacement (Branching Evolution, Hardened Scales) fired N times. Now
+#`counter(1/1,counter{1/1.1})` - one event of N counters. Discriminator = Hardened Scales ("that many
+#plus one"): hydra cast = 1+1 = 2/2; Forest: ONE event of 2 -> +1 = 5/5. RED on the old script: 6/6
+#(two events, each +1). Branching Evolution reaches the same P/T either way, so Scales carries it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales
+hand:Mossborn Hydra,Forest
+manapool:{2}{G}
+[PLAYER2]
+[DO]
+Mossborn Hydra
+assertpt 2/2 mossborn hydra
+Forest
+assertpt 5/5 mossborn hydra
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Mossborn Hydra,Forest
+[PLAYER2]
+[END]

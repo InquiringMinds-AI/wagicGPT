@@ -1365,3 +1365,4 @@ w62aa_cast_route_x_decline.txt
 w62fix_daybound_marker_seen_by_count.txt
 w63ae_nadaar_other_creatures_only.txt
 w63ae_nadaar_still_pumps_others.txt
+mossborn_hydra_doubling_one_event.txt
