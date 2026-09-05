@@ -1,0 +1,24 @@
+#NAME: the pending-draw scan sees a DrawAction, not only a StackAbility
+#W63-AF (R8, wave-63 codex review finding 8). `stackPendingDrawsFor` - the count
+#every X-draw and cleanup row prices the eventual hand against - accepted only
+#`StackAbility` objects and skipped `DrawAction`, the Interruptible that
+#ActionStack::addDraw actually pushes and that carries `player` and `nbcards`
+#outright. An unresolved DrawAction for this seat therefore priced as zero.
+#`assertpendingdraws <expected> <staged>` stages exactly that object and asks the
+#scan; the staged action is retired without resolving, so no card is drawn.
+#RED on the wave-63 tree: the scan sees 0 of the 3 staged cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+[PLAYER2]
+inplay:Mind Stone
+[DO]
+assertpendingdraws 3 3
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+[PLAYER2]
+inplay:Mind Stone
+[END]

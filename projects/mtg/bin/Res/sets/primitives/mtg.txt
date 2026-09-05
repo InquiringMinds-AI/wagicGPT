@@ -61338,7 +61338,7 @@ toughness=9
 name=Kalonian Hydra
 abilities=trample
 auto=counter(1/1,4)
-auto=_ATTACKING_all(creature|mybattlefield) transforms((,newability[thisforeach(counter{1/1.1}) counter(1/1)]))
+auto=_ATTACKING_all(creature|mybattlefield) transforms((,newability[counter(1/1.counter{1/1})]))
 text=Trample. -- Kalonian Hydra enters with four +1/+1 counters on it. -- Whenever Kalonian Hydra attacks, double the number of +1/+1 counters on each creature you control.
 mana={3}{G}{G}
 type=Creature
@@ -88689,7 +88689,7 @@ toughness=4
 [card]
 name=Primordial Hydra
 auto=counter(1/1,X)
-auto=@each my upkeep:thisforeach(counter{1/1.1}) counter(1/1)
+auto=@each my upkeep:counter(1/1,counter{1/1.1})
 auto=this(counter{1/1.10}) trample
 text=Primordial Hydra enters with X +1/+1 counters on it. -- At the beginning of your upkeep, double the number of +1/+1 counters on Primordial Hydra. -- Primordial Hydra has trample as long as it has ten or more +1/+1 counters on it.
 mana={X}{G}{G}
@@ -108903,7 +108903,7 @@ type=Sorcery
 [card]
 name=Solarion
 abilities=sunburst
-auto={T}:thisforeach(counter{1/1.1}) counter(1/1)
+auto={T}:counter(1/1,counter{1/1.1})
 auto=counter(1/1,sunburst)
 text=Sunburst (This enters with a +1/+1 counter on it for each color of mana spent to cast it.) -- {T}: Double the number of +1/+1 counters on Solarion.
 mana={7}

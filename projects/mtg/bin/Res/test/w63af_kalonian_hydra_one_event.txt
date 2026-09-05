@@ -1,0 +1,27 @@
+#NAME: Kalonian Hydra - the attack doubling is ONE counter event per creature
+#Oracle (Scryfall, 2026-09-05): "Trample / This creature enters with four +1/+1 counters on it. /
+#Whenever this creature attacks, double the number of +1/+1 counters on each creature you control."
+#`thisforeach(counter{1/1.1}) counter(1/1)` inside the granted newability was N one-counter events.
+#Now `counter(1/1.counter{1/1})` - ONE event of N (the dot separator is required INSIDE a
+#newability[...]: AbilityFactory splits the transforms payload on ',' and a comma there truncates
+#the grant). Hardened Scales is the discriminator.
+#  enters: counter(1/1,4) -> one event of 4, Scales -> 5 counters (5/5)
+#  attacks: N = 5 -> ONE event of 5, Scales -> +6 -> 11 counters -> 11/11
+#RED on the old script: five events of 1, each Scales'd to 2 -> +10 -> 15 counters -> 15/15.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Hardened Scales,Kalonian Hydra
+[PLAYER2]
+life:20
+[DO]
+Kalonian Hydra
+next
+assertpt 11/11 kalonian hydra
+[ASSERT]
+COMBATBLOCKERS
+[PLAYER1]
+inplay:Hardened Scales,Kalonian Hydra
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,32 @@
+#NAME: Solarion - the {T} doubling is ONE counter event
+#Oracle (Scryfall, 2026-09-05): "Sunburst (This creature enters with a +1/+1 counter on it for each
+#color of mana spent to cast it.) -- {T}: Double the number of +1/+1 counters on this creature."
+#The script looped `thisforeach(counter{1/1.1}) counter(1/1)` - N one-counter events - so every
+#counter-added replacement fired N times. Now `counter(1/1,counter{1/1.1})`: ONE event of N.
+#Hardened Scales is the discriminator ("that many plus one"):
+#  cast for {W}{U}{B}{R}{G}{2}: sunburst 5 -> ONE event of 5, Scales -> 6 counters (6/6)
+#  {T} next turn: N = 6 -> ONE event of 6, Scales -> +7 -> 13 counters -> 13/13
+#RED on the old script: six events of 1, each Scales'd to 2 -> +12 -> 18 counters -> 18/18.
+#The turn round-trip is there only to shed summoning sickness before the tap ability.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales
+hand:Solarion
+manapool:{W}{U}{B}{R}{G}{2}
+[PLAYER2]
+[DO]
+Solarion
+assertpt 6/6 solarion
+goto end
+goto upkeep
+goto end
+goto firstmain
+Solarion
+assertpt 13/13 solarion
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Solarion
+[PLAYER2]
+[END]

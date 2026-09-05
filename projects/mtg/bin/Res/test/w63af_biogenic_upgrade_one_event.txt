@@ -1,0 +1,30 @@
+#NAME: Biogenic Upgrade - the doubling is ONE counter event per target
+#Oracle (Scryfall, 2026-09-05): "Distribute three +1/+1 counters among one, two, or three target
+#creatures, then double the number of +1/+1 counters on each of those creatures."
+#All three distribution lines doubled with `thisforeach(counter{1/1.1}) counter(1/1) all(this)`
+#(N one-counter events); all three now use `counter(1/1.counter{1/1}) all(this)` - one event of N.
+#(The dot separator is required INSIDE newability[...]: the transforms payload is split on ','.)
+#One target, Hardened Scales out, Grizzly Bears 2/2 with no counters:
+#  the first counter(1/1)          -> Scales -> 2 counters
+#  the doubling, N = 2             -> ONE event of 2, Scales -> +3 -> 5 counters
+#  the "other 2 counters" row      -> counter(1/1,4) -> one event of 4, Scales -> +5 -> 10 -> 12/12
+#RED on the old script: the doubling is two events of 1 (+4 -> 6), so 11 counters -> 13/13.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Grizzly Bears
+hand:Biogenic Upgrade
+manapool:{4}{G}{G}
+[PLAYER2]
+[DO]
+Biogenic Upgrade
+Grizzly Bears
+choice 0
+assertpt 12/12 grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Grizzly Bears
+graveyard:Biogenic Upgrade
+[PLAYER2]
+[END]

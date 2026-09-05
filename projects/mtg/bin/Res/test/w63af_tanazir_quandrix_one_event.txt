@@ -1,0 +1,26 @@
+#NAME: Tanazir Quandrix - the ETB doubling is ONE counter event, on the TARGET
+#Oracle (Scryfall, 2026-09-05): "Flying, trample / When Tanazir Quandrix enters, double the number
+#of +1/+1 counters on target creature you control. / ..."
+#`thisforeach(counter{1/1.1}) counter(1/1) all(this)` -> `counter(1/1.counter{1/1}) all(this)`.
+#The amount expression is evaluated by WParsedInt(nbstr, spell, target), so this also pins that the
+#count is read off the TARGET and not off Tanazir (Tanazir carries no counters at all).
+#  Mossborn Hydra enters: counter(1/1) -> Scales -> 2 counters (2/2)
+#  Tanazir ETB: N = 2 -> ONE event of 2, Scales -> +3 -> 5 counters -> 5/5
+#RED on the old script: two events of 1, each Scales'd to 2 -> +4 -> 6 counters -> 6/6.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Mossborn Hydra
+hand:Tanazir Quandrix
+manapool:{3}{G}{U}
+[PLAYER2]
+[DO]
+Tanazir Quandrix
+Mossborn Hydra
+assertpt 5/5 mossborn hydra
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Mossborn Hydra,Tanazir Quandrix
+[PLAYER2]
+[END]
