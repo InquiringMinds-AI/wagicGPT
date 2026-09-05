@@ -163,9 +163,13 @@ void DuelLayers::Render()
         //card on the board and above that re-render. The panels that render
         //later still cover it, and should: the action layer, GuiCombat, the
         //stack and the mana bars are deliberate foreground, not board clutter.
-        if (mPlayLayer && objects[i] == (GuiLayer *) mCardSelector
-            && !mCardSelector->isShowingBigCard())
-            mPlayLayer->RenderStackBadges();
+        //#W62-owner (D42, Vita vpk23 report: "the token stack count isnt
+        //indicated"): the badges were skipped whenever the selector showed its
+        //big-card preview, and on a d-pad that preview is up for ~5 s after
+        //EVERY cursor move - i.e. always while playing. Draw them regardless;
+        //RenderStackBadges leaves out only the badges the preview would cover.
+        if (mPlayLayer && objects[i] == (GuiLayer *) mCardSelector)
+            mPlayLayer->RenderStackBadges(mCardSelector->isShowingBigCard() ? mCardSelector->bigCardRect() : NULL);
     }
 }
 
