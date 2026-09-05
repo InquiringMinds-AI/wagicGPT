@@ -2668,6 +2668,25 @@ static string dualRoleHandNote(int handSize, int lands, int spells,
     return o.str();
 }
 
+//#W62-W (D15, deck146 HIGH-3): the in-game hand listing lost the land half of
+//a modal double-faced card the moment the game started. The PRE-GAME header
+//states it ("Pelakka Predation ... is a spell you may instead play as the land
+//Pelakka Caverns" - dualRoleHandNote above); the in-game hand line printed
+//"Pelakka Predation {2}{b} [sorcery] [cannot pay now: needs 3 mana, you have 2
+//untapped sources]" to a seat stuck on two lands, with no land face anywhere.
+//Same fact, same hand, same game - carried into the line that is read every
+//window. Pure over the back face's own name and tap mana.
+static string mdfcHandLandFaceTag(const string& backName, const string& tapMana)
+{
+    if (backName.empty())
+        return "";
+    string s = " [also a LAND: you may play it as " + backName;
+    if (!tapMana.empty())
+        s += ", which taps for " + tapMana;
+    s += " - that uses your land drop and this face can no longer be cast]";
+    return s;
+}
+
 string pregameHandHeaderText(int handSize, int lands, int spells, const int sources[5],
                              const string& cheapestLabel, int cheapestCmc,
                              const vector<string>& reachable,
@@ -5219,6 +5238,23 @@ const char * kLandDropConsequence =
     " (playing a land costs no mana and uses up no cast: it does not reduce what you can"
     " cast this turn)";
 
+//#W62-W (D17, deck123 MED-2): ONE wording for both arities. The one-land ask
+//read "Land drop: play <land> now?" over a decline row "Hold <land> - do not
+//play it now"; the many-land ask read "Land drop: which land do you play now,
+//if any?" over "Play no land right now". Five deployed guides quote the SECOND
+//decline row verbatim as the answer never to give, so the variant they cannot
+//name is the one that got taken (123v162 seq 43, and both of that deck's land
+//declines are on that shape). Nothing is removed - the land is still named on
+//its own Play row, one row above the decline. Pure, so both arities are proved
+//identical without a game.
+const char * kLandDropDeclineRow = "Play no land right now";
+
+string landDropAskText(size_t landCount)
+{
+    (void) landCount; //the arity does not change the question
+    return "Land drop: which land do you play now, if any?";
+}
+
 //N-166m (wave-34 audit: b4 F3 39/91, b6 P2 34/146, b3 11 traces - 34-39% of a
 //corpus). The land drop is asked as its OWN decision (FindCardToPlay's "land"
 //branch), so no cast or ability menu ever lists it - and nothing said so. The
@@ -5237,10 +5273,21 @@ static string landDropStatusLine(bool myTurn, bool playable, bool haveLand)
     if (!myTurn)
         return "";
     if (playable)
+        //#W62-W (D15, deck146 HIGH-3): the "never listed in a casting menu"
+        //half was false, and the prompt that carried it also carried, as row 1
+        //of that same priority menu, "Pelakka Caverns with Pelakka Predation ->
+        //PLAY THIS AS A LAND ... it USES YOUR LAND DROP for this turn"
+        //(146v130 seq 7; same shape at 146v123 s24 and 146v162 s21). The true
+        //content of the sentence - that a land missing from THESE choices is
+        //not a spent drop - is kept; the false universal is replaced by the one
+        //real exception, named so the pilot can recognise the row when it sees it.
         return "Land drop: NOT yet used this turn - you can still play a land. The land"
                " drop is its OWN decision (a \"Land drop:\" question with its own Play"
-               " options); it is never listed in a casting, ability or target menu, so"
-               " its absence from the choices below does not mean it is gone.\n";
+               " options), so the absence of a land from the choices below does not mean"
+               " the drop is gone. ONE exception: a modal double-faced card whose back"
+               " face is a land is offered in the casting menu on its own row, marked"
+               " PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends"
+               " this same drop.\n";
     if (haveLand)
         return "Land drop: ALREADY USED this turn - you cannot play another land until"
                " your next turn. Do not plan mana that depends on a land entering now.\n";
@@ -18477,7 +18524,22 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //Every gate the oracle checks before its name dedupe has passed,
                 //so the remaining one is 601.2c: a mandatory target, none legal.
                 verdict = kHandNoLegalTarget;
-            handCastTags[nm] = handCastabilityTag(verdict, need, sources, costStr);
+            string tag = handCastabilityTag(verdict, need, sources, costStr);
+            //#W62-W (D15): and the land face, if this spell has one.
+            const string backLand = mdfcHandBackLandName(hc);
+            if (!backLand.empty())
+            {
+                string shown = backLand, tapped;
+                if (MTGCard * bc = MTGCollection()->getCardByName(backLand, hc->setId))
+                    if (bc->data)
+                    {
+                        tapped = landTapMana(bc->data->text);
+                        if (!bc->data->name.empty())
+                            shown = bc->data->name;
+                    }
+                tag += mdfcHandLandFaceTag(shown, tapped);
+            }
+            handCastTags[nm] = tag;
         }
         SAFE_DELETE(castPool);
     }
@@ -20357,7 +20419,16 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
     o << "you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
       << shortName << " x<N>)\"; the engine performs it N times, re-checking the cost each"
          " iteration and stopping early if it becomes unpayable, then returns priority to you"
-         " here; N is at most " << kRepeatRowMax << "]";
+         " here; N is at most " << kRepeatRowMax
+      //#W62-W (D17, deck123 MED-3): the engine REFUSES a counted take on this
+      //row when the reply carries no PLAN line (plan_missing), and refuses
+      //nothing on a pass - a rule the pilot could not read anywhere, so two
+      //identically-shaped windows three apart in one game (123v126 seq 18 and
+      //21) got opposite answers and one of the deck's two fallbacks. The rule
+      //is now stated on the row that enforces it.
+      << "; a count on this row REQUIRES a PLAN line stating your stop count, the count"
+         " you are at now, and how many you perform this window - a count with no PLAN"
+         " line is refused and re-asked]";
     return o.str();
 }
 
@@ -27133,50 +27204,449 @@ static bool landEntersTappedLine(const string& line, bool * conditionalOut)
                           //#W61-V (R3): a shockland's tapped entry is ONE branch
                           //of a choice its controller makes (Blood Crypt), so it
                           //is exactly as conditional as Isolated Chapel's.
-                          || before.find("choice") != string::npos;
+                          || before.find("choice") != string::npos
+                          //#W62-W (D1): `if <expr> then tap(noevent)` - the SPACE
+                          //form, with no paren after the `if`. Wave 61 tested
+                          //`if(` only, so Deserted Beach, Overgrown Farmland,
+                          //Lair of the Hydra, Hive of the Eye Tyrant and every
+                          //reveal-gated Snarl read as UNCONDITIONALLY tapped:
+                          //56 of the 131 false rows (engine-seat HIGH-1).
+                          || (before.find("if ") != string::npos
+                              && before.find(" then") != string::npos);
     return true;
 }
 
-string landEntersTappedTag(const string& script, const string& printedText)
+//#W62-W (D1): the parsed enters-tapped gate. `kind` says whether this code can
+//decide the gate from the pilot's own battlefield; the two evaluable shapes are
+//a basic-land-type list and an other-land count.
+enum
 {
-    bool found = false, conditional = true;
+    kLandGateOpaque = 0,   //conditional, but not decidable from the battlefield
+    kLandGateSubtype,      //taps unless one of `subtypes` is on my battlefield
+    kLandGateLandCount     //taps when my other-land count passes a threshold
+};
+
+struct LandTapGate
+{
+    bool found;        //the card has an own-ETB tap(noevent)
+    bool conditional;  //that tap is gated
+    int  kind;
+    vector<string> subtypes; //lowercase, e.g. "plains","island"
+    int  cmp;          //-1: taps when otherLands < threshold; +1: taps when >
+    int  threshold;
+    LandTapGate() : found(false), conditional(false), kind(kLandGateOpaque),
+                    cmp(0), threshold(0) {}
+};
+
+static string landGateTrim(const string& s)
+{
+    const size_t a = s.find_first_not_of(" \t");
+    if (a == string::npos)
+        return "";
+    const size_t b = s.find_last_not_of(" \t");
+    return s.substr(a, b - a + 1);
+}
+
+//A comma-separated list of BARE subtype words ("plains,swamp"). Anything else -
+//`other land`, `land[basic]`, `*[plains;swamp]`, `creature[legendary]` - is
+//refused here and leaves the gate opaque, which renders the hedged form. The
+//refusal is deliberate: a selector this code cannot count exactly must never
+//produce a resolved verdict.
+static bool landGateSubtypeList(const string& sel, vector<string> * out)
+{
+    vector<string> parts;
     size_t pos = 0;
-    //#W61-V (R3): scan EVERY line. The wave-60 loop stopped at the first line
-    //carrying tap(noevent) whatever that line was, so an activated fetch ability
-    //hid the answer for the whole card. An unconditional own-ETB line wins over a
-    //conditional one; a line that is neither contributes nothing.
+    while (true)
+    {
+        const size_t c = sel.find(',', pos);
+        const string one = landGateTrim(sel.substr(pos, c == string::npos
+                                                        ? string::npos : c - pos));
+        if (one.empty())
+            return false;
+        for (size_t i = 0; i < one.size(); i++)
+            if (!isalpha((unsigned char) one[i]))
+                return false;
+        parts.push_back(one);
+        if (c == string::npos)
+            break;
+        pos = c + 1;
+    }
+    if (parts.empty())
+        return false;
+    *out = parts;
+    return true;
+}
+
+//`<selector>|<zone>` out of a parenthesised head.
+static bool landGateSplitSelector(const string& inner, string * sel, string * zone)
+{
+    const size_t bar = inner.find('|');
+    if (bar == string::npos)
+        return false;
+    *sel = landGateTrim(inner.substr(0, bar));
+    *zone = landGateTrim(inner.substr(bar + 1));
+    return true;
+}
+
+//The balanced body of `head(` ... `)`; `head` ends in its own '('.
+static string landGateParenBody(const string& line, const string& head)
+{
+    const size_t p = line.find(head);
+    if (p == string::npos || head.empty())
+        return "";
+    const size_t open = p + head.size() - 1;
+    int depth = 0;
+    for (size_t i = open; i < line.size(); i++)
+    {
+        if (line[i] == '(')
+            depth++;
+        else if (line[i] == ')')
+        {
+            depth--;
+            if (!depth)
+                return line.substr(open + 1, i - open - 1);
+        }
+    }
+    return "";
+}
+
+//#W62-W (D1) idiom 1: `aslongas(<sel>|myBattlefield) tap(noevent) <1 oneshot`
+//(Isolated Chapel, mtg.txt:59411) and `... >2 oneshot` (Seachrome Coast,
+//mtg.txt:101153). The effect holds while the count of <sel> in my battlefield
+//passes the trailing comparator, so THAT is exactly when the land enters tapped.
+static void landGateFromAslongas(const string& line, size_t tapPos, LandTapGate * g)
+{
+    const string inner = landGateParenBody(line.substr(0, tapPos), "aslongas(");
+    string sel, zone;
+    if (inner.empty() || !landGateSplitSelector(inner, &sel, &zone)
+        || zone.find("mybattlefield") == string::npos)
+        return; //opaque
+    const string tail = line.substr(tapPos + 12); //past "tap(noevent)"
+    const size_t c = tail.find_first_of("<>");
+    if (c == string::npos)
+        return;
+    const int cmp = (tail[c] == '<') ? -1 : 1;
+    size_t d = c + 1;
+    while (d < tail.size() && tail[d] == ' ')
+        d++;
+    if (d >= tail.size() || !isdigit((unsigned char) tail[d]))
+        return;
+    const int n = atoi(tail.c_str() + d);
+    if (sel == "other land" || sel == "land")
+    {
+        //`land` counts the ENTERING land too; this row is rendered while it is
+        //still in hand, so the battlefield count in front of us is short by one.
+        g->kind = kLandGateLandCount;
+        g->cmp = cmp;
+        g->threshold = (sel == "land") ? n - 1 : n;
+        return;
+    }
+    vector<string> subs;
+    if (cmp < 0 && n == 1 && landGateSubtypeList(sel, &subs))
+    {
+        g->kind = kLandGateSubtype;
+        g->subtypes = subs;
+    }
+}
+
+//#W62-W (D1) idiom 2: a BARE `tap(noevent)` whose condition sits on the NEXT
+//line as a conditional untap - `auto=tap(noevent)` /
+//`auto=aslongas(plains,island|myBattlefield) untap` (Glacial Fortress
+//mtg.txt:46617-8, Drowned Catacomb 32505-6, Sunpetal Grove 115716-7). 70 of the
+//131 false rows. An aslongas with no comparator holds while the count is at
+//least one, so the land enters UNTAPPED exactly when one of those types is out.
+static bool landGateFromUntapLine(const string& line, LandTapGate * g)
+{
+    const size_t up = line.find("untap");
+    if (up == string::npos)
+        return false;
+    if (!line.empty() && line[0] == '@')
+        return false;
+    if (scriptLineIsActivated(line, up))
+        return false;
+    const string inner = landGateParenBody(line.substr(0, up), "aslongas(");
+    string sel, zone;
+    if (inner.empty() || !landGateSplitSelector(inner, &sel, &zone)
+        || zone.find("mybattlefield") == string::npos)
+        return false;
+    g->kind = kLandGateOpaque;
+    vector<string> subs;
+    if (landGateSubtypeList(sel, &subs))
+    {
+        g->kind = kLandGateSubtype;
+        g->subtypes = subs;
+    }
+    return true;
+}
+
+//#W62-W (D1) idiom 3: `if <expr> then tap(noevent)` - Deserted Beach
+//(borderline.txt:27515), Overgrown Farmland (81143), Lair of the Hydra (64291),
+//Hive of the Eye Tyrant (53392), and the reveal-gated Snarls (myhand, which this
+//code deliberately leaves opaque - the seat's hand is not the battlefield the
+//row is resolved against).
+static void landGateFromIfThen(const string& before, LandTapGate * g)
+{
+    const size_t thenPos = before.rfind(" then");
+    if (thenPos == string::npos)
+        return;
+    const size_t ifPos = before.rfind("if ", thenPos);
+    if (ifPos == string::npos || ifPos + 3 > thenPos)
+        return;
+    const string expr = landGateTrim(before.substr(ifPos + 3, thenPos - ifPos - 3));
+    const size_t t1 = expr.find('~');
+    if (t1 == string::npos)
+        return;
+    const size_t t2 = expr.find('~', t1 + 1);
+    if (t2 == string::npos || t2 + 1 >= expr.size()
+        || !isdigit((unsigned char) expr[t2 + 1]))
+        return;
+    const string op = expr.substr(t1 + 1, t2 - t1 - 1);
+    const int n = atoi(expr.c_str() + t2 + 1);
+    const string head = landGateTrim(expr.substr(0, t1));
+    int cmp = 0;
+    if (op == "lessthan")
+        cmp = -1;
+    else if (op == "morethan")
+        cmp = 1;
+    else if (op != "equalto")
+        return;
+    if (head.compare(0, 8, "compare(") == 0)
+    {
+        //`compare(type:land:myBattlefield)` counts EVERY land I control, the
+        //entering one included, so its threshold is one higher than the count
+        //this row can see.
+        const string body = landGateParenBody(head, "compare(");
+        if (!cmp || body.find("type:land:mybattlefield") == string::npos)
+            return;
+        g->kind = kLandGateLandCount;
+        g->cmp = cmp;
+        g->threshold = n - 1;
+        return;
+    }
+    if (head.compare(0, 5, "type(") != 0)
+        return;
+    const string body = landGateParenBody(head, "type(");
+    string sel, zone;
+    if (body.empty() || !landGateSplitSelector(body, &sel, &zone)
+        || zone.find("mybattlefield") == string::npos)
+        return;
+    if (sel == "other land" || sel == "land")
+    {
+        if (!cmp)
+            return;
+        g->kind = kLandGateLandCount;
+        g->cmp = cmp;
+        g->threshold = (sel == "land") ? n - 1 : n;
+        return;
+    }
+    vector<string> subs;
+    if (!cmp && n == 0 && landGateSubtypeList(sel, &subs))
+    {
+        g->kind = kLandGateSubtype;
+        g->subtypes = subs;
+    }
+}
+
+//#W62-W (D1): the whole-script scan. Pure. An unconditional own-ETB tap still
+//wins over a conditional one, EXCEPT when the script also carries the
+//conditional-untap line that is the checkland idiom's other half - that line IS
+//the bare tap's condition, and reading the tap alone is what produced 70 false
+//unconditional rows.
+static LandTapGate landTapGateScan(const string& script)
+{
+    LandTapGate out, cond, untapGate;
+    bool anyUnconditional = false, haveCond = false, haveUntap = false;
+    size_t pos = 0;
     while (pos <= script.size())
     {
-        size_t eol = script.find('\n', pos);
-        string line = script.substr(pos, eol == string::npos ? string::npos : eol - pos);
-        if (eol == string::npos)
-            pos = script.size() + 1;
-        else
-            pos = eol + 1;
+        const size_t eol = script.find('\n', pos);
+        const string line = script.substr(pos, eol == string::npos ? string::npos
+                                                                   : eol - pos);
+        pos = (eol == string::npos) ? script.size() + 1 : eol + 1;
         const string lineLc = scriptLower(line);
         bool lineConditional = false;
         if (!landEntersTappedLine(lineLc, &lineConditional))
+        {
+            if (!haveUntap)
+            {
+                LandTapGate u;
+                if (landGateFromUntapLine(lineLc, &u))
+                {
+                    untapGate = u;
+                    haveUntap = true;
+                }
+            }
             continue;
-        found = true;
+        }
+        out.found = true;
         if (!lineConditional)
-            conditional = false;
+        {
+            anyUnconditional = true;
+            continue;
+        }
+        if (haveCond)
+            continue;
+        const size_t at = lineLc.find("tap(noevent)");
+        const string before = lineLc.substr(0, at);
+        LandTapGate g;
+        if (before.find("aslongas") != string::npos)
+            landGateFromAslongas(lineLc, at, &g);
+        else
+            landGateFromIfThen(before, &g);
+        cond = g;
+        haveCond = true;
     }
-    if (!found)
+    if (!out.found)
+        return out;
+    const LandTapGate& pick = (anyUnconditional && haveUntap) ? untapGate : cond;
+    if (anyUnconditional && !haveUntap)
+        return out; //genuinely unconditional (Arcane Sanctum)
+    out.conditional = true;
+    out.kind = pick.kind;
+    out.subtypes = pick.subtypes;
+    out.cmp = pick.cmp;
+    out.threshold = pick.threshold;
+    return out;
+}
+
+static string landGateSubtypeLabel(const string& lc)
+{
+    string s = lc;
+    if (!s.empty())
+        s[0] = (char) toupper((unsigned char) s[0]);
+    return s;
+}
+
+//#W62-W (D1): resolve the gate against the pilot's OWN battlefield - the same
+//battlefield the prompt prints a few lines above this row (deck123 MED-1: the
+//condition is decidable and the seat declined the drop anyway, twice). Returns
+//1 = enters untapped, 0 = enters tapped, -1 = not decidable here. `witness` is
+//parallel to gate.subtypes and names a permanent carrying that type ("" = none).
+//Pure.
+static int landTapResolve(const LandTapGate& g, int myLands,
+                          const vector<string>& witness, string * evidence)
+{
+    if (!g.found || !g.conditional)
+        return -1;
+    if (g.kind == kLandGateSubtype)
+    {
+        if (g.subtypes.empty() || witness.size() != g.subtypes.size())
+            return -1;
+        for (size_t i = 0; i < witness.size(); i++)
+            if (!witness[i].empty())
+            {
+                if (evidence)
+                    *evidence = "you control " + witness[i] + ", a "
+                                + landGateSubtypeLabel(g.subtypes[i]);
+                return 1;
+            }
+        if (evidence)
+        {
+            string s = "you control no ";
+            for (size_t i = 0; i < g.subtypes.size(); i++)
+                s += (i ? " and no " : "") + landGateSubtypeLabel(g.subtypes[i]);
+            *evidence = s;
+        }
+        return 0;
+    }
+    if (g.kind == kLandGateLandCount)
+    {
+        if (myLands < 0)
+            return -1;
+        const bool tapped = (g.cmp < 0) ? (myLands < g.threshold)
+                                        : (myLands > g.threshold);
+        std::ostringstream o;
+        o << "you control " << myLands << " other land" << (myLands == 1 ? "" : "s");
+        if (evidence)
+            *evidence = o.str();
+        return tapped ? 0 : 1;
+    }
+    return -1;
+}
+
+//#W62-W (D1): the rendered bracket. A RESOLVED gate states the truth and names
+//the evidence; an unresolved conditional keeps the wave-61 hedge; an
+//unconditional tap keeps the wave-61 verdict byte for byte. Nothing is deleted:
+//the card's own sentence is still quoted in every branch that has one, so the
+//verdict and the sentence can be checked against each other on the row.
+string landEntersTappedTagFrom(const LandTapGate& g, const string& printedText,
+                               int resolution, const string& evidence)
+{
+    if (!g.found)
         return "";
     string sentence = sentenceNaming(printedText, "enters tapped", 200);
     if (sentence.empty())
         sentence = sentenceNaming(printedText, "enters the battlefield tapped", 200);
+    const bool resolved = g.conditional && (resolution == 0 || resolution == 1);
     std::ostringstream o;
     o << " [";
-    if (conditional)
+    if (resolved && resolution == 1)
+        o << "enters UNTAPPED - it makes mana this turn";
+    else if (resolved)
+        o << "enters TAPPED - it makes no mana this turn";
+    else if (g.conditional)
         o << "enters tapped UNLESS its own condition holds, so it may make no mana"
              " this turn";
     else
         o << "enters TAPPED - it makes no mana this turn";
+    if (resolved && !evidence.empty())
+        o << " (" << evidence << ")";
     if (!sentence.empty())
         o << ": \"" << sentence << "\"";
     o << "]";
     return o.str();
+}
+
+string landEntersTappedTag(const string& script, const string& printedText)
+{
+    return landEntersTappedTagFrom(landTapGateScan(script), printedText, -1, string());
+}
+
+//#W62-W (D1): scan, resolve and render in one call - the exact pipeline the
+//land-drop row runs, so the corpus proves what the row prints. Non-static: it
+//is the PARSETEST entry point for the resolved shapes.
+string landTapTagFor(const string& script, const string& printedText, int myLands,
+                     const vector<string>& witness)
+{
+    const LandTapGate g = landTapGateScan(script);
+    string ev;
+    const int res = landTapResolve(g, myLands, witness, &ev);
+    return landEntersTappedTagFrom(g, printedText, res, ev);
+}
+
+//#W62-W (D1): the impure half - the gate is asked of the pilot's own
+//battlefield, using the engine's own subtype ids (findType with forceAdd FALSE,
+//so a selector this code cannot recognise can never grow the global type list).
+static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
+{
+    if (!land)
+        return "";
+    const LandTapGate g = landTapGateScan(land->magicText);
+    if (!g.found)
+        return "";
+    int myLands = -1;
+    vector<string> witness;
+    if (me && me->game && me->game->inPlay)
+    {
+        myLands = 0;
+        witness.assign(g.subtypes.size(), string());
+        vector<int> ids(g.subtypes.size(), 0);
+        for (size_t s = 0; s < g.subtypes.size(); s++)
+            ids[s] = MTGAllCards::findType(g.subtypes[s], false);
+        for (int i = 0; i < me->game->inPlay->nb_cards; i++)
+        {
+            MTGCardInstance * c = me->game->inPlay->cards[i];
+            if (!c || !c->isLand())
+                continue;
+            myLands++;
+            for (size_t s = 0; s < ids.size(); s++)
+                if (witness[s].empty() && ids[s] && c->hasType(ids[s]))
+                    witness[s] = c->getDisplayName();
+        }
+    }
+    string evidence;
+    const int res = landTapResolve(g, myLands, witness, &evidence);
+    return landEntersTappedTagFrom(g, land->text, res, evidence);
 }
 
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
@@ -27238,17 +27708,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         for (size_t li = 0; li < lands.size(); li++)
             opts.push_back("Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel
                            //#W61-T (C7): the tapped-land fact, on the row that plays it.
-                           + landEntersTappedTag(lands[li].card->magicText,
-                                                 lands[li].card->text));
-        opts.push_back(lands.size() == 1
-                       ? "Hold " + lands[0].card->getDisplayName() + " - do not play it now"
-                       : "Play no land right now");
+                           //#W62-W (D1): resolved against the battlefield this
+                           //same prompt prints, where the gate is decidable.
+                           + landEntersTappedTagResolved(lands[li].card, this));
+        opts.push_back(kLandDropDeclineRow);
 
         std::ostringstream q;
-        if (lands.size() == 1)
-            q << "Land drop: play " << lands[0].card->getDisplayName() << " now?";
-        else
-            q << "Land drop: which land do you play now, if any?";
+        q << landDropAskText(lands.size());
         //#W47-R13 (wave-46 docket R13): the ask already explains that the land
         //drop is its OWN decision (N-166m, above) - which answers a question the
         //pilot was not getting wrong. What it got wrong is the RESOURCE: all
@@ -55729,6 +56195,198 @@ static const char * kW50Y_r94 =
             CHECK(recordReplyTrimmed(full, 0) == full && recordReplyTrimmed("", 5000).empty(),
                   "#W61-U C14 NEGATIVE no measured overrun, no trim");
         }
+    }
+
+    //#W62-W (D1, D15, D17). Card facts read off this worktree's primitives:
+    //Glacial Fortress mtg.txt:46617-8, Drowned Catacomb 32505-6, Isolated Chapel
+    //59411, Seachrome Coast 101153, Deserted Beach borderline.txt:27515,
+    //Overgrown Farmland 81143, Lair of the Hydra 64291, Hive of the Eye Tyrant
+    //53392, Shineshadow Snarl 101328, Bant Panorama mtg.txt:8934-6. Every
+    //`text=` line below is the primitive's own, and each matches the card's
+    //Oracle wording as printed.
+    cout << "\n[#W62-W] D1 the enters-tapped gate, resolved against the pilot's battlefield\n";
+    {
+        vector<string> none;
+        //---- idiom 1: the gate on the SAME line as tap(noevent) (Isolated Chapel)
+        const string chapelScript =
+            "aslongas(plains,swamp|myBattlefield) tap(noevent) <1 oneshot\n{T}:Add{W}\n{T}:Add{B}";
+        const string chapelText =
+            "Isolated Chapel enters tapped unless you control a Plains or Swamp."
+            " -- {T}: Add {W} or {B}.";
+        vector<string> chapelHit;      //parallel to {plains, swamp}
+        chapelHit.push_back("");
+        chapelHit.push_back("Underground Sea");
+        const string chapelTrue = landTapTagFor(chapelScript, chapelText, 3, chapelHit);
+        CHECK(chapelTrue == " [enters UNTAPPED - it makes mana this turn (you control"
+                            " Underground Sea, a Swamp): \"Isolated Chapel enters tapped"
+                            " unless you control a Plains or Swamp.\"]",
+              "#W62-W D1 RESOLVED-TRUE: deck123's Chapel row says it enters untapped"
+              " and names the dual that decides it");
+        vector<string> chapelMiss(2, string());
+        const string chapelFalse = landTapTagFor(chapelScript, chapelText, 3, chapelMiss);
+        CHECK(chapelFalse.find("enters TAPPED - it makes no mana this turn (you control no"
+                               " Plains and no Swamp)") != string::npos,
+              "#W62-W D1 RESOLVED-FALSE: with neither type out the row says TAPPED and"
+              " names what is missing");
+        CHECK(chapelFalse.find("UNLESS its own condition holds") == string::npos
+              && chapelTrue.find("UNLESS its own condition holds") == string::npos,
+              "#W62-W D1 NEGATIVE a resolved gate never also prints the hedge");
+        //Unresolved (no battlefield handed in) keeps the wave-61 hedge byte for byte.
+        CHECK(landEntersTappedTag(chapelScript, chapelText)
+                  .find("enters tapped UNLESS its own condition holds") != string::npos,
+              "#W62-W D1 an unresolved conditional still hedges, exactly as in wave 61");
+        //---- idiom 2: bare tap(noevent), condition on the NEXT line (Glacial Fortress)
+        const string fortScript = "tap(noevent)\naslongas(plains,island|myBattlefield) untap\n"
+                                  "{T}:Add{W}\n{T}:Add{U}";
+        const string fortText = "Glacial Fortress enters tapped unless you control a Plains"
+                                " or an Island. -- {T}: Add {W} or {U}.";
+        CHECK(landEntersTappedTag(fortScript, fortText).find("enters TAPPED -") == string::npos,
+              "#W62-W D1 the checkland idiom is never stated as unconditionally tapped"
+              " (125v152 seq 31: 131 of 172 rows did)");
+        vector<string> fortHit;        //parallel to {plains, island}
+        fortHit.push_back("Plains #1");
+        fortHit.push_back("");
+        CHECK(landTapTagFor(fortScript, fortText, 3, fortHit)
+                  .find("enters UNTAPPED - it makes mana this turn (you control Plains #1,"
+                        " a Plains)") != string::npos,
+              "#W62-W D1 RESOLVED-TRUE: 125v162 seq 8 (three Plains out) reads UNTAPPED");
+        vector<string> fortMiss(2, string());
+        CHECK(landTapTagFor(fortScript, fortText, 1, fortMiss)
+                  .find("enters TAPPED - it makes no mana this turn (you control no Plains"
+                        " and no Island)") != string::npos,
+              "#W62-W D1 RESOLVED-FALSE: with neither type out the same row reads TAPPED");
+        //Drowned Catacomb is the same two-line shape and must classify identically.
+        CHECK(landEntersTappedTag("tap(noevent)\naslongas(island,swamp|myBattlefield) untap\n"
+                                  "{T}:Add{U}\n{T}:Add{B}",
+                                  "Drowned Catacomb enters tapped unless you control an"
+                                  " Island or a Swamp. -- {T}: Add {U} or {B}.")
+                  .find("enters TAPPED -") == string::npos,
+              "#W62-W D1 Drowned Catacomb reads as the same conditional entry");
+        //---- idiom 3: `if <expr> then tap(noevent)`, no paren after the if
+        const string beachScript = "if type(other land|mybattlefield)~lessthan~2 then"
+                                   " tap(noevent)\n{T}:add{W}\n{T}:add{U}";
+        const string beachText = "Deserted Beach enters tapped unless you control two or"
+                                 " more other lands. -- {T}: Add {W} or {U}.";
+        CHECK(landEntersTappedTag(beachScript, beachText).find("enters TAPPED -") == string::npos,
+              "#W62-W D1 the `if ... then` idiom is no longer read as unconditional"
+              " (56 of the 131 false rows)");
+        CHECK(landTapTagFor(beachScript, beachText, 3, none)
+                  .find("enters UNTAPPED - it makes mana this turn (you control 3 other"
+                        " lands)") != string::npos,
+              "#W62-W D1 RESOLVED-TRUE: deck152 G3 seq 12, three other lands out");
+        CHECK(landTapTagFor(beachScript, beachText, 1, none)
+                  .find("enters TAPPED - it makes no mana this turn (you control 1 other"
+                        " land)") != string::npos,
+              "#W62-W D1 RESOLVED-FALSE: one other land out, and the noun is singular");
+        //`compare(type:land:myBattlefield)` counts the entering land as well, so the
+        //threshold it compares against is one above the count this row can see.
+        const string lairScript = "if compare(type:land:myBattlefield)~morethan~2 then"
+                                  " tap(noevent)\n{T}:Add{G}";
+        const string lairText = "If you control two or more other lands, Lair of the Hydra"
+                                " enters tapped. -- {T}: Add {G}.";
+        CHECK(landTapTagFor(lairScript, lairText, 1, none).find("enters UNTAPPED") != string::npos,
+              "#W62-W D1 deck152 G1 seq 4: one other land out, Lair enters UNTAPPED");
+        CHECK(landTapTagFor(lairScript, lairText, 2, none).find("enters TAPPED -") != string::npos,
+              "#W62-W D1 two other lands out and the same Lair row reads TAPPED");
+        CHECK(landTapTagFor(lairScript, lairText, 2, none).find("enters UNTAPPED") == string::npos,
+              "#W62-W D1 NEGATIVE the two verdicts are never printed on one row");
+        //Hive of the Eye Tyrant carries the identical script shape.
+        CHECK(landTapTagFor("if compare(type:land:myBattlefield)~morethan~2 then tap(noevent)\n"
+                            "{T}:Add{B}", "", 1, none).find("enters UNTAPPED") != string::npos,
+              "#W62-W D1 Hive of the Eye Tyrant resolves on the same rule");
+        //---- MUST NOT MATCH ----
+        CHECK(landTapTagFor("{T}:Add{C}\n{1}{T}{S}:name(search forest)"
+                            " target(forest[basic]|myLibrary) moveTo(myBattlefield)"
+                            " and!( tap(noevent) )!", "", 5, none).empty(),
+              "#W62-W D1 NEGATIVE Bant Panorama annotates nothing, board or no board");
+        CHECK(landTapTagFor("{T}:Add{R}", "({T}: Add {R}.)", 0, none).empty(),
+              "#W62-W D1 NEGATIVE a basic Mountain's row is untouched");
+        //An UNCONDITIONAL tapped land is byte-identical to wave 61 whatever the board.
+        const string sanctum = landTapTagFor("tap(noevent)\n{T}:Add{W}\n{T}:Add{U}\n{T}:Add{B}",
+                                             "Arcane Sanctum enters tapped."
+                                             " -- {T}: Add {W}, {U}, or {B}.", 6, none);
+        CHECK(sanctum == " [enters TAPPED - it makes no mana this turn:"
+                         " \"Arcane Sanctum enters tapped.\"]",
+              "#W62-W D1 NEGATIVE Arcane Sanctum is unconditional and unchanged");
+        //A gate this code cannot count from the BATTLEFIELD stays hedged: the
+        //reveal-from-hand Snarls, and the bracketed selectors (land[basic],
+        //creature[legendary], other land[forest]) no evaluator here counts.
+        const string snarl = landTapTagFor("if type(*[plains;swamp]|myhand)~equalto~0 then"
+                                           " tap(noevent)\n{T}:add{B}\n{T}:add{W}",
+            "As Shineshadow Snarl enters, you may reveal a Plains or Swamp card from your"
+            " hand. If you don't, Shineshadow Snarl enters tapped. -- {T}: Add {W} or {B}.",
+            4, none);
+        CHECK(snarl.find("enters tapped UNLESS its own condition holds") != string::npos
+              && snarl.find("enters UNTAPPED") == string::npos,
+              "#W62-W D1 a HAND-gated entry is hedged, never resolved off the battlefield");
+        CHECK(landTapTagFor("aslongas(other land[forest]|mybattlefield) tap(noevent) <3 oneshot",
+                            "", 4, none).find("UNLESS its own condition holds") != string::npos,
+              "#W62-W D1 NEGATIVE a selector this code cannot count exactly stays hedged");
+        //---- ECHO shape: the resolved bracket strips clean and still binds ----
+        {
+            vector<string> menu;
+            menu.push_back("Play Isolated Chapel" + chapelTrue);
+            menu.push_back(kLandDropDeclineRow);
+            bool stale = false;
+            string src;
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Play Isolated Chapel)",
+                                           (int) menu.size(), &menu, &stale, &src) == 1 && !stale,
+                  "#W62-W D1 ECHO a resolved land row still binds its own number and name");
+            CHECK(stripNarrationDecoration(menu[0]) == "Play Isolated Chapel",
+                  "#W62-W D1 ECHO the resolved bracket leaves no residue in the record");
+        }
+    }
+    //#W62-W (D15): the MDFC land face - in the hand line and in the header.
+    cout << "\n[#W62-W] D15 the modal double-faced land face stays visible in game\n";
+    {
+        const string tag = mdfcHandLandFaceTag("Pelakka Caverns", "{B}");
+        CHECK(tag == " [also a LAND: you may play it as Pelakka Caverns, which taps for {B}"
+                     " - that uses your land drop and this face can no longer be cast]",
+              "#W62-W D15 146v130 seq 7: the hand line carries the land face it lost");
+        CHECK(mdfcHandLandFaceTag("Emeria, Shattered Skyclave", "")
+                  == " [also a LAND: you may play it as Emeria, Shattered Skyclave - that"
+                     " uses your land drop and this face can no longer be cast]",
+              "#W62-W D15 a face whose tap mana is unknown states no mana");
+        CHECK(mdfcHandLandFaceTag("", "{B}").empty(),
+              "#W62-W D15 NEGATIVE a spell with no land back face is annotated nothing");
+        CHECK(stripNarrationDecoration("Pelakka Predation {2}{b}" + tag)
+                  == "Pelakka Predation {2}{b}",
+              "#W62-W D15 ECHO the land-face bracket strips out of the narrated record");
+        const string avail = landDropStatusLine(true, true, true);
+        CHECK(avail.find("never listed in a casting") == string::npos,
+              "#W62-W D15 NEGATIVE the header no longer claims a land is NEVER in a"
+              " casting menu - row 1 of that same menu was one");
+        CHECK(avail.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos
+              && avail.find("does not mean") != string::npos,
+              "#W62-W D15 the header names the one real exception and keeps its true half");
+        CHECK(landDropStatusLine(false, true, true).empty(),
+              "#W62-W D15 NEGATIVE still nothing on the opponent's turn");
+    }
+    //#W62-W (D17): one land-drop wording, and the repeat row states its own rule.
+    cout << "\n[#W62-W] D17 the land-drop ask and the repeat row say the same thing every time\n";
+    {
+        CHECK(landDropAskText(1) == landDropAskText(3)
+              && landDropAskText(1) == "Land drop: which land do you play now, if any?",
+              "#W62-W D17 one wording for the one-land and the many-land ask");
+        CHECK(landDropAskText(1).find("play Isolated Chapel now?") == string::npos,
+              "#W62-W D17 NEGATIVE the one-land ask no longer names the land in the question");
+        CHECK(string(kLandDropDeclineRow) == "Play no land right now",
+              "#W62-W D17 the decline row is the one five deployed guides quote");
+        CHECK(string(kLandDropDeclineRow).find("Hold ") == string::npos,
+              "#W62-W D17 NEGATIVE the one-land decline is no longer a Hold row");
+        const string rr = repeatRowLine("Ping for 1", 4, -1);
+        CHECK(rr.find("a count on this row REQUIRES a PLAN line stating your stop count,"
+                      " the count you are at now, and how many you perform this window")
+                  != string::npos,
+              "#W62-W D17 123v126 seq 21: the plan_missing rule is stated where it is enforced");
+        CHECK(rr.find("refused and re-asked]") != string::npos
+              && rr.find("\n") == string::npos,
+              "#W62-W D17 the rule closes the row's own bracket and adds no line");
+        CHECK(stripNarrationDecoration(rr)
+                  .find("Ping for 1, repeated N times, then stop") == 0
+              && stripNarrationDecoration(rr).find("PLAN line") == string::npos,
+              "#W62-W D17 ECHO the enlarged bracket strips clean out of the record and"
+              " the row still reads as its own short name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
