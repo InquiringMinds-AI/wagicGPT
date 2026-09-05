@@ -1593,6 +1593,25 @@ bool TargetChooser::canTarget(Targetable * target, bool withoutProtections)
     if (!target) return false;
     if (MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(target))
     {
+        //#W62-Z (D16, deck152 MED-2). `152v130` G3 seq 120 offered option 15
+        //`Night [your battlefield]` in Emrakul's annihilator-6 forced-sacrifice
+        //list, on a screen whose own battlefield line three lines above listed 16
+        //permanents WITHOUT it; the seat picked it at seq 135 and the resolution
+        //log named six sacrifices while only FIVE "was put into your graveyard"
+        //lines followed - annihilator under-counted by one and a phantom object
+        //absorbed a real sacrifice. The day/night designation is modelled as a
+        //type=Emblem marker card on the battlefield (borderline.txt:76946,
+        //`type=Emblem`, abilities shroud+indestructible) so the daybound machinery
+        //can locate it; CR 114.1 says an emblem is not a permanent and is in no
+        //zone, and the test suite has said the same since wave 43
+        //(TestSuiteAI.cpp isDesignationMarker: markers are invisible to every
+        //zone assertion). `notaTarget(<6>*|mybattlefield)` bypasses the shroud
+        //branch below, so the marker's own protections never stopped it. The
+        //rule is stated ONCE, at the universal chooser choke point, so it holds
+        //for sacrifice, destroy, exile, bounce and count alike; a chooser that
+        //explicitly names the Emblem type still finds it.
+        if (card->hasType(Subtypes::TYPE_EMBLEM) && !acceptsDesignationMarkers())
+            return false;
         if (other)
         {
             MTGCardInstance * tempcard = card;
@@ -1879,6 +1898,15 @@ void TypeTargetChooser::addType(int type)
     }
     types[nbtypes] = type;
     nbtypes++;
+}
+
+//#W62-Z (D16): a chooser that names the Emblem type meant it.
+bool TypeTargetChooser::acceptsDesignationMarkers() const
+{
+    for (int i = 0; i < nbtypes; i++)
+        if (types[i] == Subtypes::TYPE_EMBLEM)
+            return true;
+    return false;
 }
 
 bool TypeTargetChooser::canTarget(Targetable * target,bool withoutProtections)

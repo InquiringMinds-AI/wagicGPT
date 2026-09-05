@@ -29,6 +29,7 @@
 #include <set>
 #include <cctype>
 #include <cstring>
+#include <sstream>
 
 namespace gptcaveat {
 
@@ -583,6 +584,29 @@ inline const char * planTruncationMarker()
     return " [...the rest of your plan was not carried - restate it if you still mean it]";
 }
 
+// #W62-Z (D16, deck152 MED-1). G3 seq 115 wrote ~3 KB of deliberation into its
+// PLAN line; the bound above cut it once and marked the cut, and the surviving
+// fragment - "...We can animate it again?" - was then quoted back as YOUR PLAN
+// at seq 120 and 121, five and six windows later. The bound is not the gap: the
+// marker is, because it says the rest "was not carried" and nothing says HOW
+// MUCH, so a fragment reads like a plan that merely ended. State the size of the
+// cut, which is the one fact that tells the model its PLAN line was a
+// deliberation stream rather than a plan. Pure over (kept, original) so the
+// composed shape is provable; a plan the bound did not touch is byte-identical.
+inline std::string planTruncationNote(size_t keptChars, size_t originalChars)
+{
+    // The wave-60 literal is kept verbatim as the head - deck guides and the
+    // shipped PARSETEST pins read it - and the measured size rides after it.
+    std::string head = " [...the rest of your plan was not carried";
+    std::ostringstream o;
+    o << head;
+    if (originalChars > keptChars)
+        o << ": " << (originalChars - keptChars) << " further characters, of "
+          << originalChars << " you wrote";
+    o << " - restate it in a sentence or two if you still mean it]";
+    return o.str();
+}
+
 inline std::string planCarryBound(const std::string& plan, size_t maxChars)
 {
     if (maxChars < 1 || plan.size() <= maxChars)
@@ -606,7 +630,7 @@ inline std::string planCarryBound(const std::string& plan, size_t maxChars)
     out = (e == std::string::npos) ? std::string() : out.substr(0, e + 1);
     if (out.empty())
         return plan; // nothing survived the cut: carry the plan as it stands
-    return out + planTruncationMarker();
+    return out + planTruncationNote(out.size(), plan.size()); //#W62-Z (D16)
 }
 
 // #W60-Q (R8). THE COMPOSED PATH. planCarryBound's marker ends in ']', and the

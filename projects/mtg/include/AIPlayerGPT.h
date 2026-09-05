@@ -921,10 +921,16 @@ private:
     //parenthetical names a row that is NOT on the menu at that index (or any
     //index) - the earlier, offered answer is kept and the function returns
     //false; the caller records `named_row_not_offered` as a parse note.
+    //#W62-Z (D9): the LAST combat directive the model re-states in prose after
+    //its coded answer line and before its PLAN: line, or "" when there is none.
+    static string restatedCombatDirective(const string& content, const char * label,
+                                          const std::vector<string> * rosterA = NULL,
+                                          const std::vector<string> * rosterB = NULL);
     static bool choiceRetractedNoReplacement(const string& content, int optionCount,
                                              const std::vector<string> * optionTexts = NULL,
                                              int * replacement = NULL,
-                                             bool * namedRowNotOffered = NULL);
+                                             bool * namedRowNotOffered = NULL,
+                                             bool * planProseRecodeOut = NULL); //#W62-Z (D10)
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;

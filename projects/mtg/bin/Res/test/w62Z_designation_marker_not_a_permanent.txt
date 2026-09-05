@@ -1,0 +1,54 @@
+#NAME: a day/night DESIGNATION is not a permanent and is not a legal sacrifice
+#Oracle / CR 114.1: an emblem "has no characteristics other than the abilities
+#defined by the effect that created it" and is in no zone - it is not a permanent,
+#so no cost or effect that sacrifices, destroys, exiles or counts permanents may
+#choose one. The engine models the day/night designation as a type=Emblem marker
+#card parked on a battlefield (borderline.txt:76946) so the daybound machinery can
+#find it, and every "*|mybattlefield" chooser therefore saw it.
+#
+#REPRO (wave-61 corpus, deck152 G3): Emrakul's `notaTarget(<6>*|mybattlefield)
+#sacrifice` offered `Night [your battlefield]` as option 15 on a screen whose own
+#battlefield line listed 16 permanents WITHOUT it; the seat took it at seq 135 and
+#the resolution log named six sacrifices with only FIVE "was put into your
+#graveyard" lines - annihilator under-counted by one.
+#
+#Here: Eldrazi Ravager (annihilator 1) attacks a defender whose battlefield is
+#one Night marker and one Forest. The sacrifice has exactly one legal object.
+#RED on base: the marker absorbs the sacrifice and the Forest is still in play.
+#GREEN with the #W62-Z (D16) exclusion: the Forest is sacrificed.
+AICALLS 120
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Eldrazi Ravager
+life:20
+[PLAYER2]
+inplay:Night,Forest
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Eldrazi Ravager
+life:20
+[PLAYER2]
+graveyard:Forest
+life:14
+[END]

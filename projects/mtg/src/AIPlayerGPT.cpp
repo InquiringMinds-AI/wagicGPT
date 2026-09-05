@@ -208,6 +208,17 @@ const char * kReplyProtocol =
     "in front of you, never this example's). On a TARGET menu the "
     "short name is the target's name. ATTACK: and BLOCKS: are different: they take the A#/B# "
     "LABELS only, with no names and no parentheses (\"ATTACK: A1, A3\", \"BLOCKS: B1:A2, B3:A1\").\n"
+    //#W62-Z (D9, deck146 HIGH-1; deck162 MED-1). The engine's answer rule was
+    //never written down: 8 of 207 replies at one seat kept reasoning past LINE 1
+    //and one of them derived the surviving block, wrote it inside its PLAN, and
+    //died on the line it had already committed to. The rule the three seams now
+    //share is stated here so a model that changes its mind knows where to put
+    //the new answer - and so the PLAN, which this engine quotes back verbatim at
+    //later windows, is read as a plan and not raced against the answer.
+    "If you change your mind while writing, write the corrected ANSWER LINE again, on a line of "
+    "its own, using the same label. The LAST answer line you write is the one that runs. An "
+    "answer written inside your PLAN sentence is part of the plan, not your answer, and is NOT "
+    "read as one - so never leave the decision you actually want stated only there.\n"
     "LINE 2 is a PLAN: line - your complete game plan from this point on, CONCISE, a few sentences "
     "of intent, not an analysis. Whether to write one is a mechanical test with exactly three "
     "cases; take the first that applies and do not re-open it:\n"
@@ -4984,6 +4995,40 @@ static string leavesUntappedTag(int untappedSources, int sourcesUsed)
     if (left == 0)
         o << " - casting this taps you out";
     o << "}";
+    return o.str();
+}
+
+//#W62-Z (D14, deck125 HIGH-3). `leavesUntappedTag` is suppressed for every {X}
+//cost, for a good reason (X is announced at the NEXT window, so no remainder is
+//payable yet) - but SILENCE is not neutral on this menu. The guide the seat runs
+//teaches, correctly for every other row, "a row carrying no such clause at all
+//is a row where M is far above K; those are free", and the one row that most
+//reliably taps the seat out is the one that prints nothing: 9 of 154
+//`Cast Sphinx's Revelation` rows carry a leaves/spends tail against 323 of 634
+//for every other cast row, and all three X-floor breaks in the corpus are on
+//those rows - beside a `[<- best X for this cast: ...]` badge that is the only
+//editorial voice on the menu.
+//What replaces the silence is not a guessed number. `maxAnnounceableX` derives
+//the largest X from the seat's whole potential mana minus the base cost, so
+//"no larger X is payable at X=maxX" is that function's own definition, and each
+//step below it frees exactly one mana of the X pip's kind. Both facts are
+//exactly true at render time and neither depends on a payment the pilot has not
+//made. Pure over (maxX, baseCMC, colouredX), so PARSETEST proves every shape.
+static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX)
+{
+    if (maxX < 0)
+        return "";
+    std::ostringstream o;
+    o << " {no {leaves ...} count on this row: what it spends depends on the X you"
+         " announce at the next window";
+    if (maxX == 0)
+        o << ", and your mana affords only X=0 right now}";
+    else
+        o << ". At the largest X this row prices (X=" << maxX << ", "
+          << (maxX + baseCMC) << " mana total) your mana affords no larger X, so that"
+             " cast leaves you nothing more to spend on X; every step below it leaves"
+             " one more " << (colouredX ? "mana of the X pip's colour" : "mana")
+          << " untapped}";
     return o.str();
 }
 
@@ -13006,6 +13051,43 @@ static bool wallMissAbandoned(bool pending, const string& missedBase, const stri
     return pending && !missedBase.empty() && nowBase != missedBase;
 }
 
+//#W62-Z (D18, deck130 MED-1). `130v126` s12 carried
+//`transport: curl=28,http=0,empty=1,connect_ms=20000,phase=wall`,
+//`deadline_pct 100.0` and `latency_ms 900024` - a wall miss with its phase
+//PROVEN by the #W61-U C13 stamp - and was still classed `wall_miss_unrecorded`,
+//the class that means "an abandoned ask nothing else wrote down". One name for
+//two different states, so a corpus cannot separate a phase-proven abandonment
+//from an unexplained one without re-deriving the arithmetic by hand (which is
+//what the wave-60 adjudication had to do, and what C13 shipped the stamp to
+//stop). The class now carries the phase the stamp proved, as a SUFFIX: every
+//existing `wall_miss_unrecorded` grep still matches, nothing is renamed away,
+//and a record with no proven phase keeps the old string byte for byte.
+//NOTE the correction the deck-130 seat's reading needs: `connect_ms=20000` is
+//the connect BUDGET the attempt was given (#W60-M B4), not evidence the connect
+//failed - only the elapsed time separates a connect death from a wall miss, and
+//at 100% of the deadline this is a wall miss. `phase=` is that verdict, and the
+//class now repeats it rather than contradicting it.
+//Pure over the stamp text, so both halves are PARSETEST-provable.
+static string transportStampPhase(const string& transport)
+{
+    static const char * kKey = "phase=";
+    size_t at = transport.rfind(kKey);
+    if (at == string::npos)
+        return "";
+    at += strlen(kKey);
+    size_t e = at;
+    while (e < transport.size() && (isalnum((unsigned char) transport[e]) || transport[e] == '_'))
+        e++;
+    return transport.substr(at, e - at);
+}
+
+static string wallMissClassFor(const string& phase)
+{
+    if (phase.empty())
+        return "wall_miss_unrecorded";
+    return "wall_miss_unrecorded_" + phase;
+}
+
 //The abandoned ask gets its own zero-choice record, carrying the prompt the
 //model never answered. Additive: no window is removed, no retry is spent, and
 //nothing in the engine reads it.
@@ -13026,7 +13108,13 @@ void AIPlayerGPT::flushWallMissRecord()
     if (mWallMissLatencyMs >= 0 && mLastLatencyMs < 0)
         mLastLatencyMs = mWallMissLatencyMs;
     mWallMissLatencyMs = -1;
-    writeTransLog("wall_miss", base, "", -1, 0, "", "wall_miss_unrecorded", NULL);
+    //#W62-Z (D18): the phase this attempt's own transport stamp proved, read
+    //before writeTransLog consumes mLastTransportOutcomes.
+    string phase;
+    for (size_t i = 0; i < mLastTransportOutcomes.size() && phase.empty(); i++)
+        phase = transportStampPhase(mLastTransportOutcomes[i]);
+    const string wmClass = wallMissClassFor(phase);
+    writeTransLog("wall_miss", base, "", -1, 0, "", wmClass.c_str(), NULL);
 }
 
 int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
@@ -15700,6 +15788,47 @@ static bool planLineOpensWithConnective(const string& line)
     return false;
 }
 
+//#W62-Z (D9/D10). The PLAN BLOCK's extent in a reply, from the offset of its
+//line-leading "PLAN:" marker. The engine already has a definition of "the plan"
+//and it is not "everything after the marker": planParagraphBound (#W54-A D12a)
+//takes the FIRST PARAGRAPH, ended by a blank line or by a line whose predecessor
+//closed a sentence and which does not open with a connective - and that
+//paragraph is what mCurrentPlan carries and what later windows are shown as
+//YOUR PLAN. The same rule bounds the block here, so "inside the plan" means the
+//same span in the parser as it does in the carry. Everything AFTER the block is
+//ordinary post-answer prose and keeps the wave-47 recode behaviour (#W48-E1)
+//byte for byte. Pure; the two answer-seam scans below share it.
+static size_t planBlockEndOffset(const string& text, size_t planPos)
+{
+    if (planPos == string::npos || planPos >= text.size())
+        return text.size();
+    size_t start = planPos;
+    bool first = true;
+    string prevLine;
+    while (start <= text.size())
+    {
+        size_t end = text.find('\n', start);
+        const size_t lineEnd = (end == string::npos) ? text.size() : end;
+        const string line = text.substr(start, lineEnd - start);
+        if (!first)
+        {
+            if (line.find_first_not_of(" \t\r") == string::npos)
+                return start; //a blank line ends the paragraph
+            size_t pe = prevLine.find_last_not_of(" \t\r");
+            const char prevLast = (pe == string::npos) ? '\0' : prevLine[pe];
+            const bool prevEnded = (prevLast == '.' || prevLast == '!' || prevLast == '?');
+            if (prevEnded && !planLineOpensWithConnective(line))
+                return start;
+        }
+        prevLine = line;
+        first = false;
+        if (end == string::npos)
+            break;
+        start = end + 1;
+    }
+    return text.size();
+}
+
 static string planParagraphBound(const string& planIn)
 {
     string out;
@@ -17522,7 +17651,8 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                                  int bestCaseDamage = -1,
                                  bool bestCaseOptimal = true,
                                  int matchedAttackers = -1,
-                                 int assignableAttackers = -1)
+                                 int assignableAttackers = -1,
+                                 const string& bestCaseAssignment = "") //#W62-Z (D12)
 {
     if (attackers <= 0)
         return "";
@@ -17581,6 +17711,12 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
               << (myLife - bestCaseDamage);
             if (myLife - bestCaseDamage <= 0)
                 o << "; no block saves you";
+            //#W62-Z (D12): the assignment that reaches that number, where the
+            //number is a PROVEN maximum. Only on the exact branch: on the floor
+            //branch (trample/menace in the total) no single assignment reaches
+            //the figure, so naming one would claim more than the number does.
+            else
+                o << bestCaseAssignment;
         }
         else
         {
@@ -18314,10 +18450,18 @@ static int assignableMatchedAttackers(int attackerCount,
     return matched;
 }
 
+//#W62-Z (D12, deck146 HIGH-2): `matchOut` (optional) receives the matching this
+//function already computes - matchOut[i] is the attacker index blocker i is
+//assigned to, or -1. It is the SAME `matchOfBlocker` the returned number is
+//derived from, handed back rather than recomputed, so the printed assignment and
+//the printed life cannot disagree (the #W61-U C10a rail).
 static int assignableRemainderDamage(const vector<int>& damage,
                                      const vector<vector<char> >& can,
-                                     const vector<char> * preventable = NULL)
+                                     const vector<char> * preventable = NULL,
+                                     vector<int> * matchOut = NULL)
 {
+    if (matchOut)
+        matchOut->clear();
     const int nb = (int) can.size();
     const int na = (int) damage.size();
     //#W61-R (C2): the 32/32 cap silently deleted the clause on exactly the
@@ -18361,7 +18505,38 @@ static int assignableRemainderDamage(const vector<int>& damage,
         if (assignableAugment(j, can, seen, matchOfBlocker))
             prevented += damage[j];
     }
+    if (matchOut)
+        *matchOut = matchOfBlocker; //#W62-Z (D12)
     return total - prevented;
+}
+
+//#W62-Z (D12, deck146 HIGH-2, the decision that lost 146v152). The header
+//PROVED a survivable assignment existed - `best case with every blocker
+//assigned: you would be at 6` at 8 life - and then printed only the number.
+//The seat's own PLAN one line later read "I have no other blockers" with
+//`B1. Goblin (1/1) - may block A1-A3` printed above it. The engine held the
+//pairing in `matchOfBlocker` and threw it away. It is named here BY CARD NAME,
+//not by B#/A# label: this header is rendered on windows that carry no B#/A#
+//enumeration of their own, and a label that does not exist on the screen it is
+//printed on would be a false surface. Pure over the two name lists and the
+//matching, so every shape is provable without a board.
+static string blockAssignmentClause(const vector<string>& blockerNames,
+                                    const vector<string>& attackerNames,
+                                    const vector<int>& match)
+{
+    std::ostringstream o;
+    int shown = 0;
+    for (size_t i = 0; i < match.size() && i < blockerNames.size(); i++)
+    {
+        const int j = match[i];
+        if (j < 0 || j >= (int) attackerNames.size())
+            continue;
+        //`; ` separates - a card name can contain a comma (#W61-U C10b).
+        o << (shown++ ? "; " : "") << blockerNames[i] << " blocks " << attackerNames[j];
+    }
+    if (!shown)
+        return "";
+    return " - one legal assignment that reaches it: " + o.str();
 }
 
 //#W56-B (D10, wave-55 ledger MED = R234): the opponent's open mana was never a
@@ -19157,8 +19332,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //pairwise legality map for the bodies this seat actually has.
                 int bestCase = -1;
                 int matchedAtk = -1; //#W61-R (C2)
+                string bestCaseAssignment; //#W62-Z (D12)
                 {
                     vector<vector<char> > can;
+                    vector<string> canNames; //#W62-Z (D12): parallel to `can`
                     for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
                     {
                         MTGCardInstance * bc = game->inPlay->cards[bi];
@@ -19173,9 +19350,20 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                             any = any || ok;
                         }
                         if (any)
+                        {
                             can.push_back(row);
+                            canNames.push_back(bc->getDisplayName() + instanceHandle(bc));
+                        }
                     }
-                    bestCase = assignableRemainderDamage(faceDamage, can, &facePreventable);
+                    vector<int> match; //#W62-Z (D12)
+                    bestCase = assignableRemainderDamage(faceDamage, can, &facePreventable, &match);
+                    {
+                        vector<string> declaredNames;
+                        for (size_t dj = 0; dj < declared.size(); dj++)
+                            declaredNames.push_back(declared[dj]->getDisplayName()
+                                                    + instanceHandle(declared[dj]));
+                        bestCaseAssignment = blockAssignmentClause(canNames, declaredNames, match);
+                    }
                     //#W58-B (D7): the blocked-trampler excess is damage no
                     //assignment of the remaining blockers can touch.
                     if (bestCase >= 0)
@@ -19191,7 +19379,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                   myCreatures > 0, inUnblockable,
                                                   inUnblockableDmg, bestCase,
                                                   exactAssignment, matchedAtk,
-                                                  (int) declared.size()); //#W61-R (C2)
+                                                  (int) declared.size(), //#W61-R (C2)
+                                                  bestCaseAssignment);   //#W62-Z (D12)
             }
             else if (form == 2)
                 out << "\n" << incomingCombatSettledLine(mIncomingCombatAttackers,
@@ -20342,8 +20531,21 @@ static string optionSetKeyOf(const std::vector<string>& rows)
 static string holdRowBenefitClause()
 {
     //#W61-U (C14): the benefit the latch now actually delivers.
-    return string(" {taking this row skips every later window whose rows are"
-                  " identical to these}");
+    //#W62-Z (D13, deck125 HIGH-2): ...and only where it delivers it. The latch
+    //is kept PER SEAM (holdHonoured/takeHold are called with "priority" and with
+    //"cast", and each seam holds its own row set), so a hold taken on a priority
+    //menu never answers a casting menu carrying the identical rows - and the row
+    //promised "every later window". Nine leaks in six games: v123 seq 26->28 and
+    //48->50, v126 seq 49->51, 50->52, 61->63, 77->80, 109->111, 119->123, v130
+    //seq 11->13, each a hold followed later in the SAME turn by a byte-identical
+    //row set re-asked at the other seam. Nothing is withheld and no window is
+    //removed by this: the row's own scope is what changes, so the pilot can price
+    //the row against what it really buys. The scope is stated without naming an
+    //engine seam - "this same question" is what the pilot can see - and the row
+    //text is inside the ask key at both seams, so it carries no number.
+    return string(" {taking this row skips every later window that asks THIS"
+                  " SAME question with rows identical to these; a different"
+                  " question is still asked}");
 }
 
 static string holdRowLine()
@@ -20488,8 +20690,19 @@ static string declinedListNote(int n)
     if (n < 1)
         return string();
     std::ostringstream o;
+    //#W62-Z (D13, deck125 HIGH-2): this note and the C14 hold check read as a
+    //contradiction in one prompt - `[you declined this exact list 2 times
+    //already this turn]` beside `[hold check: 1 row above is new since the last
+    //window at this seam]` (125v126 seq 50-52). Both are true and neither is
+    //about the other's population: this one counts EVERY window this turn,
+    //wherever it was asked; the hold check compares only the last window at the
+    //same seam. So each says what it counted, and the pair stops looking like
+    //two answers to one question. The literal head that the deck guides key on
+    //("you declined this exact list N times already this turn") is unchanged
+    //byte for byte - the scope rides after it.
     o << "\n[you declined this exact list " << n << (n == 1 ? " time" : " times")
-      << " already this turn]";
+      << " already this turn - counted over every window this turn, not only"
+         " the ones asked at this same seam]";
     return o.str();
 }
 
@@ -21338,6 +21551,63 @@ static string castDeclineRow(bool combatNext)
 {
     return combatNext ? "Cast nothing right now (combat comes next this turn)"
                       : "Cast nothing right now";
+}
+
+static string optionLabel(const string& row); //#W62-Z (D11): defined below
+
+//#W62-Z (D11, deck126 MED-4). Three windows at one seat were spent on
+//`CHOICE: 5 (Attack with Vampire)` over a four-row CAST menu, `CHOICE: 6 (Cast
+//Sorin, Lord of Innistrad)` over a three-row one and `CHOICE: 5 (Cast Staff of
+//Nin)` naming two Staffs that were the OPPONENT'S. The one re-ask already fires
+//and already quotes the offending name and the legal range - `146v125` s44 -> s46
+//recovered on exactly that line - but it says nothing about WHY the action is not
+//here, and the first of the three shapes has a true, printed answer: the action
+//belongs to a LATER decision in this same turn, and the menu's own decline row
+//(castDeclineRow's "(combat comes next this turn)") is the way to it. Naming that
+//row turns a bare refusal into a route. Stated only when the row is actually on
+//THIS menu, so the clause can never point at a row that does not exist; the rest
+//of the re-ask line is byte-identical to wave 49's. Pure over (name, rows).
+static string namedActionIsCombatStep(const string& nameIn)
+{
+    string low = nameIn;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    static const char * kHeads[] = { "attack", "attacking", "declare attack", "swing", "block",
+                                     "declare block" };
+    size_t s = low.find_first_not_of(" \t\"");
+    if (s == string::npos)
+        return "";
+    for (size_t k = 0; k < sizeof(kHeads) / sizeof(kHeads[0]); k++)
+    {
+        const size_t len = strlen(kHeads[k]);
+        if (low.compare(s, len, kHeads[k]) == 0
+            && (s + len >= low.size() || !isalnum((unsigned char) low[s + len])))
+            return (low[s] == 'b') ? "block" : "attack";
+    }
+    return "";
+}
+
+static string laterStepRouteClause(const string& offendingName,
+                                   const std::vector<string> * rows)
+{
+    const string step = namedActionIsCombatStep(offendingName);
+    if (step.empty() || !rows)
+        return "";
+    for (size_t i = 0; i < rows->size(); i++)
+    {
+        //The decline row that already STATES combat is next (#W49-S D8). Only
+        //that row is named: it is the one whose own printed text makes the
+        //claim, so the clause quotes the screen rather than asserting a phase.
+        if ((*rows)[i].find("(combat comes next this turn)") == string::npos)
+            continue;
+        std::ostringstream o;
+        o << " Declaring " << (step == "block" ? "blocks" : "attackers")
+          << " is a LATER decision in this same turn, not a row of this list; row "
+          << (i + 1) << " (\"" << optionLabel((*rows)[i]) << "\") is the one that ends this"
+             " window and gets you there.";
+        return o.str();
+    }
+    return "";
 }
 
 //W50-W (D6): a damage/destroy activation aimed at the acting seat's OWN
@@ -25398,12 +25668,15 @@ int AIPlayerGPT::firstCodedChoice(const string& content, int optionCount,
 bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
                                                const std::vector<string> * optionTexts,
                                                int * replacement,
-                                               bool * namedRowNotOffered)
+                                               bool * namedRowNotOffered,
+                                               bool * planProseRecodeOut)
 {
     if (replacement)
         *replacement = -1;
     if (namedRowNotOffered)
         *namedRowNotOffered = false;
+    if (planProseRecodeOut)
+        *planProseRecodeOut = false;
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
@@ -25474,6 +25747,14 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
         regionEnd = planPos;
     else
         return false;
+    //#W62-Z (D10): the span the scan below must NOT read - the PLAN BLOCK
+    //itself (see planBlockEndOffset). Everything after that block is ordinary
+    //post-answer prose and is read exactly as it was before this wave.
+    const size_t planBlockStart = (planPos != string::npos && planPos > (size_t) lastChoiceEnd)
+                                  ? planPos : string::npos;
+    const size_t planBlockEnd = (planBlockStart == string::npos)
+                                ? string::npos : planBlockEndOffset(text, planBlockStart);
+    (void) regionEnd;
 
     //Significant name-words of the chosen option (same filter as parseChoice:
     //lowercase, length >= 4, minus the verb/decline filler) for condition (b)'s
@@ -25528,10 +25809,51 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
     //(the fake-card de-fang) prevents the shape at the source going forward; this
     //guard keeps replies generated under the old example (and any future quoting)
     //from mis-firing.
+    //#W62-Z (D10, deck162 HIGH-2 seq 49): this scan's own comment says the
+    //region ENDS at the first line-leading PLAN: marker, and `regionEnd` was
+    //computed for it above - but the variable was never read: wave 24 retired
+    //branch (b), which had been its only consumer, and the bound went with it.
+    //So a "CHOICE: n" token written INSIDE the PLAN - the block the protocol
+    //asks the model to write, and that this engine carries forward verbatim as
+    //its plan - silently replaced the committed answer with no parse note.
+    //`162v126` seq 49 answered `CHOICE: 4 (Cast Teferi's Puzzle Box)` on a
+    //six-row menu (index and name both matching row 4, coded_answers 1) and
+    //resolved to row 5, "Cast nothing right now": measured on this build, the
+    //answer line alone parses to 4, and appending one mid-prose "So CHOICE: 5"
+    //to the same reply flips it to 5 with `reanswer=5`. The bound is restored,
+    //so the rule the reply protocol states is the rule the engine runs: the
+    //answer is a coded ANSWER LINE, and plan prose never overrides one. A reply
+    //with no PLAN: line (the wave-47 decode-spiral shape #W48-E1 was written
+    //for, and the wave-33 deck133 vs140 s9 case) keeps the whole tail and is
+    //unchanged.
     {
         size_t scan = (size_t) lastChoiceEnd;
         while ((scan = low.find("choice:", scan)) != string::npos)
         {
+            //#W62-Z (D10): a coded token written INSIDE the PLAN BLOCK is plan
+            //text, not an answer - measured, never executed.
+            if (planBlockStart != string::npos && scan >= planBlockStart && scan < planBlockEnd)
+            {
+                if (planProseRecodeOut)
+                {
+                    size_t d0 = scan + 7;
+                    while (d0 < low.size() && (low[d0] == ' ' || low[d0] == '\t'))
+                        d0++;
+                    if (d0 < low.size() && isdigit((unsigned char) low[d0])
+                        && !(scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
+                                          || low[scan - 1] == '`')))
+                    {
+                        size_t e0 = d0;
+                        while (e0 < low.size() && isdigit((unsigned char) low[e0]))
+                            e0++;
+                        const int n0 = atoi(low.substr(d0, e0 - d0).c_str());
+                        if (n0 >= 0 && n0 <= optionCount && n0 != chosenNum)
+                            *planProseRecodeOut = true;
+                    }
+                }
+                scan += 7;
+                continue;
+            }
             //(1) inside quotation marks -> the model is quoting the format/example,
             //not restating an answer. Straight quotes and backtick code spans.
             if (scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
@@ -26471,12 +26793,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         bool retracted = false;
         int reanswer = -1;
         bool namedNotOffered = false;
+        bool planProseRecode = false; //#W62-Z (D10)
         //#W48-F1: N as the model named it (0 = this was not a repeat row, or no
         //count was named and the row collapses to a single activation).
         int repeatN = 0;
         string repeatReceipt; //#W49-S (D3): the narrated receipt of a countless take
         if (choice >= 0 && !content.empty()
-            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer, &namedNotOffered))
+            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer, &namedNotOffered,
+                                            &planProseRecode))
         {
             if (reanswer >= 0)
             {
@@ -26490,6 +26814,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 retracted = true;
             }
         }
+        //#W62-Z (D10): a coded index written INSIDE the PLAN is plan prose, not
+        //an answer line - the committed answer stands and the shape is signed.
+        if (planProseRecode)
+            appendParseNote(&mLastParseNote, "plan_prose_recode_ignored");
         //#W49-S (D2): the trailing re-answer named a row not on this menu - the
         //earlier offered answer executes; the divergence is signed.
         if (namedNotOffered)
@@ -26604,9 +26932,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                                             : firstLabelledLine(content, "choice:");
             if (namedRowFail)
             {
-                corr << "[RE-ASK] \"" << headParenthetical(decisionPart.empty() ? content : decisionPart)
+                const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
+                corr << "[RE-ASK] \"" << offending
                      << "\" is not on this list. Answer with a number from 1 to " << index
-                     << ", or 0 (pass).";
+                     << ", or 0 (pass)."
+                     << laterStepRouteClause(offending, &shownLines); //#W62-Z (D11)
                 fb = "named_row_reask";
                 mPriorityReaskKind = "named_row";
             }
@@ -27184,8 +27514,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     bool retracted = false;
     int reanswer = -1;
     bool namedNotOffered = false;
+    bool planProseRecode = false; //#W62-Z (D10)
     if (choice >= 0 && !content.empty()
-        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer, &namedNotOffered))
+        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer,
+                                        &namedNotOffered, &planProseRecode))
     {
         if (reanswer >= 0)
         {
@@ -27199,6 +27531,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             retracted = true;
         }
     }
+    if (planProseRecode)
+        appendParseNote(&mLastParseNote, "plan_prose_recode_ignored"); //#W62-Z (D10)
     if (namedNotOffered)
         appendParseNote(&mLastParseNote, "named_row_not_offered"); //#W49-S (D2)
     bool namedRowFail = (choice < 0 && !content.empty()
@@ -27246,8 +27580,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         std::ostringstream corr;
         if (namedRowFail)
         {
-            corr << "[RE-ASK] \"" << headParenthetical(decisionPart.empty() ? content : decisionPart)
-                 << "\" is not on this list. Answer with a number from 1 to " << options.size() << ".";
+            const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
+            corr << "[RE-ASK] \"" << offending
+                 << "\" is not on this list. Answer with a number from 1 to " << options.size() << "."
+                 << laterStepRouteClause(offending, &options); //#W62-Z (D11)
             mAskReaskKind = "named_row";
         }
         else if (passOnNoPass)
@@ -28361,7 +28697,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //made. Print nothing rather than a figure that goes stale one
             //decision later.
             if (payCost && (payCost->hasX() || payCost->hasSpecificX()))
+            {
+                //#W62-Z (D14): ...and the row says WHY it carries no count, and
+                //what the cast at its own badge's X actually leaves. Same
+                //affordability call the {X pricing:} block above already made,
+                //so the two brackets on this row cannot name different numbers.
+                const int mx = ManaEngine::maxAnnounceableX(this, payCost,
+                                                            card->has(Constants::ANYTYPEOFMANA));
+                if (untappedSources > 0)
+                    o << xCastRemainderScopeTag(mx, payCost->getConvertedCost(),
+                                                payCost->xColor > 0
+                                                && !card->has(Constants::ANYTYPEOFMANA));
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
+            }
             int used = 0;
             std::vector<std::string> creatureTaps; //#W49-D11
             std::vector<int> creatureTapDefender; //#W53-O (D6)
@@ -33911,6 +34259,126 @@ static string stripAnnotationBrackets(const string& s)
     return out;
 }
 
+static bool combatLineIsClean(const string& line, const vector<string> * rosterA,
+                              const vector<string> * rosterB); //#W62-Z (D9): defined below
+
+//#W62-Z (D9, deck146 HIGH-1). The three answer seams did not obey ONE rule.
+//A CHOICE ask has always honoured a coded index the model re-states in PROSE
+//after its answer line (#W48-E1: "So, CHOICE: 0 (pass)." at the end of a decode
+//spiral); the two COMBAT seams honoured only line-leading BLOCKS:/ATTACK: lines
+//and silently kept line 1 whatever the reply went on to say. `146v152` seq 54
+//is what that asymmetry costs: line 1 `BLOCKS: B2:A2, B1:none`, then the reply
+//derives `So BLOCKS: B2:A1.` and the engine sent line 1 - the seat died at -2 on
+//a header that had printed `best case with every blocker assigned: you would be
+//at 6`. This is the combat half of the CHOICE rule, with the SAME region bound
+//#W62-Z (D10) restores on the CHOICE side: a restatement counts where the
+//protocol still expects an answer - after the coded answer line and BEFORE the
+//first line-leading PLAN: marker - and never inside the PLAN, which is the block
+//the engine carries forward as a plan and quotes back verbatim. So the rule is
+//the same in all three seams and is stated to the model (kReplyRules).
+//Guards, in order: a token the model QUOTED (a preceding quote/backtick) is a
+//format string, not an answer; a payload that is not CLEAN by the roster grammar
+//(combatLineIsClean) is prose, not a declaration; and a payload byte-identical to
+//one of the protocol's own worked examples is an echo of the instructions.
+//Returns the payload of the LAST qualifying restatement, or "" when there is
+//none. Pure over (reply, label, rosters) so every branch is PARSETEST-provable.
+static bool combatDirectiveExampleEcho(const string& payloadLc)
+{
+    static const char * kExamples[] = {
+        " b1:a2, b3:a1, b2:none", " a1, a3", " b4-b9:a2", " none",
+        "b1:a2, b3:a1, b2:none", "a1, a3", "b4-b9:a2"
+    };
+    string t = payloadLc;
+    size_t e = t.find_last_not_of(" \t\r.");
+    t = (e == string::npos) ? string() : t.substr(0, e + 1);
+    for (size_t k = 0; k < sizeof(kExamples) / sizeof(kExamples[0]); k++)
+        if (t == kExamples[k])
+            return true;
+    return false;
+}
+
+string AIPlayerGPT::restatedCombatDirective(const string& content, const char * label,
+                                           const std::vector<string> * rosterA,
+                                           const std::vector<string> * rosterB)
+{
+    if (!label || content.empty())
+        return string();
+    string text = content;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    const size_t labelLen = strlen(label);
+    string low = text;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    string labelLc = label;
+    for (size_t i = 0; i < labelLc.size(); i++)
+        labelLc[i] = (char) tolower((unsigned char) labelLc[i]);
+
+    //The region: after the LAST line-leading coded line of this label, up to the
+    //FIRST line-leading PLAN: marker that follows it (the whole tail when there
+    //is none). A PLAN: that comes BEFORE the answer leaves no region at all.
+    size_t lastCodedEnd = string::npos, planPos = string::npos;
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        size_t lineEnd = text.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t'
+                           || text[s] == '*' || text[s] == '#' || text[s] == '-'))
+            s++;
+        if (end - s >= labelLen && low.compare(s, labelLen, labelLc) == 0)
+            lastCodedEnd = end;
+        if (planPos == string::npos && end - s >= 5
+            && low.compare(s, 5, "plan:") == 0)
+            planPos = s;
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (lastCodedEnd == string::npos)
+        return string(); //no coded line: the ordinary parse owns this reply
+    if (planPos != string::npos && planPos <= lastCodedEnd)
+        return string(); //plan-first shape: no post-answer region to read
+    const size_t planBlockStart = planPos;
+    const size_t planBlockEnd = (planBlockStart == string::npos)
+                                ? string::npos : planBlockEndOffset(text, planBlockStart);
+
+    string best;
+    size_t scan = lastCodedEnd;
+    while ((scan = low.find(labelLc, scan)) != string::npos)
+    {
+        //#W62-Z (D9/D10): the PLAN BLOCK is plan text at every seam.
+        if (planBlockStart != string::npos && scan >= planBlockStart && scan < planBlockEnd)
+        { scan += labelLen; continue; }
+        if (scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
+                         || low[scan - 1] == '`'))
+        { scan += labelLen; continue; }
+        if (scan > 0 && (isalnum((unsigned char) low[scan - 1]) || low[scan - 1] == '_'))
+        { scan += labelLen; continue; } //mid-word, not a directive
+        //The payload runs to the end of the sentence or the end of the line,
+        //whichever comes first: the rest of a prose line is prose.
+        size_t e = scan + labelLen;
+        while (e < text.size() && text[e] != '\n')
+        {
+            if ((text[e] == '.' || text[e] == ';' || text[e] == '!' || text[e] == '?')
+                && (e + 1 >= text.size() || text[e + 1] == ' ' || text[e + 1] == '\n'
+                    || text[e + 1] == '\t' || text[e + 1] == '\r'))
+                break;
+            e++;
+        }
+        string payload = text.substr(scan + labelLen, e - (scan + labelLen));
+        string payLc = payload;
+        for (size_t i = 0; i < payLc.size(); i++)
+            payLc[i] = (char) tolower((unsigned char) payLc[i]);
+        if (!combatDirectiveExampleEcho(payLc) && combatLineIsClean(payload, rosterA, rosterB))
+            best = payload;
+        scan += labelLen;
+    }
+    return best;
+}
+
 //#W49-S (D2b): the LAST-CODED-LINE rule for combat replies. deck146 vs126
 //seq 48 opened "ATTACK: A1, A2", reasoned for 2,500 chars ("Do not sacrifice
 //Spider"), and ended "ATTACK: A1" - the engine sent both and Spider died. The
@@ -34981,6 +35449,24 @@ int AIPlayerGPT::chooseAttackers()
             int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
             if (r >= 0) { send = s; result = r; takenLine = (int) li; break; } //first usable declaration
         }
+        //#W62-Z (D9): ...and a declaration the model re-states in PROSE after
+        //its coded line, before its PLAN:, is the same self-correction the
+        //CHOICE seam has honoured since #W48-E1. Appended to the line list so
+        //the last-clean rule below judges it exactly like a coded line.
+        {
+            const string restated = restatedCombatDirective(content, "ATTACK:", &attackerNames, NULL);
+            if (!restated.empty())
+            {
+                vector<bool> s;
+                if (parseAttackerSet(restated, attackers.size(), s, &attackerNames) >= 0)
+                {
+                    attackLines.push_back(restated);
+                    if (takenLine < 0)
+                        takenLine = 0;
+                    appendParseNote(&mLastParseNote, "attack_restated_prose_taken");
+                }
+            }
+        }
         //#W49-S (D2b): the last CLEAN coded line is the model's final answer
         //(see combatLineIsClean); a prose combat-math line never replaces.
         for (size_t li = attackLines.size(); takenLine >= 0 && li-- > (size_t) takenLine + 1; )
@@ -35922,6 +36408,25 @@ int AIPlayerGPT::chooseBlockers()
             strippedB = strippedB.substr(te + 8);
         vector<string> blockLines;
         collectLabeledLines(strippedB, "BLOCKS:", blockLines);
+        //#W62-Z (D9, deck146 HIGH-1 - the window that lost 146v152): an
+        //assignment the model re-states in PROSE after its coded line and
+        //before its PLAN: is a self-correction, exactly as it is at the CHOICE
+        //seam (#W48-E1). Appended to the line list so the last-CLEAN rule below
+        //judges it by the same grammar as a coded line - it is never trusted
+        //because it is later, only because it is clean.
+        {
+            vector<string> rb, ra;
+            for (size_t j = 0; j < blockers.size(); j++)
+                rb.push_back(blockers[j]->name);
+            for (size_t j = 0; j < attackers.size(); j++)
+                ra.push_back(attackers[j]->name);
+            const string restated = restatedCombatDirective(content, "BLOCKS:", &rb, &ra);
+            if (!restated.empty())
+            {
+                blockLines.push_back(restated);
+                appendParseNote(&mLastParseNote, "blocks_restated_prose_taken");
+            }
+        }
         if (blockLines.size() >= 2)
         {
             vector<string> bNames, aNames;
@@ -47700,16 +48205,36 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(firstCodedChoice(r25, (int) menu.size(), &menu) == 2 && firstCodedChoice(r25, (int) menu.size(), &menu) == c,
                   "#W49-S D2 what executed IS the first coded line -> answer_replaced is owed a false");
         }
-        //POSITIVE: a trailing re-answer whose name IS the row at that index still replaces
-        string rOk = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\nThey have 3 creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
+        //POSITIVE: a trailing re-answer whose name IS the row at that index still replaces.
+        //#W62-Z (D10): re-sited OUTSIDE the plan block. Both of these cases were
+        //written with the recode on the line straight after a one-line "PLAN: pass." -
+        //and by the engine's OWN definition of the plan (planParagraphBound, which is
+        //what mCurrentPlan carries and what later windows are shown as YOUR PLAN) a
+        //line opening with a connective after a sentence end is still that paragraph.
+        //The invariant this wave adds is that the engine never reads an answer out of
+        //the text it carries forward as the plan, so the recode is put where the model
+        //is told to put it: past the plan block. Neither case is a corpus record - the
+        //two real records in this section (r25, and #W48-E1's r34) are unchanged and
+        //still pass - and the behaviour they pin is preserved, only re-sited.
+        string rOk = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nThey have 3 creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
         rep = -1; nro = true;
         ret = choiceRetractedNoReplacement(rOk, (int) menu.size(), &menu, &rep, &nro);
         CHECK(ret && rep == 1 && !nro, "#W49-S D2 POSITIVE a trailing re-answer naming the row at its index replaces (#W48-E1 intact)");
         //ECHO-WINS on the re-answer: a wrong index with the right name lands on the named row
-        string rRemap = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\nSo CHOICE: 1 (Cast nothing right now)";
+        string rRemap = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nSo CHOICE: 1 (Cast nothing right now)";
         rep = -1; nro = true;
         ret = choiceRetractedNoReplacement(rRemap, (int) menu.size(), &menu, &rep, &nro);
         CHECK(ret && rep == 2 && !nro, "#W49-S D2 a re-answer whose name is another offered row remaps to that row (echo wins), not to its digit");
+        //#W62-Z (D10) NEGATIVE: the SAME recode, left inside the plan block, is not
+        //an answer - it is the text the next window will be shown as YOUR PLAN.
+        {
+            string rInPlan = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass. They have 3"
+                             " creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
+            int rp = -1; bool pr = false;
+            bool rt = choiceRetractedNoReplacement(rInPlan, (int) menu.size(), &menu, &rp, NULL, &pr);
+            CHECK(!rt && rp == -1 && pr,
+                  "#W62-Z D10 NEGATIVE a coded index inside the PLAN block never replaces the answer, and is signed plan_prose_recode_ignored");
+        }
         //firstCodedChoice: first-wins where salvage is last-wins
         string rTwo = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nCHOICE: 1 (Cast Tribute to Hunger)";
         CHECK(firstCodedChoice(rTwo, (int) menu.size(), &menu) == 2 && salvageLoopedChoice(rTwo, (int) menu.size(), &menu) == 1,
@@ -49784,10 +50309,24 @@ static const char * kW50Y_r94 =
     {
         CHECK(declinedListNote(0).empty(),
               "#W53-N D2 NEGATIVE a list declined zero times carries no annotation");
-        CHECK(declinedListNote(1) == "\n[you declined this exact list 1 time already this turn]",
+        //#W62-Z (D13): the literal head the deck guides key on is unchanged byte
+        //for byte; the population it counted rides after it, so the note and the
+        //#W61-U C14 hold check can no longer read as two answers to one question
+        //(125v126 seq 50-52 printed "declined this exact list 2 times" beside
+        //"1 row above is new since the last window at this seam").
+        CHECK(declinedListNote(1) == "\n[you declined this exact list 1 time already this turn"
+                                     " - counted over every window this turn, not only the ones"
+                                     " asked at this same seam]",
               "#W53-N D2 the annotation's singular shape");
-        CHECK(declinedListNote(11) == "\n[you declined this exact list 11 times already this turn]",
+        CHECK(declinedListNote(11) == "\n[you declined this exact list 11 times already this turn"
+                                      " - counted over every window this turn, not only the ones"
+                                      " asked at this same seam]",
               "#W53-N D2 the annotation's plural shape (162v126 seq 7-18 was twelve asks)");
+        CHECK(declinedListNote(3).compare(0, 46, "\n[you declined this exact list 3 times already") == 0,
+              "#W62-Z D13 the wave-53 literal the guides key on is still the head of the note");
+        CHECK(declinedListNote(3).find("not only the ones asked at this same seam") != string::npos
+              && holdReopenNoteText(1, 0).find("at this seam") != string::npos,
+              "#W62-Z D13 both hold-related notes now name the population they counted");
         // ECHO: the annotation is engine furniture; a reply that copies it must
         // not resolve to anything (it names no row).
         {
@@ -51619,9 +52158,18 @@ static const char * kW50Y_r94 =
 
     cout << "\n[#W55-A D21] the HOLD row states what taking it SAVES\n";
     {
+        //#W62-Z (D13, deck125 HIGH-2): the latch is per SEAM, so the promise is
+        //per seam. Nine same-turn leaks in six games were a hold taken at one
+        //seam followed by the identical row set re-asked at the other.
         CHECK(holdRowBenefitClause()
-              == " {taking this row skips every later window whose rows are identical to these}",
+              == " {taking this row skips every later window that asks THIS SAME question"
+                 " with rows identical to these; a different question is still asked}",
               "#W61-U C14 the benefit clause's literal - the saving the latch now delivers");
+        CHECK(holdRowBenefitClause().find("every later window whose rows are identical to these}")
+              == string::npos,
+              "#W62-Z D13 MUST-NOT-MATCH the retired unscoped promise is not renderable");
+        CHECK(holdRowBenefitClause().find_first_of("0123456789") == string::npos,
+              "#W62-Z D13 the row's tail carries no number - the row text is inside both ask keys");
         const string line = holdRowLine();
         CHECK(line == string(kHoldPriorityRowText) + holdRowBenefitClause(),
               "#W55-A D21 the rendered row is the row plus its benefit, in that order");
@@ -52450,7 +52998,9 @@ static const char * kW50Y_r94 =
         const string rendered = holdRowLine();
         CHECK(rendered != pure && rendered.compare(0, pure.size(), pure) == 0,
               "#W57-A D4 the wave-56 value was a strict PREFIX of the row - the exact shape the census missed");
-        CHECK(rendered == pure + " {taking this row skips every later window whose rows are identical to these}",
+        CHECK(rendered == pure + " {taking this row skips every later window that asks THIS"
+                                 " SAME question with rows identical to these; a different"
+                                 " question is still asked}",
               "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
         // the last-offer and upkeep-animation clauses are on the rendered row too
         {
@@ -55188,7 +55738,11 @@ static const char * kW50Y_r94 =
     //=============== #W60-M (B13a): the carried plan's bound =================
     cout << "\n[w60-M B13a] the carried YOUR PLAN echo is bounded, and withdrawn when it denies the board\n";
     {
-        const string marker = gptcaveat::planTruncationMarker();
+        //#W62-Z (D16): the marker is now sized (planTruncationNote) - the wave-60
+        //literal is still its HEAD, so the guides and the shape checks below read
+        //the head and the size rides after it.
+        const string markerHead = gptcaveat::planTruncationMarker();
+        const string marker = std::string(" [...the rest of your plan was not carried");
         //POSITIVE: `126v125` s48's own 1,236-character deliberation stream.
         const string s48 =
             "Cast Exquisite Blood to complete the combo with Sanguine Bond (which is not currently"
@@ -55203,20 +55757,31 @@ static const char * kW50Y_r94 =
             " I have one half. I still need Sanguine Bond. I have to draw it.";
         const string bounded = gptcaveat::planCarryBound(s48, kPlanCarryMaxChars);
         CHECK(s48.size() > 700 && bounded.size() < s48.size()
-              && bounded.size() - marker.size() <= kPlanCarryMaxChars,
+              && bounded.find(marker) <= kPlanCarryMaxChars,
               "#W60-M B13a POSITIVE `126v125` s48's deliberation stream is carried bounded, not"
               " verbatim (148 of that seat's 410 echoes were over 400 chars; the longest was"
               " 1,599, and the 1,236-char one produced an off-menu CHOICE)");
-        CHECK(bounded.size() >= marker.size()
-              && bounded.compare(bounded.size() - marker.size(), marker.size(), marker) == 0,
+        CHECK(bounded.find(marker) != string::npos && bounded[bounded.size() - 1] == ']',
               "#W60-M B13a POSITIVE a plan that was cut SAYS SO - the truncation marker is"
               " printed, so nothing is silently dropped from what the model wrote");
+        //#W62-Z (D16, deck152 MED-1): ...and it says HOW MUCH was dropped, which is
+        //what tells the model its PLAN line was a deliberation stream. G3 seq 115
+        //wrote ~3 KB; the surviving fragment was quoted back as YOUR PLAN at seq
+        //120 and 121, five and six windows later, with nothing saying its size.
+        {
+            std::ostringstream sz;
+            sz << " further characters, of " << s48.size() << " you wrote";
+            CHECK(bounded.find(sz.str()) != string::npos,
+                  "#W62-Z D16 the cut states the bytes dropped and the size the model wrote");
+            CHECK(gptcaveat::planTruncationNote(10, 10).find("further characters") == string::npos,
+                  "#W62-Z D16 NEGATIVE nothing dropped, no size clause");
+        }
         CHECK(bounded.find("Cast Exquisite Blood to complete the combo") == 0,
               "#W60-M B13a POSITIVE the bound keeps the plan's OPENING commitment, which is the"
               " part the next decision acts on");
         CHECK(bounded.find(marker) != string::npos
-              && bounded.substr(0, bounded.size() - marker.size())
-                     .find_last_of(".!?") + 1 == bounded.size() - marker.size(),
+              && bounded.substr(0, bounded.find(marker)).find_last_of(".!?") + 1
+                 == bounded.find(marker),
               "#W60-M B13a POSITIVE the cut lands on a sentence end, never mid-sentence");
         //MUST-NOT-MATCH: a plan already inside the bound is carried byte for
         //byte and carries NO marker.
@@ -55240,7 +55805,8 @@ static const char * kW50Y_r94 =
                     + string(700, 'x') + string(" And that is the plan.");
                 const string composed = gptcaveat::planCarryCompose(longPlan, kPlanCarryMaxChars);
                 CHECK(composed.size() < longPlan.size()
-                          && composed.find(gptcaveat::planTruncationMarker()) != string::npos,
+                          && composed.find(" [...the rest of your plan was not carried") != string::npos
+                          && composed[composed.size() - 1] == ']',
                       "#W60-Q R8 POSITIVE the truncation marker survives the caller's trim pass");
                 const string markerless = gptcaveat::planCarryBound(longPlan, kPlanCarryMaxChars);
                 CHECK(composed == markerless,
@@ -57333,6 +57899,291 @@ static const char * kW50Y_r94 =
               "#W62-Y D7 echo: a reply copying the whole annotated row binds to 1");
         CHECK(stripNarrationDecoration(rm[0]) == "add 3 counters",
               "#W62-Y D7 the repeat-cost and taps tags leave no residue in the narrated record");
+    }
+
+    //================= WAVE-62 LANE Z =================
+    cout << "\n[#W62-Z D9] one answer rule at all three seams, and it is stated to the model\n";
+    {
+        vector<string> bN, aN;
+        bN.push_back("Goblin"); bN.push_back("Spider");
+        aN.push_back("Wolf"); aN.push_back("Wolf"); aN.push_back("Wolf");
+        // THE RECORD: 146v152 seq 54, turn 24, the seat at 8 life. Line 1
+        // committed, the reply then derived the survivable assignment in prose
+        // and the engine sent line 1; seq 55 is the gameend at -2.
+        const string s54 =
+            "BLOCKS: B2:A2, B1:none\n"
+            "Survive this turn by blocking the 3/3 Wolf with the Spider. The 8/8 Wolf and 2/2"
+            " Wolf will get through, dealing 10 damage to me (I go to -2), but I must survive."
+            " Wait, 8+2=10 damage, I am at 8 life, so I lose. If I block A1 with B2, B2 dies."
+            " Then A2 and A3 get through for 5 damage. I survive at 3 life. So BLOCKS: B2:A1."
+            " Then A2 and A3 deal 5 damage.";
+        CHECK(AIPlayerGPT::restatedCombatDirective(s54, "BLOCKS:", &bN, &aN) == " B2:A1",
+              "#W62-Z D9 146v152 seq 54: the assignment the reply derived in prose is read as the answer it is");
+        CHECK(AIPlayerGPT::restatedCombatDirective("ATTACK: A1, A2\nOn reflection A3 is safe too."
+                                                   " So ATTACK: A1, A2, A3.", "ATTACK:", &aN, NULL)
+              == " A1, A2, A3",
+              "#W62-Z D9 the ATTACK seam reads the same shape, by the same rule");
+        // The payload stops at the SENTENCE, never at the end of a prose line.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:A1. Then I am at 3.",
+                                                   "BLOCKS:", &bN, &aN) == " B2:A1",
+              "#W62-Z D9 the payload is the sentence, so the prose after it is not read as assignments");
+        // MUST-NOT-MATCH 1: the protocol's own worked example, quoted back.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nThe format is BLOCKS: B1:A2, B3:A1,"
+                                                   " B2:none as shown.", "BLOCKS:", &bN, &aN).empty(),
+              "#W62-Z D9 MUST-NOT-MATCH the worked example echoed in prose is a format string, not an answer");
+        // MUST-NOT-MATCH 2: a quoted / backticked token.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI could write \"BLOCKS: B2:A1\" here.",
+                                                   "BLOCKS:", &bN, &aN).empty(),
+              "#W62-Z D9 MUST-NOT-MATCH a quoted token is the model discussing the format");
+        // MUST-NOT-MATCH 3: prose that is not a declaration by the roster grammar.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: whatever keeps me alive"
+                                                   " longest.", "BLOCKS:", &bN, &aN).empty(),
+              "#W62-Z D9 MUST-NOT-MATCH prose after the label is not a clean declaration");
+        // MUST-NOT-MATCH 4 (the D10 invariant, at the combat seams): the PLAN
+        // block is the text the engine carries forward, and no answer is read
+        // out of it.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B2:A2\nPLAN: hold the Spider back and"
+                                                   " stabilise. So BLOCKS: B2:A1.", "BLOCKS:", &bN, &aN)
+              .empty(),
+              "#W62-Z D9 MUST-NOT-MATCH a directive inside the PLAN block is plan text at the combat seams too");
+        CHECK(AIPlayerGPT::restatedCombatDirective("PLAN: block everything.\nBLOCKS: B1:A1",
+                                                   "BLOCKS:", &bN, &aN).empty(),
+              "#W62-Z D9 NEGATIVE a plan-first reply leaves no post-answer region to read");
+        CHECK(AIPlayerGPT::restatedCombatDirective("I will not block.", "BLOCKS:", &bN, &aN).empty()
+              && AIPlayerGPT::restatedCombatDirective("", "BLOCKS:", &bN, &aN).empty(),
+              "#W62-Z D9 NEGATIVE no coded line, nothing to restate");
+        // The rule is now WRITTEN DOWN where the model reads it - the half of
+        // D9 that addresses the 8-of-207 replies that deliberate past line 1.
+        CHECK(string(kReplyProtocol).find("The LAST answer line you write is the one that runs")
+              != string::npos
+              && string(kReplyProtocol).find("An answer written inside your PLAN sentence is part"
+                                             " of the plan, not your answer") != string::npos,
+              "#W62-Z D9 the reply protocol states the rule the three seams now share");
+    }
+
+    cout << "\n[#W62-Z D10] the answer is never read out of the text carried forward as the plan\n";
+    {
+        // THE RECORD: 162v126 seq 49, turn 20, main 1. Six rows; the reply's
+        // line 1 named row 4 by index AND by name (coded_answers 1), and the
+        // record resolved to row 5, "Cast nothing right now", with
+        // parse_note latched_row_mismatch.
+        vector<string> m;
+        m.push_back("Cast Forced Fruition {4}{u}{u} {leaves 4 of your 10 untapped mana sources untapped}");
+        m.push_back("Cast Liliana's Caress {1}{b} {leaves 8 of your 10 untapped mana sources untapped}");
+        m.push_back("Cast Howling Mine {2} [second copy: you already control Howling Mine; both stay"
+                    " on the battlefield - no legend rule] {leaves 8 of your 10 untapped mana sources untapped}");
+        m.push_back("Cast Teferi's Puzzle Box {4} {leaves 6 of your 10 untapped mana sources untapped}");
+        m.push_back("Cast nothing right now (combat comes next this turn)");
+        m.push_back("Hold priority: pass now, and do not ask me again - this turn or later - until one"
+                    " of the rows above changes (any change re-opens this window; you give up no cast)"
+                    + holdRowBenefitClause());
+        bool st = false;
+        CHECK(parseChoice("CHOICE: 4 (Cast Teferi's Puzzle Box)", 6, &m, &st) == 4 && !st,
+              "#W62-Z D10 162v126 seq 49: the answer line itself has always parsed to row 4");
+        const string s49 = "CHOICE: 4 (Cast Teferi's Puzzle Box)\n"
+            "PLAN: Sanguine Bond/Exquisite Blood loop is lethal to me if I gain life. Teferi's"
+            " Puzzle Box forces them to draw their hand. This triggers the loop immediately upon"
+            " resolution. I have no win condition against the loop. So CHOICE: 5 (Cast nothing"
+            " right now). Wait, is there any other way? If I deal combat damage to them, do they"
+            " lose life? No, c";
+        int rep = -1; bool nro = false, planRecode = false;
+        const bool ret = AIPlayerGPT::choiceRetractedNoReplacement(s49, 6, &m, &rep, &nro, &planRecode);
+        CHECK(!ret && rep == -1,
+              "#W62-Z D10 the committed answer stands: a coded index inside the PLAN is not a re-answer");
+        CHECK(planRecode,
+              "#W62-Z D10 ...and the shape is signed plan_prose_recode_ignored rather than silent");
+        // MUST-NOT-MATCH: the wave-47 recovery this must not cost. deck123
+        // vs146 seq 34 ended a token loop with "So, CHOICE: 0 (pass)." AFTER
+        // its plan paragraph closed - that is post-answer prose, not plan text,
+        // and it still replaces.
+        {
+            vector<string> loop; loop.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+            const string r34 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: Tap Lord of"
+                " Lineage to create more tokens.\n\nWe are lethal. We should not tap more.\n\n"
+                "So, CHOICE: 0 (pass).\n\nPLAN: Attack with all creatures to win the game.";
+            int r = -1; bool pr = false;
+            CHECK(AIPlayerGPT::choiceRetractedNoReplacement(r34, 1, &loop, &r, NULL, &pr) && r == 0 && !pr,
+                  "#W62-Z D10 MUST-NOT-MATCH the #W48-E1 post-plan recode is untouched (it is not plan text)");
+        }
+        // The bound uses the engine's OWN definition of the plan, so the span
+        // the parser refuses to read an answer out of is the span the carry
+        // hands to the next window.
+        {
+            const string reply = "CHOICE: 4 (x)\nPLAN: one. Two. Three.\n\nAfterwards.";
+            const size_t pp = reply.find("PLAN:");
+            const string block = reply.substr(pp, planBlockEndOffset(reply, pp) - pp);
+            CHECK(block.find("Afterwards") == string::npos && block.find("Three.") != string::npos,
+                  "#W62-Z D10 the plan block ends where planParagraphBound ends it");
+            CHECK(planBlockEndOffset(reply, string::npos) == reply.size(),
+                  "#W62-Z D10 NEGATIVE with no PLAN marker the whole reply stays readable");
+        }
+    }
+
+    cout << "\n[#W62-Z D11] the re-ask points at the row that reaches the step it named\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Tribute to Hunger {2}{b}");
+        menu.push_back("Cast Sorin, Lord of Innistrad {2}{w}{b}");
+        menu.push_back("Cast nothing right now (combat comes next this turn)");
+        // deck126 vs125 seq 44: "CHOICE: 5 (Attack with Vampire)" over a
+        // four-row cast menu; the re-ask already quoted the name and the range
+        // and recovered at seq 46 - it just never said where the attack lives.
+        const string route = laterStepRouteClause("Attack with Vampire", &menu);
+        CHECK(route.find("Declaring attackers is a LATER decision in this same turn") != string::npos
+              && route.find("row 3 (\"Cast nothing right now (combat comes next this turn)\")")
+                 != string::npos,
+              "#W62-Z D11 the clause names the step and the row on THIS menu that ends the window");
+        CHECK(laterStepRouteClause("Block with Spider", &menu).find("Declaring blocks") != string::npos,
+              "#W62-Z D11 the blocking shape names its own step");
+        // MUST-NOT-MATCH: a card name is not a combat step, and no row is
+        // invented when the menu does not carry the decline row that states it.
+        CHECK(laterStepRouteClause("Cast Staff of Nin", &menu).empty(),
+              "#W62-Z D11 MUST-NOT-MATCH an off-menu CARD name gets the plain re-ask, unchanged");
+        CHECK(laterStepRouteClause("Attacker's Bane", &menu).empty(),
+              "#W62-Z D11 MUST-NOT-MATCH a card whose name merely starts with the word is not a step");
+        {
+            vector<string> noRoute;
+            noRoute.push_back("Cast Tribute to Hunger {2}{b}");
+            noRoute.push_back("Cast nothing right now");
+            CHECK(laterStepRouteClause("Attack with Vampire", &noRoute).empty()
+                  && laterStepRouteClause("Attack with Vampire", NULL).empty(),
+                  "#W62-Z D11 MUST-NOT-MATCH with no row that states combat is next, nothing is claimed");
+        }
+        CHECK(route.find('{') == string::npos,
+              "#W62-Z D11 echo shape: the clause is plain re-ask prose and opens no annotation channel");
+    }
+
+    cout << "\n[#W62-Z D12] the survivable assignment is named, not just counted\n";
+    {
+        // 146v152 seq 54: two blockers, three attackers, 8 life, 13 incoming.
+        // bestCaseOptimal proved the seat could reach 6 and printed only the 6.
+        vector<string> bn, an;
+        bn.push_back("Goblin (1/1)"); bn.push_back("Spider (2/1)");
+        an.push_back("Wolf #1"); an.push_back("Wolf #2"); an.push_back("Wolf #3");
+        vector<int> match; match.push_back(0); match.push_back(1);
+        CHECK(blockAssignmentClause(bn, an, match)
+              == " - one legal assignment that reaches it: Goblin (1/1) blocks Wolf #1;"
+                 " Spider (2/1) blocks Wolf #2",
+              "#W62-Z D12 the pairing the matching already found is printed, by card name");
+        {
+            vector<int> partial; partial.push_back(-1); partial.push_back(2);
+            CHECK(blockAssignmentClause(bn, an, partial)
+                  == " - one legal assignment that reaches it: Spider (2/1) blocks Wolf #3",
+                  "#W62-Z D12 an unassigned blocker is simply absent from the assignment");
+        }
+        {
+            vector<int> none; none.push_back(-1); none.push_back(-1);
+            CHECK(blockAssignmentClause(bn, an, none).empty()
+                  && blockAssignmentClause(bn, an, vector<int>()).empty(),
+                  "#W62-Z D12 MUST-NOT-MATCH no pairing, no claim");
+            vector<int> oob; oob.push_back(7);
+            CHECK(blockAssignmentClause(bn, an, oob).empty(),
+                  "#W62-Z D12 MUST-NOT-MATCH an index off the attacker list names nothing");
+        }
+        // The matching is HANDED BACK by the same call that produced the number,
+        // so the assignment and the life it reaches cannot disagree.
+        {
+            vector<int> dmg; dmg.push_back(8); dmg.push_back(3); dmg.push_back(2);
+            vector<vector<char> > can;
+            {
+                vector<char> r0; r0.push_back(1); r0.push_back(1); r0.push_back(1); can.push_back(r0);
+                vector<char> r1; r1.push_back(1); r1.push_back(1); r1.push_back(1); can.push_back(r1);
+            }
+            vector<int> got;
+            const int rem = assignableRemainderDamage(dmg, can, NULL, &got);
+            //The augmenting search re-seats an earlier blocker when that frees a
+            //bigger attacker, so the pairing is [b0->A2, b1->A1]: both legal,
+            //both from the SAME walk the number came out of. What is pinned is
+            //that every blocker is matched to a legal attacker and the number
+            //agrees, not a particular seating order.
+            CHECK(rem == 2 && got.size() == 2 && got[0] == 1 && got[1] == 0,
+                  "#W62-Z D12 the matching returned is the one the remainder was computed from");
+            CHECK(assignableRemainderDamage(dmg, can) == rem,
+                  "#W62-Z D12 REGRESSION the number is unchanged when no matching is asked for");
+        }
+        // On the header: the clause rides the PROVEN branch only.
+        {
+            const string proven = incomingCombatLine(3, 13, 8, true, 0, 0, 2, true, 3, 3,
+                                                     " - one legal assignment that reaches it: Goblin blocks Wolf #1");
+            CHECK(proven.find("best case with every blocker assigned: you would be at 6") != string::npos
+                  && proven.find("one legal assignment that reaches it: Goblin blocks Wolf #1") != string::npos,
+                  "#W62-Z D12 the header that proves a survivable line now names one");
+            CHECK(incomingCombatLine(3, 13, 8, true, 0, 0, 2, false, 3, 3,
+                                     " - one legal assignment that reaches it: X blocks Y")
+                      .find("one legal assignment") == string::npos,
+                  "#W62-Z D12 MUST-NOT-MATCH the FLOOR branch names no assignment - no single one reaches it");
+            CHECK(incomingCombatLine(3, 13, 2, true, 0, 0, 13, true, 3, 3,
+                                     " - one legal assignment that reaches it: X blocks Y")
+                      .find("one legal assignment") == string::npos,
+                  "#W62-Z D12 MUST-NOT-MATCH a lethal best case names no saving assignment");
+            CHECK(incomingCombatLine(3, 13, 8, true, 0, 0, 2, true, 3, 3)
+                  == incomingCombatLine(3, 13, 8, true, 0, 0, 2, true, 3, 3, ""),
+                  "#W62-Z D12 REGRESSION with no assignment to name the line is byte-identical to wave 61");
+            CHECK(proven.find('{') == string::npos && proven.find('[') == string::npos,
+                  "#W62-Z D12 echo shape: the header opens no bracketed channel a reply could echo");
+        }
+    }
+
+    cout << "\n[#W62-Z D14] the {X} cast row stops reading as a free row\n";
+    {
+        // deck125 HIGH-3: 9 of 154 `Cast Sphinx's Revelation` rows carried a
+        // leaves/spends tail against 323 of 634 elsewhere, and the guide teaches
+        // that a row with no such clause is a row where the remainder is large.
+        const string t = xCastRemainderScopeTag(1, 3, false);
+        CHECK(t == " {no {leaves ...} count on this row: what it spends depends on the X you announce"
+                   " at the next window. At the largest X this row prices (X=1, 4 mana total) your"
+                   " mana affords no larger X, so that cast leaves you nothing more to spend on X;"
+                   " every step below it leaves one more mana untapped}",
+              "#W62-Z D14 the row states the scope of its own silence and the tap-out at its badge's X");
+        CHECK(xCastRemainderScopeTag(0, 3, false).find("affords only X=0 right now") != string::npos
+              && xCastRemainderScopeTag(0, 3, false).find("largest X") == string::npos,
+              "#W62-Z D14 at X=0 there is no largest-X clause to state");
+        CHECK(xCastRemainderScopeTag(2, 4, true).find("one more mana of the X pip's colour") != string::npos,
+              "#W62-Z D14 a coloured X names the colour the step frees");
+        CHECK(xCastRemainderScopeTag(-1, 3, false).empty(),
+              "#W62-Z D14 MUST-NOT-MATCH an uncomputed X claims nothing");
+        // MUST-NOT-MATCH: it is NOT the {leaves N of your M} count - printing a
+        // remainder here would be a figure about a payment not yet made.
+        CHECK(t.find("leaves 0 of your") == string::npos && t.find("taps you out") == string::npos,
+              "#W62-Z D14 MUST-NOT-MATCH no source count and no tap-out badge is claimed for an unannounced X");
+        // ECHO SHAPE: a {...} annotation, so the row's short name is unchanged
+        // and the option-set key does not see it.
+        {
+            vector<string> xm;
+            xm.push_back("Cast Sphinx's Revelation {u}{u}{w}{x}" + t);
+            xm.push_back("Cast nothing right now");
+            bool xs = false;
+            CHECK(parseChoice("CHOICE: 1 (Cast Sphinx's Revelation)", 2, &xm, &xs) == 1 && !xs,
+                  "#W62-Z D14 echo: the annotated row still binds to its own index by its short name");
+            CHECK(stripNarrationDecoration(xm[0]).find("no {leaves") == string::npos,
+                  "#W62-Z D14 echo: the annotation leaves no residue in the narrated record");
+        }
+    }
+
+    cout << "\n[#W62-Z D18] the abandoned wall miss carries the phase its own stamp proved\n";
+    {
+        // deck130 s12: curl=28,http=0,empty=1,connect_ms=20000,phase=wall at
+        // latency_ms 900024 / deadline_pct 100.0, classed wall_miss_unrecorded.
+        const string stamp = AIPlayerGPT::transportOutcomeStamp(28, 0, true, 20000, 900024, 900000);
+        CHECK(stamp == "curl=28,http=0,empty=1,connect_ms=20000,phase=wall",
+              "#W62-Z D18 the wave-61 C13 stamp is unchanged, byte for byte");
+        CHECK(transportStampPhase(stamp) == "wall",
+              "#W62-Z D18 the phase is read back off the stamp that proved it");
+        CHECK(wallMissClassFor(transportStampPhase(stamp)) == "wall_miss_unrecorded_wall",
+              "#W62-Z D18 the class repeats the verdict instead of contradicting it");
+        CHECK(wallMissClassFor("connect") == "wall_miss_unrecorded_connect"
+              && wallMissClassFor("midflight") == "wall_miss_unrecorded_midflight",
+              "#W62-Z D18 every proven phase gets its own class");
+        // MUST-NOT-MATCH / continuity: no phase, no suffix - the wave-55 string
+        // is kept exactly, and every existing grep still matches the family.
+        CHECK(wallMissClassFor("") == "wall_miss_unrecorded",
+              "#W62-Z D18 MUST-NOT-MATCH an unexplained abandonment keeps the old class byte for byte");
+        CHECK(wallMissClassFor("wall").compare(0, 21, "wall_miss_unrecorded_") == 0
+              && string("wall_miss_unrecorded").compare(0, 20, "wall_miss_unrecorded") == 0,
+              "#W62-Z D18 the old name is a prefix of the new one - no corpus key is renamed away");
+        CHECK(transportStampPhase("curl=0,http=503,empty=1").empty()
+              && transportStampPhase("").empty(),
+              "#W62-Z D18 MUST-NOT-MATCH a stamp with no phase yields none");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
