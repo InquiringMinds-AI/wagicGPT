@@ -115,6 +115,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     : mSeed((unsigned int)time(0)), randomGenerator(mSeed, true), aiRandomGenerator(aiSeedFrom(mSeed), false), mResourceManager(output), mJGE(input)
 
 {
+    mAdvanceRefusalSecs = 0;
     ExtraRules = new MTGCardInstance[2]();
 
     mGameType = GAME_TYPE_CLASSIC;
@@ -478,6 +479,12 @@ GameObserver::CombatDecision GameObserver::pendingCombatDecision(Player * p)
     return COMBAT_DECISION_NONE;
 }
 
+void GameObserver::setAdvanceRefusal(const std::string& text, float seconds)
+{
+    mAdvanceRefusal = text;
+    mAdvanceRefusalSecs = seconds;
+}
+
 bool GameObserver::humanDisplayOpen()
 {
     if (!mLayers || !mLayers->actionLayer())
@@ -685,7 +692,19 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     if (mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && combatStep == BLOCKERS
         && !isInterrupting && opponent() && !opponent()->isAI()
         && LegalActionsOracle::illegalBlockDeclaration(opponent()))
+    {
+        //Say WHY (owner, Vita vpk26: the silent refusal read as a softlock).
+        MTGCardInstance * bad = LegalActionsOracle::illegalBlockDeclaration(opponent());
+        if (bad)
+        {
+            char msg[256];
+            int need = bad->minBlockersRequired();
+            snprintf(msg, sizeof(msg), "%s can't be blocked by fewer than %d creatures - add another blocker or remove it",
+                     bad->getName().c_str(), need);
+            setAdvanceRefusal(msg, 4.0f);
+        }
         return;
+    }
     /*if (OpenedDisplay)//dont let us fly through all the phases with grave and library box still open.
     {
         return;//I want this here, but it locks up on opponents turn, we need to come up with a clever way to close opened
@@ -1088,6 +1107,12 @@ void GameObserver::dumpAssert(bool val)
 
 void GameObserver::Update(float dt)
 {
+    if (mAdvanceRefusalSecs > 0)
+    {
+        mAdvanceRefusalSecs -= dt;
+        if (mAdvanceRefusalSecs <= 0)
+            mAdvanceRefusal.clear();
+    }
     //#W57-T (half A): re-arm the per-tick hang budget. No-op unless
     //WAGIC_HANG_GUARD=1 - see GameObserver::hangTickBegin.
     hangTickBegin();

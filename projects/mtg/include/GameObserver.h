@@ -243,6 +243,13 @@ class GameObserver{
   //about to open (its ability resolved, the display not yet built). Phase
   //automation and phase-advance requests hold while it is.
   bool humanDisplayOpen();
+    //Owner, Vita vpk26 (2026-09-05): "a bizarre softlock where i could assign and
+    //cancel blockers but not go to the next step" - the W43-1 illegal-blocker
+    //gate below refused the advance SILENTLY (a lone blocker on a menace
+    //attacker). The refusal now states its reason on screen for a few seconds.
+    std::string mAdvanceRefusal;
+    float mAdvanceRefusalSecs;
+    void setAdvanceRefusal(const std::string& text, float seconds);
   //W53-DELVER root cause: phase triggers (GenericTriggeredAbility::Update)
   //POLL getCurrentGamePhase once per tick; a phase entered and left inside one
   //Update is never seen by any "@each my upkeep" trigger. The automation skips

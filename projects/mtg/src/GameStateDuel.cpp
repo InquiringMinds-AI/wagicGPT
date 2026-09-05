@@ -2166,6 +2166,15 @@ void GameStateDuel::Render()
     //render the game until someone did win the game (otherwise it crashes sometimes under linux)
     if (game && !game->didWin())
         game->Render();
+    //Owner, Vita vpk26: an advance the engine refused (illegal blockers) says why.
+    if (game && !game->didWin() && game->mAdvanceRefusalSecs > 0 && !game->mAdvanceRefusal.empty())
+    {
+        const float y = SCREEN_HEIGHT_F - 34.f;
+        r->FillRect(0, y - 3.f, SCREEN_WIDTH_F, 16.f, ARGB(200, 40, 0, 0));
+        mFont->SetColor(ARGB(255, 255, 220, 120));
+        mFont->DrawString(game->mAdvanceRefusal.c_str(), SCREEN_WIDTH_F / 2, y, JGETEXT_CENTER);
+        mFont->SetColor(ARGB(255, 255, 255, 255));
+    }
 
 #ifdef AI_CHANGE_TESTING
     if (game && totalTestGames)
