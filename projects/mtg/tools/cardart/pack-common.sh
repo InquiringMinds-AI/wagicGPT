@@ -78,6 +78,8 @@ convert_set() {
 
     if [ "$n" -eq 0 ]; then rm -rf "$w"; echo "EMPTY $set_name"; return 0; fi
 
+    # Set symbol (fetch-symbols.py) rides along at the zip root.
+    [ -f "$set_dir/symbol.png" ] && cp "$set_dir/symbol.png" "$w/symbol.png"
     mkdir -p "$OUT/sets/$set_name"
     ( cd "$w" && zip -q -0 -r -X "$zip" . ) || { echo "ZIPFAIL $set_name"; rm -rf "$w"; return 1; }
     local sz; sz="$(du -m "$zip" | cut -f1)"
