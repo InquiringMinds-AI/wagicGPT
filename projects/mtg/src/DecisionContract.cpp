@@ -326,6 +326,14 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
                     req.optionTexts.push_back(o.str());
                 }
                 req.kind = DecisionRequest::ANNOUNCE_X;
+                //#W62-Y (D5): the announcement round is a cancellable menu
+                //(ActionLayer::setCustomMenuObject added a "Cancel" row because
+                //the caller passed must=false), and MenuAbility::reactToChoiceClick
+                //treats an out-of-range choice on an announcing menu as "the
+                //player backed out of paying entirely; decline cleanly". Say so
+                //on the contract - the seat had no way to reach a row a human
+                //has always had.
+                req.canDecline = !object->checkCantCancel();
                 return true;
             }
             //X announcement: the menu's buttons ARE the X values; option
@@ -343,6 +351,16 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
                 req.optionTexts.push_back(o.str());
             }
             req.kind = DecisionRequest::ANNOUNCE_X;
+            //#W62-Y (D5, deck130 HIGH-1): the CAST route's X announcement.
+            //MTGRules.cpp arms it with setCustomMenuObject(card, false, selection),
+            //so the engine's own "Cancel" row is on the menu and cantCancel is 0 -
+            //clicking it leaves mClone NULL and MenuAbility::reactToChoiceClick
+            //returns without announcing, i.e. the cast is backed out and the card
+            //is NOT spent. `130 s21/s22` offered "Cast Starstorm {X pricing: your
+            //mana affords only X=0 ... kills nothing}" and then a ONE-row X menu
+            //headed "this ask has no pass row" - a menu that could only destroy
+            //the card. The row exists in the engine; it was simply never carried
+            //onto the decision contract.
             return true;
         }
 
@@ -435,6 +453,16 @@ void DecisionManager::applyMenuChoice(const DecisionRequest & req, const Decisio
 
     if (req.kind == DecisionRequest::CHOOSE_MODE || req.kind == DecisionRequest::ANNOUNCE_X)
     {
+        //#W62-Y (D5): a declined X announcement clicks the menu's own Cancel
+        //row (the last item; the same index the CHOOSE_MENU decline below
+        //uses). Only where the request said the menu is cancellable - on a
+        //can't-cancel menu the answer still has to land on a real option.
+        if (act.choice < 0 && req.canDecline && req.kind == DecisionRequest::ANNOUNCE_X
+            && object->abilitiesMenu && object->abilitiesMenu->mObjects.size())
+        {
+            object->doReactTo((int) object->abilitiesMenu->mObjects.size() - 1);
+            return;
+        }
         if (act.choice < 0 || act.choice >= (int) req.optionTexts.size())
             return;
         object->ButtonPressedOnMultipleChoice(act.choice);

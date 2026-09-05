@@ -1,0 +1,34 @@
+#W62-Y (D5, wave-61 deck130 HIGH-1) - the claim the decision-contract change
+#rests on: the X ANNOUNCEMENT menu carries the engine's own Cancel row, and
+#clicking it backs the cast out WITHOUT spending the card.
+#
+#MTGRules.cpp arms the announcement with setCustomMenuObject(card, false,
+#selection), so ActionLayer adds a "Cancel" item after the X rows and leaves
+#cantCancel at 0; ButtonPressedOnMultipleChoice hands that out-of-range index to
+#MenuAbility::reactToChoiceClick, which finds no ability for it and returns with
+#mClone NULL - nothing is announced. deck130 s21/s22 offered "Cast Starstorm
+#{X pricing: your mana affords only X=0 ...}" and then a ONE-row X menu headed
+#"this ask has no pass row"; the row existed, the contract never carried it.
+#
+#Ivy Elemental {X}{G} over {3}{G}: maxX = 3, so the menu is X=0..3 (four rows)
+#and the Cancel row is index 4. Taking it must leave the card in HAND. The mana
+#floated for the cast STAYS floating (the end-of-phase rule empties it) - the
+#assert pins that too, so the decline's real price is on the record.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Flicker,Ivy Elemental
+inplay:plains,mountain
+manapool:{3}{G}
+[PLAYER2]
+[DO]
+Ivy Elemental
+choice 4
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Flicker,Ivy Elemental
+inplay:plains,mountain
+manapool:{3}{G}
+[PLAYER2]
+[END]
