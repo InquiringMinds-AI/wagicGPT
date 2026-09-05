@@ -165,6 +165,7 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
 {
     char buffer[4096];
     string name;
+    int thisPrint = -1;
     if (controlId < BOOSTER_SLOTS)
     {
         name = mBooster[controlId].getName();
@@ -175,6 +176,8 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
         if (!c)
             return "";
         name = _(c->data->getName());
+        //Owned copies of THIS printing (set + art), beside the by-name total.
+        thisPrint = myCollection ? myCollection->count(c) : 0;
     }
     if (mInventory[controlId] <= 0)
     {
@@ -190,23 +193,30 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
         if (controlId < BOOSTER_SLOTS || mCounts[controlId] == 0)
             return name;
 
-        sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
+        if (thisPrint >= 0 && thisPrint != mCounts[controlId])
+            sprintf(buffer, _("%s (%i/%i)").c_str(), name.c_str(), mCounts[controlId], thisPrint);
+        else
+            sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
         return buffer;
+    }
+    //"(3)" when every owned copy is this printing; "(3 owned, 1 of this print)" otherwise.
+    char owned[128];
+    owned[0] = 0;
+    if (mCounts[controlId] >= 1)
+    {
+        if (thisPrint >= 0 && thisPrint != mCounts[controlId])
+            snprintf(owned, sizeof(owned), _(" (%i owned, %i of this print)").c_str(), mCounts[controlId], thisPrint);
+        else
+            snprintf(owned, sizeof(owned), _(" (%i)").c_str(), mCounts[controlId]);
     }
     switch (options[Options::ECON_DIFFICULTY].number)
     {
     case Constants::ECON_HARD:
     case Constants::ECON_NORMAL:
-        if (mCounts[controlId] < 1)
-            sprintf(buffer, _("%s").c_str(), name.c_str());
-        else
-            sprintf(buffer, _("%s (%i)").c_str(), name.c_str(), mCounts[controlId]);
+        sprintf(buffer, "%s%s", name.c_str(), owned);
         break;
     default:
-        if (mCounts[controlId] < 1)
-            sprintf(buffer, _("%s : %i credits").c_str(), name.c_str(), mPrices[controlId]);
-        else
-            sprintf(buffer, _("%s (%i) : %i credits").c_str(), name.c_str(), mCounts[controlId], mPrices[controlId]);
+        sprintf(buffer, _("%s%s : %i credits").c_str(), name.c_str(), owned, mPrices[controlId]);
         break;
     }
     return buffer;
@@ -757,6 +767,42 @@ void GameStateShop::Render()
             else
                 bigDisplay->setSource(NULL);
             bigDisplay->Render();
+            //A booster has no card art: put the set's full name where the art would be.
+            if (bigDisplay->mOffset.getPos() < 0)
+            {
+                int slot = bigSync.getPos();
+                if (slot >= 0 && slot < BOOSTER_SLOTS)
+                {
+                    string names = mBooster[slot].getSetNames();
+                    if (!names.empty())
+                    {
+                        //Word-wrap to the card's width (the art quad is ~180 px wide at x 385 centre).
+                        vector<string> lines;
+                        string cur, word;
+                        std::istringstream ws(names);
+                        while (ws >> word)
+                        {
+                            string trial = cur.empty() ? word : cur + " " + word;
+                            if (!cur.empty() && mFont->GetStringWidth(trial.c_str()) > 175)
+                            {
+                                lines.push_back(cur);
+                                cur = word;
+                            }
+                            else
+                                cur = trial;
+                        }
+                        if (!cur.empty())
+                            lines.push_back(cur);
+                        float lh = mFont->GetHeight() + 2;
+                        float y = 135 - lh * lines.size() / 2;
+                        mFont->SetColor(ARGB(255,255,255,255));
+                        for (size_t i = 0; i < lines.size(); i++)
+                            mFont->DrawString(lines[i].c_str(), 385, y + lh * i, JGETEXT_CENTER);
+                        mFont->SetColor(ARGB(200,200,200,200));
+                        mFont->DrawString(_("Booster - 15 cards").c_str(), 385, y + lh * lines.size() + 4, JGETEXT_CENTER);
+                    }
+                }
+            }
             float elp = srcCards->getElapsed();
             //Render the card list overlay.
             if (bListCards || elp > LIST_FADEIN)
@@ -936,6 +982,20 @@ string ShopBooster::getName()
     else if (mainSet)
         snprintf(buffer, sizeof(buffer), _("%s Booster (15 Cards)").c_str(), mainSet->id.c_str());
     return buffer;
+}
+
+string ShopBooster::getSetNames()
+{
+    if (!mainSet && pack)
+        return pack->getName();
+    if (altSet == mainSet)
+        altSet = NULL;
+    string s;
+    if (mainSet)
+        s = mainSet->name.empty() ? mainSet->id : mainSet->name;
+    if (altSet)
+        s += string(" & ") + (altSet->name.empty() ? altSet->id : altSet->name);
+    return s;
 }
 
 void ShopBooster::randomize(MTGPacks * packlist)

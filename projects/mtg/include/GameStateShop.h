@@ -43,6 +43,8 @@ class ShopBooster
 public:
     ShopBooster();
     string getName();
+    //Long set name(s) for the art area: "Tenth Edition" or "Ravnica & Guildpact"; empty when unknown.
+    string getSetNames();
     void randomize(MTGPacks * packlist);
     int basePrice();
     int maxInventory();
