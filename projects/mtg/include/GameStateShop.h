@@ -112,7 +112,10 @@ private:
     void cancelCard(int controlId);
     void cancelBooster(int controlId);
     int purchasePrice(int offset);
-    string descPurchase(int controlId, bool tiny = false);
+    //fit: 0 = full wording, 1 = medium, 2 = compact "(4/0)" - the info bar picks
+    //the longest that fits between the credits and the buttons.
+    string descPurchase(int controlId, bool tiny = false, int fit = 0);
+    string descPurchaseFit(int controlId, float maxWidth);
 public:
     GameStateShop(GameApp* parent);
     virtual ~GameStateShop();

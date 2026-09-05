@@ -287,7 +287,7 @@ static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& boost
     font->SetScale(baseScale);
 }
 
-string GameStateShop::descPurchase(int controlId, bool tiny)
+string GameStateShop::descPurchase(int controlId, bool tiny, int fit)
 {
     char buffer[4096];
     string name;
@@ -331,7 +331,14 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
     if (mCounts[controlId] >= 1)
     {
         if (thisPrint >= 0 && thisPrint != mCounts[controlId])
-            snprintf(owned, sizeof(owned), _(" (%i owned, %i of this print)").c_str(), mCounts[controlId], thisPrint);
+        {
+            if (fit <= 0)
+                snprintf(owned, sizeof(owned), _(" (%i owned, %i of this print)").c_str(), mCounts[controlId], thisPrint);
+            else if (fit == 1)
+                snprintf(owned, sizeof(owned), _(" (%i, this print %i)").c_str(), mCounts[controlId], thisPrint);
+            else
+                snprintf(owned, sizeof(owned), _(" (%i/%i)").c_str(), mCounts[controlId], thisPrint);
+        }
         else
             snprintf(owned, sizeof(owned), _(" (%i)").c_str(), mCounts[controlId]);
     }
@@ -347,6 +354,24 @@ string GameStateShop::descPurchase(int controlId, bool tiny)
     }
     return buffer;
 }
+//The info-bar line, sized to the span the buttons leave free (owner, vpk23: the
+//full wording ran under the Show List button on the Vita).
+string GameStateShop::descPurchaseFit(int controlId, float maxWidth)
+{
+    WFont * f = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    string s;
+    for (int fit = 0; fit <= 2; fit++)
+    {
+        s = descPurchase(controlId, false, fit);
+        if (!f || f->GetStringWidth(s.c_str()) <= maxWidth)
+            return s;
+    }
+    //Still too wide: trim the tail with an ellipsis.
+    while (s.size() > 4 && f->GetStringWidth((s + "...").c_str()) > maxWidth)
+        s.erase(s.size() - 1);
+    return s + "...";
+}
+
 void GameStateShop::beginPurchase(int controlId)
 {
     WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MENU_FONT);
@@ -945,8 +970,17 @@ void GameStateShop::Render()
     enableButtons();
 #endif
     
-    mFont->SetColor(ARGB(255,255,255,0));
-    mFont->DrawString(descPurchase(bigSync.getPos()).c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT - 14, JGETEXT_CENTER);
+    {
+        //Centre the purchase line in the span between the credits and the buttons.
+        float left = 5 + mFont->GetStringWidth(stream.str().c_str()) + 10;
+#ifndef TOUCH_ENABLED
+        float right = SCREEN_WIDTH - len - 16;
+#else
+        float right = SCREEN_WIDTH_F - 170 - 8;
+#endif
+        mFont->SetColor(ARGB(255,255,255,0));
+        mFont->DrawString(descPurchaseFit(bigSync.getPos(), right - left).c_str(), (left + right) / 2, SCREEN_HEIGHT - 14, JGETEXT_CENTER);
+    }
     mFont->SetColor(ARGB(255,255,255,255));
 
     if (mStage == STAGE_SHOP_TASKS && taskList)
