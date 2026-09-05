@@ -3965,6 +3965,80 @@ static int stackObjectLifeLossToSeat(Interruptible * it, Player * seat, string *
     return loss;
 }
 
+//#W63-AC (E2, deck125 HIGH-1): the same walk, for CARDS instead of life.
+//`125v162` seq 89 priced a Sphinx's Revelation row at "up to 7 discards ... at
+//worst you would be at 4" while that prompt's OWN `ON THE STACK` block listed
+//four pending draw triggers (Howling Mine x2, Dictate of Kruphix x2) it did not
+//count. Five records later the cleanup ask read "your hand has 17 cards ... you
+//must discard exactly 10 ... = 20 life - you would be at 5", from 25. A card
+//that is already promised by an unresolved trigger is in the hand the cleanup
+//step measures, so it belongs in the count that measures it.
+//Rails, identical to the life walk's: the RNG is never drawn (a `rand` amount
+//is not counted), only UNRESOLVED objects count, and only cards drawn by
+//`seat`. `exclude` drops the object the caller is itself pricing, so a spell
+//whose own draws the row already adds is never counted twice.
+static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int& cards,
+                                  const vector<Targetable *> * chosen = NULL)
+{
+    if (!a || depth > 5)
+        return;
+    if (AADrawer * dr = dynamic_cast<AADrawer *>(a))
+    {
+        if (dr->source && dr->nbcardsStr.find("rand") == string::npos)
+        {
+            const int n = dr->getNumCards();
+            vector<Targetable *> tgts;
+            if (dr->who == TargetChooser::UNSET && chosen && !chosen->empty())
+                tgts = *chosen;
+            else if (Targetable * one = dr->getTarget())
+                tgts.push_back(one);
+            for (size_t ti = 0; ti < tgts.size(); ti++)
+                if (n > 0 && dynamic_cast<Player *>(tgts[ti]) == seat)
+                    cards += n;
+        }
+    }
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+    {
+        vector<Targetable *> own;
+        const vector<Targetable *> * pass = chosen;
+        if (a->chosenTargets())
+        {
+            own = a->chosenTargets()->getTargetsFrom();
+            if (!own.empty())
+                pass = &own;
+        }
+        scanStackAbilityDraws(na->ability, seat, depth + 1, cards, pass);
+    }
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            scanStackAbilityDraws(ma->abilities[i], seat, depth + 1, cards, chosen);
+}
+
+//How many cards the UNRESOLVED stack will hand `seat` before it empties.
+static int stackPendingDrawsFor(GameObserver * observer, Player * seat,
+                                MTGCardInstance * exclude)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return 0;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return 0;
+    int cards = 0;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        StackAbility * sa = dynamic_cast<StackAbility *>(it);
+        if (!sa || !sa->ability)
+            continue;
+        if (exclude && (it->source == exclude || sa->ability->source == exclude))
+            continue;
+        scanStackAbilityDraws(sa->ability, seat, 0, cards);
+    }
+    return cards;
+}
+
 //#W60-L (B1): the life already committed against `seat` by the stack objects
 //that resolve BEFORE `below`. Ordering matters and is the whole point: an
 //object ABOVE another on the stack resolves first, so a target ask for an
@@ -5368,8 +5442,20 @@ static string manaAvailableLine(int sources, const string& colors, const string&
 {
     static const char * kNumWord[] = { "zero", "one", "two", "three", "four", "five",
                                        "six", "seven", "eight", "nine", "ten" };
+    //#W63-AC (E15, deck123): the rule rendered on 1922 of 1922 nonzero-mana
+    //lines and 0 of 177 zero-mana lines - it was missing on exactly the windows
+    //where a seat is most likely to conclude its own deck is uncastable.
+    //`123v130` seq 26 printed the bare zero line; seq 27 wrote "Colored mana
+    //cannot be used for generic costs ... This deck is uncastable" and burned
+    //10,799 bytes of overrun on it; seq 28, back at one source, carried the
+    //clause again. The payment rule is a fact about MANA, not about this board,
+    //so it is true on both faces - and the zero line adds the cheaper truth the
+    //review asked for: what would make mana.
     if (sources <= 0)
-        return "0 total (no untapped sources)";
+        return "0 total (no untapped sources - nothing of yours can be tapped for"
+               " mana in this window; an untap step, a land drop or a mana ability"
+               " is what changes that. The payment rule does not change with the"
+               " count: mana of ANY colour pays a generic cost like {2})";
     std::ostringstream o;
     o << sources << " total (";
     if (sources <= 10)
@@ -9129,9 +9215,21 @@ static bool xSurveyBoard(MTGCardInstance * card, Player * me, XVictimSurvey & sv
 //APPENDED - no number and no name is removed - because the two summed prices
 //above are what the punishers deal; what the caution adds is what the
 //opponent's completed loop then does with them.
+//#W63-AC (E13, engine MED-8): lane Y's D3 fixed the two forecast LINES and
+//said it left this paragraph alone; the paragraph then stood on the same screen
+//(`162v126` seq 13) carrying the chaining caution over BOTH of its numbers,
+//eight lines above a forecast that correctly said the same board does not chain
+//that way. The paragraph states TWO numbers with opposite owners - "every card
+//YOU draw costs you N" is life the pilot loses, "every card the OPPONENT draws
+//costs them M" is life they lose - and a loop held by side S is entered only by
+//life S's OPPONENT loses (or life S gains). So each sentence carries the clause
+//that is true for ITS number, exactly as D3 bound the forecast lines. Nothing
+//the model relies on is deleted: where both numbers are on the page both
+//clauses print; the only string that disappears is a false one.
 static string drawPunisherSummaryText(const vector<string>& mine, int minePerDraw,
                                       const vector<string>& theirs, int theirsPerDraw,
-                                      const string& loopCaution = "")
+                                      const string& yourLossLoopClause = "",
+                                      const string& theirLossLoopClause = "")
 {
     if (mine.empty() && theirs.empty())
         return "";
@@ -9156,6 +9254,7 @@ static string drawPunisherSummaryText(const vector<string>& mine, int minePerDra
         else
             o << "life (the amount is not fixed - read the permanents named)";
         o << " to theirs.";
+        o << yourLossLoopClause; //#W63-AC (E13): this number is life YOU lose
     }
     if (!mine.empty())
     {
@@ -9165,11 +9264,11 @@ static string drawPunisherSummaryText(const vector<string>& mine, int minePerDra
         else
             o << "life (the amount is not fixed - read the permanents named)";
         o << " to yours.";
+        o << theirLossLoopClause; //#W63-AC (E13): this number is life THEY lose
     }
     o << " They fire on EVERY draw - the draw step, a cycling ability, a draw"
          " spell, any extra draw - and the loss lands as the card is drawn, before"
          " anything can be done with it. Count that cost before choosing to draw.";
-    o << loopCaution; //#W60-N (B6)
     return o.str();
 }
 
@@ -9309,14 +9408,18 @@ static void drawPunisherScan(Player * me, Player * opp,
     }
 }
 
-//#W60-N (B6): `loopCaution` is computed by the caller (loopCautionForBoards is
+//#W60-N (B6): the loop clauses are computed by the caller (loopCautionForLine is
 //defined with the converter block, below this line's own emitter).
-static string drawPunisherSituationLine(Player * me, Player * opp, const string& loopCaution = "")
+//#W63-AC (E13): two clauses now, one per number - see drawPunisherSummaryText.
+static string drawPunisherSituationLine(Player * me, Player * opp,
+                                        const string& yourLossLoopClause = "",
+                                        const string& theirLossLoopClause = "")
 {
     vector<string> mine, theirs;
     int minePer = 0, theirsPer = 0;
     drawPunisherScan(me, opp, mine, minePer, theirs, theirsPer);
-    return drawPunisherSummaryText(mine, minePer, theirs, theirsPer, loopCaution);
+    return drawPunisherSummaryText(mine, minePer, theirs, theirsPer,
+                                   yourLossLoopClause, theirLossLoopClause);
 }
 
 //#W47 R1, the second half: the summary line states the standing price, but the
@@ -9984,9 +10087,21 @@ static string discardPunisherSituationLine(Player * me, Player * opp)
 //punisher of theirs it has a price. Returns "" when nothing overflows, when no
 //punisher is out, or when the price is not a number (the same rail as every
 //other punisher clause). `life` < 0 means "not supplied". Pure.
+//#W63-AC (E2, deck125 HIGH-1): two independent errors that happened to cancel
+//on the repro row and would not cancel again. (1) `handAfterDraw` was the hand
+//plus this cast's own draws and NOTHING else, so four draw triggers already on
+//the stack of the same prompt were not in the count (14 claimed, 17 actual).
+//`stackedDraws` is how many of the number came from there - the aggregate now
+//SAYS what it folded, so a reader can check it against the prompt's own ON THE
+//STACK block. (2) the floor was computed off PRE-cast life: Sphinx's Revelation
+//gains X, and "at worst you would be at 4" was 18 - 14 when the seat would in
+//fact be standing at 18 + X. `castLifeDelta` is this cast's own life movement,
+//signed, and the clause names it where it is nonzero rather than folding it
+//silently into a number the reader cannot reconstruct.
 static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDiscard,
                                         const string& punishers, int life = -1,
-                                        const string& label = "CLEANUP PRICE")
+                                        const string& label = "CLEANUP PRICE",
+                                        int stackedDraws = 0, int castLifeDelta = 0)
 {
     if (limit < 0 || handAfterDraw <= limit || perDiscard <= 0 || punishers.empty())
         return "";
@@ -9999,7 +10114,13 @@ static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDis
     //Stating it as a certainty made a green PARSETEST case protect a false
     //promise. It is still worth printing at full size - the worst case is what
     //kills - so the number stays and only its MODALITY changes.
-    o << label << ": that leaves " << handAfterDraw << " cards in hand against a"
+    o << label << ": that leaves " << handAfterDraw << " cards in hand";
+    if (stackedDraws > 0) //#W63-AC (E2)
+        o << " (that count INCLUDES " << stackedDraws << " card"
+          << (stackedDraws == 1 ? "" : "s") << " from draw trigger"
+          << (stackedDraws == 1 ? "" : "s") << " already ON THE STACK, which"
+             " resolve before any cleanup step)";
+    o << " against a"
          " maximum hand size of " << limit << ", so unless you spend cards before"
          " then the cleanup step forces up to " << over
       << " discard" << (over == 1 ? "" : "s") << " you cannot decline, and the"
@@ -10007,8 +10128,17 @@ static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDis
       << perDiscard << " life each = up to " << cost << " life";
     if (life >= 0)
     {
-        o << " - at worst you would be at " << (life - cost);
-        if (life - cost <= 0)
+        //#W63-AC (E2): the floor stands on the life this cast LEAVES, not on the
+        //life it was announced from.
+        const int floorLife = life + castLifeDelta - cost;
+        o << " - at worst you would be at " << floorLife;
+        if (castLifeDelta != 0)
+            o << " (your " << life << " life "
+              << (castLifeDelta > 0 ? "plus the " : "minus the ")
+              << (castLifeDelta > 0 ? castLifeDelta : -castLifeDelta)
+              << (castLifeDelta > 0 ? " this cast gains you" : " this cast costs you")
+              << ", minus the " << cost << " above)";
+        if (floorLife <= 0)
             o << "; at worst this KILLS you";
     }
     return o.str();
@@ -10118,10 +10248,16 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
     }
     if (variable)
         o << (said ? ", plus " : "") << "an amount that is not fixed (read the card)";
-    o << "; converters on your battlefield: " << converters.size();
+    //#W63-AC (E13, deck162 MED): the two counters on this tag were both called
+    //"converters" and 0 of 63 of THIS list ever named a discard punisher - the
+    //render was right and the label was what invited the conflation. The class
+    //is now in the name of the count.
+    o << "; draw converters (they fire when the opponent DRAWS) on your battlefield: "
+      << converters.size();
     if (converters.empty())
-        o << " (nothing of yours punishes their draws or discards yet - the cards you"
-             " hand them are free until a converter is out)";
+        o << " (nothing of yours punishes their DRAWS yet - the cards you"
+             " hand them are free until a draw converter is out; a discard"
+             " punisher is a different class and is counted separately below)";
     else
     {
         o << " - ";
@@ -10132,7 +10268,7 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
     //the zero), so a rule keyed to it is never silent - the discriminator the
     //guide's release condition is written against is the PAIR of numbers, and a
     //missing half reads as a zero the pilot then has to check by hand.
-    o << "; in your hand: " << handConverters.size();
+    o << "; draw converters in your hand: " << handConverters.size();
     if (!handConverters.empty())
     {
         o << " - ";
@@ -10222,7 +10358,14 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
     }
     if (perDraw > 0)
     {
-        o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to you from your punishers above";
+        //#W63-AC (E13, engine MED-9): "N life to you from your punishers above"
+        //reads as life GAINED, and no draw punisher in the pool gives the pilot
+        //a point of life - Underworld Dreams, Fate Unraveler and Ob Nixilis are
+        //all `damage:N` to the DRAWER. The number is life the drawer loses; the
+        //sentence now says so, and says the pilot's own life does not move.
+        o << " = " << k << " x " << perDraw << " = " << (k * perDraw)
+          << " life LOST BY THEM to your punishers above (that is life removed"
+             " from their total; you gain none of it)";
         if (holderLife >= 0) //#W62-X (D8)
         {
             o << " - if it resolves as forecast they would be at " << (holderLife - k * perDraw);
@@ -10257,7 +10400,10 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
     }
     if (perDraw > 0)
     {
-        o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to the punishers above";
+        //#W63-AC (E13, engine MED-9): the mirror. "N life to the punishers
+        //above" names no loser at all; this number is life the PILOT loses.
+        o << " = " << k << " x " << perDraw << " = " << (k * perDraw)
+          << " life LOST BY YOU to their punishers above";
         if (holderLife >= 0) //#W62-X (D8)
         {
             o << " - if it resolves as forecast you would be at " << (holderLife - k * perDraw);
@@ -10660,7 +10806,8 @@ static const int kXNetNotSupplied = -1000000;
 static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
                                int punisherPerDraw, const string& punishers,
                                int handAfterCast = -1, int handLimit = -1,
-                               int perDiscard = 0, const string& discardPunishers = "")
+                               int perDiscard = 0, const string& discardPunishers = "",
+                               int stackedDraws = 0) //#W63-AC (E2)
 {
     std::ostringstream o;
     o << " {X pricing: X=" << x << " - ";
@@ -10700,7 +10847,8 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
     string cleanup;
     if (handAfterCast >= 0 && cards > 0)
         cleanup = cleanupDiscardPriceClause(handAfterCast + cards, handLimit, perDiscard,
-                                            discardPunishers);
+                                            discardPunishers, -1, "CLEANUP PRICE",
+                                            stackedDraws); //#W63-AC (E2)
     bool ceiling = false; //#W60-Q (R3): a cleanup price folded in is a ceiling
     if (!cleanup.empty())
     {
@@ -10770,12 +10918,14 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
                                     int punisherPerDraw, const string& punishers,
                                     std::vector<string>& out,
                                     int handAfterCast = -1, int handLimit = -1,
-                                    int perDiscard = 0, const string& discardPunishers = "")
+                                    int perDiscard = 0, const string& discardPunishers = "",
+                                    int stackedDraws = 0) //#W63-AC (E2)
 {
     out.clear();
     for (int x = capX; x >= 0; x--)
         out.push_back(xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers,
-                                       handAfterCast, handLimit, perDiscard, discardPunishers));
+                                       handAfterCast, handLimit, perDiscard, discardPunishers,
+                                       stackedDraws));
 }
 
 //#W57-E (D20, wave-56 ledger MED): the `[<- ...]` marker is the most reliably
@@ -10825,7 +10975,8 @@ static void xTradeCountsAt(const std::vector<XDamVictim>& victims, int x, int & 
 //#W60-N (B5): defined with the ANNOUNCE_X plumbing below; used by the cast row.
 static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * opp,
                                 int& handAfterCast, int& limit, int& perDiscard,
-                                string& discardPunishers);
+                                string& discardPunishers,
+                                int * stackedDrawsOut = NULL); //#W63-AC (E2)
 
 //#W61-S (C10): the ladder's NET verdict for the badge - the NET at the cap and
 //the largest listed X whose NET still leaves the pilot alive. Reads the same
@@ -10919,17 +11070,19 @@ string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * a
             //carried it with no draw punisher on the board at all.
             if (drawPerX > 0 && me && sv.maxX > 0)
             {
-                int handAfterCast = -1, handLimit = -1, perDiscard = 0;
+                int handAfterCast = -1, handLimit = -1, perDiscard = 0, stackedDraws = 0;
                 string discardPunishers;
                 forcedCleanupInputs(card, me, me->opponent(), handAfterCast, handLimit,
-                                    perDiscard, discardPunishers);
+                                    perDiscard, discardPunishers, &stackedDraws); //#W63-AC (E2)
                 if (handAfterCast >= 0)
                 {
                     std::ostringstream lab;
                     lab << "CLEANUP PRICE at X=" << sv.maxX;
+                    //#W63-AC (E2): the floor stands on the life the cast leaves.
                     string cp = cleanupDiscardPriceClause(handAfterCast + sv.maxX * drawPerX,
                                                           handLimit, perDiscard,
-                                                          discardPunishers, me->life, lab.str());
+                                                          discardPunishers, me->life, lab.str(),
+                                                          stackedDraws, sv.maxX * lifePerX);
                     if (!cp.empty())
                         base += "; " + cp;
                 }
@@ -11269,12 +11422,15 @@ static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& 
 //not. `limit` is < 0 (i.e. "no clause") for a seat with no maximum hand size.
 static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * opp,
                                 int& handAfterCast, int& limit, int& perDiscard,
-                                string& discardPunishers)
+                                string& discardPunishers,
+                                int * stackedDrawsOut)
 {
     handAfterCast = -1;
     limit = -1;
     perDiscard = 0;
     discardPunishers.clear();
+    if (stackedDrawsOut)
+        *stackedDrawsOut = 0;
     if (!me || !me->game || !me->game->hand)
         return;
     int n = me->game->hand->nb_cards;
@@ -11284,6 +11440,14 @@ static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * op
             n--;
             break;
         }
+    //#W63-AC (E2): the cards the stack has already promised this seat. They are
+    //in the hand the cleanup step measures, so they are in the hand this price
+    //is computed from - every caller of this function folds them, and the
+    //clause that prints the number names how many came from here.
+    const int stacked = stackPendingDrawsFor(me->getObserver(), me, card);
+    n += stacked;
+    if (stackedDrawsOut)
+        *stackedDrawsOut = stacked;
     handAfterCast = n;
     if (me->nomaxhandsize)
         return;
@@ -11359,11 +11523,13 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         for (size_t ni = 0; ni < theirsP.size(); ni++)
             names << (ni ? ", " : "") << theirsP[ni];
         //#W60-N (B5): and what the draws force at the cleanup step.
-        int handAfterCast = -1, handLimit = -1, perDiscard = 0;
+        int handAfterCast = -1, handLimit = -1, perDiscard = 0, stackedDraws = 0;
         string discardPunishers;
-        forcedCleanupInputs(card, me, opp, handAfterCast, handLimit, perDiscard, discardPunishers);
+        forcedCleanupInputs(card, me, opp, handAfterCast, handLimit, perDiscard,
+                            discardPunishers, &stackedDraws); //#W63-AC (E2)
         xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out,
-                                handAfterCast, handLimit, perDiscard, discardPunishers);
+                                handAfterCast, handLimit, perDiscard, discardPunishers,
+                                stackedDraws);
         //#W56-C (D7 b): the monotone menu's own marker, on the largest X, via
         //the same one-row-marked plumbing the kill families use.
         if (markX && markerText)
@@ -18349,6 +18515,111 @@ static int oppNextTurnManaReach(Player * opp, MTGCardInstance * exclude = NULL,
     return (int) seen.size();
 }
 
+//#W63-AC (E5, engine HIGH-1 / MED-10, deck130 second HIGH): the printed body an
+//animate clause turns the permanent into. TWO script forms are in the pool and
+//only one was read: `becomes(creature ...^N/M...)` (the caret form, which
+//MTGAbility.cpp:5468 itself rewrites to a comma before parsing) and
+//`becomes(Creature Hydra,1/1,green)` - the COMMA form every one of Lair of the
+//Hydra's twenty rungs is written in (`borderline.txt:64293-64312`). So the
+//clause named the Lair five times in `130v152` seq 17-19 and never once said
+//how hard it hits, on exactly the card that most needs the number. Bounded to
+//the becomes(...) group so a caret elsewhere on the line cannot be read as a
+//power. Returns -1 when the line states no power. Pure.
+static int crackBackAnimatedPower(const string& line, size_t becomesPos)
+{
+    if (becomesPos == string::npos || becomesPos >= line.size())
+        return -1;
+    size_t close = line.find(')', becomesPos);
+    if (close == string::npos)
+        close = line.size();
+    size_t caret = line.find('^', becomesPos);
+    size_t comma = line.find(',', becomesPos);
+    size_t at = string::npos;
+    if (caret != string::npos && caret < close)
+        at = caret;
+    if (comma != string::npos && comma < close && (at == string::npos || comma < at))
+        at = comma;
+    if (at == string::npos)
+        return -1;
+    size_t d = at + 1;
+    while (d < close && line[d] == ' ')
+        d++;
+    if (d >= close || line[d] < '0' || line[d] > '9')
+        return -1;
+    size_t e = d;
+    while (e < close && line[e] >= '0' && line[e] <= '9')
+        e++;
+    //A power is the first half of a P/T pair - a bare number that is not
+    //followed by a slash is some other parameter, and is not claimed.
+    if (e >= close || line[e] != '/')
+        return -1;
+    return atoi(line.c_str() + d);
+}
+
+//#W63-AC (E5, engine HIGH-1): the whole animate half of one permanent, folded
+//to ONE answer. `mt` is the card's lowercased script; the walk keeps the BEST
+//affordable rung, which is the only rung whose power figure is worth printing.
+//Pure over the script and the three affordability inputs, so the "one entry per
+//PERMANENT, never one per RUNG" invariant is provable without a board - which
+//is what the wave-62 shape needed and did not have.
+//`bestPower` is -1 when the affordable rungs state no power at all.
+static bool crackBackBestAnimateRung(const string& mt, bool sourceStaysTapped,
+                                     int oppReach, int reachColorMask,
+                                     int& bestPower, string& bestCost)
+{
+    bestPower = -1;
+    bestCost.clear();
+    bool any = false;
+    size_t lp = 0;
+    while (lp <= mt.size())
+    {
+        size_t nl = mt.find('\n', lp);
+        string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+        if (line.empty() || line[0] == '@')
+            continue;
+        const size_t bp = line.find("becomes(creature");
+        if (bp == string::npos)
+            continue;
+        const size_t colon = line.find(':');
+        if (colon == string::npos || colon >= bp)
+            continue; //no cost head: not an activated animation
+        if (!crackBackCostAffordable(line.substr(0, colon), sourceStaysTapped,
+                                     oppReach, reachColorMask))
+            continue;
+        const int pw = crackBackAnimatedPower(line, bp);
+        if (!any || pw > bestPower)
+        {
+            bestPower = pw;
+            bestCost = line.substr(0, colon);
+        }
+        any = true;
+    }
+    return any;
+}
+
+//The entry that permanent contributes to the clause. One name, the best rung's
+//power (MED-10's missing figure), the cost the gate already had to price
+//(MED-10's missing price), and the reason the cost is priced against everything
+//BUT this permanent's own mana. Pure.
+static string crackBackAnimatorEntry(const string& name, int bestPower,
+                                     const string& bestCost)
+{
+    if (name.empty())
+        return "";
+    std::ostringstream o;
+    o << name;
+    if (bestPower >= 0)
+        o << " (best rung their mana pays for: " << bestPower << " power once animated";
+    else
+        o << " (this render will not claim its size";
+    if (!bestCost.empty())
+        o << ", for " << bestCost;
+    o << "; its own mana is NOT counted toward that cost - a permanent tapped for"
+         " mana is tapped, and a tapped permanent cannot attack)";
+    return o.str();
+}
+
 static string crackBackFloorSources(Player * opp)
 {
     if (!opp || !opp->game || !opp->game->inPlay)
@@ -18393,6 +18664,31 @@ static string crackBackFloorSources(Player * opp)
         const int oppReach = (cardNext >= 0) ? cardNext : openNow;
         const int reachMask = (cardNext >= 0) ? cardMask : openMask;
         const string mt = scriptLower(c->magicText);
+        //#W63-AC (E5, engine HIGH-1): ONE entry per PERMANENT, not one per
+        //affordable RUNG. The wave-62 walk appended `c->getDisplayName()` on
+        //every script line that matched, so a single Lair of the Hydra - twenty
+        //rungs, five of them affordable - read as five attackers the opponent
+        //does not have (`130v152` seq 17/18/19: the prompt's own opponent
+        //battlefield line lists it once). The control case is in the corpus:
+        //two physical Hives of the Eye Tyrant, one animate ability each, print
+        //twice - so the count was tracking the MANA, not the board. The fold is
+        //now one pure call per permanent.
+        if (!c->isCreature())
+        {
+            const bool staysTapped = c->isTapped()
+                                     && (c->basicAbilities[Constants::DOESNOTUNTAP]
+                                         || c->frozen >= 1);
+            int bestRungPower = -1;
+            string bestRungCost;
+            if (crackBackBestAnimateRung(mt, staysTapped, oppReach, reachMask,
+                                         bestRungPower, bestRungCost))
+            {
+                if (!animators.empty())
+                    animators += ", ";
+                animators += crackBackAnimatorEntry(c->getDisplayName(), bestRungPower,
+                                                    bestRungCost);
+            }
+        }
         size_t lp = 0;
         while (lp <= mt.size())
         {
@@ -18402,28 +18698,9 @@ static string crackBackFloorSources(Player * opp)
             if (line.empty())
                 continue;
             const bool triggered = (line[0] == '@');
-            if (!triggered && !c->isCreature())
-            {
-                //(a) an activated animation, with the printed body it becomes
-                size_t b = line.find("becomes(creature");
-                if (b != string::npos && crackBackAbilityUsable(c, line, b, oppReach, reachMask))
-                {
-                    int pw = -1;
-                    size_t caret = line.find('^', b);
-                    if (caret != string::npos && caret + 1 < line.size()
-                        && line[caret + 1] >= '0' && line[caret + 1] <= '9')
-                        pw = atoi(line.c_str() + caret + 1);
-                    if (!animators.empty())
-                        animators += ", ";
-                    animators += c->getDisplayName();
-                    if (pw >= 0)
-                    {
-                        std::ostringstream pp;
-                        pp << " (" << pw << " power once animated)";
-                        animators += pp.str();
-                    }
-                }
-            }
+            //#W63-AC (E5): (a), the activated animation, moved OUT of this
+            //per-line loop and into crackBackBestAnimateRung above - that is
+            //the whole fix for the five-Lairs count.
             if (!triggered)
             {
                 //(b) an activated ability whose damage can be aimed at a player
@@ -18592,6 +18869,40 @@ static string crackBackReliefClause(int total, int removed, int myLife, bool flo
              " guaranteed";
     o << "}";
     return o.str();
+}
+
+//#W63-AC (E9, engine HIGH-4, D19 FAIL): `removes N from the CRACK-BACK total
+//above` occurred 0 times in 2,251 windows including both of the windows lane X
+//built it for. The gate was never the problem: `crackBackNextTurnDue` is the
+//same predicate the LINE is rendered from, and in both repro records the line
+//was on the screen. The rows were. Lane X wired the clause into ONE seam - the
+//chooseTarget ask (`AIPlayerGPT::chooseTarget`) - and recorded that it had
+//"deliberately left alone" the other `damageTargetVerdict` call site as a "LOG
+//narration". That site is `AIPlayerGPT::describeAction`, which is not narration
+//at all: it is the DECISION-ROW builder (`renderOrder.push_back(describeAction(
+//...))`), and both repro rows - `125v146` seq 15 row 3 and `126v146` seq 38,
+//`Deal 1 damage with Staff of Nin targeting Goblin ... {right now: takes 1
+//damage - DIES} [cost: Tap]` - are rows it built. An activated ability whose
+//target is already bound never reaches a chooseTarget ask, so the clause had no
+//window to fire in.
+//This is the screen's crack-back figure for the row builder, gated on exactly
+//the render's own conditions, so a row can never point at a line that is not
+//above it. Returns false when this screen prints no CRACK-BACK line.
+static bool crackBackScreenTotal(Player * me, Player * opp, GameObserver * obs,
+                                 int& total, bool& isFloor)
+{
+    total = 0;
+    isFloor = false;
+    if (!me || !opp || !obs)
+        return false;
+    int attackers = 0;
+    const int t = crackBackTotalOver(opp, &attackers);
+    if (!crackBackNextTurnDue(obs->currentPlayer == me,
+                              (int) obs->getCurrentGamePhase(), attackers, t))
+        return false;
+    total = t;
+    isFloor = !crackBackFloorSources(opp).empty();
+    return true;
 }
 
 //#W57-B (D24): the best legal blocker assignment, as damage that still lands.
@@ -19804,8 +20115,14 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     //in the same board frame, for the same reason. Two seats died holding every
     //fact separately (see drawPunisherSummaryText).
     {
-        const string loopCaution = loopCautionForBoards(this, opp); //#W60-N (B6)
-        string punish = drawPunisherSituationLine(this, opp, loopCaution);
+        //#W63-AC (E13, MED-8): the paragraph's two numbers have opposite
+        //owners, so each takes the clause D3 built for a line carrying that
+        //number. `loopCautionForBoards` (one sentence for the whole block) was
+        //the surface that kept printing the fatal-chain caution over a number
+        //that enters no chain.
+        const string yourLossLoop = loopCautionForLine(this, opp, true);
+        const string theirLossLoop = loopCautionForLine(this, opp, false);
+        string punish = drawPunisherSituationLine(this, opp, yourLossLoop, theirLossLoop);
         if (!punish.empty())
         {
             out << "\n" << punish;
@@ -20344,6 +20661,17 @@ static string stripNarrationDecoration(const string& in)
                 //all the same species - true of THIS window's offer and false
                 //the moment it closes, so none of them may enter history.
                 || (in.compare(i, 10, "{removes: ") == 0)
+                //#W63-AC (E9): D19's relief clause is `{removes N from the
+                //CRACK-BACK total above: ...}` - no colon after the verb, so
+                //the wave-54 entry above never covered it. It prices a total
+                //that is true of THIS window's board and false the moment the
+                //body dies, which is the same species as every other row tag
+                //here; it never fired in the wave-62 corpus, so this closes the
+                //leak before it can open.
+                || (in.compare(i, 9, "{removes ") == 0)
+                //#W63-AC (E5): the rung ceiling explains THIS menu's top row
+                //and says nothing about what happened.
+                || (in.compare(i, 15, "{rung ceiling: ") == 0)
                 || (in.compare(i, 19, "{no creature target") == 0)
                 || (in.compare(i, 15, "{taps you out -") == 0)
                 || (in.compare(i, 22, "{modes live right now:") == 0)
@@ -22049,6 +22377,47 @@ string damagePlayerVerdict(int dmg, int life, bool isMe,
 static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth);
 static string toLowerCopy(const string & s);
 
+//#W63-AC (E5, engine LOW-11): does this ability turn its own source into a
+//creature? `becomes(...)` parses to ATransformer / ATransformerInstant
+//(MTGAbility.cpp:5464-5498), under whatever activation wrapper the script gave
+//it, so the nest is walked the same way the damage rider's is.
+static bool unwrapSelfAnimate(MTGAbility * a, int depth)
+{
+    if (!a || depth > 5)
+        return false;
+    if (dynamic_cast<ATransformerInstant *>(a) || dynamic_cast<ATransformer *>(a))
+        return true;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return unwrapSelfAnimate(na->ability, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (unwrapSelfAnimate(ma->abilities[i], depth + 1))
+                return true;
+    return false;
+}
+
+//#W63-AC (E5, engine LOW-11): `152v126` seq 15 printed `Mana available: 5 total
+//(five untapped sources ...)` and offered Lair of the Hydra's {1}{g}, {2}{g}
+//and {3}{g} rungs but not the {4}{g} five sources appear to pay for. The engine
+//is RIGHT and the page did not say why: ManaEngine::potentialMana excludes the
+//ability's own source from the mana it may be paid with (`if (card == target)
+//used[card] = true;`), and for THIS ability class that exclusion is rules-load-
+//bearing rather than incidental - a Lair tapped for its own {g} is a tapped
+//permanent, and a tapped creature cannot attack or block, which is the whole
+//reason to animate it. So no cap is lifted and no legal rung is withheld: the
+//row states the rule the ceiling comes from, so a pilot that counts five
+//sources and finds four rungs can check the difference instead of distrusting
+//the menu. Pure over the name.
+static string animateRungCeilingClause(const string& name)
+{
+    if (name.empty())
+        return "";
+    return " {rung ceiling: " + name + "'s OWN mana is not counted toward this"
+           " activation - tapping it for mana leaves it tapped, and a tapped"
+           " permanent can neither attack nor block, so the largest rung on this"
+           " menu is what your OTHER untapped sources pay for}";
+}
+
 //#W53-O (D5, wave-52 ledger HIGH): a targeted spell's CAST row - the REFUSABLE
 //window - carried less information than the forced target ask that follows it.
 //`123v146` seq 18 (turn 10, 6 life) offered "Cast Tragic Slip {b} {right now:
@@ -23719,6 +24088,15 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             else
                 out << (mapped ? w42Capitalize(lbl) : lbl);
         }
+        //#W63-AC (E5, engine LOW-11): the rung ceiling, said out loud - only on
+        //a self-animation offered by a permanent that is itself a mana source,
+        //which is the only shape the exclusion can surprise a reader on.
+        {
+            MTGCardInstance * asrc = action.ability->source;
+            if (asrc && !asrc->isCreature() && unwrapSelfAnimate(action.ability, 0)
+                && scriptLower(asrc->magicText).find(":add") != string::npos)
+                out << animateRungCeilingClause(asrc->getDisplayName());
+        }
     }
     if (action.click)
     {
@@ -23896,10 +24274,30 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     if (dmg > 0 && dtc->controller() && dtc->controller()->game
                         && dtc->currentZone == dtc->controller()->game->inPlay)
                     {
+                        const bool dt = ad->source && ad->source->has(Constants::DEATHTOUCH);
                         if (dtc->isCreature())
+                        {
                             out << damageTargetVerdict(dmg, dtc->toughness, dtc->life,
                                                        dtc->basicAbilities[Constants::INDESTRUCTIBLE],
-                                                       ad->source && ad->source->has(Constants::DEATHTOUCH));
+                                                       dt);
+                            //#W63-AC (E9): what killing this body takes off the
+                            //CRACK-BACK total the same screen printed. Same
+                            //arithmetic, same gate and same guards as the
+                            //chooseTarget seam: a DIES verdict, a body the
+                            //OPPONENT controls, and a line actually on screen.
+                            if (damageKillsTarget(dmg, dtc->life,
+                                                  dtc->basicAbilities[Constants::INDESTRUCTIBLE], dt)
+                                && dtc->controller() == opponent())
+                            {
+                                int cbTotal = 0;
+                                bool cbFloor = false;
+                                if (crackBackScreenTotal(this, opponent(), getObserver(),
+                                                         cbTotal, cbFloor))
+                                    out << crackBackReliefClause(cbTotal,
+                                                                 crackBackBodyContribution(dtc),
+                                                                 life, cbFloor);
+                            }
+                        }
                         else if (dtc->hasType(Subtypes::TYPE_PLANESWALKER) && dtc->counters
                                  && dtc->counters->hasCounter("loyalty", 0, 0))
                             out << damagePlaneswalkerVerdict(dmg, dtc->counters->hasCounter("loyalty", 0, 0)->nb);
@@ -38121,7 +38519,23 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
 //FACT otherwise. Nothing is withheld and no row loses its count; only the
 //verdict word is conditioned. `haveHandCost` false = no non-land card in hand
 //to compare against, so no verdict is available either way.
-string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCost)
+//#W63-AC (E16, deck125 MED-2): the comparison ran over EVERY non-land card in
+//hand, so one uncastable card set the bar for the whole hand. `125v162` seq 94:
+//eleven lands down, and all four land rows read `{you control 11 lands already;
+//the most expensive card in your hand costs 15}` with no `{spare:` prefix,
+//because Emrakul, the Aeons Torn {15} was on the list. In 125v126 seq 39 the
+//same at six lands. The one deck in the pool that always holds an uncastable
+//{15} is the one deck the tag never fires for, and the guide's cleanup ordering
+//keys on the literal `{spare:` string.
+//A card the seat cannot reach cannot be what the next land drop is FOR, so it
+//is not the demand the verdict is about. `reachCap` is the largest cost this
+//comparison still counts (the caller sets it to the land count plus the drops
+//the curve can still make); a card above it is named with its cost and stated
+//as excluded, so nothing is hidden and the reader can check the arithmetic.
+//`beyondCost <= 0` means no such card, and then every byte is as before.
+string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCost,
+                              const string& beyondName = "", int beyondCost = 0,
+                              int reachCap = -1)
 {
     if (myLands <= 0)
         return "";
@@ -38134,7 +38548,17 @@ string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCos
     o << "you control " << myLands << " land" << (myLands == 1 ? "" : "s")
       << " already";
     if (haveHandCost && highestHandCost >= 0)
-        o << "; the most expensive card in your hand costs " << highestHandCost;
+        o << "; the most expensive card in your hand you could still reach costs "
+          << highestHandCost;
+    if (!beyondName.empty() && beyondCost > 0)
+    {
+        o << "; " << beyondName << " at " << beyondCost << " is NOT counted here";
+        if (reachCap >= 0)
+            o << " - it is past what " << myLands << " land"
+              << (myLands == 1 ? "" : "s") << " plus the drops this hand can still"
+                 " make would pay for (this comparison counts costs up to "
+              << reachCap << ")";
+    }
     o << "}";
     return o.str();
 }
@@ -38299,6 +38723,13 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
     //still prints).
     int highestHandCost = -1;
     bool haveHandCost = false;
+    //#W63-AC (E16): a cost this seat cannot reach is not the demand the next
+    //land drop answers. `reachCap` is the land count plus two more drops - the
+    //review's own suggestion - and a card above it is EXCLUDED from the
+    //comparison and NAMED on the row instead of silently setting the bar.
+    const int reachCap = myLands + 2;
+    string beyondName;
+    int beyondCost = 0;
     for (size_t hc = 0; hc < hand.size(); hc++)
     {
         if (!hand[hc] || hand[hc]->hasType(Subtypes::TYPE_LAND) || !hand[hc]->getManaCost())
@@ -38306,6 +38737,15 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         int cc = hand[hc]->getManaCost()->getConvertedCost();
         if (cc <= 0)
             continue;
+        if (cc > reachCap)
+        {
+            if (cc > beyondCost)
+            {
+                beyondCost = cc;
+                beyondName = hand[hc]->name;
+            }
+            continue;
+        }
         haveHandCost = true;
         if (cc > highestHandCost)
             highestHandCost = cc;
@@ -38340,7 +38780,8 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         //a spell whose own target spec sees nothing on the board says that,
         //and a spell that targets the STACK is never given the clause.
         if (hand[j]->hasType(Subtypes::TYPE_LAND))
-            row << discardSpareLandClause(myLands, highestHandCost, haveHandCost);
+            row << discardSpareLandClause(myLands, highestHandCost, haveHandCost,
+                                         beyondName, beyondCost, reachCap); //#W63-AC (E16)
         else
         {
             if (myBattlefieldNames.count(hand[j]->name))
@@ -40339,15 +40780,25 @@ void AIPlayerGPT::runParseSelfTest()
                   "W32-R N-158g NEGATIVE: the line no longer OPENS with a mana symbol (the misbinding)");
             CHECK(manaAvailableLine(1, "{w}", "").find("one untapped source,") != string::npos,
                   "W32-R N-158g: a single source is singular");
-            CHECK(manaAvailableLine(0, "", "") == "0 total (no untapped sources)",
-                  "W32-R N-158g: the empty case still leads with a count");
+            CHECK(manaAvailableLine(0, "", "").compare(0, 30, "0 total (no untapped sources -") == 0,
+                  "W32-R N-158g: the empty case still leads with a count"
+                  " (#W63-AC E15 appended the payment rule to it)");
             CHECK(manaAvailableLine(12, "{g}", "").find("12 total (untapped sources,") != string::npos,
                   "W32-R N-158g: past the word table the digit stands alone (no out-of-range read)");
             // W36 #9 (105/158): the payment rule for generic costs rides the line.
             CHECK(ml.find("mana of ANY colour pays a generic cost like {2}") != string::npos,
                   "W36-9 the mana line states that any colour pays generic costs");
-            CHECK(manaAvailableLine(0, "", "").find("ANY colour") == string::npos,
-                  "W36-9 NEGATIVE: the zero-source line carries no payment clause");
+            //#W63-AC (E15): the wave-36 NEGATIVE is INVERTED, not deleted - the
+            //missing clause is the defect deck123 paid 10,799 bytes for. What
+            //the zero line must still never do is claim a source it does not
+            //have.
+            CHECK(manaAvailableLine(0, "", "").find("mana of ANY colour pays a generic"
+                                                    " cost like {2}") != string::npos,
+                  "#W63-AC E15 the zero-source line states the payment rule too");
+            CHECK(manaAvailableLine(0, "", "").find("untapped source,") == string::npos
+                      && manaAvailableLine(0, "", "").find("colours you can make")
+                             == string::npos,
+                  "#W63-AC E15 MUST-NOT-MATCH the zero line still claims no source and no colour");
         }
 
         // ---- N-152e: the transform-DFC Flip-Side text is truthful, and the two
@@ -46635,8 +47086,9 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(manaAvailableLine(5, "{r}{b}", "").find("sources that can make each")
                   == string::npos,
               "#W46-1 NEGATIVE a caller without the per-source data renders the old line");
-        CHECK(manaAvailableLine(0, "", "", &repro) == "0 total (no untapped sources)",
-              "#W46-1 REGRESSION the zero-source line is untouched");
+        CHECK(manaAvailableLine(0, "", "", &repro)
+                  == manaAvailableLine(0, "", ""),
+              "#W46-1 REGRESSION the zero-source line ignores the per-source data");
         CHECK(ml.find('[') == string::npos && ml.find(']') == string::npos,
               "#W46-1 NEGATIVE the clause carries no bracketed annotation to echo");
         CHECK(ml.find("1. ") == string::npos && ml.find("\n1") == string::npos,
@@ -48627,10 +49079,10 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     " << fc << "\n";
         CHECK(fc == "DRAW FORECAST: your next draw step draws 9 cards (1 + Howling Mine 1"
                     " + Dictate of Kruphix 1 + Teferi's Puzzle Box: your hand size 6)"
-                    " = 9 x 2 = 18 life to the punishers above.",
+                    " = 9 x 2 = 18 life LOST BY YOU to their punishers above.",
               "#W49-U D6 the 9-card step that killed deck123 is stated with its price");
         std::vector<std::pair<std::string, int> > noneX;
-        CHECK(drawStepForecastText(1, noneX, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life to the punishers above.",
+        CHECK(drawStepForecastText(1, noneX, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life LOST BY YOU to their punishers above.",
               "#W49-U D6 a plain draw step is still forecast under punishers");
         CHECK(drawStepForecastText(1, extras, 0).find(" life") == string::npos,
               "#W49-U D6 NEGATIVE no per-draw price known, no life arithmetic invented");
@@ -49159,20 +49611,20 @@ void AIPlayerGPT::runParseSelfTest()
     {
         std::vector<std::pair<std::string, int> > none;
         CHECK(theirDrawStepForecastText(1, none, 1)
-                  == "DRAW FORECAST (theirs): their next draw step draws 1 card = 1 x 1 = 1 life to you from your punishers above.",
+                  == "DRAW FORECAST (theirs): their next draw step draws 1 card = 1 x 1 = 1 life LOST BY THEM to your punishers above (that is life removed from their total; you gain none of it).",
               "#W50-X D16 deck162 vs125 seq 13: Underworld Dreams out, the opponent's plain draw step priced");
         std::vector<std::pair<std::string, int> > extras;
         extras.push_back(std::make_pair(string("Howling Mine"), 1));
         extras.push_back(std::make_pair(string("Teferi's Puzzle Box: your hand size"), 5));
         CHECK(theirDrawStepForecastText(1, extras, 2)
-                  == "DRAW FORECAST (theirs): their next draw step draws 7 cards (1 + Howling Mine 1 + Teferi's Puzzle Box: their hand size 5) = 7 x 2 = 14 life to you from your punishers above.",
+                  == "DRAW FORECAST (theirs): their next draw step draws 7 cards (1 + Howling Mine 1 + Teferi's Puzzle Box: their hand size 5) = 7 x 2 = 14 life LOST BY THEM to your punishers above (that is life removed from their total; you gain none of it).",
               "#W50-X D16 extras listed; the drawer-relative hand-size label is re-seated for this chair");
         CHECK(theirDrawStepForecastText(1, none, 0).find(" life") == string::npos,
               "#W50-X D16 NEGATIVE no per-draw price -> no life arithmetic");
         CHECK(theirDrawStepForecastText(1, none, 1).find("your next draw step") == string::npos,
               "#W50-X D16 NEGATIVE the mirror never reads as the punished seat's own forecast");
-        CHECK(drawStepForecastText(1, none, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life to the punishers above.",
-              "#W50-X D16 the punished seat's line is byte-identical to wave 49");
+        CHECK(drawStepForecastText(1, none, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life LOST BY YOU to their punishers above.",
+              "#W50-X D16 the punished seat's line matches wave 49 but for #W63-AC E13's loser naming");
     }
 
     cout << "\n[#W50-X D17] the cast-mode menu's Cast Card Normally row marks a bare back face\n";
@@ -49664,14 +50116,14 @@ static const char * kW50Y_r94 =
         two.push_back("Underworld Dreams #1");
         two.push_back("Fate Unraveler");
         string f2 = feedsRowTag(1, false, 0, two);
-        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Fate Unraveler; in your hand: 0}",
+        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; draw converters (they fire when the opponent DRAWS) on your battlefield: 2 - Underworld Dreams #1, Fate Unraveler; draw converters in your hand: 0}",
               "#W51-F D11 the row carries the count ahead of the converter names"
               " (#W57-E D23: the hand half is now stated too; #W60-N B5: DRAW punishers only)");
         string f0 = feedsRowTag(1, false, 0, none);
-        CHECK(f0.find("converters on your battlefield: 0") != string::npos && f0.find("free until a converter is out") != string::npos,
+        CHECK(f0.find("draw converters (they fire when the opponent DRAWS) on your battlefield: 0") != string::npos && f0.find("free until a draw converter is out") != string::npos,
               "#W51-F D11 at zero converters the row says 0 and why it matters");
         CHECK(feedsRowTag(2, false, 0, none).find("draws 2 extra cards per turn") != string::npos
-              && feedsRowTag(0, false, 7, two).find("draws 7 cards per spell they cast; converters on your battlefield: 2") != string::npos
+              && feedsRowTag(0, false, 7, two).find("draws 7 cards per spell they cast; draw converters (they fire when the opponent DRAWS) on your battlefield: 2") != string::npos
               && feedsRowTag(0, true, 0, two).find("an amount that is not fixed (read the card)") != string::npos,
               "#W51-F D11 plural, per-cast and not-fixed shapes");
         CHECK(feedsRowTag(0, false, 0, two).empty(),
@@ -49724,10 +50176,10 @@ static const char * kW50Y_r94 =
         drawC.push_back("Underworld Dreams #1");
         discC.push_back("Liliana's Caress");
         string fx = feedsRowTag(1, false, 0, drawC, noneC, discC, noneC);
-        CHECK(fx.find("converters on your battlefield: 1 - Underworld Dreams #1; in your hand: 0")
+        CHECK(fx.find("draw converters (they fire when the opponent DRAWS) on your battlefield: 1 - Underworld Dreams #1; draw converters in your hand: 0")
                   != string::npos,
               "#W60-N B5 the fed count is the DRAW punishers only");
-        CHECK(fx.find("converters on your battlefield: 2") == string::npos,
+        CHECK(fx.find("draw converters (they fire when the opponent DRAWS) on your battlefield: 2") == string::npos,
               "#W60-N B5 MUST-NOT-MATCH: the discard punisher is never added to the draw count");
         CHECK(fx.find("; discard punishers (a different class") != string::npos
                   && fx.find("on your battlefield: 1 - Liliana's Caress; in your hand: 0}") != string::npos,
@@ -49857,25 +50309,27 @@ static const char * kW50Y_r94 =
         //numbers themselves are untouched.
         vector<string> mine, theirs;
         mine.push_back("Underworld Dreams #1");
-        string sum = drawPunisherSummaryText(mine, 1, theirs, 0, lc);
+        //#W63-AC (E13): the paragraph's clause is per-NUMBER now, so the
+        //own-side sentence (life THEY lose) takes the 6th argument.
+        string sum = drawPunisherSummaryText(mine, 1, theirs, 0, "", lc);
         CHECK(sum.find("Every card the OPPONENT draws costs them 1 life to yours.") != string::npos
                   && sum.find("LOOP CAUTION: they control BOTH halves") != string::npos,
               "#W60-N B6 the summary keeps its number and gains the loop's consequence");
         CHECK(drawPunisherSummaryText(mine, 1, theirs, 0)
-                  == drawPunisherSummaryText(mine, 1, theirs, 0, ""),
+                  == drawPunisherSummaryText(mine, 1, theirs, 0, "", ""),
               "#W60-N B6 NEGATIVE with no loop the summary is byte-identical to before");
         std::vector<std::pair<std::string, int> > extras;
         extras.push_back(std::make_pair(string("Howling Mine"), 1));
         extras.push_back(std::make_pair(string("Dictate of Kruphix"), 3));
         string tf = theirDrawStepForecastText(1, extras, 1, lc);
         CHECK(tf.find("DRAW FORECAST (theirs): their next draw step draws 5 cards"
-                      " (1 + Howling Mine 1 + Dictate of Kruphix 3) = 5 x 1 = 5 life to you"
-                      " from your punishers above. LOOP CAUTION:") == 0,
+                      " (1 + Howling Mine 1 + Dictate of Kruphix 3) = 5 x 1 = 5 life LOST BY THEM to your punishers above (that is life removed from their total; you gain none of it)."
+                      " LOOP CAUTION:") == 0,
               "#W60-N B6 the 162v126 seq 20 forecast keeps its 5 and no longer reads as a safe gain");
         CHECK(theirDrawStepForecastText(1, extras, 1) == theirDrawStepForecastText(1, extras, 1, ""),
               "#W60-N B6 NEGATIVE no loop, no change to the forecast");
-        CHECK(drawStepForecastText(1, extras, 2, lc).find("= 5 x 2 = 10 life to the punishers"
-                                                          " above. LOOP CAUTION:") != string::npos,
+        CHECK(drawStepForecastText(1, extras, 2, lc).find("= 5 x 2 = 10 life LOST BY YOU to their punishers above."
+                                                          " LOOP CAUTION:") != string::npos,
               "#W60-N B6 the punished seat's own forecast carries it too");
         //(3) the PENDING half: 152v126 sat 25 decisions with Exquisite Blood in
         //play and Sanguine Bond named in the seat's own frame, and printed
@@ -52966,7 +53420,8 @@ static const char * kW50Y_r94 =
         //they pinned still prints on every land row; the verdict word is now
         //conditioned on the hand's own cost top (see discardSpareLandClause).
         CHECK(discardSpareLandClause(9, 3, true)
-                  == " {spare: you control 9 lands already; the most expensive card in your hand costs 3}",
+                  == " {spare: you control 9 lands already; the most expensive card in your hand"
+                     " you could still reach costs 3}",
               "#W55-D D9 / #W61-T C11 the land row states the lands already down, and 9 lands"
               " against a 3-drop top IS spare");
         CHECK(discardSpareLandClause(1, 0, false) == " {you control 1 land already}",
@@ -52975,7 +53430,8 @@ static const char * kW50Y_r94 =
               "#W55-D D9 NEGATIVE no land on the battlefield, no clause at all");
         //#W61-T (C11) POSITIVE: the deck130 repro - 2 lands, a 5-drop in hand.
         CHECK(discardSpareLandClause(2, 5, true)
-                  == " {you control 2 lands already; the most expensive card in your hand costs 5}",
+                  == " {you control 2 lands already; the most expensive card in your hand"
+                     " you could still reach costs 5}",
               "#W61-T C11 the 130v123 seq 9 board prints the COUNT and both numbers");
         //#W61-T (C11) MUST-NOT-MATCH: that row must not carry the verdict word.
         CHECK(discardSpareLandClause(2, 5, true).find("spare") == string::npos
@@ -55011,16 +55467,17 @@ static const char * kW50Y_r94 =
         board57.push_back("Underworld Dreams #1");
         hand57.push_back("Forced Fruition");
         CHECK(feedsRowTag(1, false, 0, none57, hand57)
-              == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 0"
-                 " (nothing of yours punishes their draws or discards yet - the cards you hand them"
-                 " are free until a converter is out); in your hand: 1 - Forced Fruition}",
+              == " {feeds: the opponent draws 1 extra card per turn; draw converters (they fire when the opponent DRAWS) on your battlefield: 0"
+                 " (nothing of yours punishes their DRAWS yet - the cards you hand them are free"
+                 " until a draw converter is out; a discard punisher is a different class and is"
+                 " counted separately below); draw converters in your hand: 1 - Forced Fruition}",
               "#W57-E D23 162v125 seq 15: the hand's converter is now a NUMBER on the row");
         CHECK(feedsRowTag(1, false, 0, board57, hand57)
-                  .find("converters on your battlefield: 1 - Underworld Dreams #1; in your hand:"
+                  .find("draw converters (they fire when the opponent DRAWS) on your battlefield: 1 - Underworld Dreams #1; draw converters in your hand:"
                         " 1 - Forced Fruition}") != string::npos,
               "#W57-E D23 both halves print, each with its own names, in one clause");
         CHECK(feedsRowTag(1, false, 0, board57, none57)
-                  .find("; in your hand: 0}") != string::npos,
+                  .find("; draw converters in your hand: 0}") != string::npos,
               "#W57-E D23 the zero prints too - a rule keyed to the hand half is never silent");
         CHECK(feedsRowTag(0, false, 0, board57, hand57).empty(),
               "#W57-E D23 NEGATIVE a card that feeds nothing still carries no tag");
@@ -58235,7 +58692,7 @@ static const char * kW50Y_r94 =
         CHECK(now.find("DRAW FORECAST: your draw step, resolving NOW, draws 13 cards")
                   == 0,
               "#W62-X D8 REPRO the tense drops \"next\" once the seat is in its draw step");
-        CHECK(now.find("= 13 x 2 = 26 life to the punishers above") != string::npos
+        CHECK(now.find("= 13 x 2 = 26 life LOST BY YOU to their punishers above") != string::npos
               && now.find("if it resolves as forecast you would be at -6") != string::npos
               && now.find("that KILLS you") != string::npos,
               "#W62-X D8 REPRO a forecast past printed life carries the resulting life and the verdict");
@@ -58248,9 +58705,9 @@ static const char * kW50Y_r94 =
         // NEGATIVE 1: no life supplied, no life claim - the wave-49 wording exactly.
         CHECK(drawStepForecastText(1, extras, 2)
                   == "DRAW FORECAST: your next draw step draws 3 cards"
-                     " (1 + Dictate of Kruphix #1 1 + Howling Mine 1) = 3 x 2 = 6 life"
-                     " to the punishers above.",
-              "#W62-X D8 NEGATIVE the defaulted call is byte-identical to wave 49");
+                     " (1 + Dictate of Kruphix #1 1 + Howling Mine 1) = 3 x 2 = 6 life LOST BY YOU to their punishers above.",
+              "#W62-X D8 NEGATIVE the defaulted call still claims no life total and no verdict"
+              " (#W63-AC E13 names the loser of the 6)");
         // NEGATIVE 2: no punishers, no arithmetic to verdict.
         CHECK(drawStepForecastText(1, extras, 0, "", true, 1).find("KILLS") == string::npos,
               "#W62-X D8 NEGATIVE with no per-draw price there is no verdict to print");
@@ -58395,11 +58852,11 @@ static const char * kW50Y_r94 =
         std::vector<std::pair<std::string, int> > noExtras;
         const string theirStep = theirDrawStepForecastText(1, noExtras, 2, scopeTheirs);
         const string myStep = drawStepForecastText(1, noExtras, 2, chainTheirs);
-        CHECK(theirStep.find("2 life to you from your punishers above.") != string::npos
+        CHECK(theirStep.find("2 life LOST BY THEM to your punishers above (that is life removed from their total; you gain none of it).") != string::npos
                   && theirStep.find(" LOOP SCOPE: they control") != string::npos
                   && theirStep.find("LOOP CAUTION") == string::npos,
               "#W62-Y D3 the THEIR-draw-step forecast (life THEY lose) carries the scope sentence, not the caution");
-        CHECK(myStep.find("2 life to the punishers above.") != string::npos
+        CHECK(myStep.find("2 life LOST BY YOU to their punishers above.") != string::npos
                   && myStep.find(" LOOP CAUTION: they control") != string::npos
                   && myStep.find("LOOP SCOPE") == string::npos,
               "#W62-Y D3 the YOUR-draw-step forecast (life YOU lose) keeps the fatal-chain caution");
@@ -59213,6 +59670,364 @@ static const char * kW50Y_r94 =
             CHECK(stripNarrationDecoration("A1. Fate Unraveler (3/3) deals 3" + tag)
                   == "A1. Fate Unraveler (3/3) deals 3",
                   "#W63-AB E4 echo shape: the bracket never reaches the narration");
+        }
+    }
+
+    // ================= wave-63 lane AC =================
+    cout << "\n[#W63-AC] E2 cleanup price / E5 manland fold / E9 relief clause reaches the rows"
+            " / E13 punisher direction and labels / E15 zero-mana rule / E16 spare-land reach\n";
+    {
+        // ---- E2: the CLEANUP PRICE folds the stack and prices off POST-cast life ----
+        // REPRO `125v162` seq 89/94 (deck125 HIGH-1): the row priced 14 cards
+        // and "at worst you would be at 4"; the cleanup ask five records later
+        // read 17 cards, 10 forced discards, 20 life, 25 -> 5. Hand after the
+        // cast 7, X=7 draws 7, and THREE cards owed by draw triggers already on
+        // that prompt's own ON THE STACK block = 17. Life 18 + 7 gained - 20 = 5,
+        // which is the number the game actually billed.
+        const string cp = cleanupDiscardPriceClause(17, 7, 2,
+                              "Liliana's Caress #1, Liliana's Caress #2", 18,
+                              "CLEANUP PRICE at X=7", 3, 7);
+        cout << "     " << cp << "\n";
+        CHECK(cp.find("CLEANUP PRICE at X=7: that leaves 17 cards in hand (that count"
+                      " INCLUDES 3 cards from draw triggers already ON THE STACK, which"
+                      " resolve before any cleanup step) against a maximum hand size of 7")
+                  == 0,
+              "#W63-AC E2 REPRO the count says how many of it came from the stack");
+        CHECK(cp.find("forces up to 10 discards you cannot decline") != string::npos
+                  && cp.find("= up to 20 life") != string::npos,
+              "#W63-AC E2 REPRO the discard count and the bill are the ones the game charged");
+        CHECK(cp.find("- at worst you would be at 5 (your 18 life plus the 7 this cast"
+                      " gains you, minus the 20 above)") != string::npos,
+              "#W63-AC E2 REPRO THE DECIDING FACT: the floor stands on the life the cast LEAVES");
+        // The wave-62 shape got 4 from the same board, off pre-cast life and a
+        // hand three cards short. That number must not be reachable any more.
+        CHECK(cp.find("you would be at 4") == string::npos,
+              "#W63-AC E2 MUST-NOT-MATCH the pre-cast floor is gone from the priced row");
+        // A life LOSS on the cast is signed the other way and says so.
+        CHECK(cleanupDiscardPriceClause(9, 7, 1, "Megrim", 5, "CLEANUP PRICE", 0, -2)
+                  .find("- at worst you would be at 1 (your 5 life minus the 2 this cast"
+                        " costs you, minus the 2 above)") != string::npos,
+              "#W63-AC E2 a cast that COSTS life prices the floor from what it leaves too");
+        // NEGATIVE: with nothing on the stack and no life delta the clause is
+        // byte-identical to the wave-62 render, and never mentions the stack.
+        CHECK(cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress", 13)
+                  == cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress", 13,
+                                               "CLEANUP PRICE", 0, 0),
+              "#W63-AC E2 NEGATIVE the defaulted call is byte-identical to wave 62");
+        CHECK(cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress", 13)
+                  .find("ON THE STACK") == string::npos
+              && cleanupDiscardPriceClause(18, 7, 4, "Liliana's Caress", 13)
+                  .find("this cast") == string::npos,
+              "#W63-AC E2 MUST-NOT-MATCH no stacked draw and no life delta claims neither");
+        // NEGATIVE: the silent cases are unchanged - nothing overflows, no
+        // punisher, no limit, no price.
+        CHECK(cleanupDiscardPriceClause(7, 7, 4, "Liliana's Caress", 13, "CLEANUP PRICE", 5, 5).empty()
+                  && cleanupDiscardPriceClause(18, 7, 0, "Liliana's Caress", 13, "CLEANUP PRICE", 5, 5).empty()
+                  && cleanupDiscardPriceClause(18, 7, 4, "", 13, "CLEANUP PRICE", 5, 5).empty(),
+              "#W63-AC E2 NEGATIVE the three silent gates still swallow the new arguments");
+        // ECHO: the clause is spliced INSIDE the {X pricing: ...} block, so the
+        // whole block strips off the narrated row and leaves no residue.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Sphinx's Revelation {x}{w}{u}{u} {X pricing: max affordable X=7; "
+                           + cp + "}");
+            menu.push_back("Cast nothing right now");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Sphinx's Revelation {x}{w}{u}{u}",
+                  "#W63-AC E2 echo shape: the cleanup price leaves no residue in the record");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Cast Sphinx's Revelation)", 2, &menu, &stale,
+                              NULL, NULL, false) == 1,
+                  "#W63-AC E2 echo: the priced row still answers as row 1");
+        }
+    }
+    {
+        // ---- E5: ONE entry per manland, the best affordable rung, its price ----
+        // The card is Lair of the Hydra (`borderline.txt:64289-64312`), written
+        // exactly as the primitive writes it: twenty rungs, the COMMA power form.
+        string lair = "if compare(type:land:mybattlefield)~morethan~2 then tap(noevent)\n"
+                      "{t}:add{g}\n"
+                      "{1}{g}:name(becomes a 1/1 hydra) becomes(creature hydra,1/1,green) ueot\n"
+                      "{2}{g}:name(becomes a 2/2 hydra) becomes(creature hydra,2/2,green) ueot\n"
+                      "{3}{g}:name(becomes a 3/3 hydra) becomes(creature hydra,3/3,green) ueot\n"
+                      "{4}{g}:name(becomes a 4/4 hydra) becomes(creature hydra,4/4,green) ueot\n"
+                      "{5}{g}:name(becomes a 5/5 hydra) becomes(creature hydra,5/5,green) ueot";
+        int pw = -99; string cost;
+        CHECK(crackBackBestAnimateRung(lair, false, 5, -1, pw, cost) && pw == 4 && cost == "{4}{g}",
+              "#W63-AC E5 REPRO five affordable rungs fold to ONE answer: the best their mana pays for");
+        CHECK(crackBackBestAnimateRung(lair, false, 4, -1, pw, cost) && pw == 3 && cost == "{3}{g}",
+              "#W63-AC E5 the ceiling tracks the reach, one rung at a time");
+        CHECK(!crackBackBestAnimateRung(lair, false, 1, -1, pw, cost),
+              "#W63-AC E5 NEGATIVE a reach that pays for no rung arms no entry at all");
+        // The colour half of the same gate (#W62-AA R5's mask), both ways.
+        CHECK(crackBackBestAnimateRung(lair, false, 5, 1 << Constants::MTG_COLOR_GREEN, pw, cost)
+                  && pw == 4,
+              "#W63-AC E5 a green-capable reach pays for the {N}{g} rung");
+        CHECK(!crackBackBestAnimateRung(lair, false, 5, 1 << Constants::MTG_COLOR_BLUE, pw, cost),
+              "#W63-AC E5 MUST-NOT-MATCH no green in the reach, no animate claim");
+        // MUST-NOT-MATCH: a becomes( with no cost head is a STATIC animation,
+        // not an activated one, and arms nothing.
+        CHECK(!crackBackBestAnimateRung("becomes(creature hydra,9/9,green)", false, 20, -1, pw, cost),
+              "#W63-AC E5 MUST-NOT-MATCH a cost-free becomes( is not an activated animation");
+        CHECK(!crackBackBestAnimateRung("@each my upkeep:becomes(creature hydra,9/9,green)",
+                                        false, 20, -1, pw, cost),
+              "#W63-AC E5 MUST-NOT-MATCH a TRIGGERED becomes( is not an activation either");
+        // The power parse, both script forms and the shapes that claim nothing.
+        {
+            const string comma = "{4}{g}:becomes(creature hydra,4/4,green) ueot";
+            const string caret = "{2}{u}:becomes(creature^3/3)";
+            CHECK(crackBackAnimatedPower(comma, comma.find("becomes(creature")) == 4,
+                  "#W63-AC E5 REPRO the COMMA power form Lair is written in is read (it was not)");
+            CHECK(crackBackAnimatedPower(caret, caret.find("becomes(creature")) == 3,
+                  "#W63-AC E5 the caret form the wave-61 walk read still reads");
+            const string nopt = "{1}{g}:becomes(creature hydra,green)";
+            const string bare = "{1}{g}:becomes(creature hydra)";
+            const string outside = "{1}{g}:becomes(creature hydra) and ^5/5 elsewhere";
+            CHECK(crackBackAnimatedPower(nopt, nopt.find("becomes(creature")) == -1
+                      && crackBackAnimatedPower(bare, bare.find("becomes(creature")) == -1
+                      && crackBackAnimatedPower(outside, outside.find("becomes(creature")) == -1,
+                  "#W63-AC E5 MUST-NOT-MATCH a non-numeric parameter, no parameter, and a caret"
+                  " OUTSIDE the becomes( group all claim no power");
+            CHECK(crackBackAnimatedPower(comma, string::npos) == -1,
+                  "#W63-AC E5 NEGATIVE no becomes( group, no power");
+        }
+        // The entry itself: one name, the figure MED-10 asked for, the price
+        // MED-10 asked for, and why the price excludes the permanent's own mana.
+        const string entry = crackBackAnimatorEntry("Lair of the Hydra", 4, "{4}{g}");
+        CHECK(entry == "Lair of the Hydra (best rung their mana pays for: 4 power once animated,"
+                       " for {4}{g}; its own mana is NOT counted toward that cost - a permanent"
+                       " tapped for mana is tapped, and a tapped permanent cannot attack)",
+              "#W63-AC E5 the entry names the permanent ONCE and carries the power and the cost");
+        {
+            //REPRO of the count itself: the wave-62 clause read
+            //"Lair of the Hydra, Lair of the Hydra, Lair of the Hydra, Lair of
+            //the Hydra, Lair of the Hydra" against ONE physical Lair.
+            int occurrences = 0;
+            for (size_t k = entry.find("Lair of the Hydra"); k != string::npos;
+                 k = entry.find("Lair of the Hydra", k + 1))
+                occurrences++;
+            CHECK(occurrences == 1,
+                  "#W63-AC E5 REPRO one permanent contributes exactly one name to the clause");
+        }
+        CHECK(crackBackAnimatorEntry("Hive of the Eye Tyrant", -1, "{3}{b}")
+                  .find("this render will not claim its size, for {3}{b}") != string::npos,
+              "#W63-AC E5 a rung that states no power still prices the activation, and claims no size");
+        CHECK(crackBackAnimatorEntry("", 4, "{4}{g}").empty(),
+              "#W63-AC E5 NEGATIVE no name, no entry");
+        // LOW-11: the rung CEILING on the seat's own menu, said out loud.
+        const string rc = animateRungCeilingClause("Lair of the Hydra");
+        CHECK(rc == " {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this"
+                    " activation - tapping it for mana leaves it tapped, and a tapped permanent"
+                    " can neither attack nor block, so the largest rung on this menu is what"
+                    " your OTHER untapped sources pay for}",
+              "#W63-AC E5 LOW-11 the menu says why five sources offer four rungs");
+        CHECK(animateRungCeilingClause("").empty(),
+              "#W63-AC E5 LOW-11 NEGATIVE no name, no clause");
+        {
+            vector<string> menu;
+            menu.push_back("Becomes a 3/3 hydra with Lair of the Hydra" + rc + " [cost: {3}{g}]");
+            menu.push_back("Cast nothing right now");
+            CHECK(stripNarrationDecoration(menu[0])
+                      == "Becomes a 3/3 hydra with Lair of the Hydra",
+                  "#W63-AC E5 LOW-11 echo shape: the ceiling clause never enters the record");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Becomes a 3/3 hydra)", 2, &menu, &stale,
+                              NULL, NULL, false) == 1,
+                  "#W63-AC E5 LOW-11 echo: the annotated row still answers as row 1");
+        }
+    }
+    {
+        // ---- E9: D19's relief clause, on the rows the corpus actually renders ----
+        // REPRO `125v146` seq 15 (engine HIGH-4): life 15, CRACK-BACK 9 over
+        // three bodies riding the FLOOR wording, and row 3 "Deal 1 damage with
+        // Staff of Nin targeting Goblin ... {right now: takes 1 damage - DIES}
+        // [cost: Tap]" - a describeAction row, which the wave-62 wiring never
+        // reached. The Goblin is 1 power, so killing it takes the total to 8.
+        const string verdict = damageTargetVerdict(1, 1, 1, false, false);
+        const string relief = crackBackReliefClause(9, 1, 15, true);
+        CHECK(verdict.find("DIES") != string::npos,
+              "#W63-AC E9 REPRO the row's own verdict is DIES (the clause's gate)");
+        CHECK(relief == " {removes 1 from the CRACK-BACK total above: 9 -> 8 - you would be at 7,"
+                        " but that total is a FLOOR, not a ceiling - surviving it is not guaranteed}",
+              "#W63-AC E9 REPRO the clause the seat never saw, on the numbers that screen printed");
+        {
+            //The COMPOSED path: the row as describeAction now builds it.
+            vector<string> menu;
+            menu.push_back("Deal 1 damage with Staff of Nin #1 targeting Goblin"
+                           " [opponent's battlefield]" + verdict + relief + " [cost: Tap]");
+            menu.push_back("Deal 1 damage with Staff of Nin #1 targeting the opponent"
+                           " (player, life 4)");
+            menu.push_back("Cast nothing right now");
+            CHECK(menu[0].find("- DIES} {removes 1 from the CRACK-BACK total above")
+                      != string::npos,
+                  "#W63-AC E9 composed shape: the clause is its own brace group after the verdict");
+            CHECK(stripNarrationDecoration(menu[0])
+                      == "Deal 1 damage with Staff of Nin #1 targeting Goblin",
+                  "#W63-AC E9 the relief clause is decision-time pricing and leaves no residue"
+                  " (the wave-54 drop list only covered \"{removes: \", with the colon)");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Deal 1 damage with Staff of Nin #1)", 3, &menu,
+                              &stale, NULL, NULL, false) == 1,
+                  "#W63-AC E9 echo: the row carrying the clause still answers as row 1");
+        }
+        // The gate that decides whether the line is on the screen at all - the
+        // SAME predicate the render uses, on the repro's own phase and seat.
+        CHECK(crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 3, 9),
+              "#W63-AC E9 the repro window (own turn, main 1, 3 attackers, 9 damage) IS due");
+        CHECK(!crackBackNextTurnDue(false, (int) MTG_PHASE_FIRSTMAIN, 3, 9)
+                  && !crackBackNextTurnDue(true, (int) MTG_PHASE_UPKEEP, 3, 9),
+              "#W63-AC E9 MUST-NOT-MATCH no clause where no CRACK-BACK line is printed");
+        CHECK(crackBackReliefClause(0, 1, 15, true).empty(),
+              "#W63-AC E9 MUST-NOT-MATCH a screen with no total prints no relief clause");
+        // REGRESSION: the wave-54 victim list, which the widened drop must not
+        // have broken.
+        CHECK(stripNarrationDecoration("Damnation {removes: Wolf, Bear}") == "Damnation",
+              "#W63-AC E9 REGRESSION the colon form still strips");
+    }
+    {
+        // ---- E13: the punisher paragraph's direction, and the loser of each number ----
+        // REPRO `162v126` seq 13 (engine MED-8): the paragraph carried the
+        // chaining caution over BOTH its numbers while the forecast eight lines
+        // down correctly said the same board does not chain that way.
+        const string conv13 = "Sanguine Bond #1", mir13 = "Exquisite Blood #1";
+        const string chain = loopCautionClause(conv13, mir13, true);
+        const string scope = loopNonChainingClause(conv13, mir13, true);
+        vector<string> mineP, theirsP;
+        mineP.push_back("Underworld Dreams #1");
+        theirsP.push_back("Fate Unraveler");
+        const string para = drawPunisherSummaryText(mineP, 3, theirsP, 2, chain, scope);
+        cout << "     " << para << "\n";
+        CHECK(para.find("Every card YOU draw costs you 2 life to theirs. LOOP CAUTION:")
+                  != string::npos,
+              "#W63-AC E13 REPRO the caution rides the number that IS their loop's entry");
+        CHECK(para.find("Every card the OPPONENT draws costs them 3 life to yours. LOOP SCOPE:")
+                  != string::npos,
+              "#W63-AC E13 REPRO the number they lose gets the scope sentence, not the caution");
+        CHECK(para.find("LOOP CAUTION") < para.find("LOOP SCOPE"),
+              "#W63-AC E13 each clause sits on its own sentence, in the order the sentences print");
+        // MUST-NOT-MATCH: the paragraph no longer ends with one sentence
+        // governing both numbers, and a paragraph with only a they-lose number
+        // never carries the fatal-chain claim.
+        {
+            const string closing = "Count that cost before choosing to draw.";
+            CHECK(para.size() >= closing.size()
+                      && para.compare(para.size() - closing.size(), closing.size(), closing) == 0,
+                  "#W63-AC E13 MUST-NOT-MATCH no clause trails the paragraph governing both"
+                  " numbers at once - the closing sentence is the last thing on it");
+        }
+        {
+            vector<string> noneP;
+            const string ownOnly = drawPunisherSummaryText(mineP, 3, noneP, 0, chain, scope);
+            CHECK(ownOnly.find("LOOP CAUTION") == string::npos
+                      && ownOnly.find("LOOP SCOPE") != string::npos,
+                  "#W63-AC E13 MUST-NOT-MATCH a paragraph whose only number is life THEY lose"
+                  " carries no fatal-chain claim");
+        }
+        CHECK(drawPunisherSummaryText(mineP, 3, theirsP, 2)
+                  == drawPunisherSummaryText(mineP, 3, theirsP, 2, "", ""),
+              "#W63-AC E13 NEGATIVE with no loop on either board the paragraph is unchanged");
+        // MED-9: the forecast numbers name their loser.
+        {
+            std::vector<std::pair<std::string, int> > noExtras13;
+            const string th = theirDrawStepForecastText(1, noExtras13, 3);
+            const string my = drawStepForecastText(1, noExtras13, 3);
+            CHECK(th.find("= 1 x 3 = 3 life LOST BY THEM to your punishers above (that is life"
+                          " removed from their total; you gain none of it).") != string::npos,
+                  "#W63-AC E13 REPRO the theirs-side number is stated as THEIR loss, not your gain");
+            CHECK(th.find("life to you from your punishers") == string::npos,
+                  "#W63-AC E13 MUST-NOT-MATCH the wave-62 wording that read as a GAIN is gone");
+            CHECK(my.find("= 1 x 3 = 3 life LOST BY YOU to their punishers above.") != string::npos
+                      && my.find("life to the punishers above") == string::npos,
+                  "#W63-AC E13 the own-side number names its loser too");
+        }
+        // The {feeds:} counter names its class.
+        {
+            std::vector<std::string> noneC, drawC, discC;
+            drawC.push_back("Underworld Dreams #1");
+            discC.push_back("Liliana's Caress");
+            const string ft = feedsRowTag(1, false, 0, drawC, noneC, discC, noneC);
+            CHECK(ft.find("draw converters (they fire when the opponent DRAWS) on your"
+                          " battlefield: 1 - Underworld Dreams #1") != string::npos
+                      && ft.find("draw converters in your hand: 0") != string::npos,
+                  "#W63-AC E13 the first counter says which class it counts");
+            CHECK(ft.find("; converters on your battlefield:") == string::npos,
+                  "#W63-AC E13 MUST-NOT-MATCH the unqualified label the guide conflated is gone");
+            CHECK(ft.find("discard punishers (a different class") != string::npos,
+                  "#W63-AC E13 the discard class keeps its own clause, unmerged");
+            CHECK(stripNarrationDecoration("Cast Howling Mine {2}" + ft) == "Cast Howling Mine {2}",
+                  "#W63-AC E13 echo shape: the relabelled tag still leaves no residue");
+        }
+    }
+    {
+        // ---- E15: the generic-cost rule on the ZERO-mana line ----
+        // REPRO `123v130` seq 26 -> 27: the bare zero line, then 10,799 bytes of
+        // "Colored mana cannot be used for generic costs ... This deck is
+        // uncastable". seq 28, back at one source, carried the clause again.
+        const string zero = manaAvailableLine(0, "", "");
+        cout << "     Mana available: " << zero << "\n";
+        CHECK(zero.compare(0, 8, "0 total ") == 0,
+              "#W63-AC E15 the zero line still LEADS with the count");
+        CHECK(zero.find("mana of ANY colour pays a generic cost like {2}") != string::npos,
+              "#W63-AC E15 REPRO the payment rule is stated where the seat is most likely to"
+              " conclude its own deck is uncastable");
+        CHECK(zero.find("an untap step, a land drop or a mana ability is what changes that")
+                  != string::npos,
+              "#W63-AC E15 and the cheaper truth the review asked for: what would make mana");
+        CHECK(manaAvailableLine(4, "{g}{u}", "").find("mana of ANY colour pays a generic cost"
+                                                      " like {2}") != string::npos,
+              "#W63-AC E15 the nonzero line is unchanged - one rule, both faces");
+        CHECK(zero.find("untapped source,") == string::npos
+                  && zero.find("colours you can make") == string::npos
+                  && zero.find("Those sources") == string::npos,
+              "#W63-AC E15 MUST-NOT-MATCH the zero line claims no source, no colour and no list");
+        CHECK(zero.find('[') == string::npos && zero.find(']') == string::npos,
+              "#W63-AC E15 echo shape: the line carries no bracketed annotation to echo");
+    }
+    {
+        // ---- E16: {spare:} stops being hostage to one uncastable card ----
+        // REPRO `125v162` seq 94 (deck125 MED-2): eleven lands down, and all
+        // four land rows read "the most expensive card in your hand costs 15"
+        // with no {spare: prefix, because Emrakul, the Aeons Torn is on the
+        // list. The reach cap the caller uses is lands + 2 = 13.
+        const string sp = discardSpareLandClause(11, 6, true, "Emrakul, the Aeons Torn", 15, 13);
+        cout << "     " << sp << "\n";
+        CHECK(sp.compare(0, 9, " {spare: ") == 0,
+              "#W63-AC E16 REPRO eleven lands against a reachable 6-drop top IS spare");
+        CHECK(sp.find("the most expensive card in your hand you could still reach costs 6")
+                  != string::npos,
+              "#W63-AC E16 the comparison states that it is over what the seat can reach");
+        CHECK(sp.find("Emrakul, the Aeons Torn at 15 is NOT counted here - it is past what"
+                      " 11 lands plus the drops this hand can still make would pay for"
+                      " (this comparison counts costs up to 13)") != string::npos,
+              "#W63-AC E16 the excluded card is NAMED with its cost - nothing is hidden");
+        // MUST-NOT-MATCH: the wave-62 shape, where the {15} set the bar.
+        CHECK(discardSpareLandClause(11, 15, true).find("spare") == string::npos,
+              "#W63-AC E16 MUST-NOT-MATCH the wave-62 comparison (bar set at 15) yields no verdict");
+        // NEGATIVE: no out-of-reach card, and the clause is byte-identical to
+        // wave 62 but for C11's own wording.
+        CHECK(discardSpareLandClause(9, 3, true)
+                  == discardSpareLandClause(9, 3, true, "", 0, 11),
+              "#W63-AC E16 NEGATIVE no card past the cap, no extra clause");
+        CHECK(discardSpareLandClause(9, 3, true).find("NOT counted here") == string::npos,
+              "#W63-AC E16 NEGATIVE nothing excluded, nothing said about exclusion");
+        CHECK(discardSpareLandClause(0, 3, true, "Emrakul, the Aeons Torn", 15, 2).empty(),
+              "#W63-AC E16 NEGATIVE no land on the battlefield, no clause at all");
+        // A hand whose ONLY non-land card is out of reach: no verdict is
+        // available, and the count still prints beside the named exclusion.
+        CHECK(discardSpareLandClause(3, -1, false, "Emrakul, the Aeons Torn", 15, 5)
+                  == " {you control 3 lands already; Emrakul, the Aeons Torn at 15 is NOT counted"
+                     " here - it is past what 3 lands plus the drops this hand can still make"
+                     " would pay for (this comparison counts costs up to 5)}",
+              "#W63-AC E16 with nothing reachable to compare against, the count and the"
+              " exclusion print and no verdict is claimed");
+        {
+            vector<string> menu;
+            menu.push_back("Island (land)" + sp);
+            menu.push_back("Emrakul, the Aeons Torn {15} (creature)");
+            CHECK(stripNarrationDecoration(menu[0]) == "Island (land)",
+                  "#W63-AC E16 echo shape: the widened clause still strips off the record");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Island)", 2, &menu, &stale, NULL, NULL, false) == 1,
+                  "#W63-AC E16 echo: the tagged land row still answers as row 1");
         }
     }
 
