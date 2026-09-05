@@ -428,6 +428,7 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 10, "aipending ") == 0          //#W54-R
                              || action.compare(0, 7, "aiseat ") == 0                       //#W57-S
                              || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
+                             || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -484,7 +485,10 @@ int TestSuiteAI::Act(float)
             //the unpaid branch) - it must reach the menu, not be pre-answered
             //by the suite default (which would commit to the paid branch).
             && action.compare("cancelcost") != 0
-            && action.compare(0, 18, "assertmanasources ") != 0) //#W59-K (K6)
+            && action.compare(0, 18, "assertmanasources ") != 0 //#W59-K (K6)
+            //#W62-AA (R1): the probe READS the armed menu's decision request -
+            //it must reach the menu, not be pre-answered by the suite default.
+            && action.compare(0, 15, "assertxdecline ") != 0)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -502,6 +506,7 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 10, "aipending ") == 0 //#W54-R
                 || action.compare(0, 7, "aiseat ") == 0 //#W57-S
                 || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
+                || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -1391,6 +1396,31 @@ int TestSuiteAI::Act(float)
         al->currentActionCard = NULL;
         al->menuObjectName.clear();
         al->modal = 0;
+        return 1;
+    }
+    else if (action.find("assertxdecline ") == 0)
+    {
+        //#W62-AA (R1, wave-62 codex review finding 1): with an X ANNOUNCEMENT
+        //menu armed, ask the DECISION CONTRACT what it carries. The engine's
+        //own Cancel row is on that menu (MTGRules arms it with must=false), and
+        //the contract is the only thing a non-click frontend can read it off.
+        //`assertxdecline 1` fails on a tree where the cast route builds the
+        //request without canDecline - which is exactly the finding.
+        int want = atoi(action.substr(15).c_str());
+        DecisionRequest req;
+        bool built = DecisionManager::buildMenuChoice(this, req);
+        bool isX = built && req.kind == DecisionRequest::ANNOUNCE_X;
+        if (!isX || (req.canDecline ? 1 : 0) != (want ? 1 : 0))
+        {
+            std::cerr << "TESTSUITE assertxdecline: expected an ANNOUNCE_X request with"
+                      << " canDecline=" << (want ? 1 : 0) << ", got "
+                      << (built ? "a request" : "no request")
+                      << " kind=" << (built ? (int) req.kind : -1)
+                      << " canDecline=" << ((built && req.canDecline) ? 1 : 0)
+                      << " rows=" << (built ? (int) req.optionTexts.size() : -1)
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
         return 1;
     }
     else if (action.find("assertpt ") == 0)
