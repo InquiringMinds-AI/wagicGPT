@@ -267,9 +267,11 @@ protected:
                              vector<int>& selForOptionOne,
                              const vector<bool>& eligibleForOptionOne = vector<bool>(),
                              int revealSource = 0, bool pickExactlyOne = false,
-                             //#W61-T (C8): single-pick, but the pick is optional
-                             //("you MAY choose a card") - see Player::decideReveal.
-                             bool singlePickOptional = false);
+                             //#W61-T (C8): single-pick reached by ARITY (a bare
+                             //target() chooser) - see Player::decideReveal.
+                             bool singlePickBare = false,
+                             //#W61-V (R1): the script's arity permits taking none.
+                             bool singlePickDeclineLegal = false);
 
     //Pre-game (opening-hand) decisions, driven by PreGamePhase before turn 1.
     //Each routes through the model with the AIPlayerBaka heuristic as the

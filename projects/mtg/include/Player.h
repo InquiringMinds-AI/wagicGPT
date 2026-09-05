@@ -230,21 +230,27 @@ public:
     //2 = the decider's OWN hand. pickExactlyOne: option one's chooser takes at
     //most ONE card (its maxtargets is 1) rather than a subset (<upto:N> /
     //<anyamount>) - drives choose-ONE framing instead of choose-a-subset.
-    //#W61-T (C8): singlePickOptional distinguishes the two single-pick shapes -
-    //a fixed <1> chooser (targetMin: the pick is compulsory) from a bare
-    //target() on a "you MAY choose" effect, where declining is legal. Both are
-    //single-pick; only the wording differs.
+    //#W61-T (C8): singlePickBare distinguishes the two single-pick shapes -
+    //a fixed <1> chooser (targetMin) from a bare target() chooser, which reaches
+    //the same one-card protocol by its arity. Both are single-pick; only the
+    //wording differs.
+    //#W61-V (R1): whether DECLINING is legal is its own fact, read from the
+    //script's arity ("upto:" - a minimum of zero), never inferred from targetMin,
+    //which is false for a mandatory bare target() as well. A mandatory choose-one
+    //("You choose a card...") must not be offered a `PUT: none`.
     virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
                              const string& optOneLabel, const string& optTwoLabel,
                              const string& optOneEffect,
                              vector<int>& selForOptionOne,
                              const vector<bool>& eligibleForOptionOne = vector<bool>(),
                              int revealSource = 0, bool pickExactlyOne = false,
-                             bool singlePickOptional = false)
+                             bool singlePickBare = false,
+                             bool singlePickDeclineLegal = false)
     {
         (void) revealed; (void) optOneLabel; (void) optTwoLabel;
         (void) optOneEffect; (void) selForOptionOne; (void) eligibleForOptionOne;
-        (void) revealSource; (void) pickExactlyOne; (void) singlePickOptional;
+        (void) revealSource; (void) pickExactlyOne; (void) singlePickBare;
+        (void) singlePickDeclineLegal;
         return -1;
     }
 

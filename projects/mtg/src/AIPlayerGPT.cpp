@@ -1694,13 +1694,28 @@ static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttac
 //it (toughness against the damage) and totalled on the side that still gets
 //through. Damage does not destroy an INDESTRUCTIBLE creature at any amount, so
 //it is named as a survivor whatever its toughness. Pure over (damage, roster).
+//#W61-V (R5, wave-61 codex review finding 5): `damage >= toughness` is not
+//death. The wave-60 struct carried only indestructible, so the roster asserted
+//DIES over a creature with protection from the damage's colour (Lightmine
+//Field's red damage against a pro-red attacker is PREVENTED, and the creature
+//both survives and keeps connecting) and counted a regenerator's power as gone.
+//Both are readable from the engine at the point the roster is built - protection
+//through MTGCardInstance::protectedAgainst against the damage's own SOURCE, and
+//regeneration off the same script text #W60-Q (R6) already reads for the destroy
+//sweeper - so both are stated. What is NOT readable here is the general
+//prevention/replacement layer (a Fog, a Circle of Protection, a damage-shield
+//counter), so the roster says once, in its own header, that it is stated before
+//those; a claim the pilot can bound is worth more than a claim it must trust.
 struct WipeVictim
 {
     string name;
     int power;
     int toughness;
     bool indestructible;
-    WipeVictim() : power(0), toughness(0), indestructible(false) {}
+    bool protectedFromSource; //#W61-V (R5): the damage never arrives
+    bool canRegenerate;       //#W61-V (R5): destroyed, but its controller may pay
+    WipeVictim() : power(0), toughness(0), indestructible(false),
+                   protectedFromSource(false), canRegenerate(false) {}
 };
 
 //Entries are separated by "; ": a card name can contain a comma
@@ -1716,20 +1731,34 @@ static string wipeSurvivorTail(int damage, const std::vector<WipeVictim>& hit)
     {
         std::ostringstream e;
         e << hit[i].name << " (" << hit[i].power << "/" << hit[i].toughness << ")";
-        const bool killed = !hit[i].indestructible && damage >= hit[i].toughness;
+        //#W61-V (R5): protection from the damage's source PREVENTS the damage -
+        //the creature is not dealt any, at any amount, and still attacks.
+        const bool killed = !hit[i].indestructible && !hit[i].protectedFromSource
+                            && damage >= hit[i].toughness;
         if (killed)
         {
+            //#W61-V (R5): a regenerator IS destroyed and its controller may pay
+            //to bring it back - it stays in DIES and is marked, exactly as the
+            //destroy roster marks it (#W60-Q R6), never silently promoted.
+            if (hit[i].canRegenerate)
+                e << " (may survive: it can regenerate)";
             dies.push_back(e.str());
             continue;
         }
-        if (hit[i].indestructible)
+        if (hit[i].protectedFromSource)
+            e << " [protected from this damage's source - it takes none]";
+        else if (hit[i].indestructible)
             e << " [indestructible]";
         lives.push_back(e.str());
         if (hit[i].power > 0)
             survivingPower += hit[i].power;
     }
     std::ostringstream o;
-    o << ". DIES at " << damage << ": ";
+    //#W61-V (R5): the scope of the claim, stated once. Protection, indestructible
+    //and regeneration are read off the board; a prevention or replacement effect
+    //(a Fog, a Circle of Protection, a shield counter) is not, so the roster does
+    //not pretend to have priced one.
+    o << ". DIES at " << damage << " (before prevention): ";
     if (dies.empty())
         o << "none";
     for (size_t i = 0; i < dies.size(); i++)
@@ -1824,6 +1853,13 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
                 wv.power = c->getPower();
                 wv.toughness = c->toughness;
                 wv.indestructible = c->basicAbilities[Constants::INDESTRUCTIBLE] ? true : false;
+                //#W61-V (R5): the engine's own protection verdict, asked of the
+                //card that DEALS the damage - the same object the row is written
+                //for, so the claim and the enforcement cannot disagree.
+                wv.protectedFromSource = (card && c->protectedAgainst(card)) ? true : false;
+                //Damage destruction IS a destroy, so regeneration is a live out;
+                //read off the same script text the destroy roster reads.
+                wv.canRegenerate = !sweeperRegenerationTail(c, 1).empty();
                 theirAttackers->push_back(wv);
             }
         }
@@ -9396,7 +9432,13 @@ static void oneShotDrawGrantScan(MTGCardInstance * card, std::vector<OneShotDraw
             else
                 b.selfDraws += n;
         }
-        if ((b.oppDraws > 0 || b.selfDraws > 0 || b.variable) && out.size() < 4)
+        //#W61-V (R7, wave-61 codex review finding 7): the `out.size() < 4` cap
+        //here silently withheld the converter count and the punisher price from
+        //the fifth and later legal branches of a modal spell - a hard cap on
+        //legal choices, which the doctrine forbids outright. Every branch the
+        //scan can price is priced; the branches are the card's own `choice`
+        //list, so the count is bounded by the script, not by this function.
+        if (b.oppDraws > 0 || b.selfDraws > 0 || b.variable)
             out.push_back(b);
     }
 }
@@ -11344,6 +11386,31 @@ static FILE * gptPadlogFile()
 #define GPTASYNCLOG(...) ((void)0)
 #endif //_DEBUG || WAGIC_DEVLOGS
 
+//#W61-V (R4, wave-61 codex review finding 4): did this round trip miss its
+//DEADLINE, or did it finish? The wave-53 test was "empty body at/after 95% of
+//the deadline", which is elapsed time alone - so an endpoint that answered
+//HTTP 503 at 855 s of a 900 s deadline was recorded as a wall miss, opened a
+//wall_miss account it never earned, and was bought again with a FULL fresh
+//deadline instead of the bounded transport retry a completed error response
+//gets. A result that ARRIVED decides first: a non-200 HTTP status is a server
+//that answered, and a curl failure that is not CURLE_OPERATION_TIMEDOUT (28)
+//is a round trip that died of something other than the clock. What is left -
+//no status at all, or curl's own timeout - is the real wall miss, and it is
+//unchanged. Pure over the five facts, so the whole table is pinned in
+//PARSETEST.
+static const long kCurlOperationTimedOut = 28; //CURLE_OPERATION_TIMEDOUT
+bool gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs,
+                       long httpStatus, long curlCode)
+{
+    if (!emptyBody || timeoutMs <= 0)
+        return false;
+    if (httpStatus != 0 && httpStatus != 200)
+        return false; //the server answered, with an error - not the clock
+    if (curlCode > 0 && curlCode != kCurlOperationTimedOut)
+        return false; //transport died of something else (connect, DNS, TLS, reset)
+    return elapsedMs * 100 >= timeoutMs * 95;
+}
+
 //Heap-allocated capture set for the HTTP worker. The worker owns and frees
 //it; the shared_ptr inside keeps AsyncState alive if the player is destroyed
 //mid-request.
@@ -11450,8 +11517,10 @@ void AIPlayerGPT::WorkerMain(void * p)
         //An empty body under that mark is a refusal/error, not a timeout.
         long elapsedMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - ctx->state->started).count();
-        ctx->state->timedOut = body.empty() && ctx->timeoutMs > 0
-                               && elapsedMs * 100 >= ctx->timeoutMs * 95;
+        //#W61-V (R4): an HTTP status or a non-timeout curl result that ARRIVED
+        //decides before the clock does.
+        ctx->state->timedOut = gptDeadlineMissed(body.empty(), elapsedMs, ctx->timeoutMs,
+                                                 httpCode, curlCode);
         ctx->state->response = body;
         ctx->state->status = 2;
     }
@@ -17488,6 +17557,26 @@ static string exileHostageRowTag(const vector<string> & held)
     return o.str();
 }
 
+//#W61-V (R8): the blocking-lifegain CEILING, over the per-blocker life each
+//body's own blocking trigger would give them and whether that body can legally
+//block any attacker on OFFER. A trigger that cannot fire is not a ceiling: a
+//Perimeter Captain that no offered attacker can be blocked by gains nothing,
+//and folding it in erases guaranteed-kill conclusions the seat has proved. Pure
+//over the two parallel lists, so the arithmetic is pinned without a board.
+static int blockingLifeCeiling(const std::vector<int>& perBlockerLife,
+                               const std::vector<bool>& canBlockSomeOffered)
+{
+    int gain = 0;
+    for (size_t i = 0; i < perBlockerLife.size(); i++)
+    {
+        if (i < canBlockSomeOffered.size() && !canBlockSomeOffered[i])
+            continue;
+        if (perBlockerLife[i] > 0)
+            gain += perBlockerLife[i];
+    }
+    return gain;
+}
+
 //#W60-P (B9): the crack-back's CONDITIONAL half. A hostage is not on the
 //battlefield, so it is not in the unconditional count the line above states -
 //folding it in there would be a claim about a board that does not exist yet.
@@ -17528,11 +17617,95 @@ static string crackBackExileReturnClause(int count, int power)
 //their choice and is made after this window.
 //Fails CLOSED in all three - an unreadable line is not evidence a source
 //exists.
+//#W61-V (R6, wave-61 codex review finding 6): the generic MANA in an activated
+//ability's cost head, so a source whose ability they cannot afford is not
+//counted as one they can aim at the pilot. `head` is the text before the cost
+//separator: `{1}{R}{S(goblin|myBattlefield)}` is 2 mana plus a sacrifice, `{T}`
+//is 0. Every `{...}` group counts as its digits when it is a number and as 1
+//otherwise, except the non-mana cost symbols (T/Q untap-tap, S/E sacrifice and
+//exile clauses), which cost no mana. -1 means the head is not a cost this
+//function can price, and the caller then makes no affordability claim. Pure.
+static int activationManaCost(const string& head)
+{
+    int total = 0;
+    size_t i = 0;
+    while (i < head.size())
+    {
+        if (head[i] != '{')
+        {
+            if (head[i] == ' ') { i++; continue; }
+            return -1; //loose text in the cost head: not priceable here
+        }
+        const size_t close = head.find('}', i);
+        if (close == string::npos)
+            return -1;
+        string sym = head.substr(i + 1, close - i - 1);
+        i = close + 1;
+        if (sym.empty())
+            continue;
+        //Sacrifice / exile / tap clauses carry no mana.
+        if (sym[0] == 's' || sym[0] == 'S' || sym[0] == 'e' || sym[0] == 'E'
+            || sym == "t" || sym == "T" || sym == "q" || sym == "Q")
+            continue;
+        bool numeric = true;
+        for (size_t k = 0; k < sym.size(); k++)
+            if (!isdigit((unsigned char) sym[k]))
+                numeric = false;
+        total += numeric ? atoi(sym.c_str()) : 1;
+    }
+    return total;
+}
+
+//#W61-V (R6): can they actually USE this activated ability on their next turn?
+//Two facts decide it and both are on the board the prompt already prints: the
+//source must be able to be untapped when they get there (a tapped permanent
+//untaps in their untap step UNLESS it does not untap or is frozen), and the
+//mana part of the activation cost must be inside their reach. Fails CLOSED
+//twice over: an unpriceable cost head and an unknown reach both drop the source
+//from the clause rather than assert it.
+//The verdict itself, pure over the cost head and the two board facts, so the
+//rule is pinned without a battlefield.
+static bool crackBackCostAffordable(const string& costHead, bool sourceStaysTapped,
+                                    int oppReach)
+{
+    const bool needsTap = costHead.find("{t}") != string::npos
+                          || costHead.find("{q}") != string::npos;
+    if (needsTap && sourceStaysTapped)
+        return false; //still tapped when they would use it
+    const int mana = activationManaCost(costHead);
+    if (mana < 0)
+        return false; //unpriceable cost head: claim nothing
+    return oppReach >= 0 && mana <= oppReach;
+}
+
+static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size_t effectPos,
+                                   int oppReach)
+{
+    if (!c)
+        return false;
+    const size_t colon = line.find(':');
+    if (colon == string::npos || colon >= effectPos)
+        return false; //no cost head: this is not an activated ability
+    //A tapped permanent untaps in its controller's own untap step, so only a
+    //permanent that does NOT untap (or is frozen) is still tapped next turn.
+    const bool staysTapped = c->isTapped()
+                             && (c->basicAbilities[Constants::DOESNOTUNTAP] || c->frozen >= 1);
+    return crackBackCostAffordable(line.substr(0, colon), staysTapped, oppReach);
+}
+
 static string crackBackFloorSources(Player * opp)
 {
     if (!opp || !opp->game || !opp->game->inPlay)
         return "";
     string animators, pingers, pumps;
+    //#W61-V (R6): what their OPEN mana can pay for - the same engine call, the
+    //same policy and the same integer the prompt's own "their open mana" line
+    //three lines above is built from (#W56-B D10), so the clause and that line
+    //cannot disagree about what they can afford.
+    ManaEngine::FreeProducerPolicy crackBackPolicy;
+    ManaCost * crackBackPotential = NEW ManaCost();
+    const int oppReach = ManaEngine::potentialColorReach(opp, crackBackPolicy, crackBackPotential);
+    SAFE_DELETE(crackBackPotential);
     MTGGameZone * bf = opp->game->inPlay;
     for (int i = 0; i < bf->nb_cards; i++)
     {
@@ -17553,7 +17726,7 @@ static string crackBackFloorSources(Player * opp)
             {
                 //(a) an activated animation, with the printed body it becomes
                 size_t b = line.find("becomes(creature");
-                if (b != string::npos)
+                if (b != string::npos && crackBackAbilityUsable(c, line, b, oppReach))
                 {
                     int pw = -1;
                     size_t caret = line.find('^', b);
@@ -17579,7 +17752,9 @@ static string crackBackFloorSources(Player * opp)
                                       || line.find("target(player") != string::npos
                                       || line.find(" opponent") != string::npos;
                 if (dp != string::npos && atPlayer
-                    && dp + 7 < line.size() && line[dp + 7] >= '1' && line[dp + 7] <= '9')
+                    && dp + 7 < line.size() && line[dp + 7] >= '1' && line[dp + 7] <= '9'
+                    //#W61-V (R6): only a source they can actually activate.
+                    && crackBackAbilityUsable(c, line, dp, oppReach))
                 {
                     std::ostringstream pp;
                     pp << c->getDisplayName() << " (" << atoi(line.c_str() + dp + 7)
@@ -19807,17 +19982,36 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
 //#W56-A (D1): ... and the board is no longer one of them. The whole predicate
 //is the RENDERED ROWS: every row printed now must be a row that was printed,
 //byte for byte, when the hold was taken. A row whose {right now: ...} price
-//moved is a row the model has not seen and re-opens the window; a row
-//DISAPPEARING still does not (the model already declined it).
+//moved is a row the model has not seen and re-opens the window.
+//#W61-V (R2, wave-61 codex review finding 2): a row DISAPPEARING re-opens it
+//too. The subset test above accepted {B} as "still the menu" after {A,B} lost
+//A, so a menu that had genuinely changed was auto-declined without an ask -
+//and the row's own promise to the pilot (#W61-U C14: "a hold taken here holds
+//until one of them changes") was false on exactly that move. "The model already
+//declined it" is not an argument for silence: what it declined was the MENU,
+//and the menu it now faces is a different one - the remaining rows are worth a
+//different answer once the alternative is gone. The predicate is therefore SET
+//EQUALITY, in both directions, over the rendered rows. This retires holds more
+//often (one more ask), never fewer: no window is closed by it.
 static bool holdStillStands(const std::set<string>& heldRows,
                             const std::vector<string>& nowRows,
                             const char ** whyOut)
 {
     if (whyOut) *whyOut = "";
+    std::set<string> nowSet;
     for (size_t i = 0; i < nowRows.size(); i++)
+    {
+        nowSet.insert(nowRows[i]);
         if (heldRows.find(nowRows[i]) == heldRows.end())
         {
             if (whyOut) *whyOut = "a printed row changed or is newly available";
+            return false;
+        }
+    }
+    for (std::set<string>::const_iterator it = heldRows.begin(); it != heldRows.end(); ++it)
+        if (!nowSet.count(*it))
+        {
+            if (whyOut) *whyOut = "a printed row it was held over is gone";
             return false;
         }
     return true;
@@ -26852,11 +27046,79 @@ static string mutateAltCostLabel(bool hasMutate, const string& alternativeName)
 //Swamp"). Read the branch off the SCRIPT and quote the CARD for the condition;
 //this code asserts neither. A land whose script has no tap(noevent) gets nothing,
 //so every untapped land's row is byte-identical to wave 60.
+//#W61-V (R3, wave-61 codex review finding 3): is this script line an
+//ACTIVATED ability's cost head? A Wagic auto line is either `cost:effect`
+//(activated) or a bare effect (the card's own ETB/static). The cost head is
+//made only of cost tokens - `{...}` symbol groups and the bare T/Q/S/E
+//letters - so a head carrying words, parentheses or `$` is not a cost and the
+//colon belongs to the effect body instead (`life:-2`, `damage:2`). Pure.
+static bool scriptLineIsActivated(const string& line, size_t beforePos)
+{
+    const size_t colon = line.find(':');
+    if (colon == string::npos || colon >= beforePos)
+        return false; //no cost separator ahead of the effect
+    const string head = line.substr(0, colon);
+    bool sawSymbol = false;
+    for (size_t i = 0; i < head.size(); i++)
+    {
+        const char c = head[i];
+        if (c == '{' || c == '}')
+        {
+            sawSymbol = true;
+            continue;
+        }
+        if (isalnum((unsigned char) c) || c == ' ' || c == '/' || c == '(' || c == ')'
+            || c == '|' || c == '[' || c == ']' || c == ',' || c == '-')
+            continue;
+        return false; //`$`, `!`, `~` and friends: not a cost head
+    }
+    return sawSymbol; //a cost head always carries at least one {...} symbol
+}
+
+//#W61-T (C7) / #W61-V (R3): the classifier reads the card's OWN enters-tapped
+//line, not any tap(noevent) anywhere in the script. Bant Panorama's
+//tap(noevent) is inside its `{1}{T}{S}:` FETCH ability and taps the fetched
+//basic, not the Panorama (mtg.txt:8934-8936); Blood Crypt's is one branch of
+//its pay-2-life choice (mtg.txt:12034), which is a conditional entry, not an
+//unconditional one. Both rendered as "enters TAPPED - it makes no mana this
+//turn" in wave 60, which is a false availability claim in the first case and a
+//false certainty in the second. Three tests decide it, in this order: an
+//activated cost head or a `@` trigger means the tap is not this card's ETB at
+//all; a tap that lands on a TARGET or a moved card is not this card's own; and
+//a gate in front of it (aslongas / if( / restriction / a `choice` branch) makes
+//the entry conditional.
+static bool landEntersTappedLine(const string& line, bool * conditionalOut)
+{
+    const size_t at = line.find("tap(noevent)");
+    if (at == string::npos)
+        return false;
+    if (!line.empty() && line[0] == '@')
+        return false; //a triggered ability, not the card's own entry
+    if (scriptLineIsActivated(line, at))
+        return false; //an activated ability's effect (Bant Panorama's fetch)
+    const string before = line.substr(0, at);
+    if (before.find("target(") != string::npos || before.find("moveto(") != string::npos)
+        return false; //the tap lands on another card, not on this one
+    if (conditionalOut)
+        *conditionalOut = before.find("aslongas") != string::npos
+                          || before.find("if(") != string::npos
+                          || before.find("restriction") != string::npos
+                          //#W61-V (R3): a shockland's tapped entry is ONE branch
+                          //of a choice its controller makes (Blood Crypt), so it
+                          //is exactly as conditional as Isolated Chapel's.
+                          || before.find("choice") != string::npos;
+    return true;
+}
+
 string landEntersTappedTag(const string& script, const string& printedText)
 {
-    bool found = false, conditional = false;
+    bool found = false, conditional = true;
     size_t pos = 0;
-    while (pos <= script.size() && !found)
+    //#W61-V (R3): scan EVERY line. The wave-60 loop stopped at the first line
+    //carrying tap(noevent) whatever that line was, so an activated fetch ability
+    //hid the answer for the whole card. An unconditional own-ETB line wins over a
+    //conditional one; a line that is neither contributes nothing.
+    while (pos <= script.size())
     {
         size_t eol = script.find('\n', pos);
         string line = script.substr(pos, eol == string::npos ? string::npos : eol - pos);
@@ -26864,14 +27126,13 @@ string landEntersTappedTag(const string& script, const string& printedText)
             pos = script.size() + 1;
         else
             pos = eol + 1;
-        size_t at = line.find("tap(noevent)");
-        if (at == string::npos)
+        const string lineLc = scriptLower(line);
+        bool lineConditional = false;
+        if (!landEntersTappedLine(lineLc, &lineConditional))
             continue;
         found = true;
-        const string before = line.substr(0, at);
-        conditional = before.find("aslongas") != string::npos
-                      || before.find("if(") != string::npos
-                      || before.find("restriction") != string::npos;
+        if (!lineConditional)
+            conditional = false;
     }
     if (!found)
         return "";
@@ -33458,6 +33719,8 @@ int AIPlayerGPT::chooseAttackers()
             //certain and the "may" halves are in the ceiling because a "may"
             //is theirs to take and this number is what the seat must survive.
             int blockGain = 0;
+            std::vector<int> blockerLife;
+            std::vector<bool> blockerCanBlockOffered;
             if (oppB && oppB->game && oppB->game->inPlay)
             {
                 MTGGameZone * bfG = oppB->game->inPlay;
@@ -33466,11 +33729,28 @@ int AIPlayerGPT::chooseAttackers()
                     MTGCardInstance * c = bfG->cards[i];
                     if (!c || !c->isCreature() || !c->canBlock())
                         continue;
+                    //#W61-V (R8, wave-61 codex review finding 8): parameterless
+                    //canBlock() is the SOLO gate (untapped, no can't-block) and
+                    //says nothing about whether this body can block anything on
+                    //OFFER. A Perimeter Captain facing an all-shadow attack has
+                    //no legal block, so it has no blocking trigger, so its
+                    //lifegain does not exist - and folding it in produced a
+                    //"life back" ceiling that can erase a proven guaranteed kill.
+                    //The pairwise map the per-attacker rows are built from is the
+                    //same one used here (couldBlockIfItAttacked, because nothing
+                    //is an attacker yet at declare-attackers), so the ceiling and
+                    //the rows cannot disagree.
+                    bool blocksSomethingOffered = false;
+                    for (size_t aj = 0; aj < attackers.size() && !blocksSomethingOffered; aj++)
+                        if (attackers[aj] && c->couldBlockIfItAttacked(attackers[aj]))
+                            blocksSomethingOffered = true;
                     int sure = 0, may = 0;
                     blockTriggeredLifeFor(c, sure, may);
-                    blockGain += sure + may;
+                    blockerLife.push_back(sure + may);
+                    blockerCanBlockOffered.push_back(blocksSomethingOffered);
                 }
             }
+            blockGain = blockingLifeCeiling(blockerLife, blockerCanBlockOffered);
             tail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
                                     infectExcluded, suppressed, blockGain,
@@ -34969,6 +35249,27 @@ static string revealEligMarker(const string & optOneLabel)
     return " [eligible for \"" + optOneLabel + "\"]";
 }
 
+//#W61-V (R1): does option one's own target() spec license taking NONE? This is
+//the engine's own arity grammar, read the way TargetChooser::createTargetChooser
+//reads it (TargetChooser.cpp:503-528): a `<...>` prefix sets a MINIMUM equal to
+//its amount unless it carries "upto:" (or "anyamount", which clears the minimum
+//outright), and a spec with no `<...>` at all is a plain one-target chooser -
+//a minimum of one. targetMin cannot be used for this: the chooser object stores
+//false for BOTH a bare `target(x)` and an `<upto:1>` one, which is how a
+//mandatory Pelakka-Predation-class choose-one came to be offered a decline.
+bool revealSinglePickDeclineLegal(const string& targetSpec)
+{
+    const size_t lt = targetSpec.find('<');
+    if (lt == string::npos)
+        return false; //bare target(): the card chooses one, and must
+    const size_t gt = targetSpec.find('>', lt);
+    if (gt == string::npos)
+        return false; //unparsable arity: fail closed, claim no decline
+    const string arity = targetSpec.substr(lt + 1, gt - lt - 1);
+    return arity.find("upto:") != string::npos
+           || arity.find("anyamount") != string::npos;
+}
+
 //Pure builder for the reveal ask text (no game/observer/endpoint state).
 //revealSource: 0 = top of library (surveil/dig), 1 = the opponent's hand, 2 =
 //the decider's own hand. pickExactlyOne: option one is a fixed <1> chooser.
@@ -34990,10 +35291,15 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
                                  const string& optOneEffect,
                                  const vector<bool>& eligibleForOptionOne,
                                  int revealSource, bool pickExactlyOne,
-                                 //#W61-T (C8): single-pick whose pick is OPTIONAL
-                                 //("You may choose a card from it ..."). Ignored
-                                 //unless pickExactlyOne is set.
-                                 bool singlePickOptional,
+                                 //#W61-T (C8): the single pick was reached by the
+                                 //chooser's ARITY (a bare target()), not by a fixed
+                                 //<1>. Ignored unless pickExactlyOne is set.
+                                 bool singlePickBare,
+                                 //#W61-V (R1): declining is a LEGAL answer here -
+                                 //the script's arity carries a minimum of zero
+                                 //("upto:"). A mandatory choose-one is never told
+                                 //it may take none.
+                                 bool singlePickDeclineLegal,
                                  bool wholeLibrary,
                                  //#W55-D (D18): the permutation the collapse used, so the
                                  //caller can map the reply's positions back to `revealed`.
@@ -35023,21 +35329,28 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
              << " (" << revealed.size() << " card"
              << (revealed.size() == 1 ? "" : "s") << ").\n";
         if (pickExactlyOne)
-            //#W61-T (C8): the optional branch states what the ENGINE's chooser
-            //accepts (one card, or a decline) and claims nothing about whether
-            //the card's own text says "may" - Scryfall's current Oracle for
-            //Pelakka Predation reads "You choose", while the engine's chooser
-            //carries no minimum, so only the answer surface is described here.
-            tail << (singlePickOptional ? "Choose ONE card to send to \""
-                                        : "Choose the ONE card to send to \"")
+            //#W61-T (C8): the bare-arity branch states what the ENGINE's chooser
+            //accepts (one card, never two).
+            //#W61-V (R1): and it says a decline is available ONLY where the
+            //script's own arity carries a minimum of zero. Pelakka Predation's
+            //current Oracle reads "You choose a card from it with mana value 3 or
+            //greater" - a mandatory choice - so its ask no longer names a decline
+            //it has no right to offer.
+            tail << (singlePickBare ? "Choose ONE card to send to \""
+                                    : "Choose the ONE card to send to \"")
                  << optOneLabel
                  << "\" - that is the card "
                  << (selfHand ? "you discard" : "they discard")
                  << "; every other card stays in "
                  << (selfHand ? "your" : "their") << " hand."
-                 << (singlePickOptional ? " This is a ONE-card choice: you can never take"
-                                          " two, and \"PUT: none\" declines."
-                                        : "")
+                 << (singlePickBare ? " This is a ONE-card choice: you can never take"
+                                      " two."
+                                    : "")
+                 << (singlePickBare && singlePickDeclineLegal
+                         ? " \"PUT: none\" declines." : "")
+                 << (singlePickBare && !singlePickDeclineLegal
+                         ? " This choice is NOT optional: while a card qualifies you"
+                           " must take one." : "")
                  << "\n";
         else
             tail << "Decide, in ONE reply, which cards go to \"" << optOneLabel
@@ -35061,13 +35374,18 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
             tail << "Reveal: you looked at the top " << revealed.size()
                  << " card" << (revealed.size() == 1 ? "" : "s") << " of your library.";
         if (pickExactlyOne)
-            tail << (singlePickOptional ? " Choose ONE card that goes to \""
-                                        : " Choose the ONE card that goes to \"")
+            tail << (singlePickBare ? " Choose ONE card that goes to \""
+                                    : " Choose the ONE card that goes to \"")
                  << optOneLabel
                  << "\"; every other card goes to \"" << optTwoLabel << "\"."
-                 << (singlePickOptional ? " This is a ONE-card choice: you can never take"
-                                          " two, and \"PUT: none\" declines."
-                                        : "")
+                 << (singlePickBare ? " This is a ONE-card choice: you can never take"
+                                      " two."
+                                    : "")
+                 << (singlePickBare && singlePickDeclineLegal //#W61-V (R1)
+                         ? " \"PUT: none\" declines." : "")
+                 << (singlePickBare && !singlePickDeclineLegal
+                         ? " This choice is NOT optional: while a card qualifies you"
+                           " must take one." : "")
                  << "\n";
         else
             tail << " Decide, in ONE reply, which of them go to \"" << optOneLabel
@@ -35149,8 +35467,13 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
              //#W61-T (C8): when the pick itself is optional, declining is always
              //legal - state it whether or not the filter emptied the list. The
              //mandatory branch keeps the wave-20 wording byte for byte.
-             << (singlePickOptional ? ", or exactly \"PUT: none\" to choose no card"
-                                    : (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : ""))
+             //#W61-V (R1): "optional" is now the SCRIPT's arity, not targetMin, so
+             //a mandatory bare chooser (Pelakka Predation) is no longer handed a
+             //decline. The eligCount == 0 arm is unreachable from the live seam
+             //(decideReveal never asks with an empty eligible set) and is kept for
+             //a direct call.
+             << (singlePickDeclineLegal ? ", or exactly \"PUT: none\" to choose no card"
+                                        : (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : ""))
              << "; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     else
         tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
@@ -35171,7 +35494,8 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                               vector<int>& selForOptionOne,
                               const vector<bool>& eligibleForOptionOne,
                               int revealSource, bool pickExactlyOne,
-                              bool singlePickOptional) //#W61-T (C8)
+                              bool singlePickBare, //#W61-T (C8)
+                              bool singlePickDeclineLegal) //#W61-V (R1)
 {
     selForOptionOne.clear();
     if (mEndpoint.empty() || revealed.empty())
@@ -35223,7 +35547,8 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     string userMsg = assemblePrompt(
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
                            eligibleForOptionOne, revealSource, pickExactlyOne,
-                           singlePickOptional, //#W61-T (C8)
+                           singlePickBare, //#W61-T (C8)
+                           singlePickDeclineLegal, //#W61-V (R1)
                            //N-166p: a search empties the library zone into the
                            //reveal zone; a top-of-library look does not.
                            revealSource == 0 && game->library->nb_cards == 0
@@ -40049,19 +40374,19 @@ void AIPlayerGPT::runParseSelfTest()
     {
         vector<bool> noElig;
         vector<MTGCardInstance*> none;
-        string search = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, true);
+        string search = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, false, true);
         cout << "     " << search.substr(0, 120) << "\n";
         CHECK(search.find("Search: you are searching your ENTIRE library") != string::npos,
               "W35-N166p a whole-library reveal is called a search");
         CHECK(search.find("not a look at the top of your library") != string::npos,
               "W35-N166p the line rules out the top-of-library reading it used to assert");
         // NEGATIVE: a genuine top-of-library look keeps its wording exactly.
-        string look = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, false);
+        string look = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false, false, false);
         CHECK(look.find("Reveal: you looked at the top") != string::npos
               && look.find("Search:") == string::npos,
               "W35-N166p NEGATIVE a real top-of-library look is byte-unchanged");
         // NEGATIVE: a HAND reveal is neither.
-        string hand = buildRevealAskText(none, "Discard", "Hand", "", noElig, 2, true, false, false);
+        string hand = buildRevealAskText(none, "Discard", "Hand", "", noElig, 2, true, false, false, false);
         CHECK(hand.find("You revealed your hand") != string::npos
               && hand.find("Search:") == string::npos,
               "W35-N166p NEGATIVE the hand-reveal branch is untouched");
@@ -48328,11 +48653,40 @@ static const char * kW50Y_r94 =
         CHECK(!holdStillStands(held, grown, &why)
               && string(why) == "a printed row changed or is newly available",
               "#W56-A D1 a NEWLY AFFORDABLE row re-opens the window");
+        //#W61-V (R2): the wave-53 case here pinned a DISAPPEARING row as no
+        //re-opener. It is UPDATED, not deleted: the same menu is still the
+        //input, and the expectation is now the set-equality one the row's own
+        //promise ("a hold taken here holds until one of them changes") states.
+        //The model declined a MENU, and this is no longer that menu.
         vector<string> shrunk;
         shrunk.push_back("Cast nothing right now");
         shrunk.push_back(holdRowLine());
-        CHECK(holdStillStands(held, shrunk, &why),
-              "#W53-N D2 NEGATIVE a row DISAPPEARING is not a re-opener - the model already declined it");
+        CHECK(!holdStillStands(held, shrunk, &why)
+              && string(why) == "a printed row it was held over is gone",
+              "#W61-V R2 a row the hold was taken over DISAPPEARING re-opens the window,"
+              " and says which way it changed");
+        //POSITIVE, unchanged: the identical menu still stands, and the two
+        //re-openers keep their own distinct reasons.
+        CHECK(holdStillStands(held, rowsA, &why) && string(why).empty(),
+              "#W61-V R2 POSITIVE set equality still holds the hold on an identical menu");
+        //MUST-NOT-MATCH: a row ADDED does not report the disappearance reason.
+        {
+            vector<string> grown2(rowsA);
+            grown2.push_back("Cast Spark Spray {r}");
+            CHECK(!holdStillStands(held, grown2, &why)
+                  && string(why) == "a printed row changed or is newly available",
+                  "#W61-V R2 NEGATIVE an ADDED row keeps the newly-available reason");
+        }
+        //A menu that both lost and gained a row re-opens (the added row is seen
+        //first, which is the reason the pilot reads).
+        {
+            vector<string> swapped;
+            swapped.push_back("Cast nothing right now");
+            swapped.push_back(holdRowLine());
+            swapped.push_back("Cast Spark Spray {r}");
+            CHECK(!holdStillStands(held, swapped, &why),
+                  "#W61-V R2 a menu that swapped a row re-opens the window");
+        }
     }
 
     cout << "\n[#W53-N D2] the declined-list annotation (prompt-only, echo shape)\n";
@@ -48459,6 +48813,38 @@ static const char * kW50Y_r94 =
         //no longer reads as an endpoint fault.
         CHECK(strcmp(noAnswerClassFor(false, true, false), "empty_reply") != 0,
               "#W53-Q D10 126v146 seq 1: the 900,018 ms non-answer is no longer filed as empty_reply");
+        //#W61-V (R4): the DEADLINE TEST itself - which decides `timedOut` before
+        //any class is asked. Wave 60 tested elapsed time alone, so a completed
+        //HTTP error late in the window was recorded as a wall miss.
+        //RED on base: an HTTP 503 at 855,000 ms of a 900,000 ms deadline.
+        CHECK(!gptDeadlineMissed(true, 855000, 900000, 503, 0),
+              "#W61-V R4 a 503 that ARRIVED at 95% of the deadline is not a wall miss");
+        CHECK(string(noAnswerClassFor(false,
+                                      gptDeadlineMissed(true, 855000, 900000, 503, 0),
+                                      false, 503, 0)) == "http_error",
+              "#W61-V R4 the late 503 classes as http_error, and the retry budget it"
+              " earns is the transport one, not a fresh full deadline");
+        //POSITIVE: the real wall miss - curl's own timeout, no status at all -
+        //is byte-identical to wave 53.
+        CHECK(gptDeadlineMissed(true, 900018, 900000, 0, 28)
+              && gptDeadlineMissed(true, 855000, 900000, 0, 0),
+              "#W61-V R4 an empty body at the wall with no HTTP status is still a timeout");
+        CHECK(string(noAnswerClassFor(false, gptDeadlineMissed(true, 900018, 900000, 0, 28),
+                                      false, 0, 28)) == "timeout",
+              "#W61-V R4 126v146 seq 1 still reads 'timeout' - CURLE_OPERATION_TIMEDOUT"
+              " is the clock, not a transport fault");
+        //NEGATIVES: a connect-level curl failure late in the window is transport,
+        //a body that arrived is never a timeout, and no deadline means no verdict.
+        CHECK(!gptDeadlineMissed(true, 880000, 900000, 0, 7),
+              "#W61-V R4 NEGATIVE a curl connect failure is not renamed a wall miss by its clock");
+        CHECK(!gptDeadlineMissed(false, 900018, 900000, 0, 28)
+              && !gptDeadlineMissed(true, 900018, 0, 0, 28)
+              && !gptDeadlineMissed(true, 10, 900000, 0, 0),
+              "#W61-V R4 NEGATIVE a non-empty body, an unset deadline and a fast empty"
+              " reply are none of them wall misses");
+        CHECK(gptDeadlineMissed(true, 899000, 900000, 200, 0),
+              "#W61-V R4 a 200 with an empty body at the wall is still the model's own"
+              " deadline miss");
         //D24: only a decision that NOTHING from the reply answered latches a recovery.
         CHECK(handedToHeuristic(-1, "unparsed_reply") && handedToHeuristic(-1, "timeout")
               && handedToHeuristic(-1, "degenerate_decode"),
@@ -54487,6 +54873,33 @@ static const char * kW50Y_r94 =
             CHECK(oneShotDrawGrantTag(zero, noConv, 0, 0, "", 10).empty(),
                   "#W61-S C12 NEGATIVE an all-zero branch list carries no tag");
         }
+        //#W61-V (R7): the NO-HARD-CAP invariant. oneShotDrawGrantScan used to
+        //store at most four branches (`out.size() < 4`), so the fifth and later
+        //legal `choice` branches of a modal spell reached the pilot with no
+        //converter count and no punisher price at all. The cap is gone; this
+        //pins that the render carries EVERY branch it is handed, at a length no
+        //four-branch cap could produce.
+        {
+            vector<OneShotDrawBranch> six;
+            for (int k = 0; k < 6; k++)
+            {
+                OneShotDrawBranch b;
+                std::ostringstream lbl;
+                lbl << "mode " << (k + 1);
+                b.label = lbl.str();
+                b.oppDraws = k + 1;
+                six.push_back(b);
+            }
+            const string sixTag = oneShotDrawGrantTag(six, noConv, 0, 0, "", 10);
+            CHECK(sixTag.find("if you choose \"mode 5\": they draw 5 cards now") != string::npos
+                  && sixTag.find("if you choose \"mode 6\": they draw 6 cards now") != string::npos,
+                  "#W61-V R7 the fifth and sixth branches are priced like the first four");
+            size_t bars = 0;
+            for (size_t k = 0; k < sixTag.size(); k++)
+                if (sixTag[k] == '|') bars++;
+            CHECK(bars == 5,
+                  "#W61-V R7 six branches render as six, not four - no branch is silently dropped");
+        }
         // ECHO SHAPE.
         {
             vector<string> menu;
@@ -54691,6 +55104,40 @@ static const char * kW50Y_r94 =
               && landEntersTappedTag("{T}:Add{G}\nmay tap(2)", "Something else.").empty(),
               "#W61-T C7 NEGATIVE an empty script, and a tap that is not tap(noevent),"
               " annotate nothing");
+        //#W61-V (R3): the two shapes wave 60 mis-read, verbatim from the
+        //primitives. Bant Panorama (mtg.txt:8933-8936) carries tap(noevent)
+        //ONLY inside its {1}{T}{S} fetch ability, for the fetched basic.
+        const string panoramaScript =
+            "{T}:Add{C}\n"
+            "{1}{T}{S}:name(search forest) target(forest[basic]|myLibrary)"
+            " moveTo(myBattlefield) and!( tap(noevent) )!\n"
+            "{1}{T}{S}:name(search plains) target(plains[basic]|myLibrary)"
+            " moveTo(myBattlefield) and!( tap(noevent) )!";
+        CHECK(landEntersTappedTag(panoramaScript,
+                                  "{T}: Add {1}. -- {1}, {T}, Sacrifice Bant Panorama:"
+                                  " Search your library for a basic Forest, Plains, or"
+                                  " Island card and put it onto the battlefield tapped."
+                                  " Then shuffle.").empty(),
+              "#W61-V R3 NEGATIVE Bant Panorama's fetch-ability tap(noevent) is not an"
+              " enters-tapped claim about the Panorama");
+        //Blood Crypt (mtg.txt:12034): the tapped entry is ONE branch of the
+        //pay-2-life choice, so it is conditional, never flat.
+        const string cryptScript =
+            "ability$!name(Choose one) choice name(Pay 2 life) life:-2 _ choice name(Tap)"
+            " tap(noevent) all(mysource)!$ controller";
+        const string crypt = landEntersTappedTag(cryptScript,
+            "({T}: Add {B} or {R}.) -- As Blood Crypt enters, you may pay 2 life."
+            " If you don't, Blood Crypt enters tapped.");
+        CHECK(crypt.find("enters tapped UNLESS its own condition holds") != string::npos,
+              "#W61-V R3 a shockland's choice branch renders as a CONDITIONAL entry");
+        CHECK(crypt.find("enters TAPPED -") == string::npos,
+              "#W61-V R3 NEGATIVE Blood Crypt is never stated as unconditionally tapped");
+        //An activated ability elsewhere on the card does not hide a real ETB
+        //line: the scan reads every line, so a Karoo-style script still speaks.
+        CHECK(landEntersTappedTag("tap(noevent)\n{1}{T}{S}:target(plains|myLibrary)"
+                                  " moveTo(myBattlefield) and!( tap(noevent) )!", "")
+                  .find("enters TAPPED") != string::npos,
+              "#W61-V R3 an own-ETB line is still read when an activated ability also taps");
         //A tapped land whose printed text does not say so still states the fact.
         CHECK(landEntersTappedTag("tap(noevent)", "").find("enters TAPPED") != string::npos
               && landEntersTappedTag("tap(noevent)", "").find("\"") == string::npos,
@@ -54718,31 +55165,71 @@ static const char * kW50Y_r94 =
         //maxtargets 1, targetMin FALSE - so wave 60 took the subset branch and
         //printed the "PUT: 1, 3" protocol the model then obeyed (146v125 s18).
         const string w60 = buildRevealAskText(none, "Choose a card", "put back", "",
-                                              noElig, 1, false, false, false);
+                                              noElig, 1, false, false, false, false);
         CHECK(w60.find("comma-separated (e.g. \"PUT: 1, 3\")") != string::npos,
               "#W61-T C8 RED-on-base: the subset branch is what a bare target() reached,"
               " and it instructs a multi-card answer");
+        //#W61-V (R1): the wave-60 case here asked for a bare chooser and asserted
+        //the ask STATED a legal decline. Pelakka Predation's chooser is bare, and
+        //its Oracle ("You choose a card from it with mana value 3 or greater") makes
+        //the choice mandatory, so that expectation was rules-wrong: it is UPDATED to
+        //the shape the script actually licenses. The declining shape keeps its own
+        //case immediately below, now driven by the arity flag the script supplies.
         const string w61 = buildRevealAskText(none, "Choose a card", "put back", "",
-                                              noElig, 1, true, true, false);
+                                              noElig, 1, true, true, false, false);
         CHECK(w61.find("Choose ONE card to send to \"Choose a card\"") != string::npos
-              && w61.find("you can never take two, and \"PUT: none\" declines") != string::npos,
-              "#W61-T C8 the optional single-pick shape frames a ONE-card choice and states"
-              " the decline the engine's chooser accepts");
+              && w61.find("you can never take two.") != string::npos,
+              "#W61-V R1 a bare single-target chooser frames a ONE-card choice");
+        CHECK(w61.find("This choice is NOT optional: while a card qualifies you must"
+                       " take one.") != string::npos,
+              "#W61-V R1 a MANDATORY choose-one (Pelakka Predation) says the choice is"
+              " not optional");
         CHECK(w61.find("the ONE card number you choose (e.g. \"PUT: 2\") - ONE number,"
-                       " never a list") != string::npos
-              && w61.find("or exactly \"PUT: none\" to choose no card") != string::npos,
-              "#W61-T C8 the reply protocol asks for one number, and states the legal decline");
-        //MUST-NOT-MATCH: the single-pick shape never carries the subset grammar.
+                       " never a list") != string::npos,
+              "#W61-T C8 the reply protocol asks for one number");
+        //MUST-NOT-MATCH: a mandatory choose-one is never offered a decline (the
+        //wave-60 defect this finding names), and never the subset grammar.
+        //(This constructs the ask over an EMPTY revealed list, which is the only
+        //shape a pure call can build, so eligCount is 0 and the empty-set arm -
+        //unreachable from the live seam, where decideReveal never asks with
+        //nothing eligible - still prints its own "if none qualify". The two
+        //clauses the finding names are what must be gone.)
+        CHECK(w61.find("or exactly \"PUT: none\" to choose no card") == string::npos
+              && w61.find("declines") == string::npos,
+              "#W61-V R1 NEGATIVE the mandatory bare chooser is offered no decline -"
+              " neither in the framing nor in the reply protocol");
         CHECK(w61.find("comma-separated") == string::npos
               && w61.find("which cards go to") == string::npos,
               "#W61-T C8 NEGATIVE the single-pick ask contains no multi-select instruction");
+        //#W61-V (R1) POSITIVE for the other side of the same flag: an <upto:1>
+        //chooser (Sigarda's Coven-class "you may choose") DOES license a decline,
+        //and says so once in the framing and once in the reply protocol.
+        const string optional = buildRevealAskText(none, "Choose a card", "put back", "",
+                                                   noElig, 1, true, true, true, false);
+        CHECK(optional.find("you can never take two. \"PUT: none\" declines.") != string::npos
+              && optional.find("or exactly \"PUT: none\" to choose no card") != string::npos,
+              "#W61-V R1 an upto: chooser states the decline the script permits");
+        //#W61-V (R1): the SCRIPT half of the same flag, on the real specs.
+        //Pelakka Predation borderline.txt:82651, Sigarda's Coven's option one and
+        //Thoughtseize's <1> shape.
+        CHECK(!revealSinglePickDeclineLegal("*[manacost>=3]|reveal"),
+              "#W61-V R1 Pelakka Predation's BARE chooser licenses no decline");
+        CHECK(revealSinglePickDeclineLegal("<upto:1>human|reveal"),
+              "#W61-V R1 an <upto:1> chooser licenses a decline");
+        CHECK(!revealSinglePickDeclineLegal("<1>*|reveal"),
+              "#W61-V R1 NEGATIVE a fixed <1> chooser licenses no decline");
+        CHECK(revealSinglePickDeclineLegal("<anyamount>snow|reveal"),
+              "#W61-V R1 an <anyamount> chooser has no minimum");
+        CHECK(!revealSinglePickDeclineLegal("<upto:2*creature|reveal"),
+              "#W61-V R1 NEGATIVE an unparsable arity fails CLOSED - no decline claimed");
         //NEGATIVE: the MANDATORY <1> shape (Thoughtseize-class) is byte-unchanged
-        //from wave 60 - only the new optional flag adds wording.
+        //from wave 20 - neither new flag adds wording to it.
         const string mandatory = buildRevealAskText(none, "Discard", "Hand", "",
-                                                    noElig, 1, true, false, false);
+                                                    noElig, 1, true, false, false, false);
         CHECK(mandatory.find("Choose the ONE card to send to \"Discard\"") != string::npos
               && mandatory.find("never take two") == string::npos
-              && mandatory.find("declines") == string::npos,
+              && mandatory.find("declines") == string::npos
+              && mandatory.find("NOT optional") == string::npos,
               "#W61-T C8 NEGATIVE a fixed <1> chooser keeps the wave-20 choose-ONE wording");
         //ECHO shape: the one-number reply the protocol asks for.
         {
@@ -54953,7 +55440,7 @@ static const char * kW50Y_r94 =
         }
         CHECK(attackPunisherClause(3, board)
               == "they control 3 creatures able to attack - deals 3 to each if all 3 attack."
-                 " DIES at 3: Goblin (2/2); Triumphant Adventurer (2/2)."
+                 " DIES at 3 (before prevention): Goblin (2/2); Triumphant Adventurer (2/2)."
                  " SURVIVES: Nadaar, Selfless Paladin (4/4) - 4 power of theirs survives it",
               "#W61-U C10 the damage wipe names who dies, who lives, and what still gets through");
         CHECK(attackPunisherClause(3, board).find("; Nadaar, Selfless Paladin (4/4);") == string::npos,
@@ -54963,7 +55450,7 @@ static const char * kW50Y_r94 =
             std::vector<WipeVictim> smalls(board.begin(), board.begin() + 2);
             CHECK(attackPunisherClause(2, smalls)
                   == "they control 2 creatures able to attack - deals 2 to each if all 2 attack."
-                     " DIES at 2: Goblin (2/2); Triumphant Adventurer (2/2)."
+                     " DIES at 2 (before prevention): Goblin (2/2); Triumphant Adventurer (2/2)."
                      " SURVIVES: none - this kills every one of them",
                   "#W61-U C10 a wipe that stops the whole attack says exactly that");
         }
@@ -54976,7 +55463,8 @@ static const char * kW50Y_r94 =
             CHECK(attackPunisherClause(9, ind).find("SURVIVES: Darksteel Myr (0/1) [indestructible]"
                                                     " - 0 power of theirs survives it")
                       != string::npos
-                  && attackPunisherClause(9, ind).find("DIES at 9: none") != string::npos,
+                  && attackPunisherClause(9, ind).find("DIES at 9 (before prevention): none")
+                         != string::npos,
                   "#W61-U C10 damage never destroys an indestructible creature, whatever the amount");
         }
         // NEGATIVE, twice over: the wave-60 clause is byte-identical wherever
@@ -54989,6 +55477,89 @@ static const char * kW50Y_r94 =
               "#W61-U C10 NEGATIVE at zero attackers nothing is rostered");
         CHECK(wipeSurvivorTail(0, board).empty() && wipeSurvivorTail(3, std::vector<WipeVictim>()).empty(),
               "#W61-U C10 NEGATIVE no damage or no board prints no roster");
+        //#W61-V (R5): the two outs the wave-60 roster asserted through.
+        //REPRO: Lightmine Field's RED damage against an attacking 2/2 with
+        //protection from red - the damage is prevented, so it neither dies nor
+        //stops attacking, and the wave-60 clause said "DIES at 2".
+        {
+            std::vector<WipeVictim> pro;
+            WipeVictim p1; p1.name = "Kor Firewalker"; p1.power = 2; p1.toughness = 2;
+            p1.protectedFromSource = true; pro.push_back(p1);
+            const string t = wipeSurvivorTail(2, pro);
+            CHECK(t.find("DIES at 2 (before prevention): none") != string::npos,
+                  "#W61-V R5 a creature with protection from the damage's source does NOT die");
+            CHECK(t.find("SURVIVES: Kor Firewalker (2/2) [protected from this damage's"
+                         " source - it takes none] - 2 power of theirs survives it")
+                      != string::npos,
+                  "#W61-V R5 it is named as a survivor, and its power still gets through");
+            //MUST-NOT-MATCH: protection is not reported as indestructible.
+            CHECK(t.find("[indestructible]") == string::npos,
+                  "#W61-V R5 NEGATIVE protection is named for what it is, not as indestructible");
+        }
+        //A regenerator IS destroyed by the damage and its controller MAY pay -
+        //it stays in DIES, marked, exactly as the destroy roster marks it.
+        {
+            std::vector<WipeVictim> reg;
+            WipeVictim r1; r1.name = "Drudge Skeletons"; r1.power = 1; r1.toughness = 1;
+            r1.canRegenerate = true; reg.push_back(r1);
+            const string t = wipeSurvivorTail(2, reg);
+            CHECK(t.find("DIES at 2 (before prevention): Drudge Skeletons (1/1)"
+                         " (may survive: it can regenerate)") != string::npos
+                  && t.find("SURVIVES: none") != string::npos,
+                  "#W61-V R5 a regenerator stays in DIES and is marked, never promoted");
+        }
+        //NEGATIVE: with neither out readable the roster is the wave-61 line and
+        //its scope is stated once, not per card.
+        {
+            const string t = wipeSurvivorTail(3, board);
+            size_t first = t.find("before prevention");
+            CHECK(first != string::npos && t.find("before prevention", first + 1) == string::npos,
+                  "#W61-V R5 NEGATIVE the prevention scope is stated ONCE, in the header");
+        }
+        //#W61-V (R8): the blocking-lifegain ceiling counts only bodies that can
+        //block something on OFFER. REPRO: a Perimeter Captain (3 life per
+        //blocking creature) and a flying Wall against an all-SHADOW attack -
+        //neither body can legally block, so no blocking trigger exists and the
+        //"life back" ceiling is 0, not 6.
+        {
+            std::vector<int> life;
+            life.push_back(3); life.push_back(3);
+            std::vector<bool> canBlock;
+            canBlock.push_back(false); canBlock.push_back(false);
+            CHECK(blockingLifeCeiling(life, canBlock) == 0,
+                  "#W61-V R8 bodies that can block no offered attacker gain them nothing");
+            canBlock[1] = true;
+            CHECK(blockingLifeCeiling(life, canBlock) == 3,
+                  "#W61-V R8 only the body that CAN block is in the ceiling");
+            //NEGATIVE: with every body able to block, the wave-61 ceiling is the
+            //wave-60 sum, unchanged.
+            canBlock[0] = true;
+            CHECK(blockingLifeCeiling(life, canBlock) == 6,
+                  "#W61-V R8 NEGATIVE an all-legal block set keeps the full ceiling");
+            CHECK(blockingLifeCeiling(std::vector<int>(), std::vector<bool>()) == 0,
+                  "#W61-V R8 NEGATIVE no blockers, no ceiling");
+        }
+        //#W61-V (R6): the activation cost the crack-back clause now prices.
+        CHECK(activationManaCost("{t}") == 0 && activationManaCost("{1}{r}{s(goblin|myBattlefield)}") == 2
+              && activationManaCost("{2}{b}{u}") == 4 && activationManaCost("{t}{x}") == 1,
+              "#W61-V R6 the mana half of an activation cost head, sacrifice and tap excluded");
+        CHECK(activationManaCost("ability$!name(x)") == -1 && activationManaCost("{1") == -1,
+              "#W61-V R6 NEGATIVE an unpriceable cost head is -1, so the clause claims nothing");
+        //REPRO 1: a tapped Staff of Nin under a does-not-untap effect is still
+        //tapped when they would aim it, so it is no crack-back source.
+        CHECK(!crackBackCostAffordable("{t}", true, 8),
+              "#W61-V R6 a source that will still be tapped aims nothing at the pilot");
+        //REPRO 2: a mana-intensive pinger their open mana cannot pay for.
+        CHECK(!crackBackCostAffordable("{1}{r}{s(goblin|myBattlefield)}", false, 1),
+              "#W61-V R6 an activation their open mana cannot pay is not a floor");
+        //POSITIVE: payable, and untapped (or untapping) - the clause still speaks.
+        CHECK(crackBackCostAffordable("{1}{r}{s(goblin|myBattlefield)}", false, 2)
+              && crackBackCostAffordable("{t}", false, 0),
+              "#W61-V R6 POSITIVE a payable activation on an untapping source still counts");
+        //NEGATIVE: an unknown reach and an unpriceable head both fail CLOSED.
+        CHECK(!crackBackCostAffordable("{2}", false, -1)
+              && !crackBackCostAffordable("ability$!name(x)", false, 9),
+              "#W61-V R6 NEGATIVE an unknown reach or an unreadable cost claims nothing");
         // ECHO: a reply naming the annotated row still binds it.
         {
             vector<string> menu;

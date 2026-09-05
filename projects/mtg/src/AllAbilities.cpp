@@ -1175,14 +1175,36 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         //most one card can go to option one whatever targetMin says. Widen the
         //gate to the arity and keep the mandatory/optional distinction as its
         //own flag so the wording stays truthful ("you MAY choose" is not "choose
-        //the ONE"). Only widened for a chooser built from abilityOne's OWN
+        //the ONE"). #W61-V (R1): that distinction is read from the SCRIPT below,
+        //not from targetMin, which is false for both shapes. Only widened for a chooser built from abilityOne's OWN
         //target() (oneTc): the defensive `tc` fallback keeps the prior test, so
         //no reveal whose option one has no target() spec changes shape.
-        bool singlePickOptional = false;
+        bool singlePickBare = false;
+        //#W61-V (R1, wave-61 codex review finding 1 HIGH): the wave-60 gate
+        //above called a bare one-target chooser OPTIONAL solely because
+        //targetMin is false, and the ask then offered `PUT: none` on a choice
+        //the card makes MANDATORY. Pelakka Predation's current Oracle reads
+        //"You choose a card from it with mana value 3 or greater" (the
+        //primitive's text= still carries the pre-errata "You may choose"), so a
+        //decline is not a legal answer while a legal card is revealed, and the
+        //reveal driver acting on one skips the discard the spell requires.
+        //targetMin cannot tell the two shapes apart: BOTH a bare `target(x)`
+        //and an `<upto:1>` chooser parse to maxtargets 1 with targetMin false
+        //(TargetChooser.cpp:522 sets targetMin only for a `<N>` prefix carrying
+        //no "upto:"). The SCRIPT can: "upto:" is the engine's own marker for an
+        //arity whose minimum is zero. Read it from option one's own target()
+        //spec, so `none` is offered exactly where the script permits taking
+        //none, and the wording of the mandatory shape says so.
+        bool singlePickDeclineLegal = false;
         if (!pickExactlyOne && oneTc && oneTc->maxtargets == 1 && !oneTc->targetMin)
         {
             pickExactlyOne = true;
-            singlePickOptional = true;
+            singlePickBare = true;
+            //Defined in AIPlayerGPT.cpp, beside the ask it words; declared here
+            //rather than pulling the whole GPT seat header into this file.
+            extern bool revealSinglePickDeclineLegal(const string& targetSpec);
+            const string oneSpec = oneTarget.size() > 1 ? oneTarget[1] : string();
+            singlePickDeclineLegal = revealSinglePickDeclineLegal(oneSpec);
         }
         SAFE_DELETE(oneTc); //eligible[] + the two arity flags captured; done with it
         vector<int> sel;
@@ -1195,7 +1217,8 @@ void MTGRevealingCards::driveInteractiveRevealStep()
 #endif
             r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel,
                                    eligible, revealSource, pickExactlyOne,
-                                   singlePickOptional); //#W61-T (C8)
+                                   singlePickBare,
+                                   singlePickDeclineLegal); //#W61-T (C8), #W61-V (R1)
         if (r == 0)
             return; //model call in flight; act on no card this tick
         REVEAL_DBG("phase0 decided r=" << r << " picks=" << sel.size()
