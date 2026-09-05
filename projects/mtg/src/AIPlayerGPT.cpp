@@ -65,6 +65,7 @@ static string landTapMana(const string& text);
 //#W62-X (D8): same reason - the loop scan is defined far below and outside the
 //anonymous namespace, and a declaration inside it would name a different function.
 static bool playerHasLifeLoop(Player * p);
+static bool lifeLoopProvenWin(Player * me); //#W62-AA (R6)
 
 namespace
 {
@@ -2122,7 +2123,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         bool myLoopClosed = false;
         if (card && card->controller())
         {
-            myLoopClosed = playerHasLifeLoop(card->controller());
+            myLoopClosed = lifeLoopProvenWin(card->controller()); //#W62-AA (R6)
             Player * themP = card->controller()->opponent();
             MTGGameZone * tbf2 = (themP && themP->game) ? themP->game->inPlay : NULL;
             for (int ti = 0; tbf2 && ti < tbf2->nb_cards; ti++)
@@ -10215,6 +10216,26 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
     return o.str();
 }
 
+//#W62-AA (R3, wave-62 codex review finding 3): ONE draw-step forecast line per
+//side. The W-Z merge left BOTH emitters alive at each of the two call sites -
+//lane X's (which carries `resolving NOW` and the life verdict) and lane Y's
+//(which carries the direction-correct loop clause) - so every screen with draw
+//punishers on it printed the same forecast twice with CONTRADICTORY loop
+//claims: `LOOP CAUTION` on the first, `LOOP SCOPE` on the second. Neither lane
+//intended two lines; the merge produced them. This is the single emitter both
+//call sites now go through, carrying both lanes' facts on one line, and it is
+//the surface the "exactly one" invariant is pinned on.
+static string drawForecastBlock(bool theirs, int base,
+                                const std::vector<std::pair<std::string, int> >& extras,
+                                int perDraw, const string& loopClause,
+                                bool stepIsNow, int holderLife)
+{
+    const string line = theirs
+        ? theirDrawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife)
+        : drawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife);
+    return line.empty() ? line : (string("\n") + line);
+}
+
 //The scan behind it: `@each my draw:...draw:N controller` on the seat's own
 //permanents and `@each opponent draw:...draw:N opponent` on the other side both
 //fire on THIS seat's draw step. `sourcenottap` (Howling Mine) is honoured. The
@@ -11605,8 +11626,14 @@ bool gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs,
 {
     if (!emptyBody || timeoutMs <= 0)
         return false;
-    if (httpStatus != 0 && httpStatus != 200)
-        return false; //the server answered, with an error - not the clock
+    //#W62-AA (R8, wave-62 codex review finding 8): ANY status that came back
+    //means the round trip COMPLETED - the server answered. Wave 61 excused only
+    //non-200 statuses, so a 200 that carried an empty body late in the window
+    //still opened a wall_miss account and bought a fresh full deadline; it is
+    //`empty_reply` (the model said nothing), and the elapsed fraction cannot
+    //change what arrived. What remains a wall miss is unchanged: NO status.
+    if (httpStatus != 0)
+        return false; //the server answered - not the clock
     if (curlCode > 0 && curlCode != kCurlOperationTimedOut)
         return false; //transport died of something else (connect, DNS, TLS, reset)
     return elapsedMs * 100 >= timeoutMs * 95;
@@ -18049,8 +18076,61 @@ static int activationManaCost(const string& head)
 //from the clause rather than assert it.
 //The verdict itself, pure over the cost head and the two board facts, so the
 //rule is pinned without a battlefield.
+//#W62-AA (R5, wave-62 codex review finding 5): the cost head's COLOURS, and
+//whether the sources they will have untapped can make them. `reachColorMask`
+//carries bit (1 << Constants::MTG_COLOR_*) for every colour those sources can
+//produce; -1 means the mask could not be read, and the check then makes no
+//claim either way (the total-mana test still applies). Only a symbol that is
+//purely a mana symbol is read - `{s(goblin|mybattlefield)}` and
+//`{c(0/0,-8,loyalty)}` carry letters that are not pips and are skipped, as is
+//any hybrid with a generic half (`{2/w}`), which generic mana can pay.
+//Lowercased script text, so the pips are lowercase. Pure.
+static bool crackBackColorsFit(const string& head, int reachColorMask)
+{
+    if (reachColorMask < 0)
+        return true; //unknown reach colours: this test claims nothing
+    size_t i = 0;
+    while (i < head.size())
+    {
+        if (head[i] != '{') { i++; continue; }
+        const size_t close = head.find('}', i);
+        if (close == string::npos)
+            break;
+        const string sym = head.substr(i + 1, close - i - 1);
+        i = close + 1;
+        bool pureMana = !sym.empty();
+        bool hasDigit = false, hasSlash = false;
+        int need = 0;
+        for (size_t k = 0; k < sym.size(); k++)
+        {
+            const char c = sym[k];
+            if (isdigit((unsigned char) c)) { hasDigit = true; continue; }
+            if (c == '/') { hasSlash = true; continue; }
+            switch (c)
+            {
+            case 'w': need |= 1 << Constants::MTG_COLOR_WHITE; break;
+            case 'u': need |= 1 << Constants::MTG_COLOR_BLUE; break;
+            case 'b': need |= 1 << Constants::MTG_COLOR_BLACK; break;
+            case 'r': need |= 1 << Constants::MTG_COLOR_RED; break;
+            case 'g': need |= 1 << Constants::MTG_COLOR_GREEN; break;
+            case 'x': break; //{x} is generic
+            default: pureMana = false; break;
+            }
+            if (!pureMana)
+                break;
+        }
+        if (!pureMana || !need)
+            continue;
+        if (hasSlash && hasDigit)
+            continue; //a generic half pays it
+        if (!(need & reachColorMask))
+            return false; //no source of theirs makes any colour this pip accepts
+    }
+    return true;
+}
+
 static bool crackBackCostAffordable(const string& costHead, bool sourceStaysTapped,
-                                    int oppReach)
+                                    int oppReach, int reachColorMask = -1) //#W62-AA (R5)
 {
     const bool needsTap = costHead.find("{t}") != string::npos
                           || costHead.find("{q}") != string::npos;
@@ -18059,7 +18139,9 @@ static bool crackBackCostAffordable(const string& costHead, bool sourceStaysTapp
     const int mana = activationManaCost(costHead);
     if (mana < 0)
         return false; //unpriceable cost head: claim nothing
-    return oppReach >= 0 && mana <= oppReach;
+    if (oppReach < 0 || mana > oppReach)
+        return false;
+    return crackBackColorsFit(costHead, reachColorMask); //#W62-AA (R5)
 }
 
 //#W62-X (D6, engine HIGH-2, second and third errors on the same render): the
@@ -18101,7 +18183,7 @@ static bool crackBackDamageIsDirect(const string& line, size_t costColon, size_t
 }
 
 static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size_t effectPos,
-                                   int oppReach)
+                                   int oppReach, int reachColorMask = -1) //#W62-AA (R5)
 {
     if (!c)
         return false;
@@ -18112,7 +18194,7 @@ static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size
     //permanent that does NOT untap (or is frozen) is still tapped next turn.
     const bool staysTapped = c->isTapped()
                              && (c->basicAbilities[Constants::DOESNOTUNTAP] || c->frozen >= 1);
-    return crackBackCostAffordable(line.substr(0, colon), staysTapped, oppReach);
+    return crackBackCostAffordable(line.substr(0, colon), staysTapped, oppReach, reachColorMask);
 }
 
 //#W62-X (D6): how many distinct mana SOURCES they will have untapped on their
@@ -18122,8 +18204,16 @@ static bool crackBackAbilityUsable(MTGCardInstance * c, const string& line, size
 //Summoning sickness is deliberately not a filter, for the reason the crack-back
 //body count gives: a source that arrived this turn is usable on their next one.
 //-1 means the layer could not be read, and the caller then keeps the old figure.
-static int oppNextTurnManaReach(Player * opp)
+//#W62-AA (R5): `exclude` is dropped from the count and from the colours. The
+//permanent whose own activation is being priced cannot also be tapped for the
+//mana that pays it - Hive of the Eye Tyrant paying its own {3}{B} is a Hive
+//that is tapped, and a tapped land does not attack. `outColorMask` (may be
+//NULL) receives bit (1 << MTG_COLOR_*) per producible colour.
+static int oppNextTurnManaReach(Player * opp, MTGCardInstance * exclude = NULL,
+                                int * outColorMask = NULL)
 {
+    if (outColorMask)
+        *outColorMask = -1;
     if (!opp || !opp->game || !opp->game->inPlay || !opp->getObserver()
         || !opp->getObserver()->mLayers)
         return -1;
@@ -18153,8 +18243,20 @@ static int oppNextTurnManaReach(Player * opp)
         if (src->isTapped()
             && (src->basicAbilities[Constants::DOESNOTUNTAP] || src->frozen >= 1))
             continue;
+        if (exclude && src == exclude) //#W62-AA (R5)
+            continue;
         seen.insert(src);
+        if (outColorMask && amp->output)
+        {
+            if (*outColorMask < 0)
+                *outColorMask = 0;
+            for (int col = 1; col < Constants::NB_Colors; col++)
+                if (amp->output->getCost(col) > 0)
+                    *outColorMask |= 1 << col;
+        }
     }
+    if (outColorMask && *outColorMask < 0)
+        *outColorMask = 0; //the layer WAS read: an empty colour set is a fact
     return (int) seen.size();
 }
 
@@ -18170,6 +18272,11 @@ static string crackBackFloorSources(Player * opp)
     ManaEngine::FreeProducerPolicy crackBackPolicy;
     ManaCost * crackBackPotential = NEW ManaCost();
     const int openNow = ManaEngine::potentialColorReach(opp, crackBackPolicy, crackBackPotential);
+    //#W62-AA (R5): the same line's COLOURS, for the fallback path below.
+    int openMask = 0;
+    for (int col = 1; col < Constants::NB_Colors; col++)
+        if (crackBackPotential->getCost(col) > 0)
+            openMask |= 1 << col;
     SAFE_DELETE(crackBackPotential);
     //#W62-X (D6, R6 FAIL): this line forecasts THEIR NEXT TURN, and their lands
     //untap in their untap step - pricing a next-turn activation against THIS
@@ -18178,14 +18285,24 @@ static string crackBackFloorSources(Player * opp)
     //The gate is split: next-turn mana for a next-turn claim. The walk falls
     //back to the open-mana figure when the action layer cannot be read, which is
     //the wave-61 behaviour exactly - no clause appears that did not appear then.
-    const int nextTurn = oppNextTurnManaReach(opp);
-    const int oppReach = (nextTurn >= 0) ? nextTurn : openNow;
     MTGGameZone * bf = opp->game->inPlay;
     for (int i = 0; i < bf->nb_cards; i++)
     {
         MTGCardInstance * c = bf->cards[i];
         if (!c)
             continue;
+        //#W62-AA (R5, wave-62 codex review finding 5): the reach that prices
+        //THIS card's own activation excludes THIS card's own mana. A manland
+        //that taps for the black in its own {3}{B} is a manland that is tapped,
+        //and a tapped permanent does not attack - counting it among the four
+        //sources that pay for it is how the merged gate claimed a crack-back
+        //body that cannot exist. The colour mask comes back from the same walk,
+        //so the total and the pips are read off one board. The fallback when the
+        //action layer cannot be read is the wave-61 open-mana figure, unchanged.
+        int cardMask = -1;
+        const int cardNext = oppNextTurnManaReach(opp, c, &cardMask);
+        const int oppReach = (cardNext >= 0) ? cardNext : openNow;
+        const int reachMask = (cardNext >= 0) ? cardMask : openMask;
         const string mt = scriptLower(c->magicText);
         size_t lp = 0;
         while (lp <= mt.size())
@@ -18200,7 +18317,7 @@ static string crackBackFloorSources(Player * opp)
             {
                 //(a) an activated animation, with the printed body it becomes
                 size_t b = line.find("becomes(creature");
-                if (b != string::npos && crackBackAbilityUsable(c, line, b, oppReach))
+                if (b != string::npos && crackBackAbilityUsable(c, line, b, oppReach, reachMask))
                 {
                     int pw = -1;
                     size_t caret = line.find('^', b);
@@ -18233,7 +18350,7 @@ static string crackBackFloorSources(Player * opp)
                 if (dp != string::npos && atPlayer && flatDmg > 0
                     && crackBackDamageIsDirect(line, line.find(':'), dp)
                     //#W61-V (R6): only a source they can actually activate.
-                    && crackBackAbilityUsable(c, line, dp, oppReach))
+                    && crackBackAbilityUsable(c, line, dp, oppReach, reachMask))
                 {
                     std::ostringstream pp;
                     pp << c->getDisplayName() << " (" << flatDmg
@@ -19482,12 +19599,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 const bool myDrawNow = observer
                     && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW
                     && activeSeat == this;
-                out << "\n" << drawStepForecastText(1, extras, theirsPer, loopCaution,
-                                                   myDrawNow, life); //#W62-X (D8)
-                //#W62-Y (D3): YOUR draw step under THEIR punishers - the number
-                //is life YOU lose, which is what enters a loop of THEIRS.
-                out << "\n" << drawStepForecastText(1, extras, theirsPer,
-                                                    loopCautionForLine(this, opp, true));
+                //#W62-AA (R3): ONE line, carrying lane X's D8 verdict AND lane
+                //Y's D3 direction-correct clause. YOUR draw step under THEIR
+                //punishers - the number is life YOU lose, which is what enters
+                //a loop of THEIRS.
+                out << drawForecastBlock(false, 1, extras, theirsPer,
+                                         loopCautionForLine(this, opp, true),
+                                         myDrawNow, life);
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -19498,13 +19616,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 const bool theirDrawNow = observer
                     && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW
                     && activeSeat == opp;
-                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer, loopCaution,
-                                                        theirDrawNow, opp->life); //#W62-X (D8)
-                //#W62-Y (D3): THEIR draw step under YOUR punishers - the number
-                //is life THEY lose. A loop of theirs is NOT entered by it (the
-                //wave-61 deck162 HIGH-1 false surface); a loop of YOURS is.
-                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer,
-                                                         loopCautionForLine(this, opp, false));
+                //#W62-AA (R3): ONE line again. THEIR draw step under YOUR
+                //punishers - the number is life THEY lose. A loop of theirs is
+                //NOT entered by it (the wave-61 deck162 HIGH-1 false surface);
+                //a loop of YOURS is.
+                out << drawForecastBlock(true, 1, theirExtras, minePer,
+                                         loopCautionForLine(this, opp, false),
+                                         theirDrawNow, opp->life);
             }
         }
     }
@@ -30074,8 +30192,17 @@ static int manaCostTextCmc(const string& costText)
 //right now (floating pool + untapped producers) or -1 when it could not be
 //computed, in which case the row states the price and claims nothing about what
 //the seat can pay. The "pays for K and stops" half is the partial-pay rule the
-//header already states, applied to THIS row's number. Pure.
-static string payRepeatRowCostTag(int counters, const string& perCost, int perCmc, int available)
+//header already states, applied to THIS row's number.
+//#W62-AA (R4, wave-62 codex review finding 4): `paidCopies` is the MANA
+//ENGINE's answer for this row - the largest number of copies of `perCost` the
+//seat can actually pay, colours and all. Wave 62 derived it here as
+//`available / perCmc`, which treats a source count as fungible mana: six
+//untapped Mountains "paid for" three {1}{W} payments the seat cannot make at
+//all. When the engine could not decide (-1) the row keeps the arithmetic bound
+//but says out loud that it is conditional on colours, rather than claiming a
+//payment count it has not checked. Pure over its five arguments.
+static string payRepeatRowCostTag(int counters, const string& perCost, int perCmc, int available,
+                                  int paidCopies = -1) //#W62-AA (R4)
 {
     if (counters <= 0 || perCost.empty() || perCmc <= 0)
         return "";
@@ -30084,13 +30211,23 @@ static string payRepeatRowCostTag(int counters, const string& perCost, int perCm
       << " mana for all " << counters;
     if (available >= 0)
     {
-        int paid = available / perCmc;
-        if (paid > counters)
-            paid = counters;
-        o << "; you have " << available << " spendable now, which pays for " << paid
-          << " of them";
-        if (paid < counters)
-            o << " and stops";
+        int bound = available / perCmc;
+        if (bound > counters)
+            bound = counters;
+        o << "; you have " << available << " spendable now, which pays for ";
+        if (paidCopies >= 0)
+        {
+            int paid = paidCopies > counters ? counters : paidCopies;
+            o << paid << " of them";
+            if (paid < counters)
+                o << " and stops";
+        }
+        else
+        {
+            o << "up to " << bound << " of them if your colours fit";
+            if (bound < counters)
+                o << ", then stops";
+        }
     }
     o << "}";
     return o.str();
@@ -31389,6 +31526,11 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 GptManaPolicy repeatPolicy(this);
                 avail += ManaEngine::potentialColorReach(this, repeatPolicy, NULL);
             }
+            //#W62-AA (R4): `avail` is a MAGNITUDE (pool + distinct untapped
+            //sources) and stays the magnitude the row prints. What it must not
+            //do any more is decide how many payments it covers - that is a
+            //colour question, and the mana engine owns it (below).
+            const int anyMana = ctx->has(Constants::ANYTYPEOFMANAABILITY);
             const bool beforeAttack = observer->currentPlayer == this
                 && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
             const bool blockStillMatters = observer->currentPlayer == this
@@ -31402,10 +31544,39 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 const int perCmc = manaCostTextCmc(per);
                 if (n <= 0 || per.empty() || perCmc <= 0)
                     continue; //a row this parse cannot account for keeps the engine's own text
-                opts[i] += payRepeatRowCostTag(n, per, perCmc, avail);
-                int paid = avail / perCmc;
-                if (paid > n)
-                    paid = n;
+                //#W62-AA (R4): the largest K whose K copies of `per` the mana
+                //engine can actually plan a payment for, from the floating pool
+                //and the untapped producers. -1 only when the cost text will
+                //not parse, and then the row hedges instead of claiming.
+                int paid = -1;
+                {
+                    int fits = 0;
+                    bool parsed = true;
+                    for (int k = 1; k <= n && parsed; k++)
+                    {
+                        ManaCost * probe = NULL;
+                        for (int j = 0; j < k; j++)
+                            probe = ManaCost::parseManaCost(per, probe, ctx);
+                        if (!probe)
+                        {
+                            parsed = false;
+                            break;
+                        }
+                        bool ok = getManaPool()->canAfford(probe, anyMana);
+                        if (!ok)
+                        {
+                            GptManaPolicy fitPol(this);
+                            ok = !ManaEngine::planPayment(this, fitPol, ctx, probe, anyMana).empty();
+                        }
+                        SAFE_DELETE(probe);
+                        if (!ok)
+                            break;
+                        fits = k;
+                    }
+                    if (parsed)
+                        paid = fits;
+                }
+                opts[i] += payRepeatRowCostTag(n, per, perCmc, avail, paid);
                 if (paid <= 0)
                     continue;
                 ManaCost * bill = NULL;
@@ -31416,10 +31587,10 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 //Only where the FLOATING pool cannot already cover it - the same
                 //guard the cast row's clause rides; mana already in the pool taps
                 //nothing.
-                if (!getManaPool()->canAfford(bill, ctx->has(Constants::ANYTYPEOFMANAABILITY)))
+                if (!getManaPool()->canAfford(bill, anyMana))
                 {
                     vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                        this, ctx, bill, ctx->has(Constants::ANYTYPEOFMANAABILITY), false);
+                        this, ctx, bill, anyMana, false);
                     std::set<MTGCardInstance *> seenSrc;
                     std::vector<std::string> taps;
                     std::vector<int> tapRestrict;
@@ -32066,7 +32237,7 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     if (Player * dtp = dynamic_cast<Player *>(t))
                         tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this,
                                                      this->life, perilBeforeResolve, //#W60-L (B1)
-                                                     playerHasLifeLoop(this)); //#W62-X (D8)
+                                                     lifeLoopProvenWin(this)); //#W62-AA (R6)
                 //#W54-C (D4): and a planeswalker's answer is its loyalty - the
                 //helper existed and only the ability path was calling it, so
                 //`130v162` seq 63's Ob Nixilis row was bare too.
@@ -32951,6 +33122,40 @@ static bool playerHasLifeLoop(Player * p)
         mir = mir || lifeLossMirrorScript(c->magicText);
     }
     return conv && mir;
+}
+
+//#W62-AA (R6, wave-62 codex review finding 6): holding both halves is not the
+//same as being able to CLOSE them. The chain is "I gain life -> they lose that
+//much -> I gain that much -> ..."; it stops dead at either end. If their side
+//reads cantchangelife / cantlifelose / cantlose their life does not move, and
+//if this seat cannot gain life (nolifegain here, nolifegainopponent there) the
+//converter is never fed. Wave 62 inferred THIS WINS THE GAME from the two
+//cards alone, so a seat under Teferi's Protection was told an unlimited chain
+//would kill it. Fail closed, as the C1 rule does for unpriced punishers: no
+//win claim unless the board says the chain can run. The rule is pure so
+//PARSETEST pins the whole table.
+static bool lifeLoopWinnable(bool loopClosed, bool theirLifeCanChange, bool iCanGainLife)
+{
+    return loopClosed && theirLifeCanChange && iCanGainLife;
+}
+//The board reader behind it. Every fact is a zone-level ability the prompt's
+//own battlefield lines already show.
+static bool lifeLoopProvenWin(Player * me)
+{
+    if (!playerHasLifeLoop(me))
+        return false;
+    Player * them = me->opponent();
+    if (!them || !them->inPlay() || !me->inPlay())
+        return false; //cannot read the other side: claim nothing
+    MTGGameZone * th = them->inPlay();
+    MTGGameZone * mi = me->inPlay();
+    const bool theirLifeCanChange = !th->hasAbility(Constants::CANTCHANGELIFE)
+                                    && !th->hasAbility(Constants::CANTLIFELOSE)
+                                    && !th->hasAbility(Constants::CANTLOSE);
+    const bool iCanGainLife = !mi->hasAbility(Constants::CANTCHANGELIFE)
+                              && !mi->hasAbility(Constants::NOLIFEGAIN)
+                              && !th->hasAbility(Constants::NOLIFEGAINOPPONENT);
+    return lifeLoopWinnable(true, theirLifeCanChange, iCanGainLife);
 }
 
 //The A-row clause for it (attackers window): the loop is THEIRS, so every life
@@ -34282,6 +34487,47 @@ static bool combatLineIsClean(const string& line, const vector<string> * rosterA
 //one of the protocol's own worked examples is an echo of the instructions.
 //Returns the payload of the LAST qualifying restatement, or "" when there is
 //none. Pure over (reply, label, rosters) so every branch is PARSETEST-provable.
+//#W62-AA (R2, wave-62 codex review finding 2): the prose IN FRONT of the
+//label decides whether the model was writing an answer or naming one it
+//refuses. `BLOCKS: B1:A1` then `I should not use BLOCKS: B2:A2.` carries a
+//payload that is perfectly clean by the roster grammar, so D9's last-clean-wins
+//rule executed precisely the assignment the reply rejected. The rule is the
+//narrow one the review states: a restatement is taken only when no NEGATION
+//token precedes the directive ON ITS OWN LINE. Line-scoped on purpose - a
+//rejection two lines up ("I should not chump. / So BLOCKS: B2:A1.") must not
+//disarm a later affirmative re-answer, which is the whole D9 recovery. The
+//payload itself is not scanned: the roster grammar already refuses prose there,
+//and "none" is a declension word, not a negation. Pure over the line prefix.
+static bool combatDirectiveNegatedOnLine(const string& lineLcBeforeLabel)
+{
+    static const char * kNegations[] = {
+        "not", "never", "avoid", "reject", "instead", "rather", "without",
+        "cannot", "cant", "dont", "doesnt", "wont", "shouldnt", "wouldnt",
+        "mustnt", "isnt", "arent", "wasnt", "refuse", "skip"
+    };
+    const string& s = lineLcBeforeLabel;
+    size_t i = 0;
+    while (i < s.size())
+    {
+        while (i < s.size() && !isalpha((unsigned char) s[i]))
+            i++;
+        size_t start = i;
+        string word;
+        while (i < s.size() && (isalpha((unsigned char) s[i]) || s[i] == '\''))
+        {
+            if (s[i] != '\'') //fold the apostrophe: don't -> dont
+                word += s[i];
+            i++;
+        }
+        if (i == start)
+            break;
+        for (size_t k = 0; k < sizeof(kNegations) / sizeof(kNegations[0]); k++)
+            if (word == kNegations[k])
+                return true;
+    }
+    return false;
+}
+
 static bool combatDirectiveExampleEcho(const string& payloadLc)
 {
     static const char * kExamples[] = {
@@ -34357,6 +34603,13 @@ string AIPlayerGPT::restatedCombatDirective(const string& content, const char * 
         { scan += labelLen; continue; }
         if (scan > 0 && (isalnum((unsigned char) low[scan - 1]) || low[scan - 1] == '_'))
         { scan += labelLen; continue; } //mid-word, not a directive
+        //#W62-AA (R2): a directive its own line NEGATES is a rejected candidate.
+        {
+            size_t ls = low.rfind('\n', scan == 0 ? 0 : scan - 1);
+            ls = (ls == string::npos) ? 0 : ls + 1;
+            if (combatDirectiveNegatedOnLine(low.substr(ls, scan - ls)))
+            { scan += labelLen; continue; }
+        }
         //The payload runs to the end of the sentence or the end of the line,
         //whichever comes first: the rest of a prose line is prose.
         size_t e = scan + labelLen;
@@ -50472,9 +50725,26 @@ static const char * kW50Y_r94 =
               && !gptDeadlineMissed(true, 10, 900000, 0, 0),
               "#W61-V R4 NEGATIVE a non-empty body, an unset deadline and a fast empty"
               " reply are none of them wall misses");
-        CHECK(gptDeadlineMissed(true, 899000, 900000, 200, 0),
-              "#W61-V R4 a 200 with an empty body at the wall is still the model's own"
-              " deadline miss");
+        //#W62-AA (R8, wave-62 codex review finding 8): this pin had the order
+        //backwards. A COMPLETED HTTP 200 is a round trip that finished - the
+        //server answered, on time enough to answer at all - and an empty body
+        //under it is the model saying nothing, which is `empty_reply`. Calling
+        //it a wall miss opened a wall_miss account the endpoint never earned
+        //and bought the same request again with a FRESH full deadline. The
+        //elapsed fraction does not change what arrived.
+        CHECK(!gptDeadlineMissed(true, 899000, 900000, 200, 0),
+              "#W62-AA R8 a COMPLETED 200 with an empty body is not a wall miss, however late");
+        CHECK(string(noAnswerClassFor(false, gptDeadlineMissed(true, 899000, 900000, 200, 0),
+                                      false, 200, 0)) == "empty_reply",
+              "#W62-AA R8 ...it classes as empty_reply, and takes the empty-200 retry rule"
+              " (retryableTransportFailure says no) instead of a fresh deadline");
+        CHECK(!AIPlayerGPT::retryableTransportFailure(0, 200, true),
+              "#W62-AA R8 NEGATIVE an answered empty 200 buys no retry at all");
+        //MUST-NOT-MATCH: the wall miss itself is untouched - no status back and
+        //curl's own clock is still the only shape that opens the account.
+        CHECK(gptDeadlineMissed(true, 899000, 900000, 0, 0)
+              && gptDeadlineMissed(true, 900018, 900000, 0, 28),
+              "#W62-AA R8 MUST-NOT-MATCH a wall miss with NO status is unchanged");
         //D24: only a decision that NOTHING from the reply answered latches a recovery.
         CHECK(handedToHeuristic(-1, "unparsed_reply") && handedToHeuristic(-1, "timeout")
               && handedToHeuristic(-1, "degenerate_decode"),
@@ -57871,11 +58141,14 @@ static const char * kW50Y_r94 =
         CHECK(manaCostTextCmc("{1}{w}") == 2 && manaCostTextCmc("{w}{w}") == 2
                   && manaCostTextCmc("{4}") == 4 && manaCostTextCmc("") == 0,
               "#W62-Y D7 the printed cost's converted value");
-        const string tag = payRepeatRowCostTag(3, "{1}{w}", 2, 5);
+        //#W62-AA (R4): the count is now the mana engine's answer, passed in,
+        //not derived from the magnitude inside the tag. The WORDING these two
+        //cases pin is unchanged; only where the number comes from moved.
+        const string tag = payRepeatRowCostTag(3, "{1}{w}", 2, 5, 2);
         CHECK(tag == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 5 spendable now,"
                      " which pays for 2 of them and stops}",
               "#W62-Y D7 the row states the total, the seat's mana, and how far it actually goes");
-        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 9)
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 9, 3)
                   == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 9 spendable now,"
                      " which pays for 3 of them}",
               "#W62-Y D7 a row the seat can pay in full says so without the stop clause");
@@ -58184,6 +58457,187 @@ static const char * kW50Y_r94 =
         CHECK(transportStampPhase("curl=0,http=503,empty=1").empty()
               && transportStampPhase("").empty(),
               "#W62-Z D18 MUST-NOT-MATCH a stamp with no phase yields none");
+    }
+
+    // ================= WAVE-62 LANE AA (the codex review of the W-Z merge) =========
+    cout << "\n[#W62-AA R2] a restatement the prose REJECTS is not an answer\n";
+    {
+        vector<string> bN, aN;
+        bN.push_back("Goblin"); bN.push_back("Spider");
+        aN.push_back("Wolf"); aN.push_back("Wolf"); aN.push_back("Wolf");
+        // The review's own trigger. D9 made the LAST clean restatement win; a
+        // clean payload sitting behind "I should not use" is the assignment the
+        // model REFUSED, and it replaced the coded answer with it.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI should not use BLOCKS: B2:A2."
+                                                   "\nPLAN: hold the Spider.", "BLOCKS:", &bN, &aN)
+              .empty(),
+              "#W62-AA R2 MUST-NOT-MATCH a directive the same line negates is not the answer");
+        CHECK(AIPlayerGPT::restatedCombatDirective("ATTACK: A1\nDo not write ATTACK: A1, A2, A3.",
+                                                   "ATTACK:", &aN, NULL).empty(),
+              "#W62-AA R2 MUST-NOT-MATCH 'do not' rejects the directive that follows it");
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI don't want BLOCKS: B2:A2.",
+                                                   "BLOCKS:", &bN, &aN).empty()
+              && AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nNever BLOCKS: B2:A2.",
+                                                      "BLOCKS:", &bN, &aN).empty(),
+              "#W62-AA R2 MUST-NOT-MATCH a contraction and 'never' read the same way");
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nRather than BLOCKS: B2:A2, I hold.",
+                                                   "BLOCKS:", &bN, &aN).empty()
+              && AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nInstead of BLOCKS: B2:A2 I chump.",
+                                                      "BLOCKS:", &bN, &aN).empty(),
+              "#W62-AA R2 MUST-NOT-MATCH 'rather than' / 'instead of' reject what they introduce");
+        // POSITIVES - the D9 recovery must survive the guard untouched.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:A1. Then I am at 3.",
+                                                   "BLOCKS:", &bN, &aN) == " B2:A1",
+              "#W62-AA R2 POSITIVE an affirmative restatement still wins");
+        // The guard is scoped to the directive's OWN line: a rejection two
+        // lines up does not disarm a later affirmative re-answer.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI should not chump.\n"
+                                                   "So BLOCKS: B2:A1.", "BLOCKS:", &bN, &aN)
+              == " B2:A1",
+              "#W62-AA R2 POSITIVE a negation on an EARLIER line does not reject a later answer");
+        // ...and the last-wins rule still applies among affirmative ones.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nMaybe BLOCKS: B2:A1.\n"
+                                                   "Final: BLOCKS: B1:A2.", "BLOCKS:", &bN, &aN)
+              == " B1:A2",
+              "#W62-AA R2 POSITIVE the LAST affirmative restatement is still the one taken");
+        // Echo shape / scope: the guard reads only the text BEFORE the label on
+        // that line. A declension word in the PAYLOAD is untouched by it - what
+        // still refuses " none" here is the wave-62 worked-example guard, not
+        // this one, and a payload that is not an example binds normally.
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:none.",
+                                                   "BLOCKS:", &bN, &aN) == " B2:none",
+              "#W62-AA R2 POSITIVE a declension word in the PAYLOAD is not a negation");
+        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: none.",
+                                                   "BLOCKS:", &bN, &aN).empty(),
+              "#W62-AA R2 NEGATIVE ' none' is still refused by the worked-example guard, unchanged");
+    }
+
+    cout << "\n[#W62-AA R3] one draw-step forecast line, carrying both lanes' facts\n";
+    {
+        std::vector<std::pair<std::string, int> > ex;
+        const string scope = " LOOP SCOPE: they control BOTH halves";
+        const string blk = drawForecastBlock(true, 1, ex, 2, scope, true, 2);
+        size_t nFc = 0;
+        for (size_t q = blk.find("DRAW FORECAST"); q != string::npos; q = blk.find("DRAW FORECAST", q + 1))
+            nFc++;
+        size_t nLoop = 0;
+        for (size_t q = blk.find("LOOP "); q != string::npos; q = blk.find("LOOP ", q + 1))
+            nLoop++;
+        cout << "     R3 theirs block:" << blk << "\n";
+        CHECK(nFc == 1 && nLoop == 1,
+              "#W62-AA R3 a theirs-forecast is exactly ONE line carrying exactly ONE loop clause");
+        CHECK(blk.find("resolving NOW") != string::npos
+              && blk.find("that KILLS them") != string::npos
+              && blk.find("LOOP SCOPE") != string::npos
+              && blk.find("LOOP CAUTION") == string::npos,
+              "#W62-AA R3 that one line carries lane X's tense+verdict AND lane Y's clause,"
+              " and no contradicting second clause");
+        const string mine = drawForecastBlock(false, 1, ex, 2, " LOOP CAUTION: they control BOTH halves",
+                                              false, 2);
+        size_t nMine = 0;
+        for (size_t q = mine.find("DRAW FORECAST"); q != string::npos; q = mine.find("DRAW FORECAST", q + 1))
+            nMine++;
+        CHECK(nMine == 1 && mine.find("your next draw step") != string::npos
+              && mine.find("that KILLS you") != string::npos,
+              "#W62-AA R3 the pilot's own half is one line by the same rule");
+        CHECK(blk.compare(0, 1, "\n") == 0 && mine.compare(0, 1, "\n") == 0,
+              "#W62-AA R3 echo shape: the block owns its own newline, so no caller adds a second");
+        CHECK(drawForecastBlock(true, 1, ex, 2, "", false, -1)
+              == string("\n") + theirDrawStepForecastText(1, ex, 2, "", false, -1),
+              "#W62-AA R3 NEGATIVE with no clause the line is byte-identical to the emitter it wraps");
+    }
+
+    cout << "\n[#W62-AA R4] the pay-repeat bill prices COLOURS, not a source count\n";
+    {
+        // Six untapped Mountains, no floating mana, Intrepid Adversary's
+        // "add 3 counters" at {1}{W} each: 6 spendable, CMC 2 - the wave-62 tag
+        // said "pays for 3 of them". The seat cannot make white and pays none.
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 6, 0)
+              == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 6 spendable now,"
+                 " which pays for 0 of them and stops}",
+              "#W62-AA R4 with the mana engine saying 0, the row says 0 - not 6/2");
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 6, 3)
+              == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 6 spendable now,"
+                 " which pays for 3 of them}",
+              "#W62-AA R4 POSITIVE colours that DO fit still print the full count, unchanged");
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 6, 2)
+              == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 6 spendable now,"
+                 " which pays for 2 of them and stops}",
+              "#W62-AA R4 POSITIVE a partial fit keeps the wave-62 wording for the part it can pay");
+        // The hedge: the cost text would not parse, so nothing is CLAIMED - the
+        // arithmetic bound is stated as a bound.
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 6, -1)
+              == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 6 spendable now,"
+                 " which pays for up to 3 of them if your colours fit}",
+              "#W62-AA R4 an undecidable row says 'up to N if your colours fit' and claims nothing");
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 4, -1).find("up to 2 of them if your colours"
+                                                              " fit, then stops") != string::npos,
+              "#W62-AA R4 the hedged form still names where the arithmetic bound stops");
+        // MUST-NOT-MATCH: no tag ever prints a payment count with no figure.
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, -1, 0)
+              == " {repeat cost: 3 x {1}{w} = 6 mana for all 3}"
+              && payRepeatRowCostTag(0, "{1}{w}", 2, 6, 0).empty()
+              && payRepeatRowCostTag(3, "", 0, 6, 0).empty(),
+              "#W62-AA R4 MUST-NOT-MATCH with no spendable figure the row states the price only");
+        // Echo shape: the tag stays in the brace channel and out of the record.
+        CHECK(stripNarrationDecoration("add 3 counters" + payRepeatRowCostTag(3, "{1}{w}", 2, 6, 0))
+              == "add 3 counters",
+              "#W62-AA R4 echo shape: the colour-corrected tag leaves no residue in the narration");
+    }
+
+    cout << "\n[#W62-AA R5] the next-turn manland gate: its own mana is not available to it\n";
+    {
+        const int maskB = 1 << Constants::MTG_COLOR_BLACK;
+        const int maskW = 1 << Constants::MTG_COLOR_WHITE;
+        // Hive of the Eye Tyrant + three Plains. Four sources, {3}{B} activation.
+        // The count test passes at 4 and fails at 3 (the Hive excluded), and the
+        // colour test fails whatever the count, because nothing makes black.
+        CHECK(!crackBackCostAffordable("{3}{b}", false, 3, maskW),
+              "#W62-AA R5 three Plains cannot pay a manland's {3}{B}: the count is short"
+              " once its own mana is excluded");
+        CHECK(!crackBackCostAffordable("{3}{b}", false, 4, maskW),
+              "#W62-AA R5 ...and four white sources still cannot, because none of them makes black");
+        CHECK(crackBackCostAffordable("{3}{b}", false, 4, maskB),
+              "#W62-AA R5 POSITIVE four sources that DO include black afford it, as before");
+        // The colour test alone, over the shapes the cost heads actually carry.
+        CHECK(crackBackColorsFit("{3}{b}", maskB) && !crackBackColorsFit("{3}{b}", maskW),
+              "#W62-AA R5 a coloured pip needs a source of that colour");
+        CHECK(crackBackColorsFit("{3}", 0) && crackBackColorsFit("{t}", 0)
+              && crackBackColorsFit("{2/w}", 0),
+              "#W62-AA R5 NEGATIVE generic, tap and a hybrid with a generic half need no colour");
+        CHECK(crackBackColorsFit("{1}{r}{s(goblin|mybattlefield)}", 1 << Constants::MTG_COLOR_RED)
+              && crackBackColorsFit("{c(0/0,-8,loyalty)}", 0),
+              "#W62-AA R5 MUST-NOT-MATCH a sacrifice clause and a loyalty head carry no pips to fit");
+        CHECK(crackBackCostAffordable("{3}{b}", false, 4)
+              && crackBackCostAffordable("{3}{b}", false, 4, -1),
+              "#W62-AA R5 NEGATIVE an unread colour mask claims nothing either way - the wave-61"
+              " total test is what decides, unchanged");
+        CHECK(!crackBackCostAffordable("{t}{1}", true, 9, maskB),
+              "#W62-AA R5 NEGATIVE the wave-61 stays-tapped and unpriceable rules are untouched");
+    }
+
+    cout << "\n[#W62-AA R6] a life loop wins only where their life can move\n";
+    {
+        CHECK(lifeLoopWinnable(true, true, true),
+              "#W62-AA R6 POSITIVE both halves, a life that can change and a seat that can gain"
+              " - the wave-62 claim, kept");
+        CHECK(!lifeLoopWinnable(true, false, true),
+              "#W62-AA R6 MUST-NOT-MATCH under cantchangelife / cantlifelose / cantlose on their"
+              " side the chain never closes, so no win is claimed");
+        CHECK(!lifeLoopWinnable(true, true, false),
+              "#W62-AA R6 MUST-NOT-MATCH a seat that cannot GAIN life never feeds its own converter");
+        CHECK(!lifeLoopWinnable(false, true, true),
+              "#W62-AA R6 NEGATIVE no closed pair, no claim - unchanged");
+        // The tail itself is untouched: it is the GATE that moved.
+        CHECK(lifeLoopWinTail(lifeLoopWinnable(true, true, true), true)
+                  .find("THIS WINS THE GAME") != string::npos
+              && lifeLoopWinTail(lifeLoopWinnable(true, false, true), true).empty(),
+              "#W62-AA R6 the tail is byte-identical where the gate passes and silent where it does not");
+        CHECK(damagePlayerVerdict(2, 5, false, 20, 0, lifeLoopWinnable(true, false, true))
+                  .find("THIS WINS THE GAME") == string::npos
+              && damagePlayerVerdict(2, 5, false, 20, 0, lifeLoopWinnable(true, true, true))
+                  .find("THIS WINS THE GAME") != string::npos,
+              "#W62-AA R6 the damage row inherits the gate: no unlimited-chain claim under prevention");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

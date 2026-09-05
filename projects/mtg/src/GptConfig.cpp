@@ -899,8 +899,15 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
 
     //audit-L (A24): the status and the error body's head go out with the
     //empty return - the code is what tells a wrong key from a dead host.
+    //#W62-AA (R7, wave-62 codex review finding 7): the status the server
+    //ACTUALLY SENT survives a later curl failure. A 503 whose body then stalls
+    //until curl returns 28 had its code forced to 0 here, so the status-first
+    //classifier downstream saw no status at all and filed the round trip as a
+    //wall miss - a fresh full deadline for a server that had already answered.
+    //CURLINFO_RESPONSE_CODE is itself 0 when no status line was received, so it
+    //is already the "nothing came back" sentinel and needs no second one.
     if (codeOut)
-        *codeOut = (res == CURLE_OK) ? httpCode : 0;
+        *codeOut = httpCode;
     if (curlCodeOut)
         *curlCodeOut = (long) res; //#W59-H (K1): preserve the transport cause
     if (res != CURLE_OK || httpCode != 200)

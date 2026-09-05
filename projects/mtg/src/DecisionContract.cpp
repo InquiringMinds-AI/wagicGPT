@@ -361,6 +361,14 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
             //headed "this ask has no pass row" - a menu that could only destroy
             //the card. The row exists in the engine; it was simply never carried
             //onto the decision contract.
+            //#W62-AA (R1, wave-62 codex review finding 1): and it is carried
+            //HERE too. The announcing branch above assigned canDecline; this
+            //one - the ordinary cast route, which is the route deck130 s21/s22
+            //actually took - set req.kind and returned, leaving canDecline at
+            //its initialised false. The Decline row was therefore still absent
+            //on exactly the path the finding names, and a max-affordable X of 0
+            //still burned the card. Same engine fact, same call.
+            req.canDecline = !object->checkCantCancel();
             return true;
         }
 
