@@ -21,3 +21,13 @@ implementation, its not visually intuitive."
       over overlays; same class as the castableNow flag lesson: draw inside CardGui::Render, not
       as an overlay).
 => DESIGN VERDICT: "not visually intuitive" — separate from the bugs; he is thinking; no redesign.
+
+## 2026-09-05 — D42 grouping while targeting (owner ruling, verbatim)
+
+On the first fix ("only piles with a member the open chooser can legally target fan out"):
+"wrong. it should remained stacked, unless one is targeted, in which case only the targeted
+object becomes unstacked, since it is now uniquely targeted."
+
+Applied: no expansion for legal targets; a pile is targeted as a pile (its leader). A card
+wearing a target/source rim leaves its pile alone; the rest stay stacked. The OK-press-expands
+rule (wave 57) is retired. Focus (cursor inside a pile) still fans it for navigation.

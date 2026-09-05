@@ -246,20 +246,10 @@ bool CardSelector::CheckUserInput(JButton key)
         goto switch_active;
         break;
     case JGE_BTN_OK:
-        //#W57-G (D42): a press on a still-collapsed pile while a chooser is
-        //live EXPANDS it, it never targets - the player has to see what they
-        //are choosing among before one of the copies is committed. In practice
-        //GuiPlay has already expanded the whole board by then (any live chooser
-        //pins it), so this is the belt to that braces: it also covers a pile
-        //that collapsed on the same tick the chooser came up.
-        if (CardView* w57cv = dynamic_cast<CardView*> (active))
-        {
-            if (w57cv->mStackCount > 1 && observer->getCurrentTargetChooser())
-            {
-                w57cv->mStackForceExpand = true;
-                return true;
-            }
-        }
+        //#W62-owner (D42): a press on a collapsed pile while a chooser is live
+        //TARGETS the pile's leader (owner ruling, 2026-09-05: piles stay
+        //stacked; only the targeted object unstacks). The wave-57 rule that
+        //expanded the pile instead is retired with the whole-board pin.
         observer->ButtonPressed(active);
         goto switch_active;
         break;

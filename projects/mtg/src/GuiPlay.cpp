@@ -211,9 +211,9 @@ GuiPlay::GuiPlay(DuelLayers* view) :
 //behind the owner's stacking/unstacking report. See below.
 //#W62-owner (D42, Vita vpk23 report: "when i use earthcraft to target the untapped
 //token, all the tapped tokens are expanding"): a live chooser no longer pins
-//the WHOLE board. Piles with a legal target of the open chooser fan in place so
-//every legal member is reachable (computeStacks); every other pile keeps its
-//stack - which is what "the cards maintain positioning" asks for.
+//the board. Piles stay stacked while a chooser is open - a pile is targeted as
+//a pile, through its leader - and the one card that IS targeted splits out of
+//its pile in computeStacks because that state is uniquely its own.
 bool GuiPlay::stacksPinnedNow()
 {
     if (!observer)
@@ -267,19 +267,6 @@ bool GuiPlay::stacksPinnedNow()
     return false;
 }
 
-//#W62-owner (D42): the chooser a decision is waiting on, if any - the one whose
-//legal targets must stay reachable while everything else keeps its pile.
-TargetChooser * GuiPlay::liveChooser()
-{
-    if (!observer)
-        return NULL;
-    if (TargetChooser * tc = observer->getCurrentTargetChooser())
-        return tc;
-    if (observer->mLayers && observer->mLayers->actionLayer())
-        return observer->mLayers->actionLayer()->getCurrentTargetChooser();
-    return NULL;
-}
-
 void GuiPlay::computeStacks()
 {
     mStackFollowers.clear();
@@ -323,6 +310,13 @@ void GuiPlay::computeStacks()
         //it on its host), so it never stacks - it follows whatever its host does.
         if (cv->card->target)
             continue;
+        //#W62-owner (D42, verbatim 2026-09-05): "it should remained stacked, unless
+        //one is targeted, in which case only the targeted object becomes unstacked,
+        //since it is now uniquely targeted." A card wearing a target rim (A) or a
+        //source rim (B) is in a state no pile-mate shares: it stands alone, and
+        //its pile-mates stay stacked. Targeting a pile targets its leader.
+        if (cv->card->forcedBorderA || cv->card->forcedBorderB)
+            continue;
         //Cards still fading in are click-invisible to the selector (closest()
         //drops actA < 32); stacking them would hide an arrival mid-animation.
         if (cv->actA < 32)
@@ -352,7 +346,6 @@ void GuiPlay::computeStacks()
             members[f->second].push_back(cv);
     }
 
-    TargetChooser * tc = liveChooser(); //#W62-owner (D42)
     for (std::map<CardView*, vector<CardView*> >::iterator g = members.begin(); g != members.end(); ++g)
     {
         CardView * lead = g->first;
@@ -376,13 +369,12 @@ void GuiPlay::computeStacks()
         //slots for as long as the entry is on the stack, and nothing else on
         //the board moves. Both flags are already in the stack key, so a marked
         //card has split out of its unmarked siblings before we get here.
-        bool expand = lead->mHasFocus || lead->mStackForceExpand
-            || (lead->card && (lead->card->forcedBorderA || lead->card->forcedBorderB))
-            || (tc && lead->card && tc->canTarget(lead->card));
+        //#W62-owner (D42): a pile fans only when the cursor is inside it. Being
+        //a legal target does not fan it (the pile is targeted as a pile); being
+        //TARGETED splits that one card out above, before piles are formed.
+        bool expand = lead->mHasFocus;
         for (size_t i = 0; i < rest.size() && !expand; ++i)
-            if (rest[i]->mHasFocus || rest[i]->mStackForceExpand
-                || (rest[i]->card && (rest[i]->card->forcedBorderA || rest[i]->card->forcedBorderB))
-                || (tc && rest[i]->card && tc->canTarget(rest[i]->card)))
+            if (rest[i]->mHasFocus)
                 expand = true;
 
         if (expand)

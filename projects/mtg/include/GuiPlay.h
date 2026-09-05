@@ -104,7 +104,6 @@ protected:
     vector<pair<CardView*, CardView*> > mStackFollowers; //follower, drawn card
     void computeStacks();
     bool stacksPinnedNow();
-    TargetChooser * liveChooser(); //#W62-owner (D42): the chooser a decision waits on, else NULL
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     void stackProbe(double ms);
     void churnProbe(); //#W58-E (D42)
