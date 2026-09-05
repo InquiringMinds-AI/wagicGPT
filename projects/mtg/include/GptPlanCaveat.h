@@ -579,6 +579,67 @@ inline bool planTargetAbsent(const std::string& planRaw, const std::string& opts
 // at or below it. Nothing is silently dropped: a plan that was cut carries the
 // marker, so the model can see that its own words were shortened and restate
 // them. `maxChars < 1` disables the length bound and returns the plan as given.
+// #W63-AD (E14, deck126 HIGH-1 second half). THE PLAN CARRY IS A SCRATCHPAD.
+// `...deck126-vs-deck146` seq 36 carried, as YOUR PLAN, "With both Exquisite
+// Blood and Sanguine Bond on the battlefield (Exquisite Blood is in hand,
+// Sanguine Bond was exiled but wait-Sanguine Bond was exiled on turn 11. Let's
+// re-read carefully." - a deliberation stream, quoted back as a stated belief.
+// planParagraphBound keeps the FIRST PARAGRAPH, and a model that argues with
+// itself writes the whole argument in one paragraph, so the shape survives it.
+// The cut here is the point where the paragraph stops being a plan: the first
+// SENTENCE that opens with a self-correction marker, and only when at least one
+// complete sentence precedes it (so a plan that merely begins "Actually, cast
+// the Bond" is never cut to nothing). Pure over the plan text; the size of the
+// cut is stated by the caller through planTruncationNote, exactly as the length
+// bound states its own. Nothing the model relies on is deleted - the model is
+// told how much of what it wrote was dropped and asked to restate it.
+inline std::string planScratchpadCut(const std::string& plan)
+{
+    if (plan.size() < 2)
+        return plan;
+    static const char * kMarkers[] = {
+        "wait", "but wait", "hold on", "hmm", "let me", "let's", "lets",
+        "actually", "on second thought", "scratch that", "correction",
+        "re-read", "reread", "i need to re", "no,", "hang on"
+    };
+    const std::string low = toLower(plan);
+    size_t i = 0;
+    bool sentenceSeen = false;
+    while (i < low.size())
+    {
+        // advance to the start of the next sentence
+        size_t stop = low.find_first_of(".!?", i);
+        if (stop == std::string::npos)
+            break;
+        sentenceSeen = true;
+        size_t s = stop + 1;
+        while (s < low.size() && (low[s] == ' ' || low[s] == '\t' || low[s] == '\r'
+                                  || low[s] == '\n' || low[s] == '"' || low[s] == '\''))
+            s++;
+        if (s >= low.size())
+            break;
+        if (sentenceSeen)
+        {
+            for (size_t k = 0; k < sizeof(kMarkers) / sizeof(kMarkers[0]); k++)
+            {
+                const size_t len = std::strlen(kMarkers[k]);
+                if (low.compare(s, len, kMarkers[k]) != 0)
+                    continue;
+                const size_t after = s + len;
+                // word boundary: the marker must not be the head of a longer word
+                if (after < low.size() && (std::isalnum((unsigned char) low[after])
+                                           || low[after] == '\''))
+                    continue;
+                std::string out = plan.substr(0, stop + 1);
+                size_t e = out.find_last_not_of(" \t\r\n");
+                return (e == std::string::npos) ? plan : out.substr(0, e + 1);
+            }
+        }
+        i = s;
+    }
+    return plan;
+}
+
 inline const char * planTruncationMarker()
 {
     return " [...the rest of your plan was not carried - restate it if you still mean it]";
@@ -641,11 +702,29 @@ inline std::string planCarryBound(const std::string& plan, size_t maxChars)
 // promised: the model was shortened and never told. Composed here so the pair
 // is one testable function rather than two correct halves in the wrong order.
 // A plan the bound did not touch keeps the trim exactly as it was.
+// #W63-AD (E14): the SCRATCHPAD cut runs FIRST, inside the same composition, for
+// the reason #W60-Q wrote this function - two correct halves in the wrong order
+// delete each other's marker. Order and denominators: the scratchpad cut chooses
+// the text, the length bound then bounds THAT text, and whichever fired last the
+// single marker states the drop against the number of characters the model
+// actually wrote. A plan neither pass touches is byte-identical.
 inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
 {
-    std::string out = planCarryBound(plan, maxChars);
-    if (out != plan)
-        return out; // the bound chose the cut and marked it; nothing to trim
+    const std::string core = planScratchpadCut(plan);
+    std::string out = planCarryBound(core, maxChars);
+    if (out != core)
+    {
+        if (core.size() == plan.size())
+            return out; // only the length bound fired: the wave-62 shape, unchanged
+        // Both fired. planCarryBound's note is denominated in `core`; restate it
+        // against the plan the model wrote, so no number on the page is false.
+        const std::string head = " [...the rest of your plan was not carried";
+        const size_t m = out.rfind(head);
+        const std::string kept = (m == std::string::npos) ? out : out.substr(0, m);
+        return kept + planTruncationNote(kept.size(), plan.size());
+    }
+    if (core.size() < plan.size())
+        return core + planTruncationNote(core.size(), plan.size());
     char last = out.empty() ? '.' : out[out.size() - 1];
     if (last != '.' && last != '!' && last != '?')
     {
@@ -728,6 +807,145 @@ inline bool planDeniesOwnPermanent(const std::string& planRaw,
                             deniedOut = inPlayNames[n];
                             return true;
                         }
+                }
+                pos = after;
+            }
+        }
+    }
+    return false;
+}
+
+// #W63-AD (E14). THE OPPOSITE CONTRADICTION to planDeniesOwnPermanent: the plan
+// ASSERTS that a permanent is on a battlefield when no battlefield holds it.
+// `...deck126-vs-deck146` seq 29 (turn 18) served "With both enchantments
+// (Exquisite Blood and Sanguine Bond) on the battlefield, any life gain wins the
+// game." into a window whose own battlefield line listed neither - Sanguine Bond
+// was exiled on turn 11 and Exquisite Blood on turn 15 - and the seat reasoned
+// from it for eight turns. The denial rule was already withdrawn on sight; the
+// assertion is the same defect with the sign flipped, and is the more dangerous
+// half, because it invents a board the model then plays to.
+//
+// Narrow by construction, the way planDeniesOwnPermanent is:
+//  * the vocabulary is the pilot's OWN cards (`deckNames`), so an arbitrary
+//    noun phrase never becomes a claim;
+//  * `inPlayNames` is BOTH battlefields, so a permanent that is anywhere in play
+//    contradicts nothing;
+//  * the claim must be an explicit presence phrase - a backward window before
+//    "on the battlefield" / "on my battlefield" / "in play", or a forward window
+//    after "I control" / "I still control" / "I now control" - so a plan that
+//    merely NAMES a card ("cast Sanguine Bond") is untouched;
+//  * a negated, conditional or future clause is excluded (that is a plan, not a
+//    false claim), and so is a zone-qualified mention ("in hand", "in exile").
+inline bool planAssertsAbsentPermanent(const std::string& planRaw,
+                                       const std::vector<std::string>& inPlayNames,
+                                       const std::vector<std::string>& deckNames,
+                                       std::string& assertedOut)
+{
+    const std::string plan = toLower(planRaw);
+    if (plan.empty())
+        return false;
+    static const char * kBack[] = { "on the battlefield", "on my battlefield",
+                                    "on the board", "in play" };
+    static const char * kFwd[] = { "i control ", "i still control ", "i now control ",
+                                   "we control ", "i have out ", "i already control " };
+    static const char * kNeg[] = { " not ", "n't", " no longer", " never", " nothing",
+                                   " if ", " once ", " when ", " unless ", " until ",
+                                   " would ", " will ", " need ", " to get ", " resolves",
+                                   " next turn", " was exiled", " were exiled", " destroyed",
+                                   " gone", " lost" };
+    static const char * kZone[] = { " in hand", " in my hand", " in exile", " in the graveyard",
+                                    " in my graveyard", " in the library", " in my library" };
+    // Which of the pilot's names are actually in play (either battlefield)?
+    std::vector<std::string> inPlayLc;
+    for (size_t i = 0; i < inPlayNames.size(); i++)
+        inPlayLc.push_back(toLower(inPlayNames[i]));
+
+    for (size_t n = 0; n < deckNames.size(); n++)
+    {
+        const std::string full = toLower(deckNames[n]);
+        if (full.size() < 5)
+            continue; // too short to name a permanent unambiguously in prose
+        bool live = false;
+        for (size_t k = 0; k < inPlayLc.size() && !live; k++)
+            live = (inPlayLc[k] == full);
+        if (live)
+            continue; // it IS in play: the plan's claim is true
+        std::vector<std::string> forms;
+        planNameForms(full, forms);
+        for (size_t f = 0; f < forms.size(); f++)
+        {
+            const std::string& nm = forms[f];
+            if (nm.size() < 5)
+                continue;
+            // a short form that matches a DIFFERENT permanent in play is not
+            // evidence about this card (two cards can share a first word).
+            bool formLive = false;
+            for (size_t k = 0; k < inPlayLc.size() && !formLive; k++)
+                formLive = (inPlayLc[k].compare(0, nm.size(), nm) == 0);
+            if (formLive)
+                continue;
+            size_t pos = 0;
+            while ((pos = plan.find(nm, pos)) != std::string::npos)
+            {
+                const size_t after = pos + nm.size();
+                const bool wordEnd = (after >= plan.size()
+                                      || !(std::isalnum((unsigned char) plan[after])
+                                           || plan[after] == '\''));
+                bool zoneScoped = false;
+                for (size_t z = 0; z < sizeof(kZone) / sizeof(kZone[0]) && !zoneScoped; z++)
+                    zoneScoped = (plan.compare(after, std::strlen(kZone[z]), kZone[z]) == 0);
+                // The CLAUSE the name sits in decides first: a conditional or
+                // negated clause ("Once X is on the battlefield", "if X is in
+                // play") is a plan, not a false board, and its markers sit
+                // BEFORE the name where neither window below would see them.
+                size_t cs = plan.find_last_of(".;!?\n", pos ? pos - 1 : 0);
+                cs = (cs == std::string::npos) ? 0 : cs + 1;
+                const std::string pre = " " + plan.substr(cs, pos - cs);
+                bool preNegated = false;
+                for (size_t g = 0; g < sizeof(kNeg) / sizeof(kNeg[0]) && !preNegated; g++)
+                    preNegated = (pre.find(kNeg[g]) != std::string::npos);
+                if (!wordEnd || zoneScoped || preNegated || planClauseIsFuture(plan, pos))
+                {
+                    pos = after;
+                    continue;
+                }
+                // BACKWARD: "<name> ... on the battlefield", within one clause.
+                const size_t winEnd = (after + 90 < plan.size()) ? after + 90 : plan.size();
+                const std::string fwdWin = plan.substr(after, winEnd - after);
+                for (size_t k = 0; k < sizeof(kBack) / sizeof(kBack[0]); k++)
+                {
+                    const size_t at = fwdWin.find(kBack[k]);
+                    if (at == std::string::npos)
+                        continue;
+                    const std::string span = " " + fwdWin.substr(0, at);
+                    if (span.find_first_of(".;!?") != std::string::npos)
+                        continue; // a sentence break: not the same claim
+                    bool negated = false;
+                    for (size_t g = 0; g < sizeof(kNeg) / sizeof(kNeg[0]) && !negated; g++)
+                        negated = (span.find(kNeg[g]) != std::string::npos);
+                    if (negated)
+                        continue;
+                    assertedOut = deckNames[n];
+                    return true;
+                }
+                // FORWARD: "I control <name>", the phrase preceding the name.
+                const size_t backStart = (pos > 60) ? pos - 60 : 0;
+                const std::string backWin = plan.substr(backStart, pos - backStart);
+                for (size_t k = 0; k < sizeof(kFwd) / sizeof(kFwd[0]); k++)
+                {
+                    const size_t at = backWin.rfind(kFwd[k]);
+                    if (at == std::string::npos)
+                        continue;
+                    const std::string span = " " + backWin.substr(at);
+                    if (span.find_first_of(".;!?") != std::string::npos)
+                        continue;
+                    bool negated = false;
+                    for (size_t g = 0; g < sizeof(kNeg) / sizeof(kNeg[0]) && !negated; g++)
+                        negated = (span.find(kNeg[g]) != std::string::npos);
+                    if (negated)
+                        continue;
+                    assertedOut = deckNames[n];
+                    return true;
                 }
                 pos = after;
             }
