@@ -479,6 +479,14 @@ private:
     static bool retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody);
     static long remainingTransportRetryMs(long deadlineMs, long firstLatencyMs);
     static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody);
+    //#W61-U (C13): the same stamp plus the two facts that make the failure's
+    //PHASE provable (the connect budget in force, the elapsed round trip), and
+    //the phase verdict itself. "" when the numbers do not settle it.
+    static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody,
+                                             long connectBudgetMs, long latencyMs,
+                                             long deadlineMs);
+    static const char * transportPhaseFor(long curlCode, long latencyMs,
+                                          long connectBudgetMs, long deadlineMs);
     //L4: one translog stream per seat, opened on the first record (after the
     //-vs- rename), flushed per record, closed by the game-end record.
     std::ofstream mTransLog;
@@ -1211,6 +1219,12 @@ private:
     //when the hold still stands (the caller passes without a model call);
     //clears the latch and returns false on any re-opener.
     bool holdHonoured(const char * seam, const std::vector<string>& rows);
+    //#W61-U (C14): the prompt-only note stating which of the two hold regimes
+    //this menu is in, measured against the previous window's rows at this seam.
+    string holdReopenNote(const char * seam, const std::vector<string>& rows);
+    std::map<string, std::set<string> > mLastMenuRows; //per seam, previous window
+    std::map<string, int> mMenuRepeatRun;              //consecutive unchanged windows
+    string mCastHoldNote;                              //measured once per cast window
     //#W53-N (D2): record the model's hold answer at this seam.
     void takeHold(const char * seam, const std::vector<string>& rows);
     //#W53-N (D12a): ", N windows ago on turn T" for the carried plan, empty
@@ -1420,6 +1434,7 @@ private:
     //wall_miss, or the abandonment writes a zero-choice `wall_miss` record.
     bool mWallMissPending;
     string mWallMissBase;
+    long mWallMissLatencyMs; //#W61-U (C13): the round trip that missed the wall
     int mWallMissEvents;
     int mWallMissUnrecorded;
     bool mLastFinishLength;  //the last reply stopped at the token cap

@@ -1684,7 +1684,70 @@ static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttac
     return o.str();
 }
 
-static string attackPunisherClause(int theirsAbleToAttack)
+//#W61-U (C10): a damage wipe priced a COUNT and never said who dies.
+//`125v146` s48, at 3 life, read `deals 3 to each if all 3 attack` over a board
+//whose Nadaar is a 4/4: the two 2/2s die, the 4/4 survives and connects for 4,
+//and the only question at 3 life - does this row stop lethal - went unanswered
+//while the row read as a three-for-one. B7 gave the DESTROY sweeper a roster;
+//this is that roster on the DAMAGE clause, split by the one fact that decides
+//it (toughness against the damage) and totalled on the side that still gets
+//through. Damage does not destroy an INDESTRUCTIBLE creature at any amount, so
+//it is named as a survivor whatever its toughness. Pure over (damage, roster).
+struct WipeVictim
+{
+    string name;
+    int power;
+    int toughness;
+    bool indestructible;
+    WipeVictim() : power(0), toughness(0), indestructible(false) {}
+};
+
+//Entries are separated by "; ": a card name can contain a comma
+//("Nadaar, Selfless Paladin"), and a separator the payload can contain is not
+//a separator (wave-60 engine-seat MED-3).
+static string wipeSurvivorTail(int damage, const std::vector<WipeVictim>& hit)
+{
+    if (hit.empty() || damage <= 0)
+        return "";
+    std::vector<std::string> dies, lives;
+    int survivingPower = 0;
+    for (size_t i = 0; i < hit.size(); i++)
+    {
+        std::ostringstream e;
+        e << hit[i].name << " (" << hit[i].power << "/" << hit[i].toughness << ")";
+        const bool killed = !hit[i].indestructible && damage >= hit[i].toughness;
+        if (killed)
+        {
+            dies.push_back(e.str());
+            continue;
+        }
+        if (hit[i].indestructible)
+            e << " [indestructible]";
+        lives.push_back(e.str());
+        if (hit[i].power > 0)
+            survivingPower += hit[i].power;
+    }
+    std::ostringstream o;
+    o << ". DIES at " << damage << ": ";
+    if (dies.empty())
+        o << "none";
+    for (size_t i = 0; i < dies.size(); i++)
+        o << (i ? "; " : "") << dies[i];
+    o << ". SURVIVES: ";
+    if (lives.empty())
+    {
+        o << "none - this kills every one of them";
+        return o.str();
+    }
+    for (size_t i = 0; i < lives.size(); i++)
+        o << (i ? "; " : "") << lives[i];
+    o << " - " << survivingPower << " power of theirs survives it";
+    return o.str();
+}
+
+//#W61-U (C10): the roster rides the clause the pilot reads.
+static string attackPunisherClause(int theirsAbleToAttack,
+                                   const std::vector<WipeVictim>& hit = std::vector<WipeVictim>())
 {
     std::ostringstream o;
     o << "they control " << theirsAbleToAttack << " creature" << (theirsAbleToAttack == 1 ? "" : "s")
@@ -1692,7 +1755,8 @@ static string attackPunisherClause(int theirsAbleToAttack)
     if (theirsAbleToAttack <= 0)
         o << "deals 0 until they have an attacker";
     else
-        o << "deals " << theirsAbleToAttack << " to each if all " << theirsAbleToAttack << " attack";
+        o << "deals " << theirsAbleToAttack << " to each if all " << theirsAbleToAttack << " attack"
+          << wipeSurvivorTail(theirsAbleToAttack, hit);
     return o.str();
 }
 
@@ -1714,7 +1778,10 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
                                 //counts and the roster and are listed here.
                                 int destroyKind = 0,
                                 std::vector<std::string> * theirSurvivors = NULL,
-                                std::vector<std::string> * mySurvivors = NULL)
+                                std::vector<std::string> * mySurvivors = NULL,
+                                //#W61-U (C10): the creatures a damage wipe would
+                                //hit, with the P/T the survivor split reads.
+                                std::vector<WipeVictim> * theirAttackers = NULL)
 {
     theirs = theirsAttack = mine = 0;
     if (theirOnly)
@@ -1747,7 +1814,18 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
             theirNames->push_back(sweeperVictimName(c)
                                   + sweeperRegenerationTail(c, destroyKind));
         if (boardCreatureCanAttackNow(c, live))
+        {
             theirsAttack++;
+            if (theirAttackers) //#W61-U (C10): same predicate, same walk
+            {
+                WipeVictim wv;
+                wv.name = c->getDisplayName() + instanceHandle(c);
+                wv.power = c->getPower();
+                wv.toughness = c->toughness;
+                wv.indestructible = c->basicAbilities[Constants::INDESTRUCTIBLE] ? true : false;
+                theirAttackers->push_back(wv);
+            }
+        }
     }
     for (int i = 0; i < me->game->inPlay->nb_cards; i++)
     {
@@ -1821,7 +1899,20 @@ static bool spellCanTargetSelf(MTGCardInstance * card)
     return ok;
 }
 
-static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
+//#W61-U (C10): what a cast row does to the creature board, in the two numbers
+//the menu pass ranks on. Filled ONLY by the emitters that actually price a
+//board sweep on this row, from the same walk that renders the clause, so the
+//marker and the clause the pilot reads underneath it cannot disagree.
+//theirs < 0 = this row prices no board sweep and takes no part in the ranking.
+struct CastRowBoardAnswer
+{
+    int theirs;
+    int mine;
+    CastRowBoardAnswer() : theirs(-1), mine(-1) {}
+};
+
+static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
+                                CastRowBoardAnswer * ans = NULL) //#W61-U (C10)
 {
     int theirs, theirsAttack, mine;
     MTGCardInstance * only = NULL;
@@ -1872,6 +1963,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
     //#W60-Q (R6): a DESTRUCTION sweeper does not take an indestructible
     //creature, and `bury` gives no regeneration window that `destroy` does.
     std::vector<std::string> theirSurvivors, mySurvivors;
+    std::vector<WipeVictim> theirAttackers; //#W61-U (C10)
     int destroyKind = 0;
     if (sweepVerb && strcmp(sweepVerb, "destroys") == 0)
         destroyKind = lowText.find("bury all(creature)") != string::npos ? 2 : 1;
@@ -1879,7 +1971,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
                              sweepVerb ? &theirNames : NULL, sweepVerb ? &myNames : NULL,
                              destroyKind,
                              sweepVerb ? &theirSurvivors : NULL,
-                             sweepVerb ? &mySurvivors : NULL))
+                             sweepVerb ? &mySurvivors : NULL,
+                             attackPunisher ? &theirAttackers : NULL)) //#W61-U (C10)
         return "";
     if (edict)
     {
@@ -1947,12 +2040,26 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
              + stackTail + selfClause;
     }
     if (sweepVerb)
+    {
+        if (ans) //#W61-U (C10): the counts this clause was just built from
+        {
+            ans->theirs = theirs;
+            ans->mine = mine;
+        }
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames,
                              theirSurvivors, mySurvivors); //#W60-Q (R6)
-    return attackPunisherClause(theirsAttack);
+    }
+    //#W61-U (C10): the attack-punisher class deliberately takes NO part in the
+    //menu ranking. What it removes is conditional on the opponent choosing to
+    //attack with everything ("deals N to each if all N attack"), and a marker
+    //that ranked that hypothetical beside a sweeper's present-tense removal
+    //would be a true statement in the wrong scope. The roster above answers the
+    //question this row is actually asked (does it stop the attack); `ans` stays
+    //unset, so no marker is issued for it.
+    return attackPunisherClause(theirsAttack, theirAttackers); //#W61-U (C10)
 }
 
-string dynamicMagnitudes(MTGCardInstance * card)
+string dynamicMagnitudes(MTGCardInstance * card, CastRowBoardAnswer * ans = NULL) //#W61-U (C10)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
     //loyalty ability plus the emblem/transforms payload in one string, so this
@@ -2101,7 +2208,7 @@ string dynamicMagnitudes(MTGCardInstance * card)
     }
     //#W49-D10: the board fact an edict / sweeper / attack-punisher turns on.
     {
-        string turnOn = boardTurnOnClause(card, text);
+        string turnOn = boardTurnOnClause(card, text, ans); //#W61-U (C10)
         if (!turnOn.empty())
         {
             out << (count ? ", " : "") << turnOn;
@@ -9909,6 +10016,9 @@ static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool names
 //Board-facing half of the same item: defined below xMenuMarkX (the ranking it
 //shares with the menu), declared here because the cast row is emitted above it.
 static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX);
+//#W61-U (C10): the same two, for the sweep counts the cast row hands the menu.
+static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut);
+static void xTradeCountsAt(const std::vector<XDamVictim>& victims, int x, int & theirs, int & mine);
 
 //Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
 //Returns "" for a non-X spell (every other cast line is byte-identical to
@@ -9918,11 +10028,23 @@ static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * op
                                 int& handAfterCast, int& limit, int& perDiscard,
                                 string& discardPunishers);
 
-string xSpellPricing(MTGCardInstance * card, Player * me)
+string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * ans = NULL) //#W61-U (C10)
 {
     XVictimSurvey sv;
     if (!xSurveyBoard(card, me, sv))
         return "";
+    //#W61-U (C10): an X sweeper's board answer is what it takes at the X its
+    //OWN marker names - the same xMenuMarkX ranking the row already prints, so
+    //the menu marker below cannot name a different X than the row does.
+    if (ans && sv.priceable && sv.sweep && sv.maxX > 0)
+    {
+        string mk;
+        int mx = xMenuMarkX(sv.victims, sv.maxX, mk);
+        int t = 0, m = 0;
+        xTradeCountsAt(sv.victims, mx, t, m);
+        ans->theirs = t;
+        ans->mine = m;
+    }
     if (!sv.priceable)
     {
         //#W47 R15: the non-damage X class states what a point of X actually
@@ -11220,9 +11342,50 @@ long AIPlayerGPT::remainingTransportRetryMs(long deadlineMs, long firstLatencyMs
 //HTTP beside one another prevents a status 0 from erasing CURLE_OPERATION_TIMEDOUT.
 string AIPlayerGPT::transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody)
 {
+    return transportOutcomeStamp(curlCode, httpStatus, emptyBody, 0, -1, 0);
+}
+
+//#W61-U (C13): WHICH PHASE a curl failure died in. Both wave-60 transport
+//records read `curl=28,http=0,empty=1` at latency 900,024 / 900,027 ms against
+//a 900,000 ms deadline: CURLE_OPERATION_TIMEDOUT (28) is returned for BOTH the
+//connect timeout and the whole-request timeout, and only the elapsed time tells
+//them apart. At 100% of the deadline that is a WALL miss - correctly classed
+//`timeout` / `wall_miss`, not `transport_error` - while a connect-phase death
+//lands at the connect budget B4 bounded to <= 20 s and <= half the deadline,
+//which is exactly what makes `transport_error` (and its retry inside what is
+//left of the deadline) reachable. That adjudication was made by hand off two
+//records; this writes it down on every record instead. "" whenever the facts do
+//not settle it (no curl failure, no latency, neither bound known) - a phase is
+//never guessed. Pure over the four numbers.
+const char * AIPlayerGPT::transportPhaseFor(long curlCode, long latencyMs,
+                                            long connectBudgetMs, long deadlineMs)
+{
+    if (curlCode <= 0 || latencyMs < 0)
+        return "";
+    if (deadlineMs > 0 && latencyMs * 100 >= deadlineMs * 95)
+        return "wall";       //the whole deadline elapsed: the server never answered
+    if (connectBudgetMs > 0 && latencyMs <= connectBudgetMs + connectBudgetMs / 4)
+        return "connect";    //died at the connect bound: the round trip never started
+    if (deadlineMs > 0 || connectBudgetMs > 0)
+        return "midflight";  //neither bound: the connection was made and then broke
+    return "";
+}
+
+//#W61-U (C13): the same stamp, with the two facts that make the phase provable
+//to a corpus reader - the connect budget that was in force, and the verdict
+//above. Both are appended ONLY on a curl failure, so every other stamp (and
+//every stamp written before this wave) is byte-identical.
+string AIPlayerGPT::transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody,
+                                          long connectBudgetMs, long latencyMs, long deadlineMs)
+{
     std::ostringstream o;
     o << "curl=" << curlCode << ",http=" << httpStatus
       << ",empty=" << (emptyBody ? 1 : 0);
+    if (curlCode > 0 && connectBudgetMs > 0)
+        o << ",connect_ms=" << connectBudgetMs;
+    const char * phase = transportPhaseFor(curlCode, latencyMs, connectBudgetMs, deadlineMs);
+    if (*phase)
+        o << ",phase=" << phase;
     return o.str();
 }
 
@@ -11439,7 +11602,9 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //first attempt when the bounded retry later succeeds.
                 if (body.empty() || mLastHttpStatus != 200)
                     mLastTransportOutcomes.push_back(
-                        transportOutcomeStamp(mLastCurlResult, mLastHttpStatus, body.empty()));
+                        transportOutcomeStamp(mLastCurlResult, mLastHttpStatus, body.empty(),
+                                              gptConnectTimeoutMs(mTimeoutMs), //#W61-U (C13)
+                                              mLastLatencyMs, mTimeoutMs));
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -11999,6 +12164,15 @@ void AIPlayerGPT::flushWallMissRecord()
     mWallMissPending = false;
     mWallMissBase.clear();
     mWallMissUnrecorded++;
+    //#W61-U (C13): the abandoned ask's OWN round trip, restored onto the record
+    //that reports it. Without it the record read `latency_ms: -1` (a cache hit)
+    //for a decision that had just spent the entire deadline, and carried no
+    //`deadline_pct` at all - so nothing in the log distinguished the two
+    //wave-60 wall misses from a connect failure. Consumed with the record, like
+    //every other latency.
+    if (mWallMissLatencyMs >= 0 && mLastLatencyMs < 0)
+        mLastLatencyMs = mWallMissLatencyMs;
+    mWallMissLatencyMs = -1;
     writeTransLog("wall_miss", base, "", -1, 0, "", "wall_miss_unrecorded", NULL);
 }
 
@@ -12130,6 +12304,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         {
             mWallMissPending = true;
             mWallMissBase = userMsg;
+            mWallMissLatencyMs = mLastLatencyMs; //#W61-U (C13)
             mWallMissEvents++;
             setNotice("no reply from the model - asking once more", 3.0f);
             DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
@@ -12179,7 +12354,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false),
-      mWallMissPending(false), mWallMissEvents(0), mWallMissUnrecorded(0),
+      mWallMissPending(false), mWallMissLatencyMs(-1), //#W61-U (C13)
+      mWallMissEvents(0), mWallMissUnrecorded(0),
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
@@ -12449,6 +12625,38 @@ static long postPlanOverrun(const string& reply)
     return (long) (last - lineEnd);
 }
 
+//#W61-U (C14, deck162 MED): 81 of 119 replies at one seat overran the protocol
+//and the translog carried every byte of it - 46,052 characters of un-committed
+//self-argument in six games, one reply 11,302 characters past its own PLAN. The
+//PARSER is unchanged (it has always stopped at the answer and the plan); this
+//trims what the RECORD keeps. The head is kept in full through the end of the
+//PLAN line - which is everything the protocol asked for and everything a seat
+//review reads - plus a bounded head of the overrun, so the SHAPE of the spiral
+//is still auditable and the `post_plan_overrun` / `post_answer_overrun` counters
+//(measured on the FULL reply, before this runs) still say exactly how big it
+//was. Below the threshold nothing is touched, so a compliant reply's record is
+//byte-identical. Pure over (reply, keep, threshold).
+static const size_t kReplyOverrunKeep = 400;   //bytes of the tail kept for shape
+static const size_t kReplyOverrunTrimAt = 1200; //below this the record is untouched
+static string recordReplyTrimmed(const string& reply, long overrun,
+                                 size_t keep = kReplyOverrunKeep,
+                                 size_t trimAt = kReplyOverrunTrimAt)
+{
+    if (overrun <= 0 || (size_t) overrun <= trimAt || reply.empty())
+        return reply;
+    const size_t tail = (size_t) overrun;
+    if (tail >= reply.size())
+        return reply; //the measurement does not address this string: keep it whole
+    const size_t headEnd = reply.size() - tail; //the end of the committed part
+    const size_t cut = headEnd + keep;
+    if (cut >= reply.size())
+        return reply;
+    std::ostringstream o;
+    o << reply.substr(0, cut) << "\n[+" << (long) (reply.size() - cut)
+      << " bytes written past the PLAN line trimmed from this record]";
+    return o.str();
+}
+
 //post_answer_overrun: the chars a reply wrote AFTER the end of its FIRST
 //line-leading coded answer. THIS is the quantity the owner ruling is about,
 //and post_plan_overrun is not: post_plan_overrun measures from the PLAN line,
@@ -12638,12 +12846,16 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W53-Q (D24): the PREVIOUS handoff's recovery lands before this record, so
     //the file reads unanswered -> recovery -> next decision in order.
     flushRecoveryRecord();
+    //#W61-U (C14): the record keeps the committed reply plus a bounded head of
+    //any overrun; the counters below are still measured on the FULL reply.
+    const long replyOverrunBytes = postPlanOverrun(reply);
+    const string recordReply = recordReplyTrimmed(reply, replyOverrunBytes);
     json rec = {
         {"seq", mTransSeq++},
         {"kind", kind},
         {"model", mModel},
         {"prompt", userMsg},
-        {"reply", reply},
+        {"reply", recordReply},
         {"choice", choice},
         {"options", optionCount},
         {"turn", translogTurn(observer->turn)},
@@ -12680,8 +12892,19 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (isLongReply(mLastLatencyMs, mTimeoutMs, !reply.empty()))
     {
         rec["long_reply"] = 1;
-        rec["deadline_pct"] = deadlineTenthsPct(mLastLatencyMs, mTimeoutMs) / 10.0;
         appendParseNote(&mLastParseNote, "long_reply");
+    }
+    //#W61-U (C13): ...and the FRACTION on every record that spent a round trip,
+    //not only on the answered ones that crossed 95%. The wave-60 corpus carried
+    //`deadline_pct` on ZERO records - no answered reply reached the long-reply
+    //mark - so the one instrument that says how much of the deadline a decision
+    //cost, and the only field that separates a wall miss from a connect failure
+    //by arithmetic, was absent exactly where it was needed. -1 (cache/reuse, or
+    //no deadline configured) still writes nothing.
+    {
+        const long tenths = deadlineTenthsPct(mLastLatencyMs, mTimeoutMs);
+        if (tenths >= 0)
+            rec["deadline_pct"] = tenths / 10.0;
     }
     //#W54-B (D13): the latched coded line's index and its parenthetical BOTH
     //disagree with the row that ran. 2 of 3,253 parentheticals in wave 53,
@@ -12826,7 +13049,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Commit-failure counters (see postPlanOverrun / commitRetracted above).
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
-    rec["post_plan_overrun"] = postPlanOverrun(reply);
+    rec["post_plan_overrun"] = replyOverrunBytes; //#W61-U (C14): the FULL reply
+    if (recordReply.size() < reply.size())
+        rec["reply_trimmed_bytes"] = (long) (reply.size() - recordReply.size());
     rec["commit_retracted"] = commitRetracted(fallback, reply);
     //WAVE-34 #1b(B), instrument only - no behaviour rides these. They measure
     //the boundary the phenomenon actually has (post-ANSWER, not post-PLAN) and
@@ -12902,6 +13127,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["wall_miss"] = 1;
         mWallMissPending = false;
         mWallMissBase.clear();
+        mWallMissLatencyMs = -1; //#W61-U (C13): this record consumed it
     }
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
@@ -18351,10 +18577,21 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //row 0 correctly) and three replies that named row 0 while coding this row
 //(146v126 seq 54/56/57). The verb the pilot writes is still in the row's first
 //clause, one word later; only the HEAD changed, and the guarantee stays.
+//#W61-U (C14, deck146 HIGH-3): the row's promise was scoped to the TURN, and
+//so was the latch behind it - `146v125` seqs 92-101 are ten consecutive asks at
+//20.4-21.6 KB each (~210 KB of inference) across Blockers -> Main 2 -> Upkeep ->
+//Draw -> Main 1 -> Main 1 on a menu whose only two cast rows were annotated
+//`at 0 this does nothing` and `the only legal targets are YOUR OWN right now`.
+//Nothing about that menu changed; the TURN did, and the turn boundary retired a
+//hold the model had already taken over the identical rows. The latch is now
+//retired by the ONLY thing that ever made it unsafe - a row the model has not
+//seen - so the row says that instead of the turn. This is not a blind cache:
+//holdStillStands re-checks the rendered rows, byte for byte, at every window,
+//and a single changed price re-opens the question.
 static const char * kHoldPriorityRowText =
-    "Hold priority for the rest of this turn: pass now, and do not ask me again"
-    " unless the board changes (any change re-opens this window; you give up no"
-    " cast)";
+    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    " until one of the rows above changes (any change re-opens this window; you"
+    " give up no cast)";
 
 //#W56-A (D1): the hold's board key is GONE. Wave 53-55 keyed the latch on
 //the situation block (phase line, hidden-zone counters and finally the life
@@ -18425,13 +18662,69 @@ static string optionSetKeyOf(const std::vector<string>& rows)
 //list it is about, and D19/D2a are what finally deliver it to these windows.
 static string holdRowBenefitClause()
 {
-    return string(" {taking this row skips the rest of this turn's identical"
-                  " windows}");
+    //#W61-U (C14): the benefit the latch now actually delivers.
+    return string(" {taking this row skips every later window whose rows are"
+                  " identical to these}");
 }
 
 static string holdRowLine()
 {
     return string(kHoldPriorityRowText) + holdRowBenefitClause();
+}
+
+//#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
+//one menu and a REAL COST on another. `152v162` seqs 32-42 are eleven priority
+//windows inside one Draw phase, 163.3 s of inference for no board effect, while
+//the seat's life ticked 15 -> 8 and every row's price ticked with it: on that
+//menu a hold is retired by the next window and buys nothing, and the row said
+//nothing about that. So the ask states which of the two menus this is, measured
+//with the LATCH'S OWN PREDICATE (every row printed now was printed at the last
+//window at this seam) rather than a second, looser one. Prompt-only, like the
+//declined count and for the same reason: a number that moves with every answer
+//must never enter the ask key. Pure over (unseen rows, repeat run).
+static string holdReopenNoteText(int unseenRows, int repeats)
+{
+    if (repeats < 1 && unseenRows < 1)
+        return string(); //first window at this seam: nothing measured yet
+    std::ostringstream o;
+    o << "\n[hold check: ";
+    if (unseenRows > 0)
+        o << unseenRows << (unseenRows == 1 ? " row above is" : " rows above are")
+          << " new since the last window at this seam - a row moving is what"
+             " re-opens a hold, so a hold taken here lasts only until one moves"
+             " again]";
+    else
+        o << "every row above was also on the menu at the last window at this seam"
+          << (repeats >= 2 ? "" : "")
+          << " (" << repeats << " window" << (repeats == 1 ? "" : "s")
+          << " in a row now) - a hold taken here holds until one of them changes]";
+    return o.str();
+}
+
+//The per-seam memory the note is measured against, and the note. Updated once
+//per window at each seam; the predicate is holdStillStands' own.
+string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>& rows)
+{
+    std::map<string, std::set<string> >::iterator it = mLastMenuRows.find(seam);
+    int unseen = 0;
+    bool first = (it == mLastMenuRows.end());
+    if (!first)
+        for (size_t i = 0; i < rows.size(); i++)
+            if (!it->second.count(rows[i]))
+                unseen++;
+    int& run = mMenuRepeatRun[seam];
+    if (first)
+        run = 0;
+    else if (unseen > 0)
+        run = 0;
+    else
+        run++;
+    const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : run);
+    std::set<string>& mem = mLastMenuRows[seam];
+    mem.clear();
+    for (size_t i = 0; i < rows.size(); i++)
+        mem.insert(rows[i]);
+    return note;
 }
 
 //#W53-N (D2): does a hold taken on <heldBoard> with <heldRows> still stand at
@@ -18542,7 +18835,12 @@ static bool isReservedHoldEcho(const string& echoLc)
     return t == "hold" || t == "hold priority"
         || t == "hold priority - do not ask me again this turn unless the board changes"
         || t == "pass priority, and do not ask me again this turn unless the board changes"
-               " (any change re-opens this window; you give up no cast)";
+               " (any change re-opens this window; you give up no cast)"
+        //#W61-U (C14): the wave-55..60 spelling, kept so a model echoing the
+        //text it learned still binds to this row.
+        || t == "hold priority for the rest of this turn: pass now, and do not ask me again"
+               " unless the board changes (any change re-opens this window; you give up no"
+               " cast)";
 }
 
 //#W54-A (D2a): where does the HOLD row sit on this menu (0-based), if at all?
@@ -18574,15 +18872,11 @@ static int holdRowIndexOf(const std::vector<string> * optionTexts)
 bool AIPlayerGPT::holdHonoured(const char * seam,
                                const std::vector<string>& rows)
 {
-    if (mHoldTurn != observer->turn)
-    {
-        if (mHoldTurn >= 0) //a turn boundary retires the hold silently
-        {
-            mHoldTurn = -1;
-            mHoldRows.clear();
-        }
-        return false;
-    }
+    //#W61-U (C14): the turn boundary no longer retires the hold. The rendered
+    //rows do, and they are re-checked below at every window - so a hold outlives
+    //the turn only while the model is being offered, byte for byte, the screen
+    //it already answered. mHoldTurn is kept as the turn it was TAKEN on (the
+    //stderr line and takeHold read it); it is no longer a gate.
     std::map<string, std::set<string> >::iterator it = mHoldRows.find(seam);
     if (it == mHoldRows.end())
         return false; //held elsewhere, never at this seam: this question is owed
@@ -18615,17 +18909,19 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
 //be held at both the priority and the casting seam.
 void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 {
-    if (mHoldTurn != observer->turn)
-    {
-        mHoldRows.clear();
-        mHoldTurn = observer->turn;
-    }
+    mHoldTurn = observer->turn;
+    //#W61-U (C14): the seam's set is REPLACED, not added to. With the turn
+    //boundary no longer clearing it (holdHonoured), a union would let a second
+    //hold widen the set of rows the first one was taken over - which is exactly
+    //the blind cache this latch must not become. A hold at a DIFFERENT seam
+    //still keeps its own key and its own set.
     std::set<string>& s = mHoldRows[seam];
+    s.clear();
     for (size_t i = 0; i < rows.size(); i++)
         s.insert(rows[i]); //#W56-A (D1): the rendered row, byte for byte
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
-               << observer->turn << " - this turn's remaining " << seam
-               << " windows are held until the board changes");
+               << observer->turn << " - later " << seam
+               << " windows are held until one of these rows changes"); //#W61-U (C14)
 }
 
 //#W53-N (D12a): the carried plan's age. mTransSeq is the seq the record now
@@ -20027,6 +20323,66 @@ static string duplicateVerdictTag(int cheaperRow, const string& cheaperName, int
       << "), which costs " << lessMana << " less mana - a different card, the same"
          " priced outcome on this board}";
     return o.str();
+}
+
+//#W61-U (C10, deck130 HIGH-2): the cast menu ranks NOTHING. A row that clears
+//the opponent's board reads with the same weight as a row that plays a 2/2, and
+//the corpus measured the consequence exactly: deck130 was offered `Cast
+//Starstorm` in 51 windows and cast it 0 times - including three windows whose
+//own `{X pricing:}` named two or more of THEIRS, two of them the deciding
+//decision of a loss - while the `[<- ...]` marker on the ANNOUNCE_X menu one
+//screen later was obeyed 6 of 6, and the guide prose written at that seam fired
+//0 of 51. So the judgement moves into the channel the pilot demonstrably reads.
+//
+//It is a FACT about the menu, never an instruction: the row's own two numbers,
+//and a comparison whose SCOPE is stated ("no other row on this menu prices a
+//bigger sweep" / "the only row on this menu that prices a board sweep"), because
+//only the rows that price a board sweep are measured here - a row that removes
+//creatures without pricing one is not silently claimed to remove fewer. The
+//tie-safe wording is the xMonotoneMarker idiom ("no listed X does more"): true
+//whether or not another row matches it. A sweep that costs the pilot more than
+//it takes is still marked - it is the biggest sweep on the menu, which is what
+//the marker says - and priced in the same bracket rather than endorsed bare
+//(the wave-60 lesson from the best-X badge that recommended a lethal NET).
+//Pure over (theirs, mine, measured rows), so the whole table is PARSETEST-pinned.
+static string boardSweepMarker(int theirs, int mine, int measuredRows)
+{
+    if (theirs <= 0 || measuredRows < 1)
+        return "";
+    std::ostringstream o;
+    o << " [<- board sweep: THEIRS " << theirs << " / YOURS " << mine << " - "
+      << (measuredRows == 1 ? "the only row on this menu that prices a board sweep"
+                            : "no other row on this menu prices a bigger sweep of THEIRS");
+    if (mine > theirs)
+        o << " (it takes more of YOURS than of THEIRS)";
+    o << "]";
+    return o.str();
+}
+
+//The pass: exactly ONE row is marked - the largest sweep of THEIRS, ties broken
+//by the smaller loss of YOURS and then by row order, so the marked row is
+//deterministic and the claim above stays true under a tie. Pure over the two
+//parallel vectors, which the row loop fills from the same walk that rendered
+//each row's clause.
+static void applyBoardSweepMark(std::vector<std::string>& rows,
+                                const std::vector<int>& theirs,
+                                const std::vector<int>& mine)
+{
+    int measured = 0, best = -1;
+    for (size_t i = 0; i < rows.size() && i < theirs.size() && i < mine.size(); i++)
+    {
+        if (theirs[i] < 0)
+            continue;
+        measured++;
+        if (theirs[i] <= 0)
+            continue;
+        if (best < 0 || theirs[i] > theirs[best]
+            || (theirs[i] == theirs[best] && mine[i] < mine[best]))
+            best = (int) i;
+    }
+    if (best < 0)
+        return;
+    rows[best] += boardSweepMarker(theirs[best], mine[best], measured);
 }
 
 static void applyDuplicateEffectTags(std::vector<std::string>& rows,
@@ -24264,6 +24620,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     string boardKey = serializeGameState();
     //#W53-N (D2): the model's own hold, honoured. No model call, no window
     //removed from the record - the row the model took said this.
+    //#W61-U (C14): measured over the same rows the latch reads, before the
+    //latch consumes the window, so a held window still updates the memory.
+    const string holdNote = holdReopenNote("priority", shownLines);
     if (holdRow > 0 && holdHonoured("priority", shownLines))
     {
         mLastChoice = 0; //a hold is a pass for this window
@@ -24289,8 +24648,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
     string userTail = tailStr;
-    if (!declinedNote.empty() && optionsEnd <= userTail.size())
-        userTail = userTail.substr(0, optionsEnd) + declinedNote + userTail.substr(optionsEnd);
+    const string promptNotes = declinedNote + holdNote; //#W61-U (C14): same channel
+    if (!promptNotes.empty() && optionsEnd <= userTail.size())
+        userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForPriority(shownLines, logWindowStackRespondable());
     string userMsg = assemblePrompt(userTail);
@@ -25534,6 +25894,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     vector<MTGCardInstance *> candidates;
     vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
     vector<int> rowUses; //#W54-C (D18): sources this row spends, -1 = unpriceable
+    vector<int> rowSweepTheirs, rowSweepMine; //#W61-U (C10): the board this row clears
     vector<string> rowNames; //#W56-B (D15): the card each row casts
     vector<int> rowCosts; //#W56-B (D15): the converted cost it would pay, -1 = unknown ({X})
     vector<string> opts; //"Cast nothing" is appended LAST (positional
@@ -25579,6 +25940,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         MTGCardInstance * card = casts[ci].card;
         ManaCost * cost = card->getManaCost();
         int rowUsed = -1; //#W54-C (D18)
+        CastRowBoardAnswer rowSweep; //#W61-U (C10)
         std::ostringstream o;
         if (!casts[ci].viaAlternative)
         {
@@ -25589,10 +25951,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             o << casts[ci].zoneLabel;
             o << exileCastNote(this, card, casts[ci].zoneLabel); //#W52-K D11
             o << hybridPipNote(cost);
-            o << dynamicMagnitudes(card);
+            o << dynamicMagnitudes(card, &rowSweep); //#W61-U (C10)
             //W43-7: {X} spells are unpriceable by dynamicMagnitudes (it skips
             //the amount "x" - X is announced AFTER this pick). Price them here.
-            o << xSpellPricing(card, this);
+            o << xSpellPricing(card, this, &rowSweep); //#W61-U (C10)
             //#W51-E D8 / #W52-K D10: what is already controlled - a legendary
             //twin (legend rule), a stackable second copy (both stay), or what a
             //tutor's search type can still find in the library.
@@ -26295,6 +26657,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
         opts.push_back(o.str());
         rowUses.push_back(rowUsed); //#W54-C (D18)
+        rowSweepTheirs.push_back(rowSweep.theirs); //#W61-U (C10)
+        rowSweepMine.push_back(rowSweep.mine);
         //#W56-B (D15): identity + price of this row, for the menu pass below.
         rowNames.push_back(card->name);
         {
@@ -26355,6 +26719,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //until the suppression filter and any re-ask removal have settled, and
         //`opts` stays the untagged identity the livelock breaker keys on.
         applyMenuFitTags(menu, rowUses, untappedSources);
+        //#W61-U (C10): and the board-sweep ranking, on the same menu copy and
+        //for the same reason - a row cannot know its own number until the
+        //suppression filter and any re-ask removal have settled.
+        applyBoardSweepMark(menu, rowSweepTheirs, rowSweepMine);
         //#W56-B (D15): and the same-card/same-verdict comparison, on the same
         //menu copy and for the same reason - a row cannot know its own number
         //until the suppression filter and any re-ask removal have settled.
@@ -26390,6 +26758,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //close it. #W55-A (D21): the row states what taking it saves.
         int holdRow = (int) menu.size();
         menu.push_back(holdRowLine());
+        //#W61-U (C14): the hold's own re-open rule for THIS menu, measured over
+        //the rows the latch reads and BEFORE the latch consumes the window (a
+        //held window still updates the memory). Only attempt 0 measures: a
+        //re-ask menu is the same window with a row removed, not a new one.
+        if (attempt == 0)
+            mCastHoldNote = holdReopenNote("cast", menu);
+        mNextAskPromptNote += mCastHoldNote;
         //The model's own hold, honoured: no model call, no row withheld.
         if (attempt == 0 && holdHonoured("cast", menu))
             return NULL;
@@ -26485,6 +26860,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         opts.erase(opts.begin() + pick);
         if (pick < (int) rowUses.size())
             rowUses.erase(rowUses.begin() + pick); //#W54-C (D18): stay index-parallel
+        if (pick < (int) rowSweepTheirs.size()) //#W61-U (C10): same
+        {
+            rowSweepTheirs.erase(rowSweepTheirs.begin() + pick);
+            rowSweepMine.erase(rowSweepMine.begin() + pick);
+        }
         if (pick < (int) rowNames.size()) //#W56-B (D15): same, for the duplicate pass
             rowNames.erase(rowNames.begin() + pick);
         if (pick < (int) rowCosts.size())
@@ -46582,10 +46962,16 @@ static const char * kW50Y_r94 =
         //#W55-A (D11b): AMENDED. Wave 54's literal led with row 0's own name and
         //that collision is R203/D11; the row now leads with its own act and
         //carries the pilot's verb one clause later.
-        CHECK(row == "Hold priority for the rest of this turn: pass now, and do not ask me again"
-                     " unless the board changes (any change re-opens this window; you give up no"
-                     " cast)",
-              "#W55-A D11b the hold row renders the reworded literal");
+        //#W61-U (C14): AMENDED AGAIN. The wave-55 literal promised a hold that
+        //expired with the TURN, and the latch behind it did - which is the
+        //deck146 HIGH-3 defect. The row now states the rule the engine keeps.
+        CHECK(row == "Hold priority: pass now, and do not ask me again - this turn or later -"
+                     " until one of the rows above changes (any change re-opens this window; you"
+                     " give up no cast)",
+              "#W61-U C14 the hold row renders the turn-free literal");
+        //NEGATIVE: the retired promise must be gone, not merely reworded around.
+        CHECK(row.find("for the rest of this turn") == string::npos,
+              "#W61-U C14 NEGATIVE the row no longer promises a turn-scoped hold");
         CHECK(row.find("Hold priority") == 0 && row.find("pass now") != string::npos,
               "#W55-A D11b it leads with its OWN act and still carries the pilot's verb");
         //NEGATIVE (the defect this reword retires): the two rows' leading words
@@ -46610,8 +46996,9 @@ static const char * kW50Y_r94 =
               && lc.find("nothing worth") == string::npos,
               "#W53-N D2 NEGATIVE the hold row states the act, never advises it");
         // the row is a decline: it must promise re-opening, in its own words
-        CHECK(lc.find("unless the board changes") != string::npos,
-              "#W53-N D2 the row states its own re-opener");
+        CHECK(lc.find("until one of the rows above changes") != string::npos
+              && lc.find("any change re-opens this window") != string::npos,
+              "#W61-U C14 the row states its own re-opener - the ROWS, not the turn");
         // ECHO: the row echoed back in full resolves to its own index.
         {
             vector<string> menu;
@@ -47814,10 +48201,18 @@ static const char * kW50Y_r94 =
               "#W54-A D2a the whole row echoed back (nested parens) answers as its own row");
         // ECHO SHAPE: the row's own leading clause, comma and all, is the hold row
         bool st6 = false;
-        CHECK(parseChoice("CHOICE: 0 (Hold priority for the rest of this turn: pass now,"
+        CHECK(parseChoice("CHOICE: 0 (Hold priority: pass now,"
                           " and do not ask me again)",
                           (int) menu.size(), &menu, &st6, NULL, NULL, true) == 2,
-              "#W55-A D11b the reworded row's disambiguating prefix is still the hold row");
+              "#W61-U C14 the reworded row's disambiguating prefix is still the hold row");
+        //#W61-U (C14): and the wave-55..60 spelling still names this row - a
+        //model that learned the old text is not sent to row 0 for it.
+        bool st6c = false;
+        CHECK(parseChoice("CHOICE: 0 (Hold priority for the rest of this turn: pass now, and do"
+                          " not ask me again unless the board changes (any change re-opens this"
+                          " window; you give up no cast))",
+                          (int) menu.size(), &menu, &st6c, NULL, NULL, true) == 2,
+              "#W61-U C14 the retired wave-55 literal still binds to the hold row");
         // #W55-A (D11b): the wave-54 spelling is still accepted - a model that
         // writes the old literal is naming this row, not row 0.
         bool st6b = false;
@@ -48485,8 +48880,8 @@ static const char * kW50Y_r94 =
     cout << "\n[#W55-A D21] the HOLD row states what taking it SAVES\n";
     {
         CHECK(holdRowBenefitClause()
-              == " {taking this row skips the rest of this turn's identical windows}",
-              "#W55-A D21 the benefit clause's literal");
+              == " {taking this row skips every later window whose rows are identical to these}",
+              "#W61-U C14 the benefit clause's literal - the saving the latch now delivers");
         const string line = holdRowLine();
         CHECK(line == string(kHoldPriorityRowText) + holdRowBenefitClause(),
               "#W55-A D21 the rendered row is the row plus its benefit, in that order");
@@ -49299,7 +49694,7 @@ static const char * kW50Y_r94 =
         const string rendered = holdRowLine();
         CHECK(rendered != pure && rendered.compare(0, pure.size(), pure) == 0,
               "#W57-A D4 the wave-56 value was a strict PREFIX of the row - the exact shape the census missed");
-        CHECK(rendered == pure + " {taking this row skips the rest of this turn's identical windows}",
+        CHECK(rendered == pure + " {taking this row skips every later window whose rows are identical to these}",
               "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
         // the last-offer and upkeep-animation clauses are on the rendered row too
         {
@@ -52462,6 +52857,290 @@ static const char * kW50Y_r94 =
             CHECK(outB.size() == 1 && outB[0] <= 0,
                   "#W60-P B9 NEGATIVE echo: the (4/4) inside the clause is not read as an"
                   " assignment - a declined block stays declined");
+        }
+    }
+
+
+    // ================= #W61-U: C10 (the cast row's ranking marker and the
+    // damage wipe's survivors), C13 (which phase a transport failure died in),
+    // C14 (the hold's real scope and the record's reply) =================
+    cout << "\n[#W61-U C10] the sweeper CAST row is ranked, and a damage wipe names its survivors\n";
+    {
+        // deck130 vs123 s20 / vs152 s19: a Starstorm row that clears their board
+        // read with the same weight as a 2/2. The marker is a FACT about the
+        // menu, and its scope is stated because only board-sweep rows are
+        // measured.
+        std::vector<std::string> rows;
+        rows.push_back("Cast Siege-Gang Commander {3}{r}{r} (2/2)");
+        rows.push_back("Cast Starstorm {x}{r}{r} {X pricing: ...}");
+        rows.push_back("Cast Rorix Bladewing {3}{r}{r}{r} (6/5) [flying]");
+        std::vector<int> theirs, mine;
+        theirs.push_back(-1); mine.push_back(-1);
+        theirs.push_back(4);  mine.push_back(1);
+        theirs.push_back(-1); mine.push_back(-1);
+        std::vector<std::string> marked(rows);
+        applyBoardSweepMark(marked, theirs, mine);
+        CHECK(marked[1] == rows[1] + " [<- board sweep: THEIRS 4 / YOURS 1 - the only row on"
+                                     " this menu that prices a board sweep]",
+              "#W61-U C10 the sweep row carries the ranking marker, with its scope stated");
+        CHECK(marked[0] == rows[0] && marked[2] == rows[2],
+              "#W61-U C10 NEGATIVE no other row is touched");
+        // two measured rows: the bigger sweep is marked, and the claim is
+        // tie-safe ("no other row prices a bigger sweep"), never "the most".
+        std::vector<std::string> rows2;
+        rows2.push_back("Cast Pyroclasm {1}{r}");
+        rows2.push_back("Cast Damnation {2}{b}{b}");
+        std::vector<int> t2, m2;
+        t2.push_back(2); m2.push_back(0);
+        t2.push_back(5); m2.push_back(2);
+        std::vector<std::string> marked2(rows2);
+        applyBoardSweepMark(marked2, t2, m2);
+        CHECK(marked2[1] == rows2[1] + " [<- board sweep: THEIRS 5 / YOURS 2 - no other row on"
+                                       " this menu prices a bigger sweep of THEIRS]"
+              && marked2[0] == rows2[0],
+              "#W61-U C10 with two priced sweeps the larger one is marked and the scope changes");
+        // deck125 HIGH-2's shape, one seam over: a sweep that costs the pilot
+        // more than it takes is still the biggest sweep on the menu - so it is
+        // marked, and PRICED in the same bracket rather than endorsed bare.
+        std::vector<std::string> rows3(1, "Cast Supreme Verdict {1}{u}{w}{w}");
+        std::vector<int> t3(1, 1), m3(1, 5);
+        std::vector<std::string> marked3(rows3);
+        applyBoardSweepMark(marked3, t3, m3);
+        CHECK(marked3[0].find("(it takes more of YOURS than of THEIRS)") != string::npos,
+              "#W61-U C10 a lopsided sweep is priced on its own marker");
+        CHECK(boardSweepMarker(3, 0, 2).find("(it takes more of YOURS") == string::npos,
+              "#W61-U C10 NEGATIVE an even-or-better sweep carries no such tail");
+        // NEGATIVE: a menu whose sweep hits nothing of theirs is not endorsed at
+        // all - `{dead right now: destroys 0 of their creatures}` must not be
+        // dressed as an answer (deck125 MED-1's shape).
+        std::vector<std::string> rows4(2, "Cast Final Judgment {4}{w}{w}");
+        rows4[1] = "Cast Essence Scatter {1}{u}";
+        std::vector<int> t4, m4;
+        t4.push_back(0); m4.push_back(0);
+        t4.push_back(-1); m4.push_back(-1);
+        std::vector<std::string> marked4(rows4);
+        applyBoardSweepMark(marked4, t4, m4);
+        CHECK(marked4 == rows4,
+              "#W61-U C10 NEGATIVE a sweep that removes 0 of THEIRS is marked on no row");
+        CHECK(boardSweepMarker(0, 0, 3).empty() && boardSweepMarker(2, 0, 0).empty(),
+              "#W61-U C10 NEGATIVE nothing to rank, nothing printed");
+        // NEGATIVE: a menu with no measured row is byte-identical to base.
+        std::vector<std::string> rows5(3, "Cast Mountain");
+        std::vector<int> t5(3, -1), m5(3, -1);
+        std::vector<std::string> marked5(rows5);
+        applyBoardSweepMark(marked5, t5, m5);
+        CHECK(marked5 == rows5,
+              "#W61-U C10 NEGATIVE every cast menu without a priced sweep renders as before");
+        // EXACTLY ONE row is marked, and a tie is deterministic: the same
+        // THEIRS goes to the smaller YOURS, then to the earlier row.
+        {
+            std::vector<std::string> tie(3, "row");
+            std::vector<int> tt, tm;
+            tt.push_back(3); tm.push_back(2);
+            tt.push_back(3); tm.push_back(1);
+            tt.push_back(3); tm.push_back(1);
+            std::vector<std::string> out(tie);
+            applyBoardSweepMark(out, tt, tm);
+            int markedRows = 0;
+            for (size_t i = 0; i < out.size(); i++)
+                if (out[i] != tie[i])
+                    markedRows++;
+            CHECK(markedRows == 1 && out[1] != tie[1],
+                  "#W61-U C10 exactly one row is marked; a tie goes to the smaller YOURS, then"
+                  " to the earlier row");
+            CHECK(out[1].find("no other row on this menu prices a bigger sweep") != string::npos,
+                  "#W61-U C10 the wording stays TRUE under a tie - it never says 'the most'");
+        }
+        // ECHO SHAPE of the new bracketed annotation: it is decision-time
+        // guidance, so it never reaches history, and it strips off an anchored
+        // candidate exactly like every other bracket tail.
+        {
+            const string mk = boardSweepMarker(4, 1, 2);
+            CHECK(stripNarrationDecoration("Cast Starstorm {x}{r}{r}" + mk)
+                      == "Cast Starstorm {x}{r}{r}",
+                  "#W61-U C10 echo shape: the marker is a bracket and never enters the narration");
+            vector<string> menu;
+            menu.push_back("Cast Siege-Gang Commander {3}{r}{r}");
+            menu.push_back("Cast Starstorm {x}{r}{r}");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 2 (Cast Starstorm" + mk + ")",
+                              (int) menu.size(), &menu, &stale, NULL, NULL, false) == 2,
+                  "#W61-U C10 echo: a reply that copies the marker back still binds its row");
+        }
+        // ---- the damage wipe's survivors (deck125 HIGH-3, `125v146` s48) ----
+        std::vector<WipeVictim> board;
+        {
+            WipeVictim a; a.name = "Goblin"; a.power = 2; a.toughness = 2; board.push_back(a);
+            WipeVictim b; b.name = "Triumphant Adventurer"; b.power = 2; b.toughness = 2; board.push_back(b);
+            WipeVictim c; c.name = "Nadaar, Selfless Paladin"; c.power = 4; c.toughness = 4; board.push_back(c);
+        }
+        CHECK(attackPunisherClause(3, board)
+              == "they control 3 creatures able to attack - deals 3 to each if all 3 attack."
+                 " DIES at 3: Goblin (2/2); Triumphant Adventurer (2/2)."
+                 " SURVIVES: Nadaar, Selfless Paladin (4/4) - 4 power of theirs survives it",
+              "#W61-U C10 the damage wipe names who dies, who lives, and what still gets through");
+        CHECK(attackPunisherClause(3, board).find("; Nadaar, Selfless Paladin (4/4);") == string::npos,
+              "#W61-U C10 NEGATIVE a comma-named card is not split by the list separator");
+        // every one of them dies: the row says so, and says nothing survives.
+        {
+            std::vector<WipeVictim> smalls(board.begin(), board.begin() + 2);
+            CHECK(attackPunisherClause(2, smalls)
+                  == "they control 2 creatures able to attack - deals 2 to each if all 2 attack."
+                     " DIES at 2: Goblin (2/2); Triumphant Adventurer (2/2)."
+                     " SURVIVES: none - this kills every one of them",
+                  "#W61-U C10 a wipe that stops the whole attack says exactly that");
+        }
+        // indestructible is not killed by damage at any amount, and is named for
+        // what it is (the same rail #W60-Q R6 put on the destroy roster).
+        {
+            std::vector<WipeVictim> ind;
+            WipeVictim m; m.name = "Darksteel Myr"; m.power = 0; m.toughness = 1;
+            m.indestructible = true; ind.push_back(m);
+            CHECK(attackPunisherClause(9, ind).find("SURVIVES: Darksteel Myr (0/1) [indestructible]"
+                                                    " - 0 power of theirs survives it")
+                      != string::npos
+                  && attackPunisherClause(9, ind).find("DIES at 9: none") != string::npos,
+                  "#W61-U C10 damage never destroys an indestructible creature, whatever the amount");
+        }
+        // NEGATIVE, twice over: the wave-60 clause is byte-identical wherever
+        // there is no roster to print, and at zero attackers.
+        CHECK(attackPunisherClause(3)
+                  == "they control 3 creatures able to attack - deals 3 to each if all 3 attack",
+              "#W61-U C10 NEGATIVE with no roster the clause is the wave-60 line, byte for byte");
+        CHECK(attackPunisherClause(0, board)
+                  == "they control 0 creatures able to attack - deals 0 until they have an attacker",
+              "#W61-U C10 NEGATIVE at zero attackers nothing is rostered");
+        CHECK(wipeSurvivorTail(0, board).empty() && wipeSurvivorTail(3, std::vector<WipeVictim>()).empty(),
+              "#W61-U C10 NEGATIVE no damage or no board prints no roster");
+        // ECHO: a reply naming the annotated row still binds it.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Lightmine Field {2}{w}{w} {right now: " + attackPunisherClause(3, board) + "}");
+            menu.push_back("Cast nothing right now");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Cast Lightmine Field)",
+                              (int) menu.size(), &menu, &stale, NULL, NULL, false) == 1,
+                  "#W61-U C10 echo: the row with the survivor roster still answers as row 1");
+        }
+    }
+
+    cout << "\n[#W61-U C13] which phase a transport failure died in, and the deadline it spent\n";
+    {
+        // The two wave-60 records, adjudicated by arithmetic instead of by hand:
+        // curl 28 at 900,024 ms against a 900,000 ms deadline is the OVERALL
+        // timeout - a wall miss - and NOT the connect failure `transport_error`
+        // is for.
+        CHECK(string(AIPlayerGPT::transportPhaseFor(28, 900024, 20000, 900000)) == "wall"
+              && string(AIPlayerGPT::transportPhaseFor(28, 900027, 20000, 900000)) == "wall",
+              "#W61-U C13 `130` s27 / `162` s16: curl 28 at the full deadline is a WALL miss");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0, 28)) == "timeout",
+              "#W61-U C13 and a wall miss stays `timeout`, never `transport_error`");
+        // A connect-phase death lands at B4's connect bound (<= 20 s and <= half
+        // the deadline), which is what makes the transport class - and its
+        // retry inside what is left of the deadline - reachable at all.
+        CHECK(string(AIPlayerGPT::transportPhaseFor(28, 20013, 20000, 900000)) == "connect",
+              "#W61-U C13 curl 28 at the connect bound is a CONNECT failure");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0, 28)) == "transport_error"
+              && AIPlayerGPT::retryableTransportFailure(28, 0, true)
+              && AIPlayerGPT::remainingTransportRetryMs(900000, 20013) == 879987,
+              "#W61-U C13 a connect failure classes transport_error and is retried inside the"
+              " deadline's remainder");
+        CHECK(string(AIPlayerGPT::transportPhaseFor(28, 300000, 20000, 900000)) == "midflight",
+              "#W61-U C13 a break after the connect and before the wall is neither");
+        // NEGATIVE: a phase is never guessed, and a non-curl outcome has none.
+        CHECK(string(AIPlayerGPT::transportPhaseFor(0, 900024, 20000, 900000)).empty()
+              && string(AIPlayerGPT::transportPhaseFor(28, -1, 20000, 900000)).empty()
+              && string(AIPlayerGPT::transportPhaseFor(28, 20013, 0, 0)).empty(),
+              "#W61-U C13 NEGATIVE no curl failure, no latency or no bound at all = no verdict");
+        // The stamp's shape, and the wave-59 shape wherever the facts are absent.
+        CHECK(AIPlayerGPT::transportOutcomeStamp(28, 0, true, 20000, 900024, 900000)
+                  == "curl=28,http=0,empty=1,connect_ms=20000,phase=wall",
+              "#W61-U C13 the stamp carries the connect budget and the verdict");
+        CHECK(AIPlayerGPT::transportOutcomeStamp(28, 0, true, 20000, 20013, 900000)
+                  == "curl=28,http=0,empty=1,connect_ms=20000,phase=connect",
+              "#W61-U C13 and reads `connect` on the shape B4 made reachable");
+        CHECK(AIPlayerGPT::transportOutcomeStamp(28, 0, true)
+                  == "curl=28,http=0,empty=1"
+              && AIPlayerGPT::transportOutcomeStamp(0, 503, true, 20000, 1200, 900000)
+                  == "curl=0,http=503,empty=1",
+              "#W61-U C13 NEGATIVE every stamp that is not a curl failure is byte-identical to"
+              " the wave-59 shape");
+        // deadline_pct: the instrument the wave-60 corpus carried on ZERO
+        // records. It is now written wherever a round trip was spent, which is
+        // strictly more windows than the long-reply stamp covers.
+        CHECK(AIPlayerGPT::deadlineTenthsPct(45000, 900000) == 50
+              && !AIPlayerGPT::isLongReply(45000, 900000, true),
+              "#W61-U C13 a 5.0% reply has a deadline_pct and no long_reply stamp");
+        CHECK(AIPlayerGPT::deadlineTenthsPct(900024, 900000) == 1000,
+              "#W61-U C13 the wall miss reads 100.0% of its deadline");
+        CHECK(AIPlayerGPT::deadlineTenthsPct(-1, 900000) == -1
+              && AIPlayerGPT::deadlineTenthsPct(45000, 0) == -1,
+              "#W61-U C13 NEGATIVE a cache/reuse record and a deadline-less seat still write none");
+    }
+
+    cout << "\n[#W61-U C14] the hold's real scope, stated per menu; and the record's reply\n";
+    {
+        // deck146 `146v125` s92-s101: ten consecutive asks over an unchanged
+        // all-dead menu, re-opened by nothing but the turn boundary. The note
+        // says which of the two regimes THIS menu is in, measured with the
+        // latch's own predicate.
+        CHECK(holdReopenNoteText(0, 3)
+              == "\n[hold check: every row above was also on the menu at the last window at this"
+                 " seam (3 windows in a row now) - a hold taken here holds until one of them"
+                 " changes]",
+              "#W61-U C14 an unchanged menu says the hold will hold, and for how long it has");
+        // deck152 I2 (`152v162` s32-s42): eleven windows whose prices moved with
+        // a ticking life total - there "any change re-opens" is a COST, and the
+        // note says so instead of the row promising a saving it cannot deliver.
+        CHECK(holdReopenNoteText(1, 0)
+              == "\n[hold check: 1 row above is new since the last window at this seam - a row"
+                 " moving is what re-opens a hold, so a hold taken here lasts only until one"
+                 " moves again]",
+              "#W61-U C14 a moving menu states the re-open as the real cost it is");
+        CHECK(holdReopenNoteText(2, 0).find("2 rows above are new") != string::npos,
+              "#W61-U C14 the count and its verb agree");
+        CHECK(holdReopenNoteText(0, 0).empty(),
+              "#W61-U C14 NEGATIVE the first window at a seam measures nothing and claims nothing");
+        // It is a prompt-only note in the same channel as the declined count -
+        // a bracket, so it never enters history and never enters the ask key.
+        CHECK(holdReopenNoteText(0, 3).compare(0, 2, "\n[") == 0
+              && declinedListNote(3).compare(0, 2, "\n[") == 0,
+              "#W61-U C14 the note rides the declined count's own prompt-only channel");
+        CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b}" + holdReopenNoteText(0, 3))
+                  .find("hold check") == string::npos,
+              "#W61-U C14 echo shape: the note is a bracket and never reaches the narration");
+        // ---- the record's copy of a runaway reply (deck162 MED) ----
+        {
+            const string committed = "CHOICE: 1 (Cast Fate Unraveler)\nPLAN: land, then Ob Nixilis.\n";
+            string spiral;
+            for (int i = 0; i < 300; i++)
+                spiral += "Wait, looking closer at the board state, is this right? ";
+            const string full = committed + spiral;
+            const long overrun = postPlanOverrun(full);
+            const string kept = recordReplyTrimmed(full, overrun);
+            CHECK(overrun > 1200 && kept.size() < full.size(),
+                  "#W61-U C14 a reply that overruns past its PLAN is trimmed at the record");
+            CHECK(kept.compare(0, committed.size(), committed) == 0,
+                  "#W61-U C14 the committed answer and the PLAN line are kept in full");
+            CHECK(kept.find("Wait, looking closer") != string::npos
+                  && kept.find("bytes written past the PLAN line trimmed from this record]")
+                     != string::npos,
+                  "#W61-U C14 a bounded head of the overrun is kept, and the cut is stated");
+            CHECK(kept.size() <= committed.size() + kReplyOverrunKeep + 80,
+                  "#W61-U C14 the kept record is bounded by the head plus the stated keep");
+            // The counters are measured on the FULL reply, before this runs -
+            // trimming the record must not shrink what the corpus reads.
+            CHECK(postPlanOverrun(full) == overrun && overrun == (long) spiral.size() - 1,
+                  "#W61-U C14 post_plan_overrun still measures the whole overrun");
+            // NEGATIVE: a compliant reply, and one just under the threshold, are
+            // stored byte-identically.
+            CHECK(recordReplyTrimmed(committed, postPlanOverrun(committed)) == committed,
+                  "#W61-U C14 NEGATIVE a reply that stops at its PLAN line is stored untouched");
+            const string small = committed + string(900, 'x');
+            CHECK(recordReplyTrimmed(small, postPlanOverrun(small)) == small,
+                  "#W61-U C14 NEGATIVE an overrun under the threshold is stored untouched");
+            CHECK(recordReplyTrimmed(full, 0) == full && recordReplyTrimmed("", 5000).empty(),
+                  "#W61-U C14 NEGATIVE no measured overrun, no trim");
         }
     }
 
