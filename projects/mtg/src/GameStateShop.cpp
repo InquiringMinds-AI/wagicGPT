@@ -245,11 +245,15 @@ static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& boost
         sym = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/symbol.png", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
     if (sym.get())
     {
-        //Set icons are black paths on transparency: give them a light disc to sit on.
-        r->FillCircle(ex, ey, 28, packHsv(hue, 0.12f, 0.97f));
-        r->DrawCircle(ex, ey, 28, packHsv(hue, 0.7f, 0.30f));
-        float s = 44.f / (sym->mHeight > sym->mWidth ? sym->mHeight : sym->mWidth);
+        //fetch-symbols.py rasterizes the glyph WHITE on transparency, so it tints
+        //at render time: a pale glyph on a disc in the wrapper's own dark shade
+        //(owner, vpk23: black was the wrong colour).
+        r->FillCircle(ex, ey, 30, packHsv(hue, 0.75f, 0.28f));
+        r->DrawCircle(ex, ey, 30, packHsv(hue, 0.25f, 0.85f));
+        float s = 46.f / (sym->mHeight > sym->mWidth ? sym->mHeight : sym->mWidth);
+        sym->SetColor(packHsv(hue, 0.08f, 1.0f));
         r->RenderQuad(sym.get(), ex - sym->mWidth * s / 2, ey - sym->mHeight * s / 2, 0, s, s);
+        sym->SetColor(ARGB(255, 255, 255, 255));
     }
     else
     {
@@ -259,23 +263,28 @@ static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& boost
         r->FillCircle(ex, ey, 7, packHsv(hue, 0.2f, 1.0f));
     }
 
-    //Name panel.
+    //Name panel: larger pale text on a panel in the wrapper's dark shade
+    //(owner, vpk23: the font was too small and the black text wrong).
+    const float baseScale = font->GetScale();
+    font->SetScale(baseScale * 1.35f);
     vector<string> lines;
     packWrap(font, names, w - 20, lines);
-    float lh = font->GetHeight() + 2;
-    float py = ey + 34;
-    r->FillRoundRect(x0 + 8, py - 4, w - 16, lh * lines.size() + 8, 4.f, ARGB(170, 255, 255, 255));
-    font->SetColor(ARGB(255, 15, 15, 15));
+    float lh = font->GetHeight() + 3;
+    float py = ey + 38;
+    r->FillRoundRect(x0 + 8, py - 5, w - 16, lh * lines.size() + 10, 4.f, packHsv(hue, 0.75f, 0.22f, 225));
+    font->SetColor(packHsv(hue, 0.06f, 1.0f));
     for (size_t i = 0; i < lines.size(); i++)
         font->DrawString(lines[i].c_str(), cx, py + lh * i, JGETEXT_CENTER);
     //Card count and, in the bottom band, code + year.
+    font->SetScale(baseScale * 1.15f);
     font->SetColor(ARGB(255, 245, 245, 245));
-    font->DrawString(_("15 cards").c_str(), cx, py + lh * lines.size() + 10, JGETEXT_CENTER);
+    font->DrawString(_("15 cards").c_str(), cx, py + lh * lines.size() + 12, JGETEXT_CENTER);
     char foot[64];
     if (mainSet && mainSet->year > 0) snprintf(foot, sizeof(foot), "%s  %d", code.c_str(), mainSet->year);
     else snprintf(foot, sizeof(foot), "%s", code.c_str());
     font->SetColor(ARGB(255, 235, 235, 235));
-    font->DrawString(foot, cx, y0 + h - band + 2, JGETEXT_CENTER);
+    font->DrawString(foot, cx, y0 + h - band + 1, JGETEXT_CENTER);
+    font->SetScale(baseScale);
 }
 
 string GameStateShop::descPurchase(int controlId, bool tiny)

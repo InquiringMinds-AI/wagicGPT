@@ -111,20 +111,32 @@ def keyrune_aliases(force):
             out[s["code"].upper()] = s["keyruneCode"].lower()
     return out
 
-def rasterize(svg_path, png_path, height):
+def rasterize(svg_path, png_path, height, fill):
+    """Glyph rasterized in one flat colour (default white) on transparency, so the
+    engine can tint it at render time (JQuad::SetColor multiplies)."""
     if shutil.which("rsvg-convert"):
-        cmd = ["rsvg-convert", "-h", str(height), "-o", png_path, svg_path]
+        css = svg_path + ".css"
+        with open(css, "w") as f:
+            f.write("svg, path, polygon, circle, rect { fill: %s !important; stroke: none; }\n" % fill)
+        cmd = ["rsvg-convert", "--stylesheet", css, "-h", str(height), "-o", png_path, svg_path]
     elif shutil.which("magick"):
-        cmd = ["magick", "-background", "none", "-density", "300", svg_path, "-resize", "x%d" % height, png_path]
+        css = None
+        cmd = ["magick", "-background", "none", "-density", "300", svg_path, "-resize", "x%d" % height,
+               "-fill", fill, "-colorize", "100%", png_path]
     else:
         sys.exit("need rsvg-convert or ImageMagick (magick) to rasterize SVG")
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        if css and os.path.exists(css):
+            os.remove(css)
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--res-sets", default=DEF_RES_SETS, help="Res/sets dir (set codes = subdirs)")
     ap.add_argument("--pool", default=DEF_POOL_BASE, help="User/sets pool dir (output)")
     ap.add_argument("--height", type=int, default=64, help="PNG height in px (default 64)")
+    ap.add_argument("--fill", default="#ffffff", help="glyph colour (default white; the engine tints at render time)")
     ap.add_argument("--sets", default="", help="comma-separated whitelist of set codes")
     ap.add_argument("--no-keyrune", action="store_true", help="Scryfall only")
     ap.add_argument("--force", action="store_true", help="re-fetch indexes and overwrite existing symbol.png")
@@ -189,7 +201,7 @@ def main():
         with open(svg_path, "wb") as f:
             f.write(svg)
         try:
-            rasterize(svg_path, png, a.height)
+            rasterize(svg_path, png, a.height, a.fill)
         except subprocess.CalledProcessError:
             misses.append("%s\trasterize failed (%s)" % (code, src)); os.remove(svg_path); continue
         os.remove(svg_path)
