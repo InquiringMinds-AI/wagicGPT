@@ -1,0 +1,33 @@
+#W62-Y (D3) - the OTHER half of the same binding, and the one the wave-61
+#deck162 record actually showed. Exquisite Blood + Sanguine Bond are on the
+#OPPONENT's battlefield; the pilot's own punisher damage takes the OPPONENT's
+#life. Their Exquisite Blood reads "whenever an OPPONENT loses life" - its
+#opponent is the pilot, who lost nothing - so the pair does not fire and the
+#pilot's total is untouched. That is rules-correct, and it is what `162v126`
+#seq 52-55 recorded (opp 20 -> 0 with my_life pinned).
+#
+#It is therefore the LOOP CAUTION narration, not the trigger, that was false:
+#the caution rode a line whose number is life THEY lose, which enters a loop of
+#theirs nowhere. See loopCautionForLine / loopNonChainingClause in
+#AIPlayerGPT.cpp and the #W62-Y D3 PARSETEST cases.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+life:20
+[PLAYER2]
+inplay:Exquisite Blood,Sanguine Bond
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lightning Bolt
+life:20
+[PLAYER2]
+inplay:Exquisite Blood,Sanguine Bond
+life:17
+[END]

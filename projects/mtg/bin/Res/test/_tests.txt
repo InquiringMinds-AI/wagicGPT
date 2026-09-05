@@ -1357,3 +1357,6 @@ intrepid_adversary_repeated_payment.txt
 w60_stack_pending_damage_total.txt
 w60Q_reveal_gate_foreign_chooser.txt
 w61R_stack_anytarget_total.txt
+w62y_lifelost_damage_fires.txt
+w62y_lifelost_damage_wrong_side.txt
+w62y_announce_x_cancel_keeps_card.txt

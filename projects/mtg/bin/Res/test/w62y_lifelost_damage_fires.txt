@@ -1,0 +1,36 @@
+#W62-Y (D3) - the wave-61 deck162 HIGH-1 ledger entry claimed the engine's
+#`@lifelostfoeof(player)` trigger (Exquisite Blood, mtg.txt:37966) does NOT fire
+#on damage-based life loss. It DOES. Oracle (Scryfall 2026-09-05,
+#/cards/named?exact=Exquisite%20Blood): "Whenever an opponent loses life, you
+#gain that much life." - and damage IS life loss.
+#
+#Mechanism: Damage::resolve raises WEventLife(-damage, fromDamage=true) for a
+#player target (Damage.cpp), and TrLifeGained (AllAbilities.h) filters on the
+#SIGN of the amount and on the two side flags only - it never looks at
+#fromDamage. This fixture is the pin for that binding: no engine change ships
+#for D3, so it is GREEN on base by design and exists so a future wave cannot
+#quietly break the half the ledger accused.
+#
+#P1 holds Exquisite Blood and bolts P2. P2 (an opponent of P1) loses 3, so P1
+#gains 3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Exquisite Blood
+hand:Lightning Bolt
+manapool:{R}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Exquisite Blood
+graveyard:Lightning Bolt
+life:23
+[PLAYER2]
+life:17
+[END]

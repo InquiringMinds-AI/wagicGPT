@@ -376,9 +376,13 @@ private:
     //453 s and 367 s of full-turn monologue over a decision with one right
     //answer. It suppresses the REQUEST, never the parse: a plan the model
     //volunteers anyway is still consumed and carried.
+    //#W62-Y (D5): `declineRowOffered` says this ask's LAST row is a decline the
+    //caller appended (CHOOSE_MENU's "Decline - do nothing", the X announcement's
+    //cancel). kNoPassRowFact - "(this ask has no pass row)" - is false on such a
+    //menu, and the seat reads that line as the reason it must take something.
     int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true,
                  const string& pendingSourceName = string(), bool askEvenIfSingle = false,
-                 bool suppressPlanRequest = false);
+                 bool suppressPlanRequest = false, bool declineRowOffered = false);
     std::map<string, int> mAskCache;
     // audit-M (#W54-M): wave-54 audit lane M members (A17/A19/A21/L8) - see
     // strategy-design/wave54/lane-M.md. WAGIC_GPT_AUDIT_M_OFF=1 disables every

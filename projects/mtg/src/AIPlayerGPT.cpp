@@ -288,6 +288,9 @@ const char * kCastAnsweredFact =
 //ask, all of which have no pass row (a 0 through that seam has only ever been
 //a fallback).
 const char * kNoPassRowFact = "(this ask has no pass row)";
+//#W62-Y (D5): the other face - a menu whose LAST row IS a decline the caller
+//appended. Same channel, same shape, so the guides' key still finds it.
+const char * kDeclineRowFact = "(the LAST row of this menu declines: it is a real answer, not a fallback)";
 //#W50-Y D10 (ii): under a carried plan on a TARGET window, when the plan's
 //named target is not among the rows. A statement about this list only.
 const char * kPlanTargetAbsentNote = "(your plan's target is not on this window)\n";
@@ -17088,6 +17091,51 @@ string loopCautionClause(const string& converter, const string& mirror, bool the
     return o.str();
 }
 
+//#W62-Y (D3) - the wave-61 deck162 HIGH-1 record, re-diagnosed. The claim on
+//the ledger was that `@lifelostfoeof(player)` (Exquisite Blood) does not fire
+//on damage-based life loss. It does: verified on this branch with two suite
+//fixtures (`w62y_lifelost_damage_fires.txt`, `w62y_lifelost_damage_wrong_side.txt`)
+//against the engine as it stands - a Lightning Bolt at the mirror-holder's
+//OPPONENT gains the mirror-holder exactly 3, and the same bolt aimed at a
+//mirror-holder who is the OPPONENT gains them nothing. Oracle (Scryfall
+//2026-09-05, /cards/named?exact=Exquisite%20Blood): "Whenever an opponent loses
+//life, you gain that much life." Both halves of the engine binding are
+//rules-correct, so nothing is owed on the engine side.
+//
+//What was false was the caution's BINDING. A loop held by player H is entered
+//from exactly two places: H GAINS life, or H's OPPONENT LOSES life. On
+//`162v126` seq 52 the caution ("any life you pay is fatal") stood on the
+//THEIR-draw-step forecast, whose number is life the OPPONENT loses to the
+//pilot's own punishers - a number that enters THEIR loop nowhere, because
+//their mirror reads "whenever an OPPONENT loses life". The seat that believed
+//it would have stopped punishing and passed forever; the review records that
+//this seat only won by disbelieving the sentence.
+//
+//So the same board fact gets the sentence that is true for the number the line
+//carries. Nothing is deleted: the chaining caution still rides every line whose
+//number CAN enter the chain, and the line whose number cannot now says so and
+//names the two entries that can. Pure over the two names, so PARSETEST proves
+//both faces.
+string loopNonChainingClause(const string& converter, const string& mirror, bool theirs)
+{
+    if (converter.empty() || mirror.empty())
+        return "";
+    std::ostringstream o;
+    if (theirs)
+        o << " LOOP SCOPE: they control BOTH halves of a life LOOP (" << converter
+          << " + " << mirror << "), and THIS number does not enter it - " << mirror
+          << " gains THEM life when an OPPONENT of theirs (you) loses life, and this"
+             " number is life THEY lose. Their chain starts only from life YOU lose"
+             " or life THEY gain.";
+    else
+        o << " LOOP SCOPE: you control BOTH halves of a life LOOP (" << converter
+          << " + " << mirror << "), and THIS number does not enter it - " << mirror
+          << " gains YOU life when an OPPONENT of yours (them) loses life, and this"
+             " number is life YOU lose. Your chain starts only from life THEY lose"
+             " or life YOU gain.";
+    return o.str();
+}
+
 //#W60-N (B6, wave-59 deck152 #4): the warning arrived one decision AFTER the
 //loop closed. `152v126` carried Exquisite Blood on the opponent's battlefield
 //and `Cards you have seen in the opponent's hand: Sanguine Bond` in the same
@@ -17256,6 +17304,30 @@ static string loopCautionForBoards(Player * me, Player * opp)
     if (s.empty())
         s = loopCautionClause(myConv, myMir, false);
     return s;
+}
+
+//#W62-Y (D3): the same two boards, for a line that carries ONE life number.
+//`numberIsYourLoss` says whose life the number takes: true for "your next draw
+//step ... life to the punishers above" (the pilot loses it), false for "their
+//next draw step ... life to you from your punishers above" (the opponent loses
+//it). A loop held by side S is entered by life S's OPPONENT loses; when the
+//number is the loop-holder's OWN loss the chain is not entered, and the line
+//says that instead of the fatal-chain sentence. The opponent's pair is answered
+//first, exactly as loopCautionForBoards does.
+static string loopCautionForLine(Player * me, Player * opp, bool numberIsYourLoss)
+{
+    string myConv, myMir, thConv, thMir;
+    if (me && me->game)
+        loopHalvesInZone(me->game->inPlay, true, myConv, myMir);
+    if (opp && opp->game)
+        loopHalvesInZone(opp->game->inPlay, true, thConv, thMir);
+    if (!thConv.empty() && !thMir.empty())
+        return numberIsYourLoss ? loopCautionClause(thConv, thMir, true)
+                                : loopNonChainingClause(thConv, thMir, true);
+    if (!myConv.empty() && !myMir.empty())
+        return numberIsYourLoss ? loopNonChainingClause(myConv, myMir, false)
+                                : loopCautionClause(myConv, myMir, false);
+    return "";
 }
 
 //#W60-N (B6): the same two predicates over a list of card NAMES the seat has
@@ -19223,6 +19295,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                     && activeSeat == this;
                 out << "\n" << drawStepForecastText(1, extras, theirsPer, loopCaution,
                                                    myDrawNow, life); //#W62-X (D8)
+                //#W62-Y (D3): YOUR draw step under THEIR punishers - the number
+                //is life YOU lose, which is what enters a loop of THEIRS.
+                out << "\n" << drawStepForecastText(1, extras, theirsPer,
+                                                    loopCautionForLine(this, opp, true));
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -19235,6 +19311,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                     && activeSeat == opp;
                 out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer, loopCaution,
                                                         theirDrawNow, opp->life); //#W62-X (D8)
+                //#W62-Y (D3): THEIR draw step under YOUR punishers - the number
+                //is life THEY lose. A loop of theirs is NOT entered by it (the
+                //wave-61 deck162 HIGH-1 false surface); a loop of YOURS is.
+                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer,
+                                                         loopCautionForLine(this, opp, false));
             }
         }
     }
@@ -19713,6 +19794,9 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 8, "{spends ") == 0)
                 //#W51-F D11: the feeds count is decision-time pricing, not history.
                 || (in.compare(i, 8, "{feeds: ") == 0)
+                //#W62-Y (D7): the pay-repeat row's bill is decision-time pricing -
+                //true while the menu is open, false the moment it is paid.
+                || (in.compare(i, 14, "{repeat cost: ") == 0)
                 //#W52-K D7 / D11: the life-cost and from-exile clauses are decision-time pricing.
                 || (in.compare(i, 23, "{paying this costs you ") == 0)
                 || (in.compare(i, 20, "{castable from exile") == 0)
@@ -26885,7 +26969,7 @@ static string repeatAskKey(int turn, int phase, const string& decision,
 
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsIn, bool narrateChoice,
                           const string& pendingSourceName, bool askEvenIfSingle,
-                          bool suppressPlanRequest)
+                          bool suppressPlanRequest, bool declineRowOffered) //#W62-Y (D5)
 {
     //W35: consume the caller's per-option register lines FIRST, on every exit
     //path, so a set of lines can never leak onto a later, unrelated ask.
@@ -27006,7 +27090,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //row, and a coded 0 here has only ever been a fallback. Say so on the
     //format line (deck123 vs130 seq 31 answered a damage-order ask "CHOICE: 0
     //(Pass)" and the heuristic ordered the damage).
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice " << kNoPassRowFact
+    //#W62-Y (D5): kNoPassRowFact is a claim about THIS menu, and on a menu the
+    //caller gave a decline row it is false. Say which of the two is true; the
+    //row itself is the caller's, this line only stops contradicting it.
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice "
+         << (declineRowOffered ? kDeclineRowFact : kNoPassRowFact)
          << " and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"" << askExemplar(options) << "\" (a worked example of the format using the first option - choose the option YOU want)"
          << planRequestClause(suppressPlanRequest) << " Write nothing else.";
     string tailStr = tail.str();
@@ -29564,6 +29652,102 @@ static bool isAddNCountersOption(const string & optRaw)
         i++;
     return opt.find(" counter", i) == i;
 }
+//#W62-Y (D7, wave-61 deck152 HIGH-3, a vanished combat step). The pay-repeat
+//menu states its partial-pay SEMANTICS (payRepeatModeNote, below) and not one
+//NUMBER: `G2 seq 23/24` rendered "Choose an option for Intrepid Adversary:
+//add 1 counter .. add 20 counters" with no mana line, no total and no
+//`{paying this taps: ...}` clause, the seat answered "add 3 counters", the
+//engine spent 6 more mana - Katilda, Dawnhart Prime and Elite Spellbinder, both
+//creatures - and t11's Attackers step was gone. The guide's #2a stop is built
+//entirely on that clause, so with the clause absent the stop cannot fire.
+//
+//The per-counter price is in the card's OWN script, on the line that names this
+//very option: `choice name(Add 3 counters) thisforeach(variable{3}) ability$!may
+//name(Pay to add counter) pay({1}{W}) ...` (Intrepid Adversary,
+//borderline.txt:57864-57883). Read from there, never guessed: an option whose
+//line carries no `pay(` is left exactly as the engine wrote it. The live menu
+//lowercases its labels (W37 #3), so the match is case-insensitive like every
+//other label matcher on this seam. Pure over the script and the label, so
+//PARSETEST proves it without a board.
+static string payRepeatPerCounterCost(const string& magicText, const string& optionLabel)
+{
+    if (optionLabel.empty() || magicText.empty())
+        return "";
+    const string want = "name(" + toLowerCopy(optionLabel) + ")";
+    const string low = toLowerCopy(magicText);
+    size_t lp = 0;
+    while (lp <= low.size())
+    {
+        size_t nl = low.find('\n', lp);
+        string line = low.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? low.size() + 1 : nl + 1;
+        if (line.find(want) == string::npos)
+            continue;
+        size_t pp = line.find("pay({");
+        if (pp == string::npos)
+            continue;
+        size_t open = pp + 4; //at the '{'
+        size_t close = line.find(')', open);
+        if (close == string::npos || close <= open)
+            continue;
+        return line.substr(open, close - open);
+    }
+    return "";
+}
+
+//#W62-Y (D7): the converted cost of a printed cost string ("{1}{w}" -> 2). A
+//numeric symbol is its number, every other symbol is one. Pure.
+static int manaCostTextCmc(const string& costText)
+{
+    int total = 0;
+    size_t i = 0;
+    while (i < costText.size())
+    {
+        if (costText[i] != '{')
+        {
+            i++;
+            continue;
+        }
+        size_t e = costText.find('}', i);
+        if (e == string::npos)
+            break;
+        string sym = costText.substr(i + 1, e - i - 1);
+        bool numeric = !sym.empty();
+        for (size_t k = 0; k < sym.size(); k++)
+            if (!isdigit((unsigned char) sym[k]))
+                numeric = false;
+        total += numeric ? atoi(sym.c_str()) : 1;
+        i = e + 1;
+    }
+    return total;
+}
+
+//#W62-Y (D7): the row's own bill. `available` is the seat's spendable mana
+//right now (floating pool + untapped producers) or -1 when it could not be
+//computed, in which case the row states the price and claims nothing about what
+//the seat can pay. The "pays for K and stops" half is the partial-pay rule the
+//header already states, applied to THIS row's number. Pure.
+static string payRepeatRowCostTag(int counters, const string& perCost, int perCmc, int available)
+{
+    if (counters <= 0 || perCost.empty() || perCmc <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {repeat cost: " << counters << " x " << perCost << " = " << (counters * perCmc)
+      << " mana for all " << counters;
+    if (available >= 0)
+    {
+        int paid = available / perCmc;
+        if (paid > counters)
+            paid = counters;
+        o << "; you have " << available << " spendable now, which pays for " << paid
+          << " of them";
+        if (paid < counters)
+            o << " and stops";
+    }
+    o << "}";
+    return o.str();
+}
+
 static string payRepeatModeNote(const vector<string>& opts)
 {
     int addModes = 0;
@@ -30016,11 +30200,32 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //a legal and sometimes correct choice, so the question is real even
         //when the answer is forced: it is what puts the commitment in the log
         //and in front of the pilot.
+        //#W62-Y (D5, deck130 HIGH-1): the DECLINE row. `130 s21` offered
+        //`Cast Starstorm {X pricing: your mana affords only X=0 right now, which
+        //deals 0 damage and kills nothing}`; taking it led to `s22`, whose whole
+        //menu was one row (`X = 0 ... this cast does NOTHING: it deals 0 damage
+        //and the spell is spent`) under the header "this ask has no pass row".
+        //The card was unavoidably burned - offered in 7 windows, taken in 1.
+        //The engine has always carried a Cancel row on this menu for the human
+        //(MTGRules arms it with must=false); the decision contract simply never
+        //exposed it (see DecisionContract.cpp #W62-Y (D5)). Nothing is capped and
+        //no window is removed: one more TRUE row, the one that lets an X spell
+        //whose only affordable X does nothing go back to the hand.
+        const size_t xRowCount = shown.size();
+        if (req.canDecline)
+            shown.push_back("Decline - do not cast this after all"
+                            " (the announcement is cancelled and the card stays in your hand)");
         int pick = askModel(announceXHeader(ctx ? ctx->getDisplayName() : string("this spell"), capX),
-                            shown, true, ctx ? ctx->getDisplayName() : string(), true);
+                            shown, true, ctx ? ctx->getDisplayName() : string(), true,
+                            false, req.canDecline); //#W62-Y (D5)
         if (pick == kChoicePending)
             return kChoicePending;
-        if (pick >= 0 && pick < (int) shown.size())
+        if (req.canDecline && pick == (int) xRowCount)
+        {
+            act.choice = -1; //applyMenuChoice clicks the menu's own Cancel row
+            return 0;
+        }
+        if (pick >= 0 && pick < (int) xRowCount)
             pick = (int) req.optionTexts.size() - 1 - pick; //shown space -> index==X space
         else if (pick < 0)
             pick = AIPlayerBaka::selectMenuOption(); //heuristic: max affordable X
@@ -30817,6 +31022,76 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //detection runs on the clean engine labels (req.optionTexts), and the
     //note is header-only (options and the staleness key untouched).
     decision += payRepeatModeNote(req.optionTexts);
+    //#W62-Y (D7, deck152 HIGH-3): the header's semantics, now with the row's own
+    //NUMBER. Read off the card's own script (payRepeatPerCounterCost) and the
+    //seat's spendable mana, and - where paying the affordable share draws on
+    //CREATURES - the same `{paying this taps: ...}` clause every priced cast row
+    //carries, which is the clause the guide's combat stop is built on.
+    //Presentation only: req.optionTexts (the staleness key), the option ORDER
+    //and the answer index are untouched.
+    {
+        int addRows = 0;
+        for (size_t i = 0; i < req.optionTexts.size(); i++)
+            if (isAddNCountersOption(req.optionTexts[i]))
+                addRows++;
+        if (addRows >= 2 && ctx)
+        {
+            int avail = getManaPool() ? getManaPool()->getConvertedCost() : 0;
+            {
+                GptManaPolicy repeatPolicy(this);
+                avail += ManaEngine::potentialColorReach(this, repeatPolicy, NULL);
+            }
+            const bool beforeAttack = observer->currentPlayer == this
+                && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+            const bool blockStillMatters = observer->currentPlayer == this
+                || observer->getCurrentGamePhase() < MTG_PHASE_COMBATBLOCKERS;
+            for (size_t i = 0; i < opts.size() && i < req.optionTexts.size(); i++)
+            {
+                if (!isAddNCountersOption(req.optionTexts[i]))
+                    continue;
+                const int n = atoi(req.optionTexts[i].c_str() + 4);
+                const string per = payRepeatPerCounterCost(ctx->magicText, req.optionTexts[i]);
+                const int perCmc = manaCostTextCmc(per);
+                if (n <= 0 || per.empty() || perCmc <= 0)
+                    continue; //a row this parse cannot account for keeps the engine's own text
+                opts[i] += payRepeatRowCostTag(n, per, perCmc, avail);
+                int paid = avail / perCmc;
+                if (paid > n)
+                    paid = n;
+                if (paid <= 0)
+                    continue;
+                ManaCost * bill = NULL;
+                for (int k = 0; k < paid; k++)
+                    bill = ManaCost::parseManaCost(per, bill, ctx);
+                if (!bill)
+                    continue;
+                //Only where the FLOATING pool cannot already cover it - the same
+                //guard the cast row's clause rides; mana already in the pool taps
+                //nothing.
+                if (!getManaPool()->canAfford(bill, ctx->has(Constants::ANYTYPEOFMANAABILITY)))
+                {
+                    vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
+                        this, ctx, bill, ctx->has(Constants::ANYTYPEOFMANAABILITY), false);
+                    std::set<MTGCardInstance *> seenSrc;
+                    std::vector<std::string> taps;
+                    std::vector<int> tapRestrict;
+                    for (size_t pi = 0; pi < picks.size(); pi++)
+                    {
+                        MTGCardInstance * ps = picks[pi] ? picks[pi]->source : NULL;
+                        if (!ps || !seenSrc.insert(ps).second)
+                            continue;
+                        if (!ps->isCreature())
+                            continue;
+                        taps.push_back(ps->getDisplayName() + instanceHandle(ps)
+                                       + animatedThisTurnNote(ps));
+                        tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
+                    }
+                    opts[i] += paymentTapsClause(taps, tapRestrict);
+                }
+                SAFE_DELETE(bill);
+            }
+        }
+    }
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -30852,7 +31127,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                    << " display-toggle (Flip Side) row(s) from the menu; the back-face land row is offered");
         opts.swap(shownOpts);
     }
-    int pick = askModel(decision, opts, true, ctxName);
+    int pick = askModel(decision, opts, true, ctxName, false, false, req.canDecline); //#W62-Y (D5)
     if (pick == kChoicePending)
         return kChoicePending;
     //Back into the engine's index space before any use of `pick`.
@@ -56929,6 +57204,135 @@ static const char * kW50Y_r94 =
             CHECK(menu[0].find("- DIES} {removes 2 from the CRACK-BACK total above") != string::npos,
                   "#W62-X D19 echo shape: the clause is its own brace group after the verdict");
         }
+    }
+
+    // ================= wave-62 lane Y =================
+    cout << "\n[W62-Y] D3 loop-caution DIRECTION / D4 sibling-ability ranking keys"
+            " / D5 X-menu decline row / D7 pay-repeat row cost\n";
+    {
+        // ---- D3: the caution rides only the line whose number can enter the chain ----
+        const string conv = "Sanguine Bond #1", mir = "Exquisite Blood #1";
+        const string chainTheirs = loopCautionClause(conv, mir, true);
+        const string scopeTheirs = loopNonChainingClause(conv, mir, true);
+        const string scopeMine   = loopNonChainingClause(conv, mir, false);
+        CHECK(chainTheirs.find(" LOOP CAUTION: they control BOTH halves") == 0,
+              "#W62-Y D3 the chaining caution is unchanged for the line whose number IS their entry");
+        CHECK(scopeTheirs == " LOOP SCOPE: they control BOTH halves of a life LOOP (Sanguine Bond #1 +"
+                             " Exquisite Blood #1), and THIS number does not enter it - Exquisite Blood #1"
+                             " gains THEM life when an OPPONENT of theirs (you) loses life, and this number"
+                             " is life THEY lose. Their chain starts only from life YOU lose or life THEY gain.",
+              "#W62-Y D3 the THEIRS pair on a they-lose number says the chain is not entered, and names both entries");
+        CHECK(scopeMine.find(" LOOP SCOPE: you control BOTH halves") == 0
+                  && scopeMine.find("this number is life YOU lose") != string::npos
+                  && scopeMine.find("life THEY lose or life YOU gain") != string::npos,
+              "#W62-Y D3 the YOURS pair on a you-lose number is the mirror sentence");
+        CHECK(scopeTheirs.find("fatal") == string::npos && scopeTheirs.find("does not stop until") == string::npos,
+              "#W62-Y D3 NEGATIVE the non-chaining sentence makes no fatal-chain claim");
+        CHECK(loopNonChainingClause(conv, "", true).empty()
+                  && loopNonChainingClause("", mir, true).empty()
+                  && loopNonChainingClause("", "", false).empty(),
+              "#W62-Y D3 NEGATIVE one half (or none) is not a loop and says nothing");
+        // The two faces are mutually exclusive on one line, and each rides the
+        // forecast line whose number it is about.
+        std::vector<std::pair<std::string, int> > noExtras;
+        const string theirStep = theirDrawStepForecastText(1, noExtras, 2, scopeTheirs);
+        const string myStep = drawStepForecastText(1, noExtras, 2, chainTheirs);
+        CHECK(theirStep.find("2 life to you from your punishers above.") != string::npos
+                  && theirStep.find(" LOOP SCOPE: they control") != string::npos
+                  && theirStep.find("LOOP CAUTION") == string::npos,
+              "#W62-Y D3 the THEIR-draw-step forecast (life THEY lose) carries the scope sentence, not the caution");
+        CHECK(myStep.find("2 life to the punishers above.") != string::npos
+                  && myStep.find(" LOOP CAUTION: they control") != string::npos
+                  && myStep.find("LOOP SCOPE") == string::npos,
+              "#W62-Y D3 the YOUR-draw-step forecast (life YOU lose) keeps the fatal-chain caution");
+        CHECK(theirDrawStepForecastText(1, noExtras, 2, "").find("LOOP") == string::npos,
+              "#W62-Y D3 NEGATIVE no pair on either board, no loop sentence at all");
+    }
+    {
+        // ---- D4: two sibling abilities of ONE card are TWO ranking keys ----
+        // RED on base: `id` was never initialised and every other field of the
+        // two actions is equal, so the map collapsed them to one key and only
+        // the first rung of Lair of the Hydra's twenty ever reached the menu.
+        // The ids are pinned equal here so the case cannot pass on garbage.
+        char rungOne, rungTwo, oneCard;
+        MTGAbility * abRung1 = reinterpret_cast<MTGAbility *>(&rungOne);
+        MTGAbility * abRung2 = reinterpret_cast<MTGAbility *>(&rungTwo);
+        MTGCardInstance * lair = reinterpret_cast<MTGCardInstance *>(&oneCard);
+        OrderedAIAction a1(NULL, abRung1, lair);
+        OrderedAIAction a2(NULL, abRung2, lair);
+        a1.efficiency = 50; a2.efficiency = 50; //preset: getEfficiency() returns without touching the pointers
+        a1.id = a2.id = 7;
+        RankingContainer rc;
+        rc[a1] = 1;
+        rc[a2] = 1;
+        CHECK(rc.size() == 2,
+              "#W62-Y D4 two equally-rated abilities of ONE card are two ranking keys (Lair of the Hydra's rungs)");
+        OrderedAIAction sameAgain(NULL, abRung1, lair);
+        sameAgain.efficiency = 50; sameAgain.id = 7;
+        rc[sameAgain] = 1;
+        CHECK(rc.size() == 2,
+              "#W62-Y D4 NEGATIVE the SAME ability on the same card is still one key - no row is duplicated");
+        OrderedAIAction fresh(NULL, abRung1, lair);
+        CHECK(fresh.id == 0,
+              "#W62-Y D4 the ranking's first tie-break is initialised, not indeterminate");
+    }
+    {
+        // ---- D5: the two faces of the format line's pass-row claim ----
+        CHECK(string(kNoPassRowFact) == "(this ask has no pass row)",
+              "#W62-Y D5 the mandatory-ask face is unchanged");
+        CHECK(string(kDeclineRowFact)
+                  == "(the LAST row of this menu declines: it is a real answer, not a fallback)",
+              "#W62-Y D5 a menu carrying a decline row says so instead of claiming there is no pass row");
+        CHECK(string(kDeclineRowFact).find("no pass row") == string::npos,
+              "#W62-Y D5 NEGATIVE the decline face does not repeat the claim it replaces");
+    }
+    {
+        // ---- D7: the pay-repeat row's own bill, read off the card's script ----
+        const string adversary =
+            "choice name(Don't add any counter) donothing\n"
+            "choice name(Add 1 counter) thisforeach(variable{1}) ability$!may name(Pay to add counter)"
+            " pay({1}{W}) name(Pay to add counter) all(mysource) oneshot!$ controller\n"
+            "choice name(Add 3 counters) thisforeach(variable{3}) ability$!may name(Pay to add counter)"
+            " pay({1}{W}) name(Pay to add counter) all(mysource) oneshot!$ controller\n";
+        CHECK(payRepeatPerCounterCost(adversary, "add 3 counters") == "{1}{w}",
+              "#W62-Y D7 the per-counter cost comes off the script line that names THIS option (live lowercase label)");
+        CHECK(payRepeatPerCounterCost(adversary, "Add 1 counter") == "{1}{w}",
+              "#W62-Y D7 the script name() capitalisation matches case-insensitively");
+        CHECK(payRepeatPerCounterCost(adversary, "don't add any counter").empty()
+                  && payRepeatPerCounterCost(adversary, "add 7 counters").empty()
+                  && payRepeatPerCounterCost("", "add 3 counters").empty(),
+              "#W62-Y D7 NEGATIVE a row with no pay( on its own line, or no line at all, is priced not at all");
+        CHECK(manaCostTextCmc("{1}{w}") == 2 && manaCostTextCmc("{w}{w}") == 2
+                  && manaCostTextCmc("{4}") == 4 && manaCostTextCmc("") == 0,
+              "#W62-Y D7 the printed cost's converted value");
+        const string tag = payRepeatRowCostTag(3, "{1}{w}", 2, 5);
+        CHECK(tag == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 5 spendable now,"
+                     " which pays for 2 of them and stops}",
+              "#W62-Y D7 the row states the total, the seat's mana, and how far it actually goes");
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, 9)
+                  == " {repeat cost: 3 x {1}{w} = 6 mana for all 3; you have 9 spendable now,"
+                     " which pays for 3 of them}",
+              "#W62-Y D7 a row the seat can pay in full says so without the stop clause");
+        CHECK(payRepeatRowCostTag(3, "{1}{w}", 2, -1)
+                  == " {repeat cost: 3 x {1}{w} = 6 mana for all 3}",
+              "#W62-Y D7 with no mana figure the row prices itself and claims nothing about the seat");
+        CHECK(payRepeatRowCostTag(0, "{1}{w}", 2, 5).empty()
+                  && payRepeatRowCostTag(3, "", 0, 5).empty(),
+              "#W62-Y D7 NEGATIVE no counters or no priced line, no tag");
+        // echo shape: the tag is an annotation - the bare label binds, the whole
+        // echoed row binds, and the tag leaves no residue in the narrated record.
+        vector<string> rm;
+        rm.push_back("add 3 counters" + tag
+                     + " {paying this taps: Katilda, Dawnhart Prime, Elite Spellbinder - they cannot attack this turn}");
+        rm.push_back("don't add any counter");
+        bool rse = false;
+        CHECK(parseChoice("CHOICE: 1 (add 3 counters)", 2, &rm, &rse, NULL) == 1 && !rse,
+              "#W62-Y D7 echo: the bare label binds with the repeat-cost tag on the row");
+        bool rse2 = false;
+        CHECK(parseChoice("CHOICE: 1 (" + rm[0] + ")", 2, &rm, &rse2, NULL) == 1 && !rse2,
+              "#W62-Y D7 echo: a reply copying the whole annotated row binds to 1");
+        CHECK(stripNarrationDecoration(rm[0]) == "add 3 counters",
+              "#W62-Y D7 the repeat-cost and taps tags leave no residue in the narrated record");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

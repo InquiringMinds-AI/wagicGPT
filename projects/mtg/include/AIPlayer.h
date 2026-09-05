@@ -31,7 +31,12 @@ public:
     MTGAbility * ability;
     NestedAbility * nability;
     Player * player;
-    int id;
+    //#W62-Y (D4): `id` is the FIRST tie-break CmpAbilities reads after the
+    //efficiency, and not one constructor below ever set it - every ranking
+    //comparison was reading an indeterminate value. Zero-initialised so the
+    //ordering is defined; the real per-action identity is the ability pointer
+    //and the target fields the comparator now walks.
+    int id = 0;
     MTGCardInstance * click;
     MTGCardInstance * target; // TODO Improve
     vector<Targetable*>mAbilityTargets;
@@ -39,19 +44,19 @@ public:
     //player targeting through abilities is handled completely seperate from spell targeting.
     
     AIAction(AIPlayer * owner, MTGAbility * a, MTGCardInstance * c, MTGCardInstance * t = NULL)
-        : owner(owner), ability(a), player(NULL), click(c), target(t),playerAbilityTarget(NULL)
+        : owner(owner), ability(a), player(NULL), id(0), click(c), target(t),playerAbilityTarget(NULL) //#W62-Y (D4)
     {
     };
 
     AIAction(AIPlayer * owner, MTGCardInstance * c, MTGCardInstance * t = NULL);
 
     AIAction(AIPlayer * owner, Player * p)//player targeting through spells
-        :  owner(owner), ability(NULL), player(p), click(NULL), target(NULL),playerAbilityTarget(NULL)
+        :  owner(owner), ability(NULL), player(p), id(0), click(NULL), target(NULL),playerAbilityTarget(NULL) //#W62-Y (D4)
     {
     };
 
     AIAction(AIPlayer * owner, MTGAbility * a, MTGCardInstance * c, vector<Targetable*>targetCards)
-        :  owner(owner), ability(a), player(NULL), click(c), mAbilityTargets(targetCards),playerAbilityTarget(NULL)
+        :  owner(owner), ability(a), player(NULL), id(0), click(c), mAbilityTargets(targetCards),playerAbilityTarget(NULL) //#W62-Y (D4)
     {
     };
 
@@ -62,7 +67,7 @@ public:
     //base of 166 on 238 of 248 rows (wave-55 ledger D2). Initialize it, and
     //resolve the seat through targetedSeat() below.
     AIAction(AIPlayer * owner, MTGAbility * a, Player * p, MTGCardInstance * c)//player targeting through abilities.
-        : owner(owner), ability(a), player(NULL), click(c),target(NULL), playerAbilityTarget(p)
+        : owner(owner), ability(a), player(NULL), id(0), click(c),target(NULL), playerAbilityTarget(p) //#W62-Y (D4)
     {
     };
     //#W56-B (D2): the ONE resolution of "which player is this action aimed at".

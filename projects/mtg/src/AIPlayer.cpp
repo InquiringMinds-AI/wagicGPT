@@ -19,7 +19,7 @@ int AIPlayer::totalAIDecks = -1;
 //#W56-B (D2): `playerAbilityTarget` was left INDETERMINATE here, so a plain
 //card action could answer a `playerAbilityTarget ?` test with garbage.
 AIAction::AIAction(AIPlayer * owner, MTGCardInstance * c, MTGCardInstance * t)
-    : owner(owner), ability(NULL), player(NULL), click(c), target(t), playerAbilityTarget(NULL)
+    : owner(owner), ability(NULL), player(NULL), id(0), click(c), target(t), playerAbilityTarget(NULL) //#W62-Y (D4)
 {
     bool prefetch = options[Options::CARDPREFETCHING].number?true:false;
     if (prefetch && WResourceManager::Instance()->IsThreaded())

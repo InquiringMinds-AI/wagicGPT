@@ -61,6 +61,18 @@ public:
         int e2 = a2Ptr->getEfficiency();
         if (e1 != e2) return (e1 > e2);
         if (a1Ptr->id != a2Ptr->id) return a1Ptr->id < a2Ptr->id;
+        //#W62-Y (D4): SIBLING ABILITIES of one card were the hole in this
+        //chain. Lair of the Hydra defines twenty animate rungs ({1}{G} 1/1 ..
+        //{20}{G} 20/20, borderline.txt:64293-64312); all twenty score the same
+        //STANDARD_BECOMES efficiency, carry no target and share one click card,
+        //so every field below compared equal and the map collapsed them to ONE
+        //key - the first rung inserted. The wave-61 corpus rendered the animate
+        //row 387 times and every one of them read "becomes a 1/1 hydra
+        //[cost: {1}{g}]", at every mana total, while the row's own card text
+        //said {X}{G}: X/X (deck152 HIGH-2). The ability POINTER is the identity
+        //that separates them; without it the ranking silently drops nineteen
+        //legal activations of a card that is in play.
+        if (a1Ptr->ability != a2Ptr->ability) return a1Ptr->ability < a2Ptr->ability;
         //Same ability, same efficiency: tie-break on the actual action
         //identity. Without this, equally-rated targets of one ability
         //collapse into a single map key and all but one are silently
