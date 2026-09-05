@@ -530,13 +530,17 @@ void GameStateDuel::initRand(unsigned int seed)
 void GameStateDuel::loadTestSuitePlayers()
 {
     if (!testSuite) return;
-    initRand(testSuite->seed);
+    //#W63-AE (E17): the same seed the game runs on drives the process-global
+    //rand() too - previously time(0) whenever the fixture named no seed.
+    initRand(testSuite->suiteSeed());
     SAFE_DELETE(game);
     game = new GameObserver(WResourceManager::Instance(), JGE::GetInstance());
     //The GameObserver ctor reseeds from time(0), which clobbered the test's
     //"seed" directive and made AI chance gates nondeterministic per run.
-    if (testSuite->seed)
-        game->resetSeed(testSuite->seed);
+    //#W63-AE (E17): a fixture with NO seed directive used to keep that clock
+    //seed, so its shuffle and every AI chance gate varied per run. suiteSeed()
+    //falls back to a stable hash of the fixture name instead.
+    game->resetSeed(testSuite->suiteSeed());
     testSuite->setObserver(game);
     for (int i = 0; i < 2; i++)
     {

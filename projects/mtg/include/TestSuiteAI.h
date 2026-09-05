@@ -106,6 +106,11 @@ public:
     string mForcedFailure;
     MTGPlayerCards * buildDeck(Player* player, int playerId);
     GameType getGameType() { return gameType; };
+    //#W63-AE (E17): the seed this game must run on. A fixture's own `seed`
+    //directive when it has one; otherwise a stable hash of its filename -
+    //NEVER the GameObserver ctor's time(0), which made every AI-driven
+    //fixture's outcome a function of the wall clock (see TestSuiteAI.cpp).
+    unsigned int suiteSeed() const;
     string getNextAction();
     Interruptible * getActionByMTGId(int mtgid);
     static int Log(const char * text);

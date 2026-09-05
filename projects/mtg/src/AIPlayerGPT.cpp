@@ -29362,8 +29362,20 @@ static string landGateSubtypeLabel(const string& lc)
 //1 = enters untapped, 0 = enters tapped, -1 = not decidable here. `witness` is
 //parallel to gate.subtypes and names a permanent carrying that type ("" = none).
 //Pure.
+//#W63-AE (E8): the granted-type disclosure. A land can carry a gate subtype it
+//does NOT print - Urborg, Tomb of Yawgmoth makes every land a Swamp, and the
+//wave-62 engine seat read two such rows (`you control Isolated Chapel, a Swamp`
+//with Urborg out, `you control Savannah, a Swamp` likewise) as false witnesses.
+//They are legal witnesses; what was missing is that the type is on the
+//BATTLEFIELD, not on the card, so a pilot checking the reason against the card
+//found nothing and had to distrust the verdict. Two changes, no verdict moves:
+//a witness whose PRINTED types carry the subtype is preferred over one that
+//only has it now, and a granted-only witness says so.
+static const char * kLandGateGrantedNote =
+    " - a type it has on the battlefield now, not one printed on the card";
 static int landTapResolve(const LandTapGate& g, int myLands,
-                          const vector<string>& witness, string * evidence)
+                          const vector<string>& witness, string * evidence,
+                          const vector<char> * witnessPrinted = NULL)
 {
     if (!g.found || !g.conditional)
         return -1;
@@ -29371,12 +29383,25 @@ static int landTapResolve(const LandTapGate& g, int myLands,
     {
         if (g.subtypes.empty() || witness.size() != g.subtypes.size())
             return -1;
-        for (size_t i = 0; i < witness.size(); i++)
-            if (!witness[i].empty())
+        //A witness whose own card prints the subtype first: it is the one the
+        //pilot can check. Only when none exists does a granted one speak, and
+        //then it names the reason it can be checked by.
+        for (int pass = 0; pass < 2; pass++)
+            for (size_t i = 0; i < witness.size(); i++)
             {
+                if (witness[i].empty())
+                    continue;
+                const bool printed = witnessPrinted && i < witnessPrinted->size()
+                                     ? (*witnessPrinted)[i] != 0 : true;
+                if (pass == 0 && !printed)
+                    continue;
                 if (evidence)
+                {
                     *evidence = "you control " + witness[i] + ", a "
                                 + landGateSubtypeLabel(g.subtypes[i]);
+                    if (!printed)
+                        *evidence += kLandGateGrantedNote;
+                }
                 return 1;
             }
         if (evidence)
@@ -29445,11 +29470,12 @@ string landEntersTappedTag(const string& script, const string& printedText)
 //land-drop row runs, so the corpus proves what the row prints. Non-static: it
 //is the PARSETEST entry point for the resolved shapes.
 string landTapTagFor(const string& script, const string& printedText, int myLands,
-                     const vector<string>& witness)
+                     const vector<string>& witness,
+                     const vector<char> * witnessPrinted = NULL)
 {
     const LandTapGate g = landTapGateScan(script);
     string ev;
-    const int res = landTapResolve(g, myLands, witness, &ev);
+    const int res = landTapResolve(g, myLands, witness, &ev, witnessPrinted);
     return landEntersTappedTagFrom(g, printedText, res, ev);
 }
 
@@ -29465,10 +29491,12 @@ static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
         return "";
     int myLands = -1;
     vector<string> witness;
+    vector<char> witnessPrinted;
     if (me && me->game && me->game->inPlay)
     {
         myLands = 0;
         witness.assign(g.subtypes.size(), string());
+        witnessPrinted.assign(g.subtypes.size(), (char) 0);
         vector<int> ids(g.subtypes.size(), 0);
         for (size_t s = 0; s < g.subtypes.size(); s++)
             ids[s] = MTGAllCards::findType(g.subtypes[s], false);
@@ -29479,12 +29507,25 @@ static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
                 continue;
             myLands++;
             for (size_t s = 0; s < ids.size(); s++)
-                if (witness[s].empty() && ids[s] && c->hasType(ids[s]))
+            {
+                if (!ids[s] || !c->hasType(ids[s]))
+                    continue;
+                //#W63-AE (E8): PRINTED means the card's own primitive carries
+                //the subtype; the instance can carry it from a live grant
+                //(Urborg's `lord(land) transforms((swamp))`). A printed witness
+                //replaces a granted one, never the other way round.
+                const bool printed = c->model && c->model->data
+                                     && c->model->data->hasType(ids[s]);
+                if (witness[s].empty() || (printed && !witnessPrinted[s]))
+                {
                     witness[s] = c->getDisplayName();
+                    witnessPrinted[s] = printed ? (char) 1 : (char) 0;
+                }
+            }
         }
     }
     string evidence;
-    const int res = landTapResolve(g, myLands, witness, &evidence);
+    const int res = landTapResolve(g, myLands, witness, &evidence, &witnessPrinted);
     return landEntersTappedTagFrom(g, land->text, res, evidence);
 }
 
@@ -31265,6 +31306,32 @@ static string payRepeatRowCostTag(int counters, const string& perCost, int perCm
     return o.str();
 }
 
+//#W63-AE (E18, D7's missing half): the taps clause on a REPEAT row. On a cast
+//row "{paying this taps: ...}" is unambiguous - there is one payment. On a
+//pay-repeat row the seat asked for `counters` payments and the engine will only
+//make the `paid` of them the mana covers, so the bare clause let "this" read as
+//all of them: the row would name two creatures while the same row's
+//{repeat cost:} half said the mana stops after two of twenty. The two halves are
+//fed the SAME `paid`, and where it is short of the ask the clause says which
+//number it is pricing, so the mana half and the taps half cannot disagree.
+//Prefix and brace shape are unchanged (stripNarrationDecoration keys on
+//"{paying this taps: "). Pure over its four arguments.
+static string payRepeatTapsClause(const std::vector<std::string>& names,
+                                  const std::vector<int>& restrictions,
+                                  int paid, int counters)
+{
+    string clause = paymentTapsClause(names, restrictions);
+    if (clause.empty() || paid <= 0 || counters <= 0 || paid >= counters)
+        return clause;
+    const size_t close = clause.rfind('}');
+    if (close == string::npos)
+        return clause;
+    std::ostringstream scope;
+    scope << " (that is the " << paid << " payment" << (paid == 1 ? "" : "s")
+          << " your mana covers, not all " << counters << ")";
+    return clause.substr(0, close) + scope.str() + "}";
+}
+
 static string payRepeatModeNote(const vector<string>& opts)
 {
     int addModes = 0;
@@ -32638,7 +32705,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                        + animatedThisTurnNote(ps));
                         tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
                     }
-                    opts[i] += paymentTapsClause(taps, tapRestrict);
+                    opts[i] += payRepeatTapsClause(taps, tapRestrict, paid, n); //#W63-AE (E18)
                 }
                 SAFE_DELETE(bill);
             }
@@ -59366,6 +59433,149 @@ static const char * kW50Y_r94 =
               "#W62-Y D7 echo: a reply copying the whole annotated row binds to 1");
         CHECK(stripNarrationDecoration(rm[0]) == "add 3 counters",
               "#W62-Y D7 the repeat-cost and taps tags leave no residue in the narrated record");
+    }
+
+    //================= WAVE-63 LANE AE =================
+    cout << "\n[#W63-AE E8] the land-drop witness says whether the subtype is PRINTED or GRANTED\n";
+    {
+        //Woodland Cemetery, mtg.txt:135398-135403 (gate {swamp, forest}); the
+        //witnesses are the wave-62 corpus's own board (Bayou subtype=Swamp
+        //Forest mtg.txt:9923-9925, Savannah subtype=Forest Plains 99480-99482,
+        //Isolated Chapel with no subtype= line at all 59410-59415). Urborg,
+        //Tomb of Yawgmoth is what grants the Swamp the last two carry.
+        const string cemScript =
+            "aslongas(swamp,forest|myBattlefield) tap(noevent) <1 oneshot\n{T}:Add{B}\n{T}:Add{G}";
+        const string cemText =
+            "Woodland Cemetery enters tapped unless you control an Swamp or Forest."
+            " -- {T}: Add {B} or {G}.";
+        // (a) PRINTED witness: byte-identical to the wave-62 string. No note.
+        vector<string> wPrinted;      //parallel to {swamp, forest}
+        wPrinted.push_back("Bayou");
+        wPrinted.push_back("");
+        vector<char> pPrinted(2, (char) 1);
+        const string printedTag = landTapTagFor(cemScript, cemText, 4, wPrinted, &pPrinted);
+        CHECK(printedTag == " [enters UNTAPPED - it makes mana this turn (you control Bayou,"
+                            " a Swamp): \"Woodland Cemetery enters tapped unless you control"
+                            " an Swamp or Forest.\"]",
+              "#W63-AE E8 POSITIVE a witness whose own card prints the subtype reads exactly as it did in wave 62");
+        CHECK(printedTag.find("not one printed on the card") == string::npos,
+              "#W63-AE E8 NEGATIVE a printed witness never carries the granted note");
+        // (b) GRANTED-ONLY witness: same verdict, and it says where the type is.
+        vector<string> wGranted;
+        wGranted.push_back("Savannah");
+        wGranted.push_back("");
+        vector<char> pGranted(2, (char) 0);
+        const string grantedTag = landTapTagFor(cemScript, cemText, 4, wGranted, &pGranted);
+        CHECK(grantedTag.find("(you control Savannah, a Swamp - a type it has on the"
+                              " battlefield now, not one printed on the card)") != string::npos,
+              "#W63-AE E8 POSITIVE 126v146 seq 64: the Urborg-granted Swamp is named AS granted,"
+              " so a pilot checking Savannah's card is not reading a false reason");
+        CHECK(grantedTag.find("enters UNTAPPED - it makes mana this turn") != string::npos,
+              "#W63-AE E8 the granted witness is still a legal witness - the VERDICT does not move");
+        // (c) PRINTED beats GRANTED: the Plains-typed nonbasic against the
+        //     same-named land that only has the type now. Bayou prints Swamp,
+        //     Isolated Chapel does not; with both out the row names Bayou.
+        vector<string> wMixed;
+        wMixed.push_back("Bayou");            //slot 0 (swamp) - printed
+        wMixed.push_back("Isolated Chapel");  //slot 1 (forest) - granted only
+        vector<char> pMixed;
+        pMixed.push_back((char) 1);
+        pMixed.push_back((char) 0);
+        CHECK(landTapTagFor(cemScript, cemText, 4, wMixed, &pMixed)
+                  .find("(you control Bayou, a Swamp)") != string::npos,
+              "#W63-AE E8 with both kinds on the board the row names the checkable one");
+        vector<string> wFlip;
+        wFlip.push_back("Isolated Chapel");   //slot 0 (swamp) - granted only
+        wFlip.push_back("Bayou");             //slot 1 (forest) - printed
+        vector<char> pFlip;
+        pFlip.push_back((char) 0);
+        pFlip.push_back((char) 1);
+        CHECK(landTapTagFor(cemScript, cemText, 4, wFlip, &pFlip)
+                  .find("(you control Bayou, a Forest)") != string::npos,
+              "#W63-AE E8 the preference is for a PRINTED witness, not for the gate's first selector"
+              " (126v125 seq 152 named the first slot's granted card)");
+        // Callers that hand in no flags keep the wave-62 behaviour byte for byte.
+        vector<string> wNoFlags;
+        wNoFlags.push_back("Bayou");
+        wNoFlags.push_back("");
+        CHECK(landTapTagFor(cemScript, cemText, 4, wNoFlags) == printedTag,
+              "#W63-AE E8 NEGATIVE with no printed/granted information the row claims nothing new");
+        // RESOLVED-FALSE and the hedge are untouched by this change.
+        vector<string> wNone(2, string());
+        vector<char> pNone(2, (char) 0);
+        CHECK(landTapTagFor(cemScript, cemText, 4, wNone, &pNone)
+                  .find("enters TAPPED - it makes no mana this turn (you control no Swamp"
+                        " and no Forest)") != string::npos,
+              "#W63-AE E8 NEGATIVE with no witness at all the row still reads TAPPED and names what is missing");
+        // echo shape: the bracket is an annotation - the bare row binds and it
+        // strips out of the narrated record.
+        vector<string> lm;
+        lm.push_back("Play Woodland Cemetery" + grantedTag);
+        lm.push_back("Play no land right now");
+        bool lse = false;
+        CHECK(parseChoice("CHOICE: 1 (Play Woodland Cemetery)", 2, &lm, &lse, NULL) == 1 && !lse,
+              "#W63-AE E8 echo: the bare row binds with the granted-witness bracket on it");
+        CHECK(stripNarrationDecoration(lm[0]) == "Play Woodland Cemetery",
+              "#W63-AE E8 the granted-witness bracket leaves no residue in the narrated record");
+    }
+
+    cout << "\n[#W63-AE E18] the pay-repeat taps clause prices the payments the mana half priced\n";
+    {
+        //D7's missing half. The board is the one the fixture composes:
+        //Intrepid Adversary's {1}{W} per counter with Katilda, Dawnhart Prime
+        //and Elite Spellbinder as the creature producers the payment taps -
+        //both untapped ATTACKERS on the seat's own pre-combat main.
+        std::vector<std::string> taps;
+        taps.push_back("Katilda, Dawnhart Prime");
+        taps.push_back("Elite Spellbinder");
+        std::vector<int> rest(2, (int) TAP_RESTRICT_NO_ATTACK);
+        // (a) POSITIVE - the payment taps attackers and the row can only afford
+        //     2 of the 3 asked for: the clause names the number it is pricing.
+        const string shortClause = payRepeatTapsClause(taps, rest, 2, 3);
+        CHECK(shortClause == " {paying this taps: Katilda, Dawnhart Prime, Elite Spellbinder"
+                             " - they cannot attack this turn"
+                             " (that is the 2 payments your mana covers, not all 3)}",
+              "#W63-AE E18 POSITIVE the taps clause renders for a payment that taps attackers,"
+              " and scopes itself to the affordable share");
+        // (b) the two halves AGREE: the K the mana half prints is the K the
+        //     taps half prices, on the same row, from the same argument.
+        const string costHalf = payRepeatRowCostTag(3, "{1}{w}", 2, 5, 2);
+        CHECK(costHalf.find("which pays for 2 of them and stops") != string::npos
+                  && shortClause.find("that is the 2 payments your mana covers") != string::npos,
+              "#W63-AE E18 D7's mana half and taps half name the SAME payment count on one row");
+        // (c) MUST-NOT-MATCH - a row whose mana covers the whole ask says
+        //     nothing about a share, and is byte-identical to the cast-row clause.
+        CHECK(payRepeatTapsClause(taps, rest, 3, 3) == paymentTapsClause(taps, rest)
+                  && payRepeatTapsClause(taps, rest, 3, 3).find("not all") == string::npos,
+              "#W63-AE E18 NEGATIVE a fully affordable row keeps the wave-62 clause byte for byte");
+        CHECK(payRepeatTapsClause(taps, rest, -1, 3) == paymentTapsClause(taps, rest)
+                  && payRepeatTapsClause(taps, rest, 2, 0) == paymentTapsClause(taps, rest),
+              "#W63-AE E18 NEGATIVE with no payment count the clause claims no share");
+        std::vector<std::string> noTaps;
+        std::vector<int> noRest;
+        CHECK(payRepeatTapsClause(noTaps, noRest, 2, 3).empty(),
+              "#W63-AE E18 NEGATIVE a payment that taps no creature prints no clause at all");
+        // (d) one payment, singular, and a non-attack restriction still rides it
+        std::vector<std::string> one;
+        one.push_back("Overgrown Battlement");
+        std::vector<int> oneRest(1, (int) TAP_RESTRICT_NO_BLOCK);
+        CHECK(payRepeatTapsClause(one, oneRest, 1, 4)
+                  == " {paying this taps: Overgrown Battlement - it cannot block on their turn"
+                     " (that is the 1 payment your mana covers, not all 4)}",
+              "#W63-AE E18 the per-source restriction register is unchanged and the scope agrees in number");
+        // (e) echo shape - prefix and brace unchanged, so the row still binds
+        //     and both tags strip out of the narrated record.
+        vector<string> em;
+        em.push_back("add 3 counters" + costHalf + shortClause);
+        em.push_back("don't add any counter");
+        bool ese = false;
+        CHECK(parseChoice("CHOICE: 1 (add 3 counters)", 2, &em, &ese, NULL) == 1 && !ese,
+              "#W63-AE E18 echo: the bare label binds with both D7 tags on the row");
+        bool ese2 = false;
+        CHECK(parseChoice("CHOICE: 1 (" + em[0] + ")", 2, &em, &ese2, NULL) == 1 && !ese2,
+              "#W63-AE E18 echo: a reply copying the whole annotated row binds to 1");
+        CHECK(stripNarrationDecoration(em[0]) == "add 3 counters",
+              "#W63-AE E18 the scoped taps clause still strips out of the narrated record");
     }
 
     //================= WAVE-62 LANE Z =================

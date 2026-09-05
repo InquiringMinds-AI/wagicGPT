@@ -121,7 +121,24 @@ static float fastClockDt()
     {
         const char * v = getenv("WAGIC_FASTCLOCK");
         if (!v || !*v)
-            cached = -1.0f; //off
+        {
+            //#W63-AE (E17): the TEST SUITE never gets the wall clock. Its
+            //main-thread path (WAGIC_TESTSUITE_THREADS=1, and the interactive
+            //suite) drove GameObserver::Update with REAL dt, and
+            //AIPlayerBaka::Act is dt-throttled (~0.07s), so how many times the
+            //AI acted between two scripted commands was a function of machine
+            //timing. That is the whole of the
+            //intrepid_adversary_repeated_payment intermittent: with the clock
+            //free the fixture's mana payment tapped a different permutation of
+            //five identical Plains run to run (proven: 20 copies at THREADS=1
+            //gave three different pass/fail vectors on the real clock and three
+            //IDENTICAL ones at WAGIC_FASTCLOCK=0.1). A fixed dt is what the
+            //worker path already has (ThreadProc feeds 1,2,3,...); this gives
+            //the same guarantee to the path a solo run takes. An explicit
+            //WAGIC_FASTCLOCK still wins, and non-suite runs are untouched.
+            const char * suite = getenv("WAGIC_TESTSUITE");
+            cached = (suite && *suite) ? 0.1f : -1.0f;
+        }
         else
         {
             float parsed = (float)atof(v);

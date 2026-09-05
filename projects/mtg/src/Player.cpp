@@ -452,6 +452,16 @@ bool Player::parseLine(const string& s)
             premade = (atoi(s.substr(limiter + 1).c_str())==1);
             return true;
         }
+        else if (areaS.compare("dungeoncompleted") == 0)
+        {
+            //#W63-AE (E12): the completed-dungeon count is real player state
+            //("as long as you've completed a dungeon" payoffs read it through
+            //`variable{pdungeoncompleted}`), but it had no serialised key, so no
+            //fixture could stand a board up in that regime and the Nadaar lord
+            //shape was untestable. Additive: an absent key leaves the ctor's 0.
+            dungeonCompleted = atoi(s.substr(limiter + 1).c_str());
+            return true;
+        }
         else if (areaS.compare("serumexiled") == 0)
         {
             exiledBySerum = atoi(s.substr(limiter + 1).c_str());
