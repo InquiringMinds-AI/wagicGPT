@@ -1,0 +1,29 @@
+#NAME: Primordial Hydra - the upkeep doubling is ONE counter event
+#Oracle (Scryfall, 2026-09-05): "This creature enters with X +1/+1 counters on it. / At the
+#beginning of your upkeep, double the number of +1/+1 counters on this creature. / ... trample ..."
+#`thisforeach(counter{1/1.1}) counter(1/1)` -> `counter(1/1,counter{1/1.1})` (one event of N).
+#Cast for X = 2 with Hardened Scales out: enters with one event of 2 -> 3 counters (3/3).
+#Next upkeep: N = 3 -> ONE event of 3, Scales -> +4 -> 7 counters -> 7/7.
+#RED on the old script: three events of 1, each Scales'd to 2 -> +6 -> 9 counters -> 9/9.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales
+hand:Primordial Hydra
+manapool:{2}{G}{G}
+[PLAYER2]
+[DO]
+Primordial Hydra
+choice 2
+assertpt 3/3 primordial hydra
+goto end
+goto upkeep
+goto end
+goto firstmain
+assertpt 7/7 primordial hydra
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hardened Scales,Primordial Hydra
+[PLAYER2]
+[END]

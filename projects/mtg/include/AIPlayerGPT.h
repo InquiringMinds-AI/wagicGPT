@@ -1507,6 +1507,16 @@ private:
     long mReasoningBudget;
 };
 
+//#W63-AF (R8, wave-63 codex review finding 8): the pending-draw scan, exported
+//so the test suite can pin it directly. It answers "how many cards will the
+//UNRESOLVED stack hand `seat` before it empties" - the quantity every X-draw and
+//cleanup row prices its hand against - and the suite's `assertpendingdraws`
+//command is the only harness that can put a bare DrawAction in front of it.
+class GameObserver;
+class Player;
+class MTGCardInstance;
+int gptStackPendingDrawsFor(GameObserver * observer, Player * seat, MTGCardInstance * exclude);
+
 #endif //WITH_GPT_AI
 
 #endif //_AIPLAYERGPT_H_

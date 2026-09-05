@@ -4030,8 +4030,10 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
 }
 
 //How many cards the UNRESOLVED stack will hand `seat` before it empties.
-static int stackPendingDrawsFor(GameObserver * observer, Player * seat,
-                                MTGCardInstance * exclude)
+//#W63-AF (R8): non-static - `gptStackPendingDrawsFor` below is the suite's door
+//to it, so the fixture pins the SAME function the rows are priced off.
+int stackPendingDrawsFor(GameObserver * observer, Player * seat,
+                         MTGCardInstance * exclude)
 {
     if (!observer || !observer->mLayers || !seat)
         return 0;
@@ -4044,6 +4046,20 @@ static int stackPendingDrawsFor(GameObserver * observer, Player * seat,
         Interruptible * it = (Interruptible *) stack->mObjects[i];
         if (!it || it->state != NOT_RESOLVED)
             continue;
+        //#W63-AF (R8, wave-63 codex review finding 8): a pending draw does not
+        //have to be a StackAbility. ActionStack::addDraw pushes a DrawAction -
+        //its own Interruptible subclass carrying `player` and `nbcards` - and
+        //the StackAbility-only scan returned 0 for it, underpricing the hand an
+        //X-draw row is about by exactly those cards. Same object, same stack,
+        //same question.
+        if (DrawAction * da = dynamic_cast<DrawAction *>(it))
+        {
+            if (exclude && it->source == exclude)
+                continue;
+            if (da->player == seat && da->nbcards > 0)
+                cards += da->nbcards;
+            continue;
+        }
         StackAbility * sa = dynamic_cast<StackAbility *>(it);
         if (!sa || !sa->ability)
             continue;
@@ -11867,9 +11883,22 @@ bool gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs,
     //still opened a wall_miss account and bought a fresh full deadline; it is
     //`empty_reply` (the model said nothing), and the elapsed fraction cannot
     //change what arrived. What remains a wall miss is unchanged: NO status.
+    //#W63-AF (R9, wave-63 codex review finding 9): HEADERS ARE NOT A ROUND TRIP.
+    //`httpStatus != 0` was read as "the server answered", but curl publishes the
+    //status the moment the RESPONSE HEADERS land - a server that sends 200
+    //headers, emits no body and stalls until curl gives up at our own deadline
+    //reports status 200 AND CURLE_OPERATION_TIMEDOUT, and the status excuse then
+    //fired first, so the clock's own verdict was thrown away and the classifier
+    //below renamed a real wall miss `transport_error`. Curl's timeout is the one
+    //fact that cannot mean anything else: WE set that timeout, so code 28 IS the
+    //deadline expiring, whatever arrived before it. Asked before the status.
+    //The wave-62 R8 case is untouched: an empty-bodied 200 that COMPLETED
+    //carries curlCode 0 and is still `empty_reply`, not a wall miss.
+    if (curlCode == kCurlOperationTimedOut)
+        return true;
     if (httpStatus != 0)
-        return false; //the server answered - not the clock
-    if (curlCode > 0 && curlCode != kCurlOperationTimedOut)
+        return false; //the server answered in full - not the clock
+    if (curlCode > 0)
         return false; //transport died of something else (connect, DNS, TLS, reset)
     return elapsedMs * 100 >= timeoutMs * 95;
 }
@@ -15456,13 +15485,24 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         string planAsserted;
         {
             std::vector<string> bothInPlay;
+            //#W63-AF (R5): and the two boards SEPARATELY - an "I control X"
+            //claim is about this seat's battlefield, and the combined list let
+            //the opponent's copy of X make it true.
+            std::vector<string> myInPlay, theirInPlay;
             for (int pi = 0; pi < 2; pi++)
             {
                 Player * bp = observer ? observer->players[pi] : NULL;
                 if (!bp || !bp->game || !bp->game->inPlay)
                     continue;
                 for (int i = 0; i < bp->game->inPlay->nb_cards; i++)
-                    bothInPlay.push_back(bp->game->inPlay->cards[i]->getDisplayName());
+                {
+                    const string dn = bp->game->inPlay->cards[i]->getDisplayName();
+                    bothInPlay.push_back(dn);
+                    if (bp == this)
+                        myInPlay.push_back(dn);
+                    else
+                        theirInPlay.push_back(dn);
+                }
             }
             //The vocabulary MUST include exile: the repro's two enchantments were
             //EXILED (turns 11 and 15), so a walk over library/hand/inPlay/
@@ -15476,7 +15516,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
                 if (az[z])
                     for (int i = 0; i < az[z]->nb_cards; i++)
                         mine.push_back(az[z]->cards[i]->getDisplayName());
-            if (!gptcaveat::planAssertsAbsentPermanent(mCurrentPlan, bothInPlay, mine, planAsserted))
+            if (!gptcaveat::planAssertsAbsentPermanent(mCurrentPlan, bothInPlay, mine, planAsserted,
+                                                      myInPlay, theirInPlay, true)) //#W63-AF (R5)
                 planAsserted.clear();
         }
         if (!planDenied.empty())
@@ -19185,16 +19226,61 @@ static int crackBackTotalOver(Player * opp, int * attackersOut)
 //rides the FLOOR wording, and then surviving the remainder is NOT a promise -
 //the clause says so rather than handing the seat a false all-clear. Pure over
 //the four numbers, so both branches and every silent case are provable.
-static string crackBackReliefClause(int total, int removed, int myLife, bool floorTotal)
+//#W63-AF (R7, wave-63 codex review finding 7): does this body also hold up the
+//REST of that total? The clause subtracts the killed creature's own current
+//power, which is right for a body that only carries itself and wrong for a lord
+//- Goblin King plus two 1/1 tokens reads 6 power, and "6 -> 4" is false because
+//the two tokens go back to 1/1 when the King leaves, for a real total of 2.
+//Recomputing every continuous effect off a hypothetical board is not something
+//this engine can be asked for cheaply; naming the fact is, and the ENGINE
+//already knows it: an ALord keeps a map of the abilities it created, keyed by
+//the creature each one is attached to. If any of those creatures is another
+//body in that same crack-back total, the remainder is BEFORE static effects and
+//the row says so instead of printing a number it cannot stand behind.
+static bool crackBackBodyHoldsUpOthers(MTGCardInstance * dying, Player * opp,
+                                       GameObserver * obs)
+{
+    if (!dying || !opp || !obs || !obs->mLayers || !opp->game || !opp->game->inPlay)
+        return false;
+    ActionLayer * al = obs->mLayers->actionLayer();
+    if (!al)
+        return false;
+    for (size_t i = 0; i < al->mObjects.size(); i++)
+    {
+        ALord * lord = dynamic_cast<ALord *>(al->mObjects[i]);
+        if (!lord || lord->source != dying)
+            continue;
+        for (map<Damageable *, MTGAbility *>::iterator it = lord->abilities.begin();
+             it != lord->abilities.end(); ++it)
+        {
+            MTGCardInstance * other = dynamic_cast<MTGCardInstance *>(it->first);
+            if (!other || other == dying)
+                continue;
+            if (other->controller() != opp)
+                continue;
+            if (crackBackBodyContribution(other) > 0)
+                return true; //it is propping up another body in the same total
+        }
+    }
+    return false;
+}
+static string crackBackReliefClause(int total, int removed, int myLife, bool floorTotal,
+                                    const string& staticSourceName = "")
 {
     if (total <= 0 || removed <= 0 || myLife < 0 || removed > total)
         return "";
     const int after = total - removed;
     std::ostringstream o;
     o << " {removes " << removed << " from the CRACK-BACK total above: " << total
-      << " -> " << after << " - you would be at " << (myLife - after);
+      << " -> " << after;
+    if (!staticSourceName.empty())
+        o << " BEFORE static effects - " << staticSourceName << " is also changing"
+             " the power of their other attackers, and that goes with it, so the"
+             " real total after it dies is not exactly " << after;
+    o << " - you would be at " << (myLife - after);
     if (myLife - after <= 0)
-        o << "; that still KILLS you";
+        o << (staticSourceName.empty() ? "; that still KILLS you"
+                                       : "; that still KILLS you at this figure");
     else if (floorTotal)
         o << ", but that total is a FLOOR, not a ceiling - surviving it is not"
              " guaranteed";
@@ -19424,6 +19510,29 @@ static string blockAssignmentClause(const vector<string>& blockerNames,
 //blockPairMaterialRank's 4/3/2/1 scale (kill and live > neither dies > trade >
 //chump), read only where `can` says the pairing is legal. Bounded passes so a
 //pathological board cannot spin. Pure over the three inputs.
+//#W63-AF (R6, wave-63 codex review finding 6). THE SWAP TEST WAS A SUM.
+//`rank[i1][j2] + rank[i2][j1] > rank[i1][j1] + rank[i2][j2]` ties [4,2] (kill
+//and live, plus a trade - one blocker LOST) with [3,3] (neither blocker dies -
+//none lost), and the strict `>` then keeps the losing pair while the header
+//says the line was chosen for the blockers' material. Ranks are ordinal
+//(4 = kill and live, 3 = neither dies, 2 = trade, 1 = chump), so their sum
+//means nothing; the comparison that matches the words is lexicographic on the
+//pair sorted WORST FIRST - raise the worst outcome first, and only then the
+//better one. On the 4/3/2/1 scale that is exactly "fewest blockers lost
+//first", because every surviving rank (4, 3) is above every dying one (2, 1).
+//The sum is kept only as the last tie-break, so no previously-improving swap
+//is lost. Pure over four ranks, so PARSETEST pins the whole table.
+static bool betterBlockerPair(int a1, int a2, int b1, int b2)
+{
+    const int aLo = a1 < a2 ? a1 : a2, aHi = a1 < a2 ? a2 : a1;
+    const int bLo = b1 < b2 ? b1 : b2, bHi = b1 < b2 ? b2 : b1;
+    if (aLo != bLo)
+        return aLo > bLo;
+    if (aHi != bHi)
+        return aHi > bHi;
+    return (a1 + a2) > (b1 + b2);
+}
+
 static void improveAssignmentMaterial(const vector<vector<char> >& can,
                                       const vector<vector<int> >& rank,
                                       vector<int>& match)
@@ -19468,7 +19577,8 @@ static void improveAssignmentMaterial(const vector<vector<char> >& can,
                     continue;
                 if (j2 >= (int) rank[i1].size() || j1 >= (int) rank[i2].size())
                     continue;
-                if (rank[i1][j2] + rank[i2][j1] > rank[i1][j1] + rank[i2][j2])
+                if (betterBlockerPair(rank[i1][j2], rank[i2][j1],
+                                      rank[i1][j1], rank[i2][j2])) //#W63-AF (R6)
                 {
                     match[i1] = j2;
                     match[i2] = j1;
@@ -21547,10 +21657,21 @@ static string holdRowBenefitClause()
     //text is inside the ask key at both seams, so it carries no number.
     //#W63-AD (E10): the two facts the latch now actually keeps, and the one
     //difference it forgives. The scope sentence is #W62-Z's, byte for byte.
+    //#W63-AF (R2, wave-63 codex review finding 2): SAY WHICH PHASES THAT SPANS.
+    //The wave-63 normalisation forgives the pass row's "(combat comes next this
+    //turn)" clause, so a hold taken in Main 1 is honoured in Main 2 when nothing
+    //else moved - and the sentence above says that only in terms of "a pass row
+    //... naming which step comes next", which the pilot has to decode into a
+    //phase. The review read the un-decoded version as a silent auto-answer of a
+    //legally distinct window. It is not silent once the row names the phases: a
+    //hold taken here is a decision about both of this turn's main phases, and
+    //the pilot can price it as one.
     return string(" {taking this row skips every later window that asks THIS"
                   " SAME question with rows identical to these; a different"
                   " question is still asked. A pass row that differs only by"
-                  " naming which step comes next is the same row}");
+                  " naming which step comes next is the same row, so a hold"
+                  " taken in your first main phase also covers your second main"
+                  " phase while these rows do not change}");
 }
 
 static string holdRowLine()
@@ -24673,7 +24794,12 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                                          cbTotal, cbFloor))
                                     out << crackBackReliefClause(cbTotal,
                                                                  crackBackBodyContribution(dtc),
-                                                                 life, cbFloor);
+                                                                 life, cbFloor,
+                                                                 //#W63-AF (R7)
+                                                                 crackBackBodyHoldsUpOthers(
+                                                                     dtc, opponent(), getObserver())
+                                                                     ? dtc->getDisplayName()
+                                                                     : string());
                             }
                         }
                         else if (dtc->hasType(Subtypes::TYPE_PLANESWALKER) && dtc->counters
@@ -33315,7 +33441,11 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                                 tdesc += crackBackReliefClause(crackTotal,
                                              dtc->controller() == opponent()
                                                  ? crackBackBodyContribution(dtc) : 0,
-                                             life, crackIsFloor);
+                                             life, crackIsFloor,
+                                             //#W63-AF (R7)
+                                             crackBackBodyHoldsUpOthers(dtc, opponent(),
+                                                                        getObserver())
+                                                 ? dtc->getDisplayName() : string());
                         }
                 //#W52-L (D15): the shrink verdict rides the creature target line.
                 if (ptDrop > 0 && !dmgAmount)
@@ -33328,7 +33458,11 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                                 tdesc += crackBackReliefClause(crackTotal,
                                              dtc->controller() == opponent()
                                                  ? crackBackBodyContribution(dtc) : 0,
-                                             life, crackIsFloor);
+                                             life, crackIsFloor,
+                                             //#W63-AF (R7)
+                                             crackBackBodyHoldsUpOthers(dtc, opponent(),
+                                                                        getObserver())
+                                                 ? dtc->getDisplayName() : string());
                         }
                 //#W54-C (D4 part iii): the PLAYER rows of the same ask. They
                 //carried nothing while their creature siblings carried a
@@ -39010,6 +39144,17 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
 //the curve can still make); a card above it is named with its cost and stated
 //as excluded, so nothing is hidden and the reader can check the arithmetic.
 //`beyondCost <= 0` means no such card, and then every byte is as before.
+//#W63-AF (R3): the reach cap the spare verdict compares against - the lands
+//already down plus the land cards still in the hand this ask is about. One more
+//land drop per land card is the ceiling of what this hand can pay for on its
+//own, and it is exactly the quantity the clause below already names ("N lands
+//plus the drops this hand can still make"). Pure over the two counts.
+int spareReachCap(int myLands, int handLandCards)
+{
+    const int m = myLands > 0 ? myLands : 0;
+    const int h = handLandCards > 0 ? handLandCards : 0;
+    return m + h;
+}
 string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCost,
                               const string& beyondName = "", int beyondCost = 0,
                               int reachCap = -1)
@@ -39201,10 +39346,20 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
     int highestHandCost = -1;
     bool haveHandCost = false;
     //#W63-AC (E16): a cost this seat cannot reach is not the demand the next
-    //land drop answers. `reachCap` is the land count plus two more drops - the
-    //review's own suggestion - and a card above it is EXCLUDED from the
+    //land drop answers. A card above the reach cap is EXCLUDED from the
     //comparison and NAMED on the row instead of silently setting the bar.
-    const int reachCap = myLands + 2;
+    //#W63-AF (R3, wave-63 codex review finding 3): AND THE CAP IS COUNTED, NOT
+    //GUESSED. `myLands + 2` was a heuristic with no board fact behind it, and
+    //the clause it feeds already claims to be "what N lands plus the drops this
+    //hand can still make would pay for" - so at eleven lands holding two more,
+    //a legal fourteen-drop was declared out of reach and every land was called
+    //spare. The drops this hand can still make are the LAND CARDS IN IT; that
+    //is the number the sentence has been promising all along.
+    int handLandCards = 0;
+    for (size_t lc = 0; lc < hand.size(); lc++)
+        if (hand[lc] && hand[lc]->hasType(Subtypes::TYPE_LAND))
+            handLandCards++;
+    const int reachCap = spareReachCap(myLands, handLandCards);
     string beyondName;
     int beyondCost = 0;
     for (size_t hc = 0; hc < hand.size(); hc++)
@@ -53690,7 +53845,8 @@ static const char * kW50Y_r94 =
               == " {taking this row skips every later window that asks THIS SAME question"
                  " with rows identical to these; a different question is still asked."
                  " A pass row that differs only by naming which step comes next is the"
-                 " same row}",
+                 " same row, so a hold taken in your first main phase also covers your"
+                 " second main phase while these rows do not change}",
               "#W61-U C14 the benefit clause's literal - the saving the latch now delivers");
         CHECK(holdRowBenefitClause().find("every later window whose rows are identical to these}")
               == string::npos,
@@ -54530,7 +54686,9 @@ static const char * kW50Y_r94 =
         CHECK(rendered == pure + " {taking this row skips every later window that asks THIS"
                                  " SAME question with rows identical to these; a different"
                                  " question is still asked. A pass row that differs only by"
-                                 " naming which step comes next is the same row}", //#W63-AD (E10)
+                                 " naming which step comes next is the same row, so a hold"
+                                 " taken in your first main phase also covers your second"
+                                 " main phase while these rows do not change}", //#W63-AF (R2)
               "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
         // the last-offer and upkeep-animation clauses are on the rendered row too
         {
@@ -60612,8 +60770,14 @@ static const char * kW50Y_r94 =
         // REPRO `125v162` seq 94 (deck125 MED-2): eleven lands down, and all
         // four land rows read "the most expensive card in your hand costs 15"
         // with no {spare: prefix, because Emrakul, the Aeons Torn is on the
-        // list. The reach cap the caller uses is lands + 2 = 13.
-        const string sp = discardSpareLandClause(11, 6, true, "Emrakul, the Aeons Torn", 15, 13);
+        // list.
+        // #W63-AF (R3): the cap the caller passes is now COUNTED - the lands
+        // down plus the land cards still in the hand - not the `lands + 2`
+        // heuristic this case used to pin. Eleven lands and two land cards in
+        // hand is a cap of 13, so the numbers below are unchanged; what changed
+        // is that 13 is now a fact about that hand instead of a constant.
+        const string sp = discardSpareLandClause(11, 6, true, "Emrakul, the Aeons Torn", 15,
+                                                 spareReachCap(11, 2));
         cout << "     " << sp << "\n";
         CHECK(sp.compare(0, 9, " {spare: ") == 0,
               "#W63-AC E16 REPRO eleven lands against a reachable 6-drop top IS spare");
@@ -61016,12 +61180,242 @@ static const char * kW50Y_r94 =
         }
     }
 
+    // ================= #W63-AF: the wave-63 codex review =================
+    {
+        // ---- R2: the hold row states the SPAN the normalisation gives it ----
+        // The wave-63 latch forgives the pass row's "(combat comes next this
+        // turn)" clause, so a Main-1 hold is honoured in Main 2 on an otherwise
+        // byte-identical menu. The row now says which phases that is.
+        cout << "\n[W63-AF] R2 the hold row names the phases its own normalisation spans\n";
+        const string hold = holdRowLine();
+        cout << "     " << hold << "\n";
+        CHECK(hold.find("a hold taken in your first main phase also covers your second"
+                        " main phase while these rows do not change") != string::npos,
+              "#W63-AF R2 POSITIVE the row states the main-1/main-2 span in phase words");
+        CHECK(hold.find("A pass row that differs only by naming which step comes next"
+                        " is the same row") != string::npos,
+              "#W63-AF R2 the wave-63 sentence it qualifies is still there, unchanged");
+        // MUST-NOT-MATCH: the row never promises to span a board change.
+        CHECK(hold.find("whatever changes") == string::npos
+              && hold.find("every later window that asks THIS SAME question with rows"
+                           " identical to these") != string::npos,
+              "#W63-AF R2 MUST-NOT-MATCH the promise is still bounded by the rows");
+        // The identity key is unchanged by the new wording (it is the PASS row
+        // that is normalised, not the hold row).
+        const char * why = "";
+        std::set<string> heldR2;
+        heldR2.insert(castDeclineRow(true));
+        heldR2.insert("Cast Sorin, Lord of Innistrad {2}{B}{B}");
+        vector<string> main2;
+        main2.push_back(castDeclineRow(false));
+        main2.push_back("Cast Sorin, Lord of Innistrad {2}{B}{B}");
+        CHECK(holdStillStands(heldR2, main2, &why) && string(why).empty(),
+              "#W63-AF R2 the main-1 -> main-2 pass row is still the same row");
+        vector<string> moved;
+        moved.push_back(castDeclineRow(false));
+        moved.push_back("Cast Sorin, Lord of Innistrad {2}{B}{B} {right now: drains 3}");
+        CHECK(!holdStillStands(heldR2, moved, &why),
+              "#W63-AF R2 MUST-NOT-MATCH a row whose price moved still re-opens the window");
+    }
+    {
+        // ---- R3: the {spare:} reach cap is COUNTED, not lands + 2 ----
+        // REPRO (the review's own trigger): eleven lands down, a six-drop and a
+        // legal fourteen-mana spell in hand. With three land cards still in the
+        // hand the cap is 14 and the fourteen-drop is IN the comparison, so no
+        // land is called spare. The old cap (lands + 2 = 13) excluded it and
+        // printed {spare: on every land row.
+        cout << "\n[W63-AF] R3 the reach cap is the lands down plus the land cards in hand\n";
+        CHECK(spareReachCap(11, 3) == 14 && spareReachCap(11, 0) == 11
+              && spareReachCap(2, 5) == 7,
+              "#W63-AF R3 POSITIVE the cap is lands-down + land-cards-in-hand");
+        CHECK(spareReachCap(11, 3) != 13,
+              "#W63-AF R3 MUST-NOT-MATCH the wave-63 `lands + 2` heuristic (13) is gone");
+        CHECK(spareReachCap(-4, -2) == 0,
+              "#W63-AF R3 NEGATIVE nonsense counts floor at zero, never a negative cap");
+        // Composed: at the review's board the fourteen-drop sets the bar, so
+        // there is no spare verdict and no exclusion clause at all.
+        const string reach = discardSpareLandClause(11, 14, true, "", 0, spareReachCap(11, 3));
+        cout << "     " << reach << "\n";
+        CHECK(reach.find("spare") == string::npos,
+              "#W63-AF R3 REPRO a reachable fourteen-drop keeps every land off the spare verdict");
+        CHECK(reach.find("NOT counted here") == string::npos,
+              "#W63-AF R3 nothing is excluded once the drops are counted");
+        CHECK(reach == " {you control 11 lands already; the most expensive card in your hand"
+                       " you could still reach costs 14}",
+              "#W63-AF R3 echo shape: the clause is the plain count-and-top, no new bracket");
+        // And with NO land left in hand the same board does read spare - the
+        // verdict is not removed, it is conditioned on a counted fact.
+        CHECK(discardSpareLandClause(11, 6, true, "Emrakul, the Aeons Torn", 15,
+                                     spareReachCap(11, 0)).compare(0, 9, " {spare: ") == 0,
+              "#W63-AF R3 NEGATIVE with no drops left, an out-of-reach card is still excluded");
+    }
+    {
+        // ---- R6: blocker material is lexicographic, not a sum ----
+        // REPRO: ranks [4,2] (kill-and-live plus a trade - one blocker LOST)
+        // against [3,3] (neither blocker dies). Both sum to six, so the old
+        // strict `>` kept the pair that loses a body while the header said the
+        // line was chosen for the blockers' material.
+        cout << "\n[W63-AF] R6 blocker material compares worst-outcome first, not by sum\n";
+        CHECK(betterBlockerPair(3, 3, 4, 2),
+              "#W63-AF R6 REPRO [3,3] (no blocker dies) beats [4,2] (one dies) at equal sum");
+        CHECK(!betterBlockerPair(4, 2, 3, 3),
+              "#W63-AF R6 and the comparison is strict in the other direction");
+        CHECK(betterBlockerPair(3, 2, 4, 1),
+              "#W63-AF R6 a trade beats a chump when both lines lose a blocker");
+        CHECK(betterBlockerPair(4, 4, 3, 3) && betterBlockerPair(4, 3, 3, 3),
+              "#W63-AF R6 POSITIVE a strictly better pair is still an improvement");
+        CHECK(!betterBlockerPair(3, 3, 3, 3) && !betterBlockerPair(2, 4, 4, 2),
+              "#W63-AF R6 MUST-NOT-MATCH an equal pair (in any order) is not an improvement");
+        CHECK(!betterBlockerPair(1, 4, 3, 3),
+              "#W63-AF R6 MUST-NOT-MATCH a bigger sum does not buy a lost blocker");
+    }
+    {
+        // ---- R7: the crack-back remainder says when it is BEFORE statics ----
+        // REPRO: Goblin King (2/2) plus two Goblin tokens read 6 power; killing
+        // the King rendered "6 -> 4" as the post-removal total, though the two
+        // tokens fall back to 1/1 for a real total of 2.
+        cout << "\n[W63-AF] R7 the relief clause names the static effects it has not removed\n";
+        const string lord = crackBackReliefClause(6, 2, 9, false, "Goblin King");
+        cout << "     " << lord << "\n";
+        CHECK(lord.find("6 -> 4 BEFORE static effects - Goblin King is also changing the power"
+                        " of their other attackers, and that goes with it, so the real total"
+                        " after it dies is not exactly 4") != string::npos,
+              "#W63-AF R7 REPRO the arithmetic is labelled as pre-static and the source named");
+        CHECK(lord.find("you would be at 5") != string::npos,
+              "#W63-AF R7 the life figure still prints - nothing is withheld");
+        // MUST-NOT-MATCH: an ordinary body prints the wave-62 clause byte for byte.
+        CHECK(crackBackReliefClause(10, 2, 9, false)
+                  == crackBackReliefClause(10, 2, 9, false, ""),
+              "#W63-AF R7 MUST-NOT-MATCH a body that props up nothing is unchanged");
+        CHECK(crackBackReliefClause(10, 2, 9, false).find("BEFORE static effects") == string::npos,
+              "#W63-AF R7 MUST-NOT-MATCH the caveat never rides a plain body");
+        // The lethal verdict is hedged to the printed figure when it is pre-static.
+        CHECK(crackBackReliefClause(12, 2, 9, false, "Goblin King")
+                  .find("that still KILLS you at this figure") != string::npos
+              && crackBackReliefClause(12, 2, 9, false)
+                  .find("; that still KILLS you") != string::npos,
+              "#W63-AF R7 a lethal remainder that is pre-static says which figure kills");
+        // Echo shape: one brace pair, no new bracketed annotation.
+        CHECK(lord[0] == ' ' && lord[1] == '{' && lord[lord.size() - 1] == '}'
+              && lord.find('[') == string::npos && lord.find(']') == string::npos,
+              "#W63-AF R7 echo shape: still one {...} clause, nothing bracketed to echo");
+    }
+    {
+        // ---- R9: a body-phase deadline expiry is `timeout`, not transport ----
+        // REPRO: 200 headers, no body, curl gives up at our own deadline with
+        // CURLE_OPERATION_TIMEDOUT. The status excuse fired first, so the clock
+        // lost and the classifier called a real wall miss `transport_error`.
+        cout << "\n[W63-AF] R9 curl's own timeout beats a status that only means headers arrived\n";
+        CHECK(gptDeadlineMissed(true, 900018, 900000, 200, 28),
+              "#W63-AF R9 REPRO 200 headers + curl 28 at the deadline IS a wall miss");
+        CHECK(string(noAnswerClassFor(false, gptDeadlineMissed(true, 900018, 900000, 200, 28),
+                                      false, 200, 28)) == "timeout",
+              "#W63-AF R9 REPRO the composed classifier now says timeout, not transport_error");
+        CHECK(gptDeadlineMissed(true, 900018, 900000, 503, 28),
+              "#W63-AF R9 the same holds for any status the headers carried");
+        // MUST-NOT-MATCH: the wave-62 R8 case is untouched - a 200 that
+        // COMPLETED with an empty body carries curlCode 0 and is empty_reply.
+        CHECK(!gptDeadlineMissed(true, 899000, 900000, 200, 0),
+              "#W63-AF R9 MUST-NOT-MATCH an empty-bodied 200 that finished is not a wall miss");
+        CHECK(string(noAnswerClassFor(false, gptDeadlineMissed(true, 899000, 900000, 200, 0),
+                                      false, 200, 0)) == "empty_reply",
+              "#W63-AF R9 MUST-NOT-MATCH wave-62 R8's class is unchanged");
+        // MUST-NOT-MATCH: a non-timeout transport death is still transport_error.
+        CHECK(!gptDeadlineMissed(true, 880000, 900000, 0, 7)
+              && string(noAnswerClassFor(false, false, false, 0, 7)) == "transport_error",
+              "#W63-AF R9 MUST-NOT-MATCH connect-refused is still transport_error");
+        // And the guards are unchanged: a non-empty body is never a wall miss.
+        CHECK(!gptDeadlineMissed(false, 900018, 900000, 200, 28)
+              && !gptDeadlineMissed(true, 900018, 0, 200, 28),
+              "#W63-AF R9 NEGATIVE a body that arrived, or no deadline, is never a wall miss");
+    }
+    {
+        // ---- R4: "Wait" as an operative verb no longer cuts the plan ----
+        cout << "\n[W63-AF] R4 the scratchpad cut fires on correction shapes, not on plan verbs\n";
+        const string keep = "Hold removal. Wait until their end step, then cast it.";
+        CHECK(gptcaveat::planScratchpadCut(keep) == keep,
+              "#W63-AF R4 REPRO \"Wait until their end step\" is the plan, and it survives");
+        CHECK(gptcaveat::planScratchpadCut("Attack with everything. Let's swing wide.")
+                  == "Attack with everything. Let's swing wide.",
+              "#W63-AF R4 POSITIVE \"Let's\" as an operative verb survives");
+        CHECK(gptcaveat::planScratchpadCut("Hold the land. Hold on to Sorin for the drain.")
+                  == "Hold the land. Hold on to Sorin for the drain.",
+              "#W63-AF R4 POSITIVE \"Hold on to X\" survives");
+        // MUST-NOT-MATCH: the deliberation shapes both repros were built for
+        // are still cut, and the cut is still marked by the caller.
+        CHECK(gptcaveat::planScratchpadCut("Cast the Bond. Wait, I have Sorin.")
+                  == "Cast the Bond.",
+              "#W63-AF R4 MUST-NOT-MATCH \"Wait, ...\" is still a correction and still cuts");
+        CHECK(gptcaveat::planScratchpadCut("Win with the loop. But wait - Sanguine Bond was exiled.")
+                  == "Win with the loop.",
+              "#W63-AF R4 MUST-NOT-MATCH \"But wait\" still cuts (the E14 repro shape)");
+        CHECK(gptcaveat::planScratchpadCut("Cast the Bond. Actually, hold it.") == "Cast the Bond."
+              && gptcaveat::planScratchpadCut("Cast the Bond. Scratch that.") == "Cast the Bond."
+              && gptcaveat::planScratchpadCut("Cast the Bond. Let's re-read the board.")
+                     == "Cast the Bond.",
+              "#W63-AF R4 MUST-NOT-MATCH the explicit correction words still cut");
+        CHECK(gptcaveat::planScratchpadCut("Wait until their end step, then cast it.")
+                  == "Wait until their end step, then cast it.",
+              "#W63-AF R4 NEGATIVE a plan that OPENS with the word is never cut to nothing");
+    }
+    {
+        // ---- R5: the absent-permanent guard respects ownership words ----
+        cout << "\n[W63-AF] R5 an ownership-scoped claim is checked against that owner's board\n";
+        std::vector<string> mine5, theirs5, both5, deck5;
+        theirs5.push_back("Sanguine Bond");        // the OPPONENT's copy
+        both5.push_back("Sanguine Bond");
+        mine5.push_back("Bloodthrone Vampire");
+        both5.push_back("Bloodthrone Vampire");
+        deck5.push_back("Sanguine Bond");
+        string got5;
+        CHECK(gptcaveat::planAssertsAbsentPermanent("I control Sanguine Bond, so any drain wins.",
+                                                    both5, deck5, got5, mine5, theirs5, true)
+              && got5 == "Sanguine Bond",
+              "#W63-AF R5 REPRO \"I control X\" is false while only THEIR copy is in play");
+        CHECK(gptcaveat::planAssertsAbsentPermanent("Sanguine Bond on my battlefield ends this.",
+                                                    both5, deck5, got5, mine5, theirs5, true),
+              "#W63-AF R5 POSITIVE \"on my battlefield\" is the same ownership claim");
+        // MUST-NOT-MATCH: an UNQUALIFIED presence claim is true - it IS in play.
+        string none5;
+        CHECK(!gptcaveat::planAssertsAbsentPermanent("Sanguine Bond is on the battlefield.",
+                                                     both5, deck5, none5, mine5, theirs5, true),
+              "#W63-AF R5 MUST-NOT-MATCH an unqualified claim is true of either board");
+        CHECK(!gptcaveat::planAssertsAbsentPermanent("They control Sanguine Bond, so I hold up"
+                                                     " removal.",
+                                                     both5, deck5, none5, mine5, theirs5, true),
+              "#W63-AF R5 MUST-NOT-MATCH a THEIRS-scoped claim about their own copy is true");
+        // ...and the mirror: their board is empty, so a theirs-scoped claim is false.
+        std::vector<string> mineOnly, theirsNone, bothMine;
+        mineOnly.push_back("Sanguine Bond");
+        bothMine.push_back("Sanguine Bond");
+        CHECK(gptcaveat::planAssertsAbsentPermanent("They control Sanguine Bond, so I wait.",
+                                                    bothMine, deck5, got5, mineOnly, theirsNone, true)
+              && got5 == "Sanguine Bond",
+              "#W63-AF R5 POSITIVE an EMPTY opposing board is a fact, not a missing argument");
+        CHECK(!gptcaveat::planAssertsAbsentPermanent("I control Sanguine Bond, so any drain wins.",
+                                                     bothMine, deck5, none5, mineOnly, theirsNone,
+                                                     true),
+              "#W63-AF R5 MUST-NOT-MATCH my own copy in play still discharges my own claim");
+        // NEGATIVE: an unscoped call behaves exactly as wave 62 did.
+        CHECK(!gptcaveat::planAssertsAbsentPermanent("I control Sanguine Bond, so any drain wins.",
+                                                     both5, deck5, none5),
+              "#W63-AF R5 NEGATIVE an unscoped caller gets the wave-62 verdict, unchanged");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
 #else
     std::cout << "=== self-test: not compiled into this build (define WAGIC_GPT_PARSETEST_BUILD) ===\n";
 #endif
+}
+
+//#W63-AF (R8): external door onto the pending-draw scan for the test suite.
+//Defined out here, at file scope, because the scan itself lives in this file's
+//anonymous namespace and would otherwise have internal linkage.
+int gptStackPendingDrawsFor(GameObserver * observer, Player * seat, MTGCardInstance * exclude)
+{
+    return stackPendingDrawsFor(observer, seat, exclude);
 }
 
 //Free-function entry so the JGE layer's main() can trigger the self-test

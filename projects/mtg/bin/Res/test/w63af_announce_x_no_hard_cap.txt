@@ -1,0 +1,31 @@
+#NAME: ANNOUNCE_X offers every AFFORDABLE X - no hard cap at 50
+#W63-AF (R1, wave-63 codex review finding 1). The ordinary cast route built the
+#decision contract's X menu as `shown = maxX > 50 ? 50 : maxX`, while the ask
+#header told the pilot "higher values are NOT offered (they are unaffordable)".
+#With 61 mana floated and Ivy Elemental {X}{G} (base cost 1) the affordable X is
+#0..60 and the ENGINE's own menu carries all 61 rows (MTGRules builds
+#`options = pool - cost + 1`), so X = 51..60 were legal, present in the engine,
+#absent from the contract, and called unaffordable. That is a hard cap on a legal
+#choice plus a false reason for the absence - the doctrine breach twice over.
+#RED on the wave-63 tree: the contract carries 51 rows.
+#`choice 61` is the menu's own Cancel item, so the card goes nowhere and the
+#floated mana stays floated - the same close the w62y decline fixture uses.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Ivy Elemental
+inplay:plains,mountain
+manapool:{60}{G}
+[PLAYER2]
+[DO]
+Ivy Elemental
+assertxrows 61
+choice 61
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Ivy Elemental
+inplay:plains,mountain
+manapool:{60}{G}
+[PLAYER2]
+[END]

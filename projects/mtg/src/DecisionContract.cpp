@@ -343,7 +343,23 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
                        - menu->abilities[0]->source->getManaCost()->getConvertedCost();
             if (maxX < 0)
                 return false;
-            int shown = maxX > 50 ? 50 : maxX; //bound the menu for degenerate pools
+            //#W63-AF (R1, wave-63 codex review finding 1). THE HARD CAP IS GONE.
+            //`maxX > 50 ? 50 : maxX` withheld every affordable X above 50 while
+            //announceXHeader told the pilot that "higher values are NOT offered
+            //(they are unaffordable)" - a legal choice removed AND a false
+            //reason printed for its absence, which is the doctrine breach twice
+            //over. The engine's own menu carries a row per X (MTGRules.cpp
+            //builds `options = pool - cost + 1`, plus the convoke credit and
+            //the cost-reduction discount), so the bound that is REAL is the
+            //affordable maximum, and the only other bound is the number of rows
+            //the engine actually armed - an index past those lands on no
+            //ability at all. Nothing else is clamped.
+            const int engineRows = (int) menu->abilities.size();
+            int shown = maxX;
+            if (engineRows > 0 && shown > engineRows - 1)
+                shown = engineRows - 1; //never offer an index the menu has no row for
+            if (shown < 0)
+                return false;
             for (int x = 0; x <= shown; x++)
             {
                 std::ostringstream o;

@@ -429,6 +429,8 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 7, "aiseat ") == 0                       //#W57-S
                              || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
                              || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
+                             || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
+                             || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -488,7 +490,9 @@ int TestSuiteAI::Act(float)
             && action.compare(0, 18, "assertmanasources ") != 0 //#W59-K (K6)
             //#W62-AA (R1): the probe READS the armed menu's decision request -
             //it must reach the menu, not be pre-answered by the suite default.
-            && action.compare(0, 15, "assertxdecline ") != 0)
+            && action.compare(0, 15, "assertxdecline ") != 0
+            && action.compare(0, 12, "assertxrows ") != 0
+            && action.compare(0, 19, "assertpendingdraws ") != 0) //#W63-AF (R1/R8)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -507,6 +511,8 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 7, "aiseat ") == 0 //#W57-S
                 || action.compare(0, 18, "assertmanasources ") == 0 //#W59-K (K6)
                 || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
+                || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
+                || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -1417,6 +1423,64 @@ int TestSuiteAI::Act(float)
                       << (built ? "a request" : "no request")
                       << " kind=" << (built ? (int) req.kind : -1)
                       << " canDecline=" << ((built && req.canDecline) ? 1 : 0)
+                      << " rows=" << (built ? (int) req.optionTexts.size() : -1)
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
+    else if (action.find("assertpendingdraws ") == 0)
+    {
+        //#W63-AF (R8, wave-63 codex review finding 8): stage an UNRESOLVED
+        //DrawAction on the stack - the object ActionStack::addDraw pushes,
+        //carrying `player` and `nbcards` - and ask the pending-draw scan what it
+        //sees. On a tree whose scan accepts only StackAbility the answer is 0,
+        //whatever the DrawAction says. The staged action is retired WITHOUT
+        //resolving (state RESOLVED_NOK), so no card is drawn and the zone
+        //assertions are untouched. This is the only harness that can put a bare
+        //DrawAction in front of the scan: AADrawer resolves its own DrawAction
+        //inside the same call, and Jandor's Ring leaves one alive only inside a
+        //priority window the scripted pump cannot land a command in.
+        //Syntax: assertpendingdraws <expected> <cards to stage>
+        string rest = action.substr(19);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.substr(0, sp).c_str());
+        int stage = sp == string::npos ? 0 : atoi(rest.substr(sp + 1).c_str());
+        ActionStack * st = observer->mLayers->stackLayer();
+        size_t before = st ? st->mObjects.size() : 0;
+        if (st && stage > 0)
+            st->addDraw(this, stage);
+        int got = gptStackPendingDrawsFor(observer, this, NULL);
+        if (st)
+            for (size_t i = before; i < st->mObjects.size(); i++)
+                ((Interruptible *) st->mObjects[i])->state = RESOLVED_NOK;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertpendingdraws: staged " << stage
+                      << " unresolved draw card(s), expected the scan to see " << expect
+                      << ", got " << got << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
+    else if (action.find("assertxrows ") == 0)
+    {
+        //#W63-AF (R1, wave-63 codex review finding 1): with an X ANNOUNCEMENT
+        //menu armed, how many X rows does the DECISION CONTRACT carry? The
+        //ordinary cast route clamped the option list at 51 rows (X = 0..50)
+        //while announceXHeader told the pilot every higher value was
+        //unaffordable. `assertxrows <N>` fails on a tree carrying that clamp.
+        //Syntax: assertxrows <expected option count>
+        int want = atoi(action.substr(12).c_str());
+        DecisionRequest req;
+        bool built = DecisionManager::buildMenuChoice(this, req);
+        bool isX = built && req.kind == DecisionRequest::ANNOUNCE_X;
+        if (!isX || (int) req.optionTexts.size() != want)
+        {
+            std::cerr << "TESTSUITE assertxrows: expected an ANNOUNCE_X request with"
+                      << " " << want << " rows, got "
+                      << (built ? "a request" : "no request")
+                      << " kind=" << (built ? (int) req.kind : -1)
                       << " rows=" << (built ? (int) req.optionTexts.size() : -1)
                       << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;

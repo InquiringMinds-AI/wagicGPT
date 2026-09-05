@@ -597,10 +597,23 @@ inline std::string planScratchpadCut(const std::string& plan)
 {
     if (plan.size() < 2)
         return plan;
+    // #W63-AF (R4, wave-63 codex review finding 4). THE MARKERS ARE CORRECTION
+    // SHAPES, NOT WORDS THE MODEL MIGHT ALSO USE AS A VERB. "wait", "hold on",
+    // "hang on", "let me" and "let's" are all OPERATIVE in a plan - "Wait until
+    // their end step, then cast it", "Hold on to the removal", "Let's attack
+    // with everything" - and the bare-word list cut exactly those sentences
+    // out, deleting the timing instruction the plan existed to carry. Every
+    // marker below is a shape that can only be the model arguing with itself:
+    // an interjection followed by a comma ("Wait, ...", "No, ..."), an explicit
+    // correction word ("Actually", "Correction", "Scratch that", "On second
+    // thought"), a re-reading, or a "but wait". "Wait, I have Sorin" (the
+    // #W60-M B13a repro) and "...but wait-Sanguine Bond was exiled" (the
+    // #W63-AD E14 repro) both still cut; "Wait until their end step" does not.
     static const char * kMarkers[] = {
-        "wait", "but wait", "hold on", "hmm", "let me", "let's", "lets",
+        "wait,", "wait -", "wait no", "but wait", "hold on,", "hang on,",
+        "hmm", "let me re", "let's re", "lets re",
         "actually", "on second thought", "scratch that", "correction",
-        "re-read", "reread", "i need to re", "no,", "hang on"
+        "re-read", "reread", "i need to re", "no,"
     };
     const std::string low = toLower(plan);
     size_t i = 0;
@@ -836,18 +849,41 @@ inline bool planDeniesOwnPermanent(const std::string& planRaw,
 //    merely NAMES a card ("cast Sanguine Bond") is untouched;
 //  * a negated, conditional or future clause is excluded (that is a plan, not a
 //    false claim), and so is a zone-qualified mention ("in hand", "in exile").
+// #W63-AF (R5, wave-63 codex review finding 5). OWNERSHIP WORDS ARE PART OF THE
+// CLAIM. `inPlayNames` is BOTH battlefields, and the guard skipped any card that
+// was in play ANYWHERE - so "I control Sanguine Bond" stayed carried as a true
+// premise while the pilot's copy sat in exile and the OPPONENT'S copy was the
+// only one on a battlefield. A claim that names an owner is only true of that
+// owner's board. `myInPlayNames` / `theirInPlayNames` scope the check; a caller
+// that passes neither gets the wave-62 behaviour byte for byte (both scopes
+// resolve to the combined list), so no existing claim changes verdict.
 inline bool planAssertsAbsentPermanent(const std::string& planRaw,
                                        const std::vector<std::string>& inPlayNames,
                                        const std::vector<std::string>& deckNames,
-                                       std::string& assertedOut)
+                                       std::string& assertedOut,
+                                       const std::vector<std::string>& myInPlayNames
+                                           = std::vector<std::string>(),
+                                       const std::vector<std::string>& theirInPlayNames
+                                           = std::vector<std::string>(),
+                                       bool ownershipScoped = false)
 {
     const std::string plan = toLower(planRaw);
     if (plan.empty())
         return false;
+    // Each presence phrase carries the BOARD it is a claim about: 0 = either
+    // battlefield (an unqualified "in play"), 1 = the pilot's own, 2 = the
+    // opponent's. Only the phrase's own scope is checked against the board.
     static const char * kBack[] = { "on the battlefield", "on my battlefield",
-                                    "on the board", "in play" };
+                                    "on the board", "in play",
+                                    "on their battlefield", "on their board",
+                                    "on the opponent's battlefield",
+                                    "on their side" };
+    static const int kBackScope[] = { 0, 1, 0, 0, 2, 2, 2, 2 };
     static const char * kFwd[] = { "i control ", "i still control ", "i now control ",
-                                   "we control ", "i have out ", "i already control " };
+                                   "we control ", "i have out ", "i already control ",
+                                   "they control ", "they still control ",
+                                   "the opponent controls ", "opponent controls " };
+    static const int kFwdScope[] = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 2 };
     static const char * kNeg[] = { " not ", "n't", " no longer", " never", " nothing",
                                    " if ", " once ", " when ", " unless ", " until ",
                                    " would ", " will ", " need ", " to get ", " resolves",
@@ -855,21 +891,40 @@ inline bool planAssertsAbsentPermanent(const std::string& planRaw,
                                    " gone", " lost" };
     static const char * kZone[] = { " in hand", " in my hand", " in exile", " in the graveyard",
                                     " in my graveyard", " in the library", " in my library" };
-    // Which of the pilot's names are actually in play (either battlefield)?
-    std::vector<std::string> inPlayLc;
+    // Which of the pilot's names are actually in play, per board. Index 0 is
+    // "either battlefield"; 1 and 2 fall back to it when the caller supplied no
+    // scoped list, which is what keeps an unscoped call byte-identical.
+    std::vector<std::string> boards[3];
     for (size_t i = 0; i < inPlayNames.size(); i++)
-        inPlayLc.push_back(toLower(inPlayNames[i]));
+        boards[0].push_back(toLower(inPlayNames[i]));
+    for (size_t i = 0; i < myInPlayNames.size(); i++)
+        boards[1].push_back(toLower(myInPlayNames[i]));
+    for (size_t i = 0; i < theirInPlayNames.size(); i++)
+        boards[2].push_back(toLower(theirInPlayNames[i]));
+    //An EMPTY board is a fact, not a missing argument: the caller says so with
+    //`ownershipScoped`. Inferring the fallback from emptiness would make "I
+    //control X" true off the opponent's copy on exactly the board state where
+    //the claim is most wrong (nothing of the pilot's own in play at all).
+    if (!ownershipScoped)
+    {
+        boards[1] = boards[0];
+        boards[2] = boards[0];
+    }
 
     for (size_t n = 0; n < deckNames.size(); n++)
     {
         const std::string full = toLower(deckNames[n]);
         if (full.size() < 5)
             continue; // too short to name a permanent unambiguously in prose
-        bool live = false;
-        for (size_t k = 0; k < inPlayLc.size() && !live; k++)
-            live = (inPlayLc[k] == full);
-        if (live)
-            continue; // it IS in play: the plan's claim is true
+        // Per-board presence. A card in play SOMEWHERE no longer discharges an
+        // ownership-specific claim - only presence on the board the claim names
+        // does (#W63-AF R5).
+        bool live[3] = { false, false, false };
+        for (int b = 0; b < 3; b++)
+            for (size_t k = 0; k < boards[b].size() && !live[b]; k++)
+                live[b] = (boards[b][k] == full);
+        if (live[0] && live[1] && live[2])
+            continue; // in play on every board a claim could name: nothing to say
         std::vector<std::string> forms;
         planNameForms(full, forms);
         for (size_t f = 0; f < forms.size(); f++)
@@ -879,10 +934,11 @@ inline bool planAssertsAbsentPermanent(const std::string& planRaw,
                 continue;
             // a short form that matches a DIFFERENT permanent in play is not
             // evidence about this card (two cards can share a first word).
-            bool formLive = false;
-            for (size_t k = 0; k < inPlayLc.size() && !formLive; k++)
-                formLive = (inPlayLc[k].compare(0, nm.size(), nm) == 0);
-            if (formLive)
+            bool formLive[3] = { false, false, false };
+            for (int b = 0; b < 3; b++)
+                for (size_t k = 0; k < boards[b].size() && !formLive[b]; k++)
+                    formLive[b] = (boards[b][k].compare(0, nm.size(), nm) == 0);
+            if (formLive[0] && formLive[1] && formLive[2])
                 continue;
             size_t pos = 0;
             while ((pos = plan.find(nm, pos)) != std::string::npos)
@@ -914,6 +970,9 @@ inline bool planAssertsAbsentPermanent(const std::string& planRaw,
                 const std::string fwdWin = plan.substr(after, winEnd - after);
                 for (size_t k = 0; k < sizeof(kBack) / sizeof(kBack[0]); k++)
                 {
+                    const int sc = kBackScope[k];
+                    if (live[sc] || formLive[sc])
+                        continue; // true of the board this phrase names
                     const size_t at = fwdWin.find(kBack[k]);
                     if (at == std::string::npos)
                         continue;
@@ -933,6 +992,9 @@ inline bool planAssertsAbsentPermanent(const std::string& planRaw,
                 const std::string backWin = plan.substr(backStart, pos - backStart);
                 for (size_t k = 0; k < sizeof(kFwd) / sizeof(kFwd[0]); k++)
                 {
+                    const int sc = kFwdScope[k];
+                    if (live[sc] || formLive[sc])
+                        continue; // true of the board this phrase names
                     const size_t at = backWin.rfind(kFwd[k]);
                     if (at == std::string::npos)
                         continue;
