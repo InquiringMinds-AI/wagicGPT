@@ -413,6 +413,12 @@ private:
     //Build the per-duel system prompt; deferred to the first decision so
     //that the opponent and all zones exist.
     void buildSystemPrompt();
+    //#W63-AD (E6c, engine HIGH-7): the system message is in ZERO logged prompts
+    //(it is a system-role message, and `prompt` holds the user turn only), so
+    //every protocol-wording claim of the last three waves shipped unreviewable.
+    //Written once per seat-game as its own record, with the reply protocol
+    //verbatim and a hash of the whole system message.
+    void recordSystemPrompt();
     string describeDeckCards(Player * p, bool withCounts);
     string loadStrategyGuide();
 
@@ -591,8 +597,12 @@ private:
     //answer taken - see findAnswerLabelLine).
     //#W50-Y D7: `rejectedLines` (out, optional) counts the line-leading coded
     //CHOICE lines the answer scan refused as rejections/unclean trailers.
+    //#W63-AD (E6b): planAnswerNote reports whether a coded answer line inside the
+    //PLAN BLOCK was demoted (1) or was the reply's only one and still answered
+    //the window (2). 0 = neither. Report only; the seams stamp it.
     string consumePlan(const string& content, const char * expectedLabel = NULL,
-                       int * choiceRunLen = NULL, int * rejectedLines = NULL);
+                       int * choiceRunLen = NULL, int * rejectedLines = NULL,
+                       int * planAnswerNote = NULL);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -952,6 +962,7 @@ private:
 
     //the per-duel head of every request; empty until first built
     string mSystemPrompt;
+    string mSystemHash; //#W63-AD (E6c): hash of mSystemPrompt, stamped on every ask record
     //append-only game narration: every noteworthy event plus the model's
     //own consumed decisions, as if narrating the game (bounded, tail kept)
     string mNarration;
