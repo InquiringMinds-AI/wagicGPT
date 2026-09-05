@@ -161,6 +161,120 @@ void GameStateShop::Start()
     load();
 }
 
+//---- Procedural booster pack (shop art area) ---------------------------------
+//No pack art ships with the game (Wizards' copyright, and unlike card scans there
+//is no established user-side source yet). The shop draws a pack instead: a
+//wrapper in a colour derived from the set code, crimped bands, an emblem, the
+//set's full name. If the user has dropped real files in, they win:
+//  sets/<CODE>/pack.jpg   - drawn scaled into the pack rectangle
+//  sets/<CODE>/symbol.png - drawn as the emblem
+static unsigned packHash(const string& s)
+{
+    unsigned h = 2166136261u;
+    for (size_t i = 0; i < s.size(); i++) { h ^= (unsigned char) s[i]; h *= 16777619u; }
+    return h;
+}
+
+static PIXEL_TYPE packHsv(float hue, float sat, float val, int alpha = 255)
+{
+    float c = val * sat, x = c * (1 - fabsf(fmodf(hue / 60.f, 2.f) - 1)), m = val - c;
+    float r = 0, g = 0, b = 0;
+    if (hue < 60) { r = c; g = x; } else if (hue < 120) { r = x; g = c; } else if (hue < 180) { g = c; b = x; }
+    else if (hue < 240) { g = x; b = c; } else if (hue < 300) { r = x; b = c; } else { r = c; b = x; }
+    return ARGB(alpha, (int)((r + m) * 255), (int)((g + m) * 255), (int)((b + m) * 255));
+}
+
+static void packWrap(WFont * font, const string& text, float maxW, vector<string>& lines)
+{
+    string cur, word;
+    std::istringstream ws(text);
+    while (ws >> word)
+    {
+        string trial = cur.empty() ? word : cur + " " + word;
+        if (!cur.empty() && font->GetStringWidth(trial.c_str()) > maxW) { lines.push_back(cur); cur = word; }
+        else cur = trial;
+    }
+    if (!cur.empty()) lines.push_back(cur);
+}
+
+//Draws the pack centred on (cx, cy); w x h is the wrapper size.
+static void renderProceduralPack(JRenderer * r, WFont * font, ShopBooster& booster, float cx, float cy, float w, float h)
+{
+    MTGSetInfo * mainSet = booster.getMainSet();
+    MTGSetInfo * altSet = booster.getAltSet();
+    string code = mainSet ? mainSet->id : string("PACK");
+    string names = booster.getSetNames();
+    unsigned hash = packHash(code);
+    float hue = (float) (hash % 360);
+    float x0 = cx - w / 2, y0 = cy - h / 2;
+    const float band = 16.f;
+
+    //Real pack art, if the user supplied it.
+    JQuadPtr art;
+    if (mainSet && !altSet)
+        art = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/pack.jpg", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
+    if (art.get())
+    {
+        r->FillRoundRect(x0 - 2, y0 - 2, w + 4, h + 4, 6.f, ARGB(255, 10, 10, 10));
+        r->RenderQuad(art.get(), x0, y0, 0, w / art->mWidth, h / art->mHeight);
+        return;
+    }
+
+    //Wrapper: shadow, body, crimped bands with a zigzag edge.
+    r->FillRoundRect(x0 + 3, y0 + 4, w, h, 8.f, ARGB(160, 0, 0, 0));
+    r->FillRoundRect(x0, y0, w, h, 8.f, packHsv(hue, 0.55f, 0.55f));
+    //A diagonal foil sheen.
+    for (int i = 0; i < 6; i++)
+        r->DrawLine(x0 + 10 + i * 6, y0 + band, x0 + 40 + i * 6, y0 + h - band, packHsv(hue, 0.25f, 0.85f, 40));
+    r->FillRect(x0, y0, w, band, packHsv(hue, 0.7f, 0.30f));
+    r->FillRect(x0, y0 + h - band, w, band, packHsv(hue, 0.7f, 0.30f));
+    PIXEL_TYPE tooth = packHsv(hue, 0.55f, 0.55f);
+    for (float tx = x0; tx < x0 + w - 6; tx += 8)
+    {
+        float xs[3] = { tx, tx + 4, tx + 8 }, ysTop[3] = { y0 + band, y0 + band - 5, y0 + band };
+        r->FillPolygon(xs, ysTop, 3, tooth);
+        float ysBot[3] = { y0 + h - band, y0 + h - band + 5, y0 + h - band };
+        r->FillPolygon(xs, ysBot, 3, tooth);
+    }
+    r->DrawRect(x0, y0, w, h, ARGB(255, 20, 20, 20));
+
+    //Emblem: the set symbol file if present, else a polygon whose side count comes from the code.
+    float ex = cx, ey = y0 + band + 34;
+    JQuadPtr sym;
+    if (mainSet)
+        sym = WResourceManager::Instance()->RetrieveQuad("sets/" + code + "/symbol.png", 0, 0, 0, 0, "", RETRIEVE_NORMAL, CACHE_NORMAL);
+    if (sym.get())
+    {
+        float s = 44.f / (sym->mHeight > sym->mWidth ? sym->mHeight : sym->mWidth);
+        r->RenderQuad(sym.get(), ex - sym->mWidth * s / 2, ey - sym->mHeight * s / 2, 0, s, s);
+    }
+    else
+    {
+        int sides = 5 + (int) ((hash >> 8) % 4);
+        r->FillPolygon(ex, ey, 24, sides, 90, packHsv(hue, 0.35f, 0.95f));
+        r->FillPolygon(ex, ey, 17, sides, 90, packHsv(hue, 0.8f, 0.35f));
+        r->FillCircle(ex, ey, 7, packHsv(hue, 0.2f, 1.0f));
+    }
+
+    //Name panel.
+    vector<string> lines;
+    packWrap(font, names, w - 20, lines);
+    float lh = font->GetHeight() + 2;
+    float py = ey + 34;
+    r->FillRoundRect(x0 + 8, py - 4, w - 16, lh * lines.size() + 8, 4.f, ARGB(170, 255, 255, 255));
+    font->SetColor(ARGB(255, 15, 15, 15));
+    for (size_t i = 0; i < lines.size(); i++)
+        font->DrawString(lines[i].c_str(), cx, py + lh * i, JGETEXT_CENTER);
+    //Card count and, in the bottom band, code + year.
+    font->SetColor(ARGB(255, 245, 245, 245));
+    font->DrawString(_("15 cards").c_str(), cx, py + lh * lines.size() + 10, JGETEXT_CENTER);
+    char foot[64];
+    if (mainSet && mainSet->year > 0) snprintf(foot, sizeof(foot), "%s  %d", code.c_str(), mainSet->year);
+    else snprintf(foot, sizeof(foot), "%s", code.c_str());
+    font->SetColor(ARGB(255, 235, 235, 235));
+    font->DrawString(foot, cx, y0 + h - band + 2, JGETEXT_CENTER);
+}
+
 string GameStateShop::descPurchase(int controlId, bool tiny)
 {
     char buffer[4096];
@@ -767,41 +881,12 @@ void GameStateShop::Render()
             else
                 bigDisplay->setSource(NULL);
             bigDisplay->Render();
-            //A booster has no card art: put the set's full name where the art would be.
+            //A booster has no card art: draw a procedural pack where the art would be.
             if (bigDisplay->mOffset.getPos() < 0)
             {
                 int slot = bigSync.getPos();
                 if (slot >= 0 && slot < BOOSTER_SLOTS)
-                {
-                    string names = mBooster[slot].getSetNames();
-                    if (!names.empty())
-                    {
-                        //Word-wrap to the card's width (the art quad is ~180 px wide at x 385 centre).
-                        vector<string> lines;
-                        string cur, word;
-                        std::istringstream ws(names);
-                        while (ws >> word)
-                        {
-                            string trial = cur.empty() ? word : cur + " " + word;
-                            if (!cur.empty() && mFont->GetStringWidth(trial.c_str()) > 175)
-                            {
-                                lines.push_back(cur);
-                                cur = word;
-                            }
-                            else
-                                cur = trial;
-                        }
-                        if (!cur.empty())
-                            lines.push_back(cur);
-                        float lh = mFont->GetHeight() + 2;
-                        float y = 135 - lh * lines.size() / 2;
-                        mFont->SetColor(ARGB(255,255,255,255));
-                        for (size_t i = 0; i < lines.size(); i++)
-                            mFont->DrawString(lines[i].c_str(), 385, y + lh * i, JGETEXT_CENTER);
-                        mFont->SetColor(ARGB(200,200,200,200));
-                        mFont->DrawString(_("Booster - 15 cards").c_str(), 385, y + lh * lines.size() + 4, JGETEXT_CENTER);
-                    }
-                }
+                    renderProceduralPack(r, mFont, mBooster[slot], 385, 135, 150, 225);
             }
             float elp = srcCards->getElapsed();
             //Render the card list overlay.
