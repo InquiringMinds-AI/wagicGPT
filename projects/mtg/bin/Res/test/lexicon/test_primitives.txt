@@ -6310,6 +6310,15 @@ auto=reject notaTarget(land|myhand)
 text=Test-only: its caster discards a land card from their own hand. Fires an opponent's land-discard trigger.
 [/card]
 [card]
+id=2100000988
+name=Lexicon Whole Library Deadend Peek
+rarity=R
+auto=name(peek) Reveal:type:*:mylibrary revealzone(mylibrary) optionone name(take a land) target(<1>land|reveal) moveto(hand) optiononeend revealend
+mana={0}
+type=Sorcery
+text=Test-only (#W69-BG, K1): reveals the WHOLE library into the reveal zone (the count expression `type:*:mylibrary` is Idyllic Tutor's own) and then stalls - option one is predicate-gated to a land, the fixture's library holds none, and there is no option two, so no chooser ever arms and every revealed card stays parked. The library zone reads 0 while all of those cards are still library cards by the rules.
+[/card]
+[card]
 id=2100000987
 name=Lexicon Deadend Wizard
 rarity=R

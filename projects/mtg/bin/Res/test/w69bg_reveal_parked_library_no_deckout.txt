@@ -1,0 +1,52 @@
+#W69-BG (K1): a game that ended with no loss condition met.
+#
+#Corpus 20260906-134120, game-146v123-1788720096 stderr:1925-1952. deck123 cast
+#Idyllic Tutor (`Reveal:type:*:mylibrary revealzone(mylibrary)`), which MOVES the
+#whole library into that player's `reveal` zone; the seat answered option one,
+#the payload went on the stack as `StackAbility. (Source: Idyllic Tutor)` and
+#never resolved, so all 42 cards stayed parked. deck146 then cast Vision Skeins
+#(`all(player) draw:2`); the two `10DrawAction`s called
+#MTGPlayerCards::drawFromLibrary on a zone that read 0 cards, and the empty-
+#library branch set deck123 as the loser:
+#`WAGIC_SELFPLAY_RESULT winner=0 life0=19 life1=11 turn=17`, both players over 10
+#life, libraries 42/43. That is the loss check that fired, and why.
+#
+#By the rules revealing does not change a card's zone: those 42 cards were still
+#in the library, so the draw was owed one of them and there was no empty library
+#to lose to. The fix returns the first still-parked card (the library's own top -
+#the reveal takes the top first) and draws it; a genuinely empty library, and a
+#reveal of some OTHER zone (`revealzone(myhand)`), still deck out unchanged.
+#
+#FIXTURE. Lexicon Whole Library Deadend Peek is Idyllic Tutor's whole-library
+#reveal with option one predicate-gated to a land (this library has none) and no
+#option two, so no chooser ever arms and the three cards stay parked - the same
+#parked-library state, reached by a route a script can hold open. `drawcard 1 1`
+#drives MTGPlayerCards::drawFromLibrary directly, the exact call 10DrawAction and
+#the draw step make; no scripted click can reach it while a reveal display is
+#open, because an open display holds every phase advance.
+#
+#RED on base (measured, engine file reverted, everything else in place):
+#`==Card number not the same in player 0's hand==, expected 1, got 0` +
+#`==Card ID not the same. Didn't find 205` - drawFromLibrary set player 1 as the
+#loser and the duel left the play phase before the draw could happen (the log
+#reads `drawcard: player 1 draws 1 (library 0, reveal 3)` then `leaveduelphase`).
+#GREEN after: gameover none and Hill Giant (the library's top, revealed first)
+#in hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Whole Library Deadend Peek
+library:Grizzly Bears,Gray Ogre,Hill Giant
+[PLAYER2]
+[DO]
+Lexicon Whole Library Deadend Peek
+drawcard 1 1
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Whole Library Deadend Peek
+hand:Hill Giant
+library:
+[PLAYER2]
+[END]
