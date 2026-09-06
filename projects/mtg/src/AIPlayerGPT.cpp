@@ -6315,6 +6315,27 @@ static string cannotPayNowClause(int reach)
     return " {you cannot pay this right now: 0 mana available}";
 }
 
+//#W69-BJ (F1): how many times a row states one fact. A guide-keyed clause is a
+//SINGLE fact about the row, so a second copy of its literal is always a defect -
+//and the wave-69 merge produced exactly that shape by keeping two builders for
+//the same clause. Pure over a string so the counting itself is testable, and
+//consumed by the dev-gated census at the end of describeAction, which sees the
+//COMPOSED row (the seam the merge broke) rather than any one emitter.
+static int clauseOccurrences(const string& row, const char * literal)
+{
+    if (!literal || !*literal)
+        return 0;
+    int n = 0;
+    const size_t len = strlen(literal);
+    size_t at = row.find(literal);
+    while (at != string::npos)
+    {
+        n++;
+        at = row.find(literal, at + len);
+    }
+    return n;
+}
+
 //#W49-D11: a creature's own {T}-cost activation offered BEFORE attackers are
 //declared on its controller's turn spends the attack (Katilda `put 1/1
 //counters [cost: {4}{g}{w}, Tap]` taken at Upkeep, 8 of 9 mana, the 4/4 then
@@ -12748,6 +12769,26 @@ static string xLibraryReserveWhy(int drawStepSize, int stackDraws, int mayDraws 
     return o.str();
 }
 
+//#W69-BJ (F5, composition BG x BH): a card parked out of THIS player's library
+//into its reveal zone never left the library by the rules - `drawFromLibrary`
+//now draws one back rather than decking out (#W69-BG K1), so the game continues
+//with `library->nb_cards == 0` and 41 cards sitting in `reveal`. Every surface
+//that reads the raw count then states 0 for the rest of the game. The board
+//frame already folds them (`yourLibraryLine`'s `myLibraryInReveal`); this is
+//the same fold for the numeric consumers, using the same `previousZone` stamp.
+static int libraryCountWithParked(Player * p)
+{
+    if (!p || !p->game || !p->game->library)
+        return 0;
+    int n = p->game->library->nb_cards;
+    MTGGameZone * rz = p->game->reveal;
+    if (rz)
+        for (int i = 0; i < rz->nb_cards; i++)
+            if (rz->cards[i] && rz->cards[i]->previousZone == p->game->library)
+                n++;
+    return n;
+}
+
 static void xLibraryReserve(Player * me, MTGCardInstance * exclude,
                             int& library, int& reserve, string& why,
                             int * stackDrawsOut = NULL) //#W67-AW (I4)
@@ -12759,7 +12800,7 @@ static void xLibraryReserve(Player * me, MTGCardInstance * exclude,
         *stackDrawsOut = 0;
     if (!me || !me->game || !me->game->library)
         return;
-    library = me->game->library->nb_cards;
+    library = libraryCountWithParked(me); //#W69-BJ (F5)
     //#W67-AW (I4): the size of the step the first term reserves for, and the
     //draws the stack has ALREADY promised this seat - both from scans the same
     //prompt runs, both folded by the two pure helpers above.
@@ -23176,10 +23217,20 @@ static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor,
 //(the seat's permanents untap in the SEAT's untap step, not theirs), so only an
 //untapped body is cover; legality is asked of the same engine call the row's
 //own body is asked with, so no evasion rule can drift between the two.
+//#W69-BJ (F2): and only where an attack of the SEAT'S OWN cannot tap them
+//first. `attacksSettled` is true exactly when the seat's attack declaration for
+//this turn is already behind it (its own turn, at or past declare-attackers);
+//before that - and on the opponent's turn, where the seat's turn still comes
+//first - an untapped body may be sent as an attacker and is then tapped through
+//the whole of the crack-back turn. A body that attacking cannot tap (VIGILANCE)
+//or that cannot be sent at all (DEFENDER/CANTATTACK) is certain cover in every
+//window; a MUSTATTACK body without vigilance is excluded by the same test,
+//which is what the rule requires of it.
 static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies,
                                 std::vector<CrackBackAttackerFact>& out,
                                 int& checkedBodies, int& uncheckedBodies,
-                                Player * me = NULL, int * existingOut = NULL)
+                                Player * me = NULL, int * existingOut = NULL,
+                                bool attacksSettled = false)
 {
     out.clear();
     checkedBodies = 0;
@@ -23196,6 +23247,11 @@ static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies
             if (!sc || sc == card || !sc->isCreature() || sc->isTapped())
                 continue;
             if (sc->basicAbilities[(int) Constants::CANTBLOCK] || !sc->canBlock())
+                continue;
+            if (!attacksSettled //#W69-BJ (F2)
+                && !sc->basicAbilities[(int) Constants::VIGILANCE]
+                && !sc->basicAbilities[(int) Constants::DEFENDER]
+                && !sc->basicAbilities[(int) Constants::CANTATTACK])
                 continue;
             standing.push_back(sc);
         }
@@ -23465,8 +23521,16 @@ static int assignableRemainderDamage(const vector<int>& damage,
 //comparison are provable without a board. Empty whenever there is nothing to
 //offer (no pairing, or the material line lets in no more damage than the life
 //line already does, in which case the life line already IS the material line).
+//#W69-BJ (F4): and it must say when the material line KILLS. The clause was
+//pure over two damage figures and took no life, so at 6 life it printed "lets
+//in 7 instead of 4 ... Both lines are legal" and never that 7 is lethal - a
+//withheld fact on the one screen where the arithmetic decides the game.
+//`lifeAfterGains` is the SAME effective life the header's own lethal verdict is
+//computed from (life minus the block triggers and lifelink the render already
+//counted), so the two authorities in the window cannot disagree; pass -1 where
+//it is unknown and no lethality is claimed either way.
 static string blockKeepAlternativeClause(const string& pairings, int keepDamage,
-                                         int bestCase)
+                                         int bestCase, int lifeAfterGains = -1)
 {
     if (pairings.empty() || keepDamage < 0 || bestCase < 0 || keepDamage <= bestCase)
         return "";
@@ -23474,8 +23538,11 @@ static string blockKeepAlternativeClause(const string& pairings, int keepDamage,
     o << " ALTERNATIVE, chosen for MATERIAL instead of life: " << pairings
       << " - every blocker in it survives, and it lets in " << keepDamage
       << " combat damage instead of " << bestCase << " ("
-      << (keepDamage - bestCase) << " more damage, and it spends no creature)."
-         " Both lines are legal: the one above is the lowest life, this one is the"
+      << (keepDamage - bestCase) << " more damage, and it spends no creature).";
+    if (lifeAfterGains >= 0 && keepDamage >= lifeAfterGains)
+        o << " " << keepDamage << " KILLS you at " << lifeAfterGains
+          << " life: this line LOSES THE GAME and the line above does not.";
+    o << " Both lines are legal: the one above is the lowest life, this one is the"
          " lowest material cost.";
     return o.str();
 }
@@ -24621,7 +24688,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                         //alive (every pairing whose material rank is a survival
                         //rank), with the damage it lets in instead. Nothing is
                         //removed: both lines are printed and the pilot picks.
-                        string keepAltClause;
+                        //#W69-BJ (F4): the pairing and its damage are collected
+                        //here; the clause itself is built after the block
+                        //triggers and lifelink are counted, so it can state
+                        //lethality off the same effective life the header uses.
+                        string keepAltPairs;
+                        int keepAltDamage = -1;
                         if (!rankMatrix.empty() && blockersDying > 0)
                         {
                             vector<vector<char> > keepCan = can;
@@ -24646,8 +24718,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                             }
                             if (keepPairs > 0)
                             {
-                                keepAltClause = blockKeepAlternativeClause(kn.str(),
-                                                                          keepDamage, bestCase);
+                                keepAltPairs = kn.str(); //#W69-BJ (F4)
+                                keepAltDamage = keepDamage;
                             }
                         }
                         //#W64-AG (F8a): the ranks of the pairings the clause is
@@ -24729,7 +24801,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                                    lethalScreen, matchRank,
                                                                    lethalScreen ? -1 : declineLife);
                         if (!bestCaseAssignment.empty()) //#W69-BH (K6d)
-                            bestCaseAssignment += keepAltClause;
+                            bestCaseAssignment += blockKeepAlternativeClause(
+                                keepAltPairs, keepAltDamage, bestCase,
+                                life - blockTriggerGain - blockLifelinkGain); //#W69-BJ (F4)
                     }
                     //#W61-R (C2): the same map, asked how many of them can be
                     //blocked at once.
@@ -27782,6 +27856,50 @@ static string menuRowShortName(const string& row)
 //(146 s14), and "I cannot cycle Stone Rain" (130 s110, already a conflict) - so
 //it buys ONE new round trip per corpus. A question ("Should I not cast X?") is
 //not a claim, and a deferral ("not yet", "not until") is not a reversal.
+//#W69-BJ (F6): the negation must GOVERN the row's name, not merely precede it
+//somewhere in the same sentence. The bag-of-words form fired on approving prose
+//("I cannot let their board grow, so Damnation now" - the negation governs
+//`let their board grow`, and the row is what the seat WANTS), each firing
+//buying a wasted round trip. The bridge between the cue and the name must
+//therefore be a verb phrase that takes the row: at most three words, no clause
+//boundary (a comma, a `;`, `so`, `because`, `but`, `while`, `since`, `unless`)
+//and, when non-empty, containing a verb that a menu row is taken WITH. That is
+//exactly the shape of all three corpus firings ("NOT cast Damnation",
+//"should not cast Soul Shatter", "cannot cycle Stone Rain").
+static bool negationGovernsRowName(const string& rest, const string& name)
+{
+    const size_t at = rest.find(name);
+    if (at == string::npos)
+        return false;
+    string bridge = rest.substr(0, at);
+    static const char * kBreaks[] = { ",", ";", " so ", " because ", " but ",
+                                      " while ", " since ", " unless ", " and ",
+                                      " if ", " when " };
+    for (size_t i = 0; i < sizeof(kBreaks) / sizeof(kBreaks[0]); i++)
+        if (bridge.find(kBreaks[i]) != string::npos)
+            return false;
+    int words = 0;
+    size_t w = bridge.find_first_not_of(" \t");
+    while (w != string::npos)
+    {
+        size_t e = bridge.find(' ', w);
+        words++;
+        w = (e == string::npos) ? string::npos : bridge.find_first_not_of(" \t", e);
+    }
+    if (words > 3)
+        return false;
+    if (words == 0)
+        return true; //the name follows the cue directly
+    static const char * kTakeVerbs[] = { "cast", "play", "activate", "equip", "use",
+                                         "attack", "block", "target", "create",
+                                         "cycle", "sacrifice", "discard", "counter",
+                                         "tap", "take", "resolve", "swing" };
+    for (size_t v = 0; v < sizeof(kTakeVerbs) / sizeof(kTakeVerbs[0]); v++)
+        if (bridge.find(kTakeVerbs[v]) != string::npos)
+            return true;
+    return false;
+}
+
 static bool proseNegatesTakenRow(const string& replyIn, const string& row,
                                  size_t fromStripped = 0, string * matchedOut = NULL)
 {
@@ -27830,6 +27948,9 @@ static bool proseNegatesTakenRow(const string& replyIn, const string& row,
                 const string rest = sent.substr(at + strlen(kNegations[k]));
                 if (rest.find(name) == string::npos)
                     break; //this sentence negates something else
+                //#W69-BJ (F6): ... and it must be THIS row the negation governs.
+                if (!negationGovernsRowName(rest, name))
+                    continue; //another cue in the same sentence may still govern it
                 const string near = rest.substr(0, 60);
                 bool deferred = false;
                 for (size_t dd = 0; dd < sizeof(kDefer) / sizeof(kDefer[0]) && !deferred; dd++)
@@ -28157,14 +28278,23 @@ string damagePlayerVerdict(int dmg, int life, bool isMe,
 //and a 19-card graveyard, and the seat pinged. The decision-relevant fact is
 //not the life: it is that this row REBUILDS THE LIBRARY. Pure over three
 //counts, so the arithmetic is provable without a board.
-static string graveyardRefillRowClause(int graveyard, int library)
+//#W69-BJ (F3): `selfToLibrary` is what the SCRIPT does with the source, not an
+//assumption. Elixir of Immortality moves itself to the library
+//(`moveTo(mylibrary) all(this)`); Feldon's Cane (mtg.txt:39576) and Campfire
+//(borderline.txt:15766) pay `{E}` and EXILE themselves, and Archangel's Light
+//is a sorcery that goes to the graveyard - for all of those the true count is
+//L+N, and the old clause claimed L+N+1 on every one of them.
+static string graveyardRefillRowClause(int graveyard, int library,
+                                       bool selfToLibrary = true)
 {
     if (graveyard <= 0 || library < 0)
         return "";
+    const int after = library + graveyard + (selfToLibrary ? 1 : 0);
     std::ostringstream o;
-    o << " {right now: shuffles your " << graveyard << "-card graveyard and this card"
-         " back into your library - your library goes from " << library << " to "
-      << (library + graveyard + 1) << " card" << ((library + graveyard + 1) == 1 ? "" : "s")
+    o << " {right now: shuffles your " << graveyard << "-card graveyard"
+      << (selfToLibrary ? " and this card" : "")
+      << " back into your library - your library goes from " << library << " to "
+      << after << " card" << (after == 1 ? "" : "s")
       << "}";
     return o.str();
 }
@@ -28177,7 +28307,8 @@ static string graveyardRefillRowClause(int graveyard, int library)
 //that shuffles without them, or carries them without shuffling, gets NO clause:
 //a wrong magnitude is strictly worse than an absent one (N-158h's rule).
 static bool abilityShufflesGraveyardIntoLibrary(MTGAbility * a, MTGCardInstance * src,
-                                                int depth = 0)
+                                                int depth = 0,
+                                                bool * selfToLibrary = NULL) //#W69-BJ (F3)
 {
     if (!a || !src || depth > 5)
         return false;
@@ -28185,20 +28316,28 @@ static bool abilityShufflesGraveyardIntoLibrary(MTGAbility * a, MTGCardInstance 
     if (!shuffles)
     {
         if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
-            shuffles = abilityShufflesGraveyardIntoLibrary(na->ability, src, depth + 1);
+            shuffles = abilityShufflesGraveyardIntoLibrary(na->ability, src, depth + 1,
+                                                          selfToLibrary);
         if (!shuffles)
             if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
                 for (size_t i = 0; i < ma->abilities.size() && !shuffles; i++)
                     shuffles = abilityShufflesGraveyardIntoLibrary(ma->abilities[i], src,
-                                                                   depth + 1);
+                                                                   depth + 1, selfToLibrary);
     }
     if (!shuffles)
         return false;
     if (depth > 0)
         return true; //the literal check belongs to the outermost call
     const string mt = scriptLower(src->magicText);
-    return mt.find("moveto(mylibrary)") != string::npos
-           && mt.find("all(*|mygraveyard)") != string::npos;
+    if (mt.find("moveto(mylibrary)") == string::npos
+        || mt.find("all(*|mygraveyard)") == string::npos)
+        return false;
+    //#W69-BJ (F3): the "+1 this card" term is claimed ONLY where the script
+    //moves THIS card to the library in so many words. Anything else (an {E}
+    //exile cost, a sorcery going to the graveyard) leaves the count at L+N.
+    if (selfToLibrary)
+        *selfToLibrary = (mt.find("moveto(mylibrary) all(this)") != string::npos);
+    return true;
 }
 
 //#W69-BH (K6c, deck162 MED-2 / engine): the POSITIVE twin of #W68-BB's
@@ -30978,10 +31117,12 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     if (action.ability)
     {
         MTGCardInstance * gsrc = action.click ? action.click : action.ability->source;
+        bool refillSelf = false; //#W69-BJ (F3)
         if (gsrc && game && game->graveyard && game->library
-            && abilityShufflesGraveyardIntoLibrary(action.ability, gsrc))
+            && abilityShufflesGraveyardIntoLibrary(action.ability, gsrc, 0, &refillSelf))
             out << graveyardRefillRowClause(game->graveyard->nb_cards,
-                                            game->library->nb_cards);
+                                            libraryCountWithParked(this), //#W69-BJ (F5)
+                                            refillSelf);
         const int bhLoss = pendingStackLifeLossToSeat(observer, this);
         if (bhLoss > 0)
             out << stackAnswerYesRowClause(abilitySelfLifeGainNow(action.ability, this),
@@ -31073,13 +31214,24 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
                 }
             }
-            out << paymentTapsClause(taps, tapRestrict);
-            //#W69-BG (K5): the pool cannot afford it and the selector found no
-            //producer - if the seat's whole colour reach is 0 as well, say so.
-            if (picks.empty())
-                out << cannotPayNowClause(windowReach());
+            //#W69-BJ (F1): ONE clause, not two. The wave-69 merge kept BG's
+            //context copy of `out << paymentTapsClause(...)` above BI's
+            //de-duplicated builder, so every affordable-by-tap row whose picks
+            //include a creature or the source itself printed the guide-keyed
+            //`{paying this taps: ...}` clause TWICE. The builder is the one kept -
+            //the self-tap clause below reads its text to avoid a third spelling.
             paidTapsClause = paymentTapsClause(taps, tapRestrict);
             out << paidTapsClause;
+            //#W69-BG (K5): the pool cannot afford it and the selector found no
+            //producer - if the seat's whole colour reach is 0 as well, say so.
+            //#W69-BJ (F7): floating mana IS mana available. `potentialColorReach`
+            //counts UNTAPPED PRODUCERS only, so a pool left by a ritual (1 float,
+            //cost 3, no untapped source) made this clause state "0 mana available"
+            //over a non-empty pool - a false surface the pilot is instructed to
+            //believe. The pool's converted total is folded into the reach term.
+            if (picks.empty())
+                out << cannotPayNowClause(windowReach()
+                                          + getManaPool()->getConvertedCost());
         }
         if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
         {
@@ -31258,6 +31410,22 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     //is already on the row and cannot be doubled.
     if (tappedAnimateNeedsVerdict(out.str()))
         out << tappedSourceAnimateVerdict();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W69-BJ (F1): the composed row, censused for a fact stated twice. The
+    //duplicate the wave-69 merge shipped lived at this seam and not inside any
+    //emitter, so no per-helper test could see it; the suite and every corpus
+    //game run this build, so a re-introduction is loud instead of silent.
+    {
+        static const char * kOnceOnly[] = { " {paying this taps: ", " {tapping ",
+                                            " {right now: ", " {crack-back cover: ",
+                                            " {reserve: " };
+        const string composed = out.str();
+        for (size_t oi = 0; oi < sizeof(kOnceOnly) / sizeof(kOnceOnly[0]); oi++)
+            if (clauseOccurrences(composed, kOnceOnly[oi]) > 1)
+                DebugTrace("W69-BJ F1: row states '" << kOnceOnly[oi]
+                           << "' more than once: " << composed);
+    }
+#endif
     return out.str();
 }
 
@@ -34904,6 +35072,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = noopPlanConflict ? "plan_contradicts_noop_row_reask"
                                       : "noop_row_zero_reask"; //#W69-BH (K4c)
                 mPriorityReaskKind = "noop_plan";
+                //#W69-BJ (F8): the re-ask's own words are "that row if you meant
+                //it anyway", so the SAME answer coming back is the offer being
+                //accepted, not a budget running out. Remember what was taken.
+                mPriorityReaskPriorChoice = choice;
                 mPriorityNoopReaskBoard = boardKey; //#W68-BA (J6): one-shot, spent here
             }
             else
@@ -35050,10 +35222,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
                 appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                    : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
-            else if (mPriorityReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c)
-                appendParseNote(&mLastParseNote, noopRowZero ? "plan_contradicts_noop_row_exhausted"
-                                                                  : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
-                                                                                 : "plan_contradicts_noop_row_unanswered"));
+            //#W69-BH (K4c) #W66-AR (H8) #W69-BJ (F8): a second answer that takes
+            //the SAME row the re-ask invited it to re-take is a RETAKE, not an
+            //exhausted budget - `_exhausted` reads as "the model could not answer
+            //the question" and would be false of the one shape the re-ask asks for.
+            else if (mPriorityReaskKind == "noop_plan")
+                appendParseNote(&mLastParseNote,
+                    (noopRowZero && choice >= 1 && choice == mPriorityReaskPriorChoice)
+                        ? "noop_row_retaken"
+                        : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
+                                       : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
+                                                      : "plan_contradicts_noop_row_unanswered")));
             else if (repeatRowTaken)
                 appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
                                                                  : "repeat_count_reask_exhausted");
@@ -35929,6 +36108,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " the row you want instead.";
             mAskReaskKind = "noop_plan";
             mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
+            mAskReaskPriorChoice = choice; //#W69-BJ (F8): see the priority seam
         }
         else
         {
@@ -36000,10 +36180,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         else if (mAskReaskKind == "index_name") //#W52-J D6: the second answer executes as given
             appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                : (choice >= 1 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
-        else if (mAskReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c)
-            appendParseNote(&mLastParseNote, noopRowZero ? "plan_contradicts_noop_row_exhausted"
-                                                              : (choice >= 1 ? "plan_contradicts_noop_row_recovered"
-                                                                             : "plan_contradicts_noop_row_unanswered"));
+        else if (mAskReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c) #W69-BJ (F8)
+            appendParseNote(&mLastParseNote,
+                (noopRowZero && choice >= 1 && choice == mAskReaskPriorChoice)
+                    ? "noop_row_retaken"
+                    : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
+                                   : (choice >= 1 ? "plan_contradicts_noop_row_recovered"
+                                                  : "plan_contradicts_noop_row_unanswered")));
         else
             appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                           : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
@@ -37804,8 +37987,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 //unchecked - see crackBackCoverFacts.
                 std::vector<CrackBackAttackerFact> cbAtk;
                 int cbChecked = 0, cbUnchecked = 0, cbExisting = 0; //#W69-BH (K6a)
+                //#W69-BJ (F2): this row renders in main 1 as well as main 2, and
+                //in main 1 the seat has not declared attackers yet.
+                const bool cbSettled = (observer && observer->currentPlayer == this
+                                        && observer->getCurrentGamePhase()
+                                               >= MTG_PHASE_COMBATATTACKERS);
                 crackBackCoverFacts(opponent(), card, bodies, cbAtk, cbChecked, cbUnchecked,
-                                    this, &cbExisting); //#W69-BH (K6a)
+                                    this, &cbExisting, cbSettled); //#W69-BH (K6a) #W69-BJ (F2)
                 //#W65-AL (G4): and WHICH number this is - crackBackScreenTotal
                 //already reports whether the line above calls it a floor.
                 o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked,
@@ -77053,6 +77241,102 @@ static const char * kW50Y_r94 =
         CHECK(blockKeepAlternativeClause("", 5, 2).empty()
                   && blockKeepAlternativeClause("A blocks B", -1, 2).empty(),
               "#W69-BH K6d MUST-NOT-MATCH no pairing, or no figure, no claim");
+    }
+
+    cout << "\n[#W69-BJ] F1 one row, one tap clause (the wave-69 merge duplicate)\n";
+    {
+        std::vector<std::string> taps;
+        std::vector<int> tapRestrictions;
+        taps.push_back("Llanowar Elves");
+        tapRestrictions.push_back(0);
+        const string one = paymentTapsClause(taps, tapRestrictions);
+        CHECK(!one.empty() && clauseOccurrences(one, " {paying this taps: ") == 1,
+              "#W69-BJ F1 the clause states the fact once");
+        //THE DEFECT, reproduced as the composed row the merge actually shipped:
+        //two builders, one row. This is the string the dev census now flags.
+        const string doubled = "Cast Overrun [cost: {2}{g}{g}]" + one + one;
+        CHECK(clauseOccurrences(doubled, " {paying this taps: ") == 2,
+              "#W69-BJ F1 REPRO the merge shape - the same clause twice on one row - is countable");
+        CHECK(clauseOccurrences("Cast Overrun [cost: {2}{g}{g}]" + one,
+                                " {paying this taps: ") == 1
+                  && clauseOccurrences("Cast Overrun [cost: {2}{g}{g}]",
+                                       " {paying this taps: ") == 0,
+              "#W69-BJ F1 MUST-NOT-MATCH the fixed row counts one, a row without the fact counts none");
+        const string echo = stripNarrationDecoration("Cast Overrun [cost: {2}{g}{g}]" + one);
+        CHECK(echo.find("Cast Overrun") == 0 && echo.find("paying this taps") == string::npos
+                  && echo.find("}") == string::npos,
+              "#W69-BJ F1 echo shape: the tap clause leaves no residue in the answer-matching name");
+    }
+
+    cout << "\n[#W69-BJ] F3 the +1 is claimed only where the card goes to the LIBRARY\n";
+    {
+        //Elixir of Immortality (mtg.txt:34776) carries `moveTo(mylibrary) all(this)`.
+        const string elixir = graveyardRefillRowClause(3, 10, true);
+        CHECK(elixir == " {right now: shuffles your 3-card graveyard and this card back into"
+                        " your library - your library goes from 10 to 14 cards}",
+              "#W69-BJ F3 POSITIVE Elixir's shape is byte-identical to what wave 68 shipped");
+        //Feldon's Cane (mtg.txt:39576) and Campfire (borderline.txt:15766) pay {E}.
+        const string cane = graveyardRefillRowClause(3, 10, false);
+        CHECK(cane == " {right now: shuffles your 3-card graveyard back into your library -"
+                      " your library goes from 10 to 13 cards}",
+              "#W69-BJ F3 REPRO an exiling refill states L+N and never names this card");
+        CHECK(cane.find("and this card") == string::npos
+                  && graveyardRefillRowClause(0, 10, false).empty()
+                  && graveyardRefillRowClause(3, -1, false).empty(),
+              "#W69-BJ F3 MUST-NOT-MATCH no self term, and no clause without a graveyard or a library");
+        const string echoR = stripNarrationDecoration("Shuffle graveyard [cost: {T}]" + cane);
+        CHECK(echoR.find("Shuffle graveyard") == 0 && echoR.find("goes from") == string::npos,
+              "#W69-BJ F3 echo shape: the refill clause leaves no residue");
+    }
+
+    cout << "\n[#W69-BJ] F4 the material line says when it is the LETHAL one\n";
+    {
+        const string lethal = blockKeepAlternativeClause("Wall blocks Bear", 7, 4, 6);
+        CHECK(lethal.find(" 7 KILLS you at 6 life: this line LOSES THE GAME and the line"
+                          " above does not.") != string::npos,
+              "#W69-BJ F4 POSITIVE at 6 life a 7-damage material line is named as lethal");
+        CHECK(blockKeepAlternativeClause("Wall blocks Bear", 7, 4, 8).find("KILLS")
+                  == string::npos
+                  && blockKeepAlternativeClause("Wall blocks Bear", 7, 4).find("KILLS")
+                         == string::npos,
+              "#W69-BJ F4 MUST-NOT-MATCH survivable damage, and an unknown life, claim nothing");
+        CHECK(blockKeepAlternativeClause("Wall blocks Bear", 7, 4, 8)
+                  == " ALTERNATIVE, chosen for MATERIAL instead of life: Wall blocks Bear -"
+                     " every blocker in it survives, and it lets in 7 combat damage instead"
+                     " of 4 (3 more damage, and it spends no creature). Both lines are legal:"
+                     " the one above is the lowest life, this one is the lowest material cost.",
+              "#W69-BJ F4 the non-lethal wording is byte-identical to what wave 68 shipped");
+    }
+
+    cout << "\n[#W69-BJ] F6 the negation must govern the row it names\n";
+    {
+        const string row = "Cast Damnation {2}{b}{b} [cost: {2}{b}{b}]";
+        //123v162 s34 - the deciding decision of the corpus.
+        CHECK(proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nYou should NOT cast Damnation."
+                                   " You should attack.\nPLAN: attack.", row, 0),
+              "#W69-BJ F6 POSITIVE 123v162 s34 still reads as a reversal");
+        CHECK(proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: so I should not cast"
+                                   " Damnation this turn.", row, 0),
+              "#W69-BJ F6 POSITIVE the 146 s14 shape (a plan-body negation naming the row) still reads");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: You do not need to hold"
+                                    " back, Damnation clears the board.", row, 0),
+              "#W69-BJ F6 MUST-NOT-MATCH approving prose whose negation governs another verb phrase");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: I cannot let their board"
+                                    " grow, so Damnation now.", row, 0),
+              "#W69-BJ F6 MUST-NOT-MATCH approving prose across a `, so` clause boundary");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: Should I not cast"
+                                    " Damnation?", row, 0),
+              "#W69-BJ F6 MUST-NOT-MATCH a question is not a claim (unchanged)");
+    }
+
+    cout << "\n[#W69-BJ] F7 floating mana is mana available\n";
+    {
+        //The render passes `windowReach() + getManaPool()->getConvertedCost()`.
+        CHECK(cannotPayNowClause(0 + 1).empty() && cannotPayNowClause(0 + 3).empty(),
+              "#W69-BJ F7 MUST-NOT-MATCH no untapped producer but a floating pool is not 0 available");
+        CHECK(cannotPayNowClause(0 + 0)
+                  == " {you cannot pay this right now: 0 mana available}",
+              "#W69-BJ F7 POSITIVE no producers and no pool still states the fact, byte-identical");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
