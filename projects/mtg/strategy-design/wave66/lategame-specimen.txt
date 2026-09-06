@@ -1,0 +1,373 @@
+file: 1788694859-ai_baka_deck125-0x55a1ef3af260-vs-ai_baka_deck123.jsonl | seq 130 | kind ask | turn 59 | rendered life 31 vs 5 (gameend: 44 vs 3, this seat LOST)
+why this one: the deciding window of the corpus's longest control game. This seat was winning 44-5 and lost by DECKING OUT four decisions later. The load-bearing surface is row 1's X badge: it prints a LIBRARY CEILING that holds back exactly ONE card for the next draw step, on a window whose stack already carries TWO Staff of Nin upkeep draw triggers that the ceiling never counts. The seat obeyed the badge (announced X=13 at seq 132), drew 13 of 14, and the pending triggers finished the library.
+also live here: the AS H7 hold-row forgiveness clause, kCastNoRowZeroFact, the AR H8 exemplar naming row 1 by number, and the AR H2a ANSWER:-prefix parser refusal - this record is one of the 83 unparsed_reply fallbacks.
+================================================================================
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Essence Scatter, Path to Exile, Supreme Verdict, Fall of the Gavel; opponent - Intruder Alarm x2, Marsh Flats, Devour Flesh x2, Thraben Doomsayer x2, Damnation x3, Bloodline Keeper x2, Vision Skeins x2, Idyllic Tutor, Lightning Greaves, Arcane Sanctum, Tribute to Hunger)
+- Opponent's Human dealt 1 damage to you (now 34)
+- Opponent's Human dealt 1 damage to you (now 33)
+- Opponent's Human dealt 1 damage to you (now 32)
+- Opponent's Human dealt 1 damage to you (now 31)
+- Opponent's Human dealt 1 damage to you (now 30)
+- Opponent's Human dealt 1 damage to you (now 29)
+- Opponent's Human dealt 1 damage to you (now 28)
+- Opponent's Human dealt 1 damage to you (now 27)
+- Opponent's Human dealt 1 damage to you (now 26)
+- Opponent's Human dealt 1 damage to you (now 25)
+- Opponent's Human dealt 1 damage to you (now 24)
+- Opponent's Human dealt 1 damage to you (now 23)
+- Opponent's Human dealt 1 damage to you (now 22)
+- Opponent's Human dealt 1 damage to you (now 21)
+- Opponent's Human dealt 1 damage to you (now 20)
+- Opponent's Human dealt 1 damage to you (now 19)
+- Opponent's Human dealt 1 damage to you (now 18)
+- Opponent's Human dealt 1 damage to you (now 17)
+- Opponent's Human dealt 1 damage to you (now 16)
+- Opponent's Human dealt 1 damage to you (now 15)
+- Opponent's Human dealt 1 damage to you (now 14)
+- Opponent's Human dealt 1 damage to you (now 13)
+- Opponent's Human dealt 1 damage to you (now 12)
+- Opponent's Human dealt 1 damage to you (now 11)
+- Opponent's Human dealt 1 damage to you (now 10)
+- Opponent's Human dealt 1 damage to you (now 9)
+- Opponent's Human dealt 1 damage to you (now 8)
+- Opponent's Human dealt 1 damage to you (now 7)
+- Opponent's Human dealt 1 damage to you (now 6)
+- Opponent's Human dealt 1 damage to you (now 5)
+- Opponent's Human dealt 1 damage to you (now 4)
+- Opponent's Human dealt 1 damage to you (now 3)
+- Opponent's Human dealt 1 damage to you (now 2)
+- Opponent's Human dealt 1 damage to you (now 1)
+=== Turn 49 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You played Island
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Island #4; Island #5; Plains #1
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+=== Turn 50 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Arcane Sanctum
+=== Turn 51 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+- You drew Sphinx's Revelation
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Glacial Fortress #1; Seachrome Coast #1; Plains #1; Island #2; Island #3; Tundra #1; Glacial Fortress #2; Tundra #2; Island #4; Tundra #3; Seachrome Coast #2; Glacial Fortress #3; Plains #2; Island #5
+- You announced X = 12 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 12 life (now 13)
+- You drew Dream Fracture
+- You drew Sphinx's Revelation
+- You drew Island
+- You drew Plains
+- You drew Path to Exile
+- You drew Supreme Verdict
+- You drew Lightmine Field
+- You drew Island
+- You drew Cancel
+- You drew Tundra
+- You drew Final Judgment
+- You drew Supreme Verdict
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Tundra
+- Phase: Cleanup
+- Cleanup discard (hand 20, limit 7): you chose Cancel, Dream Fracture, Fall of the Gavel, Cancel, Dream Fracture, Sphinx's Revelation, Island, Plains, Supreme Verdict, Island, Cancel, Final Judgment, Supreme Verdict
+- You discarded Cancel (that Cancel was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Fall of the Gavel
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Dream Fracture
+- You discarded Sphinx's Revelation
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Plains
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Cancel
+- You discarded Final Judgment
+- You discarded Supreme Verdict
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+=== Turn 53 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin #1 targeting Human #2
+- Your Staff of Nin dealt 1 damage to Human
+- Opponent's Human died (that Human was 1 of 60 copies on the opponent's battlefield; the other 59 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- You drew Elixir of Immortality
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- Paid {2}{w}{w} for Lightmine Field with Plains #1; Plains #2; Island #1; Island #2
+- You cast Lightmine Field
+- Your Lightmine Field resolved and entered the battlefield
+- Paid {1} for Elixir of Immortality with Island #3
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #4; Island #5
+- You gained 5 life (now 18)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (15 cards) into your library with Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Essence Scatter
+- You discarded Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Tribute to Hunger
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- Paid {w} for Path to Exile with Plains #1
+- You targeted Human #1 (1/1) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 4 copies in your hand; the other 3 are still there)
+- Opponent's Human was exiled from the battlefield (that Human was 1 of 59 copies on the opponent's battlefield; the other 58 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- Opponent's Swamp entered the battlefield from the opponent's library
+- You drew Cancel
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- Paid {1}{u}{w}{w} for Supreme Verdict with Island #1; Plains #2; Tundra #4; Island #2
+- You cast Supreme Verdict
+- Opponent's Thraben Doomsayer died
+- Opponent's Human died (that Human was 1 of 58 copies on the opponent's battlefield; the other 57 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 57 copies on the opponent's battlefield; the other 56 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 56 copies on the opponent's battlefield; the other 55 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 55 copies on the opponent's battlefield; the other 54 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 54 copies on the opponent's battlefield; the other 53 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 53 copies on the opponent's battlefield; the other 52 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 52 copies on the opponent's battlefield; the other 51 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 51 copies on the opponent's battlefield; the other 50 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 50 copies on the opponent's battlefield; the other 49 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 49 copies on the opponent's battlefield; the other 48 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 48 copies on the opponent's battlefield; the other 47 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 47 copies on the opponent's battlefield; the other 46 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 46 copies on the opponent's battlefield; the other 45 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 45 copies on the opponent's battlefield; the other 44 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 44 copies on the opponent's battlefield; the other 43 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 43 copies on the opponent's battlefield; the other 42 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 42 copies on the opponent's battlefield; the other 41 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 41 copies on the opponent's battlefield; the other 40 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 40 copies on the opponent's battlefield; the other 39 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 39 copies on the opponent's battlefield; the other 38 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 38 copies on the opponent's battlefield; the other 37 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 37 copies on the opponent's battlefield; the other 36 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 36 copies on the opponent's battlefield; the other 35 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 35 copies on the opponent's battlefield; the other 34 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 34 copies on the opponent's battlefield; the other 33 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 33 copies on the opponent's battlefield; the other 32 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 32 copies on the opponent's battlefield; the other 31 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 31 copies on the opponent's battlefield; the other 30 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 30 copies on the opponent's battlefield; the other 29 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 29 copies on the opponent's battlefield; the other 28 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 28 copies on the opponent's battlefield; the other 27 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 27 copies on the opponent's battlefield; the other 26 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 26 copies on the opponent's battlefield; the other 25 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 25 copies on the opponent's battlefield; the other 24 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 24 copies on the opponent's battlefield; the other 23 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 23 copies on the opponent's battlefield; the other 22 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 22 copies on the opponent's battlefield; the other 21 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 21 copies on the opponent's battlefield; the other 20 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 20 copies on the opponent's battlefield; the other 19 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 19 copies on the opponent's battlefield; the other 18 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 18 copies on the opponent's battlefield; the other 17 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 17 copies on the opponent's battlefield; the other 16 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 16 copies on the opponent's battlefield; the other 15 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 15 copies on the opponent's battlefield; the other 14 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 14 copies on the opponent's battlefield; the other 13 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 13 copies on the opponent's battlefield; the other 12 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 12 copies on the opponent's battlefield; the other 11 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 11 copies on the opponent's battlefield; the other 10 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 10 copies on the opponent's battlefield; the other 9 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 9 copies on the opponent's battlefield; the other 8 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 8 copies on the opponent's battlefield; the other 7 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 7 copies on the opponent's battlefield; the other 6 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 6 copies on the opponent's battlefield; the other 5 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 5 copies on the opponent's battlefield; the other 4 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 4 copies on the opponent's battlefield; the other 3 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died (that Human was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Opponent's Human died
+- Opponent's Human (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Fall of the Gavel
+- You discarded Fall of the Gavel
+=== Turn 56 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Marsh Flats
+=== Turn 57 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- You drew Dream Fracture
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Glacial Fortress #1; Seachrome Coast #1; Plains #1; Island #2; Island #3; Tundra #1; Glacial Fortress #2; Tundra #2; Island #4; Tundra #3; Seachrome Coast #2; Glacial Fortress #3; Plains #2; Island #5; Tundra #4
+- You announced X = 13 for Sphinx's Revelation
+- You cast Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You gained 13 life (now 31)
+- You drew Dream Fracture
+- You drew Supreme Verdict
+- You drew Plains
+- You drew Lightmine Field
+- You drew Dream Fracture
+- You drew Emrakul, the Aeons Torn
+- You drew Cancel (x2)
+- You drew Island
+- You drew Elixir of Immortality
+- You drew Supreme Verdict
+- You drew Plains
+- You drew Glacial Fortress
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Glacial Fortress
+- Paid {1} for Elixir of Immortality with Glacial Fortress #4
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 20, limit 7): you chose Path to Exile, Path to Exile, Essence Scatter, Path to Exile, Essence Scatter, Cancel, Dream Fracture, Plains, Lightmine Field, Cancel, Cancel, Island, Plains
+- You discarded Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Path to Exile
+- You discarded Essence Scatter
+- You discarded Cancel (that Cancel was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Dream Fracture (that Dream Fracture was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Plains (that Plains was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Lightmine Field
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Cancel
+- You discarded Island
+- You discarded Plains
+=== Turn 58 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent lost 1 life (now 5)
+- Opponent's Marsh Flats was put into the opponent's graveyard from the battlefield
+- Opponent used: Put a card onto the battlefield with Marsh Flats targeting Scrubland
+- Opponent's Scrubland entered the battlefield from the opponent's library
+=== Turn 59 - YOUR turn ===
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+Your life: 31 | Opponent life: 5
+Opponent life trend: turn 55: 10, turn 57: 8, turn 59: 5, now 5 (-5 since turn 55).
+ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):
+  1 (top): ability: Staff of Nin's Draw 1 [from your Staff of Nin] [triggered/activated ability]
+  2: ability: Staff of Nin's Draw 1 [from your Staff of Nin] [triggered/activated ability]
+Mana available: 17 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 12, {U} 15 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Island #1 {u}; Glacial Fortress #1 {w} or {u}; Seachrome Coast #1 {w} or {u}; Plains #1 {w}; Island #2 {u}; Island #3 {u}; Tundra #1 {w} or {u}; Glacial Fortress #2 {w} or {u}; Tundra #2 {w} or {u}; Island #4 {u}; Tundra #3 {w} or {u}; Seachrome Coast #2 {w} or {u}; Glacial Fortress #3 {w} or {u}; Plains #2 {w}; Island #5 {u}; Tundra #4 {w} or {u}; Glacial Fortress #4 {w} or {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (7 cards): Final Judgment {4}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack]; Sphinx's Revelation {u}{u}{w}{x} [instant] [castable now]; Dream Fracture (copy 1 of 2 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Supreme Verdict (copy 1 of 2 in your hand) {1}{u}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack]; Dream Fracture (copy 2 of 2 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Emrakul, the Aeons Torn {15} (15/15) [creature] [no cast row now: sorcery speed - only in your own main phase with an empty stack]; Supreme Verdict (copy 2 of 2 in your hand) {1}{u}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack]
+Your battlefield (21 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 17 are lands): Elixir of Immortality {1} [artifact] {effect: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}; Glacial Fortress #1-#4 x4; Island #1-#5 x5; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1; Plains #2; Seachrome Coast #1; Seachrome Coast #2; Staff of Nin #2 {6} [artifact]; Staff of Nin #1 {6} [artifact] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#4 x4
+Opponent battlefield (18 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 15 are lands): Arcane Sanctum; Intruder Alarm #2 {2}{u} [enchantment]; Intruder Alarm #1 {2}{u} [enchantment] {effect (each copy of this card does this): "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}; Isolated Chapel #1-#3 x3; Lightning Greaves {2} [artifact] {effect: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if..."}; Plains; Scrubland #1-#3 x3; Swamp; Tundra #1-#3 x3; Underground Sea #1-#3 x3
+Their untapped sources: 15 (colours they could make: {u}{b}{w})
+Opponent hand size: 7 | Opponent library: 16 cards
+Artifacts in play: you 3 | opponent 1
+Your library: 14 cards
+
+YOUR PLAN (as you last stated it, 2 windows ago on turn 57): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn unless a DRAW PUNISHERS line is printed, and then ping the punisher. Win by Staff of Nin pings.
+
+Casting decision (Upkeep, YOUR turn): which card do you cast now, if any?
+This menu has no row 0: to decline, take the numbered "Cast nothing right now" row on the list below. (A priority menu does have a row 0; this one does not.)
+1. Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=14 (17 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=13 - largest affordable X - X=14 gains 14 life and draws 14 cards; no listed X does more - but LIBRARY CEILING: X=14 draws 14 from a library of 14 cards: it leaves 0 cards, and your next draw step, which you cannot decline, then draws you out. X=13 is the largest listed X the library pays for (14 cards, holding 1 back for your next draw step, which you cannot decline)] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=14, 17 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped} {card text: "You gain X life and draw X cards."}
+2. Hold priority: pass now, and do not ask me again - this turn or later - until one of the rows above changes (any change re-opens this window; you give up no cast) {taking this row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked. A pass row that differs only by naming which step comes next is the same row, so a hold taken in your first main phase also covers your second main phase while these rows do not change; so is a row that differs only by a bracket saying it cannot reach a spell on the stack; and so is a row that differs only by a LIFE TOTAL it projects - what you or they would be at - because that number moves with the board and not with the row. Any OTHER change re-opens this window, including a kill count, a damage figure, a survivor count, a price, and a row that begins saying it kills you}
+3. Cast nothing right now
+
+[hold check: 2 rows above are new since the last window at this seam - a row moving is what re-opens a hold, so a hold taken here lasts only until one moves again]
+On a line of its own write CHOICE: followed by the number of your choice (the LAST row of this menu declines: it is a real answer, not a fallback) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Sphinx's Revelation)" (a worked example of the format, written out from row 1 of this list - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
