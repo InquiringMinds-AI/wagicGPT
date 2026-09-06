@@ -76,6 +76,11 @@ static int blockPairMaterialRank(MTGCardInstance * blocker, MTGCardInstance * at
 //line below it are the same number. Defined beside the per-row clause that
 //already reads it; declared here for the header far above.
 static void blockTriggeredLifeFor(MTGCardInstance * blocker, int& sure, int& may);
+//#W65-AN (G10): the lifelink half of the same projection, declared here for the
+//blockers-header caller above its definition.
+static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
+                               bool blkFirstStrike, int atkPower, bool atkFirstStrike,
+                               bool atkDeathtouch);
 
 namespace
 {
@@ -4797,8 +4802,15 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               int blockers, int guaranteed,
                               int infectExcluded = 0, bool damageSuppressed = false,
                               int blockGain = 0, const string& attackPunishers = "",
-                              bool oppLifeLoop = false) //#W62-X (D2)
+                              bool oppLifeLoop = false, //#W62-X (D2)
+                              bool * outKillClaim = NULL) //#W65-AN (G6)
 {
+    //#W65-AN (G6, deck123 HIGH-1): the A-row life-LOOP clause on the same
+    //screen has to yield to this line's kill verdict, and a second computation
+    //of "is this attack lethal" would be free to drift from this one. So the
+    //verdict is REPORTED from the exact branch that prints it.
+    if (outKillClaim)
+        *outKillClaim = false;
     if (attackers <= 0 || oppLife < 0)
         return "";
     std::ostringstream o;
@@ -4867,7 +4879,11 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                     o << ", so blocking can leave them as high as "
                       << (oppLife - guaranteed + blockGain);
                     if (oppLife - guaranteed + blockGain <= 0 && attackPunishers.empty())
+                    {
                         o << "; that KILLS them whatever they block, gain included";
+                        if (outKillClaim) //#W65-AN (G6)
+                            *outKillClaim = true;
+                    }
                 }
             }
             else
@@ -4875,7 +4891,11 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                 o << " they would be at " << (oppLife - guaranteed);
                 //#W61-R (C1b): no kill claim survives an unpriced punisher.
                 if (oppLife - guaranteed <= 0 && attackPunishers.empty())
+                {
                     o << "; that KILLS them whatever they block";
+                    if (outKillClaim) //#W65-AN (G6)
+                        *outKillClaim = true;
+                }
             }
             o << ".";
         }
@@ -18859,12 +18879,36 @@ static string loopPendingSituationLine(Player * me, Player * opp,
 //scope claim. No cast is capped and no row is removed: the row gains the
 //subtraction the paragraph above left for the pilot to do. Pure over
 //(toughness, names, life), so every branch is provable without a board.
+//#W65-AN (G6, deck162 HIGH-1). `162v126` seq 13 printed this row's finished
+//subtraction - `life 21 -> 17` - six lines under the window's own LOOP SCOPE
+//paragraph, which said that ANY nonzero payment on a tag above is fatal. The
+//seat cast the body and died from 21. A converter plus a mirror is not a
+//SIZED price at all: the first point they gain re-enters the chain, so the
+//arithmetic this tag performs is the arithmetic of a board that does not
+//exist. With the loop PROVEN closed (the #W62-AA R6 gate, the same predicate
+//the LOOP SCOPE paragraph is built from, so the two cannot disagree) the row
+//prints the loop verdict and NO resulting-life figure - the D2/E1 shape.
 string theirConverterBodyTag(int toughness, const std::vector<std::string>& theirConverters,
-                             int myLife)
+                             int myLife, bool theirLoopClosed = false) //#W65-AN (G6)
 {
     if (toughness <= 0 || theirConverters.empty())
         return "";
     const int n = (int) theirConverters.size();
+    if (theirLoopClosed)
+    {
+        std::ostringstream l;
+        l << " {their converter: this body has toughness " << toughness
+          << " and they control " << n << " life-to-damage converter"
+          << (n == 1 ? "" : "s") << " (";
+        for (int i = 0; i < n; i++)
+            l << (i ? ", " : "") << theirConverters[i];
+        l << ") - and BOTH halves of their life LOOP are in play, so NO figure is"
+             " given for what this body costs you: the first life any effect of"
+             " theirs gains off it re-enters the chain, which does not stop until"
+             " you are at 0. ANY nonzero payment here is fatal, whatever your life"
+             " total is}";
+        return l.str();
+    }
     const int off = toughness * n;
     std::ostringstream o;
     o << " {their converter: this body has toughness " << toughness << " and they control "
@@ -18927,7 +18971,8 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                                  int assignableAttackers = -1,
                                  const string& bestCaseAssignment = "", //#W62-Z (D12)
                                  bool oppLifeLoopClosed = false, //#W63-AB (E1)
-                                 int blockTriggerGain = 0) //#W64-AG (F8b/F9)
+                                 int blockTriggerGain = 0, //#W64-AG (F8b/F9)
+                                 int blockLifelinkGain = 0) //#W65-AN (G10)
 {
     if (attackers <= 0)
         return "";
@@ -18957,7 +19002,14 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
     //SCOPED to declining from its first word, so the two clauses never
     //contradict; the survival figure still precedes every ceiling below it.
     const bool bestKnown = haveBodies && !oppLifeLoopClosed && bestCaseDamage >= 0;
-    const int gain = blockTriggerGain > 0 ? blockTriggerGain : 0;
+    //#W65-AN (G10, deck152 HIGH-1). `152` s12: the best case ignored the life
+    //the SAME named block gifts through its own blockers' LIFELINK, which is
+    //the identical omission F8b fixed for blocking triggers one wave earlier -
+    //both resolve inside this combat and both move the figure this line is
+    //about. Kept as its own term so the wording can name what produced it.
+    const int trigGain = blockTriggerGain > 0 ? blockTriggerGain : 0;
+    const int llGain = blockLifelinkGain > 0 ? blockLifelinkGain : 0;
+    const int gain = trigGain + llGain;
     const int bestLife = myLife - bestCaseDamage + gain;
     const bool blockMayAvert = bestKnown && bestLife > 0 && (myLife - unblockedDamage <= 0);
     const bool splitPrinted = haveBodies && unblockableAttackers > 0;
@@ -19071,9 +19123,13 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
             //halves rather than silently folded, because the trigger is a
             //consequence of DECLARING the block and the reader can check it
             //against the BLOCKING THIS COMBAT line below.
-            if (gain > 0)
+            if (gain > 0 && llGain <= 0)
                 o << " before your blocking triggers, " << (myLife - bestCaseDamage + gain)
                   << " after the " << gain << " they gain you";
+            else if (gain > 0) //#W65-AN (G10)
+                o << " before your blocking triggers and your blockers' lifelink, "
+                  << (myLife - bestCaseDamage + gain) << " after the " << gain
+                  << " those blocks gain you";
             if (bestLife <= 0)
                 o << "; no block saves you";
             //#W62-Z (D12): the assignment that reaches that number, where the
@@ -19092,9 +19148,13 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                  " (trample/menace counted as unblocked): you would be at "
               << (myLife - bestCaseDamage)
               << " AT BEST (no assignment of your blockers does better)";
-            if (gain > 0) //#W64-AG (F8b)
+            if (gain > 0 && llGain <= 0) //#W64-AG (F8b)
                 o << ", " << bestLife << " AT BEST once the " << gain
                   << " your blocking triggers gain you is added";
+            else if (gain > 0) //#W65-AN (G10)
+                o << ", " << bestLife << " AT BEST once the " << gain
+                  << " your blocking triggers and your blockers' lifelink gain you"
+                     " is added";
             if (bestLife <= 0)
                 o << "; no block saves you";
         }
@@ -20567,9 +20627,19 @@ static string blockAssignmentClause(const vector<string>& blockerNames,
         out << " - one legal assignment that reaches it, chosen for your blockers'"
                " material as well as for the life: ";
     else if (rankKnown)
+        //#W65-AN (G10, deck152 HIGH-1): "no better material reaches that life
+        //figure" was an unqualified claim over ALL blocks, and the matching it
+        //is made from is a bipartite one - one blocker per attacker. `152v146`
+        //seq 13/27 printed it while the next line's own `GANG BLOCK:` clause
+        //reached the same life with a group that also KILLS the attacker, and
+        //0 of 10 suggestions in that corpus ever named two blockers on one
+        //attacker. The claim now says which search it is the maximum of.
         out << " - one legal assignment that reaches it, chosen for the LIFE ONLY -"
                " it does not preserve your material and no better material reaches"
-               " that life figure: ";
+               " that life figure among LONE blocks (one blocker per attacker is"
+               " all this search covers; a GANG BLOCK of two or more of yours on"
+               " one attacker was not searched and can do better - any \"GANG"
+               " BLOCK:\" clause below prices one): ";
     else
         out << " - one legal assignment that reaches it, chosen for the LIFE ONLY"
                " (no material ranking was performed on it): ";
@@ -21475,14 +21545,27 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 int matchedAtk = -1; //#W61-R (C2)
                 string bestCaseAssignment; //#W62-Z (D12)
                 int blockTriggerGain = 0; //#W64-AG (F8b)
+                int blockLifelinkGain = 0; //#W65-AN (G10)
                 {
                     vector<vector<char> > can;
                     vector<string> canNames; //#W62-Z (D12): parallel to `can`
                     vector<MTGCardInstance *> canCards; //#W63-AB (E3)
+                    //#W65-AN (G10, deck126 HIGH-1). `126v152` seq 9, AFTER
+                    //blockers were declared: canBlock() is the SOLO gate
+                    //(untapped, no can't-block) and says nothing about whether
+                    //this body is ALREADY standing in front of something. The
+                    //committed Perimeter Captain was offered to the matching a
+                    //second time, its damage was subtracted twice, and the
+                    //assignment the header NAMED could not be declared at all.
+                    //A creature blocks one attacker (CR 509.1a), so a body with
+                    //a defenser is out of the search - and what it is already
+                    //doing is folded below rather than dropped.
                     for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
                     {
                         MTGCardInstance * bc = game->inPlay->cards[bi];
                         if (!bc || !bc->isCreature() || !bc->canBlock())
+                            continue;
+                        if (bc->defenser) //#W65-AN (G10): already committed
                             continue;
                         vector<char> row;
                         bool any = false;
@@ -21567,11 +21650,48 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                             blockTriggeredLifeFor(canCards[bi], bs, bm);
                             if (bs > 0)
                                 blockTriggerGain += bs;
+                            //#W65-AN (G10, `152` s12): and the lifelink the same
+                            //named block gifts, from the pairing it names.
+                            const size_t mj = (size_t) match[bi];
+                            if (mj < declared.size() && declared[mj])
+                                blockLifelinkGain += blockerLifelinkGain(
+                                    canCards[bi]->power, canCards[bi]->toughness,
+                                    canCards[bi]->basicAbilities[Constants::LIFELINK] != 0,
+                                    canCards[bi]->basicAbilities[Constants::FIRSTSTRIKE] != 0
+                                        || canCards[bi]->basicAbilities[Constants::DOUBLESTRIKE] != 0,
+                                    declared[mj]->power,
+                                    declared[mj]->basicAbilities[Constants::FIRSTSTRIKE] != 0
+                                        || declared[mj]->basicAbilities[Constants::DOUBLESTRIKE] != 0,
+                                    declared[mj]->basicAbilities[Constants::DEATHTOUCH] != 0);
+                        }
+                        //#W65-AN (G10): the blocks ALREADY declared are part of
+                        //this same combat, so their certain life is part of the
+                        //same projection - excluding their bodies from the
+                        //search above must not delete what they are doing.
+                        for (int ci = 0; ci < game->inPlay->nb_cards; ci++)
+                        {
+                            MTGCardInstance * cc = game->inPlay->cards[ci];
+                            if (!cc || !cc->isCreature() || !cc->defenser)
+                                continue;
+                            int cs = 0, cm = 0;
+                            blockTriggeredLifeFor(cc, cs, cm);
+                            if (cs > 0)
+                                blockTriggerGain += cs;
+                            blockLifelinkGain += blockerLifelinkGain(
+                                cc->power, cc->toughness,
+                                cc->basicAbilities[Constants::LIFELINK] != 0,
+                                cc->basicAbilities[Constants::FIRSTSTRIKE] != 0
+                                    || cc->basicAbilities[Constants::DOUBLESTRIKE] != 0,
+                                cc->defenser->power,
+                                cc->defenser->basicAbilities[Constants::FIRSTSTRIKE] != 0
+                                    || cc->defenser->basicAbilities[Constants::DOUBLESTRIKE] != 0,
+                                cc->defenser->basicAbilities[Constants::DEATHTOUCH] != 0);
                         }
                         //#W63-AB (E3b): on a lethal screen the line is still
                         //printed and labelled as the least-damage line.
                         const bool lethalScreen = (bestCase >= 0
-                                                   && life - bestCase - blockTriggerGain <= 0);
+                                                   && life - bestCase - blockTriggerGain
+                                                          - blockLifelinkGain <= 0); //#W65-AN (G10)
                         //#W64-AG (F8c): the header is NOT lethal exactly when
                         //declining leaves the seat alive; then the suggestion is
                         //optional and says what declining leaves.
@@ -21595,7 +21715,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                   (int) declared.size(), //#W61-R (C2)
                                                   bestCaseAssignment,    //#W62-Z (D12)
                                                   lifeLoopProvenWin(opp), //#W63-AB (E1)
-                                                  blockTriggerGain); //#W64-AG (F8b)
+                                                  blockTriggerGain, //#W64-AG (F8b)
+                                                  blockLifelinkGain); //#W65-AN (G10)
             }
             else if (form == 2)
                 out << "\n" << incomingCombatSettledLine(mIncomingCombatAttackers,
@@ -25242,9 +25363,19 @@ static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent,
     else if (gain == 2)
         q << " THE PRICE: YOU gain life equal to the sacrificed creature's TOUGHNESS -"
              " each row states what it would give you.";
+    //#W65-AN (MED, `126v123` seq 10). The tie-break was written for the branch
+    //where the OPPONENT is paid, and printed on the branch where the toughness
+    //is life YOU gain: the ask told the seat to give itself the least. Same
+    //sentence, aimed at whoever the price actually goes to; with no beneficiary
+    //named by the script (gain 0) no row differs in a way this ask can rank, so
+    //it ranks nothing.
     q << " Pick the creature you can best AFFORD TO LOSE (usually your least useful"
-         " body, and - where the rows differ - the one that pays the least), and"
-         " answer with the chosen creature's name.";
+         " body";
+    if (gain == 1)
+        q << ", and - where the rows differ - the one that pays the least";
+    else if (gain == 2)
+        q << ", and - where the rows differ - the one that GAINS YOU THE MOST";
+    q << "), and answer with the chosen creature's name.";
     return q.str();
 }
 
@@ -31885,7 +32016,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             std::vector<std::string> theirConv;
             theirConverterScan(opponent(), theirConv);
-            o << theirConverterBodyTag(card->toughness, theirConv, life);
+            o << theirConverterBodyTag(card->toughness, theirConv, life,
+                                       lifeLoopProvenWin(opponent())); //#W65-AN (G6)
         }
         //#W64-AH (F11, deck130 HIGH-2): and, on a row that puts BODIES on the
         //board while the same screen's CRACK-BACK line is lethal, what those
@@ -35593,6 +35725,31 @@ static bool blockingTriggerCovers(MTGCardInstance * src, const string& spec,
     return ok;
 }
 
+//#W65-AN (G10, deck152 HIGH-1, `152` s12). What a BLOCKER's own lifelink
+//gains its controller in the block this projection names. Lifelink gains on
+//damage DEALT, so the term exists only where the blocker actually deals its
+//damage: a blocker with no first strike facing a first-striker that can kill
+//it outright never deals any (deathtouch makes 1 damage lethal). Every other
+//way a blocker can be stopped from dealing damage - prevention, a pump, a
+//removal spell in response - can only make this SMALLER, so the term is a
+//fail-closed under-estimate of a figure the seat is told is a best case, which
+//is the safe direction for a survival number. Pure over the seven facts, so
+//PARSETEST pins the whole table without a board.
+static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
+                               bool blkFirstStrike, int atkPower, bool atkFirstStrike,
+                               bool atkDeathtouch)
+{
+    if (!blkLifelink || blkPower <= 0)
+        return 0;
+    if (atkFirstStrike && !blkFirstStrike && atkPower > 0)
+    {
+        const int lethal = atkDeathtouch ? 1 : blkToughness;
+        if (lethal > 0 && atkPower >= lethal)
+            return 0; //killed before it ever deals damage: no lifelink
+    }
+    return blkPower;
+}
+
 //Total life `blocker`'s controller gains the moment this creature BLOCKS,
 //summed over every permanent they control that carries such a trigger.
 //Mandatory and optional ("may") gains are kept apart: a "may" is the pilot's
@@ -35750,6 +35907,39 @@ static bool lifeLoopProvenWin(Player * me)
 static const char * kLifeLoopAttackerRowTag =
     " (their life LOOP is in play: any life they gain or you lose in this combat"
     " chains without limit - fatal to you, not a trade)";
+
+//#W65-AN (G6, deck123 HIGH-1 / deck146 HIGH-1 / deck162 HIGH-1). The clause
+//above was stamped on every attacker row wherever the board held the two
+//halves, and it OVERRODE the verdict printed on the same screen. `123v126`
+//seq 48: 51 creatures, `ATTACK TOTAL ... KILLS them whatever they block` and
+//the "fatal to you" clause on every unblockable row at once; the seat answered
+//`ATTACK: none` and lost 43-0. Two clauses that contradict each other in one
+//window is the same class of false surface F9 fixed on the blockers header:
+//the one that stops the action wins, and here it is the one that is WRONG.
+//A life loop is a reason to fear a long game, never a reason to decline a
+//kill - the chain cannot fire after they are dead - so where the ATTACK TOTAL
+//has PROVEN the attack lethal (its own kill branch, which is already withheld
+//under an unpriced attack punisher and under the loop's own no-claim branch)
+//the clause says the order of resolution instead of the caution.
+//`reachable` is the caller's per-row answer to "can a branch of the chain be
+//entered from THIS row at all"; with nothing of theirs able to block this
+//attacker, declaring it gains them no life off a block and the row's own
+//decision enters the chain nowhere (`146v126` seq 29 stamped the clause on
+//three rows against a CREATURELESS opponent, where the same prompt said every
+//attacker was unblockable). Nothing else is deleted: the window's LOOP SCOPE
+//paragraph and the loop banner are untouched, so the board fact is still on
+//the screen. Pure over the two flags, so both faces are pinned.
+static string lifeLoopAttackerRowTag(bool reachable, bool attackProvenLethal)
+{
+    if (!reachable)
+        return "";
+    if (attackProvenLethal)
+        return " (their life LOOP is in play, but LETHAL COMES FIRST: the ATTACK"
+               " TOTAL on this screen proves this attack kills them whatever they"
+               " block, and the loop cannot fire after they are dead - the chain"
+               " is a reason to FINISH this combat, not a reason to hold back)";
+    return kLifeLoopAttackerRowTag;
+}
 
 //#W47-R3 (wave-46 ledger, HIGH). Does this player control a life-to-damage
 //converter right now? The board question behind the per-tag binding below.
@@ -37928,7 +38118,6 @@ int AIPlayerGPT::chooseAttackers()
     bool anyMenaceRestricted = false; //W43-1: at least one set-restricted attacker
     vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
     CombatWindowCache cw; //#W54-M (A22): per-window memo of the per-creature facts
-    const bool oppLifeLoop = playerHasLifeLoop(opponent()); //#W54-M (A22): a board fact, once per window
     //#W63-AB (E1): and whether that loop can actually RUN (#W62-AA R6's rule).
     const bool oppLoopClosed = lifeLoopProvenWin(opponent());
     //#W60-L (B11): the parts of the aggregate line, gathered from the same pass
@@ -37936,6 +38125,7 @@ int AIPlayerGPT::chooseAttackers()
     std::vector<int> rowPower;
     std::vector<bool> rowInfect; //#W60-Q (R4): damage that is poison, not life
     std::vector<bool> rowNoLegalBlock;
+    std::vector<int> aRowLoopAt; //#W65-AN (G6): reserved byte position per row
     for (size_t j = 0; j < attackers.size(); j++)
     {
         bool noLegalBlockForThisRow = false; //#W60-L (B11)
@@ -38206,8 +38396,17 @@ int AIPlayerGPT::chooseAttackers()
             //the rows agree by construction.
             noLegalBlockForThisRow = entries.empty();
         }
-        if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
-            ln << kLifeLoopAttackerRowTag;
+        //#W65-AN (G6): the clause itself is composed after the ATTACK TOTAL
+        //below - see lifeLoopAttackerRowTag - so only its byte position on this
+        //row is reserved here, which keeps the composed row order identical.
+        //It is reserved at all only where a branch of the chain can be entered
+        //FROM THIS ROW: with nothing of theirs able to block this attacker,
+        //declaring it gains them no life off a block, and `oppLoopClosed` is
+        //the #W62-AA R6 gate that the row tails and the LOOP SCOPE paragraph in
+        //this same window are already built from, so the three cannot disagree
+        //about whether the chain can run at all.
+        aRowLoopAt.push_back((oppLoopClosed && !noLegalBlockForThisRow)
+                             ? (int) ln.tellp() : -1);
         //#W60-P (B9): an attacker holding one of theirs in exile can die in
         //this combat and hand it straight back. Same fact the blocker rows
         //carry, on the window where the seat chooses to expose the body.
@@ -38245,20 +38444,14 @@ int AIPlayerGPT::chooseAttackers()
             rowPower.push_back(rp); //#W60-L (B11)
         }
         rowNoLegalBlock.push_back(noLegalBlockForThisRow);
-        //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
-        //option list, not the rendered prompt.
-        {
-            std::ostringstream full;
-            full << "A" << (j + 1) << ". " << aRowName[j] << aRowHandle[j] << aRowRest[j];
-            shownLines.push_back(full.str());
-        }
     }
-    {
-        bool anyAttackerRangeRow = false;
-        tail << joinBlockerRows(aRowName, aRowHandle, aRowRest, &anyAttackerRangeRow, "A");
-        if (anyAttackerRangeRow)
-            tail << kAttackerRangeNote;
-    }
+    //#W65-AN (G6, deck123 HIGH-1). The totals are built FIRST, into their own
+    //buffer, because the A-row life-LOOP clause has to yield to the ATTACK
+    //TOTAL's kill verdict and cannot read a line that has not been composed.
+    //NOTHING moves in the rendered order: this buffer is emitted below, after
+    //the rows, in exactly the position these lines occupied before.
+    std::ostringstream totalsTail;
+    bool attackTotalKillClaim = false; //#W65-AN (G6)
     //#W54-E (D17): the opposite number, once, from the engine's own solo block
     //gate - the same canBlock() the per-attacker lists above are filtered by,
     //so the header and the rows can never disagree. UNTAPPED-NOW is the honest
@@ -38284,7 +38477,7 @@ int AIPlayerGPT::chooseAttackers()
         for (size_t ej = 0; ej < rowNoLegalBlock.size(); ej++)
             if (rowNoLegalBlock[ej])
                 evasiveRows++;
-        tail << attackerBlockerCountLine(blockerCount, evasiveRows,
+        totalsTail << attackerBlockerCountLine(blockerCount, evasiveRows,
                                          (int) rowNoLegalBlock.size());
         //#W60-L (B11): and the arithmetic that count line stops one step short
         //of. `guaranteed` counts every attacker nothing of theirs may block, then
@@ -38359,21 +38552,48 @@ int AIPlayerGPT::chooseAttackers()
                 }
             }
             blockGain = blockingLifeCeiling(blockerLife, blockerCanBlockOffered);
-            tail << attackTotalLine((int) rowPower.size(), totalPower,
+            totalsTail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
                                     infectExcluded, suppressed, blockGain,
                                     attackDeclarationPunishers(oppL),
-                                    playerHasLifeLoop(oppL)); //#W62-X (D2)
+                                    playerHasLifeLoop(oppL), //#W62-X (D2)
+                                    &attackTotalKillClaim); //#W65-AN (G6)
             //#W64-AK (R1): and the exclusion this wave's new row class creates.
             {
                 int walkerOnlyRows = 0;
                 for (size_t j = 0; j < attackers.size(); j++)
                     if (!W64AK_MAY_PLAYER(j))
                         walkerOnlyRows++;
-                tail << walkerOnlyExclusionLine(walkerOnlyRows);
+                totalsTail << walkerOnlyExclusionLine(walkerOnlyRows);
             }
         }
     }
+    //#W65-AN (G6): and now the loop clause, in the byte position each row
+    //reserved for it, with the verdict the ATTACK TOTAL above actually printed.
+    for (size_t j = 0; j < aRowRest.size(); j++)
+    {
+        if (j >= aRowLoopAt.size() || aRowLoopAt[j] < 0
+            || (size_t) aRowLoopAt[j] > aRowRest[j].size())
+            continue;
+        aRowRest[j].insert((size_t) aRowLoopAt[j],
+                           lifeLoopAttackerRowTag(true, attackTotalKillClaim));
+    }
+    //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
+    //option list, not the rendered prompt. Built after the clause above so the
+    //logged row is byte-identical to the rendered one.
+    for (size_t j = 0; j < aRowRest.size(); j++)
+    {
+        std::ostringstream full;
+        full << "A" << (j + 1) << ". " << aRowName[j] << aRowHandle[j] << aRowRest[j];
+        shownLines.push_back(full.str());
+    }
+    {
+        bool anyAttackerRangeRow = false;
+        tail << joinBlockerRows(aRowName, aRowHandle, aRowRest, &anyAttackerRangeRow, "A");
+        if (anyAttackerRangeRow)
+            tail << kAttackerRangeNote;
+    }
+    tail << totalsTail.str(); //#W65-AN (G6): composed above, printed here
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
     //the two facts that decide it, so the model derived them from scratch - one
     //26,457-char trace on a ONE-legal-attacker decision spent ~20,000 chars
@@ -39132,7 +39352,6 @@ int AIPlayerGPT::chooseBlockers()
     bool anyGangPriced = false;
     tail << "Attackers:\n";
     vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
-    const bool oppLifeLoop = playerHasLifeLoop(opponent()); //#W54-M (A22): a board fact, once per window
     //#W63-AB (E1): holding both halves is not the same as being able to CLOSE
     //them (#W62-AA R6's rule) - a price tail that says "chains without limit"
     //must not print over a board where the chain cannot run.
@@ -39280,8 +39499,14 @@ int AIPlayerGPT::chooseBlockers()
                 }
             }
         }
-        if (oppLifeLoop) //#W49-U D5 (#W54-M A22: once per window)
-            ln << kLifeLoopAttackerRowTag;
+        //#W65-AN (G6): the same #W62-AA R6 gate the attackers window and this
+        //window's own price tails use - a clause that says "chains without
+        //limit" must not print over a board where the chain cannot run. No
+        //lethal verdict exists on this screen (there is no ATTACK TOTAL here:
+        //these attackers are theirs), and the loss branch is reachable by
+        //construction, so the caution is the only face this window can print.
+        if (oppLoopClosed)
+            ln << lifeLoopAttackerRowTag(true, false);
         //#W60-P (B9): an attacker holding one of theirs in exile can die in
         //this combat and hand it straight back. Same fact the blocker rows
         //carry, on the window where the seat chooses to expose the body.
@@ -63240,8 +63465,14 @@ static const char * kW50Y_r94 =
         vector<int> chumpRank; chumpRank.push_back(1); chumpRank.push_back(0);
         const string chump = blockAssignmentClause(bn, an, m, 1, false, chumpRank, 8);
         cout << "     chump row: \"" << chump << "\"\n";
+        // #W65-AN (G10): re-pinned IN PLACE, not deleted. The head-string
+        // equality pinned the unqualified "no better material reaches that life
+        // figure", which is deck152 HIGH-1's defect exactly - the search behind
+        // it is a one-blocker-per-attacker matching. F8a's own claim (no
+        // material head on a chump) is unchanged and still pinned.
         CHECK(chump.find("chosen for the LIFE ONLY - it does not preserve your material"
-                         " and no better material reaches that life figure:") != string::npos
+                         " and no better material reaches that life figure among LONE"
+                         " blocks") != string::npos
               && chump.find("material as well as for the life") == string::npos,
               "#W64-AG F8a POSITIVE a chump assignment never claims material");
         CHECK(chump.find(" - taking it SPENDS Thraben Doomsayer") != string::npos,
@@ -64112,6 +64343,226 @@ static const char * kW50Y_r94 =
         // X. With the Staff draw owed the best X is 10; without it, 11.
         CHECK(xLibraryCeilingX(20, 1, 12, 2) == 10 && xLibraryCeilingX(20, 1, 12, 1) == 11,
               "#W64-AK R9 the badge's ceiling is one higher once the stale reserve is dropped");
+    }
+
+    cout << "\n[#W65-AN G6] the life-LOOP clause yields to the verdict on the same screen\n";
+    {
+        // REPRO `123v126` seq 48: 51 creatures, an ATTACK TOTAL that proves the
+        // kill whatever they block, and the "fatal to you" clause stamped on the
+        // rows at once. `ATTACK: none`, lost 43-0. The two clauses are composed
+        // from ONE computation now: the total reports the verdict it printed.
+        bool kill = false;
+        const string lethalTotal = attackTotalLine(51, 60, 20, 3, 24, 0, false, 0, "",
+                                                   false, &kill);
+        cout << "     total: " << lethalTotal;
+        CHECK(lethalTotal.find("; that KILLS them whatever they block") != string::npos
+              && kill,
+              "#W65-AN G6 REPRO the ATTACK TOTAL reports the same kill verdict it prints");
+        const string yielded = lifeLoopAttackerRowTag(true, kill);
+        cout << "     row:   [" << yielded << "]\n";
+        CHECK(yielded.find("LETHAL COMES FIRST") != string::npos
+              && yielded.find("the loop cannot fire after they are dead") != string::npos,
+              "#W65-AN G6 REPRO the row clause yields: lethal first, the chain cannot"
+              " fire after they are dead");
+        CHECK(yielded.find("fatal to you, not a trade") == string::npos
+              && yielded.find("chains without limit -") == string::npos,
+              "#W65-AN G6 REPRO MUST-NOT-MATCH the verdict-contradicting caution is gone"
+              " from a proven-lethal screen");
+        // NEGATIVE: nothing proven, nothing yielded - byte-identical to wave 64.
+        bool noKill = false;
+        const string liveTotal = attackTotalLine(3, 9, 52, 5, 9, 0, false, 0, "", false,
+                                                 &noKill);
+        CHECK(!noKill && liveTotal.find("KILLS them") == string::npos
+              && lifeLoopAttackerRowTag(true, noKill) == string(kLifeLoopAttackerRowTag),
+              "#W65-AN G6 NEGATIVE with no kill claim the caution is unchanged, byte for"
+              " byte");
+        // The two withholding branches the total already has stay withholding, so
+        // the caution (not the yield) is what prints under them.
+        bool punished = false;
+        attackTotalLine(2, 4, 4, 3, 4, 0, false, 0, "Lightmine Field", false, &punished);
+        CHECK(!punished,
+              "#W65-AN G6 an unpriced attack punisher withholds the kill claim, so the"
+              " loop caution is not yielded either");
+        bool looped = false;
+        attackTotalLine(97, 98, 20, 2, 95, 0, false, 4, "", true, &looped);
+        CHECK(!looped,
+              "#W65-AN G6 the #W62-X D2 branch makes no kill claim, so nothing yields");
+        // MUST-NOT-MATCH `146v126` seq 29: three attacker rows against a
+        // CREATURELESS opponent, every attacker unblockable, the clause on all
+        // three. Unreachable from the row = no clause at all.
+        CHECK(lifeLoopAttackerRowTag(false, false).empty()
+              && lifeLoopAttackerRowTag(false, true).empty(),
+              "#W65-AN G6 MUST-NOT-MATCH a row no creature of theirs can block prints no"
+              " loop clause in either face");
+        // ECHO SHAPE: a parenthetical, like the clause it replaces - it opens no
+        // braced or bracketed annotation and leaves no residue in history.
+        CHECK(yielded.find('{') == string::npos && yielded.find('[') == string::npos
+              && yielded[0] == ' ' && yielded[1] == '(',
+              "#W65-AN G6 echo shape: the yielded clause is a row parenthetical, not a"
+              " new bracketed annotation");
+        // The wave-64 caution is a row PARENTHETICAL, not a braced or bracketed
+        // annotation, so stripNarrationDecoration passes both through untouched.
+        // The pin is that the yielded face behaves exactly as the face it
+        // replaces - it introduces no new echo class.
+        CHECK(stripNarrationDecoration("A1. Grizzly Bears #1 (2/2)" + yielded)
+                  == "A1. Grizzly Bears #1 (2/2)" + yielded
+              && stripNarrationDecoration("A1. Grizzly Bears #1 (2/2)"
+                                          + string(kLifeLoopAttackerRowTag))
+                  == "A1. Grizzly Bears #1 (2/2)" + string(kLifeLoopAttackerRowTag),
+              "#W65-AN G6 echo: the yielded clause has the wave-64 clause's echo shape"
+              " exactly - a parenthetical, not a new annotation class");
+        {
+            vector<bool> send;
+            const int r = parseAttackerSet(string("ATTACK: A1") + yielded, 1, send, NULL);
+            CHECK(r >= 0 && send.size() == 1 && send[0],
+                  "#W65-AN G6 an answer echoing the clause back still parses as A1");
+        }
+    }
+
+    cout << "\n[#W65-AN G6] the per-row converter arithmetic consults the loop detector\n";
+    {
+        // REPRO `162v126` seq 13: the row priced a body `life 21 -> 17` six lines
+        // under the window's own LOOP SCOPE paragraph ("ANY nonzero payment on a
+        // tag above is fatal"). The seat cast it and died from 21.
+        vector<string> one; one.push_back("Sanguine Bond");
+        const string open = theirConverterBodyTag(4, one, 21, false);
+        const string closed = theirConverterBodyTag(4, one, 21, true);
+        cout << "     open:   " << open << "\n     closed: " << closed << "\n";
+        CHECK(open.find("life 21 -> 17") != string::npos,
+              "#W65-AN G6 NEGATIVE with the loop OPEN the row is byte-identical to wave"
+              " 64 and still finishes the subtraction");
+        CHECK(closed.find("BOTH halves of their life LOOP are in play") != string::npos
+              && closed.find("ANY nonzero payment here is fatal") != string::npos,
+              "#W65-AN G6 REPRO with the loop CLOSED the row prints the loop verdict");
+        CHECK(closed.find("life 21 -> 17") == string::npos
+              && closed.find(" -> ") == string::npos,
+              "#W65-AN G6 REPRO MUST-NOT-MATCH no resulting-life figure survives on a"
+              " closed loop - the number is what the seat believed");
+        CHECK(closed.find("this body has toughness 4") != string::npos
+              && closed.find("Sanguine Bond") != string::npos,
+              "#W65-AN G6 the facts the row is built from are not deleted with the"
+              " arithmetic");
+        CHECK(theirConverterBodyTag(0, one, 21, true).empty()
+              && theirConverterBodyTag(4, vector<string>(), 21, true).empty(),
+              "#W65-AN G6 MUST-NOT-MATCH the closed face has the same two silences");
+        CHECK(closed[0] == ' ' && closed[1] == '{'
+              && closed[closed.size() - 1] == '}',
+              "#W65-AN G6 echo shape: the closed face is the same {their converter: }"
+              " annotation, not a new bracket");
+    }
+
+    cout << "\n[#W65-AN G10] the material claim names the search it is the maximum of\n";
+    {
+        // REPRO `152v146` seq 13/27: "no better material reaches that life figure"
+        // over a bipartite ONE-blocker-per-attacker matching, printed a line above
+        // a GANG BLOCK clause that reaches the same life AND kills the attacker.
+        vector<string> bn, an;
+        bn.push_back("Wolf #1"); an.push_back("Barrowin");
+        vector<int> m; m.push_back(0);
+        vector<int> chumpRank; chumpRank.push_back(1);
+        const string c = blockAssignmentClause(bn, an, m, 1, false, chumpRank, 8);
+        cout << "     " << c << "\n";
+        CHECK(c.find("no better material reaches that life figure among LONE blocks")
+                  != string::npos
+              && c.find("one blocker per attacker is all this search covers") != string::npos,
+              "#W65-AN G10 REPRO the maximum is claimed only over the search performed");
+        CHECK(c.find("GANG BLOCK:") != string::npos,
+              "#W65-AN G10 REPRO the clause points at the emitter that prices the case"
+              " it did not search");
+        // MUST-NOT-MATCH: the two other heads make no optimality claim, so neither
+        // gains the scope - both are byte-identical to wave 64.
+        vector<int> keepRank; keepRank.push_back(4);
+        const string keep = blockAssignmentClause(bn, an, m, 0, false, keepRank, 8);
+        CHECK(keep.find("material as well as for the life") != string::npos
+              && keep.find("LONE blocks") == string::npos,
+              "#W65-AN G10 MUST-NOT-MATCH the preserving head claims no maximum and is"
+              " unchanged");
+        const string unranked = blockAssignmentClause(bn, an, m);
+        CHECK(unranked.find("(no material ranking was performed on it)") != string::npos
+              && unranked.find("LONE blocks") == string::npos,
+              "#W65-AN G10 MUST-NOT-MATCH the unranked head is unchanged");
+    }
+
+    cout << "\n[#W65-AN G10] the best case folds the lifelink the same block gifts\n";
+    {
+        // `152` s12: the best-case life ignored the lifelink of the blockers in
+        // the very assignment it names - the identical omission F8b fixed for
+        // blocking triggers one wave earlier.
+        const string plain = incomingCombatLine(2, 9, 8, true, 0, 0, 5, true, -1, -1, "",
+                                                false, 3, 0);
+        const string ll = incomingCombatLine(2, 9, 8, true, 0, 0, 5, true, -1, -1, "",
+                                             false, 3, 2);
+        cout << "     " << ll << "\n";
+        CHECK(plain == incomingCombatLine(2, 9, 8, true, 0, 0, 5, true, -1, -1, "", false, 3),
+              "#W65-AN G10 NEGATIVE with no lifelink the header is byte-identical to wave"
+              " 64");
+        CHECK(ll.find("before your blocking triggers and your blockers' lifelink, 8 after"
+                      " the 5 those blocks gain you") != string::npos,
+              "#W65-AN G10 POSITIVE both halves are named and the figure is their sum");
+        CHECK(ll.find("before your blocking triggers, ") == string::npos,
+              "#W65-AN G10 MUST-NOT-MATCH the trigger-only wording never prints over a"
+              " figure that also carries lifelink");
+        // The badge the folded number governs: a lifelink gift that lifts the best
+        // case above 0 withdraws a death claim that would otherwise be false.
+        const string dead = incomingCombatLine(2, 9, 4, true, 0, 0, 4, true, -1, -1, "",
+                                               false, 0, 0);
+        const string saved = incomingCombatLine(2, 9, 4, true, 0, 0, 4, true, -1, -1, "",
+                                                false, 0, 3);
+        CHECK(dead.find("no block saves you") != string::npos
+              && saved.find("no block saves you") == string::npos,
+              "#W65-AN G10 the death badge is withdrawn by the same lifelink the named"
+              " block gifts");
+        CHECK(saved.find("you SURVIVE at 3 if you block") != string::npos,
+              "#W65-AN G10 and the survival figure it produces is stated, F9's shape");
+        // The FLOOR branch says the same thing in its own register.
+        const string floorLL = incomingCombatLine(2, 9, 8, true, 0, 0, 5, false, -1, -1, "",
+                                                  false, 3, 2);
+        CHECK(floorLL.find("AT BEST once the 5 your blocking triggers and your blockers'"
+                           " lifelink gain you is added") != string::npos,
+              "#W65-AN G10 the floor branch names both halves too");
+        CHECK(incomingCombatLine(2, 9, 8, true, 0, 0, 5, false, -1, -1, "", false, 3, 0)
+                  .find("once the 3 your blocking triggers gain you is added") != string::npos,
+              "#W65-AN G10 NEGATIVE the floor branch with no lifelink is unchanged");
+    }
+
+    cout << "\n[#W65-AN G10] the lifelink term exists only where the damage is dealt\n";
+    {
+        // Pure table. A blocker gains its controller life on damage DEALT, so a
+        // body that dies to first strike before it swings gains nothing.
+        CHECK(blockerLifelinkGain(2, 2, true, false, 3, false, false) == 2,
+              "#W65-AN G10 an ordinary lifelink blocker gains its power");
+        CHECK(blockerLifelinkGain(2, 2, true, false, 3, true, false) == 0,
+              "#W65-AN G10 killed by first strike before it deals damage: no gain");
+        CHECK(blockerLifelinkGain(2, 2, true, true, 3, true, false) == 2,
+              "#W65-AN G10 its OWN first strike puts its damage in the same step");
+        CHECK(blockerLifelinkGain(2, 5, true, false, 3, true, false) == 2,
+              "#W65-AN G10 a first-striker that cannot kill it does not stop the gain");
+        CHECK(blockerLifelinkGain(2, 5, true, false, 1, true, true) == 0,
+              "#W65-AN G10 first strike plus DEATHTOUCH makes 1 damage lethal");
+        CHECK(blockerLifelinkGain(2, 2, false, false, 1, false, false) == 0
+              && blockerLifelinkGain(0, 2, true, false, 1, false, false) == 0,
+              "#W65-AN G10 MUST-NOT-MATCH no lifelink, or no power, is no gain");
+    }
+
+    cout << "\n[#W65-AN MED] the forced-sacrifice tie-break faces whoever is paid\n";
+    {
+        // `126v123` seq 10: the branch where the toughness is life YOU gain told
+        // the seat to pick the row that "pays the least" - the ask inverted.
+        const string mine = buildForcedSacrificeAsk("Tribute to Hunger", true, 2);
+        const string theirs = buildForcedSacrificeAsk("Tribute to Hunger", true, 1);
+        const string none = buildForcedSacrificeAsk("Tribute to Hunger", true, 0);
+        CHECK(mine.find("the one that GAINS YOU THE MOST") != string::npos
+              && mine.find("pays the least") == string::npos,
+              "#W65-AN MED REPRO where YOU are paid the tie-break points at the most");
+        CHECK(theirs.find("the one that pays the least") != string::npos
+              && theirs.find("GAINS YOU") == string::npos,
+              "#W65-AN MED NEGATIVE the opponent-paid branch is byte-identical to wave 64");
+        CHECK(none.find("where the rows differ") == string::npos
+              && none.find("least useful body), and answer with") != string::npos,
+              "#W65-AN MED MUST-NOT-MATCH with no beneficiary named nothing is ranked");
+        CHECK(mine.find('{') == string::npos && mine.find('[') == string::npos,
+              "#W65-AN MED echo shape: the ask line opens no braced or bracketed"
+              " annotation");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
