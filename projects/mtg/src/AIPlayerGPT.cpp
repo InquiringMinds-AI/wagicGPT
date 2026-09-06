@@ -3645,17 +3645,37 @@ static string summoningSickTag(bool canBlock)
 //added: no row is created (they are still not choosable) and none is removed.
 //Only the ATTACK restriction is claimed here - the block permission is a
 //per-creature fact the board line already carries with its own can't-block test.
-static string attackersHeldSickLine(const std::vector<std::string>& names)
+//#W66-AU (R4, codex finding 4 - CONFIRMED). The line claimed two things its
+//caller never tested: that every omitted body "entered this turn" (a creature
+//GAINED this turn is summoning sick without having entered), and that each one
+//"attacks from your NEXT turn on" (a Defender, a CANTATTACK body or one whose
+//attack cost is unpaid never attacks at all). Say only what is known: the
+//sickness and the restriction it imposes THIS turn. The next-turn permission is
+//a separate, tested sentence, and it names only the bodies for which canAttack
+//would be true once the sickness lifts. `nextTurn` is parallel to `names`.
+static string attackersHeldSickLine(const std::vector<std::string>& names,
+                                    const std::vector<bool>& nextTurn = std::vector<bool>())
 {
     if (names.empty())
         return "";
     std::ostringstream o;
-    o << "NOT offered above and NOT able to attack this turn (summoning sick: entered"
-         " this turn without haste) - ";
+    o << "NOT offered above and NOT able to attack this turn (summoning sick) - ";
     for (size_t i = 0; i < names.size(); i++)
         o << (i ? "; " : "") << names[i];
-    o << ". They attack from your NEXT turn on; a plan that names one of them as an"
-         " attacker THIS turn cannot be executed.\n";
+    o << ". A plan that names one of them as an attacker THIS turn cannot be executed.";
+    std::vector<std::string> later;
+    for (size_t i = 0; i < names.size() && i < nextTurn.size(); i++)
+        if (nextTurn[i])
+            later.push_back(names[i]);
+    if (!later.empty())
+    {
+        o << " Of these, ";
+        for (size_t i = 0; i < later.size(); i++)
+            o << (i ? "; " : "") << later[i];
+        o << (later.size() == 1 ? " can attack" : " can attack")
+          << " from your NEXT turn on if nothing else changes.";
+    }
+    o << "\n";
     return o.str();
 }
 
@@ -11092,6 +11112,61 @@ static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const strin
 //subtraction is checkable against the log). Clamped to the step size, so the
 //remainder is never negative, and applied only when `stepIsNow` - a forecast of
 //a step that has not begun has nothing resolved in it. Pure over its inputs.
+//#W66-AU (R2, codex finding 2 - CONFIRMED). Wave 66 counted EVERY library->hand
+//move of the active seat inside the draw phase and subtracted it from a forecast
+//built out of the turn-based draw plus the static extra-draw permanents. A
+//cantrip cast in response to a Howling Mine trigger - or a Clue cracked in the
+//same step - therefore retired a draw the forecast never counted, and the line
+//reported zero remaining while the Mine draw and its Underworld Dreams damage
+//were still pending. The engine now carries the drawing ability's SOURCE on the
+//draw event, and only a source the forecast counted retires one of its draws:
+//the turn-based rule (no battlefield card behind it), or a permanent whose own
+//`@each my draw` / `@each opponent draw` line draws - the exact hook
+//drawStepExtrasScan reads. Pure over the script text.
+static bool drawFeedsStepForecast(const string& sourceMagicText, bool sourceOnBattlefield,
+                                  bool sourceIsTurnBasedRule)
+{
+    if (sourceIsTurnBasedRule)
+        return true;
+    if (!sourceOnBattlefield)
+        return false; //a spell resolving from the stack draws for itself
+    size_t lp = 0;
+    while (lp <= sourceMagicText.size())
+    {
+        const size_t nl = sourceMagicText.find('\n', lp);
+        string line = sourceMagicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? sourceMagicText.size() + 1 : nl + 1;
+        for (size_t i = 0; i < line.size(); i++)
+            line[i] = (char) tolower((unsigned char) line[i]);
+        const size_t st = line.find_first_not_of(" \t\r");
+        if (st == string::npos)
+            continue;
+        if (line.compare(st, 13, "@each my draw") != 0
+            && line.compare(st, 19, "@each opponent draw") != 0)
+            continue;
+        const size_t colon = line.find(':', st);
+        if (colon == string::npos)
+            continue;
+        if (line.find("draw:", colon) != string::npos)
+            return true;
+    }
+    return false;
+}
+
+//#W66-AU (R2): the sentence for the draws this step produced that the forecast
+//never counted. They are NOT subtracted; saying so is what keeps the remainder
+//honest without pretending to a provenance the engine cannot supply.
+static string drawsUnattributedClause(int unattributed)
+{
+    if (unattributed <= 0)
+        return "";
+    std::ostringstream o;
+    o << " (you also drew " << unattributed << " card" << (unattributed == 1 ? "" : "s")
+      << " this step from a spell or an ability, which this forecast never counted, so"
+         " nothing above is subtracted for " << (unattributed == 1 ? "it" : "them") << ")";
+    return o.str();
+}
+
 static int drawsStillAhead(int stepSize, int resolvedInStep, bool stepIsNow)
 {
     if (!stepIsNow || resolvedInStep <= 0)
@@ -11118,7 +11193,8 @@ static string drawsResolvedClause(int stepSize, int remaining)
 static string theirDrawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
                                         int perDraw, const string& loopCaution = "", //#W60-N (B6)
                                         bool stepIsNow = false, int holderLife = -1, //#W62-X (D8)
-                                        int resolvedInStep = 0) //#W66-AQ (H1)
+                                        int resolvedInStep = 0, //#W66-AQ (H1)
+                                        int unattributedInStep = 0) //#W66-AU (R2)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
@@ -11142,6 +11218,8 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
         o << ")";
     }
     o << drawsResolvedClause(k, left); //#W66-AQ (H1)
+    if (stepIsNow)
+        o << drawsUnattributedClause(unattributedInStep); //#W66-AU (R2)
     if (perDraw > 0)
     {
         //#W63-AC (E13, engine MED-9): "N life to you from your punishers above"
@@ -11178,7 +11256,8 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
 static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
                                    int perDraw, const string& loopCaution = "", //#W60-N (B6)
                                    bool stepIsNow = false, int holderLife = -1, //#W62-X (D8)
-                                   int resolvedInStep = 0) //#W66-AQ (H1)
+                                   int resolvedInStep = 0, //#W66-AQ (H1)
+                                   int unattributedInStep = 0) //#W66-AU (R2)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
@@ -11196,6 +11275,8 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
         o << ")";
     }
     o << drawsResolvedClause(k, left); //#W66-AQ (H1)
+    if (stepIsNow)
+        o << drawsUnattributedClause(unattributedInStep); //#W66-AU (R2)
     if (perDraw > 0)
     {
         //#W63-AC (E13, engine MED-9): the mirror. "N life to the punishers
@@ -11239,13 +11320,14 @@ static string drawForecastBlock(bool theirs, int base,
                                 const std::vector<std::pair<std::string, int> >& extras,
                                 int perDraw, const string& loopClause,
                                 bool stepIsNow, int holderLife,
-                                int resolvedInStep = 0) //#W66-AQ (H1)
+                                int resolvedInStep = 0, //#W66-AQ (H1)
+                                int unattributedInStep = 0) //#W66-AU (R2)
 {
     const string line = theirs
         ? theirDrawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife,
-                                    resolvedInStep)
+                                    resolvedInStep, unattributedInStep)
         : drawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife,
-                               resolvedInStep);
+                               resolvedInStep, unattributedInStep);
     return line.empty() ? line : (string("\n") + line);
 }
 
@@ -18070,13 +18152,20 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     //seq 152). Keyed on the turn, so a step that has not begun reads 0; the
     //opening deal is excluded by `mDealDone`, which the mulligan arm above
     //also gates on.
+    //#W66-AU (R2): ...and the counting is now PER SOURCE. The draw event carries
+    //the drawing ability's source card, so a draw retires one of the forecast's
+    //own draws only when the forecast counted its source: the turn-based rule
+    //(whose ability has no battlefield card behind it - GameObserver::ExtraRules)
+    //or a permanent with an `@each ... draw` line. Everything else - a cantrip
+    //resolving from the stack, a cracked Clue, an ETB - is counted separately and
+    //never subtracted. Where provenance cannot be known (no source at all) the
+    //MINIMUM is taken: the turn-based draw, once, and no more.
     if (mDealDone && observer)
     {
-        if (WEventZoneChange * dz = dynamic_cast<WEventZoneChange *>(event))
+        if (WEventcardDraw * dr = dynamic_cast<WEventcardDraw *>(event))
         {
-            Player * dw = (dz->card && dz->to) ? dz->to->owner : NULL;
-            if (dw && dw->game && dz->from == dw->game->library && dz->to == dw->game->hand
-                && observer->currentPlayer == dw
+            Player * dw = dr->player;
+            if (dw && observer->currentPlayer == dw
                 && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW)
             {
                 if (observer->turn != mDrawStepTurn)
@@ -18084,11 +18173,27 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                     mDrawStepTurn = observer->turn;
                     mDrawStepDrawsMine = 0;
                     mDrawStepDrawsTheirs = 0;
+                    mDrawStepOtherMine = 0;
+                    mDrawStepOtherTheirs = 0;
                 }
-                if (dw == this)
-                    mDrawStepDrawsMine++;
+                MTGCardInstance * src = dr->source;
+                bool onBattlefield = false;
+                for (int s = 0; s < 2 && src && !onBattlefield; s++)
+                    if (observer->players[s] && observer->players[s]->game
+                        && observer->players[s]->game->inPlay
+                        && observer->players[s]->game->inPlay->hasCard(src))
+                        onBattlefield = true;
+                const bool sourceless = !src
+                    || (observer->ExtraRules
+                        && (src == &observer->ExtraRules[0] || src == &observer->ExtraRules[1]));
+                int & counted = (dw == this) ? mDrawStepDrawsMine : mDrawStepDrawsTheirs;
+                int & other = (dw == this) ? mDrawStepOtherMine : mDrawStepOtherTheirs;
+                if (src && drawFeedsStepForecast(src->magicText, onBattlefield, false))
+                    counted++;
+                else if (sourceless && counted == 0)
+                    counted++; //the turn-based draw, once - the honest minimum
                 else
-                    mDrawStepDrawsTheirs++;
+                    other++;
             }
         }
     }
@@ -19247,24 +19352,50 @@ static string toLowerCopy(const string & s); //#W66-AQ (H10): fwd (defined below
 //`lifeLossMirrorScript`, the scan behind `lifeLoopProvenWin`). Returns NULL for
 //an ordinary body, in which case every byte downstream is as wave 65 wrote it.
 //Pure over the script text.
+//#W66-AU (R3): does ONE already-lowercased script line make a token
+//REPEATEDLY? The head is everything before the line's first ':' - the cost of
+//an activated ability, or a trigger header. A cost head (it carries a mana or
+//tap symbol) is repeatable by definition; a trigger header is repeatable only
+//when it recurs (@each ... , an upkeep, an attack or a combat step). Pure.
+static bool repeatableTokenEngineLine(const string& low)
+{
+    const size_t tk = low.find("token(");
+    if (tk == string::npos)
+        return false;
+    const size_t colon = low.find(':');
+    if (colon == string::npos || colon > tk)
+        return false; //a bare token(...) payload: a one-shot arrival
+    string head = low.substr(0, colon);
+    const size_t st = head.find_first_not_of(" \t\r");
+    if (st == string::npos)
+        return false;
+    head = head.substr(st);
+    if (head[0] == '@')
+        return head.find("each") != string::npos || head.find("upkeep") != string::npos
+            || head.find("attack") != string::npos || head.find("combat") != string::npos;
+    return head.find('{') != string::npos; //an activated ability's own cost
+}
+
 static const char * engineKindForScript(const string& magicText)
 {
     if (magicText.empty())
         return NULL;
-    //A repeatable token maker: a `token(` that hangs off a COST or a TRIGGER
-    //(both write a ':' ahead of it on the same line). A one-shot ETB
-    //`token(...)` with no ':' is a body's arrival, not an engine.
+    //#W66-AU (R3, codex finding 3 - CONFIRMED). "any ':' ahead of token(" is
+    //not the grammar: Wagic's colon also closes a ONE-SHOT trigger header, so
+    //`@movedto(this|mybattlefield):token(Soldier,...)` - an ETB that makes one
+    //body, once - was labelled a repeatable engine and the sweep and sacrifice
+    //renderers then said it "keeps producing while it is on board". Repeatable
+    //is what the HEAD of the line says: a cost head (an activated ability) or a
+    //recurring trigger (@each / upkeep / attack / combat). Every other trigger
+    //header - @movedto, @targeted, @damaged, @discarded - fires once per event
+    //and makes no engine of the body it sits on.
     size_t lp = 0;
     while (lp <= magicText.size())
     {
         const size_t nl = magicText.find('\n', lp);
         const string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
         lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
-        const string low = toLowerCopy(line);
-        const size_t tk = low.find("token(");
-        if (tk == string::npos)
-            continue;
-        if (low.rfind(':', tk) != string::npos)
+        if (repeatableTokenEngineLine(toLowerCopy(line)))
             return "TOKEN ENGINE (it makes more permanents, one per activation)";
     }
     int per = 0;
@@ -22786,9 +22917,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //#W66-AQ (H1): and how much of that step has ALREADY resolved.
                 const int myDone = (observer && observer->turn == mDrawStepTurn)
                                    ? mDrawStepDrawsMine : 0;
+                const int myOther = (observer && observer->turn == mDrawStepTurn)
+                                    ? mDrawStepOtherMine : 0; //#W66-AU (R2)
                 out << drawForecastBlock(false, 1, extras, theirsPer,
                                          loopCautionForLine(this, opp, true),
-                                         myDrawNow, life, myDone);
+                                         myDrawNow, life, myDone, myOther);
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -22806,9 +22939,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //#W66-AQ (H1): same subtraction on the punisher's own seat.
                 const int theirDone = (observer && observer->turn == mDrawStepTurn)
                                       ? mDrawStepDrawsTheirs : 0;
+                const int theirOther = (observer && observer->turn == mDrawStepTurn)
+                                       ? mDrawStepOtherTheirs : 0; //#W66-AU (R2)
                 out << drawForecastBlock(true, 1, theirExtras, minePer,
                                          loopCautionForLine(this, opp, false),
-                                         theirDrawNow, opp->life, theirDone);
+                                         theirDrawNow, opp->life, theirDone, theirOther);
             }
         }
     }
@@ -23905,11 +24040,12 @@ static string holdRowBenefitClause()
                   " taken in your first main phase also covers your second main"
                   " phase while these rows do not change; so is a row that"
                   " differs only by a bracket saying it cannot reach a spell on"
-                  " the stack; and so is a row that differs only by a NUMBER"
-                  " inside its brackets or braces, because a price or a life"
-                  " total moving with the board does not make it a different"
-                  " row - any WORD that changes, such as a row that begins"
-                  " saying it kills you, still re-opens this window}");
+                  " the stack; and so is a row that differs only by a LIFE"
+                  " TOTAL it projects - what you or they would be at - because"
+                  " that number moves with the board and not with the row. Any"
+                  " OTHER change re-opens this window, including a kill count, a"
+                  " damage figure, a survivor count, a price, and a row that"
+                  " begins saying it kills you}");
 }
 
 static string holdRowLine()
@@ -24084,69 +24220,74 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
 //"; this KILLS you" arriving at the zero crossing (`152v162` s44 -> s45) is a
 //real change and still re-opens the window. That is the line between forgiving
 //drift and the blind cache this latch must never become, and the row says so.
-//Digits are normalised ONLY inside a [...] or {...} annotation, never in the
-//row's own text; an instance ordinal (#2) and a mana cost ({2}) keep theirs,
-//because those name WHICH card and WHAT it costs. Shared choke point checked:
+//#W66-AU (R1): and the forgiven class is NAMED, not shaped. Only a life total
+//a row projects normalises (the words that introduce it are enumerated below);
+//every other number - a kill count, a damage figure, a survivor count, a mana
+//cost, an instance ordinal - keeps its digits. Shared choke point checked:
 //holdKeyRow is read by takeHold and holdStillStands and by nothing else -
 //the option-set key (declines/deadlock) drops every bracket already, the ask
 //key and the async slot key are built from the prompt text, not from this.
-static bool holdKeyManaCostBraceAt(const string& s, size_t open)
+//#W66-AU (R1, codex finding 1 - CONFIRMED, and a doctrine breach). Wave 66's
+//H7 normaliser replaced EVERY digit inside a [...] or {...} with '#', so a
+//removal row whose verdict moved from `kills 0 of their 1 creatures` to
+//`kills 1 of their 1 creatures` normalised to the SAME key and the newly
+//effective removal was never put again. That is the blind cache this latch
+//must never become. The forgiveness is therefore enumerated BY THE WORDS that
+//introduce a LIFE TOTAL the board moves under a row that has not otherwise
+//changed - the class the two corpus runs were about - and by nothing else: a
+//kill count, a damage figure, a survivor count, a mana price, an instance
+//ordinal and every verdict word keep their digits and still re-open the window.
+static const char * kHoldLifeProjectionAnchor[] = {
+    "you would be at ",        //152v162 s42->s43, and every combat/stack forecast
+    "they would be at ",       //the punisher seat's mirror
+    "at life ",                //130v126 s37->s55: the opponent's life in the cast tail
+    "leaves them at ",         //...and the total that same tail projects for them
+    "so taking it costs you ", //the DRAW PRICE life figure
+    "(your "                   //the cleanup forecast's restatement: "(your 18 life ...)"
+};
+//The anchor, the number it introduces, and nothing either side of it. Pure.
+static bool holdKeyLifeProjectionAt(const string& s, size_t i, size_t& numFrom, size_t& numTo)
 {
-    const size_t close = s.find('}', open);
-    if (close == string::npos || close <= open + 1 || close - open - 1 > 4)
-        return false;
-    for (size_t i = open + 1; i < close; i++)
+    const size_t n_anchors = sizeof(kHoldLifeProjectionAnchor) / sizeof(kHoldLifeProjectionAnchor[0]);
+    for (size_t a = 0; a < n_anchors; a++)
     {
-        const char c = (char) tolower((unsigned char) s[i]);
-        if (!isdigit((unsigned char) c) && !strchr("wubrgcxyzst/p", c))
-            return false;
+        const size_t n = strlen(kHoldLifeProjectionAnchor[a]);
+        if (i + n > s.size() || s.compare(i, n, kHoldLifeProjectionAnchor[a]) != 0)
+            continue;
+        size_t d = i + n;
+        if (d < s.size() && s[d] == '-')
+            d++; //a life total below zero is still a life total
+        size_t e = d;
+        while (e < s.size() && isdigit((unsigned char) s[e]))
+            e++;
+        if (e == d)
+            continue; //the anchor's words with no number after them are just words
+        //"(your " opens a life restatement only when " life" follows the number;
+        //anything else in that parenthesis is a magnitude and keeps its digits.
+        if (a == n_anchors - 1 && (e + 5 > s.size() || s.compare(e, 5, " life") != 0))
+            continue;
+        numFrom = i + n;
+        numTo = e;
+        return true;
     }
-    return true;
+    return false;
 }
 
-static string holdKeyNumbersNormalised(const string& row)
+static string holdKeyLifeProjectionsNormalised(const string& row)
 {
     string out;
-    int depth = 0; //inside a [...] or {...} annotation
     size_t i = 0;
     while (i < row.size())
     {
-        const char c = row[i];
-        if (c == '{' && holdKeyManaCostBraceAt(row, i))
+        size_t from = 0, to = 0;
+        if (holdKeyLifeProjectionAt(row, i, from, to))
         {
-            const size_t close = row.find('}', i);
-            out.append(row, i, close - i + 1); //a cost keeps its digits
-            i = close + 1;
+            out.append(row, i, from - i); //the anchoring WORDS stay, byte for byte
+            out += '#';
+            i = to;
             continue;
         }
-        if (c == '[' || c == '{')
-        {
-            depth++;
-            out += c;
-            i++;
-            continue;
-        }
-        if ((c == ']' || c == '}') && depth > 0)
-        {
-            depth--;
-            out += c;
-            i++;
-            continue;
-        }
-        if (depth > 0 && isdigit((unsigned char) c))
-        {
-            const bool ordinal = (i > 0 && row[i - 1] == '#'); //#2 names a card
-            size_t e = i;
-            while (e < row.size() && isdigit((unsigned char) row[e]))
-                e++;
-            if (ordinal)
-                out.append(row, i, e - i);
-            else
-                out += '#';
-            i = e;
-            continue;
-        }
-        out += c;
+        out += row[i];
         i++;
     }
     return out;
@@ -24164,7 +24305,7 @@ static string holdKeyRow(const string& row)
     const size_t t = core.find(kStackTargetClause); //#W64-AJ
     if (t != string::npos)
         core.erase(t, strlen(kStackTargetClause));
-    return holdKeyNumbersNormalised(core); //#W66-AS (H7)
+    return holdKeyLifeProjectionsNormalised(core); //#W66-AS (H7) + #W66-AU (R1)
 }
 
 static bool holdStillStands(const std::set<string>& heldRows,
@@ -31694,17 +31835,37 @@ static string stripTrailingPT(const string& core)
 //single definition of dead) does NOT flag, and the row it used is reported so
 //the sentence around it can name the right number - the number and the name in
 //an example that says "e.g." must still point at the same row.
-//Every row dead (or one row only) keeps row 1: withholding the example
-//altogether would leave the format unstated, which is the worse surface.
+//#W66-AU (R5, codex finding 5 - CONFIRMED). Wave 66 left the all-dead menu on
+//row 1, which is the very answer-attractor H8 was docketed against: a mandatory
+//menu of `Cast A {right now: this does nothing}` / `Cast B {...}` handed the
+//model `CHOICE: 1 (Cast A)` as its worked answer. The format still has to be
+//stated, so it is - as a TEMPLATE that names no row. A decline row is preferred
+//first where the menu has one: declining IS the least harmful answer, and it is
+//a real row, not a fallback. `*usedRow` is 0 when no row is exemplified, and the
+//caller's sentence changes with it.
 static string askExemplar(const vector<string>& options, int * usedRow = NULL)
 {
     size_t pick = 0;
+    bool anyLive = false;
     for (size_t i = 0; i < options.size(); i++)
         if (!AIPlayerGPT::rowSaysNoOp(options[i]))
         {
             pick = i;
+            anyLive = true;
             break;
         }
+    if (!options.empty() && !anyLive)
+    {
+        const int decline = declineRowIndexOf(options);
+        if (decline >= 0)
+            pick = (size_t) decline; //passing is legal: exemplify the pass
+        else
+        {
+            if (usedRow)
+                *usedRow = 0;
+            return string("CHOICE: <row number> (<that row's short name>)");
+        }
+    }
     if (usedRow)
         *usedRow = options.empty() ? 1 : (int) pick + 1;
     string core = options.empty() ? string("Example option") : stripNarrationDecoration(options[pick]);
@@ -31719,6 +31880,24 @@ static string askExemplar(const vector<string>& options, int * usedRow = NULL)
     std::ostringstream ex;
     ex << "CHOICE: " << (options.empty() ? 1 : (int) pick + 1) << " (" << core << ")";
     return ex.str();
+}
+
+//#W66-AU (R5): the sentence that carries the example. When no row is
+//exemplified (every row on the menu is dead and none of them declines) it says
+//so, and says what to do instead, rather than pointing at a row that does
+//nothing. Pure, so both faces are pinned without a game.
+static string exemplarSentence(const string& exemplarText, int exemplarRow)
+{
+    std::ostringstream o;
+    o << " and its SHORT NAME in parentheses (the name only - copy nothing from the"
+         " {...} annotations), e.g. \"" << exemplarText << "\"";
+    if (exemplarRow <= 0)
+        o << " (a worked example of the FORMAT only - every row on this list does nothing"
+             " right now, so no row is exemplified: pick the least harmful)";
+    else
+        o << " (a worked example of the format, written out from row " << exemplarRow
+          << " of this list - choose the option YOU want)";
+    return o.str();
 }
 
 //#W59-J (K10): may the seat's own last answer stand for this window? Every
@@ -31889,7 +32068,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
          //#W64-AH (F2): read off the ROWS this window renders, with the
          //caller's flag kept as the fallback - see declineFactForMenu.
          << declineFactForMenu(options, declineRowOffered)
-         << " and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"" << exemplarText << "\" (a worked example of the format, written out from row " << exemplarRow << " of this list - choose the option YOU want)"
+         << exemplarSentence(exemplarText, exemplarRow) //#W66-AU (R5)
          << planRequestClause(suppressPlanRequest) << " Write nothing else.";
     string tailStr = tail.str();
 
@@ -40630,6 +40809,7 @@ int AIPlayerGPT::chooseAttackers()
         //never appear here.
         {
             std::vector<std::string> sickNames;
+            std::vector<bool> sickNextTurn; //#W66-AU (R4)
             if (game && game->inPlay)
                 for (int si = 0; si < game->inPlay->nb_cards; si++)
                 {
@@ -40641,9 +40821,23 @@ int AIPlayerGPT::chooseAttackers()
                         if (attackers[aj] == sc)
                             offered = true;
                     if (!offered)
+                    {
                         sickNames.push_back(sc->getDisplayName() + instanceHandle(sc));
+                        //#W66-AU (R4): the NEXT-turn permission is claimed only when
+                        //MTGCardInstance::canAttack's other gates would all pass once
+                        //the sickness lifts - no CANTATTACK, no flyers-only bar, no
+                        //Defender without CANATTACK, not a Battle, and no unpaid
+                        //attack cost. Everything else is named as sick and no more.
+                        const bool wouldAttack =
+                            !sc->has(Constants::CANTATTACK)
+                            && !(sc->has(Constants::FLYERSONLY) && !sc->has(Constants::FLYING))
+                            && !(sc->has(Constants::DEFENSER) && !sc->has(Constants::CANATTACK))
+                            && !sc->hasType(Subtypes::TYPE_BATTLE)
+                            && sc->attackCost <= 0;
+                        sickNextTurn.push_back(wouldAttack);
+                    }
                 }
-            totalsTail << attackersHeldSickLine(sickNames);
+            totalsTail << attackersHeldSickLine(sickNames, sickNextTurn);
         }
         //#W60-L (B11): and the arithmetic that count line stops one step short
         //of. `guaranteed` counts every attacker nothing of theirs may block, then
@@ -56098,10 +56292,14 @@ static const char * kW50Y_r94 =
         // holds on nothing else), so that half is now forgiven; every WORD of
         // the row and of its verdict is still compared byte for byte, and that
         // is what this case pins on each side.
+        //#W66-AU (R1): AMENDED AGAIN, and this is the codex review's own case: the
+        //number of bodies they may sacrifice is a SURVIVOR COUNT, not a life
+        //total, so it is back inside the key. Only the named life projections
+        //are forgiven (see the #W66-AS H7 block for the two corpus runs).
         vector<string> countMoved(rowsA);
         countMoved[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 3, their choice}";
-        CHECK(holdStillStands(held, countMoved, &why),
-              "#W66-AS H7 a {right now:} count moving with the board no longer re-opens the window");
+        CHECK(!holdStillStands(held, countMoved, &why),
+              "#W66-AU R1 a {right now:} survivor count moving DOES re-open the window");
         vector<string> priced(rowsA);
         priced[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 2, their choice"
                     " - and the ONLY one they can spare is the Keeper}";
@@ -58073,10 +58271,11 @@ static const char * kW50Y_r94 =
                  " second main phase while these rows do not change; so is a"
                  " row that differs only by a bracket saying it cannot reach a"
                  " spell on the stack; and so is a row that differs only by a"
-                 " NUMBER inside its brackets or braces, because a price or a"
-                 " life total moving with the board does not make it a different"
-                 " row - any WORD that changes, such as a row that begins saying"
-                 " it kills you, still re-opens this window}", //#W66-AS (H7)
+                 " LIFE TOTAL it projects - what you or they would be at -"
+                 " because that number moves with the board and not with the"
+                 " row. Any OTHER change re-opens this window, including a kill"
+                 " count, a damage figure, a survivor count, a price, and a row"
+                 " that begins saying it kills you}", //#W66-AS (H7) + #W66-AU (R1)
               "#W61-U C14 the benefit clause's literal - the saving the latch now delivers");
         CHECK(holdRowBenefitClause().find("every later window whose rows are identical to these}")
               == string::npos,
@@ -58913,20 +59112,7 @@ static const char * kW50Y_r94 =
         const string rendered = holdRowLine();
         CHECK(rendered != pure && rendered.compare(0, pure.size(), pure) == 0,
               "#W57-A D4 the wave-56 value was a strict PREFIX of the row - the exact shape the census missed");
-        CHECK(rendered == pure + " {taking this row skips every later window that asks THIS"
-                                 " SAME question with rows identical to these; a different"
-                                 " question is still asked. A pass row that differs only by"
-                                 " naming which step comes next is the same row, so a hold"
-                                 " taken in your first main phase also covers your second"
-                                 " main phase while these rows do not change; so is"
-                                 " a row that differs only by a bracket saying it"
-                                 " cannot reach a spell on the stack; and so is a"
-                                 " row that differs only by a NUMBER inside its"
-                                 " brackets or braces, because a price or a life"
-                                 " total moving with the board does not make it a"
-                                 " different row - any WORD that changes, such as a"
-                                 " row that begins saying it kills you, still"
-                                 " re-opens this window}", //#W63-AF (R2) + #W64-AJ + #W66-AS (H7)
+        CHECK(rendered == pure + holdRowBenefitClause(), //#W66-AU (R1): one literal, above
               "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
         // the last-offer and upkeep-animation clauses are on the rendered row too
         {
@@ -65356,10 +65542,17 @@ static const char * kW50Y_r94 =
             CHECK(!holdStillStands(held, repriced, &why)
                   && string(why) == "a printed row changed or is newly available",
                   "#W63-AD E10 MUST-NOT-MATCH a repriced row still re-opens the window");
+            //#W66-AU (R1): AMENDED. A source COUNT is not a life total; it is one of
+            //the numbers the codex review proved a blind key could hide, so it
+            //re-opens the window. The forgiven half is pinned on the corpus rows
+            //in the #W66-AS H7 block, which is where the class actually lives.
             vector<string> countOnly = main2;
             countOnly[0] = "Cast Molten Rain {1}{r}{r} {leaves 2 of your 5 untapped}";
-            CHECK(holdStillStands(held, countOnly, &why),
-                  "#W66-AS H7 ...while the same row with one DIGIT moved keeps the hold");
+            CHECK(!holdStillStands(held, countOnly, &why),
+                  "#W66-AU R1 MUST-RE-OPEN a source count moving is not a life projection");
+            CHECK(holdKeyRow("Cast Molten Rain {1}{r}{r} {right now: you would be at 5}")
+                      == holdKeyRow("Cast Molten Rain {1}{r}{r} {right now: you would be at 4}"),
+                  "#W66-AU R1 POSITIVE ...while the life total the same row projects is forgiven");
             vector<string> grown = main2;
             grown.push_back("Cast Sorin, Lord of Innistrad {2}{w}{b}");
             CHECK(!holdStillStands(held, grown, &why),
@@ -65379,13 +65572,18 @@ static const char * kW50Y_r94 =
         //#W66-AS (H7): the annotations THEMSELVES stay in the key - every word of
         //them - which is what separates this from stripAnnotations; only the
         //digits inside them normalise, and the row's own cost keeps its digits.
-        CHECK(holdKeyRow("Cast X {2}{r} [a note] {leaves 1}") == "Cast X {2}{r} [a note] {leaves #}"
+        //#W66-AU (R1): AMENDED. A bare count inside a brace is NOT a life total,
+        //so it keeps its digits and re-opens the window - the wave-66 rule
+        //forgives the named life projections and nothing else.
+        CHECK(holdKeyRow("Cast X {2}{r} [a note] {leaves 1}") == "Cast X {2}{r} [a note] {leaves 1}"
+              && holdKeyRow("Cast X {2}{r} [a note] {leaves 1}")
+                 != holdKeyRow("Cast X {2}{r} [a note] {leaves 2}")
               && holdKeyRow("Cast X {2}{r} [a note] {leaves 1}")
                  != holdKeyRow("Cast X {2}{r} [another note] {leaves 1}")
               && holdKeyRow("Cast X {2}{r} [a note] {leaves 1}")
                  != holdKeyRow("Cast X {3}{r} [a note] {leaves 1}"),
-              "#W63-AD E10 MUST-NOT-MATCH the hold key is NOT stripAnnotations: every WORD of an"
-              " annotation, and every mana cost, stays in it");
+              "#W66-AU R1 MUST-NOT-MATCH the hold key is NOT stripAnnotations and NOT digit-blind:"
+              " every WORD, every mana cost and every non-life number stays in it");
         CHECK(holdKeyRow("Cast nothing right now (combat comes next this turn)")
               == "Cast nothing right now",
               "#W63-AD E10 the one clause the key forgives, and only where it appears");
@@ -68103,9 +68301,10 @@ static const char * kW50Y_r94 =
               "#W66-AS H7 CONTROL #W63-AD's phase clause still normalises away");
         // The row SAYS what the key forgives - a difference forgiven silently is
         // the blind cache the latch must not become.
-        CHECK(holdRowBenefitClause().find("differs only by a NUMBER") != string::npos
-              && holdRowBenefitClause().find("any WORD that changes") != string::npos,
-              "#W66-AS H7 POSITIVE the hold row names the third forgiven difference, and its limit");
+        CHECK(holdRowBenefitClause().find("differs only by a LIFE TOTAL it projects") != string::npos
+              && holdRowBenefitClause().find("Any OTHER change re-opens this window, including a"
+                                             " kill count") != string::npos,
+              "#W66-AU R1 the hold row names the forgiven class BY NAME, and its limit");
         CHECK(holdRowBenefitClause().find_first_of("0123456789") == string::npos
               && holdRowBenefitClause()[holdRowBenefitClause().size() - 1] == '}',
               "#W66-AS H7 KEY the row's own clause still carries no number and is one {...} group");
@@ -68329,18 +68528,48 @@ static const char * kW50Y_r94 =
             vector<string> sickNames;
             sickNames.push_back("Briarbridge Tracker");
             sickNames.push_back("Luminarch Aspirant #2");
-            const string line = attackersHeldSickLine(sickNames);
-            CHECK(line.find("NOT offered above and NOT able to attack this turn") == 0
+            //#W66-AU (R4): AMENDED. The line no longer claims "entered this turn"
+            //(a creature GAINED this turn is sick without having entered) and no
+            //longer promises next turn to every body: that half is a separate
+            //sentence, and it names only the bodies the caller tested.
+            std::vector<bool> bothAttack(2, true);
+            const string line = attackersHeldSickLine(sickNames, bothAttack);
+            CHECK(line.find("NOT offered above and NOT able to attack this turn (summoning sick)") == 0
                       && line.find("Briarbridge Tracker; Luminarch Aspirant #2") != string::npos
                       && line[line.size() - 1] == '\n',
                   "#W66-AT H6 the attackers window names the bodies its candidate walk left out");
-            CHECK(attackersHeldSickLine(vector<string>()).empty(),
+            CHECK(line.find("entered this turn") == string::npos,
+                  "#W66-AU R4 MUST-NOT-MATCH the line no longer asserts HOW the sickness arose");
+            CHECK(attackersHeldSickLine(vector<string>()).empty()
+                      && attackersHeldSickLine(vector<string>(), bothAttack).empty(),
                   "#W66-AT H6 NEGATIVE no summoning-sick body, no line");
             // MUST-NOT-MATCH (N-139k's rule): no affirmative attack licence for
             // THIS turn can appear in the line the model reads.
             CHECK(line.find("can attack this turn") == string::npos
                       && line.find("NEXT turn") != string::npos,
                   "#W66-AT H6 MUST-NOT-MATCH restriction first: the only attack licence named is NEXT turn");
+            // #W66-AU (R4): a body that cannot attack even once the sickness lifts
+            // (a Defender, a CANTATTACK body, an unpaid attack cost) is named as
+            // held out and promised nothing.
+            {
+                std::vector<bool> neither(2, false);
+                const string held = attackersHeldSickLine(sickNames, neither);
+                CHECK(held.find("NEXT turn") == string::npos
+                          && held.find("Briarbridge Tracker; Luminarch Aspirant #2") != string::npos,
+                      "#W66-AU R4 MUST-NOT-MATCH a Defender/CANTATTACK body is held out with no"
+                      " next-turn promise");
+                std::vector<bool> onlySecond;
+                onlySecond.push_back(false);
+                onlySecond.push_back(true);
+                const string mixed = attackersHeldSickLine(sickNames, onlySecond);
+                CHECK(mixed.find("Of these, Luminarch Aspirant #2 can attack from your NEXT turn on")
+                          != string::npos
+                          && mixed.find("Of these, Briarbridge Tracker") == string::npos,
+                      "#W66-AU R4 POSITIVE the next-turn sentence names only the bodies that passed"
+                      " the caller's test");
+                CHECK(attackersHeldSickLine(sickNames).find("NEXT turn") == string::npos,
+                      "#W66-AU R4 NEGATIVE with no verdicts supplied, nothing is promised");
+            }
         }
     }
     {
@@ -68686,7 +68915,9 @@ static const char * kW50Y_r94 =
                               "{B}:flip(backside) restriction{type(vampire|mybattlefield)~morethan~4}";
         const string unraveler = "@drawfoeof(player):damage:1 opponent";
         const string vanilla = "flying";
-        const string oneShotToken = "token(Soldier,Creature Soldier,1/1,white)";
+        //#W66-AU (R3): the REAL one-shot grammar - Wagic writes an ETB trigger with
+        //a colon too, and the colon-only test called this a repeatable engine.
+        const string oneShotToken = "@movedto(this|mybattlefield):token(Soldier,Creature Soldier,1/1,white)";
         CHECK(engineKindForScript(keeper)
                   && string(engineKindForScript(keeper)).find("TOKEN ENGINE") == 0,
               "#W66-AQ H10 POSITIVE Bloodline Keeper's `{T}:token(...)` is a token ENGINE");
@@ -68694,9 +68925,10 @@ static const char * kW50Y_r94 =
                   && string(engineKindForScript(unraveler)).find("DRAW PUNISHER") == 0,
               "#W66-AQ H10 POSITIVE Fate Unraveler is the draw punisher the same prompt lists");
         CHECK(engineKindForScript(vanilla) == NULL && engineKindForScript("") == NULL
-                  && engineKindForScript(oneShotToken) == NULL,
-              "#W66-AQ H10 MUST-NOT-MATCH an ordinary body, and a ONE-SHOT token arrival with no"
-              " cost or trigger ahead of it, are not engines");
+                  && engineKindForScript(oneShotToken) == NULL
+                  && engineKindForScript("token(Soldier,Creature Soldier,1/1,white)") == NULL,
+              "#W66-AU R3 MUST-NOT-MATCH an ordinary body, and a ONE-SHOT ETB token arrival written"
+              " in Wagic's own `@movedto(...):token(...)` grammar, are not engines");
         // THE SWEEP BRACKET. `130v123` seq 44 rendered THEIRS 1 / YOURS 2 with
         // the parenthetical that it takes more of YOURS - over a Bloodline
         // Keeper under Intruder Alarm. The seat cycled Starstorm and died at -78.
@@ -68967,14 +69199,35 @@ static const char * kW50Y_r94 =
         int row2 = 0;
         CHECK(askExemplar(plain, &row2) == "CHOICE: 1 (Cast Lightning Bolt)" && row2 == 1,
               "#W66-AR H8 MUST-NOT-MATCH a menu with no dead row is unchanged");
-        // NEGATIVE: every row dead keeps row 1 - withholding the example would
-        // leave the FORMAT unstated, which is the worse surface.
+        //#W66-AU (R5): AMENDED - the codex review's own case. Wave 66 fell back to
+        //row 1 when EVERY row was dead, which is the answer-attractor H8 was
+        //docketed against. The format is still stated; no row is exemplified.
         vector<string> allDead;
         allDead.push_back("Cast A {right now: this does nothing}");
         allDead.push_back("Cast B {right now: this does nothing}");
-        int row3 = 0;
-        CHECK(askExemplar(allDead, &row3) == "CHOICE: 1 (Cast A)" && row3 == 1,
-              "#W66-AR H8 NEGATIVE with every row dead the example is still written, from row 1");
+        int row3 = -1;
+        const string deadEx = askExemplar(allDead, &row3);
+        CHECK(deadEx == "CHOICE: <row number> (<that row's short name>)" && row3 == 0,
+              "#W66-AU R5 with every row dead no row is exemplified, and the format still is");
+        CHECK(deadEx.find("Cast A") == string::npos && deadEx.find("Cast B") == string::npos,
+              "#W66-AU R5 MUST-NOT-MATCH no dead row's name reaches the answer slot");
+        CHECK(exemplarSentence(deadEx, row3).find("every row on this list does nothing right now,"
+                                                  " so no row is exemplified: pick the least"
+                                                  " harmful") != string::npos
+                  && exemplarSentence(deadEx, row3).find("written out from row") == string::npos,
+              "#W66-AU R5 the sentence around it says what it is, and points at no row");
+        //...and where the dead menu DOES carry a decline, passing is the example.
+        {
+            vector<string> deadWithPass(allDead);
+            deadWithPass.push_back("Cast nothing right now {right now: this does nothing}");
+            int row3b = -1;
+            CHECK(askExemplar(deadWithPass, &row3b) == "CHOICE: 3 (Cast nothing right now)"
+                      && row3b == 3,
+                  "#W66-AU R5 POSITIVE where passing is legal the pass row is the worked example");
+        }
+        CHECK(exemplarSentence("CHOICE: 2 (Cast Chromatic Lantern)", 2)
+                  .find("written out from row 2 of this list") != string::npos,
+              "#W66-AU R5 NEGATIVE an ordinary menu's sentence is unchanged");
         int row4 = 0;
         CHECK(askExemplar(vector<string>(), &row4) == "CHOICE: 1 (Example option)" && row4 == 1,
               "#W66-AR H8 NEGATIVE an empty menu keeps the placeholder");
@@ -69125,6 +69378,122 @@ static const char * kW50Y_r94 =
         CHECK(gptcaveat::textHasCorrectionHeader("line one\nCorrection: no.\n")
                   && !gptcaveat::textHasCorrectionHeader("line one\nno correction needed\n"),
               "#W66-AR MED-2b the scan reads line starts, not the word anywhere");
+    }
+
+    // ================= #W66-AU: the wave-66 adversarial review's five findings ==========
+    cout << "\n[#W66-AU R1] the hold key forgives a LIFE TOTAL by name, and nothing else\n";
+    {
+        // THE REVIEW'S OWN TRIGGER. A removal row whose target loses toughness:
+        // the row is legal in both windows, and in the second one it now kills.
+        const string kills0 = "Cast Shock {r} {right now: deals 3, kills 0 of their 1 creatures}";
+        const string kills1 = "Cast Shock {r} {right now: deals 3, kills 1 of their 1 creatures}";
+        CHECK(holdKeyRow(kills0) != holdKeyRow(kills1),
+              "#W66-AU R1 MUST-RE-OPEN `kills 0 of` -> `kills 1 of` is a different question and"
+              " the hold cannot answer it");
+        {
+            std::set<string> held;
+            held.insert(holdKeyRow(kills0));
+            held.insert(holdKeyRow(holdRowLine()));
+            vector<string> now;
+            now.push_back(kills1);
+            now.push_back(holdRowLine());
+            const char * why = "";
+            CHECK(!holdStillStands(held, now, &why)
+                      && string(why) == "a printed row changed or is newly available",
+                  "#W66-AU R1 MUST-RE-OPEN end to end: the newly effective removal is put again");
+        }
+        // The other numbers the review named: damage, price, survivors, verdict.
+        CHECK(holdKeyRow("Cast Bolt {r} {right now: deals 3}")
+                  != holdKeyRow("Cast Bolt {r} {right now: deals 4}")
+              && holdKeyRow("Sacrifice a body {right now: 2 of yours survive}")
+                  != holdKeyRow("Sacrifice a body {right now: 1 of yours survives}")
+              && holdKeyRow("Crack Clue [cost: {2}, Sacrifice]")
+                  != holdKeyRow("Crack Clue [cost: {3}, Sacrifice]"),
+              "#W66-AU R1 MUST-RE-OPEN a damage figure, a survivor count and a price all stay in"
+              " the key");
+        // ...and the forgiven class, re-verified on the two corpus runs lane AS
+        // used, which is what this narrowing must not break.
+        const string clue4 = "Draw 1 with Clue [cost: {2}, Sacrifice] [DRAW PRICE: this draws 1 card,"
+            " and the opponent's Ob Nixilis, the Hate-Twisted, Underworld Dreams #1, Fate Unraveler,"
+            " Underworld Dreams #2 punish every draw, so taking it costs you 4 life right now -"
+            " you would be at 4]";
+        const string clue3 = "Draw 1 with Clue [cost: {2}, Sacrifice] [DRAW PRICE: this draws 1 card,"
+            " and the opponent's Ob Nixilis, the Hate-Twisted, Underworld Dreams #1, Fate Unraveler,"
+            " Underworld Dreams #2 punish every draw, so taking it costs you 4 life right now -"
+            " you would be at 3]";
+        CHECK(clue4 != clue3 && holdKeyRow(clue4) == holdKeyRow(clue3),
+              "#W66-AU R1 POSITIVE 152v162 s42 -> s43 still holds under the narrowed rule");
+        const string spray17 = "Cast Spark Spray {r} {leaves 5 of your 6 untapped mana sources"
+            " untapped} {kills: Vampire - and 1 to the opponent at life 17 leaves them at 16} - legal";
+        const string spray18 = "Cast Spark Spray {r} {leaves 5 of your 6 untapped mana sources"
+            " untapped} {kills: Vampire - and 1 to the opponent at life 18 leaves them at 17} - legal";
+        CHECK(spray17 != spray18 && holdKeyRow(spray17) == holdKeyRow(spray18),
+              "#W66-AU R1 POSITIVE 130v126 s37 -> s38 still holds under the narrowed rule");
+        // ...and a life projection that turns into a KILL verdict is words, not
+        // a number, so it re-opens - the line the latch must never cross.
+        CHECK(holdKeyRow("Attack: you would be at 1")
+                  != holdKeyRow("Attack: you would be at 0; this KILLS you"),
+              "#W66-AU R1 MUST-RE-OPEN the verdict word still re-opens the window");
+        // NEGATIVE: the anchoring words with no number after them are just words,
+        // and a magnitude that is not a life total keeps its digits.
+        CHECK(holdKeyRow("Cast X {at life or death}") == "Cast X {at life or death}"
+                  && holdKeyRow("Cast X {(your 3 creatures untap)}")
+                     == "Cast X {(your 3 creatures untap)}",
+              "#W66-AU R1 NEGATIVE an anchor's words alone, and a non-life number after one,"
+              " are untouched");
+    }
+
+    cout << "\n[#W66-AU R2] a draw retires a forecast draw only when the forecast counted its source\n";
+    {
+        // THE REVIEW'S OWN TRIGGER: the turn-based draw plus a Howling Mine
+        // trigger still on the stack, and a cantrip cast in response.
+        const string mine = "@each my draw sourcenottap:draw:1 opponent\n"
+                            "@each opponent draw sourcenottap:draw:1 controller";
+        const string dictate = "@each my draw:draw:1 controller\n@each opponent draw:draw:1 opponent";
+        const string cantrip = "draw:1";
+        const string clue = "{2},{S}:draw:1";
+        const string etbDraw = "@movedto(this|mybattlefield):draw:1 controller";
+        CHECK(drawFeedsStepForecast(mine, true, false) && drawFeedsStepForecast(dictate, true, false),
+              "#W66-AU R2 POSITIVE a Howling Mine / Dictate of Kruphix draw IS one the forecast counted");
+        CHECK(drawFeedsStepForecast("", false, true),
+              "#W66-AU R2 POSITIVE the turn-based draw (no battlefield source behind it) is counted");
+        CHECK(!drawFeedsStepForecast(cantrip, false, false),
+              "#W66-AU R2 MUST-NOT-MATCH a cantrip resolving from the stack retires no forecast draw");
+        CHECK(!drawFeedsStepForecast(clue, true, false) && !drawFeedsStepForecast(etbDraw, true, false),
+              "#W66-AU R2 MUST-NOT-MATCH a cracked Clue and an ETB draw are on the battlefield and"
+              " still not what the DRAW FORECAST counted");
+        CHECK(!drawFeedsStepForecast(mine, false, false),
+              "#W66-AU R2 MUST-NOT-MATCH the same script off the battlefield feeds no step forecast");
+        // The rendered line: the Mine draw is still pending, and the cantrip is
+        // named rather than silently subtracted.
+        std::vector<std::pair<std::string, int> > oneMine;
+        oneMine.push_back(std::make_pair(std::string("Howling Mine #1"), 1));
+        const string half = drawStepForecastText(1, oneMine, 2, "", true, 10, 1, 1);
+        CHECK(half.find("1 of them has ALREADY been drawn and paid for in this step") != string::npos
+                  && half.find("so 1 is still to come") != string::npos
+                  && half.find("you also drew 1 card this step from a spell or an ability, which"
+                               " this forecast never counted") != string::npos
+                  && half.find("= 1 x 2 = 2 life LOST BY YOU") != string::npos,
+              "#W66-AU R2 POSITIVE the cantrip does not retire the Mine draw, and the line says so");
+        CHECK(half.find("= 0 life LOST BY YOU") == string::npos,
+              "#W66-AU R2 MUST-NOT-MATCH the false `the whole step has already resolved` claim"
+              " cannot be printed while a counted draw is pending");
+        // NEGATIVE: with nothing unattributed the line is byte-identical to the
+        // one lane AQ shipped, and a NEXT-step forecast never carries the clause.
+        CHECK(drawStepForecastText(1, oneMine, 2, "", true, 10, 1, 0)
+                  == drawStepForecastText(1, oneMine, 2, "", true, 10, 1),
+              "#W66-AU R2 NEGATIVE the default argument leaves lane AQ's line byte-identical");
+        CHECK(drawStepForecastText(1, oneMine, 2, "", false, 10, 0, 3)
+                  == drawStepForecastText(1, oneMine, 2, "", false, 10, 0, 0),
+              "#W66-AU R2 MUST-NOT-MATCH a step not yet begun states nothing about draws inside it");
+        CHECK(drawsUnattributedClause(0).empty() && drawsUnattributedClause(-1).empty()
+                  && drawsUnattributedClause(2).find("you also drew 2 cards") != string::npos,
+              "#W66-AU R2 the clause is empty when there is nothing to say, and plural when there is");
+        // ECHO SHAPE: the clause is prose on the forecast line, not an option
+        // annotation - it opens no bracket or brace a reply could echo back.
+        CHECK(drawsUnattributedClause(1).find('[') == string::npos
+                  && drawsUnattributedClause(1).find('{') == string::npos,
+              "#W66-AU R2 ECHO the clause opens no annotation channel");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -5642,7 +5642,7 @@ int AADrawer::resolve()
                 {
                     game->currentPlayer->drawCounter = 0;//Reset drawCounter for pre-game draw
                 }
-                WEvent * e = NEW WEventcardDraw(player, 1);
+                WEvent * e = NEW WEventcardDraw(player, 1, source); //#W66-AU (R2)
                 game->receiveEvent(e);
             }
         }

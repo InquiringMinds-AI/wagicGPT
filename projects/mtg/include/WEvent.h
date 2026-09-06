@@ -306,9 +306,13 @@ struct WEventBlockersChosen : public WEvent {
 };
 
 struct WEventcardDraw : public WEvent {
-    WEventcardDraw(Player * player,int nb_cards);
+    //#W66-AU (R2): the ability's SOURCE card, so a consumer can tell the
+    //turn-based draw and a static extra-draw permanent (Howling Mine) from a
+    //cantrip or an activated ability. NULL when the drawer has no source card.
+    WEventcardDraw(Player * player,int nb_cards, MTGCardInstance * source = 0);
     Player * player;
     int nb_cards;
+    MTGCardInstance * source;
     using WEvent::getTarget;
     virtual Targetable * getTarget(Player * player);
 };
