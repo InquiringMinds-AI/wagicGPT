@@ -227,6 +227,11 @@ class AIPlayerBaka: public AIPlayer{
     //tick answers no menu; the cap is the livelock floor (see Act).
     int mMenuPassHold = 0;
     static const int kMenuPassHoldMax = 24;
+    //#W64-AK (R2): how many times the floor has actually FORCED a pass - which
+    //it now does only when LegalActionsOracle::hasAnyLegalAction says nothing
+    //legal remains, so a nonzero count is a livelock breaker firing on an empty
+    //seat and never an action taken away. Read by AIPlayerGPT's translog.
+    int mMenuPassForced = 0;
     //W50-W (D4): the cleanup-step hand-size discard as an AI DECISION. Before
     //this the engine discarded hand->cards[0] (the oldest card) for every AI
     //seat when the phase advanced - a combo deck lost its only Intruder Alarm
