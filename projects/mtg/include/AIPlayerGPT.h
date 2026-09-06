@@ -600,9 +600,14 @@ private:
     //#W63-AD (E6b): planAnswerNote reports whether a coded answer line inside the
     //PLAN BLOCK was demoted (1) or was the reply's only one and still answered
     //the window (2). 0 = neither. Report only; the seams stamp it.
+    //#W66-AR (H2c): `laterIgnoredLine` (out, optional) is the coded answer line
+    //the first-wins rule REFUSED, verbatim, whenever planAnswerNote reports
+    //kPlanAnswerLaterIgnored. The record's `reply` is trimmed past the PLAN on
+    //21 of the 33 wave-65 records carrying that note, so the line the stamp is
+    //about was the one byte-range the record did not keep.
     string consumePlan(const string& content, const char * expectedLabel = NULL,
                        int * choiceRunLen = NULL, int * rejectedLines = NULL,
-                       int * planAnswerNote = NULL);
+                       int * planAnswerNote = NULL, string * laterIgnoredLine = NULL);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -682,6 +687,12 @@ private:
     //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
     //note can never leak onto a later, unrelated record.
     string mLastParseNote;
+
+    //#W66-AR (H2c): the coded answer line the first-wins rule refused for the
+    //NEXT record, verbatim from the FULL reply. Consumed and cleared by
+    //writeTransLog, exactly like mLastParseNote, so it can never leak onto a
+    //later, unrelated record.
+    string mLastIgnoredAnswerLine;
 
     //Same for the bundled attacker declaration: the whole attack is decided
     //in ONE reply, so the seam commits once per turn's combat and does not
