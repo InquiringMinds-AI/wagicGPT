@@ -300,6 +300,20 @@ const char * kReplyProtocol =
     "announcements. An "
     "answer written inside your PLAN sentence is part of the plan, not your answer, and is NOT "
     "read as one - so never leave the decision you actually want stated only there.\n"
+    //#W69-BF (K2, deck123 HIGH-2 = the deciding decision of the corpus). WHERE A
+    //CHANGE OF MIND MUST STAND. The reply has a hard length limit and it is cut
+    //from the END: 123v162 s34 answered `CHOICE: 5 (Cast Damnation)`, wrote its
+    //PLAN, then wrote "You should NOT cast Damnation. You should attack." - and
+    //928 more bytes past the PLAN line were cut by the cap. The correction was on
+    //the wrong side of the line the cap eats. The protocol already routes a
+    //correction (a repeated answer line under an announcement); this says WHERE,
+    //in the model's own terms, and it is the same place the engine now reads a
+    //reversal from (proseReversesInCorrectionZone).
+    "Put any correction BEFORE your PLAN line. The reply has a hard length limit and it is cut "
+    "from the END, so a change of mind written after the PLAN line may never reach the game at "
+    "all - and this engine reads nothing after the PLAN line. If you decide against the answer "
+    "you wrote, say so and write the corrected answer line in the lines between your first answer "
+    "and your PLAN line, never below it.\n"
     "THE PLAN comes LAST: a PLAN: line - your complete game plan from this point on, CONCISE, a few sentences "
     "of intent, not an analysis. Whether to write one is a mechanical test with exactly three "
     "cases; take the first that applies and do not re-open it:\n"
@@ -7944,6 +7958,30 @@ static int repeatStopClampCount(int namedCount, int statedStop, int statedCurren
 //what happened (the cap, with its number), what was lost (nothing was declared)
 //and what to write instead - answer FIRST, then stop. Never Baka until it is
 //spent.
+//#W69-BF (K2, engine HIGH-1). THE SMALL SEAMS' TRUNCATION LINE. Lane BA wired
+//`reply_truncated_reask` at ask and priority "on the grounds that no truncation
+//was expected at discard/reveal/bottom"; lane BE R4 added the two combat seams.
+//125v146 s133 falsified the remaining third: a 1,409 B discard reply reached the
+//384-token cap with no `PUT:` line, scored `unparsed_reply`, and the heuristic
+//discarded seven cards including the seat's Emrakul - a permanent, unrecoverable
+//decision handed away with no receipt. These three seams answer with the SAME
+//label (PUT:), so they share one wording; the cap that was actually used is
+//quoted, as at every other seam. Pure, so PARSETEST pins the exact words.
+static string smallSeamTruncationReaskLine(long maxTokens, int wanted)
+{
+    std::ostringstream o;
+    o << "[RE-ASK] Your last reply ran to its length limit of " << maxTokens
+      << " tokens before it wrote an answer line, so none of it could be used and nothing"
+         " has been chosen yet. Answer again and put the answer FIRST: one line beginning"
+         " with \"PUT: \" naming ";
+    if (wanted > 0)
+        o << "exactly " << wanted << " different card number" << (wanted == 1 ? "" : "s");
+    else
+        o << "the card numbers you want";
+    o << " from the list above - with at most one short sentence of working before it.";
+    return o.str();
+}
+
 static string combatTruncationReaskLine(bool attackersSeam, long maxTokens)
 {
     std::ostringstream o;
@@ -15561,7 +15599,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -27000,9 +27038,24 @@ static bool rowIsDeclineRow(const string& row)
 //evidence only from the latched line's region, negations and deferrals rejected.
 //seamVocab 0 = CHOICE (byte-identical to every shipped caller), 1 = ATTACK,
 //2 = BLOCKS.
+//#W69-BF (K3, deck123 HIGH-2; deck162 MED-3; deck152 LOW; BA-8 FAIL). WHERE THE
+//SENTENCE MAY BE READ. Measured over matchups-20260906-134120 before this was
+//written: `decision_reversed_in_prose` fired 22 times and the CORRECTION ZONE -
+//the sentences between the coded line and the PLAN: line, which is where this
+//protocol tells the model to write a change of mind - was EMPTY on all 22. Every
+//firing came from the PLAN BODY, and 16 of them from the sentence-opener half
+//reading plan prose as a reversal: "I will pass to combat", "We pass to Main 2",
+//"I will pass to second main phase" are statements of intent for a LATER window,
+//and 12 of those 16 re-asks came back with the identical answer - a round trip
+//each, for nothing. `untilStripped` bounds the sentence-opener walk; the
+//PLAN-CUE half above is untouched and still reads the PLAN line's own arithmetic
+//verdict ("this window: pass", "stop reached"), which is a different claim and
+//fired 4 times. Default string::npos = the whole reply: byte-identical to every
+//shipped caller and to every case pinned before this wave.
 static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL,
                                    size_t fromStripped = 0,
-                                   const char * label = "choice:", int seamVocab = 0)
+                                   const char * label = "choice:", int seamVocab = 0,
+                                   size_t untilStripped = string::npos)
 {
     string text = replyIn;
     size_t thinkEnd = text.rfind("</think>");
@@ -27108,7 +27161,15 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         "i block with nothing", "no blocks this turn", "no blockers this turn",
         "i declare no blockers", "we declare no blockers"
     };
-    static const char * kLeads[] = { "so ", "therefore ", "thus ", "hence ", "so, ", "therefore, ", "thus, " };
+    //#W69-BF (K3): the ANNOUNCEMENTS this protocol itself asks a correction to
+    //open with ("CORRECTION:", "Re-evaluating:", "Actually,", "On second
+    //thought,"). The correction zone is the channel the protocol now routes a
+    //change of mind into, so the predicate must be able to read a sentence that
+    //arrives in the shape the protocol asked for. "Wait" and "hmm" are NOT
+    //announcements - the protocol says so and they are deliberately absent here.
+    static const char * kLeads[] = { "so ", "therefore ", "thus ", "hence ", "so, ", "therefore, ", "thus, ",
+                                     "correction: ", "correction, ", "re-evaluating: ", "re-evaluating, ",
+                                     "actually, ", "actually ", "on second thought, ", "instead, " };
     static const char * kDeferrals[] = {
         " the turn", " turn", " priority after", " after ", " next window", " next turn", " later", " until ", " once "
     };
@@ -27116,11 +27177,13 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         " with ", " next window", " next turn", " later", " until ", " once ", " after "
     };
     size_t pos = region + 1;
-    while (pos < low.size())
+    while (pos < low.size() && pos < untilStripped) //#W69-BF (K3)
     {
         //sentence opener: skip whitespace and the PLAN label
         size_t st = low.find_first_not_of(" \t\r\n", pos);
         if (st == string::npos)
+            break;
+        if (st >= untilStripped) //#W69-BF (K3): past the correction zone
             break;
         if (low.compare(st, 5, "plan:") == 0)
         {
@@ -27199,6 +27262,183 @@ static bool proseReversesDeclaration(const string& replyIn, int seamVocab,
     if (seamVocab < 0 || seamVocab > 2)
         return false;
     return planSaysPassThisWindow(replyIn, matchedOut, 0, kSeamLabels[seamVocab], seamVocab);
+}
+
+//#W69-BF (K3): the post-think, lowercased text this file's reversal predicates
+//scan, so an offset computed here indexes the same bytes planSaysPassThisWindow
+//walks. One transformation, stated once.
+static string reversalScanText(const string& replyIn)
+{
+    string text = replyIn;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    for (size_t i = 0; i < text.size(); i++)
+        text[i] = (char) tolower((unsigned char) text[i]);
+    return text;
+}
+
+//#W69-BF (K3): where the CORRECTION ZONE ends - the offset of the first
+//line-leading "plan:" at or after `fromStripped`. string::npos when the reply
+//has no PLAN line, in which case the whole reply after the coded line IS the
+//correction zone (there is no plan body to confuse it with).
+static size_t correctionZoneEnd(const string& replyIn, size_t fromStripped = 0)
+{
+    const string low = reversalScanText(replyIn);
+    size_t scan = (fromStripped > low.size()) ? low.size() : fromStripped;
+    while (scan <= low.size())
+    {
+        size_t at = low.find("plan:", scan);
+        if (at == string::npos)
+            return string::npos;
+        size_t bol = low.rfind('\n', at);
+        bol = (bol == string::npos) ? 0 : bol + 1;
+        size_t f = low.find_first_not_of(" \t\r", bol);
+        if (f == at)
+            return at; //line-leading: this is the PLAN line
+        scan = at + 5;
+    }
+    return string::npos;
+}
+
+//#W69-BF (K3): the reversal predicate, scoped to the correction zone. Same
+//function, same guards, same vocabulary - only the region changes.
+static bool proseReversesInCorrectionZone(const string& replyIn, int seamVocab,
+                                          size_t fromStripped = 0,
+                                          string * matchedOut = NULL)
+{
+    static const char * kSeamLabels[] = { "choice:", "attack:", "blocks:" };
+    if (seamVocab < 0 || seamVocab > 2)
+        return false;
+    return planSaysPassThisWindow(replyIn, matchedOut, fromStripped, kSeamLabels[seamVocab],
+                                  seamVocab, correctionZoneEnd(replyIn, fromStripped));
+}
+
+//#W69-BF (K3): the row's SHORT NAME - the option text up to the first "{", "["
+//or "(", with the leading verb dropped. This is exactly the string the protocol
+//tells the model to copy into its CHOICE parenthetical, and it is what the model
+//writes when it talks about the row in prose. It is NOT menuRowProseName: that
+//helper strips annotations first, and on a row carrying a NESTED brace group
+//("{spends 4 ... Devour Flesh {1}{b} in your hand needs 2}") the strip stops at
+//the inner close and leaves annotation fragments glued to the name - measured on
+//123v162 s34's row 5, where it yields "damnation in your hand needs 2}" and can
+//match nothing. Cutting at the first bracket cannot nest.
+static string menuRowShortName(const string& row)
+{
+    size_t cut = row.size();
+    const char * kCuts = "{[(";
+    for (const char * c = kCuts; *c; c++)
+    {
+        size_t at = row.find(*c);
+        if (at != string::npos && at < cut)
+            cut = at;
+    }
+    string core = row.substr(0, cut);
+    for (size_t i = 0; i < core.size(); i++)
+        core[i] = (char) tolower((unsigned char) core[i]);
+    size_t a = core.find_first_not_of(" \t-");
+    size_t z = core.find_last_not_of(" \t-");
+    core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
+    static const char * kDeclines[] = { "cast nothing", "pass", "hold", "done",
+                                        "decline", "do nothing" };
+    for (size_t i = 0; i < sizeof(kDeclines) / sizeof(kDeclines[0]); i++)
+        if (core.compare(0, strlen(kDeclines[i]), kDeclines[i]) == 0)
+            return string();
+    static const char * kVerbs[] = { "cast ", "play ", "activate ", "equip ", "use ",
+                                     "attack with ", "block with ", "target ", "create " };
+    for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]); v++)
+        if (core.compare(0, strlen(kVerbs[v]), kVerbs[v]) == 0)
+        {
+            core = core.substr(strlen(kVerbs[v]));
+            break;
+        }
+    a = core.find_first_not_of(" \t");
+    z = core.find_last_not_of(" \t");
+    core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
+    return (core.size() < 4) ? string() : core;
+}
+
+//#W69-BF (K3, deck123 HIGH-2 = the deciding decision of the corpus). THE
+//REVERSAL THAT NAMES THE ROW IT TAKES BACK. 123v162 s34 answered
+//`CHOICE: 5 (Cast Damnation)` and then wrote, in the same reply, "You should NOT
+//cast Damnation. You should attack." - and swept its own 21 Humans one turn
+//before lethal. No pass-opener matches that sentence: it is not a pass, it is a
+//NEGATION of the row just taken, and it names the row. That is why this
+//predicate may read the WHOLE reply after the coded line while the generic
+//opener half may not: it is evidence-bound. Measured over the corpus's 2,041
+//ask/priority records with a taken row, it fires THREE times - 123v162 s34, a
+//"so I should not cast Soul Shatter" already caught by plan_contradicts_noop_row
+//(146 s14), and "I cannot cycle Stone Rain" (130 s110, already a conflict) - so
+//it buys ONE new round trip per corpus. A question ("Should I not cast X?") is
+//not a claim, and a deferral ("not yet", "not until") is not a reversal.
+static bool proseNegatesTakenRow(const string& replyIn, const string& row,
+                                 size_t fromStripped = 0, string * matchedOut = NULL)
+{
+    if (matchedOut) matchedOut->clear();
+    const string name = menuRowShortName(row);
+    if (name.empty())
+        return false;
+    const string low = reversalScanText(replyIn);
+    size_t choiceAt = low.find("choice:", (fromStripped > low.size()) ? low.size() : fromStripped);
+    if (choiceAt == string::npos)
+        return false;
+    size_t region = low.find('\n', choiceAt);
+    if (region == string::npos)
+        return false;
+    static const char * kNegations[] = {
+        "you should not", "i should not", "we should not", "you must not", "i must not",
+        "we must not", "you should never", "i should never", "you do not", "i do not",
+        "we do not", "do not ", "don't ", "you will not", "i will not", "we will not",
+        "you cannot", "i cannot", "we cannot", "you can't", "i can't"
+    };
+    static const char * kDefer[] = { " yet", " next turn", " next window", " later",
+                                     " until ", " once ", " after " };
+    size_t pos = region + 1;
+    while (pos < low.size())
+    {
+        size_t st = low.find_first_not_of(" \t\r\n", pos);
+        if (st == string::npos)
+            break;
+        if (low.compare(st, 5, "plan:") == 0)
+        {
+            st = low.find_first_not_of(" \t", st + 5);
+            if (st == string::npos)
+                break;
+        }
+        size_t sentEnd = low.find_first_of(".!?;\n", st);
+        size_t sentStop = (sentEnd == string::npos) ? low.size() : sentEnd;
+        const bool isQuestion = (sentEnd != string::npos && low[sentEnd] == '?');
+        if (!isQuestion)
+        {
+            const string sent = low.substr(st, sentStop - st);
+            for (size_t k = 0; k < sizeof(kNegations) / sizeof(kNegations[0]); k++)
+            {
+                size_t at = sent.find(kNegations[k]);
+                if (at == string::npos)
+                    continue;
+                const string rest = sent.substr(at + strlen(kNegations[k]));
+                if (rest.find(name) == string::npos)
+                    break; //this sentence negates something else
+                const string near = rest.substr(0, 60);
+                bool deferred = false;
+                for (size_t dd = 0; dd < sizeof(kDefer) / sizeof(kDefer[0]) && !deferred; dd++)
+                    deferred = (near.find(kDefer[dd]) != string::npos);
+                if (deferred)
+                    break;
+                if (matchedOut)
+                {
+                    *matchedOut = sent;
+                    if (matchedOut->size() > 160)
+                        *matchedOut = matchedOut->substr(0, 160);
+                }
+                return true;
+            }
+        }
+        if (sentEnd == string::npos)
+            break;
+        pos = sentEnd + 1;
+    }
+    return false;
 }
 
 //#W52-J (D14): does the reply carry a PLAN line at all (post-think)? A
@@ -30475,15 +30715,38 @@ static long gptSeamMaxTokens(const char * seam, long ceilingTokens)
 {
     if (!seam || !*seam)
         return ceilingTokens;
+    //#W69-BF (K2, engine HIGH-1/HIGH-3; deck123 HIGH-2). RE-FITTED ON THE CORPUS
+    //THE CAPS THEMSELVES PRODUCED. matchups-20260906-134120, 2,282 decision
+    //records, `max_tokens` on every one. Two measurements re-size this table and
+    //nothing else does. (1) The BYTES-PER-TOKEN constant is no longer an
+    //assumption: over the 58 replies that reached their cap, true bytes divided
+    //by max_tokens is median 3.61, p10 3.15, p90 3.97 - so a cap must be sized at
+    //the WORST case 3.15 B/token, not the median. (2) The bytes a seam NEEDS
+    //(first byte through the end of the PLAN line) over the replies that were NOT
+    //truncated - the only uncensored sample there is - are p99.5 ask 1,768 B,
+    //priority 1,689 B, attackers 1,960 B, blockers 578 B, discard 961 B,
+    //reveal 383 B, bottom 622 B. Adding one correction line (~180 B, the shape
+    //the protocol now asks for) and dividing by 3.15 gives the tokens a seam must
+    //be allowed: ask 618, priority 593, attackers 679, blockers 241, discard 362,
+    //reveal 179, bottom 255. The wave-68 set cleared every one of those on the
+    //MEDIAN byte rate and TWO of them - ask and discard - by under 70 bytes on the
+    //worst-case rate. Those two are raised and the rest stand:
+    //  ask      640 -> 768 (2,419 B at 3.15 B/tok; 471 B of headroom over the need)
+    //  discard/reveal/bottom 384 -> 512 (1,613 B; 472 B over discard's need)
+    //Nothing is TIGHTENED. The -46% generation headline of wave 68 is ~90% the
+    //short system prompt and ~9.5% these caps (engine seat 2(9)); what the caps
+    //bought is a VARIANCE guarantee (max reply 10,951 -> 3,040 B, max latency
+    //1,233 -> 315 s) and that is what this table is kept for. At 768/3.97 the ask
+    //seam's worst case is ~3,050 B - still 3.6x below the wave-67 tail.
     struct SeamCap { const char * seam; long tokens; };
     static const SeamCap kCaps[] = {
-        { "ask",       640 }, //p99 need 1,630 B; 640 tok ~= 2,240 B, 9x the median reply
-        { "priority",  768 }, //p99 need 2,041 B
-        { "attackers", 768 }, //p99 need 2,161 B
-        { "blockers",  896 }, //the bundled seam, p90 need 810 B (n=33, so p99 is the max)
-        { "discard",   384 }, //max need 477 B
-        { "reveal",    384 }, //max need 397 B
-        { "bottom",    384 }, //max need 489 B
+        { "ask",       768 }, //#W69-BF (K2): need p99.5 1,768 B + a correction line, at 3.15 B/tok
+        { "priority",  768 }, //need p99.5 1,689 B; 768 tok >= 2,419 B - stands
+        { "attackers", 768 }, //need p99.5 1,960 B - stands
+        { "blockers",  896 }, //the bundled seam, need p99.5 578 B (n=26) - stands, generously
+        { "discard",   512 }, //#W69-BF (K2): 384 cleared 961 B by 68 B and ATE 125v146 s133
+        { "reveal",    512 }, //#W69-BF (K2): sized with its siblings - one small-seam budget
+        { "bottom",    512 }, //#W69-BF (K2): need p99.5 622 B, the largest of the three
     };
     for (size_t i = 0; i < sizeof(kCaps) / sizeof(kCaps[0]); i++)
         if (strcmp(seam, kCaps[i].seam) == 0)
@@ -33775,11 +34038,33 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         size_t latchedFrom = 0;
         const bool haveLatchedLine = latchedCodedChoiceLine(content, choice, index, &shownLines,
                                                             &latchedChoiceLine, &latchedFrom);
+        //#W69-BF (K3): the sentence-opener half is bounded by the CORRECTION ZONE
+        //(the sentences between the coded line and the PLAN: line, where the
+        //protocol tells the model to write a change of mind); the PLAN-cue half
+        //inside the same function still reads the PLAN line's own verdict. The
+        //corpus's 22 firings all came from the plan BODY and 12 of the 16
+        //opener-half re-asks returned the identical answer.
         string passVerdict;
-        bool passVerdictInProse = (choice >= 1 && choice <= index && !content.empty()
-                                   && !(holdRow > 0 && choice == holdRow)
-                                   && planSaysPassThisWindow(content, &passVerdict,
-                                                             haveLatchedLine ? latchedFrom : 0));
+        string rowNegation; //#W69-BF (K3): the evidence-bound half
+        const bool priorityReversalCandidate = (choice >= 1 && choice <= index && !content.empty()
+                                                && !(holdRow > 0 && choice == holdRow));
+        bool passVerdictInProse = (priorityReversalCandidate
+                                   && proseReversesInCorrectionZone(content, 0,
+                                                                    haveLatchedLine ? latchedFrom : 0,
+                                                                    &passVerdict));
+        //#W69-BF (K3): a sentence that NAMES the row just taken and negates it is
+        //a reversal wherever it stands - it cannot be plan prose about a later
+        //window, because it is about THIS row. 3 firings in 2,041 corpus records.
+        const bool priorityNegatesRow = (!passVerdictInProse && priorityReversalCandidate
+                                         && choice - 1 < (int) shownLines.size()
+                                         && proseNegatesTakenRow(content, shownLines[choice - 1],
+                                                                 haveLatchedLine ? latchedFrom : 0,
+                                                                 &rowNegation));
+        if (priorityNegatesRow)
+        {
+            passVerdictInProse = true;
+            passVerdict = rowNegation;
+        }
         //#W56-A (D16): the census stays broad, the RE-ASK narrows. All 9 of the
         //wave-55 firings were a live row taken beside the pool's own mandated
         //arithmetic vocabulary and named no other row on the menu; four
@@ -33814,6 +34099,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //evidence about the game rather than about the instrument.
         if (passVerdictInProse)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+        if (priorityNegatesRow) //#W69-BF (K3): which half saw it
+            appendParseNote(&mLastParseNote, "reversal_names_taken_row");
         if (passVerdictInProse && !rivalRowNamed)
             //#W68-BA (J6): the same partition, under a name that is now TRUE - the
             //reversal no longer needs a rival row to buy its round trip, so calling
@@ -33929,6 +34216,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         " sentence of working before it.";
                 fb = "reply_truncated_reask";
                 mPriorityReaskKind = "reply_truncated";
+                //#W69-BF (K2): a truncation re-ask fires only when the cut reply
+                //wrote NO coded line, so there is no prior answer to compare the
+                //recovery against - recorded as such rather than left to read as a
+                //recovered DECISION (123v125 s23-25 fetched nothing and counted as
+                //`reply_truncated_reask_recovered`).
+                mPriorityReaskPriorChoice = -1;
             }
             else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
             {
@@ -33960,7 +34253,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             }
             else if (planChoiceConflict)
             {
-                if (repeatRowTaken && namedCount >= 1)
+                //#W69-BF (K2, engine HIGH-2): what the cut reply had already named,
+                //so the recovery can say whether the ANSWER changed and not only
+                //whether a round trip completed.
+                mPriorityReaskPriorChoice = choice;
+                if (priorityNegatesRow) //#W69-BF (K3): quote the negation, not a pass
+                    corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
+                         << quotedChoiceLine << "\") but your reply then says you should NOT do it"
+                            " (\"" << passVerdict << "\"). Answer again with the number of the row"
+                            " you want performed now, or 0 (pass).";
+                else if (repeatRowTaken && namedCount >= 1)
                     corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
                          << quotedChoiceLine << "\") but your reply says this window is a pass (\""
                          << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
@@ -34047,9 +34349,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             //the second answer for this state, whatever it is, is final
             if (mPriorityReaskKind == "reply_truncated") //#W68-BA (J3)
+            {
                 appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
                                                                 : (choice >= 0 ? "reply_truncated_reask_recovered"
                                                                                : "reply_truncated_reask_unanswered"));
+                //#W69-BF (K2, engine HIGH-2): a recovered ROUND TRIP is not a
+                //recovered DECISION. Say which one this record is.
+                if (!replyTruncated && choice >= 0)
+                    appendParseNote(&mLastParseNote,
+                                    mPriorityReaskPriorChoice < 0 ? "reply_truncated_reask_no_prior_answer"
+                                    : (choice == mPriorityReaskPriorChoice ? "reply_truncated_answer_unchanged"
+                                                                           : "reply_truncated_answer_changed"));
+            }
             else if (mPriorityReaskKind == "label_missing") //#W67-AV (I2)
                 appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
                                                               : (choice >= 0 ? "label_missing_reask_recovered"
@@ -34058,8 +34369,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                               : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
             else if (mPriorityReaskKind == "plan_choice") //#W51-C D4b: the second answer executes as given
+            {
                 appendParseNote(&mLastParseNote, planChoiceConflict ? "plan_choice_conflict_exhausted"
                                                                     : (choice >= 0 ? "plan_choice_conflict_recovered" : "plan_choice_conflict_unanswered"));
+                //#W69-BF (K3): 16 of the corpus's 22 reversal re-asks came back with
+                //the identical answer. Recorded, so the class is countable and a
+                //window that has already answered the same way twice is not asked a
+                //third time (the board latch above already holds it to one).
+                if (choice >= 0 && mPriorityReaskPriorChoice >= 0
+                    && choice == mPriorityReaskPriorChoice)
+                    appendParseNote(&mLastParseNote, "reversal_reask_same_answer");
+            }
             else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
                 appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
                                                              : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
@@ -34884,12 +35204,29 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     size_t askLatchedFrom = 0;
     const bool askHaveLatched = latchedCodedChoiceLine(content, choice, (int) options.size(),
                                                        &options, &askLatchedLine, &askLatchedFrom);
-    const bool askReversedInProse = (choice >= 1 && choice <= (int) options.size() && !content.empty()
-                                     && !rowIsDeclineRow(options[choice - 1])
-                                     && planSaysPassThisWindow(content, &askPassVerdict,
-                                                               askHaveLatched ? askLatchedFrom : 0));
+    //#W69-BF (K3): correction-zone scoped, plus the row-naming negation. See
+    //planSaysPassThisWindow's #W69-BF note for the counts that scoped it.
+    string askRowNegation;
+    const bool askReversalCandidate = (choice >= 1 && choice <= (int) options.size()
+                                       && !content.empty()
+                                       && !rowIsDeclineRow(options[choice - 1]));
+    bool askReversedInProse = (askReversalCandidate
+                               && proseReversesInCorrectionZone(content, 0,
+                                                                askHaveLatched ? askLatchedFrom : 0,
+                                                                &askPassVerdict));
+    const bool askNegatesRow = (!askReversedInProse && askReversalCandidate
+                                && proseNegatesTakenRow(content, options[choice - 1],
+                                                        askHaveLatched ? askLatchedFrom : 0,
+                                                        &askRowNegation));
+    if (askNegatesRow)
+    {
+        askReversedInProse = true;
+        askPassVerdict = askRowNegation;
+    }
     if (askReversedInProse)
         appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+    if (askNegatesRow) //#W69-BF (K3): which half saw it, so the corpus can partition
+        appendParseNote(&mLastParseNote, "reversal_names_taken_row");
     //#W68-BA (J3): the length cap bit before the model wrote its label.
     const bool replyTruncated = (mLastFinishLength && !content.empty()
                                  && codedAnswerCount(content) == 0);
@@ -34936,6 +35273,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " number of the row you want from the list, then that row's short name in"
                     " parentheses - with at most one short sentence of working before it.";
             mAskReaskKind = "reply_truncated";
+            mAskReaskPriorChoice = -1; //#W69-BF (K2): the cut reply named no answer
         }
         else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
         {
@@ -34982,9 +35320,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         else
         {
             //#W68-BA (J6): the reversal, quoted back with the line it contradicts.
+            //#W69-BF (K3): the row-naming half is not a pass claim - say what it is.
+            mAskReaskPriorChoice = choice; //#W69-BF (K2/K3)
             corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
                  << (askHaveLatched ? askLatchedLine : firstLabelledLine(content, "choice:"))
-                 << "\") but your reply says this window is a pass (\"" << askPassVerdict
+                 << (askNegatesRow ? "\") but your reply then says you should NOT do it (\""
+                                   : "\") but your reply says this window is a pass (\"")
+                 << askPassVerdict
                  << "\"). Answer again with the number of the row you want performed now.";
             mAskReaskKind = "plan_choice";
         }
@@ -35014,13 +35356,26 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     if (reasked)
     {
         if (mAskReaskKind == "reply_truncated") //#W68-BA (J3): executes as given either way
+        {
             appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
                                                             : (choice >= 1 ? "reply_truncated_reask_recovered"
                                                                            : "reply_truncated_reask_unanswered"));
+            //#W69-BF (K2, engine HIGH-2): recovered ROUND TRIP vs recovered DECISION.
+            if (!replyTruncated && choice >= 1)
+                appendParseNote(&mLastParseNote,
+                                mAskReaskPriorChoice < 0 ? "reply_truncated_reask_no_prior_answer"
+                                : (choice == mAskReaskPriorChoice ? "reply_truncated_answer_unchanged"
+                                                                  : "reply_truncated_answer_changed"));
+        }
         else if (mAskReaskKind == "plan_choice") //#W68-BA (J6): likewise
+        {
             appendParseNote(&mLastParseNote, askReversedInProse ? "plan_choice_conflict_exhausted"
                                                                 : (choice >= 1 ? "plan_choice_conflict_recovered"
                                                                                : "plan_choice_conflict_unanswered"));
+            //#W69-BF (K3): the re-ask that changed nothing, counted.
+            if (choice >= 1 && mAskReaskPriorChoice >= 1 && choice == mAskReaskPriorChoice)
+                appendParseNote(&mLastParseNote, "reversal_reask_same_answer");
+        }
         else if (mAskReaskKind == "label_missing") //#W67-AV (I2): executes as given either way
             appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
                                                           : (choice >= 1 ? "label_missing_reask_recovered"
@@ -44404,7 +44759,7 @@ int AIPlayerGPT::chooseAttackers()
         string attackReversal;
         if (result >= 1 && !content.empty() && !attackReasked
             && mAttackReaskTurn != observer->turn
-            && proseReversesDeclaration(content, 1, &attackReversal))
+            && proseReversesInCorrectionZone(content, 1, 0, &attackReversal)) //#W69-BF (K3)
         {
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
             mAttackReaskTurn = observer->turn;
@@ -44425,7 +44780,7 @@ int AIPlayerGPT::chooseAttackers()
         }
         if (attackReasked)
             appendParseNote(&mLastParseNote,
-                            proseReversesDeclaration(content, 1)
+                            proseReversesInCorrectionZone(content, 1) //#W69-BF (K3)
                                 ? "attack_reversed_in_prose_exhausted"
                                 : (result >= 1 ? "attack_reversed_in_prose_recovered"
                                                : "attack_reversed_in_prose_unanswered"));
@@ -45548,7 +45903,7 @@ int AIPlayerGPT::chooseBlockers()
         string blockReversal;
         if (pairs > 0 && !content.empty() && !blockRevReasked
             && mBlockRevReaskTurn != observer->turn
-            && proseReversesDeclaration(content, 2, &blockReversal))
+            && proseReversesInCorrectionZone(content, 2, 0, &blockReversal)) //#W69-BF (K3)
         {
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
             mBlockRevReaskTurn = observer->turn;
@@ -45566,7 +45921,7 @@ int AIPlayerGPT::chooseBlockers()
         }
         if (blockRevReasked)
             appendParseNote(&mLastParseNote,
-                            proseReversesDeclaration(content, 2)
+                            proseReversesInCorrectionZone(content, 2) //#W69-BF (K3)
                                 ? "blocks_reversed_in_prose_exhausted"
                                 : (pairs > 0 ? "blocks_reversed_in_prose_recovered"
                                              : "blocks_reversed_in_prose_unanswered"));
@@ -46190,7 +46545,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     //through it, so a collapsed list cannot make a number mean another card.
     vector<size_t> revealOrder;
     mLogWindowKind = kAskWindowTargetOrReveal; //#W57-H (D43): keeps the whole log
-    string userMsg = assemblePrompt(
+    const string revealAskText =
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
                            eligibleForOptionOne, revealSource, pickExactlyOne,
                            singlePickBare, //#W61-T (C8)
@@ -46199,7 +46554,14 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                            //reveal zone; a top-of-library look does not.
                            revealSource == 0 && game->library->nb_cards == 0
                                && revealed.size() > 1,
-                           &revealOrder));
+                           &revealOrder);
+    //#W69-BF (K2, engine HIGH-1): this seam's one truncation re-ask, on the
+    //shared small-seam latch, keyed on the ask TEXT.
+    const bool revealTruncReasked = (!mSmallTruncReaskKey.empty()
+                                     && mSmallTruncReaskKey == revealAskText);
+    string userMsg = assemblePrompt(revealTruncReasked
+                                    ? revealAskText + "\n" + mSmallTruncReaskLine
+                                    : revealAskText);
     if (revealOrder.size() != revealed.size())
     {
         revealOrder.resize(revealed.size());
@@ -46241,6 +46603,31 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         }
     }
 
+    //#W69-BF (K2): the cap bit before the PUT: line - one re-ask quoting it,
+    //never straight to the heuristic pick below.
+    if (result < 0 && mLastFinishLength && !content.empty() && !revealTruncReasked)
+    {
+        mSmallTruncReaskKey = revealAskText;
+        mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens,
+                                                            pickExactlyOne ? 1 : 0);
+        writeTransLog("reveal", userMsg, content, result, (int) revealed.size(), "",
+                      "reply_truncated_reask", &names);
+        setNotice("that reply hit its length limit - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: reveal reply truncated at the cap - re-asking once");
+        string corrected;
+        pollCompletionRetry(assemblePrompt(revealAskText + "\n" + mSmallTruncReaskLine),
+                            corrected, "reveal");
+        return 0; //decision in flight; the display waits and re-polls next tick
+    }
+    if (revealTruncReasked) //#W69-BF (K2): a round trip, not a certified decision
+    {
+        appendParseNote(&mLastParseNote,
+                        (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
+                        : (result >= 0 ? "reply_truncated_reask_recovered"
+                                       : "reply_truncated_reask_unanswered"));
+        if (result >= 0)
+            appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
+    }
     if (result < 0)
     {
         //#W67-AX (I5): where a decline is not a legal answer, an unusable reply
@@ -46529,7 +46916,15 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
         if (mSystemPrompt.empty())
             buildSystemPrompt();
         mLogWindowKind = kAskWindowPregame; //#W57-H (D43): hand-only, no GAME LOG
-        string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need, chosenSoFar));
+        const string bottomAskText = buildPregameBottomAskText(hand, need, chosenSoFar);
+        //#W69-BF (K2, engine HIGH-1): this seam's one truncation re-ask, on the
+        //shared small-seam latch. A pregame bottom is as unrecoverable as a
+        //cleanup discard - it is the ONLY ask for those cards.
+        const bool bottomTruncReasked = (!mSmallTruncReaskKey.empty()
+                                         && mSmallTruncReaskKey == bottomAskText);
+        string userMsg = assemblePrompt(bottomTruncReasked
+                                        ? bottomAskText + "\n" + mSmallTruncReaskLine
+                                        : bottomAskText);
         string content;
         if (pollCompletionRetry(userMsg, content, "bottom") == kChoicePending)
         {
@@ -46568,6 +46963,30 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
             if (sal >= 1)
                 result = sal;
+        }
+        //#W69-BF (K2): the cap bit before the PUT: line - one re-ask, not the fill.
+        if (result < 0 && mLastFinishLength && !content.empty() && !bottomTruncReasked)
+        {
+            mSmallTruncReaskKey = bottomAskText;
+            mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens, remaining);
+            writeTransLog("bottom", userMsg, content, result, (int) hand.size(), "",
+                          "reply_truncated_reask", &names);
+            setNotice("that reply hit its length limit - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: bottom reply truncated at the cap - re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(bottomAskText + "\n" + mSmallTruncReaskLine),
+                                corrected, "bottom");
+            status = PREGAME_PENDING;
+            return NULL; //the caller unwinds; the corrected call answers later
+        }
+        if (bottomTruncReasked) //#W69-BF (K2): a round trip, not a certified decision
+        {
+            appendParseNote(&mLastParseNote,
+                            (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
+                            : (result >= 0 ? "reply_truncated_reask_recovered"
+                                           : "reply_truncated_reask_unanswered"));
+            if (result >= 0)
+                appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
         }
         mPregameBottomQueue.clear();
         string chosen;
@@ -47143,6 +47562,13 @@ int AIPlayerGPT::cleanupDiscard(int over)
         //at the ask seam, applied to a channel that had no recovery window at
         //all - the prompt itself says "this is the ONLY ask for them").
         reasked = (!mDiscardReaskKey.empty() && mDiscardReaskKey == askText);
+        //#W69-BF (K2): the truncation arm is this seam's OWN latch, so a reply cut
+        //by the cap cannot spend the distinct-index arm and vice versa.
+        if (!reasked && !mSmallTruncReaskKey.empty() && mSmallTruncReaskKey == askText)
+        {
+            reasked = true;
+            mDiscardReaskLine = mSmallTruncReaskLine;
+        }
         userMsg = assemblePrompt(reasked ? askText + "\n" + mDiscardReaskLine : askText);
         if (discardOrder.size() != hand.size())
         {
@@ -47181,6 +47607,24 @@ int AIPlayerGPT::cleanupDiscard(int over)
         if (repeatedIdx > 0)
             appendParseNote(&mLastParseNote, result >= over ? "duplicate_index_deduped"
                                                             : "duplicate_index_short");
+        //#W69-BF (K2, engine HIGH-1): the cap bit before the model wrote its PUT:
+        //line. Not an unparseable answer and not a decline - the engine's own
+        //budget landing mid-sentence, which buys ONE re-ask quoting the number,
+        //never the heuristic. One arm per ask text.
+        if (result < 0 && mLastFinishLength && !content.empty() && !reasked
+            && mSmallTruncReaskKey != askText)
+        {
+            mSmallTruncReaskKey = askText;
+            mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens, over);
+            writeTransLog("discard", userMsg, content, result, (int) hand.size(), "",
+                          "reply_truncated_reask", &names);
+            setNotice("that reply hit its length limit - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: discard reply truncated at the cap - re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(askText + "\n" + mSmallTruncReaskLine),
+                                corrected, "discard");
+            return 1; //the caller unwinds; the corrected call answers later
+        }
         if (repeatedIdx > 0 && result >= 0 && result < over && !reasked)
         {
             std::ostringstream corr;
@@ -47199,9 +47643,18 @@ int AIPlayerGPT::cleanupDiscard(int over)
             pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected, "discard");
             return 1; //the caller unwinds; the corrected call answers later
         }
-        if (reasked)
+        if (reasked && mSmallTruncReaskKey == askText)
+            //#W69-BF (K2): the truncated reply named nothing, so a completed round
+            //trip is all this stamp can honestly claim.
+            appendParseNote(&mLastParseNote,
+                            (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
+                            : (result >= 0 ? "reply_truncated_reask_recovered"
+                                           : "reply_truncated_reask_unanswered"));
+        else if (reasked)
             appendParseNote(&mLastParseNote, result >= over ? "distinct_index_reask_recovered"
                                                             : "distinct_index_reask_exhausted");
+        if (reasked && mSmallTruncReaskKey == askText && result >= 0)
+            appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
     }
     //#W55-D (D18): back from PRINTED positions to hand positions.
     if (result >= 0 && !send.empty())
@@ -74891,14 +75344,16 @@ static const char * kW50Y_r94 =
         // seams never exceed 489 B. Each cap's byte-equivalent (~3.5 B/token)
         // clears its seam's p99 need; replayed over the corpus the set leaves
         // 10.4% of the bytes ungenerated and costs 9 re-asks in 2,301 replies.
-        CHECK(gptSeamMaxTokens("ask", 6000) == 640 && gptSeamMaxTokens("priority", 6000) == 768
+        //#W69-BF (K2): re-fitted on the corpus these caps produced - ask 640 -> 768
+        //and the small seams 384 -> 512. See the #W69-BF K2 block for the sizing.
+        CHECK(gptSeamMaxTokens("ask", 6000) == 768 && gptSeamMaxTokens("priority", 6000) == 768
                   && gptSeamMaxTokens("attackers", 6000) == 768
                   && gptSeamMaxTokens("blockers", 6000) == 896,
               "#W68-BA J3 POSITIVE each seam carries its own budget, blockers the largest (it bundles)");
-        CHECK(gptSeamMaxTokens("discard", 6000) == 384 && gptSeamMaxTokens("reveal", 6000) == 384
-                  && gptSeamMaxTokens("bottom", 6000) == 384,
-              "#W68-BA J3 POSITIVE the small seams, whose largest corpus reply is 489 B");
-        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("blockers", 800) == 800,
+        CHECK(gptSeamMaxTokens("discard", 6000) == 512 && gptSeamMaxTokens("reveal", 6000) == 512
+                  && gptSeamMaxTokens("bottom", 6000) == 512,
+              "#W68-BA J3 POSITIVE the small seams share one budget");
+        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("blockers", 800) == 800, //#W69-BF (K2)
               "#W68-BA J3 POSITIVE the configured value is the CEILING - a seam cap never raises it");
         CHECK(gptSeamMaxTokens("mulligan", 6000) == 6000 && gptSeamMaxTokens(NULL, 6000) == 6000
                   && gptSeamMaxTokens("", 6000) == 6000,
@@ -75085,6 +75540,320 @@ static const char * kW50Y_r94 =
               "#W68-BA J6 POSITIVE the dead row buys ONE extra ask after the budget is spent - and only one");
         CHECK(Pin::asks(false) == 1,
               "#W68-BA J6 MUST-NOT-MATCH with no self-contradiction the budget still buys exactly one re-ask");
+    }
+
+
+    cout << "\n[#W69-BF] K2 the caps, re-fitted on the corpus the caps produced\n";
+    {
+        // matchups-20260906-134120, 2,282 decision records, `max_tokens` on every
+        // one. The bytes-per-token constant is measured now, not assumed: over the
+        // 58 replies that reached their cap, true bytes / max_tokens is median
+        // 3.61, p10 3.15, p90 3.97 - so a cap is sized at the WORST case. The bytes
+        // a seam NEEDS (first byte -> end of PLAN) over the NON-truncated replies -
+        // the only uncensored sample - are p99.5 ask 1,768 B, priority 1,689 B,
+        // attackers 1,960 B, blockers 578 B, discard 961 B, reveal 383 B,
+        // bottom 622 B. Plus one correction line (~180 B), divided by 3.15: ask
+        // needs 618 tokens, discard 362. The wave-68 set cleared ask by 68 B and
+        // discard by 68 B on the worst-case rate; those two rise, the rest stand.
+        // NOTHING is tightened: the -46% headline is ~90% the short system prompt
+        // and ~9.5% these caps, and what the caps buy is the variance guarantee.
+        CHECK(gptSeamMaxTokens("ask", 6000) == 768,
+              "#W69-BF K2 POSITIVE the ask cap clears its own p99.5 need plus a correction line at 3.15 B/token");
+        CHECK(gptSeamMaxTokens("discard", 6000) == 512 && gptSeamMaxTokens("reveal", 6000) == 512
+                  && gptSeamMaxTokens("bottom", 6000) == 512,
+              "#W69-BF K2 POSITIVE the small seams rise together - 384 cleared 961 B by 68 B and ate a discard");
+        CHECK(gptSeamMaxTokens("priority", 6000) == 768 && gptSeamMaxTokens("attackers", 6000) == 768
+                  && gptSeamMaxTokens("blockers", 6000) == 896,
+              "#W69-BF K2 MUST-NOT-MATCH no cap is TIGHTENED - the three that cleared their need stand");
+        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("discard", 256) == 256,
+              "#W69-BF K2 POSITIVE the configured value is still the CEILING at the raised seams");
+    }
+
+    cout << "\n[#W69-BF] K2 a truncation re-ask at the three seams that had none\n";
+    {
+        // engine HIGH-1: 125v146 s133, discard, cap 384, reply 1,409 B, no PUT:
+        // line, `unparsed_reply` - and the heuristic discarded seven cards
+        // including the seat's Emrakul. Lane BA wired the truncation re-ask at
+        // ask/priority "on the grounds that no truncation was expected at
+        // discard/reveal/bottom"; lane BE R4 added the combat seams. This is the
+        // remaining third, and the corpus reply it is sized on, verbatim.
+        const string s133 =
+            "I must discard 6 cards to reduce my hand from 13 to 7. The only card marked {spare} "
+            "is Island (1), so I discard that first. I have 5 more discards to make from the "
+            "remaining 12 cards (all marked {NOT spare}). My plan relies on Staff of Nin to "
+            "win, so I keep it (it's on the battlefield, not in hand). I need to keep my counterspells "
+            "(Dream Fracture, Cancel, Fall of the Gavel) and removal (Path to Exile) to protect "
+            "my win condition and handle threats. I have two Emrakuls? No, just one Emrakul "
+            "in hand. I have one Staff of Nin on battlefield. I have 22 cards in library. "
+            "The plan says \"Do not cast Emrakul... library too low\". I have 22 cards, which "
+            "is enough to cast Emrakul if I could pay, but I can't pay {15} yet. However, "
+            "keeping Emrakul is valuable as a backup win con if Staff is removed or if I can "
+            "ramp. But I have to discard 6. The most expendable cards are the ones that don't "
+            "help me win *now* or protect the win. Path to Exile has no targets. Supreme Verdict "
+            "has no targets. I should discard the cards that are least likely to be useful "
+            "in the immediate future or are redundant. I have 3 Dream Fractures, 3 Fall of "
+            "Gavels, 2 Cancels, 2 Paths, 1 Supreme Verdict, 1 Emrakul, 1 Island. I already "
+            "discarded Island. I need to discard 5 more. I should keep my best answers. Dream "
+            "Fracture is good for counters. Fall of Gavel is good for counters and life. Cancel "
+            "is good for counters. Path is good for";
+        CHECK(codedAnswerCount(s133) == 0,
+              "#W69-BF K2 REPRO 125v146 s133: the reply the cap cut carries NO coded answer line at all");
+        CHECK(s133.find("PUT:") == string::npos,
+              "#W69-BF K2 REPRO 125v146 s133: and no PUT: label anywhere - nothing to salvage, so the heuristic answered");
+        const string line = smallSeamTruncationReaskLine(512, 6);
+        CHECK(line.find("length limit of 512 tokens") != string::npos
+                  && line.find("exactly 6 different card numbers") != string::npos
+                  && line.compare(0, 9, "[RE-ASK] ") == 0,
+              "#W69-BF K2 POSITIVE the small-seam correction quotes the cap that was used and the count owed");
+        CHECK(line.find("nothing has been chosen yet") != string::npos
+                  && line.find("put the answer FIRST") != string::npos,
+              "#W69-BF K2 POSITIVE it says the window is still open - no card has been discarded, no row withheld");
+        CHECK(smallSeamTruncationReaskLine(512, 1).find("exactly 1 different card number") != string::npos
+                  && smallSeamTruncationReaskLine(512, 0).find("the card numbers you want") != string::npos,
+              "#W69-BF K2 POSITIVE the singular and the count-less (reveal) forms are grammatical");
+        CHECK(line.find("heuristic") == string::npos && line.find("CHOICE:") == string::npos,
+              "#W69-BF K2 MUST-NOT-MATCH the line never mentions the heuristic and never asks for the wrong label");
+    }
+
+    cout << "\n[#W69-BF] K2 a recovered ROUND TRIP is not a recovered DECISION\n";
+    {
+        // engine HIGH-2: 123v125 s23 (priority, cap 768) truncated mid-analysis of
+        // a Marsh Flats fetch it had ALREADY resolved to the Swamp; s25 answered
+        // pass, the seat did not fetch, and the record read
+        // `reply_truncated_reask_recovered`. The counter could not tell "the re-ask
+        // got the same answer" from "the re-ask got a different one" - which is the
+        // whole question the cap's safety rests on. The truncated reply, verbatim:
+        const string s23 =
+            "The opponent has countered my Bloodline Keeper with Fall of the Gavel. I have "
+            "no way to counter it (no instants in hand with mana, no other spells on stack "
+            "to respond to). My plan to cast Bloodline Keeper this turn is dead. I need to "
+            "survive and set up for next turn. I have 1 mana open (Tundra). I have two Marsh "
+            "Flats in hand (one played this turn? No, \"You played Marsh Flats\" in Main Phase "
+            "1. Wait, the log says \"You played Marsh Flats\" then \"Paid ... for Bloodline "
+            "Keeper\". The Marsh Flats on battlefield is tapped? No, Marsh Flats enters untapped. "
+            "But I tapped it? No, I didn't tap it. The log says \"Paid ... for Bloodline Keeper "
+            "with Scrubland #1; Scrubland #2; Plains; Isolated Chapel\". These are tapped. "
+            "The Marsh Flats I played is untapped. The other Marsh Flats is in hand.\n\nI "
+            "have 1 mana. I cannot cast anything useful right now except maybe Vision Skeins "
+            "if I had it, but I don't. I have Tragic Slip, Tribute, Devour Flesh but no mana.\nI "
+            "should pass priority to let the Fall of the Gavel resolve. It will counter Bloodline "
+            "Keeper. I gain 5 life. I will be at 25 life.\nThen in second main phase, I can "
+            "try to do something? I have 1 mana. I can't cast anything.\nI should hold priority.\n\nWait, "
+            "looking at the options:\n1. Crack Marsh Flats (Swamp)\n2. Crack Marsh Flats (Swamp) "
+            "- wait, options 1 and 2 are targeting Swamp? Option 1 says \"targeting Scrubland "
+            "[your library]\"? No, \"targeting Scrubland\" is likely a typo in the prompt's "
+            "generation or refers to the library search. Let's look closer. \"Put a card onto "
+            "the battlefield with Marsh Flats targeting Scrubland [your library]\". This implies "
+            "searching for a Scrubland? But Marsh Flats searches for Plains or Swamp. The "
+            "prompt says \"Search your library for a Plains or Swamp card\". Option 1 says "
+            "\"targeting Scrubland\". This is contradictory. Option 2 says \"targeting Swamp\". "
+            "Option 3 says \"targeting Tundra\". Option 4 says \"targeting Underground Sea\".\nMarsh "
+            "Flats only finds Plains or Swamp. So Option 2 (Swamp) is the only valid land "
+            "search from the basic lands? Or is \"Scrubland\" a typo for \"Swamp\"? Or is "
+            "there a Swamp in my library? I have 4x Isolated Chapel (Swamp/Plains), 4x Scrubland, "
+            "1x Swamp, 4x Underground Sea, 4x Tundra, 4x Marsh Flats, 1x Plains.\nI have a "
+            "basic Swamp in my library? Yes, \"1x Swamp\".\nI have Isolated Chapels which "
+            "are Swamp/Plains.\nI have Scrublands which are W/B.\nMarsh Flats fetches Plains "
+            "or Swamp.\nSo I can fetch the basic Swamp or a Plains (I have 1 Plains).\nOption "
+            "1: \"targeting Scrubland\" - Invalid for Marsh Flats.\nOption 2: \"targeting "
+            "Swamp\" - Valid. Fetches the basic Swamp.\nOption 3: \"targeting Tundra\" - Invalid.\nOption "
+            "4: \"targeting Underground Sea\" - Invalid.\n\nSo Option 2 is the only valid "
+            "land fetch.\nShould I fetch the Swamp?\nIf I fetch the Swamp";
+        CHECK(codedAnswerCount(s23) == 0,
+              "#W69-BF K2 REPRO 123v125 s23: the truncated reply named NO coded answer - there is nothing to compare a recovery to");
+        CHECK(s23.find("Option 2") != string::npos && s23.find("CHOICE:") == string::npos,
+              "#W69-BF K2 REPRO 123v125 s23: it had resolved the decision in prose and never wrote the label");
+        // The engine now records which of the three cases a recovery is. The stamp
+        // is chosen from the prior choice the re-ask stored (-1 = none), so a
+        // recovery can never again read as a certified decision when the cut reply
+        // had certified nothing.
+        struct Pin {
+            static const char * stamp(int prior, int recovered)
+            {
+                return prior < 0 ? "reply_truncated_reask_no_prior_answer"
+                       : (recovered == prior ? "reply_truncated_answer_unchanged"
+                                             : "reply_truncated_answer_changed");
+            }
+        };
+        CHECK(string(Pin::stamp(-1, 0)) == "reply_truncated_reask_no_prior_answer",
+              "#W69-BF K2 POSITIVE the s23 shape: no prior answer, so the record says so and claims nothing more");
+        CHECK(string(Pin::stamp(5, 0)) == "reply_truncated_answer_changed"
+                  && string(Pin::stamp(5, 5)) == "reply_truncated_answer_unchanged",
+              "#W69-BF K2 POSITIVE a recovery that moves the answer is `answer_changed`, never `recovered`");
+    }
+
+    cout << "\n[#W69-BF] K2 the protocol puts a correction BEFORE the PLAN line\n";
+    {
+        // The cap cuts from the END. 123v162 s34 wrote its correction after the
+        // PLAN line and 928 more bytes past it were trimmed; the protocol routed
+        // the correction but never said where it must stand.
+        const string proto = kReplyProtocol;
+        CHECK(proto.find("Put any correction BEFORE your PLAN line") != string::npos,
+              "#W69-BF K2 POSITIVE the protocol names the side of the PLAN line a correction must be on");
+        CHECK(proto.find("cut from the END") != string::npos
+                  && proto.find("may never reach the game") != string::npos,
+              "#W69-BF K2 POSITIVE it says WHY, in the model's own terms - the limit eats the tail");
+        CHECK(proto.find("between your first answer") != string::npos,
+              "#W69-BF K2 POSITIVE and names the region the engine now reads a reversal from");
+        CHECK(proto.find("the FIRST one is the one that runs") != string::npos
+                  && proto.find("Only the FIRST 400 CHARACTERS") != string::npos,
+              "#W69-BF K2 MUST-NOT-MATCH first-wins and the carry cap are untouched by this insertion");
+    }
+
+    cout << "\n[#W69-BF] K3 the reversal predicate reads the correction zone\n";
+    {
+        // Measured over matchups-20260906-134120 BEFORE this was written:
+        // `decision_reversed_in_prose` fired 22 times, and the correction zone -
+        // the sentences between the coded line and the PLAN: line - was EMPTY on
+        // ALL 22. Sixteen came from the sentence-opener half reading PLAN prose,
+        // and 12 of those 16 re-asks returned the IDENTICAL answer.
+        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nActually, I will pass.\nPLAN: hold up mana.")
+                  != string::npos,
+              "#W69-BF K3 POSITIVE the correction zone ends where the PLAN line begins");
+        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nI will pass.") == string::npos,
+              "#W69-BF K3 POSITIVE with no PLAN line the whole reply after the answer IS the correction zone");
+        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nMy plan: nothing.\nPLAN: attack.") ==
+                  string("choice: 1 (cast x)\nmy plan: nothing.\n").size(),
+              "#W69-BF K3 MUST-NOT-MATCH \"my plan:\" mid-line is not the PLAN line - only a line-leading label is");
+        // 125v162 s19 (deck125's review calls it 125 s19): a 2,282-byte PLAN that
+        // says "I will pass" after a CORRECT CHOICE, re-asked, identical answer.
+        const string s19 =
+            "CHOICE: 5 (Swamp)\n\nPLAN: The opponent's Staff of Nin is the primary threat, "
+            "dealing 1 damage per turn and drawing a card. Underworld Dreams is on the battlefield, "
+            "dealing 1 damage to the opponent every time they draw. Master of the Feast was "
+            "removed, so the opponent is not drawing extra cards from it yet. I need to establish "
+            "board presence and card advantage. My hand has an Island and Liliana's Caress "
+            "is on the battlefield. I have 7 mana available. I should cast Master of the Feast "
+            "if I can find it or cast other engines. However, I do not have Master of the "
+            "Feast in hand. I have Liliana's Caress in hand? No, it's on the battlefield. "
+            "I have an Island in hand. I need to cast a spell. I have no spells in hand except "
+            "the land. Wait, the situation says \"Your hand (1 card): Island\". So I cannot "
+            "cast a spell this turn other than playing the land. I will play the Island to "
+            "untap more sources or just have more mana next turn. Actually, I already played "
+            "a land in Main Phase 1? The log says \"Phase: Main phase 1 ... You played Island\" "
+            "in Turn 20. It is now Turn 21 Upkeep. I have not played a land for Turn 21 yet. "
+            "The prompt asks to choose a card to put onto the battlefield from Path to Exile. "
+            "Path to Exile exiled Master of the Feast, allowing me to search for a basic land. "
+            "I chose Swamp. Now I have a Swamp in hand (gained from the search effect? No, "
+            "Path to Exile says \"put that card onto the battlefield tapped\". So I gain a "
+            "Swamp onto the battlefield. I do not cast it. I just put it down. Then I proceed "
+            "to my main phase. I have no spells in hand. I will pass. Next turn I will draw. "
+            "I need to get Master of the Feast or another engine back or find a new one. I "
+            "have Fate Unraveler in graveyard. I have Master of the Feast in graveyard. I "
+            "need to draw into them or cast them. I have no way to return them. I need to "
+            "draw. I have Underworld Dreams. I need more engines. I have Howling Mine, Dictate, "
+            "Puzzle Box, Forced Fruition in deck. I need to draw into them. I have no draw "
+            "spells in hand. I will just play the land and pass. Next turn I draw. If I draw "
+            "a spell, I cast it. If I draw a land, I play it. I need to stabilize and start "
+            "drawing cards. I have no creatures. I am vulnerable to combat if they attack. "
+            "They have no creatures. I am safe for now. I will play the Swamp and pass.";
+        CHECK(planSaysPassThisWindow(s19),
+              "#W69-BF K3 REPRO 125v162 s19: the unbounded predicate still sees the plan body's \"I will pass\" - nothing was deleted");
+        CHECK(!proseReversesInCorrectionZone(s19, 0),
+              "#W69-BF K3 REPRO 125v162 s19: and the correction zone is empty, so no round trip is bought for deliberation");
+        // 125v152 s47: "We pass to Main 2" inside the PLAN, re-asked at s48, which
+        // returned the identical `CHOICE: 1 (Cast Katilda, Dawnhart Prime)`.
+        const string s47 =
+            "CHOICE: 1 (Cast Katilda, Dawnhart Prime)\nPLAN: Cast Katilda to establish a Human "
+            "lord and mana engine. In Main Phase 2, tap Katilda and the Wolves (if they were "
+            "untapped, but they are summoning sick) or just Katilda to generate mana, then "
+            "activate Katilda's +1/+1 counter ability if we have enough mana ({4}{G}{W}). "
+            "Wait, we only have 4 mana total and Katilda costs {G}{W}. After casting Katilda, "
+            "we have 2 mana left. We cannot afford Katilda's ultimate ({4}{G}{W}) yet. However, "
+            "we need to get to combat. The Wolves and Huntmaster are summoning sick, so they "
+            "cannot attack. We must wait for the next turn. The immediate goal is to stabilize "
+            "the board and prepare for the next turn's attack. Since we have no other plays, "
+            "casting Katilda is the best way to develop the board. Actually, looking at the "
+            "board, we have no attackers. We just cast Katilda. We pass to Main 2. We can't "
+            "do much more. We will attack next turn with Huntmaster and Wolves.";
+        CHECK(planSaysPassThisWindow(s47) && !proseReversesInCorrectionZone(s47, 0),
+              "#W69-BF K3 REPRO 125v152 s47: a pass to Main 2 is a plan for a later window, not a reversal of this one");
+        CHECK(proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\nActually, I will pass.\n"
+                                            "PLAN: attack with everything next turn.", 0),
+              "#W69-BF K3 POSITIVE a reversal written where the protocol asks for it, in the words it asks for, IS read");
+        CHECK(proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\nCORRECTION: I will pass.\n"
+                                            "PLAN: attack with everything next turn.", 0)
+                  && proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\n"
+                                                   "On second thought, I will pass.\nPLAN: attack.", 0),
+              "#W69-BF K3 POSITIVE the protocol's other two announcement openers reach the same predicate");
+        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x1)\n"
+                                     "PLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass."),
+              "#W69-BF K3 MUST-NOT-MATCH the PLAN-CUE half is untouched - the plan line's own arithmetic verdict still fires");
+    }
+
+    cout << "\n[#W69-BF] K3 the reversal that NAMES the row it takes back\n";
+    {
+        // deck123 HIGH-2, the deciding decision of the corpus. 123v162 s34
+        // answered `CHOICE: 5 (Cast Damnation)` and then wrote "You should NOT cast
+        // Damnation. You should attack." - row 5 swept deck123's own 21 Humans one
+        // turn before lethal. No pass-opener matches that sentence: it is not a
+        // pass, it is a NEGATION of the row just taken, and it names the row. That
+        // is why this half may read the whole reply while the generic opener half
+        // may not - it is evidence-bound, and over the corpus's 2,041 ask/priority
+        // records with a taken row it fires THREE times.
+        const string s34 =
+            "CHOICE: 5 (Cast Damnation)\n\nPLAN: L 14, C 1, stop 18; M 21; this window: cast "
+            "Damnation. The opponent has 1 creature (Fate Unraveler) and you have 21. Casting "
+            "Damnation destroys all creatures. You lose your board, but you remove the opponent's "
+            "only threat (Fate Unraveler) and their draw punisher engine (Underworld Dreams "
+            "is an enchantment, so it survives, but Fate Unraveler is gone). Wait, Underworld "
+            "Dreams is an enchantment, so it survives Damnation. However, Fate Unraveler is "
+            "a creature, so it dies. This stops the 1 damage per draw from Fate Unraveler. "
+            "Underworld Dreams will still deal 1 damage per draw. But you have no creatures "
+            "left. You will draw 2 cards next turn, taking 2 damage from Underworld Dreams. "
+            "You are at 14. You will be at 12. Then you can rebuild. Actually, let's re-read "
+            "the guide. \"M at 4+: NEVER, whatever N says. Four bodies is a board you win "
+            "with.\" You have 21 bodies. You should NOT cast Damnation.";
+        const string row5 =
+            "Cast Damnation {2}{b}{b} {right now: destroys 1 of their creature (1 without "
+            "a restriction against attacking), 21 of yours - THEIRS: Fate Unraveler (3/4) "
+            "[doesn't untap during its controller's untap step]; YOURS: Thraben Doomsayer "
+            "(2/2) [haste, shroud, doesn't untap during its controller's untap step], Human "
+            "#1 (1/1) [doesn't untap during its controller's untap step], Human #2 (1/1) [doesn't "
+            "untap during its controller's untap step], Human #3 (1/1) [doesn't untap during "
+            "its controller's untap step], Human #4 (1/1) [doesn't untap during its controller's "
+            "untap step], Human #5 (1/1) [doesn't untap during its controller's untap step], "
+            "Human #6 (1/1) [doesn't untap during its controller's untap step], Human #7 (1/1) "
+            "[doesn't untap during its controller's untap step], Human #8 (1/1) [doesn't untap "
+            "during its controller's untap step], Human #9 (1/1) [doesn't untap during its "
+            "controller's untap step], Human #10 (1/1) [doesn't untap during its controller's "
+            "untap step], Human #11 (1/1) [doesn't untap during its controller's untap step], "
+            "Human #12 (1/1) [doesn't untap during its controller's untap step], Human #13 "
+            "(1/1) [doesn't untap during its controller's untap step], Human #14 (1/1) [doesn't "
+            "untap during its controller's untap step], Human #15 (1/1) [doesn't untap during "
+            "its controller's untap step], Human #16 (1/1) [doesn't untap during its controller's "
+            "untap step], Human #17 (1/1) [doesn't untap during its controller's untap step], "
+            "Human #18 (1/1) [doesn't untap during its controller's untap step], Human #19 "
+            "(1/1) [doesn't untap during its controller's untap step], Human #20 (1/1) [doesn't "
+            "untap during its controller's untap step]} {leaves 0 of your 4 untapped mana "
+            "sources untapped - casting this taps you out} {spends 4 of your 4 untapped mana "
+            "sources this turn; Devour Flesh {1}{b} in your hand needs 2} {card text: \"Destroy "
+            "all creatures. They can't be regenerated.\"} {taps you out - rows 1, 2, 3 and "
+            "4 need more mana sources than the 0 this leaves} [<- board sweep: THEIRS 1 (including "
+            "Fate Unraveler - a DRAW PUNISHER (it bills every card the other player draws)) "
+            "/ YOURS 21 - the only row on this menu that prices a board sweep (it takes more "
+            "of YOURS than of THEIRS). THAT COUNT IS BODIES, NOT VALUE: what it takes of THEIRS "
+            "includes the engine(s) named above, and an engine keeps producing while it is "
+            "on the board, so a body-for-body comparison does not price it]";
+        CHECK(menuRowShortName(row5) == "damnation",
+              "#W69-BF K3 POSITIVE the row's SHORT NAME is what the model writes in prose - the text up to the first brace");
+        CHECK(menuRowProseName(row5) != "damnation",
+              "#W69-BF K3 MUST-NOT-MATCH menuRowProseName cannot serve here: the row's NESTED brace group leaves annotation glued to the name");
+        string why;
+        CHECK(proseNegatesTakenRow(s34, row5, 0, &why) && why.find("should not cast damnation") != string::npos,
+              "#W69-BF K3 REPRO 123v162 s34: the reversal the wave-68 predicate missed, quoted back by the sentence that carries it");
+        CHECK(!planSaysPassThisWindow(s34),
+              "#W69-BF K3 REPRO 123v162 s34: and no pass-verdict half sees it - a negation of a row is not a pass");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nShould I not cast Damnation?\nPLAN: sweep.", row5),
+              "#W69-BF K3 MUST-NOT-MATCH a QUESTION about the row is deliberation, not a claim");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nI will not cast Damnation yet.\nPLAN: sweep.", row5),
+              "#W69-BF K3 MUST-NOT-MATCH a deferral (\"not yet\") is a plan for a later window, not a reversal");
+        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nI should not cast Devour Flesh.\nPLAN: sweep.", row5),
+              "#W69-BF K3 MUST-NOT-MATCH a negation that names ANOTHER card says nothing about the row that was taken");
+        CHECK(menuRowShortName("Cast nothing right now") == string()
+                  && menuRowShortName("Pass priority") == string()
+                  && menuRowShortName("Hold {2} for Cancel") == string(),
+              "#W69-BF K3 MUST-NOT-MATCH the menu's own decline rows have no name to negate - they are exempt at every seam");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

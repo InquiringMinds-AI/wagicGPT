@@ -1263,6 +1263,21 @@ private:
     //so a reply that repeats an index and lands short had no recovery at all.
     string mDiscardReaskKey;
     string mDiscardReaskLine;
+    //#W69-BF (K2): the SMALL seams (discard/reveal/bottom) share one truncation
+    //re-ask latch, keyed on the ask TEXT so it is one arm per window. Wave 68
+    //wired the truncation re-ask at ask/priority (BA J3) and at the two combat
+    //seams (BE R4) and left these three to the heuristic; 125v146 s133 is the
+    //cost - a 1,409 B discard reply cut at the cap with no coded label, and the
+    //heuristic discarded seven cards including the seat's Emrakul.
+    string mSmallTruncReaskKey;
+    string mSmallTruncReaskLine;
+    //#W69-BF (K2, engine HIGH-2): the coded answer the TRUNCATED reply had
+    //already named when a re-ask was bought, or -1 when it named none. The
+    //recovery compares against it, so `..._recovered` can no longer mean a
+    //recovered ROUND TRIP where the executed answer differs from the one the
+    //cut reply had written (123v125 s23-25 fetched nothing and read as a success).
+    int mAskReaskPriorChoice;
+    int mPriorityReaskPriorChoice;
     //#W60-M (B13c): true when askModel answered from the K10 latch or the
     //state+question cache - a window the model was NOT shown. The declined-list
     //counter (and anything else reporting what the MODEL did) must not count it.
