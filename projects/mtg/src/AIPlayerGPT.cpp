@@ -80,7 +80,7 @@ static void blockTriggeredLifeFor(MTGCardInstance * blocker, int& sure, int& may
 //blockers-header caller above its definition.
 static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
                                bool blkFirstStrike, int atkPower, bool atkFirstStrike,
-                               bool atkDeathtouch);
+                               bool atkDeathtouch, bool blkDoubleStrike = false);
 
 namespace
 {
@@ -4824,7 +4824,8 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               int infectExcluded = 0, bool damageSuppressed = false,
                               int blockGain = 0, const string& attackPunishers = "",
                               bool oppLifeLoop = false, //#W62-X (D2)
-                              bool * outKillClaim = NULL) //#W65-AN (G6)
+                              bool * outKillClaim = NULL, //#W65-AN (G6)
+                              int blockLifelink = 0) //#W65-AP (R4)
 {
     //#W65-AN (G6, deck123 HIGH-1): the A-row life-LOOP clause on the same
     //screen has to yield to this line's kill verdict, and a second computation
@@ -4872,11 +4873,29 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             //#W61-R (C1a): the damage is a floor; the LIFE it leaves is not,
             //because the blocks that let it through are the same blocks that
             //pay them. Both numbers, in the order the combat produces them.
-            if (blockGain > 0)
+            //#W65-AP (R4, wave-65 codex review finding 4 - HIGH): the ceiling
+            //folded their blocking TRIGGERS and not their blockers' own
+            //LIFELINK, so a kill verdict could rest on a floor of their life
+            //that a legal block overturns: at 5 life behind one 5/5 lifelink
+            //blocker the screen claimed an unavoidable kill, the block gains
+            //them 5, they live, and their own loop then kills the seat. A kill
+            //claim rests on a floor that already counts every gain a legal
+            //block can produce, so the lifelink half is counted here.
+            const int gainCeiling = blockGain + (blockLifelink > 0 ? blockLifelink : 0);
+            if (gainCeiling > 0)
             {
                 o << " that damage alone puts them at " << (oppLife - guaranteed)
-                  << ", but every blocker they declare also fires the blocking"
-                     " triggers tagged on the rows above - up to " << blockGain
+                  << ", but ";
+                if (blockGain > 0)
+                    o << "every blocker they declare also fires the blocking"
+                         " triggers tagged on the rows above";
+                if (blockGain > 0 && blockLifelink > 0)
+                    o << ", and a blocker with LIFELINK gains them the damage it"
+                         " deals (twice for a double striker)";
+                else if (blockLifelink > 0)
+                    o << "every blocker they declare with LIFELINK gains them the"
+                         " damage it deals (twice for a double striker)";
+                o << " - up to " << gainCeiling
                   << " life back across their " << blockers << " blocker"
                   << (blockers == 1 ? "" : "s");
                 //#W62-X (D2, deck123 HIGH-1 / C1 repro): with BOTH halves of a
@@ -4898,8 +4917,8 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                 else
                 {
                     o << ", so blocking can leave them as high as "
-                      << (oppLife - guaranteed + blockGain);
-                    if (oppLife - guaranteed + blockGain <= 0 && attackPunishers.empty())
+                      << (oppLife - guaranteed + gainCeiling);
+                    if (oppLife - guaranteed + gainCeiling <= 0 && attackPunishers.empty())
                     {
                         o << "; that KILLS them whatever they block, gain included";
                         if (outKillClaim) //#W65-AN (G6)
@@ -12553,8 +12572,20 @@ bool gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs,
     //deadline expiring, whatever arrived before it. Asked before the status.
     //The wave-62 R8 case is untouched: an empty-bodied 200 that COMPLETED
     //carries curlCode 0 and is still `empty_reply`, not a wall miss.
+    //#W65-AP (R6, wave-65 codex review finding 6 - HIGH): curl returns 28 for
+    //BOTH bounded clocks we set - CURLOPT_TIMEOUT_MS (the decision deadline)
+    //and CURLOPT_CONNECTTIMEOUT_MS (#W60-M B4's connect budget, tens of
+    //seconds). Wave 63 was right that code 28 is OUR clock and not a foreign
+    //fault, and wrong that it is always THIS clock: a connect timeout at 30 s
+    //of a 900 s deadline was filed `timeout`, opened a wall_miss account it
+    //never earned, and bought a fresh FULL deadline instead of the bounded
+    //remainder retry a pre-deadline transport death gets. So the clock has to
+    //have actually run: code 28 is a wall miss only inside the same >=95% band
+    //every other wall verdict uses (and transportPhaseFor already uses to name
+    //the phase on the record). Wave 63's case is untouched - a 200-headers
+    //stall that runs to the deadline lands AT it and is still `timeout`.
     if (curlCode == kCurlOperationTimedOut)
-        return true;
+        return elapsedMs * 100 >= timeoutMs * 95;
     if (httpStatus != 0)
         return false; //the server answered in full - not the clock
     if (curlCode > 0)
@@ -16975,6 +17006,52 @@ static bool gptAnswerCorrectionCue(const string& line)
     return false;
 }
 
+//#W65-AP (R2, wave-65 codex review finding 2 - HIGH). THE RULE, ONE FUNCTION.
+//#W65-AO wrote first-wins into findAnswerLabelLine and said it was label-wide
+//("CHOICE / ATTACK / BLOCKS / PUT all obey it"), and the protocol tells the
+//model so - but the live ATTACK and BLOCKS drivers never called that seam: each
+//kept its own last-CLEAN-wins walk, so `ATTACK: A1 ... ATTACK: none` executed
+//`none` and `BLOCKS: B1:A1 ... BLOCKS: none` executed the later unmarked line
+//the protocol calls thinking-out-loud. A rule the surface states and one seam
+//keeps is a false surface at the other two. This is the selection, extracted:
+//the CHOICE seam and both combat drivers now decide by calling it.
+//  - the FIRST usable CLEAN candidate is the answer; with no clean candidate the
+//    first usable one stands (#W50-Y D7's "an unclean trailer is taken only when
+//    no clean line exists", read first-order);
+//  - a LATER candidate supersedes only when it EXPLICITLY CORRECTS (#W65-AO's
+//    closed marker set), and only on the same clean/unclean footing - a marker
+//    written ON the line is itself the "tail" D7's cleanliness test would reject
+//    it for, so it outranks that heuristic.
+//Returns the index of the answer, or -1 when nothing is usable.
+static int gptSelectAnswerIndex(const std::vector<bool>& usable,
+                                const std::vector<bool>& clean,
+                                const std::vector<bool>& correction,
+                                const std::vector<bool>& markedOnLine)
+{
+    int ans = -1;
+    bool anyClean = false;
+    for (size_t i = 0; i < usable.size(); i++)
+        if (usable[i] && clean[i])
+        {
+            anyClean = true;
+            if (ans < 0)
+                ans = (int) i;
+        }
+    if (ans < 0)
+        for (size_t i = 0; i < usable.size(); i++)
+            if (usable[i])
+            {
+                ans = (int) i;
+                break;
+            }
+    if (ans < 0)
+        return -1;
+    for (size_t i = (size_t) ans + 1; i < usable.size(); i++)
+        if (usable[i] && correction[i] && (clean[i] || markedOnLine[i] || !anyClean))
+            ans = (int) i;
+    return ans;
+}
+
 static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                                 size_t& segStart, size_t& segEnd, size_t& labelLineStart,
                                 int * choiceRunLen = NULL, int * rejectedLines = NULL,
@@ -17035,7 +17112,20 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                         for (size_t g = lastMatchLineEnd; g < lineStart && adjacent; g++)
                             adjacent = isspace((unsigned char) text[g]) != 0;
                     }
-                    if (adjacent && !heads.empty())
+                    //#W65-AP (R3, wave-65 codex review finding 3 - HIGH): a
+                    //MARKED correction written directly under the line it
+                    //corrects (no blank line between) was folded into the
+                    //adjacent-answer run and never became a head at all, so the
+                    //engine executed the retracted first choice - the exact
+                    //syntax #W65-AO's protocol had just told the model to use.
+                    //Correction detection therefore runs BEFORE the run fold:
+                    //a line carrying the marker ON ITSELF is always a head. The
+                    //preceding-line cue is deliberately NOT consulted here - on
+                    //an adjacent line the preceding line IS the answer being
+                    //corrected, and reading its tail would turn an ordinary
+                    //ranked list into a correction.
+                    const bool markedHere = gptAnswerCorrectionCue(rawLine);
+                    if (adjacent && !heads.empty() && !markedHere)
                         heads.back().runLen++; //extend the run; the run HEAD stays the answer
                     else
                     {
@@ -17050,10 +17140,11 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                         //is announced on its own line or on the nearest preceding
                         //non-blank line. The first head is never a correction -
                         //there is nothing yet to correct.
-                        h.markedOnLine = gptAnswerCorrectionCue(rawLine);
+                        h.markedOnLine = markedHere; //#W65-AP (R3)
                         h.correction = !heads.empty()
                                        && (h.markedOnLine
-                                           || gptAnswerCorrectionCue(prevNonBlankLine));
+                                           || (!adjacent
+                                               && gptAnswerCorrectionCue(prevNonBlankLine)));
                         h.runLen = 1;
                         heads.push_back(h);
                     }
@@ -17082,24 +17173,20 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     //clean line exists", read first-order). A later head then supersedes only if
     //it explicitly corrects, and only on the same clean/unclean footing - a
     //correction cannot be worse-formed than what it replaces.
-    size_t ans = heads.size();
+    //#W65-AP (R2): the selection is gptSelectAnswerIndex - the same function the
+    //ATTACK and BLOCKS drivers call, so there is one rule and one place it lives.
+    std::vector<bool> vUsable(heads.size(), true), vClean, vCorr, vMarked;
     bool anyClean = false;
     for (size_t i = 0; i < heads.size(); i++)
+    {
+        vClean.push_back(heads[i].clean);
+        vCorr.push_back(heads[i].correction);
+        vMarked.push_back(heads[i].markedOnLine);
         if (heads[i].clean)
-        {
             anyClean = true;
-            if (ans == heads.size())
-                ans = i;
-        }
-    if (ans == heads.size())
-        ans = 0;
-    //#W65-AO (G8): a marker written ON the correcting line is itself the "tail"
-    //that #W50-Y D7's cleanliness test would reject it for, so an EXPLICIT marker
-    //outranks that heuristic; a correction announced on the line above still has
-    //to be well-formed.
-    for (size_t i = ans + 1; i < heads.size(); i++)
-        if (heads[i].correction && (heads[i].clean || heads[i].markedOnLine || !anyClean))
-            ans = i;
+    }
+    const int sel = gptSelectAnswerIndex(vUsable, vClean, vCorr, vMarked);
+    size_t ans = (sel < 0) ? 0 : (size_t) sel;
     //#W50-Y D7's counter, first-order: an unclean CHOICE head that lost to the
     //clean answer is a line the scan refused, and is signed as one.
     if (anyClean)
@@ -21982,7 +22069,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                     declared[mj]->power,
                                     declared[mj]->basicAbilities[Constants::FIRSTSTRIKE] != 0
                                         || declared[mj]->basicAbilities[Constants::DOUBLESTRIKE] != 0,
-                                    declared[mj]->basicAbilities[Constants::DEATHTOUCH] != 0);
+                                    declared[mj]->basicAbilities[Constants::DEATHTOUCH] != 0,
+                                    //#W65-AP (R5): two damage steps, two gains
+                                    canCards[bi]->basicAbilities[Constants::DOUBLESTRIKE] != 0);
                         }
                         //#W65-AN (G10): the blocks ALREADY declared are part of
                         //this same combat, so their certain life is part of the
@@ -22005,7 +22094,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                 cc->defenser->power,
                                 cc->defenser->basicAbilities[Constants::FIRSTSTRIKE] != 0
                                     || cc->defenser->basicAbilities[Constants::DOUBLESTRIKE] != 0,
-                                cc->defenser->basicAbilities[Constants::DEATHTOUCH] != 0);
+                                cc->defenser->basicAbilities[Constants::DEATHTOUCH] != 0,
+                                //#W65-AP (R5): two damage steps, two gains
+                                cc->basicAbilities[Constants::DOUBLESTRIKE] != 0);
                         }
                         //#W63-AB (E3b): on a lethal screen the line is still
                         //printed and labelled as the least-damage line.
@@ -29203,17 +29294,25 @@ static const char * kAttackTargetScopeFacts =
     " so a planeswalker can never block.\n";
 
 //#W65-AM (G7): the scope the decline allowance re-opens on. A decline is an
-//answer about the BOARD it was given on, and a phase advance is not a board
-//change - serializeGameState's first line is the phase/turn header, so keying
-//the re-opener on the raw board key would restart the allowance ~10 times a
-//turn and turn a churn control into churn. Everything AFTER that line is game
-//state (day/night, both lives, both battlefields, the stack, the mana line, the
-//zone counts): that is what "the board moved" means here.
+//answer about the BOARD it was given on: when that board has moved the count is
+//erased and the allowance starts again.
+//#W65-AP (R1, wave-65 codex review finding 1 - HIGH, DOCTRINE). THE PHASE IS
+//PART OF THE QUESTION. This scope was the board key MINUS its first line, and
+//that first line is the phase/turn header - so two declines given in UPKEEP
+//retired the row for first main as well, over a battlefield that had not
+//changed. What is LEGAL changes with the phase (every sorcery-speed action
+//becomes legal in a main phase and stops being legal when the stack is not
+//empty), so a refusal given in one phase is not an answer to the question the
+//next phase asks: "enforce legality without constraining choice" is broken by
+//exactly the amount the header was stripping. The scope is therefore the WHOLE
+//key, header included. The churn the cap was built for is still controlled -
+//a phase holds MANY priority windows (each spell resolution, each pass back),
+//and within one phase over an unchanged board the two declines still stand;
+//what a phase change buys is one fresh offer of a row the engine says is legal.
 //Pure, so PARSETEST can pin both directions.
 static string declineBoardScope(const string& boardKey)
 {
-    size_t nl = boardKey.find('\n');
-    return nl == string::npos ? string() : boardKey.substr(nl + 1);
+    return boardKey;
 }
 
 static string lastOfferClause(bool retiresOnPass)
@@ -30330,7 +30429,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                   ? fetchLineKey(shownLines[s])
                                   : stripRepeatAnnotation(shownLines[s]);
                 mPassDeclineCount[dk]++;
-                //#W65-AM (G7): the BOARD it was declined on (phase header excluded)
+                //#W65-AM (G7): the BOARD it was declined on.
+                //#W65-AP (R1): phase header INCLUDED - see declineBoardScope.
                 mPassDeclineBoard[dk] = declineBoardScope(boardKey);
             }
         //#W48-D13: a pass, or a decision handed to the heuristic, is the loop
@@ -36290,19 +36390,37 @@ static bool blockingTriggerCovers(MTGCardInstance * src, const string& spec,
 //fail-closed under-estimate of a figure the seat is told is a best case, which
 //is the safe direction for a survival number. Pure over the seven facts, so
 //PARSETEST pins the whole table without a board.
+//#W65-AP (R5, wave-65 codex review finding 5 - HIGH): DOUBLE STRIKE IS TWO
+//DAMAGE STEPS. Both callers pass `blkFirstStrike` as FIRSTSTRIKE||DOUBLESTRIKE,
+//so a double striker was credited ONE power-sized gain: at 3 life a 3/3
+//double-strike lifelink blocker facing 6 unblocked damage was priced at +3 and
+//the screen projected death, where the real gain is 6 across the two steps and
+//the seat survives at 3. A "no block saves you" verdict is exactly the claim
+//that must never be made from an under-count, so the second step is priced.
+//It is a FLOOR still: the first-strike step is always dealt (a double striker
+//has first strike), and the second is credited only where the blocker is still
+//there to deal it - i.e. where the attacker's own damage did not already kill
+//it in the first step.
 static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
                                bool blkFirstStrike, int atkPower, bool atkFirstStrike,
-                               bool atkDeathtouch)
+                               bool atkDeathtouch, bool blkDoubleStrike)
 {
     if (!blkLifelink || blkPower <= 0)
         return 0;
-    if (atkFirstStrike && !blkFirstStrike && atkPower > 0)
-    {
-        const int lethal = atkDeathtouch ? 1 : blkToughness;
-        if (lethal > 0 && atkPower >= lethal)
-            return 0; //killed before it ever deals damage: no lifelink
-    }
-    return blkPower;
+    const int lethal = atkDeathtouch ? 1 : blkToughness;
+    const bool killedByFirstStrike = atkFirstStrike && !blkFirstStrike && atkPower > 0
+                                     && lethal > 0 && atkPower >= lethal;
+    if (killedByFirstStrike)
+        return 0; //killed before it ever deals damage: no lifelink
+    if (!blkDoubleStrike)
+        return blkPower;
+    //Two steps. The blocker deals its first-strike damage; it deals the second
+    //unless the attacker's damage in the FIRST step killed it (only possible
+    //when the attacker also strikes first), in which case the attacker's own
+    //regular damage never comes and neither does the blocker's second hit.
+    const bool diedInFirstStep = atkFirstStrike && atkPower > 0 && lethal > 0
+                                 && atkPower >= lethal;
+    return diedInFirstStep ? blkPower : blkPower * 2;
 }
 
 //Total life `blocker`'s controller gains the moment this creature BLOCKS,
@@ -37323,10 +37441,15 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
 //decode-time repeat-loop often states a well-formed BLOCKS:/ATTACK:/PUT: line
 //before spiraling (the same premise as salvageLoopedChoice), so the last one
 //that validates is recovered rather than lost to the heuristic.
-static void collectLabeledLines(const string& content, const char * label, vector<string>& out)
+//#W65-AP (R2): `prevOut`, when given, receives the nearest preceding non-blank
+//line for each collected line - the correction-cue window the CHOICE seam
+//already reads (#W65-AO G8). Optional, so every existing caller is unchanged.
+static void collectLabeledLines(const string& content, const char * label, vector<string>& out,
+                                vector<string> * prevOut = NULL)
 {
     size_t labelLen = strlen(label);
     size_t lineStart = 0;
+    string prevNonBlank;
     while (lineStart <= content.size())
     {
         size_t lineEnd = content.find('\n', lineStart);
@@ -37335,14 +37458,21 @@ static void collectLabeledLines(const string& content, const char * label, vecto
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        const string rawLine = content.substr(lineStart, end - lineStart);
         if (end - s >= labelLen)
         {
             bool m = true;
             for (size_t k = 0; k < labelLen && m; k++)
                 m = (toupper((unsigned char) content[s + k]) == toupper((unsigned char) label[k]));
             if (m)
+            {
                 out.push_back(content.substr(s + labelLen, end - (s + labelLen)));
+                if (prevOut)
+                    prevOut->push_back(prevNonBlank);
+            }
         }
+        if (rawLine.find_first_not_of(" \t\r") != string::npos)
+            prevNonBlank = rawLine;
         if (lineEnd == string::npos)
             break;
         lineStart = lineEnd + 1;
@@ -38576,6 +38706,84 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     return -1; //unusable
 }
 
+//#W65-AP (R2): the ATTACK driver's line choice, as one pure function - so the
+//rule it runs is the shared one (gptSelectAnswerIndex) and PARSETEST exercises
+//what the DRIVER executes rather than a helper beside it. Every candidate the
+//driver ever considered is here: the coded ATTACK: lines of the post-</think>
+//reply, in order, plus #W62-Z (D9)'s prose restatement as the last candidate.
+//`send` receives the declaration; `takenText` the exact line it was read from
+//(#W64-AI F4 parses the >W# suffixes from THAT line and no other); `takenIndex`
+//its position, so the caller can still sign what happened. Returns the size of
+//the declaration, or -1 when no candidate parses.
+//`restated` is #W62-Z (D9)'s prose restatement, computed by the caller because
+//AIPlayerGPT::restatedCombatDirective is private to the class (both callers -
+//the driver and PARSETEST - are members).
+static int gptAttackLineFromReply(const string& content, size_t nAttackers,
+                                  const vector<string>& attackerNames,
+                                  const string& restated,
+                                  vector<bool>& send, string * takenText,
+                                  int * takenIndex, string * notes)
+{
+    if (takenIndex)
+        *takenIndex = -1;
+    if (content.empty())
+        return -1;
+    string stripped = content;
+    size_t te = stripped.rfind("</think>");
+    if (te != string::npos)
+        stripped = stripped.substr(te + 8);
+    vector<string> lines, prevLines;
+    collectLabeledLines(stripped, "ATTACK:", lines, &prevLines);
+    const bool haveRestated = !restated.empty();
+    if (haveRestated)
+    {
+        lines.push_back(restated);
+        prevLines.push_back(string());
+    }
+    if (lines.empty())
+        return -1;
+    vector<bool> usable(lines.size(), false), clean(lines.size(), false),
+                 corr(lines.size(), false), marked(lines.size(), false);
+    vector<vector<bool> > sets(lines.size());
+    vector<int> counts(lines.size(), -1);
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        vector<bool> s;
+        const int r = parseAttackerSet(lines[i], nAttackers, s, &attackerNames);
+        if (r >= 0)
+        {
+            usable[i] = true;
+            sets[i] = s;
+            counts[i] = r;
+        }
+        clean[i] = combatLineIsClean(lines[i], &attackerNames, NULL);
+        marked[i] = gptAnswerCorrectionCue(lines[i]);
+        corr[i] = (i > 0) && (marked[i] || gptAnswerCorrectionCue(prevLines[i]));
+    }
+    const int idx = gptSelectAnswerIndex(usable, clean, corr, marked);
+    if (idx < 0)
+        return -1;
+    send = sets[(size_t) idx];
+    if (takenText)
+        *takenText = lines[(size_t) idx];
+    if (takenIndex)
+        *takenIndex = idx;
+    if (notes)
+    {
+        if (haveRestated && (size_t) idx + 1 == lines.size())
+            appendParseNote(notes, "attack_restated_prose_taken");
+        else if (idx > 0)
+            appendParseNote(notes, "attack_correction_line_taken");
+        for (size_t i = (size_t) idx + 1; i < lines.size(); i++)
+            if (usable[i])
+            {
+                appendParseNote(notes, "later_answer_ignored");
+                break;
+            }
+    }
+    return counts[(size_t) idx];
+}
+
 //#W64-AK (R1, wave-64 codex review finding 1): the row's own DESTINATION fact.
 //A creature that may attack a planeswalker but not the player is a legal attack
 //this seat may declare, and the only shape that declares it is `A#>W#` - a row
@@ -39075,6 +39283,7 @@ int AIPlayerGPT::chooseAttackers()
             //certain and the "may" halves are in the ceiling because a "may"
             //is theirs to take and this number is what the seat must survive.
             int blockGain = 0;
+            int blockLifelinkCeiling = 0; //#W65-AP (R4)
             std::vector<int> blockerLife;
             std::vector<bool> blockerCanBlockOffered;
             if (oppB && oppB->game && oppB->game->inPlay)
@@ -39104,6 +39313,17 @@ int AIPlayerGPT::chooseAttackers()
                     blockTriggeredLifeFor(c, sure, may);
                     blockerLife.push_back(sure + may);
                     blockerCanBlockOffered.push_back(blocksSomethingOffered);
+                    //#W65-AP (R4): and the LIFELINK the same body gains them by
+                    //dealing its combat damage. Kept in its own total because
+                    //the line names it separately - it is not a blocking
+                    //trigger, it is the block itself. A CEILING, like every
+                    //other term here: the block they choose is theirs, so the
+                    //number the seat must survive assumes the damage is dealt
+                    //(double strike deals it twice).
+                    if (blocksSomethingOffered && c->power > 0
+                        && c->basicAbilities[Constants::LIFELINK])
+                        blockLifelinkCeiling += c->power
+                            * (c->basicAbilities[Constants::DOUBLESTRIKE] ? 2 : 1);
                 }
             }
             blockGain = blockingLifeCeiling(blockerLife, blockerCanBlockOffered);
@@ -39112,7 +39332,8 @@ int AIPlayerGPT::chooseAttackers()
                                     infectExcluded, suppressed, blockGain,
                                     attackDeclarationPunishers(oppL),
                                     playerHasLifeLoop(oppL), //#W62-X (D2)
-                                    &attackTotalKillClaim); //#W65-AN (G6)
+                                    &attackTotalKillClaim, //#W65-AN (G6)
+                                    blockLifelinkCeiling); //#W65-AP (R4)
             //#W64-AK (R1): and the exclusion this wave's new row class creates.
             {
                 int walkerOnlyRows = 0;
@@ -39344,60 +39565,18 @@ int AIPlayerGPT::chooseAttackers()
     //target suffixes are parsed from THAT line and no other, so a target can
     //never be picked up from a discarded CoT line.
     string takenText;
-    if (!content.empty())
+    //#W65-AP (R2, wave-65 codex review finding 2 - HIGH): the driver's own
+    //last-CLEAN-wins walk lived here and never obeyed the first-wins rule the
+    //protocol states and #W65-AO wrote into the CHOICE seam, so
+    //`ATTACK: A1 / ... / ATTACK: none` executed `none`. The choice is now
+    //gptAttackLineFromReply, which runs the shared gptSelectAnswerIndex - one
+    //rule, one function, three seams.
     {
-        string stripped = content;
-        size_t te = stripped.rfind("</think>");
-        if (te != string::npos)
-            stripped = stripped.substr(te + 8);
-        vector<string> attackLines;
-        collectLabeledLines(stripped, "ATTACK:", attackLines);
         int takenLine = -1;
-        for (size_t li = 0; li < attackLines.size(); li++)
-        {
-            vector<bool> s;
-            int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
-            if (r >= 0) { send = s; result = r; takenLine = (int) li; takenText = attackLines[li]; break; } //first usable declaration
-        }
-        //#W62-Z (D9): ...and a declaration the model re-states in PROSE after
-        //its coded line, before its PLAN:, is the same self-correction the
-        //CHOICE seam has honoured since #W48-E1. Appended to the line list so
-        //the last-clean rule below judges it exactly like a coded line.
-        {
-            const string restated = restatedCombatDirective(content, "ATTACK:", &attackerNames, NULL);
-            if (!restated.empty())
-            {
-                vector<bool> s;
-                if (parseAttackerSet(restated, attackers.size(), s, &attackerNames) >= 0)
-                {
-                    attackLines.push_back(restated);
-                    if (takenLine < 0)
-                    {
-                        takenLine = 0;
-                        takenText = restated; //#W64-AI (F4)
-                    }
-                    appendParseNote(&mLastParseNote, "attack_restated_prose_taken");
-                }
-            }
-        }
-        //#W49-S (D2b): the last CLEAN coded line is the model's final answer
-        //(see combatLineIsClean); a prose combat-math line never replaces.
-        for (size_t li = attackLines.size(); takenLine >= 0 && li-- > (size_t) takenLine + 1; )
-        {
-            if (!combatLineIsClean(attackLines[li], &attackerNames, NULL))
-                continue;
-            vector<bool> s;
-            int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
-            if (r >= 0)
-            {
-                send = s;
-                result = r;
-                takenLine = (int) li;
-                takenText = attackLines[li]; //#W64-AI (F4)
-                appendParseNote(&mLastParseNote, "attack_last_line_taken");
-            }
-            break;
-        }
+        result = gptAttackLineFromReply(content, attackers.size(), attackerNames,
+                                        restatedCombatDirective(content, "ATTACK:",
+                                                                &attackerNames, NULL),
+                                        send, &takenText, &takenLine, &mLastParseNote);
         if (takenLine == 0)
             mAnswerReplacedFalse = true; //what executed is the first coded line
     }
@@ -39747,6 +39926,64 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         }
     }
     return pairs;
+}
+
+//#W65-AP (R2): the BLOCKS driver's line choice, as one pure function, on the
+//shared rule. Same shape as gptAttackLineFromReply: the coded BLOCKS: lines of
+//the post-</think> reply in order, plus #W62-Z (D9)'s prose restatement last.
+//The driver only overrides consumePlan's answer when the reply carried MORE
+//THAN ONE candidate (the shipped guard, unchanged) - with a single candidate
+//the two agree by construction. Returns true and fills `out` when a candidate
+//was selected; `firstLine` reports whether it was the reply's first.
+static bool gptBlocksLineFromReply(const string& content, const vector<string>& bNames,
+                                   const vector<string>& aNames, const string& restated,
+                                   string& out, bool * firstLine, string * notes)
+{
+    if (content.empty())
+        return false;
+    string stripped = content;
+    size_t te = stripped.rfind("</think>");
+    if (te != string::npos)
+        stripped = stripped.substr(te + 8);
+    vector<string> lines, prevLines;
+    collectLabeledLines(stripped, "BLOCKS:", lines, &prevLines);
+    const bool haveRestated = !restated.empty();
+    if (haveRestated)
+    {
+        lines.push_back(restated);
+        prevLines.push_back(string());
+    }
+    if (lines.size() < 2)
+        return false; //one candidate (or none): consumePlan's answer stands
+    //Every collected line is a candidate - as it was: this seam has never
+    //gated a BLOCKS line on parseability (an unassignable line is a legal
+    //"block nothing" and parseBlockAssignments answers 0 pairs for it), and
+    //adding a gate here would change which reply is unusable, not which of
+    //several is the answer.
+    vector<bool> usable(lines.size(), true), clean(lines.size(), false),
+                 corr(lines.size(), false), marked(lines.size(), false);
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        clean[i] = combatLineIsClean(lines[i], &bNames, &aNames);
+        marked[i] = gptAnswerCorrectionCue(lines[i]);
+        corr[i] = (i > 0) && (marked[i] || gptAnswerCorrectionCue(prevLines[i]));
+    }
+    const int idx = gptSelectAnswerIndex(usable, clean, corr, marked);
+    if (idx < 0)
+        return false;
+    out = lines[(size_t) idx];
+    if (firstLine)
+        *firstLine = (idx == 0);
+    if (notes)
+    {
+        if (haveRestated && (size_t) idx + 1 == lines.size())
+            appendParseNote(notes, "blocks_restated_prose_taken");
+        else if (idx > 0)
+            appendParseNote(notes, "blocks_correction_line_taken");
+        if ((size_t) idx + 1 < lines.size())
+            appendParseNote(notes, "later_answer_ignored");
+    }
+    return true;
 }
 
 int AIPlayerGPT::chooseBlockers()
@@ -40363,52 +40600,21 @@ int AIPlayerGPT::chooseBlockers()
     //attackers seam applies - see combatLineIsClean).
     string decisionPart = consumePlan(content, "BLOCKS:");
     bool blocksFirstLine = true;
-    if (!content.empty())
+    //#W65-AP (R2, wave-65 codex review finding 2 - HIGH): this driver kept its
+    //own last-CLEAN-wins walk, so `BLOCKS: B1:A1 / ... / BLOCKS: none` executed
+    //the later unmarked line the protocol calls thinking-out-loud. The choice is
+    //gptBlocksLineFromReply now, on the shared gptSelectAnswerIndex.
     {
-        string strippedB = content;
-        size_t te = strippedB.rfind("</think>");
-        if (te != string::npos)
-            strippedB = strippedB.substr(te + 8);
-        vector<string> blockLines;
-        collectLabeledLines(strippedB, "BLOCKS:", blockLines);
-        //#W62-Z (D9, deck146 HIGH-1 - the window that lost 146v152): an
-        //assignment the model re-states in PROSE after its coded line and
-        //before its PLAN: is a self-correction, exactly as it is at the CHOICE
-        //seam (#W48-E1). Appended to the line list so the last-CLEAN rule below
-        //judges it by the same grammar as a coded line - it is never trusted
-        //because it is later, only because it is clean.
-        {
-            vector<string> rb, ra;
-            for (size_t j = 0; j < blockers.size(); j++)
-                rb.push_back(blockers[j]->name);
-            for (size_t j = 0; j < attackers.size(); j++)
-                ra.push_back(attackers[j]->name);
-            const string restated = restatedCombatDirective(content, "BLOCKS:", &rb, &ra);
-            if (!restated.empty())
-            {
-                blockLines.push_back(restated);
-                appendParseNote(&mLastParseNote, "blocks_restated_prose_taken");
-            }
-        }
-        if (blockLines.size() >= 2)
-        {
-            vector<string> bNames, aNames;
-            for (size_t j = 0; j < blockers.size(); j++)
-                bNames.push_back(blockers[j]->name);
-            for (size_t j = 0; j < attackers.size(); j++)
-                aNames.push_back(attackers[j]->name);
-            size_t pickLine = 0;
-            for (size_t li = blockLines.size(); li-- > 1; )
-                if (combatLineIsClean(blockLines[li], &bNames, &aNames))
-                {
-                    pickLine = li;
-                    break;
-                }
-            decisionPart = blockLines[pickLine];
-            blocksFirstLine = (pickLine == 0);
-            if (pickLine > 0)
-                appendParseNote(&mLastParseNote, "blocks_last_line_taken");
-        }
+        vector<string> bNames, aNames;
+        for (size_t j = 0; j < blockers.size(); j++)
+            bNames.push_back(blockers[j]->name);
+        for (size_t j = 0; j < attackers.size(); j++)
+            aNames.push_back(attackers[j]->name);
+        string picked;
+        if (gptBlocksLineFromReply(content, bNames, aNames,
+                                   restatedCombatDirective(content, "BLOCKS:", &bNames, &aNames),
+                                   picked, &blocksFirstLine, &mLastParseNote))
+            decisionPart = picked;
     }
     //Name tables for the block name->label reconcile (mirror of the shipped
     //ATTACK reconcile): the display names as shown in the B#/A# labels, plus
@@ -54587,6 +54793,36 @@ static const char * kW50Y_r94 =
         CHECK(gptDeadlineMissed(true, 899000, 900000, 0, 0)
               && gptDeadlineMissed(true, 900018, 900000, 0, 28),
               "#W62-AA R8 MUST-NOT-MATCH a wall miss with NO status is unchanged");
+        //#W65-AP (R6, wave-65 codex review finding 6): curl returns 28 for the
+        //CONNECT timeout as well as the request timeout, and wave 63's rule
+        //("code 28 IS the deadline expiring, whatever arrived before it") read
+        //the connect budget's death as a wall miss. THE CONNECT-TIMEOUT SHAPE:
+        //http=0, curl=28, 30 s elapsed of a 900 s deadline.
+        CHECK(!gptDeadlineMissed(true, 30000, 900000, 0, 28),
+              "#W65-AP R6 a connect timeout far short of the deadline is NOT a wall miss");
+        CHECK(string(noAnswerClassFor(false, gptDeadlineMissed(true, 30000, 900000, 0, 28),
+                                      false, 0, 28)) == "transport_error",
+              "#W65-AP R6 ...it classes transport_error, so the retry is the BOUNDED"
+              " remainder and no wall_miss account is opened");
+        CHECK(AIPlayerGPT::retryableTransportFailure(28, 0, true)
+              && AIPlayerGPT::remainingTransportRetryMs(900000, 30000) == 870000,
+              "#W65-AP R6 ...and what it buys is the 870 s left of the deadline, not a"
+              " fresh 900");
+        //MUST-NOT-MATCH: wave 63's own case. A 200 whose headers landed and whose
+        //body never did stalls to OUR deadline, so the elapsed clock is AT the
+        //wall and the verdict it earned is unchanged.
+        CHECK(gptDeadlineMissed(true, 900024, 900000, 200, 28)
+              && string(noAnswerClassFor(false, gptDeadlineMissed(true, 900024, 900000, 200, 28),
+                                         false, 200, 28)) == "timeout",
+              "#W65-AP R6 MUST-NOT-MATCH #W63-AF R9's headers-then-stall is still a wall"
+              " miss - it ran the whole deadline");
+        //NEGATIVE: the band is the same one every other wall verdict uses, so a
+        //28 at 95% is a wall miss and the phase stamp agrees with the verdict.
+        CHECK(gptDeadlineMissed(true, 855000, 900000, 0, 28)
+              && string(AIPlayerGPT::transportPhaseFor(28, 855000, 20000, 900000)) == "wall"
+              && string(AIPlayerGPT::transportPhaseFor(28, 30000, 20000, 900000)) != "wall",
+              "#W65-AP R6 NEGATIVE the deadline test and the recorded phase read the same"
+              " band, so a record can never say connect while the class says timeout");
         //D24: only a decision that NOTHING from the reply answered latches a recovery.
         CHECK(handedToHeuristic(-1, "unparsed_reply") && handedToHeuristic(-1, "timeout")
               && handedToHeuristic(-1, "degenerate_decode"),
@@ -65346,20 +65582,31 @@ static const char * kW50Y_r94 =
         // re-opens and the retired row is offered again.
         CHECK(declineBoardScope(b1) != declineBoardScope(b3),
               "#W65-AM G7 POSITIVE Intruder Alarm resolving re-opens the declined rows");
-        // MUST-NOT-MATCH: a phase advance alone is NOT a board change. Keying on
-        // the raw board key would restart the allowance ~10 times a turn and turn
-        // a churn control into churn.
-        CHECK(declineBoardScope(b1) == declineBoardScope(b2),
-              "#W65-AM G7 MUST-NOT-MATCH a phase advance over an unchanged board does not"
-              " re-open the allowance");
+        // #W65-AP (R1): INVERTED. This case pinned the phase-stripped scope - "a
+        // phase advance alone is NOT a board change" - and that is the doctrine
+        // breach the review found: a sorcery-speed row refused twice in upkeep
+        // stayed retired in first main, where it is a different question. The
+        // scope now carries the header, so the phase advance re-opens.
+        CHECK(declineBoardScope(b1) != declineBoardScope(b2),
+              "#W65-AP R1 POSITIVE a phase advance re-opens the allowance - what is legal"
+              " changes with the phase, so the refusal is not an answer to the new question");
         CHECK(b1 != b2,
               "#W65-AM G7 ...and that is a real distinction: the raw keys DO differ");
-        // NEGATIVE: a key with no newline at all yields no scope, so a malformed
-        // key can never compare EQUAL to a real board and silently keep a row
-        // retired.
-        CHECK(declineBoardScope("no newline here").empty()
-              && declineBoardScope(b1) != declineBoardScope("no newline here"),
-              "#W65-AM G7 NEGATIVE a key with no header line scopes to nothing");
+        // #W65-AP (R1) MUST-NOT-MATCH: the churn control the cap was built for is
+        // still there - the SAME window, same phase, same board, keeps its two
+        // declines. Nothing re-opens without a change to the key.
+        CHECK(declineBoardScope(b1) == declineBoardScope(b1),
+              "#W65-AP R1 MUST-NOT-MATCH an unchanged window over an unchanged phase still"
+              " honours the two declines");
+        // NEGATIVE: no key can silently compare EQUAL to a different board, and a
+        // malformed key with no header line is not scoped down to nothing (which
+        // would have made every malformed key equal to every other and kept rows
+        // retired across boards that had moved).
+        CHECK(!declineBoardScope("no newline here").empty()
+              && declineBoardScope(b1) != declineBoardScope("no newline here")
+              && declineBoardScope(b3) != declineBoardScope("no newline here"),
+              "#W65-AP R1 NEGATIVE a malformed key scopes to itself, never to the empty"
+              " string every other malformed key would also equal");
         // The ROW's clause: it said \"this turn\", and the retirement is no longer
         // scoped to a turn.
         CHECK(lastOfferClause(true) == " {if you pass here, this option is not offered again"
@@ -65866,6 +66113,244 @@ static const char * kW50Y_r94 =
             CHECK(stripNarrationDecoration(row) == castDeclineRow(true),
                   "#W65-AL G9 ECHO the price leaves no residue in the narrated record");
         }
+    }
+
+
+    cout << "\n[#W65-AP R2] the ATTACK and BLOCKS drivers run the SAME rule as CHOICE\n";
+    {
+        // The review's trigger, at the DRIVER's own entry: the reply answers on
+        // its first coded line, keeps thinking, and writes a second coded line
+        // with no correction marker. The protocol calls that thinking aloud.
+        vector<string> aNames;
+        aNames.push_back("Grizzly Bears");
+        aNames.push_back("Hill Giant");
+        {
+            vector<bool> send;
+            string taken;
+            int line = -1;
+            const string reply = "ATTACK: A1\nPLAN: attack now.\n"
+                                 "On reflection they have a blocker, so maybe not.\n"
+                                 "ATTACK: none";
+            const int r = gptAttackLineFromReply(reply, 2, aNames,
+                                                 restatedCombatDirective(reply, "ATTACK:",
+                                                                         &aNames, NULL),
+                                                 send, &taken, &line, NULL);
+            CHECK(r == 1 && send.size() == 2 && send[0] && !send[1] && line == 0,
+                  "#W65-AP R2 POSITIVE the ATTACK driver executes the FIRST coded line -"
+                  " a later unmarked ATTACK: none is deliberation");
+        }
+        // MUST-NOT-MATCH: an explicitly MARKED correction still supersedes, at
+        // this seam exactly as at the CHOICE seam.
+        {
+            vector<bool> send;
+            string taken;
+            int line = -1;
+            const string reply = "ATTACK: A1\nCorrection: A2 is the safe attack.\nATTACK: A2";
+            const int r = gptAttackLineFromReply(reply, 2, aNames,
+                                                 restatedCombatDirective(reply, "ATTACK:",
+                                                                         &aNames, NULL),
+                                                 send, &taken, &line, NULL);
+            CHECK(r == 1 && send.size() == 2 && !send[0] && send[1] && line > 0,
+                  "#W65-AP R2 POSITIVE a MARKED correction is still honoured by the driver");
+        }
+        {
+            vector<bool> send;
+            string taken;
+            int line = -1;
+            const string reply = "ATTACK: A1\nATTACK: A2 (correction - I misread the board)";
+            const int r = gptAttackLineFromReply(reply, 2, aNames,
+                                                 restatedCombatDirective(reply, "ATTACK:",
+                                                                         &aNames, NULL),
+                                                 send, &taken, &line, NULL);
+            CHECK(r == 1 && send.size() == 2 && !send[0] && send[1],
+                  "#W65-AP R2 POSITIVE the marker written ON the correcting line counts too");
+        }
+        // NEGATIVE: a single coded line is unchanged, and a reply with none is
+        // still unusable (the salvage paths below the driver own that case).
+        {
+            vector<bool> send;
+            string taken;
+            int line = -1;
+            CHECK(gptAttackLineFromReply("ATTACK: A1, A2\nPLAN: swing.", 2, aNames, "",
+                                         send, &taken, &line, NULL) == 2
+                      && line == 0,
+                  "#W65-AP R2 NEGATIVE one coded line is read exactly as it was");
+            CHECK(gptAttackLineFromReply("I think I will attack with the bear.", 2, aNames, "",
+                                         send, &taken, &line, NULL) < 0
+                      && gptAttackLineFromReply("", 2, aNames, "", send, &taken, &line, NULL) < 0,
+                  "#W65-AP R2 NEGATIVE no coded ATTACK: line is no declaration from this"
+                  " function - the prose salvage still owns it");
+        }
+        // The BLOCKS driver, same rule, same shape.
+        {
+            vector<string> bN, aN;
+            bN.push_back("Wall of Omens");
+            bN.push_back("Perimeter Captain");
+            aN.push_back("Grizzly Bears");
+            aN.push_back("Hill Giant");
+            string picked;
+            bool first = false;
+            CHECK(gptBlocksLineFromReply("BLOCKS: B1:A1\nWait - if I keep the wall back"
+                                         " I survive anyway.\nBLOCKS: none",
+                                         bN, aN, "", picked, &first, NULL)
+                      && picked.find("B1:A1") != string::npos && first,
+                  "#W65-AP R2 POSITIVE the BLOCKS driver executes the FIRST coded line");
+            picked.clear();
+            CHECK(gptBlocksLineFromReply("BLOCKS: B1:A1\nCorrection: B2 is the better block.\n"
+                                         "BLOCKS: B2:A1",
+                                         bN, aN, "", picked, &first, NULL)
+                      && picked.find("B2:A1") != string::npos && !first,
+                  "#W65-AP R2 POSITIVE ...and a MARKED correction still supersedes here");
+            picked.clear();
+            CHECK(!gptBlocksLineFromReply("BLOCKS: B1:A1\nPLAN: hold the rest.", bN, aN, "",
+                                          picked, &first, NULL)
+                      && !gptBlocksLineFromReply("", bN, aN, "", picked, &first, NULL),
+                  "#W65-AP R2 NEGATIVE a single candidate leaves consumePlan's answer alone");
+        }
+        // The rule itself, as the three seams call it.
+        {
+            vector<bool> u(3, true), c(3, false), r(3, false), m(3, false);
+            c[0] = true;
+            c[2] = true;
+            CHECK(gptSelectAnswerIndex(u, c, r, m) == 0,
+                  "#W65-AP R2 the shared rule: the FIRST clean candidate wins");
+            r[2] = true;
+            m[2] = true;
+            CHECK(gptSelectAnswerIndex(u, c, r, m) == 2,
+                  "#W65-AP R2 ...and only an explicit correction moves it");
+            vector<bool> u2(2, false), c2(2, false), r2(2, false), m2(2, false);
+            CHECK(gptSelectAnswerIndex(u2, c2, r2, m2) == -1,
+                  "#W65-AP R2 NEGATIVE nothing usable selects nothing");
+        }
+    }
+
+    cout << "\n[#W65-AP R3] a correction directly under its original is still a correction\n";
+    {
+        // The adjacent-answer run fold ran BEFORE correction detection, so the
+        // marked correction extended the first head's run and the engine
+        // executed the RETRACTED choice - the exact syntax the protocol asks for.
+        const string adj = "CHOICE: 1 (Cast X)\nCHOICE: 2 (Cast Y) - CORRECTION";
+        size_t s = 0, e = 0, ls = 0;
+        int runLen = 0;
+        CHECK(findAnswerLabelLine(adj, "CHOICE:", s, e, ls, &runLen)
+                  && adj.compare(ls, 9, "CHOICE: 2") == 0,
+              "#W65-AP R3 POSITIVE the marked correction on the very next line is the answer");
+        // MUST-NOT-MATCH: an ordinary adjacent RANKED list is untouched - its
+        // head still wins and the run is still reported (W36 lane-B item 3).
+        const string ranked = "CHOICE: 4 (Forest)\nCHOICE: 5 (Island)\nCHOICE: 6 (Seat)";
+        size_t s2 = 0, e2 = 0, ls2 = 0;
+        int runLen2 = 0;
+        CHECK(findAnswerLabelLine(ranked, "CHOICE:", s2, e2, ls2, &runLen2)
+                  && ls2 == 0 && runLen2 == 3,
+              "#W65-AP R3 MUST-NOT-MATCH an adjacent ranked list still answers with its head");
+        // NEGATIVE: adjacency alone never reads the line ABOVE for a cue - on an
+        // adjacent line that line IS the answer being corrected.
+        const string tail = "CHOICE: 1 (Cast X) - my final answer\nCHOICE: 2 (Cast Y)";
+        size_t s3 = 0, e3 = 0, ls3 = 0;
+        CHECK(findAnswerLabelLine(tail, "CHOICE:", s3, e3, ls3)
+                  && ls3 == 0,
+              "#W65-AP R3 NEGATIVE a cue in the FIRST line's own tail does not promote the"
+              " line under it to a correction");
+    }
+
+    cout << "\n[#W65-AP R4] a kill verdict counts the life a legal block gains them\n";
+    {
+        // The review's board: they are at 5 behind ONE 5/5 lifelink blocker and
+        // you offer two blockable 5/5s. blockGain (blocking TRIGGERS) is zero, so
+        // the floor of 5 read as an unavoidable kill - and blocking one attacker
+        // gains them 5 and leaves them alive.
+        bool kill = true;
+        const string lethalish = attackTotalLine(2, 10, 5, 1, 5, 0, false, 0, "", false,
+                                                 &kill, 5);
+        CHECK(!kill && lethalish.find("KILLS them") == string::npos,
+              "#W65-AP R4 POSITIVE no kill claim over a blocker whose LIFELINK covers the floor");
+        CHECK(lethalish.find("LIFELINK") != string::npos
+                  && lethalish.find("as high as 5") != string::npos,
+              "#W65-AP R4 POSITIVE ...and the row says where the life comes from and how high");
+        // MUST-NOT-MATCH: with no lifelink on their side the claim is unchanged.
+        bool kill2 = false;
+        const string same = attackTotalLine(2, 10, 5, 1, 5, 0, false, 0, "", false, &kill2, 0);
+        CHECK(kill2 && same.find("KILLS them") != string::npos,
+              "#W65-AP R4 MUST-NOT-MATCH a proven kill with no lifelink to fold still claims it");
+        // NEGATIVE: the parameter is additive - every window without a lifelink
+        // blocker renders byte for byte as it did.
+        CHECK(attackTotalLine(3, 9, 52, 5, 9, 0, false, 23, "", false, NULL, 0)
+                  == attackTotalLine(3, 9, 52, 5, 9, 0, false, 23),
+              "#W65-AP R4 NEGATIVE zero lifelink is byte-identical to the shipped line");
+        // Both halves at once: the ceiling is their sum and the sentence names both.
+        const string both = attackTotalLine(2, 10, 12, 1, 5, 0, false, 3, "", false, NULL, 4);
+        CHECK(both.find("up to 7 life back") != string::npos
+                  && both.find("blocking triggers") != string::npos
+                  && both.find("LIFELINK") != string::npos,
+              "#W65-AP R4 the ceiling folds both halves and says so");
+    }
+
+    cout << "\n[#W65-AP R5] double strike is two damage steps, so two lifelink gains\n";
+    {
+        // The review's board: at 3 life, a 3/3 double-strike lifelinker blocks a
+        // 1/6 while 6 more damage lands unblocked. The helper credited 3 (one
+        // step) and the screen projected death; the real gain is 6 and the seat
+        // lives at 3.
+        CHECK(blockerLifelinkGain(3, 3, true, true, 1, false, false, true) == 6,
+              "#W65-AP R5 POSITIVE a double striker gains its power TWICE");
+        // MUST-NOT-MATCH: ordinary first strike is unchanged, and so is every
+        // other row of the shipped table (the flag defaults false).
+        CHECK(blockerLifelinkGain(3, 3, true, true, 1, false, false, false) == 3
+                  && blockerLifelinkGain(3, 3, true, true, 1, false, false) == 3,
+              "#W65-AP R5 MUST-NOT-MATCH a first striker still gains its power once");
+        // The second step is credited only where the body is still there to deal
+        // it: a first-striking attacker that kills it takes the second hit away.
+        CHECK(blockerLifelinkGain(3, 3, true, true, 4, true, false, true) == 3,
+              "#W65-AP R5 a double striker killed in the first-strike step gains once");
+        CHECK(blockerLifelinkGain(3, 5, true, true, 4, true, false, true) == 6,
+              "#W65-AP R5 ...and gains twice when it survives that step");
+        CHECK(blockerLifelinkGain(3, 3, false, true, 1, false, false, true) == 0
+                  && blockerLifelinkGain(0, 3, true, true, 1, false, false, true) == 0,
+              "#W65-AP R5 NEGATIVE no lifelink, or no power, is still no gain");
+    }
+
+    cout << "\n[#W65-AP R7] the plan carry is bounded in CHARACTERS, never mid-sequence\n";
+    {
+        // The protocol claims "the FIRST 400 CHARACTERS"; the bound was over
+        // BYTES, so an accented plan was cut early and could end inside a
+        // multibyte character.
+        //THREE-byte characters, deliberately: the shipped byte bound of 400 does
+        //not divide by 3, so a byte cut lands INSIDE the 134th character and
+        //leaves a dangling lead byte in a line the model is told to trust.
+        string accented;
+        while (gptcaveat::utf8Length(accented) < kPlanCarryMaxChars + 60)
+            accented += "\xe3\x81\x82"; //U+3042, three bytes, no ASCII in it at all
+        const string bounded = gptcaveat::planCarryBound(accented, kPlanCarryMaxChars);
+        const size_t noteAt = bounded.find(" [...the rest of your plan was not carried");
+        CHECK(noteAt != string::npos,
+              "#W65-AP R7 an over-long accented plan is still bounded and still marked");
+        const string kept = bounded.substr(0, noteAt);
+        CHECK(kept.size() % 3 == 0 && gptcaveat::utf8Length(kept) * 3 == kept.size(),
+              "#W65-AP R7 POSITIVE the cut lands on a character boundary - no half character"
+              " survives it");
+        CHECK(gptcaveat::utf8Length(kept) <= kPlanCarryMaxChars && kept.size() > kPlanCarryMaxChars,
+              "#W65-AP R7 POSITIVE the bound counts CHARACTERS, so the byte length may exceed"
+              " it and the protocol's number is true");
+        // MUST-NOT-MATCH: ASCII is one byte per character, so every shipped plan
+        // is bounded byte for byte as it was.
+        {
+            string ascii;
+            while (ascii.size() < kPlanCarryMaxChars + 120)
+                ascii += "hold the wall back and race. ";
+            const string a = gptcaveat::planCarryBound(ascii, kPlanCarryMaxChars);
+            CHECK(a.find(" [...the rest of your plan was not carried") <= kPlanCarryMaxChars
+                      && gptcaveat::utf8Length(ascii) == ascii.size(),
+                  "#W65-AP R7 MUST-NOT-MATCH an ASCII plan is unchanged by the new denominator");
+        }
+        // NEGATIVE: a plan inside the bound is byte-identical whatever it holds.
+        {
+            const string shortAccented = "Hold Ju\xc3\xa9rez back, then race.";
+            CHECK(gptcaveat::planCarryBound(shortAccented, kPlanCarryMaxChars) == shortAccented,
+                  "#W65-AP R7 NEGATIVE a plan under the bound is carried whole");
+        }
+        // The PROTOCOL and the function agree about the unit.
+        CHECK(string(kReplyProtocol).find("400 CHARACTERS") != string::npos,
+              "#W65-AP R7 the protocol says CHARACTERS, and now that is what is counted");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
