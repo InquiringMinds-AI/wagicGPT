@@ -9706,11 +9706,30 @@ static string drawPunisherSummaryText(const vector<string>& mine, int minePerDra
     //phase to avoid drawing", drew every turn regardless, and went 16 -> 1. The
     //draw step is not a choice and no row on any menu is; say so, and keep the
     //"before choosing" framing for the draws a row really does control.
+    //#W65-AL (G5, engine HIGH-5): and it is charged to the RIGHT CHAIR. The
+    //sentence rendered on 191 windows in the wave-64 corpus; 159 sat under a
+    //`punishers: theirs` paragraph, where "the cost above is charged whether you
+    //act or not" is true, and 32 under a `punishers: yours` one (162v125 seq 14
+    //- Underworld Dreams, the seat's own), where the only cost above is one the
+    //OPPONENT pays and the seat was told to price its own optional draws against
+    //it. Same class as the granted-ability actor inversion: a true sentence on
+    //the wrong chair. The compulsory-draw FACT is true of the seat either way,
+    //so it is never withdrawn; what is scoped is which side's life the paragraph
+    //above bills, and the own-punisher half gains the fact it was missing - the
+    //opponent's draw step is compulsory for THEM, so that income is collected
+    //whether they act or not.
     o << " Your DRAW STEP is COMPULSORY: no row on this or any other menu"
-         " declines it, and holding priority does not prevent it - the cost above"
-         " is charged whether you act or not. Count that cost before choosing an"
-         " OPTIONAL draw (a cycling ability, a draw spell, any extra draw), which"
-         " are the only draws a choice of yours controls.";
+         " declines it, and holding priority does not prevent it";
+    if (!theirs.empty())
+        o << " - the cost above is charged whether you act or not. Count that cost"
+             " before choosing an OPTIONAL draw (a cycling ability, a draw spell,"
+             " any extra draw), which are the only draws a choice of yours"
+             " controls.";
+    else
+        o << ". No punisher above bills YOUR draws, though: every number above is"
+             " life the OPPONENT pays, and their draw step is compulsory for them"
+             " in the same way, so that life is collected whether they act or not."
+             " Your own draws cost you nothing on this board.";
     return o.str();
 }
 
@@ -10605,6 +10624,44 @@ static string cleanupDiscardPriceClause(int handAfterDraw, int limit, int perDis
             o << "; at worst this KILLS you";
     }
     return o.str();
+}
+
+//#W65-AL (G9, deck125 HIGH-1): the PASS row's price. Every other row in a cast
+//window is priced; the pass row is not, and under a discard punisher with a
+//hand over its maximum the thing passing does not decline is the game.
+//`125v162` seq 72/73 (turn 17, 12 life, hand 10, 7 open mana, Final Judgment
+//and Path to Exile both castable) answered `Cast nothing right now` in main 1
+//and again in main 2; the cleanup at seq 74 billed 3 discards x Liliana's
+//Caress = 6 of its 12 life, and the seat was dead at seq 97. 18 windows in that
+//seat's six games carried a DISCARD PUNISHERS paragraph, a hand above the
+//maximum and a pass row; 0 of 18 priced the pass row and 18 of 18 were passed.
+//Nothing new is computed. The engine ALREADY renders this arithmetic twice on
+//the same board - on the Sphinx's Revelation cast row (`CLEANUP PRICE at X=4`,
+//cleanupDiscardPriceClause) and one window later at the cleanup ask itself
+//(cleanupDiscardHeaderText) - so the identical clause is put on the row where
+//declining is the act that incurs it, from the same function, with the label
+//saying which act it prices.
+//The clause is a `{...}` group, so stripRenderAnnotationsLc keeps it out of the
+//option-set key exactly as every other priced fact is kept out (#W55-A D2a),
+//and every input is a board fact of THIS window (hand, maximum, punisher rate,
+//life) - nothing that can move between two rebuilds of the same window
+//(wave61/corpus-livelock.md). Pure over its inputs.
+static string passRowCleanupPriceTag(bool cleanupThisTurn, int handNow, int limit,
+                                     int perDiscard, const string& punishers,
+                                     int life, int stackedDraws)
+{
+    if (!cleanupThisTurn)
+        return ""; //the seat's cleanup step is a whole turn away: not this window's price
+    const string body = cleanupDiscardPriceClause(handNow, limit, perDiscard, punishers,
+                                                  life, "CLEANUP PRICE OF PASSING",
+                                                  stackedDraws, 0);
+    if (body.empty())
+        return ""; //nothing overflows, or no punisher of theirs is out
+    return " {" + body
+           + ". Taking this row does not decline that: the cleanup step is CR 514.1"
+             " and no row on any menu declines it. Only cards LEAVING your hand"
+             " before then - cast, played, or discarded to something else - make"
+             " it smaller.}";
 }
 
 //#W60-N (B5, wave-59 deck162 HIGH-2, 18 rows): the two classes were scanned
@@ -20421,13 +20478,41 @@ static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
 {
     return a.power > b.power;
 }
+//#W65-AL (G4, engine HIGH-4 / deck123 HIGH-3 / deck162 HIGH-2). R4 taught this
+//tag to fail closed in the BODIES dimension and it still failed open in the
+//ATTACK-TOTAL one - the dimension the line above it had already flagged.
+//`123v152` seq 9: "CRACK-BACK NEXT TURN ... for up to 13 ... you would be at -4
+//or lower ... and that number is a FLOOR, not a ceiling: triggers on their board
+//add power before damage - Luminarch Aspirant", and three lines below, on the
+//cast row, "you cover 6 of 13, leaving 7 -> you would be at 2, which you SURVIVE
+//- and more blockers can only lower that, so nothing uncounted here overturns
+//it." The monotonicity argument is sound over BLOCKERS and says nothing about a
+//total that is a floor; the next window read 17, not 13, and the seat died at -8.
+//`totalIsFloor` is `crackBackScreenTotal`'s own flag - the same board fact the
+//LINE is rendered from - so the row and the line cannot disagree about which
+//number they hold. Two consequences, both required:
+//(1) NO SURVIVAL VERDICT on a floor. More power can be added before damage, so
+//    no cover figure computed against it is proven. The arithmetic still prints
+//    in full - nothing is deleted - and the verdict is withdrawn and SAID to be
+//    withdrawn.
+//(2) THE GATE MOVES OFF THE FLOOR'S LETHALITY. `myLife - total > 0` returned ""
+//    - no clause at all - and on a floor that test asks whether the CEILING is
+//    lethal using a number that is only a lower bound. `162 vs146` seq 12 read
+//    "up to 7 - you would be at 2 or lower" beside two named 3-power Hives it
+//    could animate, at 9 life, and two castable 5/5 bodies got no cover clause
+//    because 9 - 7 > 0. Where the total is a floor the screen cannot say the
+//    crack-back is survivable, so the row prices the cover it adds and says
+//    plainly that it is pricing a floor. On a CEILING the gate is unchanged.
 static string crackBackBlockerRowTag(int total, int myLife,
                                      int checkedBodies, int uncheckedBodies,
-                                     const std::vector<CrackBackAttackerFact>& atk)
+                                     const std::vector<CrackBackAttackerFact>& atk,
+                                     bool totalIsFloor = false)
 {
     const int bodies = checkedBodies + uncheckedBodies;
-    if (bodies <= 0 || total <= 0 || myLife - total > 0 || atk.empty())
+    if (bodies <= 0 || total <= 0 || atk.empty())
         return "";
+    if (myLife - total > 0 && !totalIsFloor)
+        return ""; //#W65-AL (G4): a proven-survivable CEILING needs no cover clause
     std::vector<CrackBackAttackerFact> sorted(atk);
     std::sort(sorted.begin(), sorted.end(), crackBackFactPowerDesc);
     //FLOOR: only the bodies whose block legality is checked, against only the
@@ -20463,7 +20548,13 @@ static string crackBackBlockerRowTag(int total, int myLife,
     std::ostringstream o;
     o << " {crack-back cover: the CRACK-BACK NEXT TURN line above is " << total
       << " from " << sorted.size() << " of their creatures and puts you at "
-      << (myLife - total) << ". This adds " << bodies
+      << (myLife - total);
+    if (totalIsFloor) //#W65-AL (G4): the line above calls that number a FLOOR
+        o << " OR LOWER - that line says the total is a FLOOR, not a ceiling"
+             " (triggers, animated permanents and ability damage on their board"
+             " add to it before damage), so every figure in this clause is"
+             " computed against a number that can only go UP";
+    o << ". This adds " << bodies
       << (bodies == 1 ? " body" : " bodies")
       << " - a creature that arrives this turn CAN block on their turn"
          " (summoning sickness stops attacking, not blocking). Each blocker"
@@ -20485,7 +20576,23 @@ static string crackBackBlockerRowTag(int total, int myLife,
     o << " Counting only the checked bodies you cover " << coveredFloor << " of "
       << total << ", leaving " << leftFloor << " -> you would be at "
       << (myLife - leftFloor);
-    if (myLife - leftFloor > 0)
+    if (totalIsFloor)
+    {
+        //#W65-AL (G4): the whole defect. Monotonicity over BLOCKERS does not
+        //reach a total that is a lower bound, so no survival verdict may rest
+        //on it - and none is printed, whichever side of 0 the figure falls.
+        o << ". THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from"
+             " is a FLOOR, so a larger crack-back than " << total << " is on the"
+             " table and this row does not say whether you survive"
+          << (myLife - leftFloor > 0 ? " - the " : " - and the ")
+          << (myLife - leftFloor) << " above is what you would be at ONLY if"
+             " that total does not grow. What the cover DOES establish is that"
+             " these bodies remove " << coveredFloor << " of it";
+        if (uncheckedBodies > 0)
+            o << ", and up to " << coveredCeil
+              << " if every uncounted body could also legally block";
+    }
+    else if (myLife - leftFloor > 0)
     {
         o << ", which you SURVIVE - and more blockers can only lower that, so"
              " nothing uncounted here overturns it";
@@ -22572,6 +22679,15 @@ static string stripNarrationDecoration(const string& in)
                 //true of THIS window's board and false the moment combat
                 //happens - decision-time pricing, never history.
                 || (in.compare(i, 19, "{crack-back cover: ") == 0)
+                //#W65-AL (G1): wave 64's F6 price tag never reached a rendered
+                //row, so it never reached this list either. It prices THIS
+                //window's life totals - decision-time pricing, never history -
+                //and now that it rides the CHOOSE_MENU rows it would otherwise
+                //land in chosen_text_core and the GAME LOG.
+                || (in.compare(i, 22, "{this mode right now: ") == 0)
+                //#W65-AL (G9): the pass row's cleanup price is true of the hand
+                //while the window is open and false the moment a card is spent.
+                || (in.compare(i, 27, "{CLEANUP PRICE OF PASSING: ") == 0)
                 || (in.compare(i, 19, "{no creature target") == 0)
                 || (in.compare(i, 15, "{taps you out -") == 0)
                 || (in.compare(i, 22, "{modes live right now:") == 0)
@@ -26015,6 +26131,77 @@ string tapUntapBranchTag(const string& script, const string& optionLabel,
              " it untaps in your own untap step";
     o << "]";
     return o.str();
+}
+
+//#W65-AL (G1, engine HIGH-1 / deck146 HIGH-3). The two SCRIPT-derived mode-row
+//annotations, in one place, taking the script as a STRING.
+//
+//What the wave-64 corpus measured: 3 real modal windows (Silverquill Command),
+//23 rows, ZERO annotations of any kind - not F6's price, not the wave-60
+//liveness tag, not the wave-60 tap/untap tag - while the header named the card.
+//The engine seat located the silence at the `ctx`-gated family and could not
+//run the binary; the code says why, twice over.
+//
+//(1) `ctx` is `req.contextCard`, and DecisionManager::buildMenuChoice sets it
+//from `nameableCardPointer(validatedCardPointer(currentActionCard))`. An
+//`auto=choice name(...)` list arms its menu while the SPELL RESOLVES, so its
+//subject sits in no game zone and the dangle rail refuses the pointer - which
+//is exactly why #W48 D6 added the arm-time NAME. So on the one card class these
+//annotations were written for, `ctx` is NULL by construction.
+//(2) That same class does not even arrive as CHOOSE_MODE - MEASURED, not
+//inferred. DecisionManager::buildMenuChoice enters its multiple-choice branch
+//only `if (object->abilitiesMenu->isMultipleChoice && object->currentActionCard)`.
+//A probe run of a scripted Silverquill Command cast (temporary DebugTrace at
+//both ActionLayer arm sites, removed after the reading) reports the menu arming
+//through `setMenuObject` with **isMultipleChoice = 0**, six times over the two
+//modes. So the list falls through to the REGULAR menu path and arrives as
+//CHOOSE_MENU under the header "Choose an option for <card>:" - which is the
+//header the wave-64 records print, byte for byte, while "Choose one mode for
+//<card>:" appears in none of them. The wave-64 tags rode the CHOOSE_MODE branch
+//alone and could not have reached those windows with any pointer at all.
+//The same probe reports menuObjectText populated at that site (1717 bytes of
+//Silverquill Command's script), so the snapshot below is not a hypothesis.
+//
+//Both halves are answered here: the script comes from `contextText` (the
+//arm-time snapshot, #W65-AL in DecisionContract.h) when the pointer is gone,
+//and BOTH seams call this one function, so the two menu kinds cannot drift.
+//Presentation only - the caller appends to its RENDER copy, never to
+//req.optionTexts (the staleness key) and never to the row ORDER, so act.choice
+//still means what applyMenuChoice thinks it means. Pure over its inputs: script
+//text, the engine's own label, the two life totals and the two board counts, so
+//the composed row is provable without a board and cannot differ between two
+//rebuilds of the same window (wave61/corpus-livelock.md).
+static string modeRowAnnotations(const string& script, const string& optionLabel,
+                                 int myLife, int oppLife,
+                                 int candidatesCanBlockTapped, int candidatesDoNotUntap)
+{
+    if (script.empty() || optionLabel.empty())
+        return "";
+    return tapUntapBranchTag(script, optionLabel,
+                             candidatesCanBlockTapped, candidatesDoNotUntap)
+           + modeEffectPriceTag(script, optionLabel, myLife, oppLife);
+}
+
+//#W65-AL (G1): the board counts the tap/untap tag reads, off the side a "TAPS
+//theirs" branch picks from. Lifted out of the CHOOSE_MODE branch unchanged so
+//the CHOOSE_MENU seam computes them the same way.
+static void modeTapCounts(Player * opp, int& canBlockTapped, int& doNotUntap)
+{
+    canBlockTapped = 0;
+    doNotUntap = 0;
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return;
+    MTGGameZone * tz = opp->game->inPlay;
+    for (int ti = 0; ti < tz->nb_cards; ti++)
+    {
+        MTGCardInstance * tc2 = tz->cards[ti];
+        if (!tc2)
+            continue;
+        if (tc2->isCreature() && tc2->basicAbilities[Constants::CANBLOCKTAPPED])
+            canBlockTapped++;
+        if (tc2->basicAbilities[Constants::DOESNOTUNTAP])
+            doNotUntap++;
+    }
 }
 
 //#W55-D (D22): the card-NAME menu's own header. `chooseaname` arrives at the
@@ -32358,7 +32545,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 std::vector<CrackBackAttackerFact> cbAtk;
                 int cbChecked = 0, cbUnchecked = 0;
                 crackBackCoverFacts(opponent(), card, bodies, cbAtk, cbChecked, cbUnchecked);
-                o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked, cbAtk);
+                //#W65-AL (G4): and WHICH number this is - crackBackScreenTotal
+                //already reports whether the line above calls it a floor.
+                o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked,
+                                            cbAtk, cbFloor);
             }
         }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
@@ -32441,8 +32631,24 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //before the decline and hold rows join the list, since neither is a
         //cast and neither carries a board verdict.
         const string deadMenuNote = allCastRowsDeadNote(everyCastRowDead(menu), (int) menu.size());
-        menu.push_back(castDeclineRow(observer->currentPlayer == this
-                                      && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
+        //#W65-AL (G9, deck125 HIGH-1): and its PRICE, where it has one. The
+        //cleanup step this clause prices is THIS turn's, so the clause is
+        //stated only on the seat's own turn; on the opponent's turn the seat's
+        //cleanup is a turn away and its hand is not this window's arithmetic.
+        //The `{...}` group keeps it out of the option-set key below, like every
+        //other priced fact.
+        {
+            string declineRow = castDeclineRow(observer->currentPlayer == this
+                                               && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN);
+            int cuHand = -1, cuLimit = -1, cuPer = 0, cuStacked = 0;
+            string cuPunishers;
+            forcedCleanupInputs(NULL, this, opponent(), cuHand, cuLimit, cuPer,
+                                cuPunishers, &cuStacked);
+            declineRow += passRowCleanupPriceTag(observer->currentPlayer == this,
+                                                 cuHand, cuLimit, cuPer, cuPunishers,
+                                                 life, cuStacked);
+            menu.push_back(declineRow); //the decline goes LAST
+        }
         //#W53-N (D2, second half) + #W55-A (D2a/D19): the declined-list count,
         //keyed on the OPTION SET and taken BEFORE the HOLD row is appended (the
         //row is on every window now and renders this count). The key drops the
@@ -33815,35 +34021,22 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             //#W60-Q (R5): with the two engine states that falsify its general
             //rule counted off the OPPONENT's battlefield (the side a "TAPS
             //theirs" branch can pick from). Counted here, not asserted there.
-            if (ctx)
+            //#W64-AG (F6): and the price the bare label drops.
+            //#W65-AL (G1): both now ride ONE function shared with the
+            //CHOOSE_MENU seam, over a SCRIPT that survives a refused pointer -
+            //`ctx` is NULL on precisely the `auto=choice` menus these tags were
+            //written for. Presentation only: req.optionTexts (the staleness key)
+            //and the row ORDER are untouched, so act.choice still means what
+            //applyMenuChoice thinks it means.
             {
+                const string modeScript = ctx ? ctx->magicText : req.contextText;
                 int canBlockTapped = 0, doNotUntap = 0;
-                Player * oppT = opponent();
-                if (oppT && oppT->game && oppT->game->inPlay)
-                {
-                    MTGGameZone * tz = oppT->game->inPlay;
-                    for (int ti = 0; ti < tz->nb_cards; ti++)
-                    {
-                        MTGCardInstance * tc2 = tz->cards[ti];
-                        if (!tc2)
-                            continue;
-                        if (tc2->isCreature() && tc2->basicAbilities[Constants::CANBLOCKTAPPED])
-                            canBlockTapped++;
-                        if (tc2->basicAbilities[Constants::DOESNOTUNTAP])
-                            doNotUntap++;
-                    }
-                }
+                modeTapCounts(opponent(), canBlockTapped, doNotUntap);
                 for (size_t mi = 0; mi < shownModes.size() && mi < req.optionTexts.size(); mi++)
-                    shownModes[mi] += tapUntapBranchTag(ctx->magicText, req.optionTexts[mi],
-                                                        canBlockTapped, doNotUntap);
-                //#W64-AG (F6): and the price the bare label drops. Presentation
-                //only - req.optionTexts (the staleness key) and the row ORDER
-                //are untouched, so act.choice still means what applyMenuChoice
-                //thinks it means.
-                for (size_t mi = 0; mi < shownModes.size() && mi < req.optionTexts.size(); mi++)
-                    shownModes[mi] += modeEffectPriceTag(ctx->magicText, req.optionTexts[mi],
+                    shownModes[mi] += modeRowAnnotations(modeScript, req.optionTexts[mi],
                                                          life,
-                                                         opponent() ? opponent()->life : 0);
+                                                         opponent() ? opponent()->life : 0,
+                                                         canBlockTapped, doNotUntap);
             }
         }
         string modeHeader;
@@ -34474,11 +34667,52 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //#W58-B (D1): every life-payment row on this menu carries the subtraction,
     //appended LAST so the option short name (and the echo anchor) is untouched
     //and the brace channel keeps it out of the narrated record.
+    std::vector<bool> rowAlreadyLifePriced(opts.size(), false);
     for (size_t li = 0; li < opts.size(); li++)
     {
         int lifeCostRow = 0;
         if (payLifeAmountFromOption(opts[li], lifeCostRow))
+        {
             opts[li] += lifePaymentVerdict(life, lifeCostRow);
+            rowAlreadyLifePriced[li] = true; //#W65-AL (G1): priced once, not twice
+        }
+    }
+    //#W65-AL (G1, engine HIGH-1 / deck146 HIGH-3): THE SEAM THE CORPUS
+    //EXERCISES. A modal `auto=choice name(...)` list arms its menu while the
+    //spell RESOLVES, so it has no currentActionCard and DecisionManager's
+    //multiple-choice branch is never entered - the rows arrive HERE, as
+    //CHOOSE_MENU under "Choose an option for <card>:", which is the header the
+    //wave-64 records print. The wave-60 tap/untap tag and wave-64's F6 price
+    //tag were wired to the CHOOSE_MODE branch only, so 23 real Silverquill
+    //Command mode rows over 3 windows rendered BARE and the seat took
+    //`draw:1 controller && life:-1 controller && ability$!...!$ opponent` at 5
+    //life and again at 3 (146v130 seq 57/74) and lost that game at 0.
+    //The same function the mode branch calls, over the same script (the
+    //arm-time snapshot when the pointer is gone), matched against the ENGINE's
+    //own labels: a row whose label is not a `name(...)` in that script matches
+    //nothing and is left exactly as the engine wrote it, so this is silent on
+    //every menu that is not modal. Presentation only - req.optionTexts (the
+    //staleness key), the option ORDER and the answer index are untouched.
+    {
+        const string menuScript = ctx ? ctx->magicText : req.contextText;
+        if (!menuScript.empty())
+        {
+            int canBlockTapped = 0, doNotUntap = 0;
+            modeTapCounts(opponent(), canBlockTapped, doNotUntap);
+            for (size_t li = 0; li < opts.size() && li < req.optionTexts.size(); li++)
+            {
+                //A pay-life row (the shockland pay-or-tap class) has ALREADY
+                //been priced by lifePaymentVerdict two loops above, off the same
+                //`life:-N controller` clause. One price per row: a second one
+                //saying the same thing in different words is noise on the row,
+                //not a fact the model did not have.
+                if (rowAlreadyLifePriced[li])
+                    continue;
+                opts[li] += modeRowAnnotations(menuScript, req.optionTexts[li], life,
+                                               opponent() ? opponent()->life : 0,
+                                               canBlockTapped, doNotUntap);
+            }
+        }
     }
     //Recover the subject name for the header. Some ETB menus arm on an instance
     //whose own name is cleared (getDisplayName() empty) but whose card TEMPLATE
@@ -65324,6 +65558,314 @@ static const char * kW50Y_r94 =
                           std::vector<std::string>(), std::vector<std::string>(), 2)
                   .find("and so do YOU: 2 extra cards per turn") != string::npos,
               "#W65-AO MED the clause pluralises with its own number");
+    }
+
+    //================== #W65-AL (G1): the seam the corpus exercises ==========
+    cout << "\n[#W65-AL G1] the modal price reaches the CHOOSE_MENU seam, ctx or no ctx\n";
+    {
+        // The WHOLE Silverquill Command primitive (borderline.txt:102739-102747),
+        // byte for byte - all nine `choice name(...)` lines, which is the card
+        // the wave-64 corpus rendered bare on three real windows.
+        const string sqFull =
+            "choice name(Creature gains 3/3 and return creature) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && ability$!name(Return creature)"
+            " name(Return creature) target(creature[manacost<=2]|mygraveyard)"
+            " moveto(mybattlefield)!$ controller\n"
+            "choice name(Creature gains 3/3 and you draw) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 controller"
+            " && life:-1 controller\n"
+            "choice name(Creature gains 3/3 and opponent draws) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 opponent"
+            " && life:-1 opponent\n"
+            "choice name(Creature gains 3/3 and sacrifice creature) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && ability$!name(Sacrifice creature)"
+            " name(Sacrifice creature) notaTarget(creature|mybattlefield) sacrifice!$ opponent\n"
+            "choice name(Return creature and you draw)"
+            " target(creature[manacost<=2]|mygraveyard) moveto(mybattlefield)"
+            " && draw:1 controller && life:-1 controller\n"
+            "choice name(Return creature and opponent draws)"
+            " target(creature[manacost<=2]|mygraveyard) moveto(mybattlefield)"
+            " && draw:1 opponent && life:-1 opponent\n"
+            "choice name(Return creature and sacrifice creature)"
+            " target(creature[manacost<=2]|mygraveyard) moveto(mybattlefield)"
+            " && ability$!name(Sacrifice creature) name(Sacrifice creature)"
+            " notaTarget(creature|mybattlefield) sacrifice!$ opponent\n"
+            "choice name(You draw and sacrifice creature) draw:1 controller"
+            " && life:-1 controller && ability$!name(Sacrifice creature)"
+            " name(Sacrifice creature) notaTarget(creature|mybattlefield) sacrifice!$ opponent\n"
+            "choice name(Opponent draws and sacrifice creature) draw:1 opponent"
+            " && life:-1 opponent && ability$!name(Sacrifice creature)"
+            " name(Sacrifice creature) notaTarget(creature|mybattlefield) sacrifice!$ opponent\n";
+        // The nine engine labels, in the corpus's own rendered order and wording
+        // (146v130 seq 57: rows 1..9, header "Choose an option for Silverquill
+        // Command:"). Lower-cased exactly as the records print them, which also
+        // pins that the match is case-insensitive against the script's own caps.
+        vector<string> engineRows;
+        engineRows.push_back("creature gains 3/3 and return creature");        //1
+        engineRows.push_back("creature gains 3/3 and you draw");               //2
+        engineRows.push_back("creature gains 3/3 and opponent draws");         //3
+        engineRows.push_back("creature gains 3/3 and sacrifice creature");     //4
+        engineRows.push_back("return creature and you draw");                  //5
+        engineRows.push_back("return creature and opponent draws");            //6
+        engineRows.push_back("return creature and sacrifice creature");        //7
+        engineRows.push_back("you draw and sacrifice creature");               //8
+        engineRows.push_back("opponent draws and sacrifice creature");         //9
+
+        // THE COMPOSED ASK, assembled the way the CHOOSE_MENU seam assembles it:
+        // the render copy `opts`, the ENGINE labels as the match key, and the
+        // script taken from the arm-time snapshot because `ctx` is NULL on this
+        // menu (a resolving `auto=choice` payload is in no zone). 5 life is the
+        // seq-57 board.
+        vector<string> opts(engineRows);
+        for (size_t i = 0; i < opts.size(); i++)
+            opts[i] += modeRowAnnotations(sqFull, engineRows[i], 5, 4, 0, 0);
+        for (size_t i = 0; i < opts.size(); i++)
+            cout << "     " << (i + 1) << ". " << opts[i] << "\n";
+        // REPRO 146v130 seq 57: row 8 is the row the seat took, at 5 life, and
+        // it is `draw:1 controller && life:-1 controller && ability$!...!$
+        // opponent` - the sacrifice is the OPPONENT'S and is not priced here.
+        CHECK(opts[7] == "you draw and sacrifice creature {this mode right now:"
+                         " you LOSE 1 life - you would be at 4; you draw 1 (life and"
+                         " draws only: anything else this mode does is in the row label"
+                         " and the card text)}",
+              "#W65-AL G1 REPRO 146v130 seq 57 row 8 is priced at the CHOOSE_MENU seam"
+              " with no ctx - the row the seat took bare at 5 life");
+        // REPRO 146v130 seq 74: the same row at 3 life, one window from death.
+        CHECK(modeRowAnnotations(sqFull, engineRows[7], 3, 4, 0, 0)
+                  .find("you would be at 2") != string::npos,
+              "#W65-AL G1 REPRO seq 74 the same row at 3 life reads the board it is on");
+        // The 5-life screen at 1 life is the wave-63 repro: it now says so.
+        CHECK(modeRowAnnotations(sqFull, engineRows[7], 1, 4, 0, 0)
+                  .find("you would be at 0; THIS KILLS YOU") != string::npos,
+              "#W65-AL G1 POSITIVE a mode whose controller cost reaches the seat's life"
+              " carries the kill verdict on this seam too");
+        // COVERAGE, stated as a count so a future emitter change cannot quietly
+        // drop rows: six of the nine lines carry a life/draw clause OUTSIDE any
+        // ability$! block and are priced; the other three (rows 1, 4 and 7)
+        // carry nothing but a grant and are left exactly as the engine wrote them.
+        {
+            int priced = 0;
+            for (size_t i = 0; i < opts.size(); i++)
+                if (opts[i].find("{this mode right now:") != string::npos)
+                    priced++;
+            CHECK(priced == 6,
+                  "#W65-AL G1 REPRO 6 of the 9 corpus rows carry a life/draw clause and are"
+                  " priced; wave 64 rendered 0 of 23 mode rows on this card");
+            CHECK(opts[0] == engineRows[0] && opts[3] == engineRows[3]
+                      && opts[6] == engineRows[6],
+                  "#W65-AL G1 MUST-NOT-MATCH the three grant-only rows are untouched - a"
+                  " partial price stated as a total would be its own false surface");
+        }
+        // MUST-NOT-MATCH: an opponent-facing cost is never billed to the seat.
+        CHECK(opts[2].find("you LOSE") == string::npos
+                  && opts[2].find("they LOSE 1 life - they would be at 3") != string::npos
+                  && opts[2].find("they draw 1") != string::npos,
+              "#W65-AL G1 MUST-NOT-MATCH row 3's `life:-1 opponent` is priced against THEIR"
+              " total and never against the seat's");
+        // MUST-NOT-MATCH: this pass is silent on every menu that is not modal.
+        CHECK(modeRowAnnotations(sqFull, "Cast Card Normally", 5, 4, 0, 0).empty()
+                  && modeRowAnnotations(sqFull, "Don't add any counter", 5, 4, 0, 0).empty()
+                  && modeRowAnnotations("", "you draw and sacrifice creature", 5, 4, 0, 0).empty(),
+              "#W65-AL G1 MUST-NOT-MATCH a row the script does not name, and a menu with no"
+              " script at all, are annotated with nothing");
+        // The tap/untap branch tag rides the same call, so Teferi's sub-ask is
+        // reachable from this seam too (it arrives the same way).
+        {
+            const string teferi =
+                "choice name(Choose your land) target(land|mybattlefield) untap"
+                " _ choice name(Choose opponent land) target(land|opponentbattlefield) tap\n";
+            CHECK(modeRowAnnotations(teferi, "Choose opponent land", 20, 20, 0, 0)
+                      == tapUntapBranchTag(teferi, "Choose opponent land", 0, 0),
+                  "#W65-AL G1 the wave-60 tap/untap tag is on the same call, so the two"
+                  " annotation families cannot reach different seams again");
+        }
+        // ECHO SHAPE: the annotated row still answers as its own number, and the
+        // brace group leaves no residue in the narrated record.
+        {
+            vector<string> menu(opts);
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 8 (you draw and sacrifice creature)",
+                              (int) menu.size(), &menu, &stale, NULL, NULL, false) == 8,
+                  "#W65-AL G1 ECHO the priced row still answers as row 8");
+            CHECK(stripNarrationDecoration(opts[7]) == "you draw and sacrifice creature",
+                  "#W65-AL G1 ECHO the price is decision-time pricing and leaves no residue"
+                  " in the narrated record");
+        }
+    }
+
+    //================== #W65-AL (G4): no SURVIVE verdict on a floor ==========
+    cout << "\n[#W65-AL G4] the crack-back cover verdict yields to a FLOOR total\n";
+    {
+        // REPRO 123v152 seq 9: 9 life, three attackers for 13, a FLOOR (the line
+        // above names Luminarch Aspirant), one checked body cast.
+        std::vector<CrackBackAttackerFact> atk;
+        for (int p = 0; p < 3; p++)
+        {
+            CrackBackAttackerFact f;
+            f.power = (p == 0) ? 6 : (p == 1 ? 4 : 3);
+            f.blockersNeeded = 1;
+            f.coverable = true;
+            atk.push_back(f);
+        }
+        const string onFloor = crackBackBlockerRowTag(13, 9, 1, 0, atk, true);
+        const string onCeil = crackBackBlockerRowTag(13, 9, 1, 0, atk, false);
+        cout << "     floor:" << onFloor << "\n";
+        CHECK(onCeil.find("which you SURVIVE") != string::npos,
+              "#W65-AL G4 CONTROL on a CEILING total the earned survival verdict is unchanged");
+        CHECK(onFloor.find("which you SURVIVE") == string::npos
+                  && onFloor.find("nothing uncounted here overturns it") == string::npos,
+              "#W65-AL G4 REPRO 123v152 seq 9 - no survival verdict rests on a floor; the seat"
+              " cast on that promise and the next window read 17, not 13");
+        CHECK(onFloor.find("THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from"
+                           " is a FLOOR") != string::npos,
+              "#W65-AL G4 REPRO the withdrawal is STATED, not silent");
+        CHECK(onFloor.find("OR LOWER - that line says the total is a FLOOR, not a ceiling")
+                  != string::npos,
+              "#W65-AL G4 REPRO the head clause names the same number the line above names");
+        CHECK(onFloor.find("you cover 6 of 13, leaving 7 -> you would be at 2") != string::npos
+                  && onFloor.find("these bodies remove 6 of it") != string::npos,
+              "#W65-AL G4 nothing is deleted - the whole arithmetic still prints under the"
+              " withdrawn verdict");
+        // REPRO 162 vs146 seq 12: 9 life, a FLOOR total of 7 naming two 3-power
+        // Hives. The shipped gate said 9 - 7 > 0 and printed NOTHING, so two
+        // castable 5/5 bodies got no cover clause at all.
+        {
+            std::vector<CrackBackAttackerFact> hives;
+            for (int p = 0; p < 2; p++)
+            {
+                CrackBackAttackerFact f;
+                f.power = (p == 0) ? 4 : 3;
+                f.blockersNeeded = 1;
+                f.coverable = true;
+                hives.push_back(f);
+            }
+            CHECK(crackBackBlockerRowTag(7, 9, 1, 0, hives, false).empty(),
+                  "#W65-AL G4 MUST-NOT-MATCH a proven-survivable CEILING still needs no clause");
+            const string floorGate = crackBackBlockerRowTag(7, 9, 1, 0, hives, true);
+            CHECK(!floorGate.empty()
+                      && floorGate.find("THIS IS NOT A SURVIVAL VERDICT") != string::npos,
+                  "#W65-AL G4 REPRO 162 vs146 seq 12 - a floor whose printed total is"
+                  " survivable is not a survivable crack-back, so the row is priced");
+            CHECK(floorGate.find("which still KILLS you") == string::npos,
+                  "#W65-AL G4 MUST-NOT-MATCH the floor branch claims no death either - it"
+                  " claims nothing about survival in EITHER direction");
+        }
+        // NEGATIVE: every other gate is untouched.
+        CHECK(crackBackBlockerRowTag(13, 9, 0, 0, atk, true).empty()
+                  && crackBackBlockerRowTag(0, 9, 1, 0, atk, true).empty()
+                  && crackBackBlockerRowTag(13, 9, 1, 0,
+                                            std::vector<CrackBackAttackerFact>(), true).empty(),
+              "#W65-AL G4 NEGATIVE no bodies, no total or no attackers still prints nothing");
+    }
+
+    //================== #W65-AL (G5): the compulsory clause's chair ==========
+    cout << "\n[#W65-AL G5] the compulsory-draw sentence is charged to the right chair\n";
+    {
+        vector<string> mine, theirs, none;
+        mine.push_back("Underworld Dreams");
+        theirs.push_back("Fate Unraveler");
+        // REPRO 162v125 seq 14: the seat's OWN Underworld Dreams, and the seat
+        // told the cost above is charged whether it acts or not.
+        const string ownOnly = drawPunisherSummaryText(mine, 1, none, 0);
+        cout << "     " << ownOnly << "\n";
+        CHECK(ownOnly.find("DRAW PUNISHERS on the battlefield: yours - Underworld Dreams.")
+                  != string::npos,
+              "#W65-AL G5 REPRO the repro paragraph is the punishers-YOURS one");
+        CHECK(ownOnly.find("Your DRAW STEP is COMPULSORY: no row on this or any other menu"
+                           " declines it, and holding priority does not prevent it")
+                  != string::npos,
+              "#W65-AL G5 the compulsory-draw FACT is true of the seat either way and is"
+              " never withdrawn (F10's whole point)");
+        CHECK(ownOnly.find("the cost above is charged whether you act or not") == string::npos,
+              "#W65-AL G5 REPRO 32 of 191 wave-64 windows billed the seat for a cost only the"
+              " OPPONENT pays - that clause is gone from the punishers-YOURS paragraph");
+        CHECK(ownOnly.find("Count that cost before choosing an OPTIONAL draw") == string::npos
+                  && ownOnly.find("Your own draws cost you nothing on this board.")
+                         != string::npos,
+              "#W65-AL G5 and the instruction built on it goes with it - there is no cost"
+              " above for the seat's own optional draws to be priced against");
+        CHECK(ownOnly.find("their draw step is compulsory for them in the same way, so that"
+                           " life is collected whether they act or not") != string::npos,
+              "#W65-AL G5 the true token the wrong chair was standing in for: the income"
+              " above is collected on THEIR compulsory draw step");
+        // CONTROL: the 159 correct windows are byte-identical to wave 64.
+        const string theirsOnly = drawPunisherSummaryText(none, 0, theirs, 3);
+        CHECK(theirsOnly.find("Your DRAW STEP is COMPULSORY: no row on this or any other menu"
+                              " declines it, and holding priority does not prevent it - the"
+                              " cost above is charged whether you act or not. Count that cost"
+                              " before choosing an OPTIONAL draw (a cycling ability, a draw"
+                              " spell, any extra draw), which are the only draws a choice of"
+                              " yours controls.") != string::npos,
+              "#W65-AL G5 CONTROL a punishers-THEIRS paragraph is unchanged from wave 64");
+        // BOTH sides on the board: the cost above IS charged to the seat, so the
+        // wave-64 sentence stands.
+        CHECK(drawPunisherSummaryText(mine, 1, theirs, 3)
+                  .find("the cost above is charged whether you act or not") != string::npos,
+              "#W65-AL G5 with a punisher of theirs also out the seat IS billed and the"
+              " sentence stands - the split is on the CHAIR, not on the seat's own board");
+        CHECK(drawPunisherSummaryText(none, 0, none, 0).empty(),
+              "#W65-AL G5 NEGATIVE an empty board still prints no paragraph");
+    }
+
+    //================== #W65-AL (G9): the pass row is priced ================
+    cout << "\n[#W65-AL G9] the pass row carries the cleanup price it does not decline\n";
+    {
+        // REPRO 125v162 seq 72/73: turn 17, own turn, 12 life, hand 10, maximum
+        // hand size 7, the opponent's Liliana's Caress at 2 life a discard. The
+        // seat passed twice; the cleanup at seq 74 billed 6 of its 12 life.
+        const string tag = passRowCleanupPriceTag(true, 10, 7, 2, "Liliana's Caress", 12, 0);
+        const string row = castDeclineRow(true) + tag;
+        cout << "     " << row << "\n";
+        CHECK(tag.find("CLEANUP PRICE OF PASSING: that leaves 10 cards in hand against a"
+                       " maximum hand size of 7") != string::npos,
+              "#W65-AL G9 REPRO the pass row states the hand and the maximum");
+        CHECK(tag.find("forces up to 3 discards you cannot decline") != string::npos
+                  && tag.find("for 2 life each = up to 6 life") != string::npos
+                  && tag.find("at worst you would be at 6") != string::npos,
+              "#W65-AL G9 REPRO the number the engine printed one window later, on the row"
+              " where declining is the act that incurs it");
+        CHECK(tag.find("Taking this row does not decline that: the cleanup step is CR 514.1")
+                  != string::npos,
+              "#W65-AL G9 the row says what taking it does NOT buy - the F10 shape, on the"
+              " surface where the misreading is a pass");
+        // The same arithmetic the cleanup ask itself prints, so the two screens
+        // cannot name different numbers.
+        CHECK(cleanupDiscardHeaderText(10, 7, 3, 2, "Liliana's Caress", 12)
+                  .find("cost you 6 life - you would be at 6") != string::npos,
+              "#W65-AL G9 CONTROL the cleanup ask one window later bills the same 6");
+        // Lethal case: the verdict the shared clause already carries.
+        CHECK(passRowCleanupPriceTag(true, 10, 7, 2, "Liliana's Caress", 6, 0)
+                  .find("at worst this KILLS you") != string::npos,
+              "#W65-AL G9 POSITIVE where the forced discards are lethal the row says so");
+        // MUST-NOT-MATCH, four ways there is nothing to price.
+        CHECK(passRowCleanupPriceTag(false, 10, 7, 2, "Liliana's Caress", 12, 0).empty(),
+              "#W65-AL G9 MUST-NOT-MATCH on the opponent's turn the seat's cleanup is a whole"
+              " turn away and is not this window's price");
+        CHECK(passRowCleanupPriceTag(true, 7, 7, 2, "Liliana's Caress", 12, 0).empty()
+                  && passRowCleanupPriceTag(true, 10, 7, 0, "", 12, 0).empty()
+                  && passRowCleanupPriceTag(true, 10, -1, 2, "Liliana's Caress", 12, 0).empty(),
+              "#W65-AL G9 MUST-NOT-MATCH a hand at the maximum, a board with no discard"
+              " punisher of theirs, and a seat with no maximum hand size price nothing");
+        // KEY SAFETY: the clause is a {...} group, so the option-set key the
+        // declined-list count and the hold latch are built from does not see it
+        // (wave61/corpus-livelock.md) - the pass row keys identically whatever
+        // the hand size is.
+        CHECK(optionSetKeyLine(row) == optionSetKeyLine(castDeclineRow(true))
+                  && optionSetKeyLine(row) == optionSetKeyLine(castDeclineRow(false)),
+              "#W65-AL G9 KEY SAFETY the price rides the render and never the key");
+        // ECHO SHAPE: the annotated pass row still answers, by number and by name.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Final Judgment {3}{w}{w}");
+            menu.push_back("Cast Path to Exile {w}");
+            menu.push_back(row);
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 3 (Cast nothing right now)", 3, &menu,
+                              &stale, NULL, NULL, false) == 3,
+                  "#W65-AL G9 ECHO the priced pass row still answers as its own number");
+            CHECK(stripNarrationDecoration(row) == castDeclineRow(true),
+                  "#W65-AL G9 ECHO the price leaves no residue in the narrated record");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

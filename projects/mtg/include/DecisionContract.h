@@ -83,6 +83,16 @@ public:
     //This string is snapshotted while the object is provably alive, so it names
     //the subject when no pointer can. Empty when the object had no name.
     std::string contextName;
+    //#W65-AL (G1, engine HIGH-1 / deck146 HIGH-3): the menu subject's SCRIPT,
+    //snapshotted at arm time on the same rail as contextName and for the same
+    //reason. Every mode-row annotation this engine has - the wave-60 liveness
+    //tag, the wave-60 tap/untap branch tag and wave-64's F6 price tag - reads
+    //`contextCard->magicText`, and contextCard is NULL on exactly the menus
+    //those annotations exist for (a resolving `auto=choice` payload is in no
+    //zone, so the dangle rail refuses the pointer). 23 mode rows over 3 real
+    //Silverquill Command windows rendered bare in the wave-64 corpus while the
+    //header named the card from contextName. Empty when the object had none.
+    std::string contextText;
     //#W55-D (D22): CHOOSE_MODE is also how a card-NAME choice arrives - the
     //engine builds `chooseaname`'s list of names as a MenuAbility of
     //AASetNameChosen options, indistinguishable at this seam from a modal
