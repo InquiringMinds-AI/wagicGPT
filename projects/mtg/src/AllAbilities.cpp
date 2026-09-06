@@ -1349,6 +1349,14 @@ void MTGRevealingCards::driveInteractiveRevealStep()
                            " chooser cannot be declined - taking the first legal card ("
                            << zone->cards[i]->name << ") rather than leaving the reveal"
                            " with no reachable outcome");
+                //#W67-AZ (R7): SAY THAT THIS FIRED. The floor is the last resort
+                //under every path into a zero-target mandatory chooser, and it was
+                //silent - a corpus could not tell a card the seat chose from one
+                //the engine pressed for it. Defined in AIPlayerGPT.cpp, declared
+                //here rather than pulling the GPT seat header into this file; a
+                //non-GPT seat records nothing.
+                extern void gptNoteEngineRevealFloor(Player * seat, const string& card);
+                gptNoteEngineRevealFloor(ctrl, zone->cards[i]->name);
                 mAIGraveSel.push_back(zone->cards[i]);
                 observer->cardClick(zone->cards[i], zone->cards[i]);
                 clicked++;

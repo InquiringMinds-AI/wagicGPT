@@ -3690,22 +3690,40 @@ static bool revealRefusalMustPick(bool pickExactlyOne, bool singlePickDeclineLeg
     return pickExactlyOne && !singlePickDeclineLegal;
 }
 
-//#W67-AX (I5): WHICH card a refusal degrades to - the first row the engine's own
-//option-one chooser accepts, in PRINTED order. Not the heuristic's `chooseCard`:
-//that walks hand/library/battlefield/graveyard/stack/exile/command and never the
-//reveal zone, so it cannot answer this seam at all. The first eligible row is the
-//deck126 review's own recommendation and it is the only choice provable without a
-//model: it is legal by the engine's `canTarget` verdict, and it is deterministic.
-//`eligible` empty means the reveal is not predicate-gated and every row qualifies.
+//#W67-AX (I5), as rewritten by #W67-AZ (R7, codex review finding 7): WHICH card a
+//refusal degrades to. Wave 67 took the FIRST eligible element of the vector - a
+//position, not a decision: on an Idyllic Tutor revealing a whole library the
+//tutored card was whichever enchantment the library shuffle happened to list
+//first, and a mandatory tutor is exactly the decision the pilot most wants
+//answered well when the model has failed.
+//
+//`AIPlayerBaka::chooseCard` cannot answer here: it walks hand, library,
+//battlefield, graveyard, stack, exile and command zone and never the reveal zone,
+//and it is itself first-in-zone-order, so routing through it would return the
+//same positional answer with a heuristic's name on it. The preference the
+//heuristic DOES have over cards it may take is cost-dominant - `FindCardToPlay`'s
+//"*" rank is pure max converted cost, the rule the stock commander hints ride -
+//so the degrade takes the most expensive card the chooser accepts, ties going to
+//the earliest row so the answer stays deterministic. `eligible` empty means the
+//reveal is not predicate-gated and every row qualifies.
 //Returns an index into the revealed set, or -1 when nothing is eligible.
-static int firstEligibleRevealIndex(const std::vector<bool>& eligible, size_t revealedCount)
+//Pure over the two vectors, so the whole decision is provable without a board.
+static int heuristicRevealIndex(const std::vector<int>& cmc,
+                                const std::vector<bool>& eligible)
 {
-    if (eligible.size() != revealedCount)
-        return revealedCount ? 0 : -1;
-    for (size_t i = 0; i < eligible.size(); i++)
-        if (eligible[i])
-            return (int) i;
-    return -1;
+    const bool gated = (eligible.size() == cmc.size());
+    int best = -1, bestCmc = -1;
+    for (size_t i = 0; i < cmc.size(); i++)
+    {
+        if (gated && !eligible[i])
+            continue;
+        if (best < 0 || cmc[i] > bestCmc)
+        {
+            best = (int) i;
+            bestCmc = cmc[i];
+        }
+    }
+    return best;
 }
 
 //#W67-AX (I7, deck162 HIGH-2): does this menu carry a row whose own clause says
@@ -4343,7 +4361,18 @@ static int stackObjectLifeLossToSeat(Interruptible * it, Player * seat, string *
 //is not counted), only UNRESOLVED objects count, and only cards drawn by
 //`seat`. `exclude` drops the object the caller is itself pricing, so a spell
 //whose own draws the row already adds is never counted twice.
+//#W67-AZ (R5, codex review finding 5): a MAY draw is not a draw you cannot
+//decline. The walk recurses through every NestedAbility, and MayAbility IS one -
+//an unresolved "you may draw a card" (Aven Fisher's death trigger, every
+//`may draw:` line) was counted into the library reserve and then described by
+//`xLibraryReserveWhy` as a draw the seat "cannot decline either", which both
+//lowered the recommended X and stated a falsehood about the stack the same
+//prompt prints. Anything under a MayAbility now accumulates into `mayCards`
+//instead: it is reported as OPTIONAL, and it is not reserved against - an
+//under-count leaves the ceiling generous, which is the only direction that
+//cannot cost a legal line (the rule this scan's own header states).
 static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int& cards,
+                                  int& mayCards, bool underMay = false,
                                   const vector<Targetable *> * chosen = NULL)
 {
     if (!a || depth > 5)
@@ -4360,9 +4389,15 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
                 tgts.push_back(one);
             for (size_t ti = 0; ti < tgts.size(); ti++)
                 if (n > 0 && dynamic_cast<Player *>(tgts[ti]) == seat)
-                    cards += n;
+                {
+                    if (underMay)
+                        mayCards += n;
+                    else
+                        cards += n;
+                }
         }
     }
+    const bool nowMay = underMay || (dynamic_cast<MayAbility *>(a) != NULL);
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
     {
         vector<Targetable *> own;
@@ -4373,25 +4408,32 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
             if (!own.empty())
                 pass = &own;
         }
-        scanStackAbilityDraws(na->ability, seat, depth + 1, cards, pass);
+        scanStackAbilityDraws(na->ability, seat, depth + 1, cards, mayCards, nowMay, pass);
     }
     if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
         for (size_t i = 0; i < ma->abilities.size(); i++)
-            scanStackAbilityDraws(ma->abilities[i], seat, depth + 1, cards, chosen);
+            scanStackAbilityDraws(ma->abilities[i], seat, depth + 1, cards, mayCards,
+                                  nowMay, chosen);
 }
 
 //How many cards the UNRESOLVED stack will hand `seat` before it empties.
 //#W63-AF (R8): non-static - `gptStackPendingDrawsFor` below is the suite's door
 //to it, so the fixture pins the SAME function the rows are priced off.
+//#W67-AZ (R5): `mayOut`, where the caller asks for it, receives the pending
+//draws this seat MAY DECLINE. The returned number is the undeclinable one, and
+//every existing caller keeps exactly that.
 int stackPendingDrawsFor(GameObserver * observer, Player * seat,
-                         MTGCardInstance * exclude)
+                         MTGCardInstance * exclude, int * mayOut = NULL)
 {
+    if (mayOut)
+        *mayOut = 0;
     if (!observer || !observer->mLayers || !seat)
         return 0;
     ActionStack * stack = observer->mLayers->stackLayer();
     if (!stack)
         return 0;
     int cards = 0;
+    int mayCards = 0;
     for (size_t i = 0; i < stack->mObjects.size(); i++)
     {
         Interruptible * it = (Interruptible *) stack->mObjects[i];
@@ -4416,8 +4458,10 @@ int stackPendingDrawsFor(GameObserver * observer, Player * seat,
             continue;
         if (exclude && (it->source == exclude || sa->ability->source == exclude))
             continue;
-        scanStackAbilityDraws(sa->ability, seat, 0, cards);
+        scanStackAbilityDraws(sa->ability, seat, 0, cards, mayCards);
     }
+    if (mayOut)
+        *mayOut = mayCards;
     return cards;
 }
 
@@ -7793,6 +7837,32 @@ static int repeatStopClampCount(int namedCount, int statedStop, int statedCurren
     if (room >= namedCount)
         return -1; //the count fits inside the stop the model set - untouched
     return room > 0 ? room : 0;
+}
+
+//#W67-AZ (R2, codex review finding 2). THE BOUNDARY. Wave 66 executed the
+//clamp only when it left TWO or more repetitions and passed the window
+//otherwise - while the receipt it had already written said the engine "ran 1 of
+//them this window". One legal repetition became zero, narrated as one. There is
+//nothing to withhold: the repeat row family performs a SINGLE activation for any
+//count under two (the `repeat_count_under_two` branch), so a stop that leaves
+//one runs one. Only a stop with no room left executes nothing, and then the
+//receipt's own number is 0. Pure, so the boundary is provable without a board.
+static bool repeatStopExecutesNothing(int allowed)
+{
+    return allowed == 0;
+}
+
+//#W67-AZ (R2): the receipt, lifted out of the seam so the number it narrates is
+//the number the seam executes, in one testable place. Wording unchanged from
+//wave 66 - only `allowed` varies.
+static string repeatStopClampReceipt(int named, int statedCurrent, int statedStop, int allowed)
+{
+    std::ostringstream rcpt;
+    rcpt << "You named " << named << " repeats again after being asked"
+            " about it, with your own PLAN putting you at " << statedCurrent
+         << " and your stop at " << statedStop << "; the engine performed the stop"
+            " you stated and ran " << allowed << " of them this window.";
+    return rcpt.str();
 }
 
 //#W67-AY (I8, deck146 HIGH-1): THE ZONE THE PROMPT NEVER SHOWED. Every
@@ -12266,7 +12336,11 @@ static int xLibraryReserveCount(int drawStepSize, int stackDraws)
     return step + (stackDraws > 0 ? stackDraws : 0);
 }
 
-static string xLibraryReserveWhy(int drawStepSize, int stackDraws)
+//#W67-AZ (R5): `mayDraws` are the pending draws the seat MAY DECLINE. They are
+//named - a silent omission is the shape the model confabulates into - but they
+//are NOT in the reserve, so the ceiling stays generous about a draw that may
+//never happen.
+static string xLibraryReserveWhy(int drawStepSize, int stackDraws, int mayDraws = 0)
 {
     std::ostringstream o;
     o << "your next draw step, which you cannot decline";
@@ -12275,6 +12349,10 @@ static string xLibraryReserveWhy(int drawStepSize, int stackDraws)
     if (stackDraws > 0)
         o << ", plus the " << stackDraws << " draw" << (stackDraws == 1 ? "" : "s")
           << " already on the stack, which you cannot decline either";
+    if (mayDraws > 0)
+        o << " (up to " << mayDraws << " further draw" << (mayDraws == 1 ? "" : "s")
+          << " on the stack you MAY decline "
+          << (mayDraws == 1 ? "is" : "are") << " not reserved for)";
     return o.str();
 }
 
@@ -12300,11 +12378,12 @@ static void xLibraryReserve(Player * me, MTGCardInstance * exclude,
         for (size_t xi = 0; xi < xExtras.size(); xi++)
             if (xExtras[xi].second > 0)
                 step += xExtras[xi].second;
-        const int sd = stackPendingDrawsFor(me->getObserver(), me, exclude);
+        int mayDraws = 0; //#W67-AZ (R5): counted, named, never reserved
+        const int sd = stackPendingDrawsFor(me->getObserver(), me, exclude, &mayDraws);
         if (stackDrawsOut)
             *stackDrawsOut = sd;
         reserve = xLibraryReserveCount(step, sd);
-        why = xLibraryReserveWhy(step, sd);
+        why = xLibraryReserveWhy(step, sd, mayDraws);
     }
     if (!me->game->inPlay)
         return;
@@ -15160,7 +15239,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mRecoveryExecRow(-1), //#W67-AX (I7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -15781,6 +15860,31 @@ void AIPlayerGPT::noteHeuristicExecuted(const char * seam, int row, const string
     mRecoveryExecText = text;
 }
 
+//#W67-AZ (R7): the driver's own last-resort pick, recorded. Counted for the
+//gameend report and traced, so a corpus can tell a card the seat chose from a
+//card the engine pressed for it after every other path declined to answer.
+void AIPlayerGPT::noteEngineRevealFloor(const string& card)
+{
+    mEngineRevealFloorPicks++;
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the reveal driver's floor picked "
+               << card << " - no seam had selected a card for a chooser that cannot decline ("
+               << mEngineRevealFloorPicks << " this game)");
+}
+
+//#W67-AZ (R7, codex review finding 7): the DRIVER's own floor - the last resort
+//in MTGRevealingCards for any zero-click mandatory chooser, including seats that
+//never asked a model - now says that it fired. It was silent, so a corpus could
+//not tell a card the seat CHOSE from a card the engine pressed for it. Called
+//from AllAbilities.cpp through this extern (the reveal driver deliberately does
+//not include the GPT seat's header); a non-GPT seat records nothing.
+void gptNoteEngineRevealFloor(Player * seat, const string& card)
+{
+    AIPlayerGPT * gpt = dynamic_cast<AIPlayerGPT *>(seat);
+    if (!gpt)
+        return;
+    gpt->noteEngineRevealFloor(card);
+}
+
 //#W53-Q (D24): does this record hand its decision to the heuristic? TRUE only
 //when nothing from the reply executed (choice < 0) AND a fallback class was
 //stamped - so an executed answer, and a note-only record, never latch one.
@@ -16376,6 +16480,10 @@ void AIPlayerGPT::logGameEnd()
         //decline (see reserveDeclineHonoured). A window the model answered once
         //and whose arithmetic nothing in the step can move - not a window removed.
         {"reserve_decline_windows_skipped", mReserveDeclineWindows},
+        //#W67-AZ (R7): reveal picks made by the DRIVER's last-resort floor, after
+        //every seam declined to select for a chooser that cannot be declined.
+        //Zero on a healthy game; nonzero says the engine answered, not the seat.
+        {"engine_reveal_floor_picks", mEngineRevealFloorPicks},
         //#W54-D (D8b): asks whose whole option list rendered as one
         //interchangeable row and were resolved without a model call.
         {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
@@ -18380,6 +18488,44 @@ static bool replyLabelMissing(const string& reply)
 //The LAST sentence before the PLAN marker that states an action, matched against
 //the rows by short-name containment. Exactly one distinct row -> that row
 //(1-based); zero or more than one -> -1, and the caller re-asks.
+//#W67-AZ (R1, codex review finding 1). POLARITY. The label-missing salvage
+//matches an action verb and a row's short name inside ONE sentence, and the
+//reply that REFUSES a row is the shape whose words match that row hardest:
+//`I will not cast Doom Blade.\nPLAN: Preserve it for later.` named the Doom
+//Blade row uniquely and cast it. A negation cue standing BEFORE the row's name
+//in that sentence disqualifies the match; the salvage then has no candidate and
+//the caller re-asks (never Baka, never the row). Cues are WORD-BOUNDED, so
+//"Cast nothing right now" is not negated by the "not" inside "nothing", and the
+//two contracted forms cover the apostrophe the model actually writes. Pure.
+static bool sentenceNegatesBefore(const string& lowSentence, size_t at)
+{
+    struct Cue { const char * s; bool suffix; };
+    static const Cue kNeg[] = {
+        { "not", false }, { "never", false }, { "cannot", false }, { "no longer", false },
+        { "rather than", false }, { "instead of", false }, { "avoid", false },
+        { "avoiding", false }, { "refrain", false }, { "without", false },
+        { "n't", true }, { "n\xE2\x80\x99t", true }
+    };
+    for (size_t k = 0; k < sizeof(kNeg) / sizeof(kNeg[0]); k++)
+    {
+        const string cue = kNeg[k].s;
+        size_t p = lowSentence.find(cue);
+        while (p != string::npos && p < at)
+        {
+            const char after = (p + cue.size() < lowSentence.size())
+                               ? lowSentence[p + cue.size()] : ' ';
+            const char before = p ? lowSentence[p - 1] : ' ';
+            const bool rightOk = !isalnum((unsigned char) after);
+            const bool leftOk = kNeg[k].suffix ? (isalpha((unsigned char) before) != 0)
+                                               : !isalnum((unsigned char) before);
+            if (rightOk && leftOk)
+                return true;
+            p = lowSentence.find(cue, p + 1);
+        }
+    }
+    return false;
+}
+
 static int salvageLabelMissingChoice(const string& reply, int optionCount,
                                      const vector<string> * optionTexts)
 {
@@ -18435,7 +18581,15 @@ static int salvageLabelMissingChoice(const string& reply, int optionCount,
             const size_t par = head.find(" (");
             if (par != string::npos && par >= 4)
                 head = head.substr(0, par);
-            if (low.find(name) == string::npos && low.find(head) == string::npos)
+            size_t at = low.find(name);
+            if (at == string::npos)
+                at = low.find(head);
+            if (at == string::npos)
+                continue;
+            //#W67-AZ (R1): a NEGATED mention is not a decision to take the row.
+            //Disqualifying it costs one re-ask; crediting it casts the spell the
+            //reply said it was keeping.
+            if (sentenceNegatesBefore(low, at))
                 continue;
             if (hit >= 0)
                 ambiguous = true;
@@ -20271,7 +20425,8 @@ string loopNonChainingClause(const string& converter, const string& mirror, bool
 string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
                               const string& seenWhere, bool theirs,
                               const string& affordClause = "",
-                              bool halfCanReturn = true)
+                              bool halfCanReturn = true,
+                              bool blockedByExile = true) //#W67-AZ (R6)
 {
     if (inPlayHalf.empty() || seenHalf.empty() || seenWhere.empty())
         return "";
@@ -20281,9 +20436,17 @@ string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
          " pair, " << seenHalf << ", is " << seenWhere << ".";
     if (!halfCanReturn)
     {
-        o << " A card in exile does not come back unless another card says so, so"
-             " the pair is BROKEN, not one resolution from closing, and nothing"
-             " chains while it stays there. IF it ever does return and the pair"
+        //#W67-AZ (R6): the same face, with the zone's own reason.
+        if (blockedByExile)
+            o << " A card in exile does not come back unless another card says so, so"
+                 " the pair is BROKEN, not one resolution from closing, and nothing"
+                 " chains while it stays there.";
+        else
+            o << " A card in a graveyard does not come back without a recursion effect,"
+                 " and nothing that could return it is on that battlefield or in that"
+                 " hand, so the pair is NOT one resolution from closing and nothing"
+                 " chains while it stays there.";
+        o << " IF it ever does return and the pair"
              " closes,"
           << (theirs
                   ? " any life YOU lose, and any life they gain, would chain until"
@@ -20476,6 +20639,64 @@ static void loopHalvesInNames(const std::map<string, int>& names, string& conver
     }
 }
 
+//#W67-AZ (R6, codex review finding 6). A GRAVEYARD IS NOT A RETURN.
+//
+//Wave 67 gated the "one resolution from closing" claim on the zone being one a
+//card "returns from (hand, library, graveyard)" - but a card in a graveyard
+//returns only if something returns it. With Sanguine Bond on the battlefield and
+//Exquisite Blood in the graveyard and no recursion anywhere, the banner told the
+//pilot the pair was one resolution from closing, which is a fact the board does
+//not establish - the same false-surface shape the exile face was written to end.
+//The claim now needs a VISIBLE recursion source: a card in that player's hand or
+//on their battlefield whose own script moves a card out of a graveyard to a hand
+//or a battlefield (`target(...|mygraveyard) ... moveto(hand)` - Raise Dead,
+//Regrowth - or `moveTo(myBattlefield)` - Zombify - and the `may moveto(hand)
+//target(*|mygraveyard)` ETB shape of Gravedigger and Eternal Witness). With none
+//the banner says the pair needs recursion, and states the consequence of a close
+//conditionally, exactly as the exile face does. Pure over the two script fields.
+static bool graveyardRecursionScript(const string& magicText, const string& targetSpec)
+{
+    string low = magicText + " " + targetSpec;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    if (low.find("graveyard") == string::npos)
+        return false;
+    size_t p = low.find("moveto(");
+    while (p != string::npos)
+    {
+        const size_t close = low.find(')', p);
+        const string dest = low.substr(p + 7, close == string::npos ? string::npos
+                                                                   : close - (p + 7));
+        if (dest.find("hand") != string::npos || dest.find("battlefield") != string::npos
+            || dest.find("inplay") != string::npos)
+            return true;
+        p = low.find("moveto(", p + 1);
+    }
+    return false;
+}
+
+//#W67-AZ (R6): does this seat hold anything that could return the half? Hand and
+//battlefield only - the zones whose contents the engine may act from - and the
+//scripts are the cards' own. A card the seat cannot see is not evidence.
+static bool seatHasGraveyardRecursion(Player * pl)
+{
+    if (!pl || !pl->game)
+        return false;
+    MTGGameZone * zones[2] = { pl->game->inPlay, pl->game->hand };
+    for (int z = 0; z < 2; z++)
+    {
+        if (!zones[z])
+            continue;
+        for (int i = 0; i < zones[z]->nb_cards; i++)
+        {
+            MTGCardInstance * c = zones[z]->cards[i];
+            if (c && graveyardRecursionScript(c->magicText, c->spellTargetType))
+                return true;
+        }
+    }
+    return false;
+}
+
 //#W60-N (B6): one half in play, the other half SEEN. Public zones are read off
 //the board; the opponent's hand is read off the names the seat has already been
 //shown (the same list the frame prints as "Cards you have seen in the
@@ -20502,8 +20723,12 @@ static string loopPendingSituationLine(Player * me, Player * opp,
         //from that zone at all. A graveyard can be recurred from and a hand can
         //be cast from; exile is the one zone nothing leaves unless a card says
         //so, and that is the zone the banner was lying about.
+        bool blockedByExile = true; //#W67-AZ (R6): which zone withheld the claim
+        //#W67-AZ (R6): a graveyard returns a card only when something can return
+        //it, so the graveyard row's verdict is read off THIS seat's own board.
+        const bool graveBack = seatHasGraveyardRecursion(pl);
         struct { MTGGameZone * z; const char * ours; const char * theirs; bool back; } zones[] = {
-            { pl->game->graveyard, "in your graveyard", "in their graveyard", true },
+            { pl->game->graveyard, "in your graveyard", "in their graveyard", graveBack },
             { pl->game->exile, "in your exile", "in their exile", false },
             { NULL, NULL, NULL, true }
         };
@@ -20541,6 +20766,7 @@ static string loopPendingSituationLine(Player * me, Player * opp,
                 found = hit;
                 where = (side == 0) ? zones[zi].theirs : zones[zi].ours;
                 halfCanReturn = zones[zi].back; //#W67-AY (I8)
+                blockedByExile = (zi == 1); //#W67-AZ (R6)
             }
         }
         if (found.empty())
@@ -20578,7 +20804,7 @@ static string loopPendingSituationLine(Player * me, Player * opp,
             }
         }
         return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0, afford,
-                                     halfCanReturn); //#W67-AY (I8)
+                                     halfCanReturn, blockedByExile); //#W67-AY (I8), #W67-AZ (R6)
     }
     return "";
 }
@@ -24320,6 +24546,9 @@ static string stripNarrationDecoration(const string& in)
                 //same species as the TAPPED form directly above.
                 || (in.compare(i, 10, "{library: ") == 0)
                 || (in.compare(i, 10, "{rows for ") == 0)
+                //#W67-AZ (R4): the shortened band rung's clause is the same
+                //species - true of this window's mana, false the moment it moves.
+                || (in.compare(i, 30, "{identical in effect right now") == 0)
                 || (in.compare(i, 20, "{it enters UNTAPPED ") == 0)
                 //#W58-B (D1): the life-payment verdict is the same species -
                 //it prices THIS window's payment against the life the frame
@@ -25352,8 +25581,9 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 //Nothing that re-opens such a window can change the answer: the reserve is
 //arithmetic over the seat's UNTAPPED SOURCES, and a re-render moves counts, not
 //sources. So a decline taken on a menu carrying a reserve row is honoured for the
-//rest of that STEP - the scope the row's own clause reasons in - under two tests,
-//both of which must hold:
+//rest of that STEP - the scope the row's own clause reasons in - under the
+//BOARD-KEY test #W67-AZ (R3) added below and these two finer tests, all of
+//which must hold:
 //  * the rows still stand by `holdStillStands`, the same byte test the hold row
 //    uses (a WORD change re-opens the window; a digit inside a bracket does not);
 //  * the untapped-source COUNT has not moved. That number is exactly what the
@@ -25383,13 +25613,41 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 //A row appearing or leaving moves the key and re-opens the window; a source
 //untapping or being spent moves the count and re-opens it; the next step re-opens
 //it unconditionally. Nothing here is a cache of an answer the model did not give.
-static bool reserveDeclineStillStands(const string& heldKey, const string& nowKey,
+//#W67-AZ (R3, codex review finding 3). THE BOARD IS THE KEY. The three terms
+//above - phase, castable-set names, untapped-source count - are what the
+//RESERVE ARITHMETIC is made of, and wave 67 shipped them as the whole latch.
+//They are not the whole GAME: the opponent can resolve a lethal spell, a
+//permanent can leave, a creature can attack, cards can be drawn, and every one
+//of those windows still reads "the same castable set, the same 4 sources" and
+//is auto-passed unasked. That is a cache of an answer across changed state,
+//which is the one thing the doctrine forbids. The latch now requires the FULL
+//board key first - `serializeGameState`, the same string the priority seam's
+//ask key and the cast livelock breaker compare, carrying the stack, both life
+//totals, both battlefields, hand and library counts - and keeps the two
+//arithmetic terms as the finer tests they always were. Nothing volatile enters
+//it: the key is the board render the same window already built (it is not the
+//prompt, which carries the notes and the plan), and it never touches
+//mPromptTail, the ask key or the async slot key.
+//
+//MEASURED on the corpus this was shipped for (162v130 s16->s17, s18->s19):
+//under the full key NEITHER pair latches - s16->s17 the seat's hand went 5 -> 6
+//cards, its library 46 -> 45 and a Howling Mine trigger left the stack; s18->s19
+//the hand went 7 -> 9, the library 43 -> 41 and two of three stack triggers
+//resolved. The board moved in both, so both windows are re-asked, which is what
+//an unchanged-board latch means. The wave-67 latch held them by not looking.
+static bool reserveDeclineStillStands(const string& heldBoard, const string& nowBoard,
+                                      const string& heldKey, const string& nowKey,
                                       int heldSources, int nowSources,
                                       const char ** whyOut)
 {
     if (whyOut) *whyOut = "";
     if (heldKey.empty())
         return false;
+    if (heldBoard.empty() || heldBoard != nowBoard)
+    {
+        if (whyOut) *whyOut = "the board moved";
+        return false;
+    }
     if (heldSources != nowSources)
     {
         if (whyOut) *whyOut = "the untapped-source count moved";
@@ -25403,7 +25661,8 @@ static bool reserveDeclineStillStands(const string& heldKey, const string& nowKe
     return true;
 }
 
-bool AIPlayerGPT::reserveDeclineHonoured(const string& castSetKey, int untappedSources)
+bool AIPlayerGPT::reserveDeclineHonoured(const string& castSetKey, int untappedSources,
+                                        const string& boardKey) //#W67-AZ (R3)
 {
     if (mReserveDeclineKey.empty())
         return false;
@@ -25411,14 +25670,17 @@ bool AIPlayerGPT::reserveDeclineHonoured(const string& castSetKey, int untappedS
         || mReserveDeclinePhase != observer->getCurrentGamePhase())
     {
         mReserveDeclineKey.clear();
+        mReserveDeclineBoard.clear();
         return false;
     }
     const char * why = "";
-    if (!reserveDeclineStillStands(mReserveDeclineKey, castSetKey,
+    if (!reserveDeclineStillStands(mReserveDeclineBoard, boardKey,
+                                   mReserveDeclineKey, castSetKey,
                                    mReserveDeclineSources, untappedSources, &why))
     {
         DebugTrace("AIPlayerGPT: the reservation decline is re-opened - " << why);
         mReserveDeclineKey.clear();
+        mReserveDeclineBoard.clear();
         return false;
     }
     mReserveDeclineWindows++;
@@ -25429,9 +25691,11 @@ bool AIPlayerGPT::reserveDeclineHonoured(const string& castSetKey, int untappedS
     return true;
 }
 
-void AIPlayerGPT::takeReserveDecline(const string& castSetKey, int untappedSources)
+void AIPlayerGPT::takeReserveDecline(const string& castSetKey, int untappedSources,
+                                    const string& boardKey) //#W67-AZ (R3)
 {
     mReserveDeclineKey = castSetKey;
+    mReserveDeclineBoard = boardKey;
     mReserveDeclineSources = untappedSources;
     mReserveDeclineTurn = observer->turn;
     mReserveDeclinePhase = observer->getCurrentGamePhase();
@@ -32554,13 +32818,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                            << ",stated_M=" << planCurrent << ",stated_stop=" << planStop
                            << ",executed=" << allowed << ")";
                         appendParseNote(&mLastParseNote, cs.str().c_str());
-                        std::ostringstream rcpt;
-                        rcpt << "You named " << namedCount << " repeats again after being asked"
-                                " about it, with your own PLAN putting you at " << planCurrent
-                             << " and your stop at " << planStop << "; the engine performed the stop"
-                                " you stated and ran " << allowed << " of them this window.";
-                        stopClampReceipt = rcpt.str();
-                        if (allowed >= 2)
+                        stopClampReceipt = repeatStopClampReceipt(namedCount, planCurrent,
+                                                                  planStop, allowed);
+                        //#W67-AZ (R2): one repetition left is one repetition RUN -
+                        //the receipt above says so, and the row performs it.
+                        if (!repeatStopExecutesNothing(allowed))
                             namedCount = allowed;
                         else
                         {
@@ -35364,7 +35626,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 + (ci < candidateUsesAlt.size() && candidateUsesAlt[ci]
                                    ? "|alt" : ""));
         const string castSetKey = castSetKeyOf(castNames);
-        if (attempt == 0 && reserveDeclineHonoured(castSetKey, untappedSources))
+        if (attempt == 0 && reserveDeclineHonoured(castSetKey, untappedSources, boardNow))
             return NULL;
         if (attempt == 0 && loopAutoPassWindow()) //#W66-AS (H3 second half)
             return NULL;
@@ -35420,7 +35682,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //#W67-AX (I7): a decline taken on a menu that carries a reserve row
             //is a decision about the whole step, not about this window.
             if (menuHasReserveRow(menu))
-                takeReserveDecline(castSetKey, untappedSources);
+                takeReserveDecline(castSetKey, untappedSources, boardNow);
             return NULL;
         }
         //#W53-N (D2): the model closed this turn's casting question itself.
@@ -36194,23 +36456,25 @@ static string payRepeatTapsClause(const std::vector<std::string>& names,
 //spendable now, which pays for 1 of them and stops", i.e. each adds the same
 //ONE counter. 5 occurrences on the corpus, ~13.5 kB of menu.
 //
-//The engine's menu is untouched: this decides which rows the PROMPT LISTS, and
-//the pick is mapped straight back to the engine index (the same shownToFull
-//discipline the Flip-Side filter uses). Nothing legal is made unreachable in
-//effect: every rung of the identical band produces the same counters, and the
-//band's LARGEST rung - the biggest ask the card offers, and the one that is
-//never worse if the mana estimate moves before the payment - is the row kept.
+//The engine's menu is untouched, and since #W67-AZ (R4) so is the PRINTED list:
+//this decides which rows are DESCRIBED at length and which get one short clause
+//saying they are identical right now. Every rung keeps its row, its number and
+//its answerability; the band's LARGEST rung - the biggest ask the card offers,
+//and the one that is never worse if the mana estimate moves before the payment -
+//is the row that carries the band's arithmetic.
 //
 //`paid[i]` is the mana engine's own answer for row i (-1 = it could not decide).
 //The collapse runs ONLY when every add-N row's `paid` is known and identical:
 //an unknown or a varying count means the rows are not proven identical, and
 //then the full list is printed exactly as wave 66 printed it. Pure over the
 //engine labels and those counts, so PARSETEST proves the whole decision.
-//Returns the index of the kept band row, or -1 for "collapse nothing".
+//Returns the index of the band's largest row (the one that carries the band's
+//own clause), or -1 for "there is no identical band". `bandRows` marks the OTHER
+//rows of the band - the ones whose description collapses.
 static int payRepeatCollapse(const vector<string>& optionTexts, const vector<int>& paid,
-                             vector<bool>& hide, int& bandLow, int& bandHigh, int& bandPaid)
+                             vector<bool>& bandRows, int& bandLow, int& bandHigh, int& bandPaid)
 {
-    hide.assign(optionTexts.size(), false);
+    bandRows.assign(optionTexts.size(), false);
     bandLow = bandHigh = bandPaid = 0;
     if (optionTexts.size() != paid.size())
         return -1;
@@ -36254,7 +36518,7 @@ static int payRepeatCollapse(const vector<string>& optionTexts, const vector<int
         if ((int) i == keep || !isAddNCountersOption(optionTexts[i]))
             continue;
         if (atoi(optionTexts[i].c_str() + 4) > common)
-            hide[i] = true;
+            bandRows[i] = true;
     }
     bandLow = low;
     bandHigh = keepN;
@@ -36265,17 +36529,37 @@ static int payRepeatCollapse(const vector<string>& optionTexts, const vector<int
 //#W67-AW (I9a): what the kept row says about the rows it stands for. The band
 //is NAMED, so an answer that reaches for a number inside it has a row to land
 //on, and the reachable maximum is stated as the number that actually happens.
+//#W67-AZ (R4, codex review finding 4): the tag says what is TRUE of the band
+//now that every row of it is still listed and still answerable. Wave 67 hid
+//rows 3..21 and told the model the kept row "stands for all of them" - a legal
+//choice the model could no longer make, which is the render removing a decision
+//rather than shortening it. The rows stay; only their descriptions collapse.
 static string payRepeatCollapseTag(int bandLow, int bandHigh, int bandPaid)
 {
     if (bandHigh <= bandLow || bandLow <= 0)
         return "";
     std::ostringstream o;
     o << " {rows for " << bandLow << " through " << bandHigh
-      << " counters are collapsed into this one: your mana pays for " << bandPaid
+      << " counters are all identical in effect right now: your mana pays for " << bandPaid
       << " payment" << (bandPaid == 1 ? "" : "s")
       << " and stops, so every one of them adds the same " << bandPaid
       << " counter" << (bandPaid == 1 ? "" : "s")
-      << " - this row is the largest ask the card offers and stands for all of them}";
+      << " - each of those rows is still on this list and any of them is a legal answer;"
+         " this row is the largest ask the card offers}";
+    return o.str();
+}
+
+//#W67-AZ (R4): what each OTHER row of the identical band says. The row keeps its
+//own engine label and its own number - it is answerable exactly as it was - and
+//its long price/taps description is replaced by the one fact that distinguishes
+//it right now, which is that it does not differ. Pure.
+static string payRepeatBandRowTag(int bandPaid)
+{
+    if (bandPaid < 0)
+        return "";
+    std::ostringstream o;
+    o << " {identical in effect right now: adds " << bandPaid << " counter"
+      << (bandPaid == 1 ? "" : "s") << "}";
     return o.str();
 }
 
@@ -37664,6 +37948,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //Presentation only: req.optionTexts (the staleness key), the option ORDER
     //and the answer index are untouched.
     std::vector<int> repeatPaid(req.optionTexts.size(), -1); //#W67-AW (I9a)
+    std::vector<size_t> repeatBase(opts.size(), (size_t) -1); //#W67-AZ (R4)
     {
         int addRows = 0;
         for (size_t i = 0; i < req.optionTexts.size(); i++)
@@ -37727,6 +38012,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                         paid = fits;
                 }
                 repeatPaid[i] = paid; //#W67-AW (I9a)
+                if (i < repeatBase.size()) //#W67-AZ (R4): where this row's own text ends
+                    repeatBase[i] = opts[i].size();
                 opts[i] += payRepeatRowCostTag(n, per, perCmc, avail, paid);
                 if (paid <= 0)
                     continue;
@@ -37778,55 +38065,55 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //engine's option vector, req.optionTexts (the staleness key) and the answer
     //INDEX are untouched: only the shown list shrinks, and the model's pick is
     //mapped straight back through shownToFull before anything is clicked.
-    //#W67-AW (I9a): the unreachable repeat-pay rungs, collapsed into the one
-    //row that stands for them. Decided from the engine's OWN labels and the
-    //per-row payment counts computed above; the engine's option vector,
-    //req.optionTexts (the staleness key) and the answer INDEX are untouched -
-    //only the shown list shrinks, and the pick is mapped back through
-    //shownToFull before anything is clicked, exactly as the Flip-Side filter
-    //does.
-    vector<bool> repeatHidden(opts.size(), false);
-    bool repeatCollapsed = false;
+    //#W67-AW (I9a), as rewritten by #W67-AZ (R4, codex review finding 4): the
+    //unreachable repeat-pay rungs keep their ROWS and lose their DESCRIPTIONS.
+    //Wave 67 dropped rows 3..21 from the printed list, so a model that wanted
+    //`Add 3` had no row to answer - a legal engine choice made unreachable by
+    //the renderer, which is the breach the doctrine names. Every row is printed,
+    //numbered and answerable exactly as the engine offers it; the ~2.7 kB of
+    //byte-identical price and taps text on the band's rows is replaced by one
+    //short clause each, and the band's own arithmetic is stated once on the
+    //largest row. The engine option vector, req.optionTexts (the staleness key)
+    //and the answer INDEX are untouched, and now so is the printed list.
     if (opts.size() == req.optionTexts.size())
     {
-        vector<bool> hide;
+        vector<bool> bandRows;
         int bLow = 0, bHigh = 0, bPaid = 0;
-        const int keep = payRepeatCollapse(req.optionTexts, repeatPaid, hide,
+        const int keep = payRepeatCollapse(req.optionTexts, repeatPaid, bandRows,
                                            bLow, bHigh, bPaid);
-        if (keep >= 0 && keep < (int) opts.size() && hide.size() == opts.size())
+        if (keep >= 0 && keep < (int) opts.size() && bandRows.size() == opts.size())
         {
-            //Never hide the LAST row: it is the decline the index map reads.
-            if (!hide.empty())
-                hide[hide.size() - 1] = false;
-            size_t hidden = 0;
-            for (size_t i = 0; i < hide.size(); i++)
-                if (hide[i])
-                    hidden++;
-            if (hidden > 0 && opts.size() - hidden >= 2)
+            size_t shortened = 0;
+            for (size_t i = 0; i < bandRows.size(); i++)
             {
-                repeatHidden = hide;
-                repeatCollapsed = true;
+                if (!bandRows[i] || i >= repeatBase.size()
+                    || repeatBase[i] == (size_t) -1 || repeatBase[i] > opts[i].size())
+                    continue;
+                opts[i].resize(repeatBase[i]);
+                opts[i] += payRepeatBandRowTag(bPaid);
+                shortened++;
+            }
+            if (shortened > 0)
+            {
                 opts[(size_t) keep] += payRepeatCollapseTag(bLow, bHigh, bPaid);
-                DebugTrace("AIPlayerGPT: collapsed " << hidden
-                           << " identical repeat-pay rung row(s) into the largest ask");
+                DebugTrace("AIPlayerGPT: shortened " << shortened
+                           << " identical repeat-pay rung row(s); every rung stays on the list");
             }
         }
     }
     vector<string> shownOpts;
     vector<size_t> shownToFull;
-    if (mdfcLandRowShown || repeatCollapsed)
+    if (mdfcLandRowShown)
         for (size_t i = 0; i < opts.size(); i++)
         {
             if (mdfcLandRowShown && i < req.optionTexts.size()
                 && req.optionTexts[i] == "Flip Side")
                 continue;
-            if (repeatHidden[i]) //#W67-AW (I9a)
-                continue;
             shownOpts.push_back(opts[i]);
             shownToFull.push_back(i);
         }
     //A menu that would be left with nothing but a decline keeps its full list.
-    const bool toggleFiltered = (mdfcLandRowShown || repeatCollapsed)
+    const bool toggleFiltered = mdfcLandRowShown
                                 && shownOpts.size() >= 2
                                 && shownOpts.size() < opts.size();
     if (toggleFiltered)
@@ -44289,23 +44576,39 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     {
         //#W67-AX (I5): where a decline is not a legal answer, an unusable reply
         //still owes the engine a legal pick - the safe default here is not safe,
-        //it is a VOIDED spell (see revealRefusalMustPick). The pick is the first
-        //row the engine's own chooser accepts, recorded as the class
+        //it is a VOIDED spell (see revealRefusalMustPick). #W67-AZ (R7): the pick
+        //is the HEURISTIC's, over the rows the engine's own chooser accepts -
+        //cost-dominant, the preference `FindCardToPlay`'s "*" rank carries - and
+        //not the first element of the vector. Recorded as the class
         //`reveal_fallback_pick` with the card it took, so a corpus reads what
         //answered instead of reconstructing it from a force-close line.
+        std::vector<int> revealedCmc; //#W67-AZ (R7)
+        for (size_t ri = 0; ri < revealed.size(); ri++)
+            revealedCmc.push_back(revealed[ri] && revealed[ri]->getManaCost()
+                                  ? revealed[ri]->getManaCost()->getConvertedCost() : 0);
         const int forced = revealRefusalMustPick(pickExactlyOne, singlePickDeclineLegal)
-                           ? firstEligibleRevealIndex(eligibleForOptionOne, revealed.size())
+                           ? heuristicRevealIndex(revealedCmc, eligibleForOptionOne)
                            : -1;
         if (forced >= 0 && forced < (int) revealed.size())
         {
             selForOptionOne.push_back(forced);
             const string took = revealed[forced]->name;
-            writeTransLog("reveal", userMsg, content, forced + 1, (int) revealed.size(),
+            //#W67-AZ (R7): the record's row number is the PRINTED position - the
+            //number the options list in the same record is indexed by - not the
+            //position in the engine's reveal vector.
+            int forcedRow = forced + 1;
+            for (size_t rj = 0; rj < revealOrder.size(); rj++)
+                if (revealOrder[rj] == (size_t) forced)
+                {
+                    forcedRow = (int) rj + 1;
+                    break;
+                }
+            writeTransLog("reveal", userMsg, content, forcedRow, (int) revealed.size(),
                           took, "reveal_fallback_pick", &names);
-            noticeFallback("model reply failed - the engine took the first legal card", 5.0f);
+            noticeFallback("model reply failed - the heuristic chose among the legal cards", 5.0f);
             narrateDecision(revealSummaryNarration(revealed.size(), took, optOneLabel));
             DebugTrace("AIPlayerGPT: reveal reply unusable and this chooser has no legal"
-                       " decline - taking the first eligible card (" << took << ")");
+                       " decline - the heuristic took " << took);
             return 1;
         }
         //Unusable reply: the display falls back to its safe default (send
@@ -71117,20 +71420,35 @@ static const char * kW50Y_r94 =
         CHECK(revealChooserCanDecline(false, 1) && revealChooserCanDecline(true, 1000)
                   && revealChooserCanDecline(false, 1000),
               "#W67-AX I5 MUST-NOT-MATCH a bare or unlimited chooser declines exactly as it did");
-        // WHICH card the degrade takes: the first row the engine's own canTarget
-        // verdict accepts, in printed order. A gated reveal skips the rows that
-        // do not qualify; an ungated one takes row 1; nothing eligible is -1
-        // (that reveal never reaches the ask - see the eligCount == 0 branch).
+        // WHICH card the degrade takes: #W67-AZ (R7). The heuristic's own
+        // preference - highest converted cost - over the rows the engine's
+        // canTarget verdict accepts, never the vector's first element.
         std::vector<bool> gated;
         gated.push_back(false); gated.push_back(false); gated.push_back(true); gated.push_back(true);
-        CHECK(firstEligibleRevealIndex(gated, 4) == 2,
-              "#W67-AX I5 the degrade takes the first ELIGIBLE row, not the first row");
+        std::vector<int> cmc4;
+        cmc4.push_back(9); cmc4.push_back(8); cmc4.push_back(2); cmc4.push_back(5);
+        CHECK(heuristicRevealIndex(cmc4, gated) == 3,
+              "#W67-AZ R7 REPRO the degrade takes the most expensive ELIGIBLE card (row 4, cost 5),"
+              " not the first eligible one (row 3) and not the cheapest");
+        CHECK(heuristicRevealIndex(cmc4, gated) != 2,
+              "#W67-AZ R7 MUST-NOT-MATCH the wave-67 answer was the first eligible vector element");
+        {
+            std::vector<int> ties;
+            ties.push_back(3); ties.push_back(3); ties.push_back(3);
+            CHECK(heuristicRevealIndex(ties, std::vector<bool>(3, true)) == 0,
+                  "#W67-AZ R7 a tie goes to the earliest row, so the degrade is deterministic");
+        }
         std::vector<bool> none4(4, false);
-        CHECK(firstEligibleRevealIndex(none4, 4) == -1,
-              "#W67-AX I5 MUST-NOT-MATCH nothing eligible is no pick, never row 1");
-        CHECK(firstEligibleRevealIndex(std::vector<bool>(), 52) == 0
-                  && firstEligibleRevealIndex(std::vector<bool>(), 0) == -1,
-              "#W67-AX I5 an ungated reveal qualifies every row; an empty reveal has none");
+        CHECK(heuristicRevealIndex(cmc4, none4) == -1,
+              "#W67-AZ R7 MUST-NOT-MATCH nothing eligible is no pick, never row 1");
+        {
+            std::vector<int> ungated;
+            ungated.push_back(1); ungated.push_back(6); ungated.push_back(0);
+            CHECK(heuristicRevealIndex(ungated, std::vector<bool>()) == 1,
+                  "#W67-AZ R7 an ungated reveal qualifies every row and still ranks them");
+            CHECK(heuristicRevealIndex(std::vector<int>(), std::vector<bool>()) == -1,
+                  "#W67-AZ R7 an empty reveal has no pick");
+        }
     }
 
     cout << "\n[#W67-AX I5] the reveal residual is read from the record's own latency\n";
@@ -71241,18 +71559,40 @@ static const char * kW50Y_r94 =
                   && s19row1.find("{leaves 1 of your 4 untapped mana sources untapped}") != string::npos,
               "#W67-AX I7 REPRO both windows print the same 4 untapped sources - the number the"
               " reserve arithmetic is a function of");
-        CHECK(reserveDeclineStillStands(k18, k19, 4, 4, &why) && string(why).empty(),
-              "#W67-AX I7 so the decline taken at s18 still stands at s19 and s19 is not asked");
-        CHECK(!reserveDeclineStillStands(k18, k19, 4, 3, &why)
+        //#W67-AZ (R3): and the BOARD, which is the first term now. These two are
+        //the corpus's own boards, reduced to what moved between the windows: the
+        //hand count, the library count and the stack. `s18board` -> `s19board` is
+        //162v130 s18 -> s19 verbatim in those three numbers.
+        const string s18board = "Your hand (7 cards)|Your library: 43 cards|stack: 3";
+        const string s19board = "Your hand (9 cards)|Your library: 41 cards|stack: 1";
+        CHECK(reserveDeclineStillStands(s18board, s18board, k18, k19, 4, 4, &why)
+                  && string(why).empty(),
+              "#W67-AZ R3 an UNCHANGED board with the same castable set and the same sources"
+              " still holds the decline - the latch is narrowed, not deleted");
+        CHECK(!reserveDeclineStillStands(s18board, s19board, k18, k19, 4, 4, &why)
+                  && string(why) == "the board moved",
+              "#W67-AZ R3 REPRO 162v130 s18->s19: the hand, the library and the stack all moved,"
+              " so the window is re-asked - wave 67 auto-passed it on phase and names alone");
+        CHECK(!reserveDeclineStillStands(
+                  "Your hand (7 cards)|Your library: 43 cards|stack: 3|opponent life 8",
+                  "Your hand (7 cards)|Your library: 43 cards|stack: 3|opponent life 1",
+                  k18, k19, 4, 4, &why)
+                  && string(why) == "the board moved",
+              "#W67-AZ R3 MUST-RE-OPEN a lethal spell resolving moves nothing the castable set or"
+              " the source count can see, and re-opens the window anyway");
+        CHECK(!reserveDeclineStillStands(s18board, s18board, k18, k19, 4, 3, &why)
                   && string(why) == "the untapped-source count moved",
               "#W67-AX I7 MUST-RE-OPEN a source count that moved re-opens the window");
         std::vector<string> grown(names19);
         grown.push_back("Underworld Dreams");
-        CHECK(!reserveDeclineStillStands(k18, castSetKeyOf(grown), 4, 4, &why)
+        CHECK(!reserveDeclineStillStands(s18board, s18board, k18, castSetKeyOf(grown), 4, 4, &why)
                   && string(why) == "the castable set moved",
               "#W67-AX I7 MUST-RE-OPEN a row the model has not been offered re-opens the window");
-        CHECK(!reserveDeclineStillStands(string(), k19, 4, 4, &why),
+        CHECK(!reserveDeclineStillStands(s18board, s18board, string(), k19, 4, 4, &why),
               "#W67-AX I7 MUST-NOT-MATCH an empty latch holds nothing");
+        CHECK(!reserveDeclineStillStands(string(), string(), k18, k19, 4, 4, &why)
+                  && string(why) == "the board moved",
+              "#W67-AZ R3 MUST-NOT-MATCH a latch with no board recorded holds nothing");
     }
 
     cout << "\n[#W67-AX transport MED] the two 900 s wall misses, by their own numbers\n";
@@ -71439,25 +71779,50 @@ static const char * kW50Y_r94 =
         int lo = 0, hi = 0, pd = 0;
         const int keep = payRepeatCollapse(labels, paid, hide, lo, hi, pd);
         CHECK(keep == 20 && lo == 2 && hi == 20 && pd == 1,
-              "#W67-AW I9a REPRO the s11 menu keeps the largest ask and names the band 2..20");
+              "#W67-AW I9a REPRO the s11 menu names the band 2..20 on its largest row");
         //The flag vector is always sized to the menu, whatever the verdict, so
         //a caller can read it without a second size check.
         CHECK(hide.size() == labels.size(),
-              "#W67-AW I9a the hide vector is sized to the menu on every path");
+              "#W67-AW I9a the band vector is sized to the menu on every path");
         int hidden = 0;
         for (size_t i = 0; i < hide.size(); i++)
             if (hide[i])
                 hidden++;
         CHECK(hidden == 18,
-              "#W67-AW I9a 18 identical rungs are hidden; the decline, the reachable rung and the"
-              " kept row are not");
+              "#W67-AW I9a 18 identical rungs are shortened; the decline, the reachable rung and"
+              " the band's largest row keep their own text");
         CHECK(hide.size() == 21 && !hide[0] && !hide[1] && hide[2] && hide[19] && !hide[20],
               "#W67-AW I9a POSITIVE the band is exactly the rows the mana cannot reach in full");
         const string tag = payRepeatCollapseTag(lo, hi, pd);
-        CHECK(tag == " {rows for 2 through 20 counters are collapsed into this one: your mana pays"
-                     " for 1 payment and stops, so every one of them adds the same 1 counter - this"
-                     " row is the largest ask the card offers and stands for all of them}",
-              "#W67-AW I9a POSITIVE the kept row names the band and the reachable maximum");
+        CHECK(tag == " {rows for 2 through 20 counters are all identical in effect right now: your"
+                     " mana pays for 1 payment and stops, so every one of them adds the same 1"
+                     " counter - each of those rows is still on this list and any of them is a"
+                     " legal answer; this row is the largest ask the card offers}",
+              "#W67-AZ R4 POSITIVE the band's clause says the rows are IDENTICAL, never that they"
+              " were removed - every rung is still answerable");
+        CHECK(tag.find("collapsed into this one") == string::npos
+                  && tag.find("stands for all of them") == string::npos,
+              "#W67-AZ R4 MUST-NOT-MATCH the wave-67 wording claimed rows the model could no"
+              " longer answer");
+        //#W67-AZ (R4): and what each other row of the band carries instead of its
+        //~130-byte price and taps description. The row's own engine label, its own
+        //number and its answerability are untouched.
+        const string bandRow = payRepeatBandRowTag(1);
+        CHECK(bandRow == " {identical in effect right now: adds 1 counter}",
+              "#W67-AZ R4 POSITIVE a shortened rung states the one fact that is true of it now");
+        CHECK(payRepeatBandRowTag(3) == " {identical in effect right now: adds 3 counters}"
+                  && payRepeatBandRowTag(0) == " {identical in effect right now: adds 0 counters}"
+                  && payRepeatBandRowTag(-1).empty(),
+              "#W67-AZ R4 the shortened clause pluralises and prints nothing for an unknown count");
+        CHECK(bandRow.size() < 60 && ("add 7 counters" + bandRow).size() < 70,
+              "#W67-AZ R4 the shortened rung is one short line, which is the whole point of it");
+        CHECK(bandRow[0] == ' ' && bandRow[1] == '{'
+                  && bandRow[bandRow.size() - 1] == '}'
+                  && bandRow.find('[') == string::npos
+                  && (int) std::count(bandRow.begin(), bandRow.end(), '{') == 1,
+              "#W67-AZ R4 ECHO the shortened clause opens exactly one brace and closes it");
+        CHECK(stripNarrationDecoration("add 7 counters" + bandRow) == "add 7 counters",
+              "#W67-AZ R4 ECHO the shortened clause is decision-time and never enters history");
         // MUST-NOT-MATCH: a menu whose mana pays every rung in full collapses
         // NOTHING - there is no identical band to collapse.
         {
@@ -71760,9 +72125,38 @@ static const char * kW50Y_r94 =
               == pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "in their hand"
                                         " (a card you have been shown)", true, "", true),
               "#W67-AY I8 NEGATIVE the returnable face is byte-identical to the shipped banner");
-        CHECK(pendingLoopWarningText("Sanguine Bond #1", "Exquisite Blood", "in your graveyard", false)
+        //#W67-AZ (R6, codex review finding 6): a graveyard half keeps the pending
+        //claim only where the seat can actually return it. Wave 67 pinned the
+        //claim on the ZONE alone, which is a fact the board does not establish.
+        CHECK(pendingLoopWarningText("Sanguine Bond #1", "Exquisite Blood", "in your graveyard",
+                                     false, "", true)
                   .find("one resolution from closing") != string::npos,
-              "#W67-AY I8 MUST-NOT-MATCH a graveyard half is recurrable and keeps the pending claim");
+              "#W67-AZ R6 POSITIVE a graveyard half WITH a visible recursion source keeps the"
+              " pending claim");
+        {
+            const string graveNoBack = pendingLoopWarningText("Sanguine Bond #1", "Exquisite Blood",
+                                                              "in your graveyard", false, "",
+                                                              false, false);
+            CHECK(graveNoBack.find("NOT one resolution from closing") != string::npos
+                      && graveNoBack.find("without a recursion effect") != string::npos,
+                  "#W67-AZ R6 REPRO the Sanguine Bond / graveyard Exquisite Blood board with no"
+                  " recursion says what the board establishes");
+            CHECK(graveNoBack.find("A card in exile") == string::npos,
+                  "#W67-AZ R6 MUST-NOT-MATCH the graveyard face does not claim the card is exiled");
+            CHECK(graveNoBack.find("would chain until they are at 0") != string::npos,
+                  "#W67-AZ R6 POSITIVE the consequence is kept, conditionally - nothing deleted");
+        }
+        // The predicate itself, on the engine's own scripts.
+        CHECK(graveyardRecursionScript("moveto(hand)", "creature|myGraveyard")
+                  && graveyardRecursionScript("moveTo(myBattlefield)", "creature|mygraveyard")
+                  && graveyardRecursionScript("may moveto(hand) target(*|mygraveyard)", ""),
+              "#W67-AZ R6 POSITIVE Raise Dead, Zombify and the Eternal Witness ETB shape are"
+              " recursion the seat can see");
+        CHECK(!graveyardRecursionScript("moveto(hand)", "creature|mybattlefield")
+                  && !graveyardRecursionScript("life:2", "")
+                  && !graveyardRecursionScript("target(*|mygraveyard) moveto(exile)", ""),
+              "#W67-AZ R6 MUST-NOT-MATCH a bounce spell, a life gain and a graveyard EXILE effect"
+              " are not a return");
     }
 
     cout << "\n[#W67-AY I9b] the no-op conjunction sees an anaphor, and a reply with no PLAN label\n";
@@ -71886,6 +72280,100 @@ static const char * kW50Y_r94 =
               == narrationShapeKey("- Your Human died (that Human was 7 of 96 copies)")
               && narrationShapeKey("- Your Human died") != narrationShapeKey("- Your Vampire died"),
               "#W67-AY MED the shape key normalises numbers and nothing else");
+    }
+
+    cout << "\n[#W67-AZ] R5 a MAY draw on the stack is optional, and is not reserved for\n";
+    {
+        // Wave 67's reserve folded every pending draw, MayAbility included, and
+        // said the seat "cannot decline" a draw it may decline (an Aven Fisher
+        // "you may draw a card" death trigger). The count and the sentence now
+        // separate the two, and only the undeclinable half is reserved.
+        CHECK(xLibraryReserveCount(1, 2) == 3 && xLibraryReserveCount(2, 0) == 2,
+              "#W67-AZ R5 the reserve is the draw step plus the UNDECLINABLE stack draws");
+        CHECK(xLibraryReserveWhy(1, 2, 0)
+                  == "your next draw step, which you cannot decline, plus the 2 draws already on"
+                     " the stack, which you cannot decline either",
+              "#W67-AZ R5 MUST-NOT-MATCH with no may-draws the sentence is byte-identical to"
+              " wave 67's");
+        CHECK(xLibraryReserveWhy(1, 0, 1)
+                  == "your next draw step, which you cannot decline (up to 1 further draw on the"
+                     " stack you MAY decline is not reserved for)",
+              "#W67-AZ R5 REPRO an unresolved may-draw is named as OPTIONAL and left out of the"
+              " reserve, never counted as one you cannot decline");
+        CHECK(xLibraryReserveWhy(2, 1, 3).find("up to 3 further draws on the stack you MAY"
+                                               " decline are not reserved for") != string::npos,
+              "#W67-AZ R5 the optional term agrees in number and stands beside the mandatory one");
+        CHECK(xLibraryReserveWhy(1, 1, 2).find("cannot decline either") != string::npos
+                  && xLibraryReserveWhy(1, 1, 2).find("MAY decline") != string::npos,
+              "#W67-AZ R5 POSITIVE both kinds are stated when both are on the stack - a silent"
+              " omission is the shape the model confabulates into");
+        // The ceiling reads the reserve, so an optional draw can no longer make a
+        // legal X unaffordable (the direction the F1 header calls the only safe one).
+        CHECK(xLibraryCeilingX(20, 1, 14, xLibraryReserveCount(1, 0)) == 13
+                  && xLibraryCeilingX(20, 1, 14, xLibraryReserveCount(1, 2)) == 11,
+              "#W67-AZ R5 the ceiling still folds the undeclinable draws, and only those");
+    }
+
+    cout << "\n[#W67-AZ] R1 the label-less salvage reads POLARITY before it reads names\n";
+    {
+        // The codex trigger, verbatim: two rows, and a reply that says it is NOT
+        // taking one of them. Wave 67 matched "cast" + "doom blade" in the same
+        // sentence and cast the spell the reply was keeping.
+        std::vector<string> rows;
+        rows.push_back("Cast Doom Blade {1}{b} - legal targets right now: their Rorix Bladewing");
+        rows.push_back("Cast nothing right now (combat comes next this turn)");
+        CHECK(salvageLabelMissingChoice("I will not cast Doom Blade.\nPLAN: Preserve it for later.",
+                                        2, &rows) == -1,
+              "#W67-AZ R1 REPRO a negated sentence is not a decision - the salvage yields nothing"
+              " and the caller re-asks");
+        CHECK(salvageLabelMissingChoice("I don't cast Doom Blade this turn.\nPLAN: hold it.",
+                                        2, &rows) == -1,
+              "#W67-AZ R1 POSITIVE the contracted form negates too");
+        CHECK(salvageLabelMissingChoice("Rather than cast Doom Blade I keep the mana up.\n"
+                                        "PLAN: hold.", 2, &rows) == -1,
+              "#W67-AZ R1 POSITIVE \"rather than\" before the row name negates the mention");
+        CHECK(salvageLabelMissingChoice("I will never cast Doom Blade into open mana.\nPLAN: wait.",
+                                        2, &rows) == -1,
+              "#W67-AZ R1 POSITIVE \"never\" negates it");
+        // MUST-NOT-MATCH: the affirmative salvage #W67-AV shipped is untouched,
+        // and the row whose own NAME carries "nothing" is not self-negated.
+        CHECK(salvageLabelMissingChoice("I cast Doom Blade on Rorix.\nPLAN: trade up.", 2, &rows)
+                  == 1,
+              "#W67-AZ R1 MUST-NOT-MATCH an affirmative sentence still salvages its row");
+        CHECK(salvageLabelMissingChoice("I cast nothing right now.\nPLAN: hold up removal.",
+                                        2, &rows) == 2,
+              "#W67-AZ R1 MUST-NOT-MATCH the \"not\" inside \"nothing\" is not a negation cue");
+        // The predicate itself: word boundaries in both directions.
+        CHECK(sentenceNegatesBefore("i will not cast doom blade", 20)
+                  && sentenceNegatesBefore("i won't cast doom blade", 18)
+                  && sentenceNegatesBefore("instead of doom blade i cast shock", 11),
+              "#W67-AZ R1 POSITIVE the cue set covers the corpus's negation shapes");
+        CHECK(!sentenceNegatesBefore("i cast nothing right now", 7)
+                  && !sentenceNegatesBefore("i cast notion thief", 7)
+                  && !sentenceNegatesBefore("i cast doom blade, not shock", 7),
+              "#W67-AZ R1 MUST-NOT-MATCH a cue INSIDE a word, and a cue standing AFTER the row"
+              " name, negate nothing");
+    }
+
+    cout << "\n[#W67-AZ] R2 a stop that leaves one repetition runs one\n";
+    {
+        // The codex trigger: named 2, stated M 25, stated stop 26 -> allowed 1.
+        // Wave 67 wrote the receipt "ran 1 of them this window" and then passed.
+        CHECK(repeatStopClampCount(2, 26, 25) == 1,
+              "#W67-AZ R2 REPRO the boundary the wave-67 PARSETEST block skipped: allowed == 1");
+        CHECK(!repeatStopExecutesNothing(1) && !repeatStopExecutesNothing(2)
+                  && repeatStopExecutesNothing(0),
+              "#W67-AZ R2 POSITIVE one allowed repetition EXECUTES; only a stop with no room"
+              " passes the window");
+        CHECK(repeatStopClampReceipt(2, 25, 26, 1)
+                  == "You named 2 repeats again after being asked about it, with your own PLAN"
+                     " putting you at 25 and your stop at 26; the engine performed the stop you"
+                     " stated and ran 1 of them this window.",
+              "#W67-AZ R2 POSITIVE the receipt states the number the seam executes");
+        CHECK(repeatStopClampReceipt(34, 66, 26, 0).find("ran 0 of them this window") != string::npos,
+              "#W67-AZ R2 POSITIVE a stop already passed narrates ZERO, and executes zero");
+        CHECK(repeatStopClampReceipt(20, 20, 26, 6).find("ran 6 of them this window") != string::npos,
+              "#W67-AZ R2 MUST-NOT-MATCH the multi-repeat wording is byte-identical to wave 67's");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -1279,12 +1279,19 @@ private:
     //a mana symbol nested inside the reserve clause.
     //Nothing here reaches mPromptTail, the ask key or the async slot key.
     string mReserveDeclineKey;
+    string mReserveDeclineBoard; //#W67-AZ (R3): the full board this decline was given on
     int mReserveDeclineSources;
     int mReserveDeclineTurn;
     int mReserveDeclinePhase;
     int mReserveDeclineWindows; //gameend report field
-    bool reserveDeclineHonoured(const string& castSetKey, int untappedSources);
-    void takeReserveDecline(const string& castSetKey, int untappedSources);
+    int mEngineRevealFloorPicks; //#W67-AZ (R7): gameend report field
+public:
+    void noteEngineRevealFloor(const string& card); //#W67-AZ (R7)
+private:
+    bool reserveDeclineHonoured(const string& castSetKey, int untappedSources,
+                                const string& boardKey); //#W67-AZ (R3)
+    void takeReserveDecline(const string& castSetKey, int untappedSources,
+                            const string& boardKey); //#W67-AZ (R3)
     //#W66-AS (H3 second half): consecutive windows auto-passed inside a proven
     //opponent life LOOP because the oracle says this seat has NO legal action
     //at all. Narrated once, as a receipt, when the run ends.
