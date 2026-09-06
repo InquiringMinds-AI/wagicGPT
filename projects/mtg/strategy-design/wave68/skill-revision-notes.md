@@ -111,3 +111,23 @@ brief (staged wave68/deck<N>/strategy.txt) and the rewrite brief (bin/Res forbid
 Room: prose tightened (prompt-surface inventory, "Read the games", KEEP, section-5 history bullet, combat/
 holds/land/matchups/4.1 wording) and four section-5 anti-pattern bullets that only restated 4.1 rules
 were removed (tags live in 4.1; A14 moved to the cap bullet). No rule removed. v2 = 39,990 bytes.
+
+## Revision 4 — findings adjudicated (Astra round 3, skill-v2-codex-review-r3.md)
+
+Verified against A119 (10743-10761), A153, A222, A284, A69, the rewrite brief 21-27 and the cited v2 lines.
+- #12 CONFIRMED. The fixed floor / fixed stop-look is gone; mulligan is odds reasoning (deck land + colour-source
+  counts, each look priced as a fresh seven shaved by one card), bottoming is a preference ORDER satisfiable at
+  every N, no NEVER-bottom absolutes; consistent with the 2.2 doctrine line. A66/A67 stay as lineage tags only.
+- #13 CONFIRMED. A284's threshold restored in "What earns bytes" and the marker bullet: a derivation is retired only
+  after N/N marked-row takes across two corpora, with the "a miss restores the derivation" prediction.
+- #14 CONFIRMED. A222 restored: bottoming orders validated only by offers/ships/bottoms with the reply-implied order;
+  two or three samples cannot discriminate — report, withhold verdict, UNTESTED-AT-THIS-SEAT.
+- #15 CONFIRMED. 2.2 states thesis -> engine -> rules with the mulligan rule as the FIRST rule under rules (A69's
+  placement reconciled with the brief); 4.4 and checklist 5 say the same; "top of the file" removed.
+- Dropped set re-read in FULL: A117, A132, A167, A208, A217, A223, A230, A231, A240, A260, A262, A263, A276, A295,
+  A297, A298, A299, A300, A312, A327, A329 each carried seat-side method and are restored (new "Counting discipline"
+  and "Predictions" paragraphs in section 3; A297 in the perception classifier; A167 under KEEP). A296 has no
+  seat-side method — an engine-lane rule (a lane that removes a gate ships the legality test the gate enforced);
+  it belongs in lane briefs and is the only amendment now untagged. Tagged: 330 of 331.
+Room: prose only — 4.5 merged into 5, checklist compressed to pointers, illustrative parentheticals and
+section-3/4.x wording tightened; no rule removed. v2 = 39,995 bytes.
