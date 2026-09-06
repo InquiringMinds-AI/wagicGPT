@@ -5,7 +5,7 @@ Repo /home/magi/Projects/wagicGPT, game dir projects/mtg. Use python for translo
 wagic; write only under projects/mtg/strategy-design/wave67/. Never write mechanisms as the
 owner's positions. Report what you did NOT check.
 
-CORPUS (wave 67, binary = master __HASH__ = wave-66 close 8ddf25c89 + wave-67 step 1: lanes AV (the reply rule, from a corpus
+CORPUS (wave 67, binary = master 14977f3af = wave-66 close 8ddf25c89 + wave-67 step 1: lanes AV (the reply rule, from a corpus
 measurement table in lane-AV.md: FIRST-WINS KEPT — the before-PLAN anchor tied 4/9 and only 75% of replies carry a
 line-leading PLAN; shipped: the label scanner skips a heading word + colon (`ANSWER:`, `So`, `CORRECTION:`, `The answer is`,
 `Therefore,`) at every seam; a complete reply with a PLAN and no coded line is salvaged by an exact single-row name match on
@@ -26,7 +26,7 @@ stop `repeat_clamped_to_own_stop` (AZ R2: allowed==1 boundary) and the `{right n
 reads a persisted `mStatedStop` so it survives refusals; I8 `Your graveyard (N cards): ...` beside the battlefield (feeds
 boardKey), `Their graveyard` when non-empty; an EXILED loop half reads BROKEN (AZ R6: a graveyard half needs visible
 recursion); I9b `planArguesAgainstRow` sees anaphora ("this does nothing") and unlabeled plans; exemplar avoids half-dead
-rows; 208-line death batches bucketed at render), and AZ (the Codex review: __AZ_SUMMARY__); read wave67/known-bugs.md,
+rows; 208-line death batches bucketed at render), and AZ (the Codex review: all 7 confirmed + fixed — salvage refuses a negated sentence (`sentenceNegatesBefore`); the own-stop clamp's allowed==1 executes one; the reservation-decline latch is keyed on the FULL board key (serializeGameState) — at 162v130 s16-19 the board DID move, so the corpus pairs would not latch; every repeat-pay rung stays on the printed list, only descriptions collapse; may-draws excluded from the library reserve as 'up to'; a graveyard loop half is returnable only with a visible recursion source; the reveal degrade uses the heuristic's cost-dominant pick and the AllAbilities floor records `engine_reveal_floor_picks`); read wave67/known-bugs.md,
 wave67/lane-{AV,AW,AX,AY,AZ}.md and wave67/codex-review.md for what changed and each lane's falsifiable predictions.
 Lane-flagged questions for the engine seat: (1) `unparsed_reply` count (wave 66: 83; AV predicts < 5) and the shapes of
 any that remain — especially `So PUT:` at the discard seam which AV did NOT wire; (2) answer-first share and overrun bytes
