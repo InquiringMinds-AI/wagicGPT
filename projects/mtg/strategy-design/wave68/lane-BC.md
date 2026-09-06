@@ -91,8 +91,8 @@ LIBRARY cards and a HAND card** as pickable ward targets, labelled as the ward c
 | `unsupported.txt` | 0 | 0 |
 | **total** | **85** | **85** |
 
-The five `_macros.txt` lines are the shared choke point: **107** cards in the pool expand a `_WARDn_`
-macro, so the macro fix reaches all of them without touching their card blocks. The 80 in-card
+The five `_macros.txt` lines are the shared choke point: **116** card lines in the pool expand a `_WARDn_`
+macro (114 borderline, 1 mtg, 1 planeswalkers), so the macro fix reaches all of them without touching their card blocks. The 80 in-card
 lines are the hand-written wards (life wards, experience/power-scaled ward ladders, the
 "ward—sacrifice a permanent" and "ward—discard a card" shapes whose rider is a nested
 `choice name(Counter spell) target(*|mystack) fizzle` rather than `donothing?fizzle` — 6 of those,
