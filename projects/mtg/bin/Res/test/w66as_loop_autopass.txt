@@ -1,0 +1,25 @@
+#W66-AS (H3, second half; deck130 HIGH-2). The auto-pass gate, on a real board.
+#`130v126` seqs 37-55 put ONE casting window to the model NINETEEN times while
+#the opponent's Sanguine Bond + Exquisite Blood chain drained the seat 19 -> 1.
+#Where the seat has NO legal action at all the only legal answer is a pass, and
+#the engine now gives it without a round trip. This pins BOTH inputs of that
+#gate against the engine's own oracles: player 1 faces a proven-closed loop and
+#can do nothing (auto-pass), player 2 holds the loop and faces none (never).
+[INIT]
+firstmain
+[PLAYER1]
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[DO]
+assertloopautopass 1 1
+assertloopautopass 0 2
+[ASSERT]
+firstmain
+[PLAYER1]
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[END]

@@ -14269,7 +14269,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -23343,12 +23343,48 @@ static string holdRowBenefitClause()
                   " taken in your first main phase also covers your second main"
                   " phase while these rows do not change; so is a row that"
                   " differs only by a bracket saying it cannot reach a spell on"
-                  " the stack}");
+                  " the stack; and so is a row that differs only by a NUMBER"
+                  " inside its brackets or braces, because a price or a life"
+                  " total moving with the board does not make it a different"
+                  " row - any WORD that changes, such as a row that begins"
+                  " saying it kills you, still re-opens this window}");
 }
 
 static string holdRowLine()
 {
     return string(kHoldPriorityRowText) + holdRowBenefitClause();
+}
+
+//#W66-AS (deck123 MED): the casting menu HAS NO ROW 0 and the priority menu
+//does, and nothing said so. `123v162` seq 45 answered `CHOICE: 0 (pass)` on a
+//casting menu whose decline was the numbered "Cast nothing right now" row -
+//the reply was correct about its INTENT and wrong about this menu's grammar,
+//and it cost the corpus's only `no_pass_reask`. The re-ask that repairs it
+//already says the sentence; saying it BEFORE the answer costs one line and
+//no round trip. Constant text: nothing here can move between two rebuilds of
+//a window, so it is safe in the question (wave61/corpus-livelock.md).
+static const char * kCastNoRowZeroFact =
+    "\nThis menu has no row 0: to decline, take the numbered \"Cast nothing right now\""
+    " row on the list below. (A priority menu does have a row 0; this one does not.)";
+
+//#W66-AS (H3 second half; deck130 HIGH-2): `130v126` seqs 37-55 put ONE
+//two-row casting menu to the model NINETEEN times while the opponent's proven
+//life LOOP drained the seat 19 -> 1, one window per link, every one answered
+//"Cast nothing" or "Hold". The window is legally owed - the seat held an
+//instant-speed row throughout - so no window is removed here; what was missing
+//is the fact that makes ONE answer serve all of them. PROMPT-ONLY, spliced
+//into the same channel as the declined count and the hold check, so it can
+//never enter the ask key or the async slot key. Constant text, no numbers.
+static string loopChainingNote(bool oppLoopProven, bool holdRowOffered)
+{
+    if (!oppLoopProven || !holdRowOffered)
+        return "";
+    return string("\n[LOOP RUNNING: both halves of the opponent's life LOOP are on the"
+                  " battlefield and the chain is live, so this same question is put to"
+                  " you again for every link of it, with only its numbers moved. Nothing"
+                  " on this list stops the chain. If your answer would be the same for"
+                  " every link, the HOLD row answers all of them at once; a row that"
+                  " changes in WORDS, or a row that is new, still re-opens the question.]");
 }
 
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
@@ -23471,6 +23507,89 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
 //`holdStillStands` and by nothing else, and `optionSetKeyLine` (the
 //decline/deadlock key) already drops every bracket through
 //`stripRenderAnnotationsLc`, so no ask key and no async slot key changes here.
+//#W66-AS (H7, deck152 HIGH-3; deck123 MED; deck125 MED). THE THIRD DIFFERENCE
+//THE LATCH FORGIVES - and the one that broke every hold in the wave-65 corpus:
+//the NUMBERS INSIDE an annotation. `152v162`'s loss game ran NINE no-op windows
+//inside one draw step (334 s) over a single Clue row whose only delta between
+//windows was its DRAW PRICE projection ("you would be at 4" -> "at 3" -> "at 2"
+//...); `130v126` seqs 37-55 billed NINETEEN windows on one Spark Spray row
+//whose only delta was "at life 17 leaves them at 16" -> "at life 18 leaves them
+//at 17" while the seat died 19 -> 1, and the model TOOK the hold row four times
+//inside that run (s36, s41, s43, s53) and was asked again every time.
+//Those numbers are PROJECTIONS OF THE BOARD, not the row's content: the row
+//offers the same card, at the same cost, against the same objects. What is NOT
+//forgiven is any WORD of the row or of its verdict - the same run's
+//"; this KILLS you" arriving at the zero crossing (`152v162` s44 -> s45) is a
+//real change and still re-opens the window. That is the line between forgiving
+//drift and the blind cache this latch must never become, and the row says so.
+//Digits are normalised ONLY inside a [...] or {...} annotation, never in the
+//row's own text; an instance ordinal (#2) and a mana cost ({2}) keep theirs,
+//because those name WHICH card and WHAT it costs. Shared choke point checked:
+//holdKeyRow is read by takeHold and holdStillStands and by nothing else -
+//the option-set key (declines/deadlock) drops every bracket already, the ask
+//key and the async slot key are built from the prompt text, not from this.
+static bool holdKeyManaCostBraceAt(const string& s, size_t open)
+{
+    const size_t close = s.find('}', open);
+    if (close == string::npos || close <= open + 1 || close - open - 1 > 4)
+        return false;
+    for (size_t i = open + 1; i < close; i++)
+    {
+        const char c = (char) tolower((unsigned char) s[i]);
+        if (!isdigit((unsigned char) c) && !strchr("wubrgcxyzst/p", c))
+            return false;
+    }
+    return true;
+}
+
+static string holdKeyNumbersNormalised(const string& row)
+{
+    string out;
+    int depth = 0; //inside a [...] or {...} annotation
+    size_t i = 0;
+    while (i < row.size())
+    {
+        const char c = row[i];
+        if (c == '{' && holdKeyManaCostBraceAt(row, i))
+        {
+            const size_t close = row.find('}', i);
+            out.append(row, i, close - i + 1); //a cost keeps its digits
+            i = close + 1;
+            continue;
+        }
+        if (c == '[' || c == '{')
+        {
+            depth++;
+            out += c;
+            i++;
+            continue;
+        }
+        if ((c == ']' || c == '}') && depth > 0)
+        {
+            depth--;
+            out += c;
+            i++;
+            continue;
+        }
+        if (depth > 0 && isdigit((unsigned char) c))
+        {
+            const bool ordinal = (i > 0 && row[i - 1] == '#'); //#2 names a card
+            size_t e = i;
+            while (e < row.size() && isdigit((unsigned char) row[e]))
+                e++;
+            if (ordinal)
+                out.append(row, i, e - i);
+            else
+                out += '#';
+            i = e;
+            continue;
+        }
+        out += c;
+        i++;
+    }
+    return out;
+}
+
 static string holdKeyRow(const string& row)
 {
     static const char * kCombatNextClause = " (combat comes next this turn)";
@@ -23483,7 +23602,7 @@ static string holdKeyRow(const string& row)
     const size_t t = core.find(kStackTargetClause); //#W64-AJ
     if (t != string::npos)
         core.erase(t, strlen(kStackTargetClause));
-    return core;
+    return holdKeyNumbersNormalised(core); //#W66-AS (H7)
 }
 
 static bool holdStillStands(const std::set<string>& heldRows,
@@ -23713,6 +23832,60 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
                << " windows are held until one of these rows changes"); //#W61-U (C14)
 }
 
+//#W66-AS (H3, second half; deck130 HIGH-2). A window with NO legal answer is
+//not a decision. Inside a proven-closed opponent life LOOP the engine re-puts
+//the same window once per link - `130v126` seqs 37-55 is nineteen of them - and
+//where the oracle says this seat can do NOTHING AT ALL (hasAnyLegalAction is
+//the engine's own phase-aware predicate: no cast, no activation, no land drop,
+//at this phase and this speed) the only legal answer is a pass. Asking a model
+//to choose between one row and itself is not "not constraining its choice"; it
+//is a round trip for a decision the rules have already made. Nothing is removed
+//from a window that HAS a legal row - a seat holding an instant-speed answer is
+//still asked, every link, and the LOOP RUNNING note tells it the hold row can
+//close the run. Fail CLOSED: any doubt (no observer, no opponent, any legal
+//action at all, no proven loop) and the ask goes out as before.
+bool AIPlayerGPT::loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction)
+{
+    return oppLoopProven && !anyLegalAction;
+}
+
+bool AIPlayerGPT::loopAutoPassFor(Player * p)
+{
+    if (!p || !p->opponent())
+        return false;
+    //the cheap board read first: hasAnyLegalAction walks the action layer, and
+    //this runs on every AI tick.
+    if (!lifeLoopProvenWin(p->opponent()))
+        return false;
+    return loopAutoPassApplies(true, LegalActionsOracle::hasAnyLegalAction(p));
+}
+
+bool AIPlayerGPT::loopAutoPassWindow()
+{
+    if (loopAutoPassFor(this))
+    {
+        mLoopAutoPassRun++;
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: their life LOOP is chaining and this"
+                   " seat has no legal action - passing without an ask ("
+                   << mLoopAutoPassRun << " in a row)");
+        return true;
+    }
+    //The receipt, once, on the first window that IS a decision again: the
+    //narration is append-only and the model is owed what happened while it was
+    //not asked (arrival-tracing, not a counter - the number is the count of
+    //windows the engine answered on its behalf).
+    if (mLoopAutoPassRun > 0)
+    {
+        std::ostringstream n;
+        n << "Their life LOOP ran " << mLoopAutoPassRun << (mLoopAutoPassRun == 1 ? " link" : " links")
+          << " while you had no legal action; the engine passed each one for you.";
+        narrateDecision(n.str());
+        writeTransLog("defer", "", "", -1, 0, "", "loop_autopass");
+        mLoopAutoPassRun = 0;
+    }
+    return false;
+}
+
 //#W53-N (D12a): the carried plan's age. mTransSeq is the seq the record now
 //being assembled will carry, and mPlanSetSeq is the seq of the record whose
 //reply wrote the plan, so the difference is the number of decision windows
@@ -23865,6 +24038,84 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
       << "; a count on this row REQUIRES a PLAN line stating your stop count, the count"
          " you are at now, and how many you perform this window - a count with no PLAN"
          " line is refused and re-asked]";
+    return o.str();
+}
+
+//#W66-AS (H3, deck123 HIGH-1/2; deck130 HIGH-2; deck162 HIGH-1): the repeat row
+//was the ONLY row family printing no `{right now:}` verdict, and it is the one
+//row whose own contract already DEMANDS the numbers a verdict needs - a PLAN
+//naming the stop count, the count now and this window's count. 162v123 shows
+//what happens when nothing reads them back: "stop=20" written in the PLAN and
+//x33 / x10 / x21 / x20 / x47 / x30 / x200 taken in 10 of 13 windows, 266
+//creatures against an opponent on 15, 92% of that game's decisions. These read
+//the two numbers out of the PLAN in every spelling the corpus wrote them
+//("stop=20", "stop 24", "stop: 18"; "M=68", "M 24 now", "M is 111 now",
+//"M (41)"). Pure over the reply text, so PARSETEST pins every spelling and the
+//negatives that must stay countless.
+static int repeatPlanScanNumber(const string& plan, const char * label)
+{
+    string low;
+    for (size_t i = 0; i < plan.size(); i++)
+        low += (char) tolower((unsigned char) plan[i]);
+    const size_t n = strlen(label);
+    size_t at = 0;
+    while ((at = low.find(label, at)) != string::npos)
+    {
+        const size_t after = at + n;
+        const bool boundedBefore = (at == 0 || !isalnum((unsigned char) low[at - 1]));
+        const bool boundedAfter = (after >= low.size() || !isalnum((unsigned char) low[after]));
+        at = after;
+        if (!boundedBefore || !boundedAfter)
+            continue; //"stopped", "master": the label is part of a word
+        size_t d = after;
+        while (d < low.size() && (low[d] == ' ' || low[d] == '=' || low[d] == ':' || low[d] == '('))
+            d++;
+        if (d + 2 < low.size() && low.compare(d, 3, "is ") == 0)
+        {
+            d += 3;
+            while (d < low.size() && low[d] == ' ')
+                d++;
+        }
+        if (d < low.size() && isdigit((unsigned char) low[d]))
+        {
+            int v = 0;
+            while (d < low.size() && isdigit((unsigned char) low[d]) && v < 1000000)
+                v = v * 10 + (low[d++] - '0');
+            return v;
+        }
+    }
+    return -1;
+}
+
+//The pilot's own stop, and the count it says it is at. Both or nothing: a
+//half-stated plan is not a stop the engine may hold anyone to.
+static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * currentOut)
+{
+    const int s = repeatPlanScanNumber(plan, "stop");
+    const int m = repeatPlanScanNumber(plan, "m");
+    if (stopOut) *stopOut = s;
+    if (currentOut) *currentOut = m;
+    return s >= 0 && m >= 0;
+}
+
+//#W66-AS (H3): the row's verdict, in the `{...}` form every other priced row
+//uses - so stripRenderAnnotationsLc keeps it out of the option-set key, exactly
+//like the cleanup price and the kills-census. Both numbers are facts of THIS
+//window (the engine's own creature count, and the stop the pilot last stated in
+//its carried PLAN); neither is a running total of asks, so two rebuilds of one
+//window render the same bytes - the wave-61 livelock rule, kept.
+static string repeatRowStopClause(int creatureCount, int statedStop)
+{
+    if (creatureCount < 0 || statedStop < 0)
+        return ""; //nothing stated, or not a token maker: no verdict is owed
+    std::ostringstream o;
+    o << " {right now: M=" << creatureCount << ", your stated stop=" << statedStop << ", ";
+    if (creatureCount >= statedStop)
+        o << "so this window would add to a count ALREADY AT OR PAST your own stop"
+             " - past your stop = a wasted window}";
+    else
+        o << "so this window has " << (statedStop - creatureCount)
+          << " to add before it reaches your own stop - past your stop = a wasted window}";
     return o.str();
 }
 
@@ -28309,7 +28560,17 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //named row stays the answer of last resort (D9/D2a), but the
             //disagreement now earns the SAME one re-ask #W52-J D6 gives the
             //ambiguous shape, before anything executes.
-            appendParseNote(noteOut, "index_name_conflict");
+            //#W66-AS (deck123 MED): ...but NOT when the named row is UNIQUE on
+            //this menu, which the HOLD row is by construction (holdRowIndexOf
+            //finds the one row carrying its reserved text). A unique name IS an
+            //answer: it names exactly one row and the engine can take no other.
+            //All THREE `index_name_conflict` re-asks in the wave-65 corpus were
+            //this shape (`123v162` seqs 29, 68, 111, every one `CHOICE: 2 (Hold
+            //priority)` over a three-row menu) and all three recovered to the
+            //hold row - three full round trips to be told again what the reply
+            //had already said unambiguously. The divergence is still STAMPED, so
+            //it is not the silent name-wins of wave 64; only the round trip goes.
+            appendParseNote(noteOut, "index_name_unique_name");
         }
         return holdRowIdx + 1;
     }
@@ -28334,7 +28595,11 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         if (firstNum != 0)
         {
             appendParseNote(noteOut, "pass_row_named");
-            appendParseNote(noteOut, "index_name_conflict"); //#W65-AO (G8)
+            //#W66-AS (deck123 MED): row 0's own reserved label is unique too -
+            //stamped, resolved, not re-asked. The genuinely ambiguous shape (the
+            //index names the HOLD row while the echo names row 0) keeps the
+            //conflict stamp and the re-ask, one branch above.
+            appendParseNote(noteOut, "index_name_unique_name");
         }
         return 0;
     }
@@ -29684,6 +29949,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //base action; only the rendered line and the plan differ.
     vector<int> repeatBaseRow;
     repeatBaseRow.assign(shown.size(), -1);
+    //#W66-AS (H3): the stop the pilot last stated, read back onto the row that
+    //asks for it. From the CARRIED plan (mCurrentPlan), which is the only plan
+    //text the prompt carries forward, so the row cannot state a stop the model
+    //cannot see one line above it.
+    int carriedStop = -1;
+    repeatPlanStopAndCurrent(mCurrentPlan, &carriedStop, NULL);
     for (int rb = 0; rb < baseIndex; rb++)
     {
         if (isManaOnlyAction(shown[rb]->ability))
@@ -29697,7 +29968,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (rsrc && rsrc->controller())
                 creatureCount = creatureCountOnBattlefield(rsrc->controller());
         }
-        string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1, creatureCount);
+        string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1, creatureCount)
+                       + repeatRowStopClause(creatureCount, carriedStop); //#W66-AS (H3)
         index++;
         shown.push_back(shown[rb]);
         shownLines.push_back(rline);
@@ -29945,6 +30217,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mLastChoice = 0; //a hold is a pass for this window
         return NULL;
     }
+    //#W66-AS (H3 second half): the same unwind, for a window with no legal row.
+    if (loopAutoPassWindow())
+    {
+        mLastChoice = 0;
+        return NULL;
+    }
     //#W49-S (D8/D3): the one re-ask for this board state. Appending the
     //correction makes this a DIFFERENT question (its own askKey, a fresh
     //call); the board moving on retires it. It is deliberately NOT cleared on
@@ -29965,7 +30243,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
     string userTail = tailStr;
-    const string promptNotes = declinedNote + holdNote; //#W61-U (C14): same channel
+    const string promptNotes = declinedNote + holdNote //#W61-U (C14): same channel
+        + loopChainingNote(lifeLoopProvenWin(opponent()), holdRow > 0); //#W66-AS (H3)
     if (!promptNotes.empty() && optionsEnd <= userTail.size())
         userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
@@ -30177,6 +30456,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
+        //#W66-AS (H3, deck162 HIGH-1): the PLAN the row demands, READ BACK. A
+        //count taken over a plan whose own numbers say the stop is already
+        //reached is refused exactly as a count with no plan is - ONE re-ask,
+        //on the model's own stated stop, quoting both numbers. This is not a
+        //cap: no count is clamped, no row is withheld, and the second answer
+        //executes as given whatever it is (the exhausted stamp below). 162v123
+        //wrote "stop=20" and then took x33 at M=68, x47 at M=153 and x200 at
+        //M=230 - ten windows, each a full round trip, each past a stop the
+        //reply itself restated in the same breath.
+        int planStop = -1, planCurrent = -1;
+        const bool repeatPastStop =
+            repeatRowTaken && namedCount >= 1 && replyHasPlanLine(content)
+            && repeatPlanStopAndCurrent(content, &planStop, &planCurrent)
+            && planStop - planCurrent <= 0;
         //#W52-J (D6): number and name point at different rows and the name is
         //not unique on the menu (echo_index_conflict_ambiguous) -> one re-ask
         //quoting both, instead of executing the index.
@@ -30194,7 +30487,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //the record written here carries the reply that earned the re-ask.
         if (!content.empty() && mPriorityReaskBoard != boardKey
             && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict
-                || planMissing || indexNameConflict))
+                || planMissing || repeatPastStop || indexNameConflict)) //#W66-AS (H3)
         {
             std::ostringstream corr;
             const char * fb;
@@ -30244,6 +30537,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "plan_missing";
                 mPriorityReaskKind = "plan_missing";
             }
+            else if (repeatPastStop) //#W66-AS (H3)
+            {
+                corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
+                     << quotedChoiceLine << "\") but your own PLAN puts you at " << planCurrent
+                     << " with your stop at " << planStop
+                     << ", so every repeat in this window is past the stop you set. Answer again:"
+                        " 0 (pass) to stop here, or the repeat row with the stop you actually"
+                        " intend and a count that does not pass it.";
+                fb = "repeat_past_stop";
+                mPriorityReaskKind = "repeat_past_stop";
+            }
             else
             {
                 corr << "[RE-ASK] You chose the repeat row but named no count. Answer again with"
@@ -30260,6 +30564,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                       : indexNameConflict ? "the number and the name disagree - asking again"
                       : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
+                      : repeatPastStop ? "the repeat row was taken past its own stop - asking again" //#W66-AS (H3)
                                     : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
@@ -30281,6 +30586,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
                 appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
                                                              : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
+            else if (mPriorityReaskKind == "repeat_past_stop") //#W66-AS (H3): executes as given either way
+                appendParseNote(&mLastParseNote, repeatPastStop ? "repeat_past_stop_exhausted"
+                                                                : (choice >= 0 ? "repeat_past_stop_recovered" : "repeat_past_stop_unanswered"));
             else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
                 appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                    : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
@@ -32731,6 +33039,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //before the decline and hold rows join the list, since neither is a
         //cast and neither carries a board verdict.
         const string deadMenuNote = allCastRowsDeadNote(everyCastRowDead(menu), (int) menu.size());
+        int declineRowIdx = -1; //#W66-AS (H7 second half): the decline's own row number
         //#W65-AL (G9, deck125 HIGH-1): and its PRICE, where it has one. The
         //cleanup step this clause prices is THIS turn's, so the clause is
         //stated only on the seat's own turn; on the opponent's turn the seat's
@@ -32747,7 +33056,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             declineRow += passRowCleanupPriceTag(observer->currentPlayer == this,
                                                  cuHand, cuLimit, cuPer, cuPunishers,
                                                  life, cuStacked);
-            menu.push_back(declineRow); //the decline goes LAST
+            declineRowIdx = (int) menu.size();
+            menu.push_back(declineRow); //the decline goes LAST among the cast rows
         }
         //#W53-N (D2, second half) + #W55-A (D2a/D19): the declined-list count,
         //keyed on the OPTION SET and taken BEFORE the HOLD row is appended (the
@@ -32772,8 +33082,30 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W55-A (D4): and on the seat's OWN turn, for the reason the priority
         //seam carries - an own-turn run of byte-identical windows had no row to
         //close it. #W55-A (D21): the row states what taking it saves.
-        int holdRow = (int) menu.size();
-        menu.push_back(holdRowLine());
+        //#W66-AS (H7 second half; deck123 MED, deck125 MED): WHICH DECLINE IS
+        //THE DEFAULT. The two decline rows are not equivalent - the plain
+        //decline closes one window, the hold closes the run - and the corpus
+        //answered with the first one it read: 182 plain declines to 4 holds on
+        //deck123, 213 to 29 on deck125, while the same seats sat through runs
+        //of byte-identical windows. Where the seat holds an instant-speed
+        //answer the engine WILL put this question again, so the hold is the
+        //decline that fits the window and it is listed first. Nothing is
+        //removed and nothing is renumbered away: both rows are on the menu,
+        //the decline is still the last row, and every consumer below reads the
+        //index this block just assigned rather than a position it assumed.
+        const bool holdFirstDecline = LegalActionsOracle::hasInstantResponse(this);
+        int holdRow;
+        if (holdFirstDecline && declineRowIdx >= 0)
+        {
+            holdRow = declineRowIdx;
+            menu.insert(menu.begin() + declineRowIdx, holdRowLine());
+            declineRowIdx++;
+        }
+        else
+        {
+            holdRow = (int) menu.size();
+            menu.push_back(holdRowLine());
+        }
         //#W61-U (C14): the hold's own re-open rule for THIS menu, measured over
         //the rows the latch reads and BEFORE the latch consumes the window (a
         //held window still updates the memory). Only attempt 0 measures: a
@@ -32781,8 +33113,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (attempt == 0)
             mCastHoldNote = holdReopenNote("cast", menu);
         mNextAskPromptNote += mCastHoldNote;
+        //#W66-AS (H3 second half): prompt-only, same channel, never in a key.
+        mNextAskPromptNote += loopChainingNote(lifeLoopProvenWin(opponent()), holdRow >= 0);
         //The model's own hold, honoured: no model call, no row withheld.
         if (attempt == 0 && holdHonoured("cast", menu))
+            return NULL;
+        if (attempt == 0 && loopAutoPassWindow()) //#W66-AS (H3 second half)
             return NULL;
 
         std::ostringstream q;
@@ -32790,6 +33126,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
           << (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn")
           << "): which card do you cast now, if any?";
         q << deadMenuNote; //#W57-C (D12)
+        q << kCastNoRowZeroFact; //#W66-AS (deck123 MED)
         if (attempt > 0)
             q << "\n[RE-ASK " << attempt << "] The engine could not actually complete: "
               << rejectedSoFar << " - its cost or its targets cannot be satisfied right"
@@ -32815,7 +33152,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //windows. Nothing is deleted: the engine still re-puts the question and
         //the model still sees every window it is actually asked; only the
         //number now describes what it says it describes.
-        if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
+        if (pick == declineRowIdx) //#W66-AS: "cast nothing", wherever it now sits
         {
             DebugTrace("AIPlayerGPT: chose to cast nothing");
             if (!mAskAnswerReserved)
@@ -54555,12 +54892,22 @@ static const char * kW50Y_r94 =
               && holdStillStands(held, rowsA, &why),
               "#W56-A D1 a phase step, a life tick and an ALTERNATING STACK TOP no longer re-open a hold when no printed row moved (123v126 s75-s87)");
         // a printed PRICE moving IS a re-opener - the row is a question the
-        // model has not been asked.
+        // model has not been asked. #W66-AS (H7): AMENDED, and the amendment is
+        // the wave-66 item. A price that moved only in its DIGITS is a
+        // projection of the board, not a new row (152v162 s42-s49 broke nine
+        // holds on nothing else), so that half is now forgiven; every WORD of
+        // the row and of its verdict is still compared byte for byte, and that
+        // is what this case pins on each side.
+        vector<string> countMoved(rowsA);
+        countMoved[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 3, their choice}";
+        CHECK(holdStillStands(held, countMoved, &why),
+              "#W66-AS H7 a {right now:} count moving with the board no longer re-opens the window");
         vector<string> priced(rowsA);
-        priced[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 3, their choice}";
+        priced[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 2, their choice"
+                    " - and the ONLY one they can spare is the Keeper}";
         CHECK(!holdStillStands(held, priced, &why)
               && string(why) == "a printed row changed or is newly available",
-              "#W56-A D1 a {right now:} price change re-opens the window, and says so");
+              "#W56-A D1 a {right now:} price change in WORDS re-opens the window, and says so");
         // must-NOT-match: the DECLINED-list key still collapses that same pair
         // (wave-55 D2a is untouched); the hold key must not.
         CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(priced),
@@ -56494,9 +56841,14 @@ static const char * kW50Y_r94 =
             const char * why = "x";
             CHECK(holdStillStands(held, at26, &why) && string(why).empty(),
                   "#W56-A D1 the same printed menu keeps the hold");
-            CHECK(!holdStillStands(held, at25, &why)
-                  && string(why) == "a printed row changed or is newly available",
-                  "#W56-A D1 a row repriced by the ticking life total re-opens the window - the model has not been asked THIS screen");
+            //#W66-AS (H7): AMENDED. Wave 56 made the two keys diverge on this
+            //very repro and wave 66's corpus priced the divergence: the same
+            //ticking life total broke 19 casting windows on 130v126 (seqs
+            //37-55) and 9 priority windows on 152v162, with the model taking
+            //the hold row inside both runs. The two keys now AGREE here - a
+            //digit is not a row - and every word of the row still separates them.
+            CHECK(holdStillStands(held, at25, &why) && string(why).empty(),
+                  "#W66-AS H7 a row repriced only by the ticking life total keeps the hold (130v126 s37-s55)");
             vector<string> loopGrown(at26);
             loopGrown.push_back("Cast Tribute to Hunger {1}{b}");
             CHECK(!holdStillStands(held, loopGrown, &why),
@@ -56518,7 +56870,11 @@ static const char * kW50Y_r94 =
                  " same row, so a hold taken in your first main phase also covers your"
                  " second main phase while these rows do not change; so is a"
                  " row that differs only by a bracket saying it cannot reach a"
-                 " spell on the stack}",
+                 " spell on the stack; and so is a row that differs only by a"
+                 " NUMBER inside its brackets or braces, because a price or a"
+                 " life total moving with the board does not make it a different"
+                 " row - any WORD that changes, such as a row that begins saying"
+                 " it kills you, still re-opens this window}", //#W66-AS (H7)
               "#W61-U C14 the benefit clause's literal - the saving the latch now delivers");
         CHECK(holdRowBenefitClause().find("every later window whose rows are identical to these}")
               == string::npos,
@@ -57362,7 +57718,13 @@ static const char * kW50Y_r94 =
                                  " taken in your first main phase also covers your second"
                                  " main phase while these rows do not change; so is"
                                  " a row that differs only by a bracket saying it"
-                                 " cannot reach a spell on the stack}", //#W63-AF (R2) + #W64-AJ
+                                 " cannot reach a spell on the stack; and so is a"
+                                 " row that differs only by a NUMBER inside its"
+                                 " brackets or braces, because a price or a life"
+                                 " total moving with the board does not make it a"
+                                 " different row - any WORD that changes, such as a"
+                                 " row that begins saying it kills you, still"
+                                 " re-opens this window}", //#W63-AF (R2) + #W64-AJ + #W66-AS (H7)
               "#W57-A D4 the rendered HOLD row carries its benefit tail, and that is what a take must record");
         // the last-offer and upkeep-animation clauses are on the rendered row too
         {
@@ -63756,10 +64118,18 @@ static const char * kW50Y_r94 =
         // MUST-NOT-MATCH: everything else still retires the hold, byte for byte.
         {
             vector<string> repriced = main2;
-            repriced[0] = "Cast Molten Rain {1}{r}{r} {leaves 2 of your 4 untapped}";
+            //#W66-AS (H7): the reprice that re-opens it is now a WORD one - a
+            //bare count moving inside the brace is the forgiven half, pinned
+            //directly below so both sides of the new line are on the record.
+            repriced[0] = "Cast Molten Rain {1}{r}{r} {leaves 2 of your 4 untapped - and taps out"
+                          " the only source that could answer the Keeper}";
             CHECK(!holdStillStands(held, repriced, &why)
                   && string(why) == "a printed row changed or is newly available",
                   "#W63-AD E10 MUST-NOT-MATCH a repriced row still re-opens the window");
+            vector<string> countOnly = main2;
+            countOnly[0] = "Cast Molten Rain {1}{r}{r} {leaves 2 of your 5 untapped}";
+            CHECK(holdStillStands(held, countOnly, &why),
+                  "#W66-AS H7 ...while the same row with one DIGIT moved keeps the hold");
             vector<string> grown = main2;
             grown.push_back("Cast Sorin, Lord of Innistrad {2}{w}{b}");
             CHECK(!holdStillStands(held, grown, &why),
@@ -63776,8 +64146,16 @@ static const char * kW50Y_r94 =
                   "#W63-AD E10 MUST-NOT-MATCH only the ONE shipped phase clause is forgiven");
         }
         // The normaliser touches nothing else: no price, no bracket, no name.
-        CHECK(holdKeyRow("Cast X {2}{r} [a note] {leaves 1}") == "Cast X {2}{r} [a note] {leaves 1}",
-              "#W63-AD E10 MUST-NOT-MATCH the hold key is NOT stripAnnotations: prices stay in it");
+        //#W66-AS (H7): the annotations THEMSELVES stay in the key - every word of
+        //them - which is what separates this from stripAnnotations; only the
+        //digits inside them normalise, and the row's own cost keeps its digits.
+        CHECK(holdKeyRow("Cast X {2}{r} [a note] {leaves 1}") == "Cast X {2}{r} [a note] {leaves #}"
+              && holdKeyRow("Cast X {2}{r} [a note] {leaves 1}")
+                 != holdKeyRow("Cast X {2}{r} [another note] {leaves 1}")
+              && holdKeyRow("Cast X {2}{r} [a note] {leaves 1}")
+                 != holdKeyRow("Cast X {3}{r} [a note] {leaves 1}"),
+              "#W63-AD E10 MUST-NOT-MATCH the hold key is NOT stripAnnotations: every WORD of an"
+              " annotation, and every mana cost, stays in it");
         CHECK(holdKeyRow("Cast nothing right now (combat comes next this turn)")
               == "Cast nothing right now",
               "#W63-AD E10 the one clause the key forgives, and only where it appears");
@@ -65736,8 +66114,14 @@ static const char * kW50Y_r94 =
         string note57;
         bool st57 = false;
         const int k57 = parseChoice("0 (Hold priority)", 4, &rows57, &st57, NULL, &note57, true);
-        CHECK(k57 == 4 && note57.find("index_name_conflict") != string::npos,
-              "#W65-AO G8 130v162 s57 a coded 0 naming the HOLD row is stamped a number/name conflict");
+        //#W66-AS (deck123 MED): AMENDED. The conflict is still STAMPED (wave 64's
+        //silent name-wins does not come back) but it no longer buys a round trip
+        //when the named row is UNIQUE on the menu, which the reserved HOLD row
+        //always is. All three of the wave-65 corpus's re-asks of this shape
+        //(123v162 s29/s68/s111) recovered to the row the reply had already named.
+        CHECK(k57 == 4 && note57.find("index_name_unique_name") != string::npos
+              && note57.find("index_name_conflict") == string::npos,
+              "#W66-AS 130v162 s57 a coded 0 naming the HOLD row is stamped, resolved, not re-asked");
         string note57b;
         const int k57b = parseChoice("4 (Hold priority)", 4, &rows57, &st57, NULL, &note57b, true);
         CHECK(k57b == 4 && note57b.find("index_name_conflict") == string::npos,
@@ -66351,6 +66735,234 @@ static const char * kW50Y_r94 =
         // The PROTOCOL and the function agree about the unit.
         CHECK(string(kReplyProtocol).find("400 CHARACTERS") != string::npos,
               "#W65-AP R7 the protocol says CHARACTERS, and now that is what is counted");
+    }
+
+
+    // ================= #W66-AS: wave-66 H3 / H7 + the two MED items =================
+
+    // ---- #W66-AS (H3): the repeat row's {right now:} verdict, and the stop it reads back ----
+    cout << "\n[#W66-AS H3] the repeat row finally prints a verdict, off the pilot's own PLAN\n";
+    {
+        // Every spelling the wave-65 corpus wrote, on the corpus lines themselves
+        // (123v162 seqs 21, 26, 73, 76, 79, 96).
+        int st = -1, cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: L=15, C=2, stop=20; M=68 now; this window: x33 / pass", &st, &cu)
+              && st == 20 && cu == 68,
+              "#W66-AS H3 POSITIVE 123v162 s73: stop=20 and M=68 are both read");
+        CHECK(repeatPlanStopAndCurrent("PLAN: L 20, C 1, stop 24; M 24 now; this window: pass.", &st, &cu)
+              && st == 24 && cu == 24,
+              "#W66-AS H3 POSITIVE s26's space-separated spelling");
+        CHECK(repeatPlanStopAndCurrent("PLAN: L=15, C=2, stop=20; M is 101 now; this window: x10", &st, &cu)
+              && st == 20 && cu == 101,
+              "#W66-AS H3 POSITIVE s76's \"M is 101 now\"");
+        CHECK(repeatPlanStopAndCurrent("Correction: M (41) is already above stop (33)", &st, &cu)
+              && st == 33 && cu == 41,
+              "#W66-AS H3 POSITIVE 123v126 s36's parenthesised spelling");
+        // MUST-NOT-MATCH: the label inside a word, and a plan with no numbers.
+        CHECK(!repeatPlanStopAndCurrent("PLAN: the loop stopped when Master of the Feast died", &st, &cu)
+              && st < 0 && cu < 0,
+              "#W66-AS H3 MUST-NOT-MATCH \"stopped\" is not `stop` and \"Master\" is not `M`");
+        CHECK(!repeatPlanStopAndCurrent("PLAN: keep making vampires until they are dead.", &st, &cu),
+              "#W66-AS H3 NEGATIVE a plan that states no stop states no stop");
+        // Half a plan is not a stop the engine may hold anyone to.
+        CHECK(!repeatPlanStopAndCurrent("PLAN: stop=20; keep going", &st, &cu) && st == 20 && cu < 0,
+              "#W66-AS H3 NEGATIVE a stop with no count-now is not a usable pair");
+
+        // The rendered verdict, both faces.
+        const string past = repeatRowStopClause(68, 20);
+        const string room = repeatRowStopClause(3, 24);
+        CHECK(past.find("{right now: M=68, your stated stop=20") != string::npos
+              && past.find("ALREADY AT OR PAST your own stop") != string::npos
+              && past.find("a wasted window}") != string::npos,
+              "#W66-AS H3 POSITIVE the past-stop face names both numbers and the verdict");
+        CHECK(room.find("has 21 to add before it reaches your own stop") != string::npos,
+              "#W66-AS H3 POSITIVE the headroom face states the remainder (24 - 3)");
+        CHECK(repeatRowStopClause(68, -1).empty() && repeatRowStopClause(-1, 20).empty(),
+              "#W66-AS H3 NEGATIVE no stated stop, or not a token maker: no verdict is invented");
+        // KEY SAFETY (wave61/corpus-livelock.md): the verdict is a {...} group, so
+        // the option-set key - the declined-list count and the deadlock key - does
+        // not see it, exactly like every other priced fact.
+        {
+            const string bare = repeatRowLine("Create vampire with Lord of Lineage", 2, 68);
+            vector<string> a, b;
+            a.push_back(bare + repeatRowStopClause(68, 20));
+            b.push_back(bare + repeatRowStopClause(101, 20));
+            CHECK(optionSetKeyOf(a) == optionSetKeyOf(b),
+                  "#W66-AS H3 KEY the verdict's numbers never reach the option-set key");
+            CHECK(stripRenderAnnotationsLc(a[0]).find("wasted window") == string::npos,
+                  "#W66-AS H3 KEY stripRenderAnnotationsLc drops the whole clause");
+            // ECHO: a reply copying the row, clause and all, still binds to it.
+            vector<string> menu;
+            menu.push_back(a[0]);
+            menu.push_back("Cast nothing right now");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Create vampire with Lord of Lineage x10)", 2, &menu, &stale) == 1,
+                  "#W66-AS H3 ECHO the short-name reply binds past the new clause");
+            CHECK(stripNarrationDecoration(a[0]).find("wasted window") == string::npos,
+                  "#W66-AS H3 ECHO the clause leaves no residue in the narrated record");
+        }
+    }
+
+    // ---- #W66-AS (H3, second half): the auto-pass gate ----
+    cout << "\n[#W66-AS H3b] a window with no legal row is not a decision\n";
+    {
+        CHECK(AIPlayerGPT::loopAutoPassApplies(true, false),
+              "#W66-AS H3b POSITIVE proven loop + nothing legal = the engine passes for the seat");
+        CHECK(!AIPlayerGPT::loopAutoPassApplies(true, true),
+              "#W66-AS H3b MUST-NOT-MATCH a seat with ANY legal action is still asked (130v126's"
+              " Spark Spray row is a real decision, nineteen times over)");
+        CHECK(!AIPlayerGPT::loopAutoPassApplies(false, false),
+              "#W66-AS H3b MUST-NOT-MATCH no proven loop: a dead window is the seam's own business,"
+              " not this gate's - fail closed");
+        CHECK(!AIPlayerGPT::loopAutoPassApplies(false, true),
+              "#W66-AS H3b NEGATIVE neither input: nothing happens");
+        // The prompt-only note that carries the other half of H3b.
+        const string note = loopChainingNote(true, true);
+        CHECK(note.find("[LOOP RUNNING:") != string::npos
+              && note.find("the HOLD row answers all of them at once") != string::npos
+              && note.find("Nothing on this list stops the chain") != string::npos,
+              "#W66-AS H3b POSITIVE the note names the chain and the one row that closes the run");
+        CHECK(note.find_first_of("0123456789") == string::npos,
+              "#W66-AS H3b KEY the note carries no number, so no rebuild of one window can move it");
+        CHECK(loopChainingNote(false, true).empty() && loopChainingNote(true, false).empty(),
+              "#W66-AS H3b NEGATIVE no proven loop, or no hold row to point at: no note");
+    }
+
+    // ---- #W66-AS (H7): the hold key stops breaking on a moved number ----
+    cout << "\n[#W66-AS H7] a price moving with the board is not a different row\n";
+    {
+        // 152v162 seqs 42 -> 43, verbatim from the corpus record's options_text.
+        const string clue4 = "Draw 1 with Clue [cost: {2}, Sacrifice] [DRAW PRICE: this draws 1 card,"
+            " and the opponent's Ob Nixilis, the Hate-Twisted, Underworld Dreams #1, Fate Unraveler,"
+            " Underworld Dreams #2 punish every draw, so taking it costs you 4 life right now -"
+            " you would be at 4]";
+        const string clue3 = "Draw 1 with Clue [cost: {2}, Sacrifice] [DRAW PRICE: this draws 1 card,"
+            " and the opponent's Ob Nixilis, the Hate-Twisted, Underworld Dreams #1, Fate Unraveler,"
+            " Underworld Dreams #2 punish every draw, so taking it costs you 4 life right now -"
+            " you would be at 3]";
+        const string clueKills = "Draw 1 with Clue [cost: {2}, Sacrifice] [DRAW PRICE: this draws 1"
+            " card, and the opponent's Ob Nixilis, the Hate-Twisted, Underworld Dreams #1, Fate"
+            " Unraveler, Underworld Dreams #2 punish every draw, so taking it costs you 4 life right"
+            " now - you would be at 0; this KILLS you]";
+        CHECK(clue4 != clue3 && holdKeyRow(clue4) == holdKeyRow(clue3),
+              "#W66-AS H7 POSITIVE 152v162 s42 -> s43: the projection moved, the row did not");
+        CHECK(holdKeyRow(clueKills) != holdKeyRow(clue3),
+              "#W66-AS H7 MUST-NOT-MATCH s44 -> s45: \"; this KILLS you\" is a WORD, and it still"
+              " re-opens the window - this is the line between forgiving drift and a blind cache");
+        // 130v126 seqs 37 -> 38, the nineteen-window casting run.
+        const string spray17 = "Cast Spark Spray {r} {leaves 5 of your 6 untapped mana sources"
+            " untapped} {kills: Vampire - and 1 to the opponent at life 17 leaves them at 16} - legal";
+        const string spray18 = "Cast Spark Spray {r} {leaves 5 of your 6 untapped mana sources"
+            " untapped} {kills: Vampire - and 1 to the opponent at life 18 leaves them at 17} - legal";
+        CHECK(spray17 != spray18 && holdKeyRow(spray17) == holdKeyRow(spray18),
+              "#W66-AS H7 POSITIVE 130v126 s37 -> s38: one hold now covers the whole chain");
+        // MUST-NOT-MATCH: the row's own COST, and WHICH card it names, keep their digits.
+        CHECK(holdKeyRow("Cast Shock {r}") != holdKeyRow("Cast Shock {2}{r}"),
+              "#W66-AS H7 MUST-NOT-MATCH a mana cost is not annotation payload");
+        CHECK(holdKeyRow("Draw 1 with Clue [cost: {2}, Sacrifice]")
+                  != holdKeyRow("Draw 1 with Clue [cost: {3}, Sacrifice]"),
+              "#W66-AS H7 MUST-NOT-MATCH a cost INSIDE a bracket is still a cost");
+        CHECK(holdKeyRow("Tap Underworld Dreams #1 [target: Goblin #1]")
+                  != holdKeyRow("Tap Underworld Dreams #1 [target: Goblin #2]"),
+              "#W66-AS H7 MUST-NOT-MATCH an instance ordinal names WHICH card, and keeps its digits");
+        CHECK(holdKeyRow("Draw 1 with Clue") == "Draw 1 with Clue",
+              "#W66-AS H7 NEGATIVE digits in the row's OWN text are untouched");
+        // The two clauses wave 63 and wave 64 forgive are forgiven exactly as before.
+        CHECK(holdKeyRow("Cast nothing right now (combat comes next this turn)")
+                  == holdKeyRow("Cast nothing right now"),
+              "#W66-AS H7 CONTROL #W63-AD's phase clause still normalises away");
+        // The row SAYS what the key forgives - a difference forgiven silently is
+        // the blind cache the latch must not become.
+        CHECK(holdRowBenefitClause().find("differs only by a NUMBER") != string::npos
+              && holdRowBenefitClause().find("any WORD that changes") != string::npos,
+              "#W66-AS H7 POSITIVE the hold row names the third forgiven difference, and its limit");
+        CHECK(holdRowBenefitClause().find_first_of("0123456789") == string::npos
+              && holdRowBenefitClause()[holdRowBenefitClause().size() - 1] == '}',
+              "#W66-AS H7 KEY the row's own clause still carries no number and is one {...} group");
+        // The latch, end to end, over the corpus rows.
+        {
+            std::set<string> held;
+            held.insert(holdKeyRow(clue4));
+            held.insert(holdKeyRow(holdRowLine()));
+            vector<string> now;
+            now.push_back(clue3);
+            now.push_back(holdRowLine());
+            const char * why = "";
+            CHECK(holdStillStands(held, now, &why),
+              "#W66-AS H7 POSITIVE end to end: the nine no-op windows of 152's draw step collapse to one");
+            vector<string> nowKills;
+            nowKills.push_back(clueKills);
+            nowKills.push_back(holdRowLine());
+            CHECK(!holdStillStands(held, nowKills, &why),
+              "#W66-AS H7 MUST-NOT-MATCH end to end: the KILLS verdict re-opens it");
+        }
+    }
+
+    // ---- #W66-AS (H7, second half): which decline is the default ----
+    cout << "\n[#W66-AS H7b] the hold row leads the declines where the question will be re-put\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Spark Spray {r} - legal");
+        menu.push_back(holdRowLine());
+        menu.push_back("Cast nothing right now");
+        CHECK(holdRowIndexOf(&menu) == 1,
+              "#W66-AS H7b POSITIVE the hold row is found by its own text, not by its position");
+        bool stale = false;
+        CHECK(parseChoice("CHOICE: 2 (Hold priority)", 3, &menu, &stale) == 2,
+              "#W66-AS H7b POSITIVE a hold at row 2 is answered at row 2");
+        CHECK(parseChoice("CHOICE: 3 (Cast nothing right now)", 3, &menu, &stale) == 3,
+              "#W66-AS H7b POSITIVE the plain decline is still on the menu, one row lower");
+        vector<string> old;
+        old.push_back("Cast Spark Spray {r} - legal");
+        old.push_back("Cast nothing right now");
+        old.push_back(holdRowLine());
+        CHECK(optionSetKeyOf(old) != optionSetKeyOf(menu)
+              && holdRowIndexOf(&old) == 2,
+              "#W66-AS H7b CONTROL the two orders are genuinely different lists, and the finder"
+              " reads each one correctly - nothing is removed, only ordered");
+    }
+
+    // ---- #W66-AS (deck123 MED): a unique name IS the answer ----
+    cout << "\n[#W66-AS MED] the three corpus re-asks that were told what they had already said\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn,"
+                       " so Morbid does NOT apply)}");
+        menu.push_back("Cast nothing right now");
+        menu.push_back(holdRowLine());
+        bool stale = false; string note;
+        // 123v162 seqs 29 / 68 / 111, verbatim.
+        CHECK(parseChoice("CHOICE: 2 (Hold priority)", 3, &menu, &stale, NULL, &note) == 3,
+              "#W66-AS MED POSITIVE 123v162 s68: the named row is taken, as it always was");
+        CHECK(note.find("index_name_unique_name") != string::npos
+              && note.find("hold_row_named") != string::npos,
+              "#W66-AS MED POSITIVE the divergence is STAMPED - this is not wave 64's silent"
+              " name-wins");
+        CHECK(note.find("index_name_conflict") == string::npos,
+              "#W66-AS MED MUST-NOT-MATCH ...and it no longer buys a round trip: the hold row is"
+              " unique on the menu, so its name names exactly one row");
+        // The genuinely ambiguous shape keeps the conflict and the re-ask.
+        string note2;
+        bool stale2 = false;
+        CHECK(parseChoice("CHOICE: 3 (pass)", 3, &menu, &stale2, NULL, &note2, true) == 3
+              && note2.find("pass_hold_ambiguous") != string::npos
+              && note2.find("index_name_conflict") != string::npos,
+              "#W66-AS MED MUST-NOT-MATCH the index names the HOLD row while the echo names row 0 -"
+              " two halves that genuinely disagree, and that one still re-asks");
+    }
+
+    // ---- #W66-AS (deck123 MED): the casting menu says it has no row 0 ----
+    cout << "\n[#W66-AS MED] the grammar of THIS menu, before the answer instead of after it\n";
+    {
+        const string fact = kCastNoRowZeroFact;
+        CHECK(fact.find("This menu has no row 0") != string::npos
+              && fact.find("Cast nothing right now") != string::npos,
+              "#W66-AS MED POSITIVE 123v162 s45's `CHOICE: 0 (pass)` is answered before it is written");
+        CHECK(fact.find("A priority menu does have a row 0") != string::npos,
+              "#W66-AS MED POSITIVE it names the OTHER menu too, because that is where the pilot"
+              " learned the habit - nothing is contradicted, the two menus are told apart");
+        CHECK(fact.find("is not on this list") == string::npos,
+              "#W66-AS MED MUST-NOT-MATCH it is not the named-row re-ask's wording");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
