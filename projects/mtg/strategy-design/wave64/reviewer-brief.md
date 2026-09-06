@@ -5,7 +5,7 @@ Repo /home/magi/Projects/wagicGPT, game dir projects/mtg. Use python for translo
 wagic; write only under projects/mtg/strategy-design/wave64/. Never write mechanisms as the
 owner's positions. Report what you did NOT check.
 
-CORPUS (wave 64, binary = master __CORPUS_HASH__ = wave-63 close be2e88282 + wave-64 step 1: lanes AG (F6 modal rows priced
+CORPUS (wave 64, binary = master dab6a6cba = wave-63 close be2e88282 + wave-64 step 1: lanes AG (F6 modal rows priced
 like cast rows; F7 gang-block verdict derived with deathtouch/first strike modelled; F8 block suggestion labels its ranking
 truthfully, names what it spends, optional on NOT-lethal headers, projection folds block-trigger gain; F9 survival stated
 first, bare `this KILLS you` only when no assignment survives), AH (F1 best-X clamped to the library with the ceiling
@@ -21,7 +21,7 @@ cover folds evasion/CANTBLOCK/enters-tapped, indented top-level corrections reco
 gang budget board-sized, upkeep draw reserved only while ahead; #3 transport classification refuted as out of scope);
 read wave64/known-bugs.md, wave64/lane-{AG,AH,AI,AJ,AK}.md and wave64/codex-review.md for what changed and each lane's
 falsifiable predictions. Two lane-flagged questions for the engine seat: Wagic's `flyersonly` allows planeswalker attacks
-where modern CR may not; AK's R5 makes wave-63 E6b's in-plan exclusion unreachable for line-leading coded lines): __CORPUS_DIR__ (__CORPUS_STATS__).
+where modern CR may not; AK's R5 makes wave-63 E6b's in-plan exclusion unreachable for line-leading coded lines): /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260906-001533/ (21 games: 21 natural, 0 crashed, 0 hung; 2295 decisions, 1 fallbacks; 152 6/6, 126 4/6, 162/130/146 3/6, 125 2/6, 123 0/6).
 One JSONL per SEAT (filename
 ...deckA-<ptr>-vs-...deckB = the deckA seat): records {seq, kind, prompt, reply, choice,
 chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?, ...}; `prompt` is
