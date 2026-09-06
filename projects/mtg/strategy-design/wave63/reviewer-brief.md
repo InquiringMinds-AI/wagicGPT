@@ -5,7 +5,7 @@ Repo /home/magi/Projects/wagicGPT, game dir projects/mtg. Use python for translo
 wagic; write only under projects/mtg/strategy-design/wave63/. Never write mechanisms as the
 owner's positions. Report what you did NOT check.
 
-CORPUS (wave 63, binary = master __CORPUS_HASH__ = wave-62 close 41fbad879 + wave-63 step 1: lanes AB (E1 block-side
+CORPUS (wave 63, binary = master 98d13050f = wave-62 close 41fbad879 + wave-63 step 1: lanes AB (E1 block-side
 life loop fail-closed; E3 survivable-block suggestion ranks blocker material; E4 GANG BLOCK verdict hoisted + summed
 trigger prices), AC (E2 CLEANUP PRICE folds stacked draws + cast life delta; E5 manland once per permanent / best rung;
 E9 crack-back relief clause wired to describeAction; E13/E15/E16), AD (E6 latched line on record + plan-bound answer
@@ -19,7 +19,7 @@ cards rewritten as ONE counter event, incl. Mossborn Hydra 76e4f58b9 — Ascenda
 deliberately unchanged); read wave63/known-bugs.md, wave63/lane-{AB,AC,AD,AE,AF}.md and wave63/codex-review.md for what
 changed and each lane's falsifiable predictions. Also open (owner-reported on the Vita, NOT a corpus item):
 wave63/softlock-blockers-1788650768.md — a human defender could assign/cancel blockers but never advance; if a corpus
-game shows an AI seat stuck at Blockers with a calm stack, cite it there): __CORPUS_DIR__ (__CORPUS_STATS__).
+game shows an AI seat stuck at Blockers with a calm stack, cite it there): /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260905-191148/ (21 games: 19 natural, 0 crashed, 2 HUNG — 152v162 and 152v130, the daybound marker loop, see wave63/corpus-hang.md; fixed on master 0026a9d87 and RERUN as single games in /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260905-214946/ (152v162, natural, 162 won) and /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260905-215345/ (152v130, natural, 152 won) — read those for the 152v162 and 152v130 pairings and treat the hung games' partial translogs as evidence of the hang only). Binary for the 19 = 98d13050f; for the reruns = 0026a9d87 (differs only by the marker-count fix).
 One JSONL per SEAT (filename
 ...deckA-<ptr>-vs-...deckB = the deckA seat): records {seq, kind, prompt, reply, choice,
 chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?, ...}; `prompt` is
