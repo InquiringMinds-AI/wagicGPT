@@ -148,3 +148,30 @@ the turn-14 log prints ~200 per-token death lines while the board line is bucket
 narration the same way; hold churn runs (130: 8 windows in one draw step at 3 life; 123: an 18-window drained turn) —
 census the cause (which fact changed each window?) and fix only what the census proves. Read wave66/lane-AS.md (H3/H7),
 lane-AR.md (H8), lane-AU.md (R5), wave66/engine-seat.md §4 first.
+
+## Lane AZ — the seven findings of wave67/codex-review.md (fix or refute, each with evidence)
+Worktree: worktrees/lanes/w67-AZ (base = master after the AV-AY merge = af986181b + the review commit). Read
+wave67/codex-review.md in full, then the lane report each finding touches (lane-AV.md for #1, lane-AY.md for #2/#6,
+lane-AX.md for #3/#7, lane-AW.md for #4/#5); wave66/lane-AU.md shows the expected shape of a CONFIRMED/REFUTED table. For
+EACH finding: VERIFY against the code first (REFUTED with the line that proves it, or CONFIRMED with a reproduction — a
+PARSETEST case or fixture failing on the current tree); fix every CONFIRMED one in the general form. Three are DOCTRINE
+breaches and take priority: #3 (~`:35367`) the reservation-decline latch auto-passes later windows on phase + candidate
+names + source count alone — a decline may be honoured ONLY while the FULL board key (the hold key, AS H7 + AU R1 discipline:
+stack, life, permanents, hand count) is unchanged; anything less is a blind cache — key it on that, re-verify at 162v130
+s16-19 that the corpus pair still latches (nothing changed there). #4 (~`:37781`) the repeat-pay render HIDES legal rungs —
+the render must keep EVERY legal row reachable: collapse to `rows 3-21: Add 3 .. Add 20 (identical in effect right now —
+answer any number in that band)` so a number in the band maps to its engine row (the shownToFull map must accept the band),
+never a single surviving row; fix the pin at ~`:71452`. #7 (~`:44296`, `AllAbilities.cpp:1341`) an unusable mandatory reveal
+reply is answered with the FIRST eligible card instead of the heuristic's pick — call Baka's `chooseCard`/target-choice
+scorer on the eligible set (the "safe default" the brief asked for is the heuristic, not vector index 0), fix the pin at
+~`:71126`; the driver floor in AllAbilities may stay as the last resort but must record that it fired. #1 (~`:18407`) the
+label-less salvage matches `I will not cast Doom Blade` to the Doom Blade row — polarity: a sentence with a negation
+(`not`, `never`, `don't`, `won't`, `rather than`, `instead of`) before the action verb is NOT a decision; when the only
+match is negated, re-ask; PARSETEST the negated shapes. #2 (~`:32549`) the clamp's `allowed == 1` boundary converts one
+legal repetition into a pass while narrating one — execute one (the row family supports x1) or narrate zero truthfully;
+add the boundary case. #5 (~`:12263`, `scanStackAbilityDraws` ~`:4366`) an unresolved `MayAbility` draw is counted as
+mandatory in the library reserve — count a may-draw as OPTIONAL (say "up to"), never as "cannot decline". #6 (~`:20505`)
+a loop half in the graveyard is not returnable without a recursion effect — `halfCanReturn` requires a visible recursion
+source (a known reanimation/return-to-hand card in hand/battlefield) or reads "in the graveyard; needs recursion to
+return"; fix the pin at ~`:71763`. Gate as usual (suite THREADS=1 0 failed, AI count, PARSETEST 0 failed, RED evidence per
+confirmed finding). Tag `#W67-AZ (Rn)`. Write wave67/lane-AZ.md with the CONFIRMED/REFUTED table.
