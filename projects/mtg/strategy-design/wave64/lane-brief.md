@@ -150,3 +150,25 @@ the lethal forecast is built from (deck146 MED-4, 146v162 seq 33); 8/12 self-tar
 (deck146 MED-5); E4b by the letter — `(1 if all block)` summed price below the tag's largest single price 4 (engine);
 44/44 declined land drops were `[enters TAPPED]` rows — the tag omits next-turn value (deck125 MED-1). Read
 wave63/lane-AD.md (E6, E10, E14), lane-AC.md (E9, E13), lane-AB.md (E4) and wave63/engine-seat.md first.
+
+## Lane AK — the nine findings of wave64/codex-review.md (fix or refute, each with evidence)
+Worktree: worktrees/lanes/w64-AK (base = master after the AG-AJ merge = 95b0aa152 + the review commit). Read
+wave64/codex-review.md in full, then the lane report each finding touches (lane-AI.md for #1/#2, lane-AH.md for
+#3?/#4/#7/#9 — #3 names the transport classifier, which no wave-64 lane touched: verify whether the diff moved it at
+all and REFUTE-as-out-of-scope with the line if not, else fix, lane-AG.md for #6/#8, lane-AJ.md for #5);
+wave63/lane-AF.md shows the expected shape of a CONFIRMED/REFUTED table. For EACH finding: VERIFY against the code
+first (REFUTED with the line that proves it, or CONFIRMED with a reproduction — a PARSETEST case or fixture failing on
+the current tree); fix every CONFIRMED one in the general form. #1 is HIGH and a doctrine breach (a legal option
+removed): the candidate set for the attackers bundle must include every creature that may attack ANY legal
+destination (player OR planeswalker/battle), with each row saying which it may attack. #2 is HIGH: adjudicate the
+F3 fix's 24-tick floor against the doctrine (no window removed) AND the hang class it exists for (wave-58: a driver
+that never passes is a dead game) — the pass may only be forced when the seat has NO legal action left (ask
+computeActions / the oracle), never on a bare count; if a floor stays as a livelock breaker it must be gated on
+"nothing legal remains" and its firing must be recorded. #4/#7: the crack-back cover claim must fold evasion
+(flying/menace/unblockable per attacker), CANTBLOCK and enters-tapped, or say it cannot and print no survival
+verdict. #5: a top-level correction may be indented — align `lineIsCodedAnswerLine` with `codedAnswerLineAt` and fix
+the PARSETEST case that pins the wrong expectation. #6: skip the whole `ability$!...!$` granted block, not one
+clause. #8: no silent cap at 64 — size the budget from the board, or fall back to the uncapped path and say so. #9:
+the reserve counts a next-upkeep draw only when that upkeep is still ahead of the draw in question. Gate as usual
+(suite THREADS=1 0 failed, AI count, PARSETEST 0 failed, RED evidence per confirmed finding). Tag `#W64-AK (Rn)`.
+Write wave64/lane-AK.md with the CONFIRMED/REFUTED table.
