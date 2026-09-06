@@ -1314,6 +1314,12 @@ private:
     string mPaidPendingCard;
     string mPaidPendingStep;
     int mHoldWindowsSkipped; //gameend report field
+    //#W69-BI (K7, engine MED-5): the same total, split by the seam that
+    //suppressed the window. 2,727 suppressions on the wave-68 corpus reached
+    //the record as ONE number, so "which seam holds" was unanswerable without
+    //re-running the games. The two members sum to mHoldWindowsSkipped.
+    int mHoldWindowsSkippedPriority;
+    int mHoldWindowsSkippedCast;
     //#W67-AX (I7): the RESERVATION decline, honoured the way the hold row is.
     //`162v130` seq 16 -> 17 and 18 -> 19: the model declined a `{reserve:}` row
     //(the row's own clause says the mana it spends strands a sorcery-speed card
@@ -1622,6 +1628,22 @@ private:
     //the next translog record for this seat. Consumed when written, so a drop
     //is stamped exactly once.
     std::vector<std::string> mAsyncDropStamps;
+    //#W69-BI (K7, engine MED-2): the game total of the above. The per-decision
+    //field is consumed with its record, so a reader taking the game's drop
+    //count off the gameend record read an ABSENT field as zero.
+    int mAsyncDropsGame;
+    //#W69-BI (K7, deck130 LOW / BA-7): takes of a row that carried the
+    //`[repeat: activated this turn N times already]` annotation. The stop guard
+    //reads the model's own stated stop, not this annotation, so a take under
+    //the tag is invisible to `repeat_past_stop`; counted here instead of
+    //inferred by grepping prompts.
+    int mRepeatAnnotatedTakes;
+    //#W69-BI (K7, deck146 MED): the attacker-line blocker forecast, so "dead
+    //surface or window that never arose" is a record rather than a grep.
+    int mBlockerForecastRows;      //rows that rendered [their untapped blockers:
+    int mBlockerForecastMulti;     //...with two or more candidates
+    int mBlockerForecastGang;      //...carrying a GANG BLOCK verdict
+    int mBlockerForecastCollapsed; //...printed in the collapsed (>4) form
     //#W55-E (D5a): reveal-driver stall figures for the record being written.
     int mRevealStallTicks;
     long mRevealStallSecs;
