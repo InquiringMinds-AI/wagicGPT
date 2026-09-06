@@ -142,3 +142,29 @@ says a symmetric engine also draws YOU (41/41) and `draw converters in your hand
 the plain `Cast nothing` row should withdraw once the declined-this-list tag fires (deck125, 58% no-ops). Read
 wave64/lane-AJ.md (F13), lane-AK.md (R5), wave63/lane-AD.md (E6) first. Anything you print that varies per rebuild stays
 out of both keys (wave61/corpus-livelock.md).
+
+## Lane AP — the seven findings of wave65/codex-review.md (fix or refute, each with evidence)
+Worktree: worktrees/lanes/w65-AP (base = master after the AL-AO merge = 9e2440011 + the review commit db3e32638).
+Read wave65/codex-review.md in full, then the lane report each finding touches (lane-AM.md for #1, lane-AO.md for
+#2/#3/#7, lane-AN.md for #4/#5); wave64/lane-AK.md shows the expected shape of a CONFIRMED/REFUTED table. For EACH
+finding: VERIFY against the code first (REFUTED with the line that proves it, or CONFIRMED with a reproduction — a
+PARSETEST case or fixture failing on the current tree); fix every CONFIRMED one in the general form.
+#1 is HIGH and a doctrine breach (a legal option removed): a phase change re-opens the decline scope — a sorcery-speed
+action refused in upkeep is a DIFFERENT question in main; `declineBoardScope` must key on the phase (or the re-opener
+must fire on any change to what is legal, which the phase changes), and the PARSETEST case that pins the phase-stripped
+scope is inverted. #2 is HIGH: the ATTACK and BLOCKS drivers (~:39354, :40361) must go through the same first-wins
+selector as CHOICE — one rule, one function; PARSETEST cases must exercise the DRIVER entry, not the helper alone.
+#3 is HIGH: a marked correction directly after the original (no blank line between) must still be detected — fix the
+adjacent-answer run fold in `findAnswerLabelLine` (~:17027) so correction detection runs BEFORE run folding.
+#4/#5 are HIGH: `LETHAL COMES FIRST` and the "no block saves you" verdict must fold blockers' lifelink (incl. DOUBLE
+STRIKE = two damage steps, two gains) or print no verdict — a kill verdict rests on a floor of THEIR life that already
+counts every gain a legal block can produce; when the count cannot be closed, print the arithmetic and withdraw the
+verdict. #6 is HIGH and has been REFUTED-as-out-of-scope by wave-63 R9 and wave-64 AK #3 while never being fixed — it
+is a real defect (curl returns 28 for BOTH `CURLOPT_CONNECTTIMEOUT_MS` and `CURLOPT_TIMEOUT_MS`): read wave-63's
+rationale (`git log -L '/^bool gptDeadlineMissed/,/^}/:src/AIPlayerGPT.cpp'`, commit 0f1213f37) then FIX it this wave in
+the general form — the `timeout` verdict requires elapsed ≥ ~deadline (the existing ≥95% band); curl 28 far short of
+the deadline is `transport_error` with the bounded remainder retry; update the PARSETEST cases at ~:54545-54560 to pin
+the corrected order with a connect-timeout shape (http=0, curl=28, elapsed=30000, deadline=900000). #7 is LOW: bound
+the plan carry by UTF-8 code points, never mid-sequence, or state "bytes" in the protocol — pick the one that keeps the
+protocol truthful. Gate as usual (suite THREADS=1 0 failed, AI count, PARSETEST 0 failed, RED evidence per confirmed
+finding). Tag `#W65-AP (Rn)`. Write wave65/lane-AP.md with the CONFIRMED/REFUTED table.
