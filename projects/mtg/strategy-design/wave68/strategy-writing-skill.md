@@ -1,3 +1,5 @@
+> SUPERSEDED 2026-09-06: the current skill edition is `wave68/strategy-writing-skill-v2.md` (owner-installed after six Astra adversarial rounds, `wave68/skill-v2-codex-review*.md`). This file is retained as lineage only — 22 waves of synthesis logs and the original text of amendments 1-332. Do not read it as the skill.
+
 # Skill: Writing a per-deck strategy guide for the qwen pilot (wave 40)
 
 ## Synthesis notes (wave 40) -- TWENTY-SECOND per-deck-rotation cycle

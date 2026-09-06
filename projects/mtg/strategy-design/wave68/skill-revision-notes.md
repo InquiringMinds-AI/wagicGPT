@@ -158,3 +158,12 @@ Verified against A287 (13289-13298), A271 (13049-13059), A294 (13388-13403), DoD
 - #22 CONFIRMED. Belief-correcting retirement now requires BOTH the render carrying the corrective fact AND zero
   breaks across two corpora with the triggering shape (DoD 7340-7343).
 Room: prose only (section 1/2.2/3/4.x wording, illustrative quotes); no rule removed. v2 = 39,998 bytes.
+
+## Installed as the current edition (owner ruling 2026-09-06: "sure. this should be fine")
+Revision 6 installed; `wave68/reviewer-brief.md` points at v2; the 1.3 MB file carries a SUPERSEDED header.
+Round-6 residuals DOCKETED for the next revision (not applied): #23 belief diagnosis narrowed to arithmetic
+(restore the deck-specific-explanation branch); #24 A155's hidden-payment teaching (name the life-paying
+source and the resulting life change); #25 A324's positive-evidence requirement for explanatory mechanisms
+("not refuted" is not evidence). Standing cadence: Astra reviews the skill once per wave against the seats'
+actual outputs, not per revision.
+
