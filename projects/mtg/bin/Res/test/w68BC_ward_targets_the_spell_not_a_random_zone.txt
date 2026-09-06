@@ -1,0 +1,45 @@
+#NAME: A ward trigger's pay-or-be-countered rider belongs on the SPELL ON THE
+#STACK - and the unpaid spell is countered.
+#Oracle (CR 702.21b; Tomakul Honor Guard "Ward {2}"): "Whenever this permanent
+#becomes the target of a spell or ability an opponent controls, counter that
+#spell or ability unless that player pays {2}."
+#Every ward script in the pool chose its rider's HOST with
+#`target(...|opponentzones)`, and opponentzones expands to the opponent's
+#BATTLEFIELD, STACK, GRAVEYARD, LIBRARY, HAND, EXILE, SIDEBOARD and COMMAND
+#ZONE (TargetChooser.cpp, "opponentzones"), battlefield first.  #W68-BC (J7)
+#narrows all 85 of them to `opponentstack`, the one zone the rule names.
+#SCOPE OF THIS FIXTURE: it pins the RULE - P1 taps out for Shock, cannot pay
+#the {2}, and Shock must be countered with the 3/1 alive.  It is GREEN on base
+#too: on the scripted CLICK path the chooser already settled on the stack card
+#(Mind Stone is P1's battlefield decoy and was not taken).  The defect the fix
+#removes is the ROW LIST the interactive-AI seat is shown, which enumerates the
+#chooser's zones - 152v130 s33 offered 12 opponent LIBRARY cards and a HAND
+#card as pickable ward targets - and that seam has no endpoint under the suite.
+#So this is a regression PIN on the rules outcome, not the leak's repro.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Tomakul Honor Guard
+[DO]
+Shock
+Tomakul Honor Guard
+endinterruption
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+hand:
+manapool:{0}
+life:20
+[PLAYER2]
+inplay:Tomakul Honor Guard
+life:20
+[END]

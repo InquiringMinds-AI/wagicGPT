@@ -509,6 +509,9 @@ private:
                                          bool badReply);
     static bool retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody);
     static long remainingTransportRetryMs(long deadlineMs, long firstLatencyMs);
+    //#W68-BC (J2): the wall arm's missing question. See the .cpp comment - a
+    //wall miss has no remainder, so it buys no second attempt.
+    static bool retryFitsInDeadline(long deadlineMs, long firstLatencyMs);
     static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody);
     //#W61-U (C13): the same stamp plus the two facts that make the failure's
     //PHASE provable (the connect budget in force, the elapsed round trip), and
@@ -859,7 +862,10 @@ private:
     string mLastPrunedPairs;
     void ensureGameStartRecord();
     //#W55-E (D23): write the abandoned wall-missed ask down before it is lost.
-    void flushWallMissRecord();
+    //#W68-BC (J2): classOverride names WHY the miss is being written down
+    //(the abandonment classes stay the default; "wall_miss_no_retry" is the
+    //new one, written the moment the deadline is spent).
+    void flushWallMissRecord(const char * classOverride = NULL);
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
                        const std::vector<string> * optionTexts = NULL,
@@ -1450,9 +1456,18 @@ private:
     //Report-only: nothing in the engine reads these, and no key or tail moves.
     string mRecoveryExecSeam;
     string mRecoveryExecText;
+    string mRecoveryExecBy; //#W68-BC (MED): "heuristic" or "reask"
     int mRecoveryExecRow; //1-based printed row, 0 = a pass/no-op, -1 = unknown
     void flushRecoveryRecord();
     void noteHeuristicExecuted(const char * seam, int row, const string& text);
+    //#W68-BC (MED, engine MED-1): the OTHER way a fallback recovers - the seat
+    //re-asked and the model's SECOND answer executed. That path reaches none
+    //of the noteHeuristicExecuted sites, so 123 s42 (a `named_row_reask`
+    //recovery) carried no `executed_*` and no `recovered_by` at all: a record
+    //that named a failure and said nothing about the outcome. Same three
+    //fields, plus `executed_by` so a reader never mistakes a re-ask for the
+    //heuristic.
+    void noteReaskExecuted(const char * seam, int row, const string& text);
     //#W53-Q (D24): the latch's gate, pure so PARSETEST can pin it.
     static bool handedToHeuristic(int choice, const char * fallback);
     //#W54-B (D9): a reply that ANSWERED after eating the whole deadline is
@@ -1467,6 +1482,11 @@ private:
     //side of it. Neither touches WAGIC_GPT_TIMEOUT: the deadline is the
     //owner's dial and this item is observability.
     static long deadlineTenthsPct(long latencyMs, long timeoutMs);
+    //#W68-BC (J2): the worst per-ATTEMPT fraction on a record that spent two
+    //round trips. -1 when neither leg is knowable. The SUM stays in
+    //latency_ms and the legs in attempt_ms; only the FRACTION becomes
+    //per-attempt, because "137% of the deadline" described no call that ran.
+    static long deadlineTenthsPctOfAttempts(long firstMs, long secondMs, long timeoutMs);
     static bool isLongReply(long latencyMs, long timeoutMs, bool answered);
     //#W54-B (D13): the latched coded line's index AND its parenthetical both
     //disagree with the row that EXECUTED (deck126 vs125 seq 13/14: "CHOICE: 2
@@ -1574,6 +1594,14 @@ private:
     long mWallMissLatencyMs; //#W61-U (C13): the round trip that missed the wall
     int mWallMissEvents;
     int mWallMissUnrecorded;
+    //#W68-BC (J2): wall misses that were handed straight to the heuristic
+    //because the deadline was spent (no second full deadline was bought).
+    int mWallMissNoRetry;
+    //#W68-BC (J2): the two legs of a retried decision, kept past the sum so
+    //the record can publish them (`attempt_ms`) and compute deadline_pct per
+    //attempt. -1 = no such leg. Consumed with the record, like latency_ms.
+    long mLastAttemptFirstMs;
+    long mLastAttemptSecondMs;
     bool mLastFinishLength;  //the last reply stopped at the token cap
     long mLastReasoningTokens; //the server's own reasoning-token count when it
                              //reports one (-1 = it did not); the budget is in

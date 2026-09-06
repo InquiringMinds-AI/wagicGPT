@@ -194,11 +194,11 @@
 #AUTO_DEFINE _IMPULSEUENT_ moveto(exile) and!( transforms((,canplayfromexile)) uent )! all(*[zpos=1]|mylibrary)
 
 # Ward
-#AUTO_DEFINE _WARD1_ @targeted(this) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentzones) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
-#AUTO_DEFINE _WARD2_ @targeted(this) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
-#AUTO_DEFINE _WARD3_ @targeted(this) from(*|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*|opponentzones) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
-#AUTO_DEFINE _WARD4_ @targeted(this) from(*|opponentzones):choice name(This spell costs 4 more) name(This spell costs 4 more) target(*|opponentzones) transforms((,newability[pay[[{4}]] name(pay 4 mana) donothing?fizzle])) oneshot
-#AUTO_DEFINE _WARD8_ @targeted(this) from(*|opponentzones):choice name(This spell costs 8 more) name(This spell costs 8 more) target(*|opponentzones) transforms((,newability[pay[[{8}]] name(pay 8 mana) donothing?fizzle])) oneshot
+#AUTO_DEFINE _WARD1_ @targeted(this) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentstack) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
+#AUTO_DEFINE _WARD2_ @targeted(this) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+#AUTO_DEFINE _WARD3_ @targeted(this) from(*|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*|opponentstack) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
+#AUTO_DEFINE _WARD4_ @targeted(this) from(*|opponentzones):choice name(This spell costs 4 more) name(This spell costs 4 more) target(*|opponentstack) transforms((,newability[pay[[{4}]] name(pay 4 mana) donothing?fizzle])) oneshot
+#AUTO_DEFINE _WARD8_ @targeted(this) from(*|opponentzones):choice name(This spell costs 8 more) name(This spell costs 8 more) target(*|opponentstack) transforms((,newability[pay[[{8}]] name(pay 8 mana) donothing?fizzle])) oneshot
 
 # Renown
 #AUTO_DEFINE _RENOWN_($c) this(cantargetcard(*[-renown]) transforms((,newability[@combatdamaged(player) from(this):counter(1/1.$c) && becomes(renown) forever]))

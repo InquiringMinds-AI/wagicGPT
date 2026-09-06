@@ -34347,7 +34347,7 @@ auto=@targeted(this) from(instant[manacost=2]|myzones):choice name(This spell co
 auto=@targeted(this) from(sorcery[manacost=2]|myzones):choice name(This spell costs 2 less) name(This spell costs 2 less) add{C} controller
 auto=@targeted(this) from(instant[manacost>=3]|myzones):choice name(This spell costs 2 less) name(This spell costs 2 less) add{C}{C} controller
 auto=@targeted(this) from(sorcery[manacost>=3]|myzones):choice name(This spell costs 2 less) name(This spell costs 2 less) add{C}{C} controller
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Trample, Lifelink -- Spells you cast that target Elderwood Scion cost {2} less to cast. Spells your opponents cast that target Elderwood Scion cost {2} more to cast.
 mana={3}{G}{W}
 type=Creature
