@@ -1,0 +1,26 @@
+# Adversarial findings
+
+1. **HIGH — [AIPlayerGPT.cpp:18407](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:18407): The label-missing salvage treats a negated sentence as an affirmative decision because it searches for action verbs and row-name substrings without checking polarity.**  
+   **Trigger:** With rows `Cast Doom Blade` / `Cast nothing right now`, the complete reply `I will not cast Doom Blade.\nPLAN: Preserve it for later.` uniquely matches the Doom Blade row at lines 18421–18445 and casts it.
+
+2. **HIGH — [AIPlayerGPT.cpp:32549](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:32549): A model-authored stop that leaves exactly one repetition causes the engine to execute zero repetitions while narrating that it executed one.**  
+   **Trigger:** On the second answer after `repeat_past_stop`, `namedCount=2`, `statedCurrent=25`, and `statedStop=26` produce `allowed=1`; lines 32557–32562 say the engine ran one, but the `allowed < 2` branch at lines 32565–32569 changes the choice to pass. The PARSETEST block exercises zero, six, and large clamps but omits this boundary.
+
+3. **HIGH — [AIPlayerGPT.cpp:35367](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:35367): The reservation-decline latch auto-passes later legal casting windows using only phase, candidate names, and untapped-source count, ignoring material board and stack changes.**  
+   **Trigger:** The GPT declines a flash creature during the opponent’s main phase because casting it would strand a sorcery; the opponent then casts a lethal spell in that same phase while the flash candidate set and source count remain unchanged, so `reserveDeclineHonoured` returns true and the new priority window exits without asking. This is a blind cache of an answer across changed game state, contrary to the lane doctrine.
+
+4. **HIGH — [AIPlayerGPT.cpp:37781](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:37781): The repeat-pay renderer removes legal engine choices rather than merely shortening their descriptions.**  
+   **Trigger:** Intrepid Adversary offers legal `Add 2` through `Add 20` rows while current mana pays for one; lines 37788–37827 hide every intermediate row and expose only the largest ask, so the model cannot deliberately choose `Add 2`, `Add 3`, or any other hidden legal rung. The test at [AIPlayerGPT.cpp:71452](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:71452) pins this forbidden removal as correct.
+
+5. **MED — [AIPlayerGPT.cpp:12263](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:12263): The new library reserve counts optional draws already on the stack as mandatory, producing a false “cannot decline” claim and an artificially low recommended X.**  
+   **Trigger:** An unresolved `MayAbility` containing `draw:1 controller`—for example an Aven Fisher “you may draw” trigger—is recursively counted by `scanStackAbilityDraws` at lines 4366–4376; `xLibraryReserveWhy` then states that draw cannot be declined and folds it into the ceiling even though the player may decline it.
+
+6. **MED — [AIPlayerGPT.cpp:20505](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:20505): Merely finding a loop half in a graveyard is treated as proof that it can return, so the renderer can falsely claim that the pair is “one resolution from closing.”**  
+   **Trigger:** Sanguine Bond is on the battlefield, Exquisite Blood is in its controller’s graveyard, and neither player has a recursion effect or permission to cast it there; the graveyard entry sets `halfCanReturn=true`, producing the claim at lines 20297–20304. The assertion at [AIPlayerGPT.cpp:71763](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:71763) explicitly pins this unsupported expectation.
+
+7. **HIGH — [AIPlayerGPT.cpp:44296](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:44296): An unusable mandatory-reveal reply is auto-answered with the first eligible card, bypassing both the model’s legal choice and the requested heuristic selection.**  
+   **Trigger:** A mandatory tutor reveals several eligible enchantments and receives an empty or malformed reply; lines 44296–44309 select the first eligible vector element automatically. The second safety net at [AllAbilities.cpp:1341](/home/magi/Projects/wagicGPT/projects/mtg/src/AllAbilities.cpp:1341) repeats the same behavior for any zero-click mandatory chooser, and [AIPlayerGPT.cpp:71126](/home/magi/Projects/wagicGPT/projects/mtg/src/AIPlayerGPT.cpp:71126) pins first-eligible selection rather than a heuristic decision.
+
+## Verdict
+
+The diff is **not safe to ship as-is**. It introduces three separate doctrine violations that suppress or auto-answer legal decisions, a boundary error that silently converts one legal repetition into a pass while emitting a false receipt, and two render calculations that assert facts not established by the engine state. The transport ordering examined here did not yield a wave-67-specific refutation, but the defects above are independently release-blocking and are precisely the sort of failures a green suite and the current PARSETEST cases would miss—or, in three cases, affirmatively bless.
