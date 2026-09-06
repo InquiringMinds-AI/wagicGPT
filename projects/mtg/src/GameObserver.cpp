@@ -582,6 +582,9 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
 #else
 #define ADVANCE_REFUSED(why) do { } while (0)
 #endif
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    if (advProbe) { fprintf(stderr, "[advanceprobe] ENTRY allow=%d log=%d t=%d ph=%d step=%d cur=%s act=%s intr=%s settled=%d/%d/%d ticks=%d\n", (int) allowInterrupt, (int) log, turn, (int) mCurrentGamePhase, (int) combatStep, currentPlayer == players[0] ? "p1" : "p2", currentActionPlayer == players[0] ? "p1" : (currentActionPlayer ? "p2" : "-"), isInterrupting ? (isInterrupting == players[0] ? "p1" : "p2") : "-", mSettledTurn, (int) mSettledPhase, mSettledStep, mPhaseTicks); fflush(stderr); }
+#endif
     //W53-DELVER (owner Vita report 2026-08-28; generalised per his note to every
     //step trigger - end of turn, the opponent's upkeep, ...): no phase advance
     //while the human seat has a reveal display open or about to open. Applies
@@ -761,10 +764,12 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
         || LegalActionsOracle::hasInstantResponse(phaseResponder)
     ))
     {
-        mLayers->stackLayer()->AddNextGamePhase();
+        int added = mLayers->stackLayer()->AddNextGamePhase();
+        ADVANCE_REFUSED(added ? "(not refused) -> AddNextGamePhase queued" : "AddNextGamePhase returned 0 (NOT_RESOLVED item present)");
     }
     else
     {
+       ADVANCE_REFUSED("(not refused) -> nextGamePhase direct");
        nextGamePhase(); 
     }
 }
@@ -3011,7 +3016,11 @@ bool GameObserver::processActions(bool undo
         //#W56-E: the engine already made this click itself (auto-tap for an
         //equip/activation cost). Re-issuing it is either refused for ever or
         //pays twice - honour the record by consuming the engine's own action.
-        if (lenient && !mReplayEngineActions.empty())
+        //WAGIC_REPLAY_NOCONSUME=1 (dev): keep a synthetic line appended to a
+        //record from being swallowed by a STALE engine action from an earlier
+        //turn - the list is never pruned, and the key ignores the turn (softlock
+        //1788650768: a synthetic `next` was 'consumed' and nothing was tested).
+        if (lenient && !mReplayEngineActions.empty() && !getenv("WAGIC_REPLAY_NOCONSUME"))
         {
             for (list<string>::iterator eit = mReplayEngineActions.begin(); eit != mReplayEngineActions.end(); eit++)
             {
