@@ -1,0 +1,43 @@
+#NAME: A#>W# applied through the GPT seam removes loyalty and deals no player damage (#W65-AM G2)
+#DESC: Wave-64 engine HIGH-2: the A#>W# grammar was rendered, parsed and echoed,
+#DESC: and BOTH walker attacks in the corpus delivered 0. 123v126 seq 25 declared
+#DESC: an unblockable 5/5 at a 4-loyalty Sorin; seq 26->27 ran Attackers -> Main 2
+#DESC: with no combat-damage event of any kind, Sorin still read 4 loyalty at
+#DESC: seq 32 and the opponent's life was 23 before and after. 5 damage vanished.
+#DESC: The wave-64 fixture (w64ai_attack_planeswalker) pins the ENGINE path -
+#DESC: a scripted click, then the rule's menu answered on a LATER tick - and that
+#DESC: path works. The defect is one layer above it, in the seam the model's
+#DESC: reply actually rides: DecisionManager::applyDeclareAttackers answered the
+#DESC: rule's menu in the SAME tick it clicked, but MenuAbility only arms its
+#DESC: menu from Update() on the following tick, so menuObject was always NULL,
+#DESC: the answer was never given, and the fall-through declared an ordinary
+#DESC: attack - which the walker menu then TOGGLED BACK OFF when it finally
+#DESC: armed. Neither the player nor the planeswalker was ever damaged.
+#DESC: `aideclareattack` drives that seam with the same arguments
+#DESC: AIPlayerGPT::chooseAttackers passes, so this is the declaration END TO END:
+#DESC: declare A1>W1 -> combat damage -> loyalty counters removed.
+#DESC: Hill Giant (3/3) at Jace Beleren (3 loyalty) kills Jace exactly, and the
+#DESC: defending player's life is untouched at 20 - damage sent at a walker never
+#DESC: reduces a life total, so 20 is also the falsifier for the fall-through
+#DESC: (an ordinary attack would read 17).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Jace Beleren
+life:20
+[DO]
+goto attackers
+aideclareattack Hill Giant > Jace Beleren
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

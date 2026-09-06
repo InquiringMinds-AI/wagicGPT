@@ -695,6 +695,16 @@ private:
     //declines keep a fresh look every turn plus one re-look; the map
     //clears on turn change. Keyed by rendered option line.
     std::map<string, int> mPassDeclineCount;
+    //#W65-AM (G7, deck123 HIGH-2, DOCTRINE): the BOARD the last decline of each
+    //line was made over. A two-decline cap with no re-opener is a hard cap on
+    //legal choices - 162 seq 66/69 retired the free {T} token-maker rows for the
+    //turn, and when Intruder Alarm resolved in main 1 (seq 73) the menu held
+    //only three equips, so the combo could not fire on the turn it assembled.
+    //A decline is an answer about the board it was given on: when that board
+    //moves, the allowance starts again. Nothing is cached blind and nothing is
+    //rendered from this map - it never enters mPromptTail, the ask key or the
+    //option-set key (the wave-61 livelock class is untouched).
+    std::map<string, string> mPassDeclineBoard;
     int mPassDeclineTurn;
 
     //Modal-DFC flip-thrash cap (R-DFC-FLIP, deck102 wave-22): the in-hand

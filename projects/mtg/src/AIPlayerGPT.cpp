@@ -8163,6 +8163,31 @@ static string resolveOwningCardName(const MTGCardInstance * c, int depth = 0)
     return resolveOwningCardName(c->storedSourceCard, depth + 1);
 }
 
+//#W65-AM (G3, engine HIGH-3): the CHAIR half of the same ladder.
+//
+//Wave 64 moved the activation line's actor onto `e->source->controller()` - but
+//on a `targetedplayer` grant `e->source` IS the nameless dummy, and the dummy's
+//controller is the GRANTEE, the very player the event's own `controller` already
+//named. The two facts were identical, so the fix changed nothing at the seam the
+//corpus exercises: 126v130 seq 16 still prints, verbatim,
+//  - You cast Tribute to Hunger
+//  - Your Tribute to Hunger resolved and went to your graveyard
+//  - Opponent used: Gain life equal to its toughness with Tribute to Hunger ...
+//  - You gained 1 life (now 21)
+//10 lines over 5 events and 3 games, unchanged from wave 63. The NAME half was
+//already right because resolveOwningCardName walks `storedSourceCard` back to
+//the granting card; the CHAIR has to walk the SAME link, or the two halves of
+//one sentence name two different cards.
+//
+//Pure over the one fact that separates the two cases (a granted dummy carries no
+//name of its own - that is precisely why the name ladder exists), so PARSETEST
+//can pin it in both directions.
+bool activationSourceIsGrantedDummy(const string& sourceDisplayName,
+                                    const string& sourceRawName)
+{
+    return sourceDisplayName.empty() && sourceRawName.empty();
+}
+
 //W42-D2, THE VERB SEAM. Every activation line - both seats, every decision path
 //- selects its verb HERE and nowhere else. There is an OPEN OWNER QUESTION on
 //the wording ("Opponent chose ..." reads better than "Opponent used ..." for a
@@ -8195,6 +8220,25 @@ bool activationActorIsMine(bool activatorIsMe, bool cardControllerKnown,
                            bool cardControllerIsMine)
 {
     return cardControllerKnown ? cardControllerIsMine : activatorIsMe;
+}
+
+//#W65-AM (G3): the chair chosen over the LADDER the NAME already walks. Each
+//rung is (this card carries a name of its own, its controller: 1 mine / 0
+//theirs / -1 unknown), ordered from the event's source outward through
+//storedSourceCard - exactly the chain resolveOwningCardName descends. The first
+//NAMED rung is the card that is speaking, and its controller is the actor; a
+//chain that reaches no named card falls back to the event's own activator,
+//which is what wave 64 already did for an unknown controller.
+//This is the whole G3 fix: wave 64 asked the FIRST rung for its controller, and
+//on a granted dummy that rung is unnamed and controlled by the GRANTEE.
+bool activationChairOverLadder(bool activatorIsMe,
+                               const vector<std::pair<bool, int> >& rungs)
+{
+    for (size_t i = 0; i < rungs.size(); i++)
+        if (rungs[i].first)
+            return activationActorIsMine(activatorIsMe, rungs[i].second >= 0,
+                                         rungs[i].second == 1);
+    return activationActorIsMine(activatorIsMe, false, false);
 }
 
 //W41-3(a) / W42-D2: THE ONE narration of an activation, rendered from whichever
@@ -18158,9 +18202,22 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //clicking player (see activationActorIsMine). `mine` above still
         //gates the consumed-decision de-dup, which is keyed on the seat that
         //ACTED and must not move.
-        Player * cardCtrl = e->source->controller();
-        const bool narrationMine = activationActorIsMine(mine, cardCtrl != NULL,
-                                                         cardCtrl == this);
+        //#W65-AM (G3): walk the SAME storedSourceCard chain the name ladder
+        //walks and take the chair from the first card that carries a name.
+        //Wave 64 asked e->source->controller() - and on a `targetedplayer`
+        //grant e->source is the nameless dummy whose controller IS the grantee,
+        //so the chair it produced was byte-identical to the event's own and the
+        //corpus line never moved.
+        vector<std::pair<bool, int> > chairRungs;
+        for (MTGCardInstance * lc = e->source; lc && chairRungs.size() <= 4;
+             lc = lc->storedSourceCard)
+        {
+            Player * lcCtrl = lc->controller();
+            chairRungs.push_back(std::make_pair(
+                !activationSourceIsGrantedDummy(lc->getDisplayName(), lc->name),
+                lcCtrl ? (lcCtrl == this ? 1 : 0) : -1));
+        }
+        const bool narrationMine = activationChairOverLadder(mine, chairRungs);
         return abilityActivationNarration(narrationMine,
                                           scriptTokenDisplayCase(e->abilityText, e->source),
                                           owningName + handle,
@@ -28645,9 +28702,43 @@ static string fetchLineKey(const string& line)
 //first, conditional on the pass (picking another option costs nothing), and no
 //affirmative "you will be offered this again" converse - absence stays silent
 //rather than becoming a promise the seam cannot keep.
+//#W64-AI (F4) / #W65-AM (G2, deck152 LOW): the W-row section's scope paragraph.
+//It named the destination and what damage there does NOT do, and said nothing
+//about what a planeswalker does in COMBAT. Under the trust doctrine a silent
+//omission is worse than wrong text - the model confabulates rules into gaps -
+//and the one combat question these rows invite is "can it block me back?".
+//Stated where it is read, in the restriction-first register (no affirmative
+//"planeswalkers can ..." substring for a pilot to latch).
+static const char * kAttackTargetScopeFacts =
+    "Damage sent at a planeswalker does NOT reduce their life total, and a"
+    " planeswalker they still control keeps activating its abilities every turn."
+    " Blocking works the same either way: they may block an attacker with their"
+    " CREATURES whichever it is aimed at - and a planeswalker is not a creature,"
+    " so a planeswalker can never block.\n";
+
+//#W65-AM (G7): the scope the decline allowance re-opens on. A decline is an
+//answer about the BOARD it was given on, and a phase advance is not a board
+//change - serializeGameState's first line is the phase/turn header, so keying
+//the re-opener on the raw board key would restart the allowance ~10 times a
+//turn and turn a churn control into churn. Everything AFTER that line is game
+//state (day/night, both lives, both battlefields, the stack, the mana line, the
+//zone counts): that is what "the board moved" means here.
+//Pure, so PARSETEST can pin both directions.
+static string declineBoardScope(const string& boardKey)
+{
+    size_t nl = boardKey.find('\n');
+    return nl == string::npos ? string() : boardKey.substr(nl + 1);
+}
+
 static string lastOfferClause(bool retiresOnPass)
 {
-    return retiresOnPass ? " {if you pass here, this option is not offered again this turn}"
+    //#W65-AM (G7): the clause said "this turn", and the retirement no longer
+    //lasts a turn - any board change re-opens the allowance. Saying "this turn"
+    //over a rule that re-opens is a rendered non-fact, and the direction it
+    //errs in is the one that costs plays (a pilot that believes the row is gone
+    //for good takes it early). The row is priced by what it now IS.
+    return retiresOnPass ? " {if you pass here, this option is not offered again"
+                           " until the board changes}"
                          : "";
 }
 
@@ -28800,6 +28891,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (mPassDeclineTurn != observer->turn)
     {
         mPassDeclineCount.clear();
+        mPassDeclineBoard.clear(); //#W65-AM (G7)
         mFlipDoneCount.clear();
         mPassDeclineTurn = observer->turn;
         //#W48-F1: a repeat-N plan is an answer about THIS turn's priority
@@ -28846,6 +28938,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         const std::pair<string, const OrderedAIAction *>& b)
                      { return (asTurnSide(a.second->ability) != NULL)
                               < (asTurnSide(b.second->ability) != NULL); });
+    //The dedupe/deadlock key is board state + question, NOT the assembled
+    //prompt: consuming an answer appends to the narration and updates the
+    //plan, and a full-prompt key would read that as a state change.
+    //#W65-AM (G7): computed HERE rather than after the option list, because the
+    //decline allowance below is scoped to the board a decline was given on.
+    //serializeGameState() only reads the game; nothing between here and its old
+    //site mutates it, so the value is byte-identical to the one that was built
+    //there.
+    string boardKey = serializeGameState();
     vector<string> renderRows; //#W48 (D2): the rendered option rows, pre-collapse
     for (size_t c = 0; c < renderOrder.size(); c++)
     {
@@ -28895,10 +28996,38 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //a loop's moving digits would mint a fresh key at every activation and
         //silently retire the two-decline allowance for exactly the option
         //class the allowance matters most for.
-        std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line)
-                                                                              : stripRepeatAnnotation(line));
+        const string declineKey = fetchLine ? fetchLineKey(line) : stripRepeatAnnotation(line);
+        std::map<string, int>::iterator dc = mPassDeclineCount.find(declineKey);
         int declineCap = fetchLine ? 1 : 2;
         int declines = (dc != mPassDeclineCount.end()) ? dc->second : 0;
+        //#W65-AM (G7, deck123 HIGH-2, DOCTRINE): a hard cap on legal choices is
+        //forbidden - "enforce legality without constraining choice". The cap
+        //retired rows for the REST OF THE TURN with no re-opener at all, and
+        //162 seq 66/69 -> 73 is the cost: the free {T} token-maker rows were
+        //retired, then Intruder Alarm RESOLVED in main 1 and the menu that
+        //should have shown the combo held only three equips. A decline is an
+        //answer about the board it was given on; when that board moves it is no
+        //longer an answer to this question, so the allowance starts again.
+        //The re-opener is the board key the window already builds - the same
+        //value the ask cache and the re-ask memory key on - so "changed" means
+        //exactly what it means everywhere else in this seam. Nothing is cached
+        //blind: an UNCHANGED board still honours the two declines, which is the
+        //churn the cap was built for (a held fetch-crack re-asked at 44-97
+        //windows a game).
+        if (declines >= declineCap)
+        {
+            std::map<string, string>::iterator db = mPassDeclineBoard.find(declineKey);
+            //An EMPTY stamp is the consume-on-choose marker (a fetch already
+            //cracked this turn): spent, not declined, and no board change
+            //brings it back.
+            if (db == mPassDeclineBoard.end()
+                || (!db->second.empty() && db->second != declineBoardScope(boardKey)))
+            {
+                mPassDeclineCount.erase(declineKey);
+                mPassDeclineBoard.erase(declineKey);
+                declines = 0;
+            }
+        }
         if (declines >= declineCap)
             continue;
         shown.push_back(cand);
@@ -29221,10 +29350,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
     tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
 
-    //The dedupe/deadlock key is board state + question, NOT the assembled
-    //prompt: consuming an answer appends to the narration and updates the
-    //plan, and a full-prompt key would read that as a state change.
-    string boardKey = serializeGameState();
     //#W53-N (D2): the model's own hold, honoured. No model call, no window
     //removed from the record - the row the model took said this.
     //#W61-U (C14): measured over the same rows the latch reads, before the
@@ -29651,7 +29776,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //re-ask multiplier; deck44's target-flip re-ask). Next turn
             //re-offers.
             if (isFetchCrackLine(shownLines[actRow]))
+            {
                 mPassDeclineCount[fetchLineKey(shownLines[actRow])] = 2;
+                //#W65-AM (G7): a TAKEN fetch is CONSUMED for the turn, not
+                //declined over a board. The empty stamp is that marker, and the
+                //re-opener above skips it - a crack already spent must not come
+                //back when the fetched land changes the board.
+                mPassDeclineBoard[fetchLineKey(shownLines[actRow])] = string();
+            }
             //Count a consumed DFC flip toward the per-turn thrash cap.
             if (AATurnSide * cats = asTurnSide(shown[actRow]->ability))
             {
@@ -29699,9 +29831,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //already counted here; keying its own text would spend a second
             //decline allowance on the same action and retire it a window early.
             for (int s = 0; s < baseIndex; s++)
-                mPassDeclineCount[isFetchCrackLine(shownLines[s])
+            {
+                const string dk = isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s])
-                                  : stripRepeatAnnotation(shownLines[s])]++;
+                                  : stripRepeatAnnotation(shownLines[s]);
+                mPassDeclineCount[dk]++;
+                //#W65-AM (G7): the BOARD it was declined on (phase header excluded)
+                mPassDeclineBoard[dk] = declineBoardScope(boardKey);
+            }
         //#W48-D13: a pass, or a decision handed to the heuristic, is the loop
         //being broken - the consecutive count starts again from nothing.
         if (choice <= 0 || (holdRow > 0 && choice == holdRow))
@@ -38524,10 +38661,7 @@ int AIPlayerGPT::chooseAttackers()
                          " many counters, and it dies at 0]";
             tail << "\n";
         }
-        tail << "Damage sent at a planeswalker does NOT reduce their life total, and"
-                " a planeswalker they still control keeps activating its abilities"
-                " every turn. Blocking works the same either way: they may block an"
-                " attacker whichever it is aimed at.\n";
+        tail << kAttackTargetScopeFacts;
     }
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
@@ -49667,7 +49801,12 @@ void AIPlayerGPT::runParseSelfTest()
         // POSITIVE: at the last window the allowance affords, the clause is on
         // the row - the fact the pilot cannot derive (deck146 vs125 seq 51: the
         // second and final upkeep offer of a LETHAL animation, opponent at 1).
-        CHECK(lastOfferClause(true) == " {if you pass here, this option is not offered again this turn}",
+        //#W65-AM (G7): the retirement is no longer turn-scoped - a board change
+        //re-opens the allowance - so the clause says that instead. Everything
+        //else this block pins (conditional on the PASS, no affirmative converse,
+        //no residue in the record) is unchanged.
+        CHECK(lastOfferClause(true) == " {if you pass here, this option is not offered again"
+                                       " until the board changes}",
               "#W47-R4 the last-offer clause states the restriction on this window's pass");
         // NEGATIVE 1: with allowance left, the row says nothing at all - absence
         // is never turned into a promise the seam cannot keep (whether a later
@@ -64112,6 +64251,193 @@ static const char * kW50Y_r94 =
         // X. With the Staff draw owed the best X is 10; without it, 11.
         CHECK(xLibraryCeilingX(20, 1, 12, 2) == 10 && xLibraryCeilingX(20, 1, 12, 1) == 11,
               "#W64-AK R9 the badge's ceiling is one higher once the stale reserve is dropped");
+    }
+
+    cout << "\n[#W65-AM G3] the activation chair walks the granted-ability ladder\n";
+    {
+        // The wave-64 fix asked e->source->controller(). On a `targetedplayer`
+        // grant e->source is a NAMELESS dummy whose controller is the GRANTEE -
+        // the same chair the event already named - so nothing moved: 126v130
+        // seq 16 still printed the lane's own falsifier verbatim, 10 lines over
+        // 5 events and 3 games. The chair now walks storedSourceCard exactly as
+        // resolveOwningCardName does for the name.
+        // POSITIVE: is this source a granted dummy? Only a card with no name of
+        // any kind is.
+        CHECK(activationSourceIsGrantedDummy("", ""),
+              "#W65-AM G3 POSITIVE a source with no display name and no raw name is a"
+              " granted dummy - the rung the name ladder already skips");
+        // MUST-NOT-MATCH: a real card is never treated as a dummy, on either rung.
+        CHECK(!activationSourceIsGrantedDummy("Tribute to Hunger", "tribute to hunger")
+              && !activationSourceIsGrantedDummy("", "tribute to hunger")
+              && !activationSourceIsGrantedDummy("Tribute to Hunger", ""),
+              "#W65-AM G3 MUST-NOT-MATCH any name at all on either rung means the card"
+              " speaks for itself");
+        // THE REPRO, as the ladder: rung 0 is the dummy (unnamed, controlled by
+        // THEM, because the sacrificing player is the grantee); rung 1 is the
+        // card that granted it - my Tribute to Hunger.
+        {
+            vector<std::pair<bool, int> > rungs;
+            rungs.push_back(std::make_pair(false, 0)); //the dummy: unnamed, theirs
+            rungs.push_back(std::make_pair(true, 1));  //Tribute to Hunger: mine
+            CHECK(activationChairOverLadder(false /*they clicked*/, rungs),
+                  "#W65-AM G3 REPRO my Tribute to Hunger's granted ability is credited to ME"
+                  " even though THEY activated it");
+            // ...and the mirror, which is the other half of the same corpus lines
+            // (130v126 seq 31/47/67 read \"You used: ... Opponent gained 1 life\").
+            vector<std::pair<bool, int> > mirror;
+            mirror.push_back(std::make_pair(false, 1)); //the dummy: unnamed, mine
+            mirror.push_back(std::make_pair(true, 0));  //their Tribute to Hunger
+            CHECK(!activationChairOverLadder(true /*I clicked*/, mirror),
+                  "#W65-AM G3 REPRO their Tribute to Hunger is theirs even when I am the"
+                  " one sacrificing");
+        }
+        // MUST-NOT-MATCH: this is exactly what wave 64 shipped, and it is why the
+        // fix could not move the line - asking rung 0 alone gives the grantee.
+        {
+            vector<std::pair<bool, int> > rung0only;
+            rung0only.push_back(std::make_pair(false, 0));
+            CHECK(!activationChairOverLadder(false, rung0only),
+                  "#W65-AM G3 MUST-NOT-MATCH a ladder that reaches no named card cannot"
+                  " credit the caster - it falls back to the activator, as before");
+        }
+        // MUST-NOT-MATCH: an ORDINARY activation (a real card at rung 0) is
+        // untouched in both chairs - the wave-64 behaviour stands where it was right.
+        {
+            vector<std::pair<bool, int> > own;
+            own.push_back(std::make_pair(true, 1));
+            CHECK(activationChairOverLadder(true, own) && activationChairOverLadder(false, own),
+                  "#W65-AM G3 MUST-NOT-MATCH my own card's activation is mine whoever clicked");
+            vector<std::pair<bool, int> > theirs;
+            theirs.push_back(std::make_pair(true, 0));
+            CHECK(!activationChairOverLadder(true, theirs) && !activationChairOverLadder(false, theirs),
+                  "#W65-AM G3 MUST-NOT-MATCH their own card's activation is theirs whoever clicked");
+        }
+        // NEGATIVE: an unknown controller on the named rung still falls back to
+        // the event's own value (the wave-64 rule, unchanged).
+        {
+            vector<std::pair<bool, int> > unknown;
+            unknown.push_back(std::make_pair(true, -1));
+            CHECK(activationChairOverLadder(true, unknown)
+                  && !activationChairOverLadder(false, unknown),
+                  "#W65-AM G3 NEGATIVE an unknown controller defers to the activator");
+        }
+        // NEGATIVE: an empty ladder (no source at all) cannot invent a chair.
+        CHECK(activationChairOverLadder(true, vector<std::pair<bool, int> >())
+              && !activationChairOverLadder(false, vector<std::pair<bool, int> >()),
+              "#W65-AM G3 NEGATIVE with no rungs at all the activator stands");
+        // ECHO: the corpus line, verbatim, from both chairs. 126v130 seq 16 read
+        // \"- Opponent used: Gain life equal to its toughness with Tribute to Hunger
+        // targeting Goblin #1\" two lines above \"- You gained 1 life (now 21)\".
+        {
+            vector<std::pair<bool, int> > rungs;
+            rungs.push_back(std::make_pair(false, 0));
+            rungs.push_back(std::make_pair(true, 1));
+            CHECK(abilityActivationNarration(activationChairOverLadder(false, rungs),
+                                             "Gain life equal to its toughness",
+                                             "Tribute to Hunger", "Goblin #1")
+                  == "You used: Gain life equal to its toughness with Tribute to Hunger"
+                     " targeting Goblin #1",
+                  "#W65-AM G3 ECHO the corpus line now agrees with the \"You gained 1 life\""
+                  " line beneath it");
+            vector<std::pair<bool, int> > mirror;
+            mirror.push_back(std::make_pair(false, 1));
+            mirror.push_back(std::make_pair(true, 0));
+            CHECK(abilityActivationNarration(activationChairOverLadder(true, mirror),
+                                             "Gain life equal to its toughness",
+                                             "Tribute to Hunger", "Goblin #1")
+                  == "Opponent used: Gain life equal to its toughness with Tribute to Hunger"
+                     " targeting Goblin #1",
+                  "#W65-AM G3 ECHO the peer seat's copy of the same event");
+        }
+    }
+
+    cout << "\n[#W65-AM G2] the W-row section states that a planeswalker cannot block\n";
+    {
+        const string scope = kAttackTargetScopeFacts;
+        CHECK(scope.find("a planeswalker is not a creature, so a planeswalker can never block")
+                  != string::npos,
+              "#W65-AM G2 POSITIVE the section states the combat fact its rows invite"
+              " (deck152 LOW)");
+        // MUST-NOT-MATCH: restriction-first - no affirmative substring a pilot can
+        // latch as \"planeswalkers block\", and no promise about the attack.
+        CHECK(scope.find("planeswalker can block") == string::npos
+              && scope.find("planeswalkers block") == string::npos
+              && scope.find("safe") == string::npos,
+              "#W65-AM G2 MUST-NOT-MATCH no affirmative blocking substring and no safety"
+              " promise");
+        // NEGATIVE: the two wave-64 facts are still there, byte for byte - this
+        // is additive, nothing was removed.
+        CHECK(scope.find("Damage sent at a planeswalker does NOT reduce their life total")
+                  == 0
+              && scope.find("keeps activating its abilities every turn") != string::npos,
+              "#W65-AM G2 NEGATIVE the wave-64 scope facts are unchanged");
+        // ECHO SHAPE: it is prose, not an annotation - no bracket or brace can
+        // hide an option label inside it, and it ends the line it owns.
+        CHECK(scope.find('[') == string::npos && scope.find('{') == string::npos
+              && scope[scope.size() - 1] == '\n',
+              "#W65-AM G2 echo: the paragraph carries no annotation syntax");
+    }
+
+    cout << "\n[#W65-AM G7] the decline allowance re-opens when the BOARD moves\n";
+    {
+        // deck123 HIGH-2 / DOCTRINE: `declineCap = 2` with no re-opener retired
+        // legal rows for the rest of the turn. 162 seq 66/69 retired the free
+        // {T} token-maker rows; Intruder Alarm then RESOLVED in main 1 (seq 73)
+        // and the menu held only three equips - the combo could not fire on the
+        // turn it assembled.
+        const string b1 = "Phase: Main phase 1 | It is your turn.\n"
+                          "Your life: 12 | Opponent life: 9\n"
+                          "Your battlefield: Springleaf Drum, Ornithopter\n";
+        const string b2 = "Phase: Combat begins | It is your turn.\n"
+                          "Your life: 12 | Opponent life: 9\n"
+                          "Your battlefield: Springleaf Drum, Ornithopter\n";
+        const string b3 = "Phase: Main phase 1 | It is your turn.\n"
+                          "Your life: 12 | Opponent life: 9\n"
+                          "Your battlefield: Springleaf Drum, Ornithopter, Intruder Alarm\n";
+        // POSITIVE: a permanent arriving IS a board change - the allowance
+        // re-opens and the retired row is offered again.
+        CHECK(declineBoardScope(b1) != declineBoardScope(b3),
+              "#W65-AM G7 POSITIVE Intruder Alarm resolving re-opens the declined rows");
+        // MUST-NOT-MATCH: a phase advance alone is NOT a board change. Keying on
+        // the raw board key would restart the allowance ~10 times a turn and turn
+        // a churn control into churn.
+        CHECK(declineBoardScope(b1) == declineBoardScope(b2),
+              "#W65-AM G7 MUST-NOT-MATCH a phase advance over an unchanged board does not"
+              " re-open the allowance");
+        CHECK(b1 != b2,
+              "#W65-AM G7 ...and that is a real distinction: the raw keys DO differ");
+        // NEGATIVE: a key with no newline at all yields no scope, so a malformed
+        // key can never compare EQUAL to a real board and silently keep a row
+        // retired.
+        CHECK(declineBoardScope("no newline here").empty()
+              && declineBoardScope(b1) != declineBoardScope("no newline here"),
+              "#W65-AM G7 NEGATIVE a key with no header line scopes to nothing");
+        // The ROW's clause: it said \"this turn\", and the retirement is no longer
+        // scoped to a turn.
+        CHECK(lastOfferClause(true) == " {if you pass here, this option is not offered again"
+                                       " until the board changes}",
+              "#W65-AM G7 POSITIVE the clause is priced by what the rule now IS");
+        CHECK(lastOfferClause(true).find("this turn") == string::npos,
+              "#W65-AM G7 MUST-NOT-MATCH the turn-scoped claim is not producible");
+        CHECK(lastOfferClause(false).empty(),
+              "#W65-AM G7 NEGATIVE a row with allowance left still carries no timing clause");
+        CHECK(lastOfferClause(true).find("will be offered") == string::npos,
+              "#W65-AM G7 NEGATIVE no affirmative converse a pilot could read as permission"
+              " to wait");
+        // ECHO SHAPE: the reworded clause rides the rendered row only - it still
+        // leaves no residue in the narrated record and a reply copying it binds.
+        {
+            vector<string> pri;
+            pri.push_back("becomes beholder with Hive of the Eye Tyrant [cost: {3}{b}]");
+            pri.push_back("Cast nothing right now");
+            bool stG7 = false;
+            CHECK(parseChoice("CHOICE: 1 (" + pri[0] + lastOfferClause(true) + ")",
+                              2, &pri, &stG7, NULL) == 1 && !stG7,
+                  "#W65-AM G7 echo: a reply copying the reworded clause still binds to index 1");
+            CHECK(stripNarrationDecoration(pri[0] + lastOfferClause(true))
+                  == stripNarrationDecoration(pri[0]),
+                  "#W65-AM G7 echo: the reworded clause leaves no residue in the record");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

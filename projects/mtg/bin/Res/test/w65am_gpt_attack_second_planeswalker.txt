@@ -1,0 +1,39 @@
+#NAME: A#>W2 applied through the GPT seam binds the SECOND walker, not the first (#W65-AM G2)
+#DESC: The companion to w65am_gpt_attack_planeswalker_damage: the same apply seam
+#DESC: with a two-walker board, so the INDEX is discriminating.
+#DESC: The apply path never answered the rule's menu at all (MenuAbility arms from
+#DESC: Update on the FOLLOWING tick, so ActionLayer::menuObject was always NULL
+#DESC: here and the wave-64 guard never fired); the fall-through then declared an
+#DESC: ordinary attack at the player.
+#DESC: MEASURED, so this fixture is not claiming it: once the menu IS answered by
+#DESC: identity, the non-first index binds correctly on its own - MenuAbility::
+#DESC: processAbility re-reads abilities[0], but reactToChoiceClick SAFE_DELETEs
+#DESC: the unchosen options and SAFE_DELETE NULLs the slot, so the `if(head)`
+#DESC: guard skips the re-derivation and the chosen target stands.
+#DESC: Hill Giant (3/3) sent at Jace Beleren (3 loyalty, the SECOND walker in
+#DESC: battlefield order) kills Jace exactly. Garruk Wildspeaker keeps its 4
+#DESC: loyalty and the defending player's life stays 20 - so a fall-through to the
+#DESC: ordinary attack rule (life 17) and a bind to the wrong walker (Garruk at 1,
+#DESC: Jace alive) are both failures of this assert.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Garruk Wildspeaker,Jace Beleren
+life:20
+[DO]
+goto attackers
+aideclareattack Hill Giant > Jace Beleren
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Garruk Wildspeaker
+graveyard:Jace Beleren
+life:20
+[END]

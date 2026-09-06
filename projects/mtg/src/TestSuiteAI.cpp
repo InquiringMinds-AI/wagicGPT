@@ -1114,6 +1114,60 @@ int TestSuiteAI::Act(float)
             ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
         }
     }
+    else if (action.find("aideclareattack ") == 0)
+    {
+        //#W65-AM (G2, engine HIGH-2): the GPT seat's ATTACK APPLY seam, driven
+        //directly. `A#>W#` was rendered, parsed and echoed in the wave-64 corpus
+        //and delivered ZERO damage twice out of two (123v126 seq 25: an
+        //unblockable 5/5 declared at a 4-loyalty Sorin; Attackers -> Main 2 with
+        //no combat-damage event, Sorin still at 4, their life unchanged). No
+        //scripted fixture can reach that seam - a scripted click goes through
+        //MTGPlaneswalkerAttackRule's menu on a LATER tick, which is exactly the
+        //path that WORKS - so the defect lived one layer above every existing
+        //fixture. This calls DecisionManager::buildDeclareAttackers +
+        //applyDeclareAttackers with the same arguments AIPlayerGPT::chooseAttackers
+        //does, so a fixture pins the declaration AND what combat then does with it.
+        //Syntax: aideclareattack <attacker name>[ > <planeswalker/battle name>]
+        string arg = action.substr(16);
+        string aName = arg, wName;
+        size_t gt = arg.find('>');
+        if (gt != string::npos)
+        {
+            aName = arg.substr(0, gt);
+            wName = arg.substr(gt + 1);
+        }
+        while (aName.size() && aName[aName.size() - 1] == ' ') aName.erase(aName.size() - 1);
+        while (wName.size() && wName[0] == ' ') wName.erase(0, 1);
+        while (wName.size() && wName[wName.size() - 1] == ' ') wName.erase(wName.size() - 1);
+        MTGCardInstance * atk = getCard(aName);
+        MTGCardInstance * pw = wName.size() ? getCard(wName) : NULL;
+        if (!atk)
+        {
+            std::cerr << "TESTSUITE aideclareattack: no card '" << aName
+                      << "' (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        if (wName.size() && !pw)
+        {
+            std::cerr << "TESTSUITE aideclareattack: no attack target '" << wName
+                      << "' (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        DecisionRequest req;
+        if (!DecisionManager::buildDeclareAttackers(atk->controller(), req))
+        {
+            std::cerr << "TESTSUITE aideclareattack: no attackers decision for '" << aName
+                      << "' (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        DecisionAction act;
+        act.attackers.push_back(atk);
+        act.attackerTargets.push_back(pw);
+        DecisionManager::applyDeclareAttackers(req, act);
+        DebugTrace("TESTSUITE aideclareattack " << aName << (wName.size() ? " > " : "") << wName
+                   << ": attacker=" << atk->isAttacker()
+                   << " target=" << (void *) atk->isAttacking << " [" << suite->filename << "]");
+    }
     else if (action.compare(0, 10, "aipending ") == 0)
     {
         //#W54-R: arm THIS seat as an interactive AI (the live-LLM branch of
