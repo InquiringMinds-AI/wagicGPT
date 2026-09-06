@@ -18,6 +18,13 @@ unix:QMAKE_CXXFLAGS += -std=gnu++14
 
 # Optional LLM-backed opponent (AIPlayerGPT) — Linux dev build only for now
 unix:DEFINES += WITH_GPT_AI
+
+# #W68-BE (R1): build-time guard - a `//` inside a constructor initializer
+# list silently deletes every initializer after it on that physical line
+# (wave 68 lost 29 of AIPlayerGPT's). The checker only fails on an
+# initializer that comment-stripping actually removes, so trailing tag
+# comments stay legal. Runs before every link of the dev build.
+unix:QMAKE_PRE_LINK += python3 $$PWD/tools/check-ctor-init.py $$PWD/src
 # audit-W54 O2: the reply-parser self-test corpus compiles in only here (desktop)
 unix:DEFINES += WAGIC_GPT_PARSETEST_BUILD
 unix:INCLUDEPATH += include/thirdparty

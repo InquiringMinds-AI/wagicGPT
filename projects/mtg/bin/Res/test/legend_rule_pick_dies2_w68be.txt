@@ -1,0 +1,26 @@
+#NAME: Legend rule - the other direction
+#DESC: #W68-BE (R2). The counterfactual of legend_rule_pick_dies_w68be.txt: the
+#DESC: OTHER printing is clicked, and it is the one that dies. Together the two
+#DESC: fixtures prove the survivor is decided by the pick and not by list order.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:140233,191239
+[PLAYER2]
+inplay:Mind Stone
+[DO]
+choice 1
+140233
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:191239
+graveyard:140233
+[PLAYER2]
+inplay:Mind Stone
+[END]

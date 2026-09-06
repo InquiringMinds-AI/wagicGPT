@@ -710,6 +710,16 @@ private:
     int mBlockRevReaskTurn;
     string mBlockRevReaskLine;
 
+    //#W68-BE (R4): the combat seams' ONE length-cap re-ask per turn, on its
+    //own latch. A reply the token cap cut before it wrote its ATTACK:/BLOCKS:
+    //line is not a decline and not an unparseable answer - it is the engine's
+    //own budget landing mid-sentence, which J3 promised buys one re-ask that
+    //quotes the cap. The ask and priority seams had it; these two delegated
+    //straight to the heuristic instead. Separate from the reversal latch so
+    //neither failure can spend the other's single arm.
+    int mAttackTruncReaskTurn;
+    int mBlockTruncReaskTurn;
+
     //Parse-shape signature for the NEXT translog record (parseChoice noteOut,
     //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
     //note can never leak onto a later, unrelated record.

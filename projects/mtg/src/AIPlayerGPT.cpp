@@ -7939,6 +7939,43 @@ static int repeatStopClampCount(int namedCount, int statedStop, int statedCurren
 //count under two (the `repeat_count_under_two` branch), so a stop that leaves
 //one runs one. Only a stop with no room left executes nothing, and then the
 //receipt's own number is 0. Pure, so the boundary is provable without a board.
+//#W68-BE (R4, codex review finding 4 - MED): the combat seams' length-cap
+//correction, pure so PARSETEST pins the exact words the model reads. It says
+//what happened (the cap, with its number), what was lost (nothing was declared)
+//and what to write instead - answer FIRST, then stop. Never Baka until it is
+//spent.
+static string combatTruncationReaskLine(bool attackersSeam, long maxTokens)
+{
+    std::ostringstream o;
+    o << "[RE-ASK] Your last reply hit its length limit (" << maxTokens
+      << " tokens) and was cut off before it wrote "
+      << (attackersSeam ? "an ATTACK: line" : "a BLOCKS: line")
+      << ", so nothing was declared. Answer again and write the "
+      << (attackersSeam ? "ATTACK:" : "BLOCKS:")
+      << " line FIRST - "
+      << (attackersSeam
+              ? "the attackers you mean to declare, or \"ATTACK: none\" to attack"
+                " with nobody this turn"
+              : "the assignments you mean, or exactly \"BLOCKS: none\" to block"
+                " with nobody this turn")
+      << " - then stop.";
+    return o.str();
+}
+
+//#W68-BE (R3, codex review finding 3 - HIGH): WHICH takes the stated stop clamps.
+//J1 was right that a stated stop applies to ANY activation of the same ability -
+//that is why the plain activation row now EARNS the re-ask. It does not follow
+//that the second, explicitly re-affirmed answer may be turned into a pass. The
+//model's stop is arithmetic over a COUNT ("stop=23, M=35"), so the clamp is
+//meaningful only where a count was taken; a single explicit activation, answered
+//again after the engine quoted the conflict back, is the model overriding its own
+//plan - which it may do, and which the no-auto-answer doctrine says the engine
+//must not convert into `choice = 0`. Counted rows clamp; a base row executes.
+static bool repeatStopClampApplies(bool repeatRowTaken, int stopTestCount)
+{
+    return repeatRowTaken && stopTestCount >= 1;
+}
+
 static bool repeatStopExecutesNothing(int allowed)
 {
     return allowed == 0;
@@ -14496,7 +14533,18 @@ long AIPlayerGPT::deadlineTenthsPct(long latencyMs, long timeoutMs)
 long AIPlayerGPT::deadlineTenthsPctOfAttempts(long firstMs, long secondMs, long timeoutMs)
 {
     const long a = deadlineTenthsPct(firstMs, timeoutMs);
-    const long b = deadlineTenthsPct(secondMs, timeoutMs);
+    //#W68-BE (R8, codex review finding 8 - LOW): the SECOND attempt is never given
+    //the original deadline. The retry arm hands it remainingTransportRetryMs - what
+    //the first leg left - and buildRequestBody uses that as the call's timeout, so
+    //dividing it by `timeoutMs` under-reports exactly the attempt at risk: a 120 s
+    //decision that fails transport at 20 s and then spends its whole 100 s remainder
+    //published 83.3% for a leg that consumed 100% of its budget. Each leg is now
+    //measured against the budget it actually ran under.
+    long secondBudget = (firstMs >= 0) ? remainingTransportRetryMs(timeoutMs, firstMs)
+                                       : timeoutMs;
+    if (secondBudget <= 0)
+        secondBudget = timeoutMs; //no knowable remainder: fall back to the deadline
+    const long b = deadlineTenthsPct(secondMs, secondBudget);
     return a > b ? a : b;
 }
 
@@ -15513,7 +15561,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), //#W68-BA (J3/J6) mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -20439,7 +20487,8 @@ static string yourLibraryLine(int libraryCards, int myLibraryInReveal)
 //The hand-size line must never read 0 for a hand that is merely DISPLACED into
 //a reveal zone for the duration of one decision. State the true size and say
 //where the cards are being shown.
-static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards)
+static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards,
+                                    bool deckOutBlocked = false) //#W68-BE (R7)
 {
     std::ostringstream o;
     o << "Opponent hand size: " << (oppHandCards + oppHandInReveal);
@@ -20455,7 +20504,21 @@ static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int 
     //decision (hold and pass, or race), and it states the engine rule it rests
     //on. It is a bare count-down, not a turn prediction: extra draws of theirs
     //only make it sooner, so "at most" is true whatever else is on the board.
-    if (oppLibraryCards >= 0 && oppLibraryCards <= 3)
+    //#W68-BE (R7, codex review finding 7 - MED): the engine's own draw-from-empty
+    //rule (MTGPlayerCards::drawFromLibrary) has THREE exceptions - the drawing
+    //player's CANTLOSE or CANTMILLLOSE, or the other side's CANTWIN - and under any
+    //of them the empty draw returns without setting a loser. The countdown promised
+    //a loss the engine will not deliver. The count is never hidden (the trust
+    //doctrine: render the true token); what changes is the consequence sentence.
+    if (oppLibraryCards >= 0 && oppLibraryCards <= 3 && deckOutBlocked)
+    {
+        o << " - they have " << oppLibraryCards << " card"
+          << (oppLibraryCards == 1 ? "" : "s") << " left, but DECKING THEM OUT DOES"
+             " NOT WIN: a permanent in play stops the empty-library loss (they cannot"
+             " lose, they cannot lose to milling, or you cannot win), so their draw"
+             " from an empty library ends the game for nobody";
+    }
+    else if (oppLibraryCards >= 0 && oppLibraryCards <= 3)
     {
         o << " - DECK-OUT IS IN RANGE: a player who must draw from an empty"
              " library LOSES, and they have " << oppLibraryCards << " card"
@@ -22723,7 +22786,8 @@ static bool castBodyEntersTapped(MTGCardInstance * card)
 //one and the total does not move at all - the floor is 0, and saying otherwise
 //would be the review's own premise stated as a fact. Only when EVERY creature
 //they control is in that total is a removal proven, and then it is the
-//SMALLEST contribution, because that is the one they will give up.
+//SMALLEST contribution - a bound that holds whichever body they choose, never
+//a prediction of their choice (#W68-BE R5).
 //The survival verdict obeys #W65-AL (G4): none is printed against a total the
 //line above calls a FLOOR. Pure over six numbers.
 static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor,
@@ -22760,18 +22824,28 @@ static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor,
         return o.str();
     }
     const int left = total - minAttackerPower;
+    //#W68-BE (R5, codex review finding 5 - MED): THEY choose the sacrifice, so
+    //`total - minAttackerPower` is the WORST CASE that can be left, never a
+    //prediction of which body they give up. At 10 life against a 2/2 and a 16/16
+    //(total 18, smallest 2) the shipped line read "you would be at -6; that STILL
+    //KILLS you" - but handing over the 16/16 leaves 2 and the seat is at 8. The
+    //bound holds in ONE direction only: it can never overturn survival, and it can
+    //never PROVE death. It is printed as the bound it is.
     o << " Every one of their " << theirCreatures << " creature"
       << (theirCreatures == 1 ? " is" : "s is")
       << " in that total, and the smallest of them contributes " << minAttackerPower
-      << " - that is the one they will give up - so this takes AT LEAST "
+      << ", so whichever one THEY hand over this takes AT LEAST "
       << minAttackerPower << " off it: " << total << " - " << minAttackerPower
-      << " = " << left << " -> you would be at " << (myLife - left);
+      << " = " << left << " is the MOST that can be left -> you could still be as low"
+         " as " << (myLife - left);
     if (totalIsFloor)
         o << ". THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from is a"
              " FLOOR, so a larger crack-back than " << total << " is on the table and"
              " this row does not say whether you survive";
     else if (myLife - left <= 0)
-        o << "; that STILL KILLS you";
+        o << " - a KILL IS POSSIBLE, not certain: THEY pick which creature to give"
+             " up, and giving up a bigger one leaves less than " << left
+          << ". This row does not prove you die and it does not prove you live";
     else
         o << ", which you SURVIVE - and they can only give up MORE than "
           << minAttackerPower << ", never less, so nothing uncounted here overturns it";
@@ -24295,8 +24369,17 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                      myCreatures > 0,
                                                      crackBackFloorSources(opp)); //#W61-R (C3)
         }
+        //#W68-BE (R7): the three exceptions MTGPlayerCards::drawFromLibrary itself
+        //checks before it declares a loser - the drawing player's CANTLOSE or
+        //CANTMILLLOSE, or the OTHER side's CANTWIN. Asked of the same zones the
+        //engine asks, so the forecast cannot disagree with the rule it cites.
+        const bool deckOutBlocked =
+            (opp->game->inPlay->hasAbility(Constants::CANTLOSE)
+             || opp->game->inPlay->hasAbility(Constants::CANTMILLLOSE)
+             || game->inPlay->hasAbility(Constants::CANTWIN));
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
-                                              opp->game->library->nb_cards); //#W44-6
+                                              opp->game->library->nb_cards,
+                                              deckOutBlocked); //#W44-6, #W68-BE (R7)
         //Artifact counts feed metalcraft/affinity-style decisions and are
         //tedious to re-count from the board lines.
         int myArtifacts = 0, oppArtifacts = 0;
@@ -24940,9 +25023,11 @@ static string stripNarrationDecoration(const string& in)
                 //#W63-AC (E5): the rung ceiling explains THIS menu's top row
                 //and says nothing about what happened.
                 || (in.compare(i, 15, "{rung ceiling: ") == 0)
-                //#W68-BB (J5): the post-announcement decline's forfeiture clause
-                //prices THIS window's pool; the moment the step ends it is false.
-                || (in.compare(i, 24, "{declining now FORFEITS ") == 0)
+                //#W68-BB (J5): the post-announcement decline's clause prices THIS
+                //window's pool; the moment the step ends it is false.
+                //#W68-BE (R6): its opening words changed with the wording fix, and
+                //this prefix is what keeps it out of history - they move together.
+                || (in.compare(i, 19, "{declining strands ") == 0)
                 //#W68-BB (J9): the pending stack's death verdict is true of the
                 //stack in front of the model, and of nothing afterwards.
                 || (in.compare(i, 20, "{answers the stack: ") == 0)
@@ -25314,9 +25399,18 @@ static string xDeclineForfeitClause(int floating)
     if (floating <= 0)
         return "";
     std::ostringstream o;
-    o << " {declining now FORFEITS the " << floating << " mana already paid: the card comes"
-         " back to your hand but the mana does not - your sources stay tapped, and any"
-         " floating mana you do not spend before this step ends is lost}";
+    //#W68-BE (R6, codex review finding 6 - MED): "FORFEITS" was false, and
+    //castAbandonedNarration one screen later said so in the seat's own log ("still
+    //floating, unspent"). Declining strands the mana, it does not destroy it: the
+    //sources stay tapped, the pool stays in the pool, and it is spendable on any
+    //other spell or ability taken before the step ends. What IS true is that no row
+    //on THIS list can use it - the list only sets X for the cast being cancelled.
+    o << " {declining strands the " << floating << " mana already paid: the card comes"
+         " back to your hand, your sources STAY TAPPED, and the " << floating
+      << " mana stays floating in your pool. No row on this list can spend it - this"
+         " list only sets X for the cast you are cancelling - but any other spell or"
+         " ability you take before this step ends can, and whatever is still floating"
+         " when the step ends is lost}";
     return o.str();
 }
 
@@ -27302,6 +27396,14 @@ const char * kSelfTargetClause = " {this hits YOUR permanent}";
 //#W68-BC (MED, deck146 s51): the legend-rule ask's missing sentence. The
 //model is owed the RULE (CR 704.5j) and the one thing about it that is most
 //easily assumed wrong - the copies do not merge. Pure, so PARSETEST pins the
+//#W68-BE (R2, codex review finding 2 - HIGH): the wave-68 clause said "you KEEP
+//the one you pick here" and the engine does the opposite. MTGRules.cpp's
+//MTGNewLegend::MoveLegend builds a GenericTargetAbility over an AAMover to
+//"ownergraveyard", and AAMover::resolve moves the SELECTED target - so the copy
+//the pilot clicks is the copy that dies. Verified by fixture, both directions
+//(bin/Res/test/legend_rule_pick_dies_w68be.txt): two printings of Ajani Goldmane,
+//click one, the CLICKED one is in the graveyard and the other is on the
+//battlefield. The clause now states the engine's own semantics.
 //wording; the loyalty numbers ride the ROWS (describeTarget), not this clause,
 //because they are per-copy facts and the clause is the rule.
 string legendRuleTargetClause(const string& name, int copies)
@@ -27309,11 +27411,12 @@ string legendRuleTargetClause(const string& name, int copies)
     std::ostringstream o;
     o << " LEGEND RULE (CR 704.5j): you control " << copies
       << " legendary permanents named \"" << name
-      << "\" - you KEEP the one you pick here and the other"
-      << (copies > 2 ? "s go" : " goes")
-      << " to its owner's graveyard now. The copies do NOT merge: no counters,"
+      << "\" - the one you pick on this list is the one that GOES TO ITS OWNER'S"
+         " GRAVEYARD now; the other" << (copies > 2 ? "s stay" : " stays")
+      << " on the battlefield. Pick the copy you want to LOSE, not the copy you"
+         " want to keep. The copies do NOT merge: no counters,"
          " no damage, no attachments and no abilities move between them, so the"
-         " one you keep has exactly what is already printed on its row and"
+         " one that stays has exactly what is already printed on its row and"
          " nothing from the other" << (copies > 2 ? "s" : "") << ".";
     return o.str();
 }
@@ -33978,12 +34081,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 //and a reply that states a NEW stop above its count is not
                 //clamped at all (repeatStopClampCount returns -1 and the count
                 //stands). Both numbers are recorded verbatim.
-                if (repeatPastStop)
+                //#W68-BE (R3): the clamp is for COUNTED takes only. A base row that
+                //earned the re-ask and was answered again is executed as given, and
+                //the record says which of the two happened.
+                if (repeatPastStop && !repeatStopClampApplies(repeatRowTaken, stopTestCount))
+                {
+                    std::ostringstream sr;
+                    sr << "stop_conflict_single_activation_executed(stated_M=" << planCurrent
+                       << ",stated_stop=" << planStop << ",executed=1)";
+                    appendParseNote(&mLastParseNote, sr.str().c_str());
+                }
+                else if (repeatPastStop)
                 {
                     //#W68-BA (J1): the count the clamp performs is the count the
-                    //guard tested - the named repeats, or the ONE activation a base
-                    //row is. On this branch stop - M <= 0, so `allowed` is 0 and the
-                    //window resolves as the pass the model's own arithmetic demands.
+                    //guard tested - the named repeats. On this branch stop - M <= 0,
+                    //so `allowed` is 0 and the window resolves as the pass the
+                    //model's own arithmetic demands.
                     const int allowed = repeatStopClampCount(stopTestCount, planStop, planCurrent);
                     if (allowed >= 0)
                     {
@@ -44151,10 +44264,14 @@ int AIPlayerGPT::chooseAttackers()
     //blockers seam does with its gang correction - the changed text is what makes
     //the corrected question a fresh call instead of a replay of the answer that
     //earned it. The latch is cleared when the turn moves on.
-    if (mAttackReaskTurn != observer->turn)
+    //#W68-BE (R4): the cap re-ask shares the correction LINE (only one correction
+    //can be pending at a time) but not the LATCH - the line survives while either
+    //arm holds this turn.
+    if (mAttackReaskTurn != observer->turn && mAttackTruncReaskTurn != observer->turn)
         mAttackReaskLine.clear();
     const bool attackReasked = (mAttackReaskTurn == observer->turn && !mAttackReaskLine.empty());
-    if (attackReasked)
+    const bool attackTruncReasked = (mAttackTruncReaskTurn == observer->turn); //#W68-BE (R4)
+    if (!mAttackReaskLine.empty() && (attackReasked || attackTruncReasked))
         tail << "\n" << mAttackReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     const string attackTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
@@ -44240,6 +44357,32 @@ int AIPlayerGPT::chooseAttackers()
         }
     }
 
+    //#W68-BE (R4, codex review finding 4): J3 shipped a per-seam token cap AND the
+    //promise - printed in the protocol - that a reply cut before its answer is asked
+    //again. The ask and priority seams honour it; this seam went straight to the
+    //heuristic, so the cap this wave introduced could silently REMOVE the seat's own
+    //combat declaration. A reply that reports finish_reason "length" and parsed to no
+    //usable declaration is the cap landing mid-sentence, not the model declining:
+    //ONE re-ask per turn, quoting the number, and the heuristic only after it.
+    //Nothing is capped or withheld here - the same question is put once more.
+    if (result < 0 && mLastFinishLength && !content.empty() && !attackTruncReasked)
+    {
+        mAttackTruncReaskTurn = observer->turn;
+        mAttackReaskLine = combatTruncationReaskLine(true, mLastRequestMaxTokens);
+        writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
+                      "", "reply_truncated_reask", &shownLines);
+        setNotice("that reply hit its length limit - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: attackers reply_truncated -> re-asking once");
+        string corrected;
+        pollCompletionRetry(assemblePrompt(attackTail + "\n" + mAttackReaskLine),
+                            corrected, "attackers");
+        return 1; //in flight; nothing declared yet, re-poll next tick
+    }
+    if (attackTruncReasked) //#W68-BE (R4): what the single arm bought
+        appendParseNote(&mLastParseNote,
+                        result >= 0 ? "reply_truncated_reask_recovered"
+                                    : (mLastFinishLength ? "reply_truncated_reask_exhausted"
+                                                         : "reply_truncated_reask_unanswered"));
     if (result < 0)
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
@@ -45260,12 +45403,15 @@ int AIPlayerGPT::chooseBlockers()
     //single arm. 0 windows of this shape occurred at the blockers seam in the
     //wave-67 corpus (33 records); it is wired because the predicate is one
     //predicate, and its firing rate is a wave-68 measurement, not a claim.
-    if (mBlockRevReaskTurn != observer->turn)
+    //#W68-BE (R4): the cap re-ask shares this correction line and keeps its own latch.
+    if (mBlockRevReaskTurn != observer->turn && mBlockTruncReaskTurn != observer->turn)
         mBlockRevReaskLine.clear();
     const bool blockRevReasked = (mBlockRevReaskTurn == observer->turn
                                   && !mBlockRevReaskLine.empty()
                                   && mBlocksDoneTurn != observer->turn);
-    if (blockRevReasked)
+    const bool blockTruncReasked = (mBlockTruncReaskTurn == observer->turn
+                                    && mBlocksDoneTurn != observer->turn); //#W68-BE (R4)
+    if (!mBlockRevReaskLine.empty() && (blockRevReasked || blockTruncReasked))
         tail << "\n" << mBlockRevReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     const string blockTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
@@ -45514,6 +45660,26 @@ int AIPlayerGPT::chooseBlockers()
         }
     }
 
+    //#W68-BE (R4, codex review finding 4): the blockers seam took J3's token cap
+    //and none of J3's recovery. An explicit "BLOCKS: none" is already answered
+    //above, so reaching here with finish_reason "length" means the cap cut the
+    //reply before it wrote any assignment line at all. ONE re-ask per turn, then
+    //the heuristic. Nothing is capped or withheld: the question is put once more.
+    if (pairs == 0 && mLastFinishLength && !content.empty() && !blockTruncReasked)
+    {
+        mBlockTruncReaskTurn = observer->turn;
+        mBlockRevReaskLine = combatTruncationReaskLine(false, mLastRequestMaxTokens);
+        writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                      "", "reply_truncated_reask", &shownLines);
+        setNotice("that reply hit its length limit - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: blockers reply_truncated -> re-asking once");
+        return 1; //next tick rebuilds the prompt WITH the correction line
+    }
+    if (blockTruncReasked) //#W68-BE (R4): what the single arm bought
+        appendParseNote(&mLastParseNote,
+                        pairs > 0 ? "reply_truncated_reask_recovered"
+                                  : (mLastFinishLength ? "reply_truncated_reask_exhausted"
+                                                       : "reply_truncated_reask_unanswered"));
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
@@ -74051,6 +74217,56 @@ static const char * kW50Y_r94 =
         CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 900035) == 0,
               "#W68-BC J2 REPRO AX's premise IS true of remainingTransportRetryMs - the wall"
               " arm simply did not use it (mRetryBudgetMs = 0 means the full deadline again)");
+
+        //#W68-BE (R8, codex finding 8): "per attempt" divided BOTH legs by the
+        //ORIGINAL deadline, but the second leg never gets it - the retry arm hands
+        //it remainingTransportRetryMs. A 120 s decision that fails transport at 20 s
+        //and then spends its whole 100 s remainder is a leg at 100.0% of its budget,
+        //and the shipped figure called it 83.3%.
+        CHECK(AIPlayerGPT::deadlineTenthsPct(100000, 120000) == 833,
+              "#W68-BE R8 REPRO against the ORIGINAL deadline the retry leg reads 83.3%");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(20000, 100000, 120000) == 1000,
+              "#W68-BE R8 POSITIVE against its OWN budget (120000-20000) it is 100.0%");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(20000, 100000, 120000) != 833,
+              "#W68-BE R8 MUST-NOT-MATCH the retry is never measured against a budget it"
+              " was not given");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(2502, 50000, 120000) == 425,
+              "#W68-BE R8 POSITIVE a connect-phase failure leaves almost the whole deadline,"
+              " so a 50 s retry is 42.5% of it");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(900035, 333376, 900000) == 1000
+                  && AIPlayerGPT::deadlineTenthsPctOfAttempts(-1, -1, 900000) == -1
+                  && AIPlayerGPT::deadlineTenthsPctOfAttempts(868729, -1, 900000) == 965,
+              "#W68-BE R8 MUST-NOT-MATCH BC's three shipped cases are unchanged");
+    }
+
+    cout << "\n[#W68-BE] R4 the combat seams honour J3's truncation re-ask\n";
+    {
+        //REPRO: J3 gave attackers and blockers a token cap and neither seam any
+        //recovery - a reply the cap cut before its label went straight to Baka,
+        //silently removing the seat's own declaration while the protocol promised
+        //it would be asked again.
+        const string a = combatTruncationReaskLine(true, 768);
+        const string bl = combatTruncationReaskLine(false, 768);
+        cout << "     " << a << "\n     " << bl << "\n";
+        CHECK(a == "[RE-ASK] Your last reply hit its length limit (768 tokens) and was cut"
+                   " off before it wrote an ATTACK: line, so nothing was declared. Answer"
+                   " again and write the ATTACK: line FIRST - the attackers you mean to"
+                   " declare, or \"ATTACK: none\" to attack with nobody this turn - then"
+                   " stop.",
+              "#W68-BE R4 POSITIVE the attackers correction quotes the cap and the label");
+        CHECK(bl == "[RE-ASK] Your last reply hit its length limit (768 tokens) and was cut"
+                    " off before it wrote a BLOCKS: line, so nothing was declared. Answer"
+                    " again and write the BLOCKS: line FIRST - the assignments you mean, or"
+                    " exactly \"BLOCKS: none\" to block with nobody this turn - then stop.",
+              "#W68-BE R4 POSITIVE the blockers correction is the same shape, its own words");
+        CHECK(a.find("BLOCKS:") == string::npos && bl.find("ATTACK:") == string::npos,
+              "#W68-BE R4 MUST-NOT-MATCH neither seam's correction names the other's label");
+        CHECK(a.find('{') == string::npos && a.find('[') == 0
+                  && a.find('[', 1) == string::npos && bl.find('{') == string::npos,
+              "#W68-BE R4 ECHO the correction opens no annotation channel; the only bracket"
+              " is the [RE-ASK] marker every seam's correction already carries");
+        CHECK(combatTruncationReaskLine(true, 240).find("(240 tokens)") != string::npos,
+              "#W68-BE R4 POSITIVE the number printed is the cap the request actually used");
     }
 
     //---- #W68-BC (MED, deck146 s51): the legend-rule ask says the rule ----
@@ -74062,10 +74278,23 @@ static const char * kW50Y_r94 =
         CHECK(lr.find("do NOT merge") != string::npos
                   && lr.find("no counters") != string::npos,
               "#W68-BC MED POSITIVE it denies the merge the reply invented (\"4 + 4 = 8\")");
-        CHECK(lr.find(" goes to its owner's graveyard now") != string::npos
+        //#W68-BE (R2, codex finding 2): the clause said "you KEEP the one you pick"
+        //and MTGNewLegend::MoveLegend moves the SELECTED target to the graveyard.
+        //Engine semantics pinned by fixture legend_rule_pick_dies_w68be.txt (both
+        //directions: whichever printing is clicked is the one in the graveyard).
+        CHECK(lr.find("the one you pick on this list is the one that GOES TO ITS OWNER'S"
+                      " GRAVEYARD now") != string::npos,
+              "#W68-BE R2 POSITIVE the clause states what the engine does with the pick");
+        CHECK(lr.find("; the other stays on the battlefield") != string::npos
                   && legendRuleTargetClause("Lolth, Spider Queen", 3)
-                         .find("s go to its owner's graveyard now") != string::npos,
-              "#W68-BC MED POSITIVE the clause agrees in number with the copy count");
+                         .find("; the others stay on the battlefield") != string::npos,
+              "#W68-BE R2 POSITIVE the survivors agree in number with the copy count");
+        CHECK(lr.find("Pick the copy you want to LOSE, not the copy you want to keep")
+                  != string::npos,
+              "#W68-BE R2 POSITIVE the instruction is stated in the pilot's own terms");
+        CHECK(lr.find("you KEEP the one you pick") == string::npos
+                  && lr.find("the other goes to its owner's graveyard") == string::npos,
+              "#W68-BE R2 MUST-NOT-MATCH the reversed wave-68 wording is gone");
         CHECK(lr.find("4 + 4") == string::npos && lr.find("loyalty") == string::npos,
               "#W68-BC MED MUST-NOT-MATCH the RULE clause carries no per-copy number - the"
               " loyalty rides each ROW (describeTarget), where the pick is made");
@@ -74241,11 +74470,25 @@ static const char * kW50Y_r94 =
         // REPRO `130v126` s21-s24: six sources and a Talisman were tapped into
         // the pool for Starstorm, the X menu offered a decline that spoke only
         // about the CARD, the seat took it, and the pool emptied at end of step.
+        //#W68-BE (R6, codex finding 6): "FORFEITS ... the mana does not [come back]"
+        //contradicted castAbandonedNarration one screen later ("still floating,
+        //unspent") and was simply false - the pool survives the decline and is
+        //spendable until end of step. The row says the true thing instead.
         CHECK(xDeclineForfeitClause(6)
-                  == " {declining now FORFEITS the 6 mana already paid: the card comes back to"
-                     " your hand but the mana does not - your sources stay tapped, and any"
-                     " floating mana you do not spend before this step ends is lost}",
-              "#W68-BB J5 POSITIVE the decline row states the mana it strands");
+                  == " {declining strands the 6 mana already paid: the card comes back to"
+                     " your hand, your sources STAY TAPPED, and the 6 mana stays floating in"
+                     " your pool. No row on this list can spend it - this list only sets X for"
+                     " the cast you are cancelling - but any other spell or ability you take"
+                     " before this step ends can, and whatever is still floating when the step"
+                     " ends is lost}",
+              "#W68-BE R6 POSITIVE the decline row states what the pool actually does");
+        CHECK(xDeclineForfeitClause(6).find("FORFEITS") == string::npos
+                  && xDeclineForfeitClause(6).find("the mana does not") == string::npos,
+              "#W68-BE R6 MUST-NOT-MATCH the forfeiture claim the narration contradicts");
+        CHECK(xDeclineForfeitClause(6).find("stays floating in your pool") != string::npos
+                  && castAbandonedNarration("Starstorm", 6).find("still floating, unspent")
+                         != string::npos,
+              "#W68-BE R6 POSITIVE row and narration now say the same thing about the pool");
         CHECK(xDeclineForfeitClause(0).empty() && xDeclineForfeitClause(-1).empty(),
               "#W68-BB J5 MUST-NOT-MATCH with an empty pool the decline row is wave 67's");
         {
@@ -74458,9 +74701,11 @@ static const char * kW50Y_r94 =
               && cover.find("This row removes ONE of their creatures and THEY choose which one.")
                      != string::npos,
               "#W68-BD J8 REPRO the removal row now points at the line above it");
-        CHECK(cover.find("smallest of them contributes 2 - that is the one they will give up -"
-                         " so this takes AT LEAST 2 off it: 18 - 2 = 16 -> you would be at 2,"
-                         " which you SURVIVE") != string::npos,
+        //#W68-BE (R5): the same numbers, stated as the bound they are.
+        CHECK(cover.find("smallest of them contributes 2, so whichever one THEY hand over"
+                         " this takes AT LEAST 2 off it: 18 - 2 = 16 is the MOST that can be"
+                         " left -> you could still be as low as 2, which you SURVIVE")
+                  != string::npos,
               "#W68-BD J8 POSITIVE with every body in the total the floor is the smallest of them");
         //The rules-correct case the review's own premise got wrong: they CHOOSE,
         //so a creature outside the crack-back total is theirs to hand over and
@@ -74482,10 +74727,24 @@ static const char * kW50Y_r94 =
             CHECK(crackBackRemovalRowTag(18, 10, true, 4, 4, 2).find("STILL KILLS") == string::npos,
                   "#W68-BD J8 MUST-NOT-MATCH a FLOOR total takes no KILL verdict either");
         }
-        CHECK(crackBackRemovalRowTag(18, 10, false, 4, 4, 2).find("= 16 -> you would be at -6;"
-                                                                  " that STILL KILLS you")
+        //#W68-BE (R5, codex finding 5): `total - minAttackerPower` is a WORST CASE.
+        //At 10 life against a 2/2 and a 16/16 the shipped line said "you would be at
+        //-6; that STILL KILLS you" - but THEY choose, and handing over the 16/16
+        //leaves 2 damage and the seat at 8. The bound can refute survival's opposite,
+        //never prove death; it is printed as a bound.
+        CHECK(crackBackRemovalRowTag(18, 10, false, 4, 4, 2)
+                  .find("= 16 is the MOST that can be left -> you could still be as low as -6"
+                        " - a KILL IS POSSIBLE, not certain") != string::npos,
+              "#W68-BE R5 POSITIVE the remaining-damage figure is stated as a bound");
+        CHECK(crackBackRemovalRowTag(18, 10, false, 4, 4, 2).find("STILL KILLS you")
+                      == string::npos
+                  && crackBackRemovalRowTag(18, 10, false, 4, 4, 2)
+                         .find("that is the one they will give up") == string::npos,
+              "#W68-BE R5 MUST-NOT-MATCH no categorical kill, and no claim about which"
+              " creature they choose");
+        CHECK(crackBackRemovalRowTag(18, 30, false, 4, 4, 2).find("which you SURVIVE")
                   != string::npos,
-              "#W68-BD J8 POSITIVE a removal that does not save the seat says so");
+              "#W68-BE R5 POSITIVE the survival half is untouched - the bound proves it");
         CHECK(crackBackRemovalRowTag(0, 18, false, 4, 4, 2).empty()
                   && crackBackRemovalRowTag(18, 18, false, 0, 0, 2).empty()
                   && crackBackRemovalRowTag(18, 18, false, 4, 0, 2).empty()
@@ -74518,6 +74777,24 @@ static const char * kW50Y_r94 =
               && opponentZoneCountsLine(3, 0, 46)
                      == "Opponent hand size: 3 | Opponent library: 46 cards",
               "#W68-BD MED MUST-NOT-MATCH outside three draws the line is wave-67's, byte for byte");
+        //#W68-BE (R7, codex finding 7): MTGPlayerCards::drawFromLibrary returns
+        //WITHOUT setting a loser when the drawing player has CANTLOSE or
+        //CANTMILLLOSE, or the other side has CANTWIN. The countdown promised a loss
+        //the engine will not deliver; the flag now rides the same helper.
+        CHECK(opponentZoneCountsLine(3, 0, 2, true)
+                  == "Opponent hand size: 3 | Opponent library: 2 cards - they have 2 cards"
+                     " left, but DECKING THEM OUT DOES NOT WIN: a permanent in play stops the"
+                     " empty-library loss (they cannot lose, they cannot lose to milling, or"
+                     " you cannot win), so their draw from an empty library ends the game for"
+                     " nobody",
+              "#W68-BE R7 POSITIVE the blocked countdown states the count AND the exception");
+        CHECK(opponentZoneCountsLine(3, 0, 2, true).find("DECK-OUT IS IN RANGE") == string::npos
+                  && opponentZoneCountsLine(3, 0, 0, true).find("loses them the game")
+                         == string::npos,
+              "#W68-BE R7 MUST-NOT-MATCH no loss is promised while the engine blocks it");
+        CHECK(opponentZoneCountsLine(3, 0, 4, true)
+                  == "Opponent hand size: 3 | Opponent library: 4 cards",
+              "#W68-BE R7 MUST-NOT-MATCH outside three draws the flag changes nothing");
 
         cout << "\n[#W68-BD] MED a stage-1 side gate says how many objects each side can reach\n";
         //REPRO `152v125` s59: "1. choose a creature / 2. Decline" with the
@@ -74703,11 +74980,23 @@ static const char * kW50Y_r94 =
               "#W68-BA J1 MUST-NOT-MATCH an unrelated row, the repeat row itself and a pass are not base takes");
         // the count the guard tests, and what the model's own subtraction performs
         const int stopTestCount = 1; //a base-row take is ONE repetition
+        //#W68-BE (R3, codex finding 3): J1's RE-ASK for the plain activation row
+        //stands - that is what the stated stop earns. What wave 68 also did was
+        //clamp the SECOND, explicitly re-affirmed answer to zero, turning
+        //`CHOICE: 1 (Create vampire with Bloodline Keeper #1)` into a pass. The
+        //stop is arithmetic over a COUNT; a single explicit take answered again
+        //is the model overriding its own plan, which the no-auto-answer doctrine
+        //says the engine may not do for it. Only counted rows clamp.
+        CHECK(!repeatStopClampApplies(false, stopTestCount),
+              "#W68-BE R3 POSITIVE a re-affirmed single activation is never clamped to a pass");
+        CHECK(repeatStopClampApplies(true, 34) && repeatStopClampApplies(true, 2),
+              "#W68-BE R3 POSITIVE a COUNTED take past the stated stop still clamps (J1/H3)");
+        CHECK(!repeatStopClampApplies(true, 0) && !repeatStopClampApplies(true, -1),
+              "#W68-BE R3 MUST-NOT-MATCH a repeat row with no count is not a counted take");
+        //the arithmetic itself is unchanged - it is simply not consulted for a base row
         CHECK(repeatStopClampCount(stopTestCount, 23, 24) == 0
                   && repeatStopExecutesNothing(repeatStopClampCount(stopTestCount, 23, 24)),
-              "#W68-BA J1 POSITIVE the single activation at M=24 against stop=23 performs the model's own zero");
-        CHECK(repeatStopClampCount(stopTestCount, 23, 35) == 0,
-              "#W68-BA J1 POSITIVE twelve windows later the same arithmetic gives the same zero");
+              "#W68-BA J1 the single-activation arithmetic is unchanged; #W68-BE R3 stops it deciding");
         CHECK(repeatStopClampCount(stopTestCount, 23, 20) == -1,
               "#W68-BA J1 MUST-NOT-MATCH an activation INSIDE the stated stop is not clamped at all");
     }

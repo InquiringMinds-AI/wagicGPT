@@ -1,0 +1,32 @@
+#NAME: Legend rule - the copy you PICK is the copy that dies
+#DESC: #W68-BE (R2, wave-68 codex review finding 2). The wave-68 legend-rule
+#DESC: clause told the pilot "you KEEP the one you pick here". The engine does
+#DESC: the opposite: MTGNewLegend::MoveLegend (MTGRules.cpp) builds a
+#DESC: GenericTargetAbility over an AAMover to "ownergraveyard", and
+#DESC: AAMover::resolve moves the SELECTED target - so the copy that is clicked
+#DESC: is the copy that goes to the graveyard.
+#DESC: Two printings of Ajani Goldmane (140233 LRW, 191239 M10) share a name, so
+#DESC: the two copies are distinguishable by id and the ASSERT can name WHICH
+#DESC: one survived. Here 191239 is clicked; 191239 is the one in the graveyard.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:140233,191239
+[PLAYER2]
+inplay:Mind Stone
+[DO]
+choice 1
+191239
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:140233
+graveyard:191239
+[PLAYER2]
+inplay:Mind Stone
+[END]
