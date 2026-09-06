@@ -1526,14 +1526,59 @@ int TestSuiteAI::Act(float)
         //inside the same call, and Jandor's Ring leaves one alive only inside a
         //priority window the scripted pump cannot land a command in.
         //Syntax: assertpendingdraws <expected> <cards to stage>
+        //#W69-BH (K4a, deck125 HIGH): the OTHER shape the same scan must see -
+        //a StackAbility whose AADrawer carries a CARD as its target, which is
+        //what `@each my upkeep:draw:1` with no target keyword builds (Staff of
+        //Nin; `who == UNSET`, target = the source card). `AADrawer::resolve`
+        //maps that through `getPlayerFromTarget` to the card's CONTROLLER and
+        //draws; the scan asked `dynamic_cast<Player *>` and saw nobody, so the
+        //library reserve, the X ceiling built on it and the cleanup hand count
+        //all priced those draws as zero. Syntax: `assertpendingdraws <expected>
+        //card <name>` stages exactly that object on the named in-play card.
+        //RED on the wave-68 tree: the scan sees 0 of the 1 staged card.
         string rest = action.substr(19);
         size_t sp = rest.find(' ');
         int expect = atoi(rest.substr(0, sp).c_str());
-        int stage = sp == string::npos ? 0 : atoi(rest.substr(sp + 1).c_str());
+        string tail = (sp == string::npos) ? string() : rest.substr(sp + 1);
+        bool cardTarget = (tail.compare(0, 5, "card ") == 0);
+        string cardName = cardTarget ? tail.substr(5) : string();
+        int stage = cardTarget ? 0 : atoi(tail.c_str());
         ActionStack * st = observer->mLayers->stackLayer();
         size_t before = st ? st->mObjects.size() : 0;
         if (st && stage > 0)
             st->addDraw(this, stage);
+        if (st && cardTarget)
+        {
+            MTGCardInstance * host = NULL;
+            //the harness lowercases every command line, so match that way
+            for (size_t li = 0; li < cardName.size(); li++)
+                cardName[li] = (char) tolower((unsigned char) cardName[li]);
+            for (int ci = 0; game->inPlay && ci < game->inPlay->nb_cards; ci++)
+            {
+                MTGCardInstance * cc = game->inPlay->cards[ci];
+                if (!cc)
+                    continue;
+                string cn = cc->getName();
+                for (size_t li = 0; li < cn.size(); li++)
+                    cn[li] = (char) tolower((unsigned char) cn[li]);
+                if (cn == cardName)
+                    host = cc;
+            }
+            if (host)
+            {
+                //`_target` is the SOURCE CARD, and `who` is left UNSET - the
+                //exact construction AbilityFactory performs for a bare `draw:N`.
+                MTGAbility * drawer = NEW AADrawer(observer, observer->mLayers->actionLayer()->getMaxId(),
+                                                  host, host, NULL, "1");
+                st->addAbility(drawer);
+            }
+            else
+            {
+                std::cerr << "TESTSUITE assertpendingdraws: no in-play card named \""
+                          << cardName << "\" [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+        }
         int got = gptStackPendingDrawsFor(observer, this, NULL);
         if (st)
             for (size_t i = before; i < st->mObjects.size(); i++)

@@ -1,0 +1,31 @@
+#NAME: the pending-draw scan sees a draw whose target is a CARD
+#W69-BH (K4a, deck125 HIGH; wave-68 lane BB's fold still under-counted).
+#`stackPendingDrawsFor` - the count the X library ceiling, the library reserve
+#and the cleanup hand price are all built on - counted a pending AADrawer only
+#when its target was literally a Player object. `AADrawer::resolve` instead maps
+#the target through MTGAbility::getPlayerFromTarget, which turns a CARD into its
+#CONTROLLER. `@each my upkeep:draw:1` with no target keyword (Staff of Nin) is
+#built with who == UNSET and the SOURCE CARD as the target, so every pending
+#Staff draw scanned as zero for everybody. Corpus evidence
+#(matchups-20260906-134120): the reserve's stack term rendered 0 times in 2,282
+#prompts, and 125v126 s110 printed "1 draw is already owed" at the seat's own
+#upkeep with a Staff trigger unresolved on the stack (true: 2), read a ceiling
+#of X=7 where the truth was X=6, announced 7 and decked itself at 65 life.
+#`assertpendingdraws <n> card <name>` stages exactly that object - a real
+#AADrawer over the named in-play card, targeting the card - and asks the scan.
+#RED on the wave-68 tree: the scan sees 0 of the 1 staged draw.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Staff of Nin
+[PLAYER2]
+inplay:Mind Stone
+[DO]
+assertpendingdraws 1 card Staff of Nin
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Staff of Nin
+[PLAYER2]
+inplay:Mind Stone
+[END]
