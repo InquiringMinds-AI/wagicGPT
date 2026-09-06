@@ -1,0 +1,438 @@
+file: /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260905-191148/1788653511-ai_baka_deck123-0x555d7a2bc100-vs-ai_baka_deck130.jsonl
+seq: 95  turn: 37  kind: attackers  my_life: 2  opp_life: 13  prompt bytes: 21634
+why this one: the lethal alpha strike that ENDED the game (results.tsv 123v130 -> 130 at -67, turn 36-37); it is the only late window in the corpus where a 20-attacker collapsed A-row range, the ATTACK TOTAL verdict and a 2-life seat all sit in one render.
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Marsh Flats; Bloodline Keeper; Tundra; Vision Skeins; Tundra; Scrubland; Thraben Doomsayer
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Forgotten Cave
+- Opponent used: cycling with Forgotten Cave
+- Opponent drew a card
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Marsh Flats
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Spark Spray
+- Opponent used: cycling with Spark Spray
+- Opponent drew a card
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Main phase 1
+- You played Scrubland
+- Paid {1}{w}{w} for Thraben Doomsayer with Tundra #1; Tundra #2; Scrubland
+- You cast Thraben Doomsayer
+- Your Thraben Doomsayer resolved and entered the battlefield
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Molten Rain
+- Opponent's Molten Rain dealt 2 damage to you (now 18)
+- Your Scrubland was put into your graveyard from the battlefield
+- Opponent's Molten Rain resolved and went to the opponent's graveyard
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Tragic Slip
+- Phase: Main phase 1
+- You played Marsh Flats
+- Paid {1}{u} for Vision Skeins with Tundra #1; Tundra #2
+- You cast Vision Skeins
+- You drew Thraben Doomsayer
+- You drew Marsh Flats
+- Opponent drew 2 cards
+- Your Vision Skeins resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Thraben Doomsayer
+- Phase: Combat damage
+- Your Thraben Doomsayer dealt 2 damage to the opponent (now 18)
+=== Turn 8 - opponent's turn ===
+- Phase: Upkeep
+- You used: Put a card onto the battlefield with Marsh Flats targeting Scrubland
+- You lost 1 life (now 17)
+- Your Marsh Flats was put into your graveyard from the battlefield
+- Your Scrubland entered the battlefield from your library
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Molten Rain
+- Opponent's Molten Rain dealt 2 damage to you (now 15)
+- Your Scrubland was put into your graveyard from the battlefield
+- Opponent's Molten Rain resolved and went to the opponent's graveyard
+- Phase: Cleanup
+- Opponent discarded Starstorm
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Marsh Flats
+- Phase: Main phase 1
+- You played Marsh Flats
+- You used: Create human with Thraben Doomsayer
+- Your Thraben Doomsayer created a 1/1 Human token
+- You used: Put a card onto the battlefield with Marsh Flats targeting Scrubland
+- You lost 1 life (now 14)
+- Your Marsh Flats was put into your graveyard from the battlefield
+- Your Scrubland entered the battlefield from your library
+- Paid {2}{w} for Idyllic Tutor with Tundra #1; Tundra #2; Scrubland
+- You cast Idyllic Tutor
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Your revealed Intruder Alarm went to your hand
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Combat begins
+- Opponent cast Starstorm
+- Opponent's Starstorm dealt 1 damage to Thraben Doomsayer
+- Opponent's Starstorm dealt 1 damage to Human
+- Your Human died
+- Your Human (token) ceased to exist and left your graveyard
+- Opponent's Starstorm resolved and went to the opponent's graveyard
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+- Phase: Main phase 1
+- You played Marsh Flats
+- Paid {1}{w}{w} for Thraben Doomsayer with Tundra #1; Tundra #2; Scrubland
+- You cast Thraben Doomsayer
+- Your Thraben Doomsayer resolved and entered the battlefield
+- You used: Put a card onto the battlefield with Marsh Flats targeting Tundra
+- You lost 1 life (now 13)
+- Your Marsh Flats was put into your graveyard from the battlefield
+- Your Tundra entered the battlefield from your library
+- You used: Create human with Thraben Doomsayer #1
+- Your Thraben Doomsayer created a 1/1 Human token
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Phase: Combat begins
+- Opponent cast Starstorm
+- Opponent's Starstorm dealt 2 damage to Thraben Doomsayer
+- Your Thraben Doomsayer died (that Thraben Doomsayer was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Opponent's Starstorm dealt 2 damage to Human
+- Your Human died
+- Your Human (token) ceased to exist and left your graveyard
+- Opponent's Starstorm dealt 2 damage to Thraben Doomsayer
+- Your Thraben Doomsayer died
+- Opponent's Starstorm resolved and went to the opponent's graveyard
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Isolated Chapel
+- Phase: Main phase 1
+- You played Isolated Chapel
+- Paid {2}{u} for Intruder Alarm with Tundra #1; Tundra #2; Tundra #3
+- You cast Intruder Alarm
+- Your Intruder Alarm resolved and entered the battlefield
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Stone Rain
+- Your Scrubland was put into your graveyard from the battlefield
+- Opponent's Stone Rain resolved and went to the opponent's graveyard
+- Opponent cast Pyrite Spellbomb
+- Opponent's Pyrite Spellbomb resolved and entered the battlefield
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Underground Sea
+- Phase: Main phase 1
+- You played Underground Sea
+- Paid {2}{b}{b} for Bloodline Keeper with Isolated Chapel; Underground Sea; Tundra #1; Tundra #2
+- You cast Bloodline Keeper
+- Your Bloodline Keeper resolved and entered the battlefield
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to Bloodline Keeper
+- Your Bloodline Keeper died
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+- Phase: Main phase 1
+- You played Marsh Flats
+=== Turn 18 - opponent's turn ===
+- Phase: Upkeep
+- Opponent's Pyrite Spellbomb was put into the opponent's graveyard from the battlefield
+- Opponent used: Deal 2 damage with Pyrite Spellbomb targeting you
+- Opponent's Pyrite Spellbomb dealt 2 damage to you (now 11)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forgotten Cave
+- Opponent cast Stone Rain
+- Your Tundra was put into your graveyard from the battlefield (that Tundra was 1 of 3 copies on your battlefield; the other 2 are still there)
+- Opponent's Stone Rain resolved and went to the opponent's graveyard
+=== Turn 19 - YOUR turn ===
+- Phase: Upkeep
+- You used: Put a card onto the battlefield with Marsh Flats targeting Underground Sea
+- You lost 1 life (now 10)
+- Your Marsh Flats was put into your graveyard from the battlefield
+- Your Underground Sea entered the battlefield from your library
+- Phase: Draw
+- You drew Thraben Doomsayer
+- Phase: Main phase 1
+- Paid {1}{w}{w} for Thraben Doomsayer with Tundra #1; Tundra #2; Isolated Chapel
+- You cast Thraben Doomsayer
+- Your Thraben Doomsayer resolved and entered the battlefield
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Siege-Gang Commander
+- Opponent's Siege-Gang Commander resolved and entered the battlefield
+- Opponent's Siege-Gang Commander created 3 1/1 Goblin tokens
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Lightning Greaves
+- Phase: Main phase 1
+- Paid {2} for Lightning Greaves with Tundra #1; Tundra #2
+- You cast Lightning Greaves
+- Your Lightning Greaves resolved and entered the battlefield
+- You used: Equip with Lightning Greaves targeting Thraben Doomsayer
+- Paid {b} for Tragic Slip with Isolated Chapel
+- You targeted Goblin #1 (1/1) with Tragic Slip
+- You cast Tragic Slip
+- Your Tragic Slip resolved and went to your graveyard
+- Opponent's Goblin died (that Goblin was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- You used: Create human with Thraben Doomsayer
+- Your Thraben Doomsayer created a 1/1 Human token
+- Phase: Attackers
+- You declared attackers: Thraben Doomsayer
+- Phase: Combat damage
+- Opponent's Siege-Gang Commander dealt 2 damage to Thraben Doomsayer
+- Your Thraben Doomsayer dealt 2 damage to Siege-Gang Commander
+- Your Thraben Doomsayer died
+- Opponent's Siege-Gang Commander died
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Siege-Gang Commander
+- Opponent's Siege-Gang Commander resolved and entered the battlefield
+- Opponent's Siege-Gang Commander created 3 1/1 Goblin tokens
+- Opponent discarded Forgotten Cave
+- Opponent used: cycling with Forgotten Cave
+- Opponent drew a card
+- Phase: Blockers
+- You declared blockers: Human blocks Goblin
+- Phase: Combat damage
+- Opponent's Goblin dealt 1 damage to you (now 9)
+- Your Human dealt 1 damage to Goblin
+- Opponent's Goblin dealt 1 damage to Human
+- Opponent's Goblin died (that Goblin was 1 of 5 copies on the opponent's battlefield; the other 4 are still there)
+- Your Human died
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Your Human (token) ceased to exist and left your graveyard
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Tribute to Hunger
+- Phase: Main phase 1
+- Paid {2}{b}{b} for Damnation with Isolated Chapel; Underground Sea #1; Tundra #1; Tundra #2
+- You cast Damnation (that Damnation was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Goblin died (that Goblin was 1 of 4 copies on the opponent's battlefield; the other 3 are still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent's Goblin died (that Goblin was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent's Siege-Gang Commander died
+- Opponent's Goblin died (that Goblin was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent's Goblin died
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Your Damnation resolved and went to your graveyard
+=== Turn 24 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: Put a card into hand with Hammer of Bogardan
+- Opponent's Hammer of Bogardan was returned to the opponent's hand from the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent discarded Spark Spray
+- Opponent used: cycling with Spark Spray
+- Opponent drew a card
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Devour Flesh
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Rorix Bladewing
+- Opponent's Rorix Bladewing resolved and entered the battlefield
+- Paid {2}{b} for Tribute to Hunger with Isolated Chapel; Tundra #1; Tundra #2
+- You cast Tribute to Hunger
+- Opponent discarded Lay Waste
+- Opponent used: cycling with Lay Waste
+- Opponent drew a card
+- Your Tribute to Hunger resolved and went to your graveyard
+- Opponent used: Gain life equal to its toughness with Tribute to Hunger targeting Rorix Bladewing
+- Opponent's Rorix Bladewing died
+- You gained 5 life (now 14)
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent discarded Forgotten Cave
+- Opponent used: cycling with Forgotten Cave
+- Opponent drew a card
+- Opponent cast Siege-Gang Commander
+- Opponent's Siege-Gang Commander resolved and entered the battlefield
+- Opponent's Siege-Gang Commander created 3 1/1 Goblin tokens
+- Opponent cast Dwarven Blastminer
+- Opponent's Dwarven Blastminer resolved and entered the battlefield
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Scrubland
+- Phase: Main phase 1
+- You played Scrubland
+- Paid {2}{b}{b} for Damnation with Isolated Chapel; Underground Sea #1; Tundra #1; Tundra #2
+- You cast Damnation
+- Opponent's Dwarven Blastminer died
+- Opponent's Siege-Gang Commander died
+- Opponent's Goblin died (that Goblin was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent's Goblin died (that Goblin was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Opponent's Goblin died
+- Opponent's Goblin (token) ceased to exist and left the opponent's graveyard
+- Your Damnation resolved and went to your graveyard
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Stone Rain
+- Your Tundra was put into your graveyard from the battlefield (that Tundra was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Opponent's Stone Rain resolved and went to the opponent's graveyard
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to you (now 11)
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Swamp
+- Phase: Main phase 1
+- You played Swamp
+- Paid {2}{w} for Idyllic Tutor with Tundra; Swamp; Isolated Chapel
+- You cast Idyllic Tutor
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Your revealed Intruder Alarm went to your hand
+- Phase: Main phase 2
+- Paid {2}{u} for Intruder Alarm with Underground Sea #1; Underground Sea #2; Scrubland
+- You cast Intruder Alarm
+- Your Intruder Alarm resolved and entered the battlefield
+=== Turn 32 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: Put a card into hand with Hammer of Bogardan
+- Opponent's Hammer of Bogardan was returned to the opponent's hand from the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to you (now 8)
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Intruder Alarm
+=== Turn 34 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: Put a card into hand with Hammer of Bogardan
+- Opponent's Hammer of Bogardan was returned to the opponent's hand from the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to you (now 5)
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Bloodline Keeper
+- Phase: Main phase 1
+- Paid {2}{b}{b} for Bloodline Keeper with Swamp; Isolated Chapel; Tundra; Underground Sea #1
+- You cast Bloodline Keeper
+- Your Bloodline Keeper resolved and entered the battlefield
+- You used: Equip with Lightning Greaves targeting Bloodline Keeper
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- You used: Create vampire with Bloodline Keeper (you named 18 repeats of it)
+- Your Bloodline Keeper created 17 2/2 Vampire tokens
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Your repeated activation ran 18 of the 18 times you named
+- You used: Transform:backside with Bloodline Keeper
+- Paid {b} for Bloodline Keeper with Underground Sea #2
+- Your Bloodline Keeper transformed into Lord of Lineage (now 5/5 flying, haste, shroud, doesn't untap during its controller's untap step)
+- Phase: Attackers
+- You declared attackers: Lord of Lineage
+- Phase: Combat damage
+- Your Lord of Lineage dealt 5 damage to the opponent (now 13)
+=== Turn 36 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: Put a card into hand with Hammer of Bogardan
+- Opponent's Hammer of Bogardan was returned to the opponent's hand from the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Mountain
+- Opponent cast Hammer of Bogardan
+- Opponent's Hammer of Bogardan dealt 3 damage to you (now 2)
+- Opponent's Hammer of Bogardan resolved and went to the opponent's graveyard
+=== Turn 37 - YOUR turn ===
+- Phase: Draw
+- You drew Isolated Chapel
+- Phase: Main phase 1
+- You played Isolated Chapel
+
+--- CURRENT SITUATION ---
+Phase: Attackers | It is your turn.
+Your life: 2 | Opponent life: 13
+Opponent life trend: turn 34: 18, turn 35: 18, turn 37: 13, now 13 (-5 since turn 34).
+Mana available: 7 total (seven untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 4, {U} 3, {B} 6 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Tundra {w} or {u}; Isolated Chapel #1 {w} or {b}; Underground Sea #1 {u} or {b}; Underground Sea #2 {u} or {b}; Scrubland {w} or {b}; Swamp {b}; Isolated Chapel #2 {w} or {b}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (2 cards): Devour Flesh {1}{b} [instant] [castable now]; Intruder Alarm {2}{u} [enchantment] [no cast row now: sorcery speed - only in your own main phase with an empty stack]
+Your battlefield (31 permanents listed, of which 21 are creatures, 20 of them able to attack right now, and 7 are lands): Intruder Alarm #2 {2}{u} [enchantment]; Intruder Alarm #1 {2}{u} [enchantment] {effect (each copy of this card does this): "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}; Isolated Chapel #1; Isolated Chapel #2; Lightning Greaves {2} [artifact] [attached to: Lord of Lineage] {effect: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if..."}; Lord of Lineage (5/5) [flying, haste, shroud, doesn't untap during its controller's untap step] {attached: Lightning Greaves} [tapped - cannot attack or block this turn]; Scrubland; Swamp; Tundra; Underground Sea #1; Underground Sea #2; Vampire #1-#20 (4/4) (printed 2/2) [flying, doesn't untap during its controller's untap step] x20
+Opponent battlefield (10 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 10 are lands): Forgotten Cave [tapped]; Mountain #8; Mountain #9; Mountain #1-#7 [tapped] x7
+Their untapped sources: 2 (colours they could make: {r})
+Opponent hand size: 2 | Opponent library: 27 cards
+Artifacts in play: you 1 | opponent 0
+Your library: 27 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 37): I have 21 creatures (20x 4/4 Vampires, 1x 5/5 Lord of Lineage) and Intruder Alarm on the battlefield. All are tapped and summoning sick. I must pass this turn to preserve the board state. On the opponent's turn, I will tap Lord of Lineage to create a Vampire token. This token entering will untap all 21 creatures. I will then attack with all 21 creatures to win the game.
+
+Combat: declare ALL attackers for this turn in ONE decision.
+Your creatures that can attack:
+A1-A20. Vampire #1-#20 (4/4) [flying, doesn't untap during its controller's untap step] [no creature they control can block this attacker] x20
+An A-row whose label is a RANGE ("A4-A9") is that many SEPARATE creatures whose rows were identical, printed once. Every label in the range is a real, distinct creature: A4 is the first creature of the printed handle range, A5 the next, and so on to the last. Name them one at a time exactly as you would any other A#, or name the whole range at once ("ATTACK: A4-A9"), or write "ATTACK: all" to declare every listed attacker.
+They have 0 untapped creatures able to block: every attacker you declare this turn is unblocked unless something changes first.
+ATTACK TOTAL: 20 attackers listed, 80 total combat damage to a player - declaring all of them with none blocked puts them at -67. At least 80 damage lands whatever they block - they would be at -67; that KILLS them whatever they block.
+This is not your last chance to act this turn: your SECOND MAIN PHASE follows combat, so creatures, sorceries and other main-phase cards you do not cast now can still be cast after combat on this same turn, and you get priority again during combat, so instants and activated abilities you hold stay castable this turn. Declaring attackers taps only the attacking creatures - never your lands.
+On the FIRST line write ATTACK: followed by the attackers you send, comma-separated (e.g. "ATTACK: A1, A3"), or "ATTACK: none" to attack with nobody this turn; then a PLAN: line only if the reply rules call for one. Write nothing else.
