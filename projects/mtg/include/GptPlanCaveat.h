@@ -692,30 +692,71 @@ inline std::string planTruncationNote(size_t keptChars, size_t originalChars)
     return o.str();
 }
 
+// #W65-AP (R7, wave-65 codex review finding 7). THE PROTOCOL SAYS CHARACTERS.
+// kReplyProtocol and #W65-AO's pin both claim "the FIRST 400 CHARACTERS of your
+// PLAN line", and the bound was over std::string::size() - BYTES - so a plan
+// carrying accented card names or non-Latin text was cut early and could end
+// mid-sequence, leaving invalid UTF-8 in a line the model is asked to trust.
+// Counted in code points, the claim is true and the cut can never land inside a
+// character. ASCII is one byte per code point, so every shipped case and every
+// ASCII plan is byte-identical.
+inline size_t utf8Length(const std::string& s)
+{
+    size_t n = 0;
+    for (size_t i = 0; i < s.size(); i++)
+        if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+            n++;
+    return n;
+}
+
+// Byte offset one past the `maxChars`-th code point, or s.size() when the
+// string has no more than that many. Always a character boundary.
+inline size_t utf8ByteLimit(const std::string& s, size_t maxChars)
+{
+    size_t n = 0, i = 0;
+    while (i < s.size())
+    {
+        if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+        {
+            if (n == maxChars)
+                return i;
+            n++;
+        }
+        i++;
+    }
+    return s.size();
+}
+
 inline std::string planCarryBound(const std::string& plan, size_t maxChars)
 {
-    if (maxChars < 1 || plan.size() <= maxChars)
+    if (maxChars < 1)
+        return plan;
+    // #W65-AP (R7): the bound is denominated in CODE POINTS, and the byte offset
+    // it resolves to is a character boundary.
+    const size_t limit = utf8ByteLimit(plan, maxChars);
+    if (limit >= plan.size())
         return plan;
     // Prefer a sentence boundary; a mid-sentence stump re-served every decision
     // reads like an instruction fragment. Only accept one past the halfway mark,
     // so a plan whose first sentence is itself longer than the bound is cut at
     // the bound rather than back to almost nothing.
-    size_t cut = plan.find_last_of(".!?", maxChars);
-    if (cut != std::string::npos && cut + 1 > maxChars / 2)
+    size_t cut = plan.find_last_of(".!?", limit);
+    if (cut != std::string::npos && cut + 1 > limit / 2)
         cut = cut + 1;
     else
     {
         // Otherwise cut at the last word break at or below the bound.
-        cut = plan.find_last_of(" \t\n", maxChars);
-        if (cut == std::string::npos || cut < maxChars / 2)
-            cut = maxChars;
+        cut = plan.find_last_of(" \t\n", limit);
+        if (cut == std::string::npos || cut < limit / 2)
+            cut = limit; // #W65-AP (R7): a character boundary, never mid-sequence
     }
     std::string out = plan.substr(0, cut);
     size_t e = out.find_last_not_of(" \t\r\n");
     out = (e == std::string::npos) ? std::string() : out.substr(0, e + 1);
     if (out.empty())
         return plan; // nothing survived the cut: carry the plan as it stands
-    return out + planTruncationNote(out.size(), plan.size()); //#W62-Z (D16)
+    //#W65-AP (R7): the note counts what the protocol counts - characters.
+    return out + planTruncationNote(utf8Length(out), utf8Length(plan)); //#W62-Z (D16)
 }
 
 // #W60-Q (R8). THE COMPOSED PATH. planCarryBound's marker ends in ']', and the
@@ -745,10 +786,10 @@ inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
         const std::string head = " [...the rest of your plan was not carried";
         const size_t m = out.rfind(head);
         const std::string kept = (m == std::string::npos) ? out : out.substr(0, m);
-        return kept + planTruncationNote(kept.size(), plan.size());
+        return kept + planTruncationNote(utf8Length(kept), utf8Length(plan)); //#W65-AP (R7)
     }
     if (core.size() < plan.size())
-        return core + planTruncationNote(core.size(), plan.size());
+        return core + planTruncationNote(utf8Length(core), utf8Length(plan)); //#W65-AP (R7)
     char last = out.empty() ? '.' : out[out.size() - 1];
     if (last != '.' && last != '!' && last != '?')
     {
