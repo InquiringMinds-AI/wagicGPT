@@ -1642,6 +1642,79 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
     return o.str();
 }
 
+//#W68-BD (J8, deck146 HIGH-1): ONE edict floor, for mode rows and standalone
+//rows alike. The standalone edict row has walked the opponent battlefield for
+//its floor since #W62-X and counted the bodies AT that floor since #W67-AW; a
+//MODE whose granted half is the same edict (Silverquill Command's `notaTarget
+//(creature|mybattlefield) sacrifice!$ opponent`) printed only `{this mode has
+//a legal object right now}` - no count, no "they choose". `146v123` s31 is the
+//record: 31 creatures on their board, the seat's own plan one window earlier
+//named the card it expected them to give up (Thraben Doomsayer), and it spent
+//BOTH Commands on that mode for two 1/1 tokens. The walk is lifted out of
+//boardTurnOnClause unchanged so the two surfaces cannot state different
+//numbers, and both compose their sentence with edictClause.
+static void edictFloorScan(Player * them, int& theirCreatures, int& minToughness,
+                           int& atFloor, MTGCardInstance ** onlyOut)
+{
+    theirCreatures = 0;
+    minToughness = 0;
+    atFloor = 0;
+    if (onlyOut)
+        *onlyOut = NULL;
+    MTGGameZone * z = (them && them->game) ? them->game->inPlay : NULL;
+    for (int i = 0; z && i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (!c || !c->isCreature())
+            continue;
+        theirCreatures++;
+        if (onlyOut && !*onlyOut)
+            *onlyOut = c;
+        if (!minToughness || c->toughness < minToughness)
+            minToughness = c->toughness;
+    }
+    if (minToughness < 0)
+        minToughness = 0;
+    //the same walk the floor came from, so the two numbers cannot disagree
+    for (int i = 0; z && minToughness > 0 && i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (c && c->isCreature() && c->toughness == minToughness)
+            atFloor++;
+    }
+    if (theirCreatures != 1 && onlyOut)
+        *onlyOut = NULL; //a named victim is a claim only when there is exactly one
+}
+
+//#W68-BD (J8): the MODE form of that floor. The clause itself is edictClause's,
+//byte for byte; what the mode adds is the scope - which HALF of the pair this
+//is - and, at more than one body, the sentence the standalone gain-bearing row
+//already carries in its own words: the pick is the opponent's, so the row is
+//planned on their worst body and not on the one the pilot wants gone. A mode
+//edict grants no life, so the gain terms of edictClause are deliberately off.
+//Pure over the four numbers, so PARSETEST proves the wording without a board.
+static string modeEdictFloorTag(int theirCreatures, const string& onlyName,
+                                int minToughness, int atFloor)
+{
+    if (theirCreatures < 0)
+        return "";
+    std::ostringstream o;
+    o << " {this mode's SACRIFICE half is an EDICT: "
+      << edictClause(theirCreatures, onlyName, 0, false, false, "", "", 0, -1, false,
+                     minToughness, atFloor);
+    if (theirCreatures > 1)
+    {
+        o << " - the pick is THEIRS, so plan on their least valuable body, not the"
+             " one you want gone";
+        if (minToughness > 0 && atFloor > 0)
+            o << " (" << atFloor << " of their " << theirCreatures << " creatures "
+              << (atFloor == 1 ? "is" : "are") << " at the smallest toughness on their board, "
+              << minToughness << ")";
+    }
+    o << "}";
+    return o.str();
+}
+
 //#W53-P (D4b): the edict forecast is computed off the BATTLEFIELD, and a
 //sacrifice already on the stack aimed at the same permanent has not taken it
 //off the battlefield yet - so the `{right now: they sacrifice Emrakul (MV 15,
@@ -2203,7 +2276,11 @@ struct CastRowBoardAnswer
     int theirs;
     int mine;
     string engines; //#W66-AQ (H10): the ones of THEIRS that are not bodies
-    CastRowBoardAnswer() : theirs(-1), mine(-1) {}
+    //#W68-BD (J8): 1 = this row is a plain edict whose victim the OPPONENT
+    //picks. It takes no part in the sweep ranking; it is read by the
+    //crack-back cover block only.
+    int edictKind;
+    CastRowBoardAnswer() : theirs(-1), mine(-1), edictKind(0) {}
 };
 
 static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
@@ -2273,6 +2350,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         return "";
     if (edict)
     {
+        if (ans) //#W68-BD (J8): the crack-back cover block reads this
+            ans->edictKind = 1;
         bool targetGains = lowText.find("toughnesslifegain targetcontroller") != string::npos;
         //#W53-O (D13): the determined victim's own facts, and - when the gain
         //goes to THEM - what their life-to-damage converter turns it into.
@@ -2344,26 +2423,11 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         if (card && card->controller())
         {
             myLoopClosed = lifeLoopProvenWin(card->controller()); //#W62-AA (R6)
-            Player * themP = card->controller()->opponent();
-            MTGGameZone * tbf2 = (themP && themP->game) ? themP->game->inPlay : NULL;
-            for (int ti = 0; tbf2 && ti < tbf2->nb_cards; ti++)
-            {
-                MTGCardInstance * tc2 = tbf2->cards[ti];
-                if (!tc2 || !tc2->isCreature())
-                    continue;
-                if (!minTough || tc2->toughness < minTough)
-                    minTough = tc2->toughness;
-            }
-            if (minTough < 0)
-                minTough = 0;
-            //#W67-AW (M4): how many of their bodies sit ON that floor - the
-            //same walk, so the two numbers cannot disagree.
-            for (int ti = 0; tbf2 && minTough > 0 && ti < tbf2->nb_cards; ti++)
-            {
-                MTGCardInstance * tc3 = tbf2->cards[ti];
-                if (tc3 && tc3->isCreature() && tc3->toughness == minTough)
-                    minToughCount++;
-            }
+            //#W68-BD (J8): the floor walk moved into edictFloorScan verbatim so
+            //the standalone row and the MODE row compose the same numbers.
+            int edictTheirs = 0;
+            edictFloorScan(card->controller()->opponent(), edictTheirs, minTough,
+                           minToughCount, NULL);
         }
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
@@ -7934,6 +7998,76 @@ static string narrationShapeKey(const string& line)
     return k;
 }
 
+//#W68-BD (engine MED, the narration census). MEASURED on the wave-67 corpus
+//(42 seats, largest narration per seat, 479,148 B / 11,048 lines total): the
+//log is NOT full of structural filler - phase markers are already lazy (5 of
+//11,048 lines are a phase marker with nothing after it), adjacent-duplicate
+//runs are already bucketed (43 runs of 2, collapsing them SAVES NOTHING), and
+//only 50 of 952 turns are draw-step-only. What dominates by bytes after the
+//event lines themselves is one line class: `- Paid {cost} for CARD with A; B;
+//C` at 44,103 B over 513 lines (9.2% of all narration bytes, 85 B average).
+//The mana SOURCES on a payment made in a PAST turn are the one part of it that
+//no later decision reads - which lands are untapped NOW is the CURRENT
+//SITUATION block's job, and it prints them - while the cost and the card are
+//the history. Folding the source list to its COUNT on past turns only saves
+//18,714 B, 3.9% of all narration, with no fact class deleted: the payment, the
+//cost, the card and how many sources it took all still print.
+//The current turn is untouched (its payments are this window's arithmetic), a
+//bucketed line (`[xN - ...]`) is skipped so the two transforms cannot fight,
+//and a line whose shape does not match exactly is passed through byte for byte.
+//Pure over the body, so PARSETEST proves it without a game.
+string narrationFoldPaidSources(const string& body)
+{
+    if (body.empty())
+        return body;
+    vector<string> lines;
+    size_t p2 = 0;
+    while (true)
+    {
+        size_t nl = body.find('\n', p2);
+        lines.push_back(body.substr(p2, nl == string::npos ? string::npos : nl - p2));
+        if (nl == string::npos)
+            break;
+        p2 = nl + 1;
+    }
+    int lastTurn = -1;
+    for (size_t i = 0; i < lines.size(); i++)
+        if (lines[i].compare(0, 8, "=== Turn") == 0)
+            lastTurn = (int) i;
+    if (lastTurn < 0)
+        return body;
+    bool changed = false;
+    for (int i = 0; i < lastTurn; i++)
+    {
+        string& L = lines[(size_t) i];
+        if (L.compare(0, 7, "- Paid ") != 0)
+            continue;
+        if (L.find("[x") != string::npos)
+            continue; //already bucketed: leave it alone
+        const size_t w = L.rfind(" with ");
+        if (w == string::npos || w + 6 >= L.size())
+            continue;
+        const string tail = L.substr(w + 6);
+        int n = 1;
+        for (size_t k = 0; k + 1 < tail.size(); k++)
+            if (tail[k] == ';' && tail[k + 1] == ' ')
+                n++;
+        std::ostringstream o;
+        o << L.substr(0, w) << " (paid with " << n << " source"
+          << (n == 1 ? "" : "s") << ")";
+        if (o.str().size() >= L.size())
+            continue; //never make a line longer
+        L = o.str();
+        changed = true;
+    }
+    if (!changed)
+        return body;
+    std::ostringstream out;
+    for (size_t i = 0; i < lines.size(); i++)
+        out << (i ? "\n" : "") << lines[i];
+    return out.str();
+}
+
 string narrationBucketRuns(const string& body)
 {
     if (body.empty())
@@ -10978,6 +11112,17 @@ static string oneShotDrawGrantTag(const std::vector<OneShotDrawBranch>& branches
             else
                 o << ", so those " << b.oppDraws << " draws take "
                   << (b.oppDraws * minePerDraw) << " off them";
+            //#W68-BD (J8, deck146 HIGH-2): the punisher arithmetic prices what
+            //their draw does to THEM, and on a board with no converter that
+            //number is 0 - so the only framing on the screen said the card was
+            //worth nothing. It is worth a card, to them. `146v125` s19/s20: the
+            //seat read `take 0 off them` and called handing a control deck a
+            //card "a 2-for-1 in card advantage". The punisher figure is
+            //untouched; the ledger side is now named beside it.
+            o << " - and either way this HANDS THEM " << b.oppDraws << " card"
+              << (b.oppDraws == 1 ? "" : "s")
+              << ": that is what this row COSTS you, and it is not measured by"
+                 " the punisher figure above";
             said = true;
         }
         if (b.selfDraws > 0)
@@ -17403,7 +17548,11 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         int wmode = kLogWindowFull, wturns = 0;
         logWindowSetting(wmode, wturns);
         //#W67-AY (MED): and the batch bucketing, over the composed body only.
-        const string body = narrationBucketRuns(logWindowApply(mNarration, &elided));
+        //#W68-BD (MED): and the past-turn payment-source fold, over the same
+        //composed body. Order matters: bucketing first, so a run this fold
+        //would break into non-identical lines is already collapsed.
+        const string body = narrationFoldPaidSources(
+            narrationBucketRuns(logWindowApply(mNarration, &elided)));
         u << logWindowLogHeader(elided > 0, wturns) << "\n" << body << "\n";
     }
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
@@ -20241,6 +20390,23 @@ static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int 
           << (oppHandInReveal == 1 ? "" : "s") << ") is revealed below; those cards"
              " are still in their hand until this decision resolves";
     o << " | Opponent library: " << oppLibraryCards << " cards";
+    //#W68-BD (deck162 LOW): the number was on the screen and the CONSEQUENCE
+    //was not. `162v126` was won by the opponent decking out while the seat sat
+    //at 10 life with no idea it was coming - it had a clock it never had to
+    //find. The forecast is stated only inside three draws, where it is the
+    //decision (hold and pass, or race), and it states the engine rule it rests
+    //on. It is a bare count-down, not a turn prediction: extra draws of theirs
+    //only make it sooner, so "at most" is true whatever else is on the board.
+    if (oppLibraryCards >= 0 && oppLibraryCards <= 3)
+    {
+        o << " - DECK-OUT IS IN RANGE: a player who must draw from an empty"
+             " library LOSES, and they have " << oppLibraryCards << " card"
+          << (oppLibraryCards == 1 ? "" : "s") << " left, so they can survive at"
+             " most " << oppLibraryCards << " more draw"
+          << (oppLibraryCards == 1 ? "" : "s")
+          << " and the draw after that loses them the game (any extra draw of"
+             " theirs makes it sooner, never later)";
+    }
     return o.str();
 }
 
@@ -22485,6 +22651,76 @@ static bool castBodyEntersTapped(MTGCardInstance * card)
     return scriptLower(card->magicText).find("tap(noevent)") != string::npos;
 }
 
+//#W68-BD (J8, deck126 MED): the cover clause on the row that REMOVES an
+//attacker. `126v152` s14: the header read `CRACK-BACK NEXT TURN: 4 of their
+//creatures will be able to attack ... for up to 18 - you would be at 0; that
+//would KILL you` and row 2 was Cast Tribute to Hunger with its edict floor and
+//NOTHING about the line above it - while a creature row three lines away
+//carried `{crack-back cover: ...}`. The one row that subtracts from that total
+//was the one row that did not price itself against it.
+//
+//An edict is not a blocker, so the arithmetic is not the blocker tag's. THEY
+//choose the victim, and the rules-correct floor follows from that: if any
+//creature they control is NOT in the crack-back total, they can hand over that
+//one and the total does not move at all - the floor is 0, and saying otherwise
+//would be the review's own premise stated as a fact. Only when EVERY creature
+//they control is in that total is a removal proven, and then it is the
+//SMALLEST contribution, because that is the one they will give up.
+//The survival verdict obeys #W65-AL (G4): none is printed against a total the
+//line above calls a FLOOR. Pure over six numbers.
+static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor,
+                                     int theirCreatures, int attackerBodies,
+                                     int minAttackerPower)
+{
+    if (total <= 0 || theirCreatures <= 0 || attackerBodies <= 0)
+        return "";
+    if (attackerBodies > theirCreatures)
+        return ""; //the two walks disagree: claim nothing
+    std::ostringstream o;
+    o << " {crack-back cover: the CRACK-BACK NEXT TURN line above is " << total
+      << " from " << attackerBodies << " of their creatures and puts you at "
+      << (myLife - total);
+    if (totalIsFloor)
+        o << " OR LOWER - that line says the total is a FLOOR, not a ceiling, so"
+             " every figure in this clause is computed against a number that can"
+             " only go UP";
+    o << ". This row removes ONE of their creatures and THEY choose which one.";
+    const int spare = theirCreatures - attackerBodies;
+    if (spare > 0)
+    {
+        o << " " << spare << " of their " << theirCreatures << " creature"
+          << (theirCreatures == 1 ? "" : "s")
+          << " " << (spare == 1 ? "is" : "are") << " NOT in that total, so they can"
+             " hand over a body that was not going to attack: the FLOOR of what this"
+             " takes off the crack-back is 0 and the line above stands unchanged}";
+        return o.str();
+    }
+    if (minAttackerPower <= 0)
+    {
+        o << " Every creature they control is in that total, but the smallest"
+             " contribution is 0, so this row is not proven to take anything off it}";
+        return o.str();
+    }
+    const int left = total - minAttackerPower;
+    o << " Every one of their " << theirCreatures << " creature"
+      << (theirCreatures == 1 ? " is" : "s is")
+      << " in that total, and the smallest of them contributes " << minAttackerPower
+      << " - that is the one they will give up - so this takes AT LEAST "
+      << minAttackerPower << " off it: " << total << " - " << minAttackerPower
+      << " = " << left << " -> you would be at " << (myLife - left);
+    if (totalIsFloor)
+        o << ". THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from is a"
+             " FLOOR, so a larger crack-back than " << total << " is on the table and"
+             " this row does not say whether you survive";
+    else if (myLife - left <= 0)
+        o << "; that STILL KILLS you";
+    else
+        o << ", which you SURVIVE - and they can only give up MORE than "
+          << minAttackerPower << ", never less, so nothing uncounted here overturns it";
+    o << "}";
+    return o.str();
+}
+
 //#W64-AK (R4/R7): the per-attacker legality the cover is computed from, asked of
 //the ENGINE (MTGCardInstance::canBlockPairwise - the exact body canBlock() runs,
 //extracted in W41-13 so no evasion rule can drift between a prediction and the
@@ -24726,7 +24962,15 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 10, "{rows for ") == 0)
                 //#W67-AZ (R4): the shortened band rung's clause is the same
                 //species - true of this window's mana, false the moment it moves.
+                //#W68-BD (MED): the clause was shortened to `{same effect right
+                //now: ...}`; both spellings stay on this list so a build that
+                //still carries the old string cannot leak it into history.
                 || (in.compare(i, 30, "{identical in effect right now") == 0)
+                || (in.compare(i, 22, "{same effect right now") == 0)
+                //#W68-BD (J8): the mode edict floor is a board fact of THIS
+                //window - their creature count and the smallest toughness on
+                //their board - and rides a rendered row the model may echo.
+                || (in.compare(i, 40, "{this mode's SACRIFICE half is an EDICT:") == 0)
                 || (in.compare(i, 20, "{it enters UNTAPPED ") == 0)
                 //#W58-B (D1): the life-payment verdict is the same species -
                 //it prices THIS window's payment against the life the frame
@@ -27915,7 +28159,19 @@ static bool everyCastRowDead(const std::vector<std::string>& rows)
 //clause, which works for the same reason (a menu-level fact stated once,
 //instead of an inference the pilot has to run over every row). Pure over a bool
 //and the count.
-static string allCastRowsDeadNote(bool allDead, int castRows)
+//#W68-BD (deck146 MED-2): the header said the CASTING seam has nothing live
+//and stopped there, and the seat read it as "this turn has nothing". `146v125`
+//s22/s24 are both correct all-dead casting menus, both answered correctly -
+//and on those same two turns the seat cast nothing AND animated nothing, with
+//an untapped Hive of the Eye Tyrant on the board and an opponent at zero
+//creatures. Across that game the seat declined the animation on an untapped
+//Hive twelve times. The screen never said the casting seam is not the turn.
+//`landPlaysLegal` is the engine's own legalLandPlays count, so the one number
+//in this sentence is the same number the land seam will offer; at 0 the land
+//clause is omitted entirely and nothing is claimed about it. The rest is a
+//SCOPE statement about seams this engine has - it names no card, promises no
+//legality, and cannot be false of a board.
+static string allCastRowsDeadNote(bool allDead, int castRows, int landPlaysLegal = 0)
 {
     if (!allDead || castRows <= 0)
         return "";
@@ -27924,7 +28180,15 @@ static string allCastRowsDeadNote(bool allDead, int castRows)
       << (castRows == 1 ? "" : "s") << " below carry a verdict computed from the board"
          " that reads zero - not one of them changes a number on the board as it stands."
          " Nothing is withheld and no row is capped: casting one is still legal and still"
-         " your choice, and the decline and hold rows are on the menu as always.";
+         " your choice, and the decline and hold rows are on the menu as always."
+         " THIS IS THE CASTING SEAM ONLY, NOT YOUR WHOLE TURN: your land drop, the"
+         " activated abilities of your permanents (a manland animation among them),"
+         " your attack and your planeswalker loyalty abilities are asked at their own"
+         " windows and none of them is priced on this menu - a dead casting menu is not"
+         " a turn with nothing to do.";
+    if (landPlaysLegal > 0)
+        o << " Right now the land seam holds " << landPlaysLegal << " legal land play"
+          << (landPlaysLegal == 1 ? "" : "s") << ".";
     return o.str();
 }
 
@@ -28388,7 +28652,12 @@ struct GptModalMode
     //that still does the other half, and the wave-65 census called it dead.
     bool outerPayload;
     bool subPresent;
-    GptModalMode() : outerPayload(false), subPresent(false) {}
+    //#W68-BD (J8): is the granted half an EDICT handed to the opponent - a
+    //`sacrifice` over a spec on THEIR battlefield that they, not the pilot,
+    //choose from? Recorded here so the mode row can carry the same floor the
+    //standalone edict row carries.
+    bool subOpponentEdict;
+    GptModalMode() : outerPayload(false), subPresent(false), subOpponentEdict(false) {}
 };
 static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>& out)
 {
@@ -28440,8 +28709,21 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
                         {
                             size_t mb = toLowerCopy(spec).find("mybattlefield");
                             if (mb != string::npos)
+                            {
                                 spec = spec.substr(0, mb) + "opponentbattlefield"
                                        + spec.substr(mb + 13);
+                                //#W68-BD (J8): the edict shape, read off the
+                                //script and not off the label - `mybattlefield`
+                                //inside an ability granted to the OPPONENT is
+                                //their battlefield, and a `sacrifice` verb over
+                                //it is an edict whose victim they pick. Both
+                                //halves are required; a grant with no sacrifice
+                                //verb, or a spec that was never rewritten, is
+                                //not claimed as one.
+                                if (innerLow.find("sacrifice") != string::npos
+                                    && toLowerCopy(spec).find("creature") != string::npos)
+                                    m.subOpponentEdict = true;
+                            }
                         }
                         m.subSpec = spec;
                     }
@@ -28485,6 +28767,82 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
     }
     return out.size() >= 2;
 }
+//#W68-BD (J8, deck146 HIGH-2): the mode's own payload segment, extracted the
+//way modeEffectPriceTag extracts it, so the mirror test below reads exactly
+//what the price tag reads. Pure over (script, label).
+static string modalSegmentFor(const string& script, const string& label)
+{
+    if (script.empty() || label.empty())
+        return "";
+    const string low = toLowerCopy(script);
+    const string want = "name(" + toLowerCopy(label) + ")";
+    size_t at = low.find(want);
+    if (at == string::npos)
+        return "";
+    size_t bgn = at + want.size();
+    size_t end = low.find(" choice ", bgn);
+    size_t nl = low.find('\n', bgn);
+    if (nl != string::npos && (end == string::npos || nl < end))
+        end = nl;
+    if (end == string::npos)
+        end = low.size();
+    return low.substr(bgn, end - bgn);
+}
+//#W68-BD (J8): the same segment with every actor word flipped. A pure token
+//swap, never a guess from the label's words - `draw:1 opponent && life:-1
+//opponent` becomes `draw:1 controller && life:-1 controller` and nothing else
+//moves.
+static string modalActorSwap(const string& seg)
+{
+    string o;
+    for (size_t i = 0; i < seg.size();)
+    {
+        if (seg.compare(i, 10, "controller") == 0)
+        {
+            o += "opponent";
+            i += 10;
+        }
+        else if (seg.compare(i, 8, "opponent") == 0)
+        {
+            o += "controller";
+            i += 8;
+        }
+        else
+        {
+            o += seg[i];
+            i++;
+        }
+    }
+    return o;
+}
+//#W68-BD (J8): "row 1 is this same mode pointed at you". The two rows the seat
+//confused at `146v125` s16 and s19/20 (`return creature and you draw` /
+//`return creature and opponent draws`) are the SAME payload with the actor
+//flipped, and nothing on either row said so. The pairing is proven by the
+//script - an exact segment match after the swap - never by comparing the
+//labels, which is precisely what the model was already doing wrong. No match =
+//no claim.
+static string modalMirrorModeLabel(const string& script, const string& label)
+{
+    const string seg = modalSegmentFor(script, label);
+    if (seg.empty())
+        return "";
+    const string want = modalActorSwap(seg);
+    if (want == seg)
+        return ""; //a mode with no actor word has no mirror
+    std::vector<GptModalMode> modes;
+    if (!modalChoiceModes(script, modes))
+        return "";
+    for (size_t i = 0; i < modes.size(); i++)
+    {
+        if (toLowerCopy(modes[i].label) == toLowerCopy(label))
+            continue;
+        if (modalSegmentFor(script, modes[i].label) == want)
+            return modes[i].label;
+    }
+    return "";
+}
+
 //#W64-AG (F6, deck146 HIGH-1 - the decision that lost 146v152). Mode rows
 //reached the seat as the engine's bare `name(...)` label and NOTHING else. That
 //label is an OMISSION, not a summary: `name(Return creature and you draw)` drops
@@ -28643,7 +29001,22 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
     }
     if (oppDraw > 0)
     {
-        o << (first ? " " : "; ") << "they draw " << oppDraw;
+        //#W68-BD (J8, deck146 HIGH-2): a card handed to the opponent is a
+        //PRICE, and this row reported it as a bare fact beside a number that is
+        //good for the seat ("they LOSE 1 life ... they draw 1"). The seat read
+        //the pair exactly that way twice and wrote "a 2-for-1 in card advantage
+        //(I spend 1 card, they draw 1)" - it counted their card as its own
+        //gain. `#W47-R3` settled the framing for life THEY gain; the same
+        //sentence is owed to a card they draw. Nothing is deleted: the count is
+        //still printed, and what is added is which side of the ledger it is on.
+        o << (first ? " " : "; ") << "you HAND THEM " << oppDraw << " card"
+          << (oppDraw == 1 ? "" : "s")
+          << " - that is a PRICE this mode pays, not a gain of yours: a card in"
+             " THEIR hand is theirs to use against you";
+        const string mirror = modalMirrorModeLabel(script, optionLabel);
+        if (!mirror.empty())
+            o << ", and the row named \"" << mirror
+              << "\" is this same mode pointed at YOU instead";
         first = false;
     }
     o << " (life and draws only: anything else this mode does is in the row label"
@@ -29014,6 +29387,102 @@ static bool modalModeLiveness(GameObserver * observer, MTGCardInstance * card,
         (v == 0 ? live : (v == 1 ? halfDead : dead)).push_back(modes[i].label);
     }
     return !live.empty() || !halfDead.empty() || !dead.empty();
+}
+
+//#W68-BD (deck152 MED-4): a STAGE-1 gate row that opens a side pick, and the
+//two branches it opens. `152v125` s59 offered `1. choose a creature / 2.
+//Decline` with the opponent at ZERO creatures; the seat took row 1, wrote "the
+//opponent has no creatures on the battlefield, so the creature target for
+//Teferi's +1 is Staff of Nin" - false, an artifact is not a creature - and the
+//stage-3 list (s60) held only its own three bodies, with no pass row. The gate
+//is asked for a type the polarity the pilot wants has none of, and the screen
+//says nothing until the commitment is irreversible.
+//The branches are read off the SCRIPT the gate was built from: the `may
+//name(<gate>)` line grants an ability holding exactly two `choice name(X)
+//target(SPEC)` branches (Teferi's +1 - your side untaps, their side taps).
+//Anything else - one branch, three branches, a branch with no target spec -
+//yields false and nothing is claimed. Pure over (script, label).
+static bool gateSideBranches(const string& script, const string& label,
+                             string& labelA, string& specA,
+                             string& labelB, string& specB)
+{
+    labelA.clear();
+    specA.clear();
+    labelB.clear();
+    specB.clear();
+    if (script.empty() || label.empty())
+        return false;
+    const string low = toLowerCopy(script);
+    const string want = "name(" + toLowerCopy(label) + ")";
+    size_t at = low.find(want);
+    if (at == string::npos)
+        return false;
+    size_t bgn = at + want.size();
+    size_t end = low.find('\n', bgn);
+    if (end == string::npos)
+        end = low.size();
+    const string seg = script.substr(bgn, end - bgn);
+    const string segLow = low.substr(bgn, end - bgn);
+    std::vector<std::string> labels, specs;
+    for (size_t k = segLow.find("choice name("); k != string::npos;
+         k = segLow.find("choice name(", k + 1))
+    {
+        size_t ne = seg.find(')', k + 12);
+        if (ne == string::npos)
+            break;
+        size_t tp = segLow.find("target(", ne);
+        if (tp == string::npos)
+            break;
+        //the target spec must belong to THIS branch, not the next one
+        size_t nextChoice = segLow.find("choice name(", k + 1);
+        if (nextChoice != string::npos && tp > nextChoice)
+            continue; //a branch with no target spec of its own: claim nothing
+        size_t te = seg.find(')', tp + 7);
+        if (te == string::npos)
+            break;
+        labels.push_back(seg.substr(k + 12, ne - (k + 12)));
+        specs.push_back(seg.substr(tp + 7, te - (tp + 7)));
+    }
+    if (labels.size() != 2)
+        return false;
+    labelA = labels[0];
+    specA = specs[0];
+    labelB = labels[1];
+    specB = specs[1];
+    return true;
+}
+//#W68-BD (deck152 MED-4): the row clause. Counts only, from the engine's own
+//TargetChooser - what each side of the pick this row opens can legally reach
+//right now. A count of 0 is NAMED ("NONE") rather than left for the pilot to
+//infer from a battlefield line forty lines up; the gate itself is untouched and
+//still answerable, which is the doctrine's requirement. A negative count means
+//the spec carried no requirement and nothing is claimed for that side.
+static string gateSideCensusTag(const string& labelA, int nA,
+                                const string& labelB, int nB)
+{
+    if (labelA.empty() || labelB.empty() || nA < 0 || nB < 0)
+        return "";
+    std::ostringstream o;
+    o << " {taking this row commits you to a SIDE pick next, and the two branches"
+         " it opens can legally reach this many permanents right now: \"" << labelA
+      << "\" - ";
+    if (nA == 0)
+        o << "NONE";
+    else
+        o << nA;
+    o << "; \"" << labelB << "\" - ";
+    if (nB == 0)
+        o << "NONE";
+    else
+        o << nB;
+    o << ".";
+    if (nA == 0 || nB == 0)
+        o << " A branch at NONE has no legal object at all this window, so taking"
+             " this row cannot reach that side";
+    else
+        o << " Both sides are reachable";
+    o << "}";
+    return o.str();
 }
 
 //#W66-AQ (H9): the subject of a resolving `auto=choice` menu sits in no game
@@ -35821,6 +36290,36 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                             cbAtk, cbFloor);
             }
         }
+        //#W68-BD (J8, deck126 MED): and, on a row that REMOVES one of their
+        //attackers, what it does to the same line. Gated through the same
+        //crackBackScreenTotal, so this row can never point at a line that is
+        //not above it; the bodies in the total come from the SAME
+        //crackBackBodyContribution walk the line itself is built from, and the
+        //creature count from edictFloorScan, the walk the row's own edict floor
+        //came from.
+        if (rowSweep.edictKind == 1)
+        {
+            int cbTotal2 = 0;
+            bool cbFloor2 = false;
+            if (crackBackScreenTotal(this, opponent(), getObserver(), cbTotal2, cbFloor2))
+            {
+                int edT = 0, edMin = 0, edAt = 0;
+                edictFloorScan(opponent(), edT, edMin, edAt, NULL);
+                int bodies2 = 0, minPow = 0;
+                MTGGameZone * obf = (opponent() && opponent()->game)
+                                    ? opponent()->game->inPlay : NULL;
+                for (int bi = 0; obf && bi < obf->nb_cards; bi++)
+                {
+                    const int pw = crackBackBodyContribution(obf->cards[bi]);
+                    if (pw <= 0)
+                        continue;
+                    bodies2++;
+                    if (!minPow || pw < minPow)
+                        minPow = pw;
+                }
+                o << crackBackRemovalRowTag(cbTotal2, life, cbFloor2, edT, bodies2, minPow);
+            }
+        }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -35901,7 +36400,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W57-C (D12): the menu-level verdict, taken over the CAST rows only -
         //before the decline and hold rows join the list, since neither is a
         //cast and neither carries a board verdict.
-        const string deadMenuNote = allCastRowsDeadNote(everyCastRowDead(menu), (int) menu.size());
+        const string deadMenuNote = allCastRowsDeadNote(
+            everyCastRowDead(menu), (int) menu.size(),
+            (int) LegalActionsOracle::legalLandPlays(this).size()); //#W68-BD (MED)
         int declineRowIdx = -1; //#W66-AS (H7 second half): the decline's own row number
         //#W65-AL (G9, deck125 HIGH-1): and its PRICE, where it has one. The
         //cleanup step this clause prices is THIS turn's, so the clause is
@@ -36923,8 +37424,17 @@ static string payRepeatBandRowTag(int bandPaid)
 {
     if (bandPaid < 0)
         return "";
+    //#W68-BD (MED, wave-67 engine adjudication: I9a's byte saving is ZERO after
+    //AZ R4). Measured on the corpus: the 7 band windows still run 2,514-2,737 B
+    //because each of the 19 band rows carries EIGHTY-FIVE bytes of tag - this
+    //clause at 46 B and `{this mode has a legal object right now}` at 39 B, the
+    //same two sentences nineteen times. Every rung stays on the list and stays
+    //answerable; the row is shortened to its engine label plus the one fact
+    //that distinguishes it, which is that it does not differ. The legality of
+    //the band is stated once, on the kept row's collapse tag ("any of them is a
+    //legal answer"), instead of once per row.
     std::ostringstream o;
-    o << " {identical in effect right now: adds " << bandPaid << " counter"
+    o << " {same effect right now: adds " << bandPaid << " counter"
       << (bandPaid == 1 ? "" : "s") << "}";
     return o.str();
 }
@@ -38236,6 +38746,33 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 haveCensus = modalModeLiveness(observer, subj, menuScript,
                                                liveM, halfM, deadM);
             }
+            //#W68-BD (J8, deck146 HIGH-1): the EDICT floor on the mode rows
+            //that carry one. The mode list is re-read from the same script the
+            //census read; the floor numbers come from edictFloorScan, the one
+            //walk the standalone edict row uses, so a Silverquill Command
+            //sacrifice mode and a Tribute to Hunger row in the same game state
+            //cannot name different counts.
+            std::vector<GptModalMode> edictModes;
+            int edTheirs = 0, edMinTough = 0, edAtFloor = 0;
+            string edOnlyName;
+            if (modalChoiceModes(menuScript, edictModes))
+            {
+                bool anyEdict = false;
+                for (size_t ei = 0; ei < edictModes.size(); ei++)
+                    if (edictModes[ei].subOpponentEdict)
+                        anyEdict = true;
+                if (anyEdict)
+                {
+                    MTGCardInstance * edOnly = NULL;
+                    edictFloorScan(opponent(), edTheirs, edMinTough, edAtFloor, &edOnly);
+                    if (edOnly)
+                        edOnlyName = edOnly->getDisplayName();
+                }
+                else
+                    edictModes.clear();
+            }
+            else
+                edictModes.clear();
             for (size_t li = 0; li < opts.size() && li < req.optionTexts.size(); li++)
             {
                 //A pay-life row (the shockland pay-or-tap class) has ALREADY
@@ -38249,6 +38786,29 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                                opponent() ? opponent()->life : 0,
                                                canBlockTapped, doNotUntap,
                                                modeTheirsPer); //#W66-AQ (H9)
+                //#W68-BD (deck152 MED-4): a stage-1 side gate says how many
+                //objects each side it opens can reach - "NONE" instead of an
+                //unanswerable ask. The subject is the same pointer the census
+                //uses; with no subject there is no TargetChooser and no claim.
+                {
+                    string gA, gSA, gB, gSB;
+                    MTGCardInstance * gSubj = ctx ? ctx
+                                                  : modalSubjectFromScript(this, menuScript);
+                    if (gSubj && gateSideBranches(menuScript, req.optionTexts[li],
+                                                  gA, gSA, gB, gSB))
+                        opts[li] += gateSideCensusTag(
+                            gA, modalSpecObjectCount(observer, gSubj, gSA),
+                            gB, modalSpecObjectCount(observer, gSubj, gSB));
+                }
+                //#W68-BD (J8): the edict floor rides the row whose mode owns it.
+                {
+                    const string edLow = toLowerCopy(req.optionTexts[li]);
+                    for (size_t ei = 0; ei < edictModes.size(); ei++)
+                        if (edictModes[ei].subOpponentEdict
+                            && toLowerCopy(edictModes[ei].label) == edLow)
+                            opts[li] += modeEdictFloorTag(edTheirs, edOnlyName,
+                                                          edMinTough, edAtFloor);
+                }
                 if (haveCensus) //#W66-AQ (H9)
                 {
                     const string rowLow = toLowerCopy(req.optionTexts[li]);
@@ -38467,7 +39027,17 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 if (!bandRows[i] || i >= repeatBase.size()
                     || repeatBase[i] == (size_t) -1 || repeatBase[i] > opts[i].size())
                     continue;
-                opts[i].resize(repeatBase[i]);
+                //#W68-BD (MED): back to the ENGINE's own label, which drops the
+                //per-row liveness tag the band repeats 19 times as well as the
+                //price text. Only when the row provably still BEGINS with that
+                //label - otherwise the wave-67 truncation point stands.
+                if (i < req.optionTexts.size() && !req.optionTexts[i].empty()
+                    && opts[i].size() >= req.optionTexts[i].size()
+                    && opts[i].compare(0, req.optionTexts[i].size(),
+                                       req.optionTexts[i]) == 0)
+                    opts[i] = req.optionTexts[i];
+                else
+                    opts[i].resize(repeatBase[i]);
                 opts[i] += payRepeatBandRowTag(bPaid);
                 shortened++;
             }
@@ -62017,8 +62587,33 @@ static const char * kW50Y_r94 =
                       " computed from the board that reads zero - not one of them changes a number"
                       " on the board as it stands. Nothing is withheld and no row is capped:"
                       " casting one is still legal and still your choice, and the decline and hold"
-                      " rows are on the menu as always.",
+                      " rows are on the menu as always."
+                      //#W68-BD (deck146 MED-2): the scope sentence
+                      " THIS IS THE CASTING SEAM ONLY, NOT YOUR WHOLE TURN: your land drop, the"
+                      " activated abilities of your permanents (a manland animation among them),"
+                      " your attack and your planeswalker loyalty abilities are asked at their own"
+                      " windows and none of them is priced on this menu - a dead casting menu is not"
+                      " a turn with nothing to do.",
               "#W57-C D12 the token states the fact AND that no window is removed");
+        //#W68-BD (deck146 MED-2). REPRO `146v125` s22/s24: a correct all-dead
+        //casting menu on a turn where the seat also had an untapped manland and
+        //a land drop, and cast nothing AND animated nothing. POSITIVE: the land
+        //count rides the note when the land seam has one. MUST-NOT-MATCH: at 0
+        //legal land plays NOTHING is claimed about the land drop.
+        cout << "\n[#W68-BD] MED the dead-cast header says the casting seam is not the turn\n";
+        CHECK(allCastRowsDeadNote(true, 1, 0).find("THIS IS THE CASTING SEAM ONLY") != string::npos,
+              "#W68-BD MED REPRO the header now names the seams this menu does not price");
+        CHECK(allCastRowsDeadNote(true, 1, 0).find("land seam holds") == string::npos,
+              "#W68-BD MED MUST-NOT-MATCH no land clause when no land play is legal");
+        CHECK(allCastRowsDeadNote(true, 1, 2).find("Right now the land seam holds 2 legal land plays.")
+                  != string::npos
+              && allCastRowsDeadNote(true, 1, 1).find("holds 1 legal land play.") != string::npos,
+              "#W68-BD MED POSITIVE the land count is the engine's own, and pluralises");
+        CHECK(allCastRowsDeadNote(false, 3, 4).empty() && allCastRowsDeadNote(true, 0, 4).empty(),
+              "#W68-BD MED MUST-NOT-MATCH a live menu and an empty menu still print nothing");
+        CHECK(stripNarrationDecoration(allCastRowsDeadNote(true, 1, 2))
+                  == allCastRowsDeadNote(true, 1, 2),
+              "#W68-BD MED ECHO the header carries no brace channel to strip");
         CHECK(allCastRowsDeadNote(false, 3).empty() && allCastRowsDeadNote(true, 0).empty(),
               "#W57-C D12 NEGATIVE no token without the verdict, and none over an empty menu");
         vector<string> mixed(allDead);
@@ -64645,7 +65240,10 @@ static const char * kW50Y_r94 =
         cout << "     " << peerTag << "\n";
         CHECK(peerTag == " [DRAW GRANT (one-shot, on resolution): if you choose \"the opponent\":"
                          " they draw 20 cards now; converters on your battlefield: 0 (nothing of"
-                         " yours punishes their draws, so those 20 draws take 0 off them) |"
+                         " yours punishes their draws, so those 20 draws take 0 off them)"
+                         //#W68-BD (J8, deck146 HIGH-2): the ledger side
+                         " - and either way this HANDS THEM 20 cards: that is what this row COSTS"
+                         " you, and it is not measured by the punisher figure above |"
                          " if you choose \"you\": YOU draw 21 cards now]",
               "#W61-S C12 POSITIVE the seq-23 board: the converter count the row omitted, per branch");
         CHECK(peerTag.find("Underworld Dreams") == string::npos,
@@ -64676,8 +65274,42 @@ static const char * kW50Y_r94 =
             CHECK(oneShotDrawGrantTag(flat, noConv, 0, 0, "", 10)
                       == " [DRAW GRANT (one-shot, on resolution): they draw 2 cards now;"
                          " converters on your battlefield: 0 (nothing of yours punishes their"
-                         " draws, so those 2 draws take 0 off them)]",
+                         " draws, so those 2 draws take 0 off them)"
+                         " - and either way this HANDS THEM 2 cards: that is what this row COSTS"
+                         " you, and it is not measured by the punisher figure above]",
                   "#W61-S C12 a non-modal grant carries no branch label");
+            //#W68-BD (J8, deck146 HIGH-2). REPRO `146v125` s19/s20: the ONLY
+            //framing on the screen was `take 0 off them`, and the seat wrote
+            //"a 2-for-1 in card advantage (I spend 1 card, they draw 1)".
+            //POSITIVE: the cost sentence rides the branch WITH converters too,
+            //where the punisher figure is non-zero and still is not the cost.
+            //MUST-NOT-MATCH: a branch that draws only the PILOT never says the
+            //opponent was handed anything. ECHO: the bracket is stripped whole.
+            cout << "\n[#W68-BD] J8 a granted opponent draw is priced as a PRICE\n";
+            CHECK(oneShotDrawGrantTag(flat, noConv, 0, 0, "", 10)
+                      .find("HANDS THEM 2 cards: that is what this row COSTS you") != string::npos,
+                  "#W68-BD J8 REPRO the row now names the card as a cost, not only as 0 off them");
+            {
+                vector<string> conv;
+                conv.push_back("Underworld Dreams #1");
+                const string withConv = oneShotDrawGrantTag(flat, conv, 2, 0, "", 10);
+                CHECK(withConv.find("so those 2 draws take 4 off them") != string::npos
+                      && withConv.find("- and either way this HANDS THEM 2 cards") != string::npos,
+                      "#W68-BD J8 POSITIVE the punisher figure survives and the cost is named beside it");
+                vector<OneShotDrawBranch> selfOnly;
+                OneShotDrawBranch s; s.selfDraws = 3;
+                selfOnly.push_back(s);
+                CHECK(oneShotDrawGrantTag(selfOnly, noConv, 0, 0, "", 10).find("HANDS THEM")
+                          == string::npos,
+                      "#W68-BD J8 MUST-NOT-MATCH a pilot-only draw hands the opponent nothing");
+                CHECK(oneShotDrawGrantTag(flat, noConv, 0, 0, "", 10).find("HANDS THEM 2 card ")
+                          == string::npos,
+                      "#W68-BD J8 MUST-NOT-MATCH the count pluralises");
+                CHECK(stripNarrationDecoration("Cast Peer into the Abyss"
+                                               + oneShotDrawGrantTag(flat, noConv, 0, 0, "", 10))
+                          == "Cast Peer into the Abyss",
+                      "#W68-BD J8 ECHO the DRAW GRANT bracket never enters history");
+            }
             vector<OneShotDrawBranch> varOnly;
             OneShotDrawBranch v; v.variable = true;
             varOnly.push_back(v);
@@ -68069,8 +68701,38 @@ static const char * kW50Y_r94 =
         // the seat-kill tag, at the same 1 life.
         const string theirs = modeEffectPriceTag(sq, "Return creature and opponent draws", 1, 20);
         CHECK(theirs.find("they LOSE 1 life - they would be at 19") != string::npos
-              && theirs.find("they draw 1") != string::npos,
+              //#W68-BD (J8): "they draw 1" is now stated as the PRICE it is
+              && theirs.find("you HAND THEM 1 card - that is a PRICE this mode pays,"
+                             " not a gain of yours") != string::npos,
               "#W64-AG F6 POSITIVE an opponent life cost is priced against THEIR total");
+        //#W68-BD (J8, deck146 HIGH-2). REPRO `146v125` s16: rows 1 and 2 of
+        //Silverquill Command are the same mode pointed in opposite directions
+        //and neither said so; the seat took row 2 twice and argued the sign
+        //backwards. POSITIVE: the mirror is found by an exact SCRIPT match
+        //after an actor swap. MUST-NOT-MATCH: the pilot-side row of the same
+        //pair never claims a card was handed over, and a mode with no mirror
+        //in the script names none.
+        cout << "\n[#W68-BD] J8 the mirrored draw mode is named on the row\n";
+        CHECK(theirs.find("the row named \"Return creature and you draw\" is this same mode"
+                          " pointed at YOU instead") != string::npos,
+              "#W68-BD J8 REPRO the opponent-draw row names its own mirror");
+        CHECK(modeEffectPriceTag(sq, "Return creature and you draw", 5, 20)
+                  .find("HAND THEM") == string::npos,
+              "#W68-BD J8 MUST-NOT-MATCH the pilot-side row hands them nothing");
+        CHECK(modalMirrorModeLabel(sq, "Return creature and opponent draws")
+                  == "Return creature and you draw"
+              && modalMirrorModeLabel(sq, "Return creature and you draw")
+                  == "Return creature and opponent draws",
+              "#W68-BD J8 POSITIVE the mirror pairing is symmetric");
+        CHECK(modalMirrorModeLabel(sq, "Creature gains 3/3 and return creature").empty()
+              && modalMirrorModeLabel(sq, "no such mode").empty()
+              && modalMirrorModeLabel("", "Return creature and you draw").empty(),
+              "#W68-BD J8 MUST-NOT-MATCH a mode with no actor word, an unknown label and an"
+              " empty script all name no mirror");
+        CHECK(modalActorSwap("draw:1 opponent && life:-1 opponent")
+                  == "draw:1 controller && life:-1 controller"
+              && modalActorSwap("draw:1 controller") == "draw:1 opponent",
+              "#W68-BD J8 POSITIVE the actor swap is a token flip, both ways");
         CHECK(theirs.find("THIS KILLS YOU") == string::npos
               && theirs.find("you LOSE") == string::npos,
               "#W64-AG F6 MUST-NOT-MATCH an opponent-facing cost never carries the seat-kill tag");
@@ -69787,7 +70449,8 @@ static const char * kW50Y_r94 =
         // MUST-NOT-MATCH: an opponent-facing cost is never billed to the seat.
         CHECK(opts[2].find("you LOSE") == string::npos
                   && opts[2].find("they LOSE 1 life - they would be at 3") != string::npos
-                  && opts[2].find("they draw 1") != string::npos,
+                  //#W68-BD (J8): the granted draw reads as a price on the row
+                  && opts[2].find("you HAND THEM 1 card") != string::npos,
               "#W65-AL G1 MUST-NOT-MATCH row 3's `life:-1 opponent` is priced against THEIR"
               " total and never against the seat's");
         // MUST-NOT-MATCH: this pass is silent on every menu that is not modal.
@@ -72216,12 +72879,42 @@ static const char * kW50Y_r94 =
         //~130-byte price and taps description. The row's own engine label, its own
         //number and its answerability are untouched.
         const string bandRow = payRepeatBandRowTag(1);
-        CHECK(bandRow == " {identical in effect right now: adds 1 counter}",
+        //#W68-BD (MED): the clause is shortened again - 46 B -> 38 B - and the
+        //band row now drops the per-row liveness tag with it at the caller.
+        CHECK(bandRow == " {same effect right now: adds 1 counter}",
               "#W67-AZ R4 POSITIVE a shortened rung states the one fact that is true of it now");
-        CHECK(payRepeatBandRowTag(3) == " {identical in effect right now: adds 3 counters}"
-                  && payRepeatBandRowTag(0) == " {identical in effect right now: adds 0 counters}"
+        CHECK(payRepeatBandRowTag(3) == " {same effect right now: adds 3 counters}"
+                  && payRepeatBandRowTag(0) == " {same effect right now: adds 0 counters}"
                   && payRepeatBandRowTag(-1).empty(),
               "#W67-AZ R4 the shortened clause pluralises and prints nothing for an unknown count");
+        //#W68-BD (MED, wave-67 adjudication "I9a's byte saving is ZERO"). The
+        //7 band windows in the corpus run 2,514-2,737 B because each band row
+        //carries EIGHTY-FIVE bytes of tag: this clause plus a 39-byte
+        //`{this mode has a legal object right now}`, nineteen times over.
+        //REPRO: the corpus row, verbatim from `152v146` s24. POSITIVE: the
+        //shortened row is the engine label plus this one clause. The band's
+        //legality is stated ONCE, on the kept row.
+        cout << "\n[#W68-BD] MED the band row costs one clause, not two\n";
+        {
+            const string corpusRow = "add 2 counters {this mode has a legal object right now}"
+                                     " {identical in effect right now: adds 1 counter}";
+            CHECK(corpusRow.size() == 103,
+                  "#W68-BD MED REPRO the corpus band row is 100 bytes for a rung that differs"
+                  " from its neighbours in one digit");
+            const string shortened = string("add 2 counters") + payRepeatBandRowTag(1);
+            CHECK(shortened == "add 2 counters {same effect right now: adds 1 counter}"
+                      && shortened.size() + 49 == corpusRow.size(),
+                  "#W68-BD MED POSITIVE the shortened row is label + one clause, 49 B smaller");
+            CHECK(shortened.find("this mode has a legal object") == string::npos,
+                  "#W68-BD MED MUST-NOT-MATCH the per-row liveness tag is not repeated on a"
+                  " band row - the kept row's collapse tag states it once for the band");
+            CHECK(payRepeatCollapseTag(2, 20, 1).find("any of them is a legal answer")
+                      != string::npos,
+                  "#W68-BD MED POSITIVE the band's legality is stated on the kept row");
+            CHECK(stripNarrationDecoration(shortened) == "add 2 counters"
+                  && stripNarrationDecoration(corpusRow) == "add 2 counters",
+                  "#W68-BD MED ECHO both spellings are stripped from history");
+        }
         CHECK(bandRow.size() < 60 && ("add 7 counters" + bandRow).size() < 70,
               "#W67-AZ R4 the shortened rung is one short line, which is the whole point of it");
         CHECK(bandRow[0] == ' ' && bandRow[1] == '{'
@@ -73136,6 +73829,240 @@ static const char * kW50Y_r94 =
         }
         CHECK(holdKeyRow(crackBackVerdictKey(4, 11, 8)) == "[crack-back verdict: LETHAL]",
               "#W68-BB J9 ECHO the marker carries no digits, so no anchor can normalise it away");
+    }
+
+    //---- #W68-BD: J8 (the edict floor on a mode, the crack-back cover on the
+    //row that removes an attacker) and the render MEDs (the deck-out forecast,
+    //the stage-1 side gate, the narration payment fold).
+    {
+        cout << "\n[#W68-BD] J8 the mode edict floor is the standalone edict's, one function\n";
+        //Silverquill Command, verbatim from `borderline.txt:102739` - the card
+        //that lost 146v123. Its four sacrifice modes hand the edict to the
+        //OPPONENT (`notaTarget(creature|mybattlefield) sacrifice!$ opponent`).
+        const string sqc =
+            "choice name(Creature gains 3/3 and return creature) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && ability$!name(Return creature)"
+            " target(creature[manacost<=2]|mygraveyard) moveto(mybattlefield)!$ controller\n"
+            "choice name(Creature gains 3/3 and you draw) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 controller && life:-1 controller\n"
+            "choice name(Creature gains 3/3 and opponent draws) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 opponent && life:-1 opponent\n"
+            "choice name(Creature gains 3/3 and sacrifice creature) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && ability$!name(Sacrifice creature)"
+            " notaTarget(creature|mybattlefield) sacrifice!$ opponent\n"
+            "choice name(Return creature and sacrifice creature)"
+            " target(creature[manacost<=2]|mygraveyard) moveto(mybattlefield) &&"
+            " ability$!name(Sacrifice creature) notaTarget(creature|mybattlefield)"
+            " sacrifice!$ opponent\n";
+        std::vector<GptModalMode> sqm;
+        CHECK(modalChoiceModes(sqc, sqm) && sqm.size() == 5,
+              "#W68-BD J8 the five-mode script parses");
+        //REPRO `146v123` s31: the two sacrifice modes are the rows that printed
+        //`{this mode has a legal object right now}` and nothing else.
+        CHECK(!sqm[0].subOpponentEdict && !sqm[1].subOpponentEdict && !sqm[2].subOpponentEdict
+                  && sqm[3].subOpponentEdict && sqm[4].subOpponentEdict,
+              "#W68-BD J8 REPRO exactly the two sacrifice modes are edicts handed to the opponent");
+        //MUST-NOT-MATCH: a grant to the CONTROLLER over the controller's own
+        //battlefield is not an edict, and neither is a grant with no sacrifice.
+        {
+            std::vector<GptModalMode> nm;
+            CHECK(modalChoiceModes(
+                      "choice name(A) ability$!name(x) notaTarget(creature|mybattlefield)"
+                      " sacrifice!$ controller\n"
+                      "choice name(B) ability$!name(y) notaTarget(creature|mybattlefield)"
+                      " moveto(myhand)!$ opponent\n", nm)
+                  && nm.size() == 2 && !nm[0].subOpponentEdict && !nm[1].subOpponentEdict,
+                  "#W68-BD J8 MUST-NOT-MATCH a controller-side sacrifice and an opponent-side"
+                  " bounce are neither of them edicts");
+        }
+        //The clause itself is edictClause's, byte for byte - the standalone
+        //edict row and the mode row cannot state different numbers.
+        const string floorTag = modeEdictFloorTag(31, "", 1, 30);
+        cout << "     " << floorTag << "\n";
+        CHECK(floorTag == " {this mode's SACRIFICE half is an EDICT: they control 31 creatures -"
+                          " they choose which one - the pick is THEIRS, so plan on their least"
+                          " valuable body, not the one you want gone (30 of their 31 creatures"
+                          " are at the smallest toughness on their board, 1)}",
+              "#W68-BD J8 POSITIVE the s31 board: 31 creatures, the pick theirs, the floor named");
+        CHECK(floorTag.find("they control 31 creatures - they choose which one") == 42
+              && edictClause(31, "", 0, false).find("they control 31 creatures - they choose"
+                                                    " which one") == 0,
+              "#W68-BD J8 POSITIVE the mode clause opens with edictClause's own sentence");
+        //At exactly one body the victim is DETERMINED and is named, exactly as
+        //the standalone row names it; at zero the mode says it does nothing.
+        CHECK(modeEdictFloorTag(1, "Thraben Doomsayer", 2, 1)
+                  == " {this mode's SACRIFICE half is an EDICT: they control 1 creature -"
+                     " Thraben Doomsayer is sacrificed}",
+              "#W68-BD J8 POSITIVE at one body the victim is named and no pick sentence prints");
+        CHECK(modeEdictFloorTag(0, "", 0, 0)
+                  == " {this mode's SACRIFICE half is an EDICT: they control 0 creatures -"
+                     " at 0 this does nothing}",
+              "#W68-BD J8 POSITIVE at zero bodies the mode is priced dead");
+        CHECK(modeEdictFloorTag(4, "", 0, 0).find("at the smallest toughness") == string::npos
+                  && modeEdictFloorTag(4, "", 3, 0).find("at the smallest toughness") == string::npos,
+              "#W68-BD J8 MUST-NOT-MATCH an unknown floor or an uncounted floor claims no count");
+        CHECK(modeEdictFloorTag(-1, "", 0, 0).empty(),
+              "#W68-BD J8 MUST-NOT-MATCH an unscanned board claims nothing");
+        CHECK(stripNarrationDecoration("Return creature and sacrifice creature" + floorTag)
+                  == "Return creature and sacrifice creature",
+              "#W68-BD J8 ECHO the mode edict floor never enters history");
+
+        cout << "\n[#W68-BD] J8 the row that REMOVES an attacker prices the crack-back line\n";
+        //REPRO `126v152` s14: CRACK-BACK 18 from 4 of their creatures at 18
+        //life (the header read "you would be at 0; that would KILL you"), and
+        //the Tribute to Hunger row carried its edict floor and NO cover clause
+        //while a creature row three lines away carried one.
+        const string cover = crackBackRemovalRowTag(18, 18, false, 4, 4, 2);
+        cout << "     " << cover << "\n";
+        CHECK(cover.find("the CRACK-BACK NEXT TURN line above is 18 from 4 of their creatures"
+                         " and puts you at 0") != string::npos
+              && cover.find("This row removes ONE of their creatures and THEY choose which one.")
+                     != string::npos,
+              "#W68-BD J8 REPRO the removal row now points at the line above it");
+        CHECK(cover.find("smallest of them contributes 2 - that is the one they will give up -"
+                         " so this takes AT LEAST 2 off it: 18 - 2 = 16 -> you would be at 2,"
+                         " which you SURVIVE") != string::npos,
+              "#W68-BD J8 POSITIVE with every body in the total the floor is the smallest of them");
+        //The rules-correct case the review's own premise got wrong: they CHOOSE,
+        //so a creature outside the crack-back total is theirs to hand over and
+        //the floor of the removal is ZERO.
+        CHECK(crackBackRemovalRowTag(18, 18, false, 6, 4, 2)
+                  .find("2 of their 6 creatures are NOT in that total, so they can hand over a"
+                        " body that was not going to attack: the FLOOR of what this takes off the"
+                        " crack-back is 0") != string::npos,
+              "#W68-BD J8 POSITIVE a body outside the total makes the proven removal 0");
+        CHECK(crackBackRemovalRowTag(18, 18, false, 6, 4, 2).find("AT LEAST") == string::npos,
+              "#W68-BD J8 MUST-NOT-MATCH no removal is claimed when they can dodge it");
+        //#W65-AL (G4)'s rule: no survival verdict against a FLOOR.
+        {
+            const string onFloor = crackBackRemovalRowTag(18, 18, true, 4, 4, 2);
+            CHECK(onFloor.find("OR LOWER") != string::npos
+                      && onFloor.find("THIS IS NOT A SURVIVAL VERDICT") != string::npos
+                      && onFloor.find("which you SURVIVE") == string::npos,
+                  "#W68-BD J8 POSITIVE a FLOOR total takes no survival verdict, per #W65-AL G4");
+            CHECK(crackBackRemovalRowTag(18, 10, true, 4, 4, 2).find("STILL KILLS") == string::npos,
+                  "#W68-BD J8 MUST-NOT-MATCH a FLOOR total takes no KILL verdict either");
+        }
+        CHECK(crackBackRemovalRowTag(18, 10, false, 4, 4, 2).find("= 16 -> you would be at -6;"
+                                                                  " that STILL KILLS you")
+                  != string::npos,
+              "#W68-BD J8 POSITIVE a removal that does not save the seat says so");
+        CHECK(crackBackRemovalRowTag(0, 18, false, 4, 4, 2).empty()
+                  && crackBackRemovalRowTag(18, 18, false, 0, 0, 2).empty()
+                  && crackBackRemovalRowTag(18, 18, false, 4, 0, 2).empty()
+                  && crackBackRemovalRowTag(18, 18, false, 3, 4, 2).empty(),
+              "#W68-BD J8 MUST-NOT-MATCH no line, no bodies, or two walks that disagree claim"
+              " nothing");
+        CHECK(crackBackRemovalRowTag(18, 18, false, 4, 4, 0)
+                  .find("the smallest contribution is 0, so this row is not proven to take"
+                        " anything off it") != string::npos,
+              "#W68-BD J8 POSITIVE a 0-power smallest body proves no removal");
+        CHECK(stripNarrationDecoration("Cast Tribute to Hunger {2}{b}" + cover)
+                  == "Cast Tribute to Hunger {2}{b}",
+              "#W68-BD J8 ECHO the removal cover never enters history");
+
+        cout << "\n[#W68-BD] MED the opponent's library is a deck-out forecast inside 3 draws\n";
+        //REPRO `162v126`: the seat WON on the opponent's deck-out at 10 life
+        //without seeing it coming; "Opponent library: 2 cards" printed the
+        //number and never the consequence.
+        const string dk = opponentZoneCountsLine(3, 0, 2);
+        cout << "     " << dk << "\n";
+        CHECK(dk == "Opponent hand size: 3 | Opponent library: 2 cards - DECK-OUT IS IN RANGE:"
+                    " a player who must draw from an empty library LOSES, and they have 2 cards"
+                    " left, so they can survive at most 2 more draws and the draw after that"
+                    " loses them the game (any extra draw of theirs makes it sooner, never later)",
+              "#W68-BD MED POSITIVE inside three cards the line states the loss condition");
+        CHECK(opponentZoneCountsLine(3, 0, 1).find("survive at most 1 more draw and") != string::npos
+              && opponentZoneCountsLine(3, 0, 0).find("they have 0 cards left") != string::npos,
+              "#W68-BD MED POSITIVE the count pluralises and 0 is still stated, not hidden");
+        CHECK(opponentZoneCountsLine(3, 0, 4) == "Opponent hand size: 3 | Opponent library: 4 cards"
+              && opponentZoneCountsLine(3, 0, 46)
+                     == "Opponent hand size: 3 | Opponent library: 46 cards",
+              "#W68-BD MED MUST-NOT-MATCH outside three draws the line is wave-67's, byte for byte");
+
+        cout << "\n[#W68-BD] MED a stage-1 side gate says how many objects each side can reach\n";
+        //REPRO `152v125` s59: "1. choose a creature / 2. Decline" with the
+        //opponent at ZERO creatures; the seat took row 1, wrote that the
+        //creature target "is Staff of Nin" (an artifact), and the stage-3 list
+        //held only its own three bodies with no pass row.
+        const string teferi =
+            "auto=@counteradded(0/0.1.TeferiEffect) from(this)"
+            " restriction{type(creature|battlefield)~morethan~0}:may name(Choose a creature)"
+            " ability$!name(Choose creature) choice name(Choose your creature)"
+            " target(creature|myBattlefield) untap _ choice name(Choose opponent creature)"
+            " target(creature|opponentbattlefield) tap!$ controller\n";
+        string gA, gSA, gB, gSB;
+        CHECK(gateSideBranches(teferi, "choose a creature", gA, gSA, gB, gSB)
+                  && gA == "Choose your creature" && gSA == "creature|myBattlefield"
+                  && gB == "Choose opponent creature" && gSB == "creature|opponentbattlefield",
+              "#W68-BD MED REPRO the gate's two branches are read off the script, case-insensitively");
+        const string census = gateSideCensusTag(gA, 3, gB, 0);
+        cout << "     " << census << "\n";
+        CHECK(census == " {taking this row commits you to a SIDE pick next, and the two branches"
+                        " it opens can legally reach this many permanents right now:"
+                        " \"Choose your creature\" - 3; \"Choose opponent creature\" - NONE."
+                        " A branch at NONE has no legal object at all this window, so taking this"
+                        " row cannot reach that side}",
+              "#W68-BD MED POSITIVE the s59 board: zero of theirs is NAMED, not left to infer");
+        CHECK(gateSideCensusTag(gA, 3, gB, 2).find("Both sides are reachable") != string::npos
+              && gateSideCensusTag(gA, 3, gB, 2).find("NONE") == string::npos,
+              "#W68-BD MED POSITIVE with both sides live the clause says so and names no NONE");
+        CHECK(gateSideCensusTag(gA, -1, gB, 2).empty() && gateSideCensusTag("", 1, gB, 2).empty(),
+              "#W68-BD MED MUST-NOT-MATCH an unasked side and a nameless branch claim nothing");
+        CHECK(!gateSideBranches(teferi, "no such gate", gA, gSA, gB, gSB)
+                  && !gateSideBranches("", "choose a creature", gA, gSA, gB, gSB)
+                  && !gateSideBranches("choice name(only one) target(creature|mybattlefield) untap",
+                                       "only one", gA, gSA, gB, gSB),
+              "#W68-BD MED MUST-NOT-MATCH an unknown gate, an empty script and a one-branch"
+              " ability yield no census");
+        CHECK(stripNarrationDecoration("choose a creature" + gateSideCensusTag(gA, 3, gB, 0))
+                  == "choose a creature",
+              "#W68-BD MED ECHO the gate census never enters history");
+
+        cout << "\n[#W68-BD] MED the narration census: past-turn payments fold their source list\n";
+        //MEASURED on the wave-67 corpus (42 seats, 479,148 B of narration):
+        //`- Paid ... with A; B; C` is 44,103 B over 513 lines, the largest
+        //foldable class; folding to a count on PAST turns saves 18,714 B (3.9%).
+        {
+            const string body =
+                "=== Turn 11 - YOUR turn ===\n"
+                "- Paid {3}{b}{w} for Kaya the Inexorable with Brightclimb Pathway #1;"
+                " Hive of the Eye Tyrant; Brightclimb Pathway #2; Emeria, Shattered Skyclave;"
+                " Brightclimb Pathway #3\n"
+                "- You cast Kaya the Inexorable\n"
+                "=== Turn 12 - opponent's turn ===\n"
+                "- Paid {1}{u} for Essence Scatter with Island #1; Island #2\n";
+            const string folded = narrationFoldPaidSources(body);
+            cout << "     " << folded << "\n";
+            CHECK(folded.find("- Paid {3}{b}{w} for Kaya the Inexorable (paid with 5 sources)\n")
+                      != string::npos,
+                  "#W68-BD MED POSITIVE a past-turn payment keeps its cost and its card and folds"
+                  " its sources to a count");
+            CHECK(folded.find("- Paid {1}{u} for Essence Scatter with Island #1; Island #2")
+                      != string::npos,
+                  "#W68-BD MED MUST-NOT-MATCH the CURRENT turn's payment is untouched - its"
+                  " sources are this window's arithmetic");
+            CHECK(folded.find("- You cast Kaya the Inexorable") != string::npos
+                      && folded.find("=== Turn 11 - YOUR turn ===") == 0,
+                  "#W68-BD MED POSITIVE nothing else in the log moves");
+            CHECK(folded.size() + 106 == body.size(),
+                  "#W68-BD MED POSITIVE the fold is a saving, measured");
+            CHECK(narrationFoldPaidSources("- Paid {w} for Plains with Plains #1\n")
+                      == "- Paid {w} for Plains with Plains #1\n"
+                  && narrationFoldPaidSources("") == "",
+                  "#W68-BD MED MUST-NOT-MATCH a log with no turn header, and an empty log, are"
+                  " returned byte for byte");
+            CHECK(narrationFoldPaidSources(
+                      "=== Turn 3 - YOUR turn ===\n- Paid {w} for X with A [x4 - this exact line"
+                      " 4 times in this batch]\n=== Turn 4 - opponent's turn ===\n")
+                      .find("[x4 - this exact line 4 times in this batch]") != string::npos,
+                  "#W68-BD MED MUST-NOT-MATCH a bucketed line is left to the bucketer");
+            CHECK(narrationFoldPaidSources(
+                      "=== Turn 3 - YOUR turn ===\n- Paid {w} for X with A\n"
+                      "=== Turn 4 - opponent's turn ===\n")
+                      .find("- Paid {w} for X with A") != string::npos,
+                  "#W68-BD MED MUST-NOT-MATCH a one-source line is never made LONGER");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
