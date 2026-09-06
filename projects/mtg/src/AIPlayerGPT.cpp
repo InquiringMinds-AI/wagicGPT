@@ -6201,6 +6201,49 @@ static string tappedSourceAnimateClause()
     return " [this land is TAPPED: animated, it still cannot attack this turn]";
 }
 
+//#W69-BG (K5, deck146 HIGH-1 / deck125 MED): the bracket above states the
+//RESTRICTION and stops there, and the seat took the row 2 of 2 - `146: 162 s22`
+//at ONE life, `125 s243` - paying a whole turn's mana for a body that cannot
+//attack and, being tapped, cannot block either. Every other row on that menu
+//carries a `{right now: ...}` verdict and the all-dead census reads those
+//verdicts; this row carried none, so it was the only unpriced row on the menu
+//and read as the live one. It now carries the verdict its neighbours carry, in
+//the grammar `AIPlayerGPT::verdictReadsZero` already folds ("does nothing"), so
+//the row joins the dead census instead of being the exception to it. Nothing is
+//removed: the row, the cost and the bracket all stay and the cast is still
+//legal. The scope word is THIS TURN - the land untaps in its controller's next
+//untap step, and the clause never says the animation is worthless.
+static string tappedSourceAnimateVerdict()
+{
+    return " {right now: does nothing this turn}";
+}
+//The gate, pure so PARSETEST can pin both sides: the verdict is appended only
+//to a row that carries the TAPPED bracket and does not already carry a
+//`{right now: ...}` of its own - a row this engine priced some other way keeps
+//its own price and never gets two verdicts.
+bool tappedAnimateNeedsVerdict(const string& row)
+{
+    return row.find(" [this land is TAPPED: animated") != string::npos
+        && row.find(" {right now: ") == string::npos;
+}
+
+//#W69-BG (K5, deck125 MED, `125: 126 s111/113`): an activation row offered on a
+//board with no mana at all. The row printed its `[cost: ...]` and nothing else,
+//so the only way to know it could not be paid was to cross-reference the
+//header's `Mana available: 0 total`. The clause states the fact on the row.
+//It is stated, never withheld - the row stays on the menu (a cost can be paid
+//by something this gate does not model, and the doctrine forbids removing a
+//legal row) - and it fires only on the conjunction of three engine facts: the
+//pool cannot afford the cost, the auto-tap selector finds no producer for it,
+//and `potentialColorReach` is 0. Any one of them alone would be a claim this
+//engine cannot stand behind.
+static string cannotPayNowClause(int reach)
+{
+    if (reach > 0)
+        return "";
+    return " {you cannot pay this right now: 0 mana available}";
+}
+
 //#W49-D11: a creature's own {T}-cost activation offered BEFORE attackers are
 //declared on its controller's turn spends the attack (Katilda `put 1/1
 //counters [cost: {4}{g}{w}, Tap]` taken at Upkeep, 8 of 9 mana, the 4/4 then
@@ -27876,18 +27919,33 @@ int secondCopyVerdict(const string& magicText)
         return 1;
     return anyLord ? 2 : 0;
 }
+//#W69-BG (K8, deck126 MED): the stacking verdict said only that the legend rule
+//does not apply - a LEGALITY fact - and left the usefulness question the pilot
+//was actually asking unanswered, so `125 s42` (a second Sanguine Bond,
+//`mtg.txt:99004` `@lifeof(player) ... :life:-thatmuch opponent`, which doubles
+//the drain per life gained) and `125 s35` (a second Staff of Nin,
+//`mtg.txt:112425` `@each my upkeep:draw:1` + `{t}:damage:1`, a second draw and
+//a second ping) printed the same neutral head that a redundant copy would have
+//printed. The three verdicts are read off the SCRIPT by `secondCopyVerdict`
+//already; the stacking one now says what it found. And an EMPTY script is no
+//longer folded into "it stacks": with no lines to read the tag says only the
+//legend-rule fact, because claiming a second use of an effect this engine never
+//saw would be the wrong-scope lie the trust doctrine forbids.
 static string secondCopyTag(const string& name, const string& magicText = string())
 {
     string head = " [second copy: you already control " + name
                   + "; both stay on the battlefield - no legend rule";
-    int verdict = magicText.empty() ? 0 : secondCopyVerdict(magicText);
+    if (magicText.empty())
+        return head + "]"; //no script read: state the legality fact only
+    int verdict = secondCopyVerdict(magicText);
     if (verdict == 1)
         return head + ", but its effect is already on the battlefield and a second copy"
                       " changes nothing]";
     if (verdict == 2)
         return head + ", but the effect it gives your OTHER permanents is already on -"
                       " this copy adds only its own abilities]";
-    return head + "]";
+    return head + ", and this copy is one more of the same effect - each line it"
+                  " repeats happens again]";
 }
 static void appendCappedNames(std::ostringstream& o, const vector<string>& names, size_t cap)
 {
@@ -30274,6 +30332,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 }
             }
             out << paymentTapsClause(taps, tapRestrict);
+            //#W69-BG (K5): the pool cannot afford it and the selector found no
+            //producer - if the seat's whole colour reach is 0 as well, say so.
+            if (picks.empty())
+                out << cannotPayNowClause(windowReach());
         }
         if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
         {
@@ -30444,6 +30506,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             }
         }
     }
+    //#W69-BG (K5): last, so a `{right now: ...}` any earlier emitter produced
+    //is already on the row and cannot be doubled.
+    if (tappedAnimateNeedsVerdict(out.str()))
+        out << tappedSourceAnimateVerdict();
     return out.str();
 }
 
@@ -46777,7 +46843,13 @@ string discardAlreadyControlClause(const string& onBattlefield)
 {
     if (onBattlefield.empty())
         return "";
-    return " {you already control one: " + onBattlefield + "}";
+    //#W69-BG (K5, deck146 MED): the brace form was ignored 4 of 4 at this seam
+    //while the cast menu's `[legendary: you already control ...]` mark was
+    //obeyed. Same fact, so: the same words in the mark shape that is obeyed.
+    //The `{dead right now: ...}` verdict is deliberately NOT re-shaped here -
+    //it is one cross-seam verdict literal that the guides key on, and this
+    //lane's evidence is about THIS clause.
+    return " [you already control one: " + onBattlefield + "]";
 }
 
 //#W66-AT (H5, deck125 HIGH-2): the discard ask priced its rows correctly and
@@ -57482,6 +57554,43 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(tapCostBeforeCombatClause("Katilda, Dawnhart Prime")
               == " {tapping Katilda, Dawnhart Prime now: it cannot attack this turn}",
               "#W49-T D11 the {T}-before-combat clause");
+        //---- #W69-BG (K5): the tapped animation is PRICED, not only restricted.
+        {
+            const string bracket = tappedSourceAnimateClause();
+            const string verdict = tappedSourceAnimateVerdict();
+            CHECK(verdict == " {right now: does nothing this turn}",
+                  "#W69-BG K5 POSITIVE the tapped animation carries a right-now verdict of its own");
+            CHECK(AIPlayerGPT::verdictReadsZero("{right now: does nothing this turn}"),
+                  "#W69-BG K5 the verdict is in the grammar the all-dead census folds - the row joins it");
+            const string row = "becomes beholder with Hive of the Eye Tyrant #2 [cost: {3}{b}]" + bracket;
+            CHECK(tappedAnimateNeedsVerdict(row),
+                  "#W69-BG K5 POSITIVE the corpus row (146: 162 s22 / 125 s243) earns the verdict");
+            CHECK(!tappedAnimateNeedsVerdict(row + verdict),
+                  "#W69-BG K5 MUST-NOT-MATCH a row that already carries the verdict never gets a second one");
+            CHECK(!tappedAnimateNeedsVerdict(row + " {right now: destroys 2 of their creatures}"),
+                  "#W69-BG K5 MUST-NOT-MATCH a row this engine priced some other way keeps its own price");
+            CHECK(!tappedAnimateNeedsVerdict("becomes beholder with Hive of the Eye Tyrant #2 [cost: {3}{b}]"),
+                  "#W69-BG K5 MUST-NOT-MATCH an UNTAPPED source's animation is not priced dead");
+            CHECK(verdict[1] == '{' && verdict[verdict.size() - 1] == '}',
+                  "#W69-BG K5 echo shape: one braced annotation, opened and closed");
+            {
+                vector<string> menu2;
+                menu2.push_back(row + verdict);
+                bool st2 = false; string s2;
+                CHECK(parseChoice(string("CHOICE: 1 (") + row + verdict + ")", 1, &menu2, &st2, &s2) == 1 && !st2,
+                      "#W69-BG K5 echo: the priced tapped-animate row echoed whole still binds to index 1");
+            }
+            //---- #W69-BG (K5): the unpayable activation says so on the row.
+            CHECK(cannotPayNowClause(0) == " {you cannot pay this right now: 0 mana available}",
+                  "#W69-BG K5 POSITIVE 125: 126 s111/113 - the row states what the header alone said");
+            CHECK(cannotPayNowClause(1).empty() && cannotPayNowClause(7).empty(),
+                  "#W69-BG K5 MUST-NOT-MATCH any colour reach at all and nothing is claimed");
+            CHECK(cannotPayNowClause(0)[1] == '{'
+                  && cannotPayNowClause(0)[cannotPayNowClause(0).size() - 1] == '}',
+                  "#W69-BG K5 echo shape: one braced annotation, opened and closed");
+            CHECK(!AIPlayerGPT::verdictReadsZero(cannotPayNowClause(0).substr(1)),
+                  "#W69-BG K5 MUST-NOT-MATCH the payment clause is not a right-now verdict and never enters the dead census");
+        }
         // ECHO SHAPE: the annotations strip and the rows still bind to their index.
         {
             vector<string> menu;
@@ -60057,11 +60166,41 @@ static const char * kW50Y_r94 =
               "#W53-P D11 the partial-redundancy form for a lord-plus-own-abilities card");
         CHECK(part.find("changes nothing") == string::npos,
               "#W53-P D11 NEGATIVE a second Chromatic Lantern is a mana source and is never called dead");
+        //#W69-BG (K8): the stacking verdict now answers the usefulness question
+        //too. The wave-52 HEAD is byte-identical (guides key on it); the
+        //stacking clause is APPENDED, exactly as verdicts 1 and 2 already are.
         CHECK(secondCopyTag("Howling Mine", mine9)
+              == " [second copy: you already control Howling Mine; both stay on the battlefield"
+                 " - no legend rule, and this copy is one more of the same effect - each line it"
+                 " repeats happens again]",
+              "#W69-BG K8 POSITIVE a stacking card's tag says the copy is one more of the effect");
+        CHECK(secondCopyTag("Howling Mine", mine9)
+              .compare(0, strlen(" [second copy: you already control Howling Mine; both stay on"
+                                 " the battlefield - no legend rule"),
+                       " [second copy: you already control Howling Mine; both stay on the"
+                       " battlefield - no legend rule") == 0,
+              "#W69-BG K8 the wave-52 head is byte-identical - the clause is appended, not a rewrite");
+        CHECK(secondCopyTag("Howling Mine", mine9).find("changes nothing") == string::npos,
+              "#W69-BG K8 MUST-NOT-MATCH a stacking copy is never called dead");
+        //The corpus's own two cards, read straight off mtg.txt.
+        CHECK(secondCopyTag("Sanguine Bond",
+                            "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent")
+              .find("one more of the same effect") != string::npos,
+              "#W69-BG K8 POSITIVE mtg.txt:99004 - a second Sanguine Bond drains again (125 s42)");
+        CHECK(secondCopyTag("Staff of Nin", "@each my upkeep:draw:1\n{T}:damage:1 target(anytarget)")
+              .find("one more of the same effect") != string::npos,
+              "#W69-BG K8 POSITIVE mtg.txt:112425 - a second Staff of Nin draws and pings again (125 s35)");
+        CHECK(secondCopyTag("Intruder Alarm", alarm).find("one more of the same effect") == string::npos
+              && secondCopyTag("Chromatic Lantern", lantern).find("one more of the same effect") == string::npos,
+              "#W69-BG K8 MUST-NOT-MATCH the dead and partial verdicts never gain the stacking clause");
+        CHECK(secondCopyTag("Howling Mine")
               == " [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule]",
-              "#W53-P D11 NEGATIVE a stacking card's tag is byte-identical to the wave-52 form");
-        CHECK(secondCopyTag("Howling Mine") == secondCopyTag("Howling Mine", mine9),
-              "#W53-P D11 NEGATIVE no script supplied: the wave-52 wording, unchanged");
+              "#W69-BG K8 no script supplied: the legality fact only - no usefulness claim is made");
+        CHECK(secondCopyTag("Howling Mine") != secondCopyTag("Howling Mine", mine9),
+              "#W69-BG K8 MUST-NOT-MATCH an unread script is no longer folded into the stacking verdict");
+        CHECK(secondCopyTag("Howling Mine", mine9)[1] == '['
+              && secondCopyTag("Howling Mine", mine9)[secondCopyTag("Howling Mine", mine9).size() - 1] == ']',
+              "#W69-BG K8 echo shape: one bracketed annotation, opened and closed");
         CHECK(dead.find(" [second copy: ") == 0 && dead[dead.size() - 1] == ']',
               "#W53-P D11 echo shape: one bracketed annotation, opened and closed");
     }
@@ -61823,8 +61962,19 @@ static const char * kW50Y_r94 =
               "#W55-D D9 a spell whose own chooser sees nothing says so");
         CHECK(discardDeadTargetClause(1).empty() && discardDeadTargetClause(7).empty(),
               "#W55-D D9 NEGATIVE a spell with a legal target carries no dead clause");
-        CHECK(discardAlreadyControlClause("Howling Mine") == " {you already control one: Howling Mine}",
-              "#W55-D D9 the duplicate-permanent clause names the permanent");
+        //#W69-BG (K5): the same words, in the mark shape the cast menu's obeyed
+        //`[legendary: you already control ...]` uses. The brace form was ignored
+        //4 of 4 at this seam.
+        CHECK(discardAlreadyControlClause("Howling Mine") == " [you already control one: Howling Mine]",
+              "#W69-BG K5 POSITIVE the duplicate-permanent clause names the permanent in the obeyed mark shape");
+        CHECK(discardAlreadyControlClause("Howling Mine").find('{') == string::npos
+              && discardAlreadyControlClause("Howling Mine").find('}') == string::npos,
+              "#W69-BG K5 MUST-NOT-MATCH the ignored brace form is gone from this clause");
+        CHECK(discardAlreadyControlClause("").empty(),
+              "#W69-BG K5 MUST-NOT-MATCH no permanent named, no clause");
+        CHECK(discardAlreadyControlClause("Howling Mine")[1] == '['
+              && discardAlreadyControlClause("Howling Mine")[discardAlreadyControlClause("Howling Mine").size() - 1] == ']',
+              "#W69-BG K5 echo shape: one bracketed annotation, opened and closed");
         CHECK(discardAlreadyControlClause("").empty(),
               "#W55-D D9 NEGATIVE nothing of that name on the battlefield, no clause");
         //the echo shape: the clauses strip off an anchored candidate

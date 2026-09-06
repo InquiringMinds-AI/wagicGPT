@@ -431,6 +431,7 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
                              || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                              || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
+                             || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -492,7 +493,9 @@ int TestSuiteAI::Act(float)
             //it must reach the menu, not be pre-answered by the suite default.
             && action.compare(0, 15, "assertxdecline ") != 0
             && action.compare(0, 12, "assertxrows ") != 0
-            && action.compare(0, 19, "assertpendingdraws ") != 0) //#W63-AF (R1/R8)
+            && action.compare(0, 19, "assertpendingdraws ") != 0 //#W63-AF (R1/R8)
+            //#W69-BG (K1): the draw driver is not a menu answer.
+            && action.compare(0, 9, "drawcard ") != 0)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -513,6 +516,7 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 15, "assertxdecline ") == 0 //#W62-AA (R1)
                 || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                 || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
+                || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -869,6 +873,31 @@ int TestSuiteAI::Act(float)
     else if (action.compare(0, 17, "revealasyncticks ") == 0)
     {
         observer->mRevealTestAsyncTicks = atoi(action.substr(17).c_str());
+    }
+    else if (action.compare(0, 9, "drawcard ") == 0)
+    {
+        //#W69-BG (K1): drive `MTGPlayerCards::drawFromLibrary` directly - the
+        //exact call `10DrawAction` and the draw step make, and the only place
+        //an empty library sets a loser. No scripted click can reach it while a
+        //reveal display is open (the display holds every phase advance), which
+        //is precisely the state the corpus lost a game in, so the seam is
+        //pinned end to end here the way lane AM pinned `aideclareattack`.
+        //Syntax: `drawcard <1|2> <count>`.
+        int who = 1, howmany = 1;
+        {
+            std::istringstream ds(action.substr(9));
+            ds >> who >> howmany;
+        }
+        if (who < 1) who = 1;
+        if (who > 2) who = 2;
+        if (howmany < 1) howmany = 1;
+        Player * dp = observer->players[who - 1];
+        DebugTrace("TESTSUITE drawcard: player " << who << " draws " << howmany
+                   << " (library " << dp->game->library->nb_cards
+                   << ", reveal " << dp->game->reveal->nb_cards << ") ["
+                   << suite->filename << "]");
+        for (int i = 0; i < howmany; ++i)
+            dp->game->drawFromLibrary();
     }
     else if (action.compare(0, 18, "revealstallbudget ") == 0)
     {

@@ -386,6 +386,41 @@ void MTGPlayerCards::OptimizedHand(Player * who,int amount, int lands, int creat
 
 void MTGPlayerCards::drawFromLibrary()
 {
+    //#W69-BG (K1): a library reveal (MTGRevealingCards::Update) physically
+    //MOVES the revealed cards out of the library into this player's own
+    //`reveal` zone. By the rules they never left the library - revealing does
+    //not change a card's zone - so a draw taken while any of them are still
+    //parked must take one of THEM, and must never read the emptied library as
+    //the empty-library loss. Corpus 20260906-134120, game-146v123-1788720096:
+    //Idyllic Tutor parked all 42 cards of deck123's library, its option-one
+    //payload (`StackAbility. (Source: Idyllic Tutor)`) never resolved, and the
+    //next `all(player) draw:2` (Vision Skeins) called this function on a zone
+    //that read 0 - `WAGIC_SELFPLAY_RESULT winner=0 life0=19 life1=11 turn=17`
+    //with both players above 10 life and 42/43 cards of library between them.
+    //`MTGGameZone::removeCard` stamps `previousZone` on every move, so a card
+    //parked out of THIS library is exactly one whose previousZone is this
+    //library: a reveal of the hand (`revealzone(myhand)`) leaves previousZone
+    //== hand and a genuinely empty library still decks out. The return uses
+    //the same `putInZone` the reveal's own force-close and option-two paths
+    //use, and CardDisplay::Update re-inits an open display whose zone changed,
+    //so this cannot strand the display either.
+    if (!library->nb_cards && reveal)
+    {
+        MTGCardInstance * parked = NULL;
+        for (int i = 0; i < reveal->nb_cards; ++i)
+        {
+            //The reveal takes the library's TOP first, so the first parked
+            //card in zone order is the one this draw is owed.
+            if (i < (int) reveal->cards.size() && reveal->cards[i]
+                && reveal->cards[i]->previousZone == library)
+            {
+                parked = reveal->cards[i];
+                break;
+            }
+        }
+        if (parked)
+            putInZone(parked, reveal, library);
+    }
     if (!library->nb_cards)
     {
         if (inPlay->hasAbility(Constants::CANTLOSE)
