@@ -1,0 +1,48 @@
+##W67-AX (I5; deck126 HIGH-2 / engine HIGH-4): a reveal whose option one CANNOT
+#be declined must still commit a legal pick when nothing was selected.
+#
+#Idyllic Tutor's option one is `target(<1>enchantment|reveal)` - targetMin true,
+#maxtargets 1 - and MTGRevealingCards::CheckUserInput only ends a chooser on
+#BTN_NEXT when `targetMin == false || maxtargets == UNLIMITED`. So a zero-target
+#answer presses nothing: the driver finalizes into phase 3, re-issues the same
+#inert BTN_NEXT every tick, its progress signature never moves, and 600 s later
+#the stall guard force-closes the reveal and puts the whole library back. That
+#is not a fallback - it VOIDS a resolved spell. Both of the wave-66 corpus's
+#`reveal_stall_forced` records are that sequence (126v162 s10 -> s12, the deck's
+#only tutor, turn 5, game lost; 126v123 s51 -> s53).
+#
+#`revealasync` opts this scripted seat into the real interactive-AI driver and
+#names a card that is not in the library, so the stub selects NOTHING - the same
+#state a refused model reply leaves. `revealstallbudget` shrinks ONLY the
+#no-progress tick budget (shipped: 20000 ticks AND 600 s of wall clock, which no
+#script can reach); the stall itself is entirely real.
+#
+#RED on base: nothing is selected, the reveal is force-closed, and Wild Growth
+#is still in the library - hand is empty.
+#GREEN after: the driver takes the first card the chooser accepts, so Wild Growth
+#reaches hand and the rest of the library is shuffled back.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:plains,island,swamp
+hand:Idyllic Tutor
+library:Grizzly Bears,Gray Ogre,Wild Growth,Juggernaut,Craw Wurm
+[PLAYER2]
+[DO]
+revealasync zzznosuchcardzzz
+revealasyncticks 0
+revealstallbudget 10
+plains
+island
+swamp
+Idyllic Tutor
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:*,*,*
+hand:Wild Growth
+graveyard:Idyllic Tutor
+library:*,*,*,*
+[PLAYER2]
+[END]

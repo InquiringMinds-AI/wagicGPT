@@ -3613,9 +3613,84 @@ static string chosenNameNarration(bool mine, const string& cardName, const strin
 //(a cache hit or reuse) explains nothing, so the whole wait is the residual.
 static long revealWaitUnexplainedSecs(long waitSecs, long latencyMs)
 {
-    const long tripSecs = latencyMs > 0 ? (latencyMs / 1000) : 0L;
+    //#W67-AX (I5): the wait is counted in WHOLE SECONDS off `time(NULL)` and the
+    //round trip in milliseconds, so a trip floored to seconds leaves up to 999 ms
+    //of its own duration in the residual - which is why lane AT's own cases had
+    //to read `<= 1` rather than `== 0` on two of five corpus reveals (107/106146,
+    //561/560586). Round the trip UP to the wait's granularity: a residual then
+    //means engine wait, not clock resolution, and the corpus's 16 reveals sum to
+    //exactly the 1200 s the two force-closes account for.
+    const long tripSecs = latencyMs > 0 ? ((latencyMs + 999) / 1000) : 0L;
     const long residual = waitSecs - tripSecs;
     return residual > 0 ? residual : 0L;
+}
+
+//#W67-AX (I5, deck126 HIGH-2 / engine HIGH-4). MUST A REFUSED REVEAL STILL PICK?
+//
+//A reveal whose option one is a MANDATORY single pick has no decline the engine
+//can finalize: `MTGRevealingCards::CheckUserInput` only ends a chooser on
+//BTN_NEXT when `targetMin == false || maxtargets == UNLIMITED`, so a zero-target
+//answer on a `target(<1>...)` chooser presses nothing, the driver re-enters
+//phase 3 with nothing changed, and 600 s later the stall guard force-closes the
+//reveal and puts every revealed card back. That is not a fallback: it VOIDS a
+//resolved spell. `126v162` seq 10 (`ANSWER: PUT: 44`, row 44 eligible) -> seq 12
+//"the engine returned the 52 revealed cards to your library"; deck 126's only
+//Idyllic Tutor, turn 5, game lost. Same pair at `126v123` seq 51 -> 53. Both of
+//the corpus's `reveal_stall_forced` records, and both of its refused reveals -
+//the class is 2 of 2, not a coincidence.
+//
+//The rule: where a decline is not a legal answer, a refusal still owes the
+//engine a LEGAL pick. Where a decline IS legal (an `<upto:N>` chooser, a bare
+//optional target) the safe default is itself a legal outcome and nothing is
+//forced. Pure, so both halves are pinned in PARSETEST.
+static bool revealRefusalMustPick(bool pickExactlyOne, bool singlePickDeclineLegal)
+{
+    return pickExactlyOne && !singlePickDeclineLegal;
+}
+
+//#W67-AX (I5): WHICH card a refusal degrades to - the first row the engine's own
+//option-one chooser accepts, in PRINTED order. Not the heuristic's `chooseCard`:
+//that walks hand/library/battlefield/graveyard/stack/exile/command and never the
+//reveal zone, so it cannot answer this seam at all. The first eligible row is the
+//deck126 review's own recommendation and it is the only choice provable without a
+//model: it is legal by the engine's `canTarget` verdict, and it is deterministic.
+//`eligible` empty means the reveal is not predicate-gated and every row qualifies.
+//Returns an index into the revealed set, or -1 when nothing is eligible.
+static int firstEligibleRevealIndex(const std::vector<bool>& eligible, size_t revealedCount)
+{
+    if (eligible.size() != revealedCount)
+        return revealedCount ? 0 : -1;
+    for (size_t i = 0; i < eligible.size(); i++)
+        if (eligible[i])
+            return (int) i;
+    return -1;
+}
+
+//#W67-AX (I7, deck162 HIGH-2): does this menu carry a row whose own clause says
+//taking it strands a sorcery-speed card in hand? `sorceryReserveClause` is the
+//only emitter of the group, and the group is what makes the decline a decision
+//about the whole step rather than about this window. Pure.
+static bool menuHasReserveRow(const std::vector<string>& rows)
+{
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].find("{reserve: this row is INSTANT SPEED") != string::npos)
+            return true;
+    return false;
+}
+
+//#W67-AX (I7): the CASTABLE SET as a key, built from the engine's own candidate
+//list rather than from the rendered rows. The rendered rows will not do: the
+//annotation stripper `optionSetKeyOf` uses finds the first `}` after a `{`, and
+//a `{reserve: ... Underworld Dreams {b}{b}{b} ...}` clause NESTS mana symbols
+//inside it, so the strip stops short and leaves residue that moves with the
+//clause. The names are what the reserve arithmetic is about (which spells are
+//castable) and they cannot drift with a render. Pure.
+static string castSetKeyOf(const std::vector<string>& castNames)
+{
+    string k;
+    for (size_t i = 0; i < castNames.size(); i++)
+        k += castNames[i] + "\n";
+    return k;
 }
 
 //#W66-AT (H6): the two scopes wave 34 settled, as a predicate a case can pin.
@@ -12849,6 +12924,11 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
 
 } //namespace
 
+//#W67-AX (I5): defined in AllAbilities.cpp beside the chooser gate it lifts.
+//Declared HERE, outside the anonymous namespace above, so it keeps the external
+//linkage the definition has.
+bool revealChooserCanDecline(bool targetMin, int maxtargets);
+
 //#W56-W (E-3): forward - defined with the other modal-DFC helpers, next to
 //asMdfcLandPlay, whose definition of "this is a land row" it shares. Declared
 //HERE, outside the anonymous namespace above, so it has the same linkage as the
@@ -14663,7 +14743,8 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mRecoveryExecRow(-1), //#W67-AX (I7)
+       mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -15221,9 +15302,17 @@ void AIPlayerGPT::flushRecoveryRecord()
         return;
     int recovers = mRecoverySeq;
     string cls = mRecoveryClass, kind = mRecoveryKind;
+    //#W67-AX (I7): the executed answer, captured with the same flush idiom so a
+    //stamp can never leak onto a later recovery.
+    const string execSeam = mRecoveryExecSeam;
+    const string execText = mRecoveryExecText;
+    const int execRow = mRecoveryExecRow;
     mRecoverySeq = -1;              //cleared BEFORE the write, per the flush idiom
     mRecoveryClass.clear();
     mRecoveryKind.clear();
+    mRecoveryExecSeam.clear();
+    mRecoveryExecText.clear();
+    mRecoveryExecRow = -1;
     json rec = {
         {"seq", mTransSeq++},
         {"kind", "recovery"},
@@ -15240,7 +15329,36 @@ void AIPlayerGPT::flushRecoveryRecord()
     //finding, and must not be dressed up as an action.
     if (!mNarrationPending.empty())
         rec["recovered_by"] = mNarrationPending;
+    //#W67-AX (I7, engine MED-1 - load-bearing). WHAT THE HEURISTIC ACTUALLY DID.
+    //`recovered_by` is the narration DELTA, which is silent for exactly the
+    //answers a review most needs to see: a pass, a decline, a cast the log
+    //voices only as zone events on a later window. 18 of the wave-66 corpus's
+    //93 recovery records carried no `recovered_by` at all, and none of the 93
+    //named a ROW. These three fields are the executed answer as the seam that
+    //ran it saw it - the seam's own name, the 1-based printed row (0 = a pass
+    //or a no-cast, which is an answer and is stated as one), and its text.
+    //Written only where the seam stamped them, so a seam that does not yet
+    //report stays silent rather than claiming an unknown row.
+    if (!execSeam.empty())
+    {
+        rec["executed_seam"] = execSeam;
+        rec["executed_choice"] = execRow;
+        rec["executed_text"] = execText;
+    }
     transLogWrite(rec.dump()); //audit-L (L4)
+}
+
+//#W67-AX (I7): the seam records what the heuristic answered on its behalf. Called
+//AFTER the base class has decided, so it lands on the recovery record that
+//already trails this decision's fallback record. A stamp with no pending
+//recovery is dropped: only a decision the model failed earns one.
+void AIPlayerGPT::noteHeuristicExecuted(const char * seam, int row, const string& text)
+{
+    if (mRecoverySeq < 0 || !seam || !*seam)
+        return;
+    mRecoveryExecSeam = seam;
+    mRecoveryExecRow = row;
+    mRecoveryExecText = text;
 }
 
 //#W53-Q (D24): does this record hand its decision to the heuristic? TRUE only
@@ -15333,6 +15451,15 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //any overrun; the counters below are still measured on the FULL reply.
     const long replyOverrunBytes = postPlanOverrun(reply);
     const string recordReply = recordReplyTrimmed(reply, replyOverrunBytes);
+    //#W67-AX (I5, engine HIGH-4): this record's OWN round trip, snapshotted
+    //beside the field that publishes it. `mLastLatencyMs` is consumed (set to
+    //-1) further down this same function, and the reveal residual below is
+    //read AFTER that consume - so it saw -1 on every reveal that had a round
+    //trip and reported the whole wait as unexplained (14 of the wave-66
+    //corpus's 16 reveals; 1622 s reported against 1200 s real). Every later
+    //reader of the latency takes this snapshot, so the order of the consume
+    //cannot change what the record says again.
+    const long recordLatencyMs = mLastLatencyMs;
     json rec = {
         {"seq", mTransSeq++},
         {"kind", kind},
@@ -15680,8 +15807,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //that a future stall would move, and 0 means there is nothing here to
         //fix. A cache hit (`latency_ms` -1) explains nothing, so the whole wait
         //is the residual.
+        //#W67-AX (I5): the SNAPSHOT, not the consumed member (see recordLatencyMs).
         rec["reveal_wait_unexplained_secs"] =
-            (int) revealWaitUnexplainedSecs(mRevealStallSecs, mLastLatencyMs);
+            (int) revealWaitUnexplainedSecs(mRevealStallSecs, recordLatencyMs);
         if (mRevealStallParked)
         {
             rec["reveal_stall"] = true;
@@ -15824,6 +15952,10 @@ void AIPlayerGPT::logGameEnd()
         //#W53-N (D2): windows the model's own HOLD row closed. Not a window
         //removed - a window the model answered once and did not want re-put.
         {"hold_windows_skipped", mHoldWindowsSkipped},
+        //#W67-AX (I7): casting windows held by the model's own reservation
+        //decline (see reserveDeclineHonoured). A window the model answered once
+        //and whose arithmetic nothing in the step can move - not a window removed.
+        {"reserve_decline_windows_skipped", mReserveDeclineWindows},
         //#W54-D (D8b): asks whose whole option list rendered as one
         //interchangeable row and were resolved without a model call.
         {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
@@ -24535,6 +24667,106 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
                << " windows are held until one of these rows changes"); //#W61-U (C14)
 }
 
+//#W67-AX (I7, deck162 HIGH-2). THE RESERVATION DECLINE, HONOURED.
+//
+//`162v130` seq 16 declined a Dictate of Kruphix row whose own `{reserve:}`
+//clause said the mana it spends is the last window Underworld Dreams {b}{b}{b}
+//has this turn; seq 17 put the identical question back inside the SAME draw step
+//(one count inside a `{feeds:}` clause had moved), and the model cast the row it
+//had just reserved against. seq 18 -> 19 repeated it at 1 life with an exactly
+//lethal second punisher in hand, and that is the game.
+//
+//Nothing that re-opens such a window can change the answer: the reserve is
+//arithmetic over the seat's UNTAPPED SOURCES, and a re-render moves counts, not
+//sources. So a decline taken on a menu carrying a reserve row is honoured for the
+//rest of that STEP - the scope the row's own clause reasons in - under two tests,
+//both of which must hold:
+//  * the rows still stand by `holdStillStands`, the same byte test the hold row
+//    uses (a WORD change re-opens the window; a digit inside a bracket does not);
+//  * the untapped-source COUNT has not moved. That number is exactly what the
+//    hold key forgives (digits inside braces), and it is the one number this
+//    latch may not forgive, so it is kept as its own scalar beside the rows.
+//A new turn or a new phase re-opens it unconditionally. Nothing here enters
+//`mPromptTail`, the ask key or the async slot key (wave61/corpus-livelock.md):
+//the rows are the ones already rendered and the count is an engine number.
+//The latch's whole predicate, as one pure function so both terms are pinned in
+//PARSETEST.
+//
+//WHY NOT `holdStillStands`. The wave-66 review read `162v130` s16 -> s17 as "one
+//count inside a {feeds:} clause had moved" - it is NOT. Measured on the corpus's
+//own `options_text`: s16 -> s17 the row gains `in your hand: 1 - Liliana's Caress`
+//where s16 read `in your hand: 0` (a card NAME, a word), and s18 -> s19 gains a
+//whole `{spends 3 of your 4 untapped mana sources this turn; ...}` clause. The
+//hold key re-opens on both, correctly - so a hold-shaped latch would not have
+//held either pair, and shipping one would have been a fix that fires on nothing.
+//
+//What genuinely did not move across all four windows is what the reserve
+//arithmetic is made of: the CASTABLE SET (the engine's own candidate names -
+//see castSetKeyOf; the rendered rows cannot supply it) and the seat's UNTAPPED
+//SOURCE COUNT (`{leaves 1 of your 4 untapped mana sources untapped}` on every
+//one of the four). Those two are the latch, plus the turn and the phase
+//held by the caller: within ONE step, with the same castable rows and the same
+//open mana, nothing the engine can re-render changes the answer the model gave.
+//A row appearing or leaving moves the key and re-opens the window; a source
+//untapping or being spent moves the count and re-opens it; the next step re-opens
+//it unconditionally. Nothing here is a cache of an answer the model did not give.
+static bool reserveDeclineStillStands(const string& heldKey, const string& nowKey,
+                                      int heldSources, int nowSources,
+                                      const char ** whyOut)
+{
+    if (whyOut) *whyOut = "";
+    if (heldKey.empty())
+        return false;
+    if (heldSources != nowSources)
+    {
+        if (whyOut) *whyOut = "the untapped-source count moved";
+        return false;
+    }
+    if (heldKey != nowKey)
+    {
+        if (whyOut) *whyOut = "the castable set moved";
+        return false;
+    }
+    return true;
+}
+
+bool AIPlayerGPT::reserveDeclineHonoured(const string& castSetKey, int untappedSources)
+{
+    if (mReserveDeclineKey.empty())
+        return false;
+    if (mReserveDeclineTurn != observer->turn
+        || mReserveDeclinePhase != observer->getCurrentGamePhase())
+    {
+        mReserveDeclineKey.clear();
+        return false;
+    }
+    const char * why = "";
+    if (!reserveDeclineStillStands(mReserveDeclineKey, castSetKey,
+                                   mReserveDeclineSources, untappedSources, &why))
+    {
+        DebugTrace("AIPlayerGPT: the reservation decline is re-opened - " << why);
+        mReserveDeclineKey.clear();
+        return false;
+    }
+    mReserveDeclineWindows++;
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: honouring the model's reservation"
+               " decline for the rest of this step (turn " << observer->turn
+               << ", " << untappedSources << " untapped sources unchanged; "
+               << mReserveDeclineWindows << " windows held this game)");
+    return true;
+}
+
+void AIPlayerGPT::takeReserveDecline(const string& castSetKey, int untappedSources)
+{
+    mReserveDeclineKey = castSetKey;
+    mReserveDeclineSources = untappedSources;
+    mReserveDeclineTurn = observer->turn;
+    mReserveDeclinePhase = observer->getCurrentGamePhase();
+    DebugTrace("AIPlayerGPT: the model declined a menu carrying a reserve row on turn "
+               << observer->turn << " - this step's later casting windows are held"
+                  " while these rows and the untapped-source count do not change");
+}
+
 //#W66-AS (H3, second half; deck130 HIGH-2). A window with NO legal answer is
 //not a decision. Inside a proven-closed opponent life LOOP the engine re-puts
 //the same window once per link - `130v126` seqs 37-55 is nineteen of them - and
@@ -31763,7 +31995,26 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (choice < 0) //transport/parse failure: defer to the heuristic
     {
         DebugTrace("AIPlayerGPT[ph" << phase << "]: defer to heuristic (cached=" << unchanged << ")");
-        return AIPlayerBaka::chooseOrderedAction(ranking);
+        //#W67-AX (I7, engine MED-1): and what it answered. The row is the one
+        //this window PRINTED for that action when the heuristic picked one the
+        //model was offered; 0 says the heuristic passed. Report-only.
+        const OrderedAIAction * heur = AIPlayerBaka::chooseOrderedAction(ranking);
+        int heurRow = 0;
+        string heurText("pass");
+        if (heur)
+        {
+            heurText = stripNarrationDecoration(describeAction(*heur));
+            for (size_t si = 0; si < shown.size(); si++)
+                if (shown[si] == heur)
+                {
+                    heurRow = (int) si + 1;
+                    if (si < renderRows.size())
+                        heurText = renderRows[si];
+                    break;
+                }
+        }
+        noteHeuristicExecuted("priority", heurRow, heurText);
+        return heur;
     }
     if (choice == 0) //deliberate pass
     {
@@ -33194,7 +33445,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             return NULL;
         }
         if (pick < 0) //model deferred or endpoint failed: heuristic decides
-            return AIPlayerBaka::FindCardToPlay(pMana, type);
+        {
+            //#W67-AX (I7): the land seam reports its heuristic answer too.
+            MTGCardInstance * heur = AIPlayerBaka::FindCardToPlay(pMana, type);
+            noteHeuristicExecuted("land", heur ? 1 : 0,
+                                  heur ? ("play " + heur->name) : string("no land drop"));
+            return heur;
+        }
 
         //Validate the pick with the heuristic's own machinery (residual
         //gates, dice, payment state) - same pattern as the cast seam below.
@@ -34244,6 +34501,16 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //The model's own hold, honoured: no model call, no row withheld.
         if (attempt == 0 && holdHonoured("cast", menu))
             return NULL;
+        //#W67-AX (I7): and the reservation decline, on its own terms (the cast
+        //set + the untapped-source count, inside this step).
+        std::vector<string> castNames;
+        for (size_t ci = 0; ci < candidates.size(); ci++)
+            castNames.push_back((candidates[ci] ? candidates[ci]->name : string("?"))
+                                + (ci < candidateUsesAlt.size() && candidateUsesAlt[ci]
+                                   ? "|alt" : ""));
+        const string castSetKey = castSetKeyOf(castNames);
+        if (attempt == 0 && reserveDeclineHonoured(castSetKey, untappedSources))
+            return NULL;
         if (attempt == 0 && loopAutoPassWindow()) //#W66-AS (H3 second half)
             return NULL;
 
@@ -34268,7 +34535,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
         if (pick < 0) //model deferred or endpoint failed: heuristic decides
-            return AIPlayerBaka::FindCardToPlay(pMana, type);
+        {
+            //#W67-AX (I7, engine MED-1): say what the heuristic did with the
+            //window the model lost. 51 of the wave-66 corpus's 83 fallbacks were
+            //unadjudicable for want of exactly this. Report-only; no key moves.
+            MTGCardInstance * heur = AIPlayerBaka::FindCardToPlay(pMana, type);
+            int heurRow = 0;
+            if (heur)
+                for (size_t ci = 0; ci < candidates.size(); ci++)
+                    if (candidates[ci] == heur) { heurRow = (int) ci + 1; break; }
+            noteHeuristicExecuted("cast", heurRow,
+                                  heur ? ("cast " + heur->name) : string("cast nothing"));
+            return heur;
+        }
         //#W60-M (B13c): count a decline only when the MODEL was shown this
         //window. The sentence the count feeds is addressed to the model ("you
         //declined this exact list N times already this turn"), and after
@@ -34283,6 +34562,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             DebugTrace("AIPlayerGPT: chose to cast nothing");
             if (!mAskAnswerReserved)
                 mListDeclineCount[listKeyHash(listKey)]++; //#W53-N (D2, second half)
+            //#W67-AX (I7): a decline taken on a menu that carries a reserve row
+            //is a decision about the whole step, not about this window.
+            if (menuHasReserveRow(menu))
+                takeReserveDecline(castSetKey, untappedSources);
             return NULL;
         }
         //#W53-N (D2): the model closed this turn's casting question itself.
@@ -42970,6 +43253,27 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
 
     if (result < 0)
     {
+        //#W67-AX (I5): where a decline is not a legal answer, an unusable reply
+        //still owes the engine a legal pick - the safe default here is not safe,
+        //it is a VOIDED spell (see revealRefusalMustPick). The pick is the first
+        //row the engine's own chooser accepts, recorded as the class
+        //`reveal_fallback_pick` with the card it took, so a corpus reads what
+        //answered instead of reconstructing it from a force-close line.
+        const int forced = revealRefusalMustPick(pickExactlyOne, singlePickDeclineLegal)
+                           ? firstEligibleRevealIndex(eligibleForOptionOne, revealed.size())
+                           : -1;
+        if (forced >= 0 && forced < (int) revealed.size())
+        {
+            selForOptionOne.push_back(forced);
+            const string took = revealed[forced]->name;
+            writeTransLog("reveal", userMsg, content, forced + 1, (int) revealed.size(),
+                          took, "reveal_fallback_pick", &names);
+            noticeFallback("model reply failed - the engine took the first legal card", 5.0f);
+            narrateDecision(revealSummaryNarration(revealed.size(), took, optOneLabel));
+            DebugTrace("AIPlayerGPT: reveal reply unusable and this chooser has no legal"
+                       " decline - taking the first eligible card (" << took << ")");
+            return 1;
+        }
         //Unusable reply: the display falls back to its safe default (send
         //nothing to option one - every card keeps option two).
         writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
@@ -68644,11 +68948,15 @@ static const char * kW50Y_r94 =
         // ---- engine MED-3: the reveal wait's residual ----
         // The corpus's own sixteen pairs: wait seconds beside the record's own
         // latency_ms. Every one of them is explained by the round trip.
-        CHECK(revealWaitUnexplainedSecs(107, 106146) <= 1
+        //#W67-AX (I5) AMENDED, not deleted: the two `<= 1` reads were the
+        //sub-second remainder of a floored round trip, and the trip is now
+        //rounded up to the wait's own granularity - so every one of these five
+        //corpus reveals leaves EXACTLY nothing unexplained.
+        CHECK(revealWaitUnexplainedSecs(107, 106146) == 0
                   && revealWaitUnexplainedSecs(139, 139015) == 0
                   && revealWaitUnexplainedSecs(68, 68246) == 0
                   && revealWaitUnexplainedSecs(54, 54747) == 0
-                  && revealWaitUnexplainedSecs(561, 560586) <= 1,
+                  && revealWaitUnexplainedSecs(561, 560586) == 0,
               "#W66-AT MED-3 REPRO: the 835 s of reveal wait is the seat's own round trips");
         CHECK(revealWaitUnexplainedSecs(500, 10000) == 490,
               "#W66-AT MED-3 a REAL engine stall is what this figure is for");
@@ -69494,6 +69802,194 @@ static const char * kW50Y_r94 =
         CHECK(drawsUnattributedClause(1).find('[') == string::npos
                   && drawsUnattributedClause(1).find('{') == string::npos,
               "#W66-AU R2 ECHO the clause opens no annotation channel");
+    }
+
+    cout << "\n[#W67-AX I5] a refused reveal degrades to a legal pick, never to a void\n";
+    {
+        // THE CORPUS SHAPE. 126v162 s10 answered `ANSWER: PUT: 44` on Idyllic
+        // Tutor's `optionone ... target(<1>enchantment|reveal)` chooser - a
+        // MANDATORY single pick, so the refusal had no legal decline and the
+        // engine voided the spell 600 s later. Both halves are pinned: the
+        // predicate that says a pick is owed, and the chooser gate that says
+        // why a zero-target answer could never be finalized.
+        CHECK(revealRefusalMustPick(true, false),
+              "#W67-AX I5 REPRO 126v162 s10: a mandatory single-pick reveal owes a pick even on a"
+              " refusal");
+        CHECK(!revealRefusalMustPick(true, true) && !revealRefusalMustPick(false, false)
+                  && !revealRefusalMustPick(false, true),
+              "#W67-AX I5 MUST-NOT-MATCH: where a decline is legal - an upto: chooser, a multi-pick"
+              " reveal - nothing is forced and the safe default stands");
+        // The engine's own BTN_NEXT gate, lifted (MTGRevealingCards::CheckUserInput).
+        CHECK(!revealChooserCanDecline(true, 1),
+              "#W67-AX I5 the <1> chooser cannot be finalized with no targets - the 600 s stall");
+        CHECK(revealChooserCanDecline(false, 1) && revealChooserCanDecline(true, 1000)
+                  && revealChooserCanDecline(false, 1000),
+              "#W67-AX I5 MUST-NOT-MATCH a bare or unlimited chooser declines exactly as it did");
+        // WHICH card the degrade takes: the first row the engine's own canTarget
+        // verdict accepts, in printed order. A gated reveal skips the rows that
+        // do not qualify; an ungated one takes row 1; nothing eligible is -1
+        // (that reveal never reaches the ask - see the eligCount == 0 branch).
+        std::vector<bool> gated;
+        gated.push_back(false); gated.push_back(false); gated.push_back(true); gated.push_back(true);
+        CHECK(firstEligibleRevealIndex(gated, 4) == 2,
+              "#W67-AX I5 the degrade takes the first ELIGIBLE row, not the first row");
+        std::vector<bool> none4(4, false);
+        CHECK(firstEligibleRevealIndex(none4, 4) == -1,
+              "#W67-AX I5 MUST-NOT-MATCH nothing eligible is no pick, never row 1");
+        CHECK(firstEligibleRevealIndex(std::vector<bool>(), 52) == 0
+                  && firstEligibleRevealIndex(std::vector<bool>(), 0) == -1,
+              "#W67-AX I5 an ungated reveal qualifies every row; an empty reveal has none");
+    }
+
+    cout << "\n[#W67-AX I5] the reveal residual is read from the record's own latency\n";
+    {
+        // READ-AFTER-CONSUME (engine HIGH-4). writeTransLog stamps `latency_ms`
+        // from mLastLatencyMs and then CONSUMES it (mLastLatencyMs = -1); the
+        // residual was read after that consume and therefore always saw -1, so
+        // it reported the WHOLE wait as unexplained. These are the wave-66
+        // corpus's own 16 reveal records: 14 round trips whose residual is 0,
+        // and the two genuine engine stalls (latency -1, driver half 600 s).
+        const long waits[16]   = { 38, 16, 70, 21, 114, 600, 6, 7, 68, 16, 28, 12, 600, 17, 4, 5 };
+        const long latency[16] = { 37425, 15573, 69881, 21051, 114340, -1, 6053, 6901,
+                                   68365, 15938, 28526, 11822, -1, 16748, 3603, 5275 };
+        long fixedTotal = 0, buggyTotal = 0;
+        for (int i = 0; i < 16; i++)
+        {
+            // The FIXED order: the snapshot taken beside the latency_ms field.
+            fixedTotal += revealWaitUnexplainedSecs(waits[i], latency[i]);
+            // The BUGGY order: the member has already been consumed to -1.
+            buggyTotal += revealWaitUnexplainedSecs(waits[i], -1);
+        }
+        CHECK(fixedTotal == 1200,
+              "#W67-AX I5 REPRO the 16 corpus reveals leave 1200 s unexplained (the two"
+              " force-closed reveals, and nothing else), not the 1622 the corpus reported");
+        CHECK(buggyTotal == 1622,
+              "#W67-AX I5 MUST-NOT-MATCH the consumed-member order is what reported 1622 s");
+        CHECK(revealWaitUnexplainedSecs(114, 114340) == 0 && revealWaitUnexplainedSecs(38, 37425) == 0
+                  && revealWaitUnexplainedSecs(70, 69881) == 0,
+              "#W67-AX I5 a wait its own round trip accounts for leaves no residual");
+        CHECK(revealWaitUnexplainedSecs(600, -1) == 600,
+              "#W67-AX I5 the two force-closed reveals are 600 s of genuine engine wait");
+    }
+
+    cout << "\n[#W67-AX I7] a reservation decline is a decision about the step\n";
+    {
+        // THE CORPUS'S OWN ROWS. `162v130` seq 18 and seq 19, both `ask`, both
+        // turn 13, both in the seat's DRAW step: the model declined at s18 and
+        // cast the reserved row at s19, at 1 life, with the second Underworld
+        // Dreams in hand for exactly lethal. Verbatim from `options_text`.
+        const string s18row1 =
+            "Cast Dictate of Kruphix {1}{u}{u} [second copy: you already control Dictate of Kruphix; "
+            "both stay on the battlefield - no legend rule] {leaves 1 of your 4 untapped mana sources "
+            "untapped} {reserve: this row is INSTANT SPEED - it still has a window at the end of "
+            "THEIR turn. Taking it HERE, before your main phase, leaves 1 source, and Underworld "
+            "Dreams {b}{b}{b} in your hand needs 3 - it is SORCERY SPEED, so your main phase this "
+            "turn is its last window} {card text: \"Flash -- At the beginning of each player's draw "
+            "step, that player draws an additional card.\"} {feeds: the opponent draws 1 extra card "
+            "per turn; and so do YOU: 1 extra card per turn (this engine is SYMMETRIC - it feeds both "
+            "players, and your own extra draws are priced by any draw punisher THEY control); draw "
+            "converters (they fire when the opponent DRAWS) on your battlefield: 1 - Underworld "
+            "Dreams; draw converters in your hand: 1 - Underworld Dreams; discard punishers (a "
+            "different class - this row hands them CARDS, and a discard punisher fires only when a "
+            "card leaves a hand as a discard, though a larger hand can overflow a cleanup step): on "
+            "your battlefield: 1 - Liliana's Caress; in your hand: 1 - Liliana's Caress}";
+        const string s19row1 =
+            "Cast Dictate of Kruphix {1}{u}{u} [second copy: you already control Dictate of Kruphix; "
+            "both stay on the battlefield - no legend rule] {leaves 1 of your 4 untapped mana sources "
+            "untapped} {spends 3 of your 4 untapped mana sources this turn; Dictate of Kruphix "
+            "{1}{u}{u} in your hand needs 3} {reserve: this row is INSTANT SPEED - it still has a "
+            "window at the end of THEIR turn. Taking it HERE, before your main phase, leaves 1 "
+            "source, and Underworld Dreams {b}{b}{b} in your hand needs 3 - it is SORCERY SPEED, so "
+            "your main phase this turn is its last window} {card text: \"Flash -- At the beginning of "
+            "each player's draw step, that player draws an additional card.\"} {feeds: the opponent "
+            "draws 1 extra card per turn; and so do YOU: 1 extra card per turn (this engine is "
+            "SYMMETRIC - it feeds both players, and your own extra draws are priced by any draw "
+            "punisher THEY control); draw converters (they fire when the opponent DRAWS) on your "
+            "battlefield: 1 - Underworld Dreams; draw converters in your hand: 1 - Underworld Dreams; "
+            "discard punishers (a different class - this row hands them CARDS, and a discard punisher "
+            "fires only when a card leaves a hand as a discard, though a larger hand can overflow a "
+            "cleanup step): on your battlefield: 1 - Liliana's Caress; in your hand: 1 - Liliana's "
+            "Caress}";
+        std::vector<string> menu18, menu19;
+        menu18.push_back(s18row1); menu18.push_back("Cast nothing right now");
+        menu19.push_back(s19row1); menu19.push_back("Cast nothing right now");
+        CHECK(menuHasReserveRow(menu18) && menuHasReserveRow(menu19),
+              "#W67-AX I7 REPRO 162v130 s18/s19: both windows offer the reserve row");
+        std::vector<string> plain;
+        plain.push_back("Cast Howling Mine {2} {leaves 3 of your 5 untapped mana sources untapped}");
+        plain.push_back("Cast nothing right now");
+        CHECK(!menuHasReserveRow(plain),
+              "#W67-AX I7 MUST-NOT-MATCH an ordinary menu takes no reservation latch");
+        // THE REVIEW'S CLAIM, CORRECTED. It reads the re-open as "one count
+        // inside a {feeds:} clause had moved". It is not: s19 gains a whole
+        // `{spends 3 of your 4 untapped mana sources this turn; ...}` clause, so
+        // the hold key re-opens - a hold-shaped latch would have held NOTHING.
+        std::set<string> heldRows;
+        heldRows.insert(holdKeyRow(s18row1));
+        heldRows.insert(holdKeyRow("Cast nothing right now"));
+        const char * why = "";
+        CHECK(s18row1 != s19row1 && !holdStillStands(heldRows, menu19, &why),
+              "#W67-AX I7 the hold key RE-OPENS this pair - the rows differ by a whole clause,"
+              " not by a digit");
+        // ...and the rendered rows cannot supply the key either: the stripper
+        // stops at the first `}` after a `{`, and the reserve clause NESTS mana
+        // symbols, so its residue moves with the clause.
+        CHECK(optionSetKeyOf(menu18) != optionSetKeyOf(menu19),
+              "#W67-AX I7 MUST-NOT-MATCH the annotation-stripped row key does not survive a"
+              " nested mana symbol inside a clause - the latch is not built on it");
+        // What did not move: the CASTABLE SET (the engine's own candidate names)
+        // and the untapped-source count printed on both rows.
+        std::vector<string> names18, names19;
+        names18.push_back("Dictate of Kruphix");
+        names19.push_back("Dictate of Kruphix");
+        const string k18 = castSetKeyOf(names18), k19 = castSetKeyOf(names19);
+        CHECK(k18 == k19 && !k18.empty(),
+              "#W67-AX I7 REPRO the castable set is the same one spell at both windows");
+        CHECK(s18row1.find("{leaves 1 of your 4 untapped mana sources untapped}") != string::npos
+                  && s19row1.find("{leaves 1 of your 4 untapped mana sources untapped}") != string::npos,
+              "#W67-AX I7 REPRO both windows print the same 4 untapped sources - the number the"
+              " reserve arithmetic is a function of");
+        CHECK(reserveDeclineStillStands(k18, k19, 4, 4, &why) && string(why).empty(),
+              "#W67-AX I7 so the decline taken at s18 still stands at s19 and s19 is not asked");
+        CHECK(!reserveDeclineStillStands(k18, k19, 4, 3, &why)
+                  && string(why) == "the untapped-source count moved",
+              "#W67-AX I7 MUST-RE-OPEN a source count that moved re-opens the window");
+        std::vector<string> grown(names19);
+        grown.push_back("Underworld Dreams");
+        CHECK(!reserveDeclineStillStands(k18, castSetKeyOf(grown), 4, 4, &why)
+                  && string(why) == "the castable set moved",
+              "#W67-AX I7 MUST-RE-OPEN a row the model has not been offered re-opens the window");
+        CHECK(!reserveDeclineStillStands(string(), k19, 4, 4, &why),
+              "#W67-AX I7 MUST-NOT-MATCH an empty latch holds nothing");
+    }
+
+    cout << "\n[#W67-AX transport MED] the two 900 s wall misses, by their own numbers\n";
+    {
+        // 130v146 s11 and 162v123 s9, verbatim:
+        // latency_ms 900026 / 900022, deadline 900000, curl 28, http 0, empty,
+        // connect budget 20000. AP-R6 asks whether these were connect deaths
+        // mis-read as wall misses. They were not: BOTH bounded clocks are set on
+        // the handle (CURLOPT_CONNECTTIMEOUT_MS / CURLOPT_TIMEOUT_MS), the phase
+        // test compares elapsed against the DEADLINE - the same clock latency_ms
+        // is measured on - and at 100.0% of it the verdict is `wall`. The
+        // connect budget on the stamp is a BUDGET, not evidence of a connect.
+        CHECK(string(AIPlayerGPT::transportPhaseFor(28, 900026, 20000, 900000)) == "wall"
+                  && string(AIPlayerGPT::transportPhaseFor(28, 900022, 20000, 900000)) == "wall",
+              "#W67-AX transport MED REPRO both corpus records are wall-phase by their own numbers");
+        CHECK(wallMissClassFor(AIPlayerGPT::transportPhaseFor(28, 900026, 20000, 900000))
+                  == "wall_miss_unrecorded_wall",
+              "#W67-AX transport MED REPRO the class the corpus carries follows from the phase");
+        CHECK(gptDeadlineMissed(true, 900026, 900000, 0, 28),
+              "#W67-AX transport MED a wall-phase empty body at the deadline is a deadline miss");
+        // ...and why no retry fired: R6's budget is the remainder, and a wall
+        // miss leaves none. This is the answer to "no retry" - not a missing
+        // ladder, an exhausted deadline.
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 900026) == 0,
+              "#W67-AX transport MED the retry budget after a wall miss is zero by arithmetic");
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 20500) == 879500
+                  && string(AIPlayerGPT::transportPhaseFor(28, 20500, 20000, 900000)) == "connect",
+              "#W67-AX transport MED MUST-NOT-MATCH a REAL connect death is a different phase and"
+              " keeps the rest of the deadline");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

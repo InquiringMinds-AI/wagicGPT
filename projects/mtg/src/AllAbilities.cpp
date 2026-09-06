@@ -734,6 +734,22 @@ static int revealTestAsyncDecide(GameObserver * g, const vector<MTGCardInstance*
 static bool revealTestAsyncActive(GameObserver *) { return false; }
 #endif
 
+//#W67-AX (I5, deck126 HIGH-2 / engine HIGH-4). CAN THIS CHOOSER BE FINALIZED
+//WITH NO TARGETS? This is `MTGRevealingCards::CheckUserInput`'s own BTN_NEXT
+//gate, lifted out so the driver can ask it BEFORE pressing a key that would do
+//nothing. A `target(<1>enchantment|reveal)` chooser (Idyllic Tutor) has
+//targetMin true and maxtargets 1, so a zero-target BTN_NEXT falls through every
+//branch of CheckUserInput and returns false: nothing is pressed, nothing moves,
+//the driver re-enters phase 3 with an identical progress signature, and 600 s
+//later the stall guard force-closes the reveal and puts the whole library back -
+//a resolved spell voided. Both of the wave-66 corpus's `reveal_stall_forced`
+//records are that exact sequence, each one seq after a refused reveal reply.
+//Pure; declared in AIPlayerGPT.cpp so PARSETEST pins both sides.
+bool revealChooserCanDecline(bool targetMin, int maxtargets)
+{
+    return !targetMin || maxtargets == TargetChooser::UNLITMITED_TARGETS;
+}
+
 //#W54-F (D7a): the reveal driver's STALL GUARD.
 //
 //WHY. An open reveal display is held by GameObserver::OpenedDisplay and blocks
@@ -1313,6 +1329,32 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         //flight), nothing of ours is pending and the wait would never end.
         if (!clicked)
             mAIGraveSel.clear();
+        //#W67-AX (I5): NOTHING WAS SELECTED AND THIS CHOOSER HAS NO DECLINE.
+        //The finalize below would press a key CheckUserInput ignores (see
+        //revealChooserCanDecline), and the reveal would then sit until the stall
+        //guard voided it. A mandatory chooser is owed a target: take the first
+        //card it accepts - `canTarget` is exactly what the click enforces, so the
+        //pick is legal by construction and deterministic. This is the floor under
+        //EVERY path into a zero-target mandatory chooser (the model seam's own
+        //degrade lives in AIPlayerGPT::decideReveal); it is never reached while a
+        //decline is legal, and it removes no window and no option.
+        if (!clicked && ownChooser()
+            && !revealChooserCanDecline(ownChooser()->targetMin, ownChooser()->maxtargets))
+        {
+            for (int i = 0; i < zone->nb_cards; i++)
+            {
+                if (!zone->cards[i] || !ownChooser()->canTarget(zone->cards[i]))
+                    continue;
+                DebugTrace("MTGRevealingCards: no card was selected for a reveal whose"
+                           " chooser cannot be declined - taking the first legal card ("
+                           << zone->cards[i]->name << ") rather than leaving the reveal"
+                           " with no reachable outcome");
+                mAIGraveSel.push_back(zone->cards[i]);
+                observer->cardClick(zone->cards[i], zone->cards[i]);
+                clicked++;
+                break;
+            }
+        }
         TargetChooser * tcAfter = ownChooser();
         REVEAL_DBG("phase0 after clicks: clicked=" << mAIGraveSel.size()
                    << " tcAfter=" << (void*) tcAfter
