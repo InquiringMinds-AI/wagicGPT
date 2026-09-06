@@ -381,6 +381,9 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //option-source rescue below came back empty. A name captured at arm time
     //cannot dangle, so it survives the validation the pointer cannot.
     req.contextName = object->menuObjectName;
+    //#W65-AL (G1): and the SCRIPT the mode annotations are read off - see the
+    //field's comment. Same capture, same arm site, same dangle argument.
+    req.contextText = object->menuObjectText;
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;

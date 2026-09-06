@@ -35,6 +35,17 @@ public:
     //provably alive cannot dangle, so the name survives the validation the
     //pointer cannot. Empty when the object had no name.
     std::string menuObjectName;
+    //#W65-AL (G1). The same rail as menuObjectName, for the same reason and at
+    //the same three sites. Wave 64 priced modal rows off `ctx->magicText`, and
+    //`ctx` is the validated menu-subject POINTER: a menu armed by a resolving
+    //spell's `auto=choice` payload (Silverquill Command, Peer into the Abyss)
+    //is armed on a card in NO game zone, so the dangle rail refuses the pointer
+    //and every ctx-gated annotation went silent while the header - built from
+    //the captured NAME - kept naming the card. 23 mode rows over 3 windows in
+    //the wave-64 corpus rendered bare, and the seat took `life:-1 controller`
+    //at 5 life and again at 3. A SCRIPT captured while the object is provably
+    //alive cannot dangle either. Empty when the object had no script.
+    std::string menuObjectText;
     //#W43-6. Bumped by every setMenuObject / setCustomMenuObject. A menu's
     //IDENTITY cannot be read off menuObject (the alternative-cost menu and the
     //{X} announcement it chains into are both armed on the SAME card) nor off

@@ -1401,6 +1401,7 @@ int TestSuiteAI::Act(float)
         al->menuObject = NULL;
         al->currentActionCard = NULL;
         al->menuObjectName.clear();
+        al->menuObjectText.clear(); //#W65-AL (G1)
         al->modal = 0;
         return 1;
     }

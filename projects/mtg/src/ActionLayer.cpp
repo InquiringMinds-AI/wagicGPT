@@ -495,6 +495,12 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
     menuRowElements.clear();
     currentActionCard = (MTGCardInstance*)object;
     menuObjectName = object->getDisplayName();
+    //#W65-AL (G1), same capture as the name. `object` is a Targetable; only a
+    //card carries a script, and a menu armed on anything else simply has none.
+    if (MTGCardInstance * menuCard = dynamic_cast<MTGCardInstance *>(object))
+        menuObjectText = menuCard->magicText;
+    else
+        menuObjectText.clear();
     for (size_t i = 0; i < mObjects.size(); i++)
     {
         ActionElement * currentAction = (ActionElement *) mObjects[i];
@@ -558,6 +564,12 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
     menuObject = object;
     menuArmedSerial++;
     menuObjectName = object->getDisplayName(); //#W48 D6, same capture as setMenuObject
+    //#W65-AL (G1), same capture as the name. `object` is a Targetable; only a
+    //card carries a script, and a menu armed on anything else simply has none.
+    if (MTGCardInstance * menuCard = dynamic_cast<MTGCardInstance *>(object))
+        menuObjectText = menuCard->magicText;
+    else
+        menuObjectText.clear();
     SAFE_DELETE(abilitiesMenu);
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, customName.size()?customName.c_str():object->getDisplayName().c_str());
     menuRowElements.clear(); //#W58-F (F1): the rows of a multiple-choice menu
@@ -710,6 +722,7 @@ void ActionLayer::ButtonPressed(int, int controlid)
             menuObject = 0;
             currentActionCard = NULL;
             menuObjectName.clear();
+            menuObjectText.clear(); //#W65-AL (G1)
         }
     }
     else if (controlid == kCancelMenuID)
@@ -718,6 +731,7 @@ void ActionLayer::ButtonPressed(int, int controlid)
         menuObject = 0;
         currentActionCard = NULL;
         menuObjectName.clear();
+        menuObjectText.clear(); //#W65-AL (G1)
     }
     else
     {
@@ -755,6 +769,7 @@ void ActionLayer::ButtonPressedOnMultipleChoice(int choice)
     menuObject = 0;
     currentActionCard = NULL;
     menuObjectName.clear();
+    menuObjectText.clear(); //#W65-AL (G1)
 }
 
 ActionLayer::ActionLayer(GameObserver *observer)
