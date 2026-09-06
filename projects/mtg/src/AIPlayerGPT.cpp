@@ -228,14 +228,30 @@ const char * kReplyProtocol =
     //reasoned one are the SAME line. The selector is unchanged and still reads
     //both orders (first-wins), which is why a legacy answer-first reply still
     //parses byte for byte - see gptSelectAnswerIndex.
-    "Write your REASONING first, then your ANSWER, then your PLAN - in that order, and nothing "
-    "after the PLAN line.\n"
-    "REASONING comes FIRST: a few short sentences of working, at most. Think the decision through "
+    //#W67-AV (I3, engine HIGH-1/HIGH-2; deck130/126/125/123/162 HIGH-1). THE
+    //SECTION NAMES BECAME LABELS. #W66-AR named the three parts REASONING /
+    //ANSWER / PLAN and the model wrote two of them back as literal line-leading
+    //labels: 51 replies opened an answer line with `ANSWER:` and 380 (18.1% of
+    //the corpus) opened the reply with `REASONING:`. 50 of the 83
+    //`unparsed_reply` records had the answer written in the exact label syntax
+    //behind one of those words. The parser now skips them (#W67-AV I1,
+    //gptcaveat::answerHeadingSkip) - but a protocol that invites the shape is
+    //still the cause, so the two parts that are not labels are DESCRIBED and
+    //never named: "your working" and "the answer, on a line of its own". PLAN
+    //keeps its name because PLAN: IS a label the engine reads. The one rule the
+    //scanner could not infer is now stated where the model composes the line:
+    //nothing comes before the label.
+    "Reply in three parts, in this order: your working, then one answer line, then your PLAN line - "
+    "and nothing after the PLAN line. Do not put a heading over any part of it.\n"
+    "Your working comes FIRST: a few short sentences, at most. Think the decision through "
     "here, where it is safe to change your mind. Nothing in this part is kept and nothing in it is "
     "read as an answer - but write the answer LABEL (CHOICE:, ATTACK:, BLOCKS:, PUT:) exactly ONCE "
     "in your whole reply, on the answer line itself and never inside your reasoning, because the "
     "FIRST line carrying that label is the one that runs.\n"
-    "THE ANSWER LINE comes next, on a line of its own, using exactly the label the decision asks for (CHOICE: for numbered "
+    "THE ANSWER comes next, on a line of its own that BEGINS with the label the decision asks for. "
+    "Nothing may come before that label on that line - not a heading, not \"ANSWER:\", not "
+    "\"CORRECTION:\", not \"So\" or \"Therefore,\": the line's first characters are the label itself. "
+    "Use exactly the label the decision asks for (CHOICE: for numbered "
     "choices, ATTACK: for attack declarations, BLOCKS: for block assignments). For CHOICE: write "
     "the label, then the NUMBER of your choice FROM THE LIST, then that option's SHORT NAME in "
     "parentheses - CHOICE: <number> (<short name>). The SHORT NAME is the action and card name "
@@ -263,7 +279,7 @@ const char * kReplyProtocol =
     //change of mind still runs and deliberation prose no longer can.
     "Write the answer line ONCE, after you have finished reasoning. If more than one answer line "
     "is written, the FIRST one is the one that runs. If you change your mind after writing it, "
-    "write the corrected ANSWER LINE again, on a line of its own, using the same label, and "
+    "write the corrected answer line again, on a line of its own, beginning with the same label, and "
     "ANNOUNCE the change either on that line or on one of the three lines just above it, as a line "
     "that STARTS with the announcement and a colon or comma - \"CORRECTION:\", \"Re-evaluating:\", "
     "\"Actually,\", \"On second thought,\". A later answer line with no such announcement above it "
@@ -288,7 +304,7 @@ const char * kReplyProtocol =
     "Your PLAN is a private note to your future self. It is not an instruction to the game, it is "
     "not a second answer, and it is NOT checked against this decision's option list: it may name "
     "any card in your deck or hand and any future turn, whether or not that card is among today's "
-    "choices. Only the ANSWER LINE has to come from the list.\n"
+    "choices. Only the answer line has to come from the list.\n"
     "Keep the reasoning SHORT and put nothing after the PLAN line: once the PLAN is written the "
     "decision is made, and anything after it is neither read nor kept.\n"
     "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
@@ -14244,6 +14260,7 @@ static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
                            || low[s] == '*' || low[s] == '#' || low[s] == '-'
                            || low[s] == '>' || low[s] == '`'))
             s++;
+        s = gptcaveat::answerHeadingSkip(low, s, end); //#W67-AV (I1)
         for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
         {
             size_t len = strlen(kLabels[k]);
@@ -15075,6 +15092,7 @@ static string codedAnswerLineAt(const string& reply, int ordinal, size_t keep = 
                            || reply[s] == '*' || reply[s] == '#' || reply[s] == '-'
                            || reply[s] == '>' || reply[s] == '`'))
             s++;
+        s = gptcaveat::answerHeadingSkip(reply, s, end); //#W67-AV (I1)
         for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
         {
             const size_t len = strlen(kLabels[k]);
@@ -17539,6 +17557,7 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
         size_t s = lineStart;
         while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
             s++; //tolerate markdown bullet/heading decoration on the label line
+        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
         //#W63-AD (E6b): a label line that STARTS inside the plan block is plan
         //text. It is skipped whole - it neither answers nor anchors a run.
         const bool inPlanBlock = (planStart != string::npos && planEnd != string::npos
@@ -17781,6 +17800,118 @@ static bool planLineOpensWithConnective(const string& line)
 //same span in the parser as it does in the carry. Everything AFTER the block is
 //ordinary post-answer prose and keeps the wave-47 recode behaviour (#W48-E1)
 //byte for byte. Pure; the two answer-seam scans below share it.
+//#W67-AV (I2, engine HIGH-2; deck130 HIGH-3; deck125 HIGH-1). A COMPLETE REPLY
+//WITH NO LABEL IS NOT A FAILED REPLY. 92 of the 2094 wave-66 corpus replies
+//carry NO coded answer line at all and 87 of them carry a line-leading PLAN:
+//the model reasoned, concluded in prose ("Therefore, I cast nothing.", "I will
+//choose option 1."), wrote its plan, and never wrote the label. 81 of the 92
+//went to Baka as `unparsed_reply`; 125v146 seq 58 lost a decided Talisman to
+//Baka's Stone Rain. #W67-AV I1 rescues 49 of them (the answer was written
+//behind an `ANSWER:` heading); this is the remainder.
+//The salvage is DELIBERATELY the narrow one. Measured on the 37 label-free
+//replies, matching a row's short name inside the LAST action sentence before
+//PLAN yields 7 exact single-row matches, 2 ambiguous and 28 no-match; widening
+//the scan backwards over every sentence yields 22 - and hand-reading those 15
+//extra shows them salvaging HYPOTHETICALS (125v123 s43's last matching sentence
+//is "Even if I cast Tribute to Hunger to remove Fate Unraveler..." while its
+//conclusion two sentences later is "Therefore, I cast nothing."). A wrong row
+//executed is worse than a question, so the wide scan is not shipped: exact
+//single-row match or ONE re-ask, never Baka on a complete reply.
+static string gptRowShortName(const string& row)
+{
+    string n = row;
+    size_t cut = n.find('{');
+    if (cut != string::npos)
+        n = n.substr(0, cut);
+    cut = n.find('[');
+    if (cut != string::npos)
+        n = n.substr(0, cut);
+    const size_t s = n.find_first_not_of(" \t\r\n");
+    if (s == string::npos)
+        return string();
+    const size_t e = n.find_last_not_of(" \t\r\n");
+    return n.substr(s, e - s + 1);
+}
+
+//The trigger: a COMPLETE reply (it reached its PLAN line) that carries no coded
+//answer line anywhere. A reply with no PLAN is a truncated or spiralling reply
+//and keeps every path it has today.
+static bool replyLabelMissing(const string& reply)
+{
+    return !reply.empty() && codedAnswerCount(reply) == 0
+           && firstLineLeadingPlanPos(reply) != string::npos;
+}
+
+//The LAST sentence before the PLAN marker that states an action, matched against
+//the rows by short-name containment. Exactly one distinct row -> that row
+//(1-based); zero or more than one -> -1, and the caller re-asks.
+static int salvageLabelMissingChoice(const string& reply, int optionCount,
+                                     const vector<string> * optionTexts)
+{
+    if (!optionTexts || optionCount <= 0 || (int) optionTexts->size() < optionCount
+        || !replyLabelMissing(reply))
+        return -1;
+    const size_t planAt = firstLineLeadingPlanPos(reply);
+    const string head = reply.substr(0, planAt);
+    //sentences: a newline, or . ! ? followed by whitespace
+    vector<string> sentences;
+    size_t start = 0;
+    for (size_t i = 0; i < head.size(); i++)
+    {
+        const char c = head[i];
+        const bool nl = (c == '\n');
+        const bool stop = ((c == '.' || c == '!' || c == '?')
+                           && (i + 1 >= head.size() || isspace((unsigned char) head[i + 1])));
+        if (!nl && !stop)
+            continue;
+        sentences.push_back(head.substr(start, i + 1 - start));
+        start = i + 1;
+    }
+    if (start < head.size())
+        sentences.push_back(head.substr(start));
+    static const char * kActs[] = {
+        "cast ", "choose ", "choosing ", "play ", "discard ", "pick ", "select ",
+        "take ", "hold ", "pass", "attack", "block", "put ", "activate "
+    };
+    for (size_t si = sentences.size(); si-- > 0; )
+    {
+        string low = sentences[si];
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        bool isAction = false;
+        for (size_t k = 0; k < sizeof(kActs) / sizeof(kActs[0]) && !isAction; k++)
+            isAction = (low.find(kActs[k]) != string::npos);
+        if (!isAction)
+            continue;
+        int hit = -1;
+        bool ambiguous = false;
+        for (int r = 0; r < optionCount; r++)
+        {
+            string name = gptRowShortName((*optionTexts)[r]);
+            if (name.size() < 4)
+                continue; //too short to identify a row inside prose
+            for (size_t i = 0; i < name.size(); i++)
+                name[i] = (char) tolower((unsigned char) name[i]);
+            //A row's own parenthetical gloss ("Cast nothing right now (combat
+            //comes next this turn)") is not part of the name the model writes
+            //back, so the head before it is a second candidate. Two rows whose
+            //heads collide simply make the sentence ambiguous, which re-asks.
+            string head = name;
+            const size_t par = head.find(" (");
+            if (par != string::npos && par >= 4)
+                head = head.substr(0, par);
+            if (low.find(name) == string::npos && low.find(head) == string::npos)
+                continue;
+            if (hit >= 0)
+                ambiguous = true;
+            else
+                hit = r + 1;
+        }
+        return (ambiguous || hit < 0) ? -1 : hit; //the LAST action sentence, not the best one
+    }
+    return -1;
+}
+
 //#W64-AJ (F13, engine seat HIGH-1). A CODED ANSWER LINE ENDS THE PLAN
 //PARAGRAPH. `planParagraphBound`'s two terminators are a blank line and a
 //sentence boundary without a connective, and neither fires on the shape the
@@ -17815,6 +17946,7 @@ static bool lineIsCodedAnswerLine(const string& line)
     while (s < line.size() && (line[s] == ' ' || line[s] == '\t'
                                || line[s] == '*' || line[s] == '#'))
         s++;
+    s = gptcaveat::answerHeadingSkip(line, s, line.size()); //#W67-AV (I1)
     for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
     {
         const size_t len = strlen(kLabels[k]);
@@ -24616,6 +24748,7 @@ int AIPlayerGPT::codedChoiceOrdinal(const string& content, int choice, int optio
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -25322,6 +25455,7 @@ bool AIPlayerGPT::latchedCodedChoiceLine(const string& replyIn, int choice, int 
         while (s < end && (text[s] == ' ' || text[s] == '\t'
                            || text[s] == '*' || text[s] == '#' || text[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -28634,6 +28768,7 @@ bool AIPlayerGPT::latchedRowMismatch(const string& reply, int choice, int option
         while (s < end && (reply[s] == ' ' || reply[s] == '\t'
                            || reply[s] == '*' || reply[s] == '#' || reply[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(reply, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -29959,6 +30094,7 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++; //tolerate markdown/list decoration before the label
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -30008,6 +30144,7 @@ int AIPlayerGPT::firstCodedChoice(const string& content, int optionCount,
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -30097,6 +30234,7 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
         while (s < end && (text[s] == ' ' || text[s] == '\t'
                            || text[s] == '*' || text[s] == '#' || text[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -31290,6 +31428,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 choice = sal;
             }
         }
+        //#W67-AV (I2): the same complete-reply-with-no-label rescue the ask
+        //seam runs. 30 of the 92 label-free wave-66 replies are priority windows.
+        bool labelMissing = false;
+        if (choice < 0 && !content.empty() && replyLabelMissing(content))
+        {
+            const int lm = salvageLabelMissingChoice(content, index, &shownLines);
+            if (lm >= 1)
+            {
+                DebugTrace("AIPlayerGPT: priority reply carried no answer label; its last action"
+                           " sentence names row " << lm);
+                choice = lm;
+                appendParseNote(&mLastParseNote, "label_missing_salvaged");
+            }
+            else
+                labelMissing = true;
+        }
         //Retraction gate: a parsed/salvaged choice that the model explicitly
         //took back (with no replacing CHOICE) is not its decision - defer to
         //the heuristic rather than execute the retracted digit.
@@ -31453,14 +31607,24 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                        && planArguesAgainstRow(content, shownLines[choice - 1]));
         if (!content.empty() && mPriorityReaskBoard != boardKey
             && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict
-                || planMissing || repeatPastStop || indexNameConflict || noopPlanConflict)) //#W66-AS (H3) #W66-AR (H8)
+                || planMissing || repeatPastStop || indexNameConflict || noopPlanConflict
+                || labelMissing)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2)
         {
             std::ostringstream corr;
             const char * fb;
             //#W56-C (D3): quote what the engine ran, not the reply's first try.
             const string quotedChoiceLine = haveLatchedLine ? latchedChoiceLine
                                                             : firstLabelledLine(content, "choice:");
-            if (namedRowFail)
+            if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
+            {
+                corr << "[RE-ASK] Your reply has no answer line. Answer again with one line that"
+                        " BEGINS with \"CHOICE: \" - the number of the row you want from the list,"
+                        " then that row's short name in parentheses, or 0 (pass) - and nothing"
+                        " before the label on that line.";
+                fb = "label_missing_reask";
+                mPriorityReaskKind = "label_missing";
+            }
+            else if (namedRowFail)
             {
                 const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
                 corr << "[RE-ASK] \"" << offending
@@ -31536,7 +31700,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "", fb, &renderRows); //#W57-A (D4)
-            setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
+            setNotice(labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
+                      : namedRowFail ? "that answer named nothing on the list - asking again"
                       : indexNameConflict ? "the number and the name disagree - asking again"
                       : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
@@ -31554,7 +31719,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
         {
             //the second answer for this state, whatever it is, is final
-            if (mPriorityReaskKind == "named_row")
+            if (mPriorityReaskKind == "label_missing") //#W67-AV (I2)
+                appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
+                                                              : (choice >= 0 ? "label_missing_reask_recovered"
+                                                                             : "label_missing_reask_unanswered"));
+            else if (mPriorityReaskKind == "named_row")
                 appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                               : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
             else if (mPriorityReaskKind == "plan_choice") //#W51-C D4b: the second answer executes as given
@@ -32163,6 +32332,22 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             choice = sal;
         }
     }
+    //#W67-AV (I2): a COMPLETE reply that never wrote the label. Exact
+    //single-row name match on its last action sentence, else ONE re-ask below.
+    bool labelMissing = false;
+    if (choice < 0 && !content.empty() && replyLabelMissing(content))
+    {
+        const int lm = salvageLabelMissingChoice(content, (int) options.size(), &options);
+        if (lm >= 1)
+        {
+            DebugTrace("AIPlayerGPT: ask reply carried no answer label; its last action sentence"
+                       " names row " << lm);
+            choice = lm;
+            appendParseNote(&mLastParseNote, "label_missing_salvaged");
+        }
+        else
+            labelMissing = true;
+    }
     //Retraction gate (see chooseOrderedAction): a choice the model explicitly
     //took back with no replacement is not its decision.
     bool retracted = false;
@@ -32245,10 +32430,19 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
     //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
     //creatures)" over a 4-row Main-1 cast menu.
-    if ((namedRowFail || passOnNoPass || indexNameConflict || noopPlanConflict) && !reasked)
+    if ((namedRowFail || passOnNoPass || indexNameConflict || noopPlanConflict
+         || labelMissing) && !reasked) //#W67-AV (I2)
     {
         std::ostringstream corr;
-        if (namedRowFail)
+        if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
+        {
+            corr << "[RE-ASK] Your reply has no answer line. Answer again with one line that"
+                    " BEGINS with \"CHOICE: \" - the number of the row you want from the list, then"
+                    " that row's short name in parentheses - and nothing before the label on that"
+                    " line.";
+            mAskReaskKind = "label_missing";
+        }
+        else if (namedRowFail)
         {
             const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
             corr << "[RE-ASK] \"" << offending
@@ -32281,14 +32475,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " the row you want instead.";
             mAskReaskKind = "noop_plan";
         }
-        const char * fb = namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask"
+        const char * fb = labelMissing ? "label_missing_reask" //#W67-AV (I2)
+                          : namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask"
                           : indexNameConflict ? "index_name_conflict" : "plan_contradicts_noop_row_reask";
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
-        setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
+        setNotice(labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
+                  : namedRowFail ? "that answer named nothing on the list - asking again"
                   : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
                   : indexNameConflict ? "the number and the name disagree - asking again"
                                       : "the chosen row does nothing and the reply says so - asking again", 5.0f);
@@ -32299,7 +32495,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     if (reasked)
     {
-        if (mAskReaskKind == "no_pass")
+        if (mAskReaskKind == "label_missing") //#W67-AV (I2): executes as given either way
+            appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
+                                                          : (choice >= 1 ? "label_missing_reask_recovered"
+                                                                         : "label_missing_reask_unanswered"));
+        else if (mAskReaskKind == "no_pass")
             appendParseNote(&mLastParseNote, passOnNoPass ? "no_pass_reask_exhausted"
                                                           : (choice >= 1 ? "no_pass_reask_recovered" : "no_pass_reask_unanswered"));
         else if (mAskReaskKind == "index_name") //#W52-J D6: the second answer executes as given
@@ -38994,6 +39194,7 @@ static void collectLabeledLines(const string& content, const char * label, vecto
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         const string rawLine = content.substr(lineStart, end - lineStart);
         if (end - s >= labelLen)
         {
@@ -39305,6 +39506,7 @@ static bool laterCodedBlockAssignment(const string& content, size_t from)
         while (s < end && (content[s] == ' ' || content[s] == '\t' || content[s] == '\n'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         static const char * kLabel = "BLOCKS:";
         if (end - s >= 7)
         {
@@ -39390,6 +39592,7 @@ static bool truncatedBlockCommitmentAbandoned(const string& content)
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         static const char * kLabel = "BLOCKS:";
         if (end - s >= 7)
         {
@@ -39700,6 +39903,7 @@ string AIPlayerGPT::restatedCombatDirective(const string& content, const char * 
         while (s < end && (text[s] == ' ' || text[s] == '\t'
                            || text[s] == '*' || text[s] == '#' || text[s] == '-'))
             s++;
+        s = gptcaveat::answerHeadingSkip(low, s, end); //#W67-AV (I1)
         if (end - s >= labelLen && low.compare(s, labelLen, labelLc) == 0)
             lastCodedEnd = end;
         if (planPos == string::npos && end - s >= 5
@@ -43533,7 +43737,10 @@ string discardSpareDefaultLine(int spareRows, int over)
     if (spareRows <= 0)
         return "";
     std::ostringstream o;
-    o << "DEFAULT ANSWER: discard the spare land. " << spareRows << " row"
+    //#W67-AV (I3): this tail printed a line-leading "DEFAULT ANSWER:" - the
+    //engine teaching the model the very heading the corpus then wrote back over
+    //its answer label. Same claim, no heading shape.
+    o << "BY DEFAULT, discard the spare land. " << spareRows << " row"
       << (spareRows == 1 ? " below is" : "s below are") << " marked {spare: ...} - a"
          " surplus land this hand no longer needs, and the rows are ordered most"
          " disposable FIRST, so the spare rows are the low numbers. Every other row"
@@ -47013,7 +47220,7 @@ void AIPlayerGPT::runParseSelfTest()
         //this case exists for (the plan is not validated against the options) is
         //unchanged and is still pinned; only the name of the bound line moved.
         CHECK(proto.find("NOT checked against this decision's option list") != string::npos
-              && proto.find("Only the ANSWER LINE has to come from the list.") != string::npos
+              && proto.find("Only the answer line has to come from the list.") != string::npos
               && proto.find("Only LINE 1 has to come from the list.") == string::npos,
               "W35-plan the plan line is declared free of the option list; only the answer is bound");
     }
@@ -64225,8 +64432,9 @@ static const char * kW50Y_r94 =
               != string::npos
               && string(kReplyProtocol).find("The LAST answer line you write is the one that runs")
                  == string::npos
-              && string(kReplyProtocol).find("Write your REASONING first, then your ANSWER, then"
-                                             " your PLAN") != string::npos
+              && string(kReplyProtocol).find("Reply in three parts, in this order: your working,"
+                                             " then one answer line, then your PLAN line")
+                 != string::npos
               && string(kReplyProtocol).find("An answer written inside your PLAN sentence is part"
                                              " of the plan, not your answer") != string::npos,
               "#W62-Z D9 the reply protocol states the rule the three seams now share");
@@ -64243,6 +64451,25 @@ static const char * kW50Y_r94 =
         CHECK(string(kReplyProtocol).find("LINE 1 is your ANSWER") == string::npos
               && string(kReplyProtocol).find("Write no reasoning, no commentary") == string::npos,
               "#W66-AR H2a NEGATIVE the protocol no longer asks for the answer on line 1");
+        //#W67-AV (I3, engine HIGH-1). NO SECTION IS NAMED WITH A WORD THE MODEL
+        //WILL WRITE AS A LABEL. The wave-66 corpus wrote `ANSWER:` before the
+        //answer label in 51 replies and opened 380 replies with `REASONING:`;
+        //both words were the protocol's own section names, in the "X comes
+        //next:" heading form. POSITIVE: the rule the parser cannot infer is
+        //stated - nothing comes before the label on the answer line.
+        CHECK(string(kReplyProtocol).find("Nothing may come before that label on that line")
+              != string::npos
+              && string(kReplyProtocol).find("the line's first characters are the label itself")
+                 != string::npos
+              && string(kReplyProtocol).find("Do not put a heading over any part of it")
+                 != string::npos,
+              "#W67-AV I3 the protocol states that the answer line begins with the label");
+        //NEGATIVE: neither heading form survives anywhere in the protocol.
+        CHECK(string(kReplyProtocol).find("REASONING comes FIRST") == string::npos
+              && string(kReplyProtocol).find("THE ANSWER LINE comes next") == string::npos
+              && string(kReplyProtocol).find("your REASONING") == string::npos
+              && string(kReplyProtocol).find("ANSWER LINE") == string::npos,
+              "#W67-AV I3 NEGATIVE no section is named REASONING or ANSWER LINE any more");
         //#W66-AR (H2b): the announcement FORM the wider window accepts is the one
         //the protocol names, and the deliberation words it does not.
         CHECK(string(kReplyProtocol).find("\"Re-evaluating:\"") != string::npos
@@ -68475,9 +68702,14 @@ static const char * kW50Y_r94 =
         // The default sentence: present only with a spare row, and it names the count.
         {
             const string d = discardSpareDefaultLine(3, 1);
-            CHECK(d.find("DEFAULT ANSWER: discard the spare land.") == 0
+            //#W67-AV (I3): the claim is unchanged; the HEADING SHAPE is gone -
+            //an engine line reading "DEFAULT ANSWER:" taught the model the exact
+            //`ANSWER:` prefix 51 wave-66 replies then wrote over their labels.
+            CHECK(d.find("BY DEFAULT, discard the spare land.") == 0
                       && d.find("3 rows below are") != string::npos,
                   "#W66-AT H5 the default sentence leads the ask and names the spare count");
+            CHECK(d.find("DEFAULT ANSWER:") == string::npos,
+                  "#W67-AV I3 NEGATIVE no engine tail writes a line-leading ANSWER: heading");
             CHECK(discardSpareDefaultLine(0, 1).empty(),
                   "#W66-AT H5 NEGATIVE no spare row, no default sentence - the ask is unchanged");
             CHECK(discardSpareDefaultLine(1, 1).find("1 row below is") != string::npos,
@@ -69494,6 +69726,233 @@ static const char * kW50Y_r94 =
         CHECK(drawsUnattributedClause(1).find('[') == string::npos
                   && drawsUnattributedClause(1).find('{') == string::npos,
               "#W66-AU R2 ECHO the clause opens no annotation channel");
+    }
+
+    // ============ #W67-AV (I1/I2/I3): the reply rule, on the corpus's own bytes ============
+    cout << "\n[#W67-AV I1] a heading word before the answer label is skipped at EVERY seam\n";
+    {
+        // POSITIVES - every shape the wave-66 corpus wrote, VERBATIM. 50 of that
+        // corpus's 83 unparsed_reply records carry one of these lines.
+        vector<string> m3;
+        m3.push_back("Cast Spark Spray {r}");
+        m3.push_back("Cast Ob Nixilis, the Hate-Twisted {3}{b}");
+        m3.push_back("Cast nothing right now");
+        {   // 162v123 seq 13 - the single most common shape (46 of the 50)
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "ANSWER: CHOICE: 3 (Cast nothing right now)\nPLAN: hold.";
+            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
+                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
+                  "#W67-AV I1 162v123 s13 `ANSWER: CHOICE: 3 (Cast nothing right now)` is an answer");
+            bool st = false;
+            CHECK(parseChoice(r.substr(ss, se - ss), 3, &m3, &st) == 3,
+                  "#W67-AV I1 ...and it resolves to row 3 through the ordinary parse");
+        }
+        {   // 130v125 seq 52 - and the heading is ALSO the retraction announcement
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "CHOICE: 1 (Cast Spark Spray)\nCORRECTION: CHOICE: 3 (Cast nothing right now)";
+            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
+                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
+                  "#W67-AV I1 130 s52 `CORRECTION: CHOICE: 3` is a MARKED correction, and it wins");
+        }
+        {   // 126v162 seq 10 - the reveal that VOIDED an Idyllic Tutor
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "ANSWER: PUT: 44";
+            CHECK(findAnswerLabelLine(r, "PUT:", ss, se, ls) && r.substr(ss, se - ss) == " 44",
+                  "#W67-AV I1 126v162 s10 `ANSWER: PUT: 44` is an answer at the reveal seam");
+        }
+        {   // the combat seams read the same predicate
+            size_t ss = 0, se = 0, ls = 0;
+            CHECK(findAnswerLabelLine("ANSWER: ATTACK: A1, A3", "ATTACK:", ss, se, ls),
+                  "#W67-AV I1 the ATTACK seam skips the heading too");
+            vector<string> lines;
+            collectLabeledLines("ANSWER: BLOCKS: B1:A2", "BLOCKS:", lines);
+            CHECK(lines.size() == 1 && lines[0] == " B1:A2",
+                  "#W67-AV I1 collectLabeledLines (the combat/PUT drivers) skips the heading");
+        }
+        {   // the answer-naming phrase form, closed by a space (1 corpus line)
+            size_t ss = 0, se = 0, ls = 0;
+            CHECK(findAnswerLabelLine("The answer is CHOICE: 2 (Cast Ob Nixilis, the Hate-Twisted)",
+                                      "CHOICE:", ss, se, ls),
+                  "#W67-AV I1 `The answer is CHOICE: 2 ...` is an answer");
+        }
+        // the record's own counters agree with the seams
+        CHECK(codedAnswerCount("ANSWER: CHOICE: 3 (Cast nothing right now)") == 1
+                  && lineIsCodedAnswerLine("ANSWER: CHOICE: 3 (Cast nothing right now)")
+                  && codedAnswerLineAt("ANSWER: CHOICE: 3 (Cast nothing right now)", 1)
+                     == "CHOICE: 3 (Cast nothing right now)",
+              "#W67-AV I1 the record's coded-line counters and the latched line agree with the seams");
+
+        // MUST-NOT-MATCH - every non-heading prefix the same corpus writes
+        // before a label. None of these may become an answer.
+        CHECK(gptcaveat::answerHeadingSkip("PLAN: Turn 10 - CHOICE: 2 is the follow-up", 0, 41) == 0,
+              "#W67-AV I1 MUST-NOT-MATCH a PLAN line is plan text, never a heading over an answer");
+        {
+            const string r = "REASONING: I have Sorin on the battlefield. CHOICE: 1 is better than CHOICE: 3.";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0 && codedAnswerCount(r) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH `REASONING: ... CHOICE: 1 is better than CHOICE: 3.` is prose");
+        }
+        {
+            const string r = "4. Attack: I have no Vampires.";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH an enumerated prose line is not a heading");
+        }
+        {
+            const string r = "However, the Branch B rule says \"ATTACK: when A is at least 3 times B\".";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH a sentence that quotes the format is not a heading");
+        }
+        {
+            const string r = "But wait, I have Intruder Alarm. attack: ... x22 - these are the tokens.";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH deliberation prose that reaches a label is not a heading");
+        }
+        {   // a bare connective is DELIBERATELY not a head - three shipped rules own that shape
+            const string r = "So BLOCKS: whatever keeps me alive longest.";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH a bare connective is not a head (#W62-AA/#W62-Z own it)");
+        }
+        {   // the heading must be followed by a real label WITH a payload
+            const string r = "ANSWER: it depends on what they hold.";
+            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0 && codedAnswerCount(r) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH a heading with no label after it changes nothing");
+            const string r2 = "ANSWER: CHOICE:";
+            CHECK(gptcaveat::answerHeadingSkip(r2, 0, r2.size()) == 0,
+                  "#W67-AV I1 MUST-NOT-MATCH a heading over a payload-less label is not an answer");
+        }
+        // ECHO: the skip moves the label, it does not rewrite the reply. The
+        // latched line the record stores still begins at the LABEL, so nothing
+        // downstream sees a new bracketed or braced annotation.
+        {
+            size_t at = 0;
+            const string line = codedAnswerLineAt("ANSWER: CHOICE: 3 (Cast nothing right now)", 1,
+                                                  (size_t) -1, &at);
+            CHECK(line == "CHOICE: 3 (Cast nothing right now)" && at == 8
+                      && line.find('{') == string::npos && line.find('[') == string::npos,
+                  "#W67-AV I1 ECHO the stored line starts at the label, at its true offset, unannotated");
+        }
+        // NEGATIVE: a reply with no heading at all is byte-for-byte unchanged.
+        {
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "CHOICE: 2 (Cast Ob Nixilis, the Hate-Twisted)\nPLAN: kill the wall.";
+            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
+                      && r.substr(ss, se - ss) == " 2 (Cast Ob Nixilis, the Hate-Twisted)"
+                      && ls == 0,
+                  "#W67-AV I1 NEGATIVE an ordinary reply parses exactly as it did before");
+        }
+    }
+
+    cout << "\n[#W67-AV I2] a complete reply with a PLAN and no label is salvaged or re-asked, never Baka'd\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Idyllic Tutor {2}{w} {right now: fetches an enchantment}");
+        menu.push_back("Cast Wall of Omens {1}{w}");
+        menu.push_back("Cast nothing right now (combat comes next this turn)");
+        // POSITIVE: 126v146 seq 7 - the conclusion is in the last action sentence.
+        {
+            const string r = "The board is stalled and I need Sanguine Bond.\n"
+                             "I will cast Idyllic Tutor to find Sanguine Bond.\n"
+                             "PLAN: tutor for Sanguine Bond, then hold.";
+            CHECK(replyLabelMissing(r) && codedAnswerCount(r) == 0,
+                  "#W67-AV I2 a complete reply with a PLAN and no coded line is the trigger");
+            CHECK(salvageLabelMissingChoice(r, 3, &menu) == 1,
+                  "#W67-AV I2 126v146 s7 the last action sentence names exactly one row");
+        }
+        // POSITIVE: 125v146 seq 130 - a quoted row name reads the same way.
+        {
+            const string r = "I have no profitable cast here.\n"
+                             "So I should choose \"Cast nothing right now\".\n"
+                             "PLAN: hold up mana.";
+            CHECK(salvageLabelMissingChoice(r, 3, &menu) == 3,
+                  "#W67-AV I2 125v146 s130 a quoted row name in the last action sentence resolves");
+        }
+        // MUST-NOT-MATCH: two rows named in the one sentence is ambiguous - re-ask.
+        {
+            const string r = "Cast Idyllic Tutor or cast Wall of Omens, either is fine.\nPLAN: stabilise.";
+            CHECK(salvageLabelMissingChoice(r, 3, &menu) == -1,
+                  "#W67-AV I2 MUST-NOT-MATCH two rows named in one sentence is ambiguous, not a pick");
+        }
+        // MUST-NOT-MATCH: the wide backwards scan is NOT shipped - a HYPOTHETICAL
+        // earlier in the reply must not outrank the last action sentence
+        // (125v123 s43: "Even if I cast Tribute to Hunger..." / "Therefore, I cast nothing.").
+        {
+            vector<string> m2;
+            m2.push_back("Cast Tribute to Hunger {2}{b}");
+            m2.push_back("Cast nothing right now");
+            const string r = "Even if I cast Tribute to Hunger to remove Fate Unraveler, I gain 4 life.\n"
+                             "That still leaves the Underworld Dreams engine running.\n"
+                             "Therefore, I hold everything.\n"
+                             "PLAN: wait for the sweeper.";
+            CHECK(salvageLabelMissingChoice(r, 2, &m2) == -1,
+                  "#W67-AV I2 MUST-NOT-MATCH a hypothetical earlier in the reply is never the salvage");
+        }
+        // MUST-NOT-MATCH: an INCOMPLETE reply (no PLAN line) keeps every path it
+        // has today - the salvage is for a reply that finished its thought.
+        {
+            const string r = "I will cast Idyllic Tutor to find Sanguine";
+            CHECK(!replyLabelMissing(r) && salvageLabelMissingChoice(r, 3, &menu) == -1,
+                  "#W67-AV I2 MUST-NOT-MATCH a truncated reply with no PLAN is not salvaged");
+        }
+        // NEGATIVE: a reply that DID write a label is untouched by this path.
+        {
+            const string r = "CHOICE: 2 (Cast Wall of Omens)\nPLAN: block and draw.";
+            CHECK(!replyLabelMissing(r) && salvageLabelMissingChoice(r, 3, &menu) == -1,
+                  "#W67-AV I2 NEGATIVE a reply with a coded line never enters the salvage");
+        }
+        // ECHO: the salvage returns a ROW NUMBER, so nothing new is rendered and
+        // the record's own note is the only new token.
+        CHECK(gptRowShortName("Cast Idyllic Tutor {2}{w} {right now: fetches an enchantment}")
+                  == "Cast Idyllic Tutor"
+              && gptRowShortName("Cast Howling Mine {2} [second copy: no legend rule] {leaves 8}")
+                 == "Cast Howling Mine",
+              "#W67-AV I2 ECHO the row name the match uses is the short name, annotations stripped");
+    }
+
+    cout << "\n[#W67-AV I3] the answer anchor, and the announcement vocabulary the corpus wrote\n";
+    {
+        vector<string> m;
+        m.push_back("Cast Damnation {2}{b}{b}");
+        m.push_back("Cast Devour Flesh {1}{b}");
+        m.push_back("Cast nothing right now");
+        // POSITIVE: 123v126 seq 114. "Correct Plan:" is the announcement the
+        // corpus wrote and the header set did not name; the retracted Damnation
+        // executed and killed the seat's own 102 creatures.
+        {
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "CHOICE: 1 (Cast Damnation)\n"
+                             "PLAN: Damnation: M is 102. Do not cast Damnation.\n"
+                             "Correct Plan: Cast nothing right now.\n"
+                             "CHOICE: 3 (Cast nothing right now)";
+            CHECK(gptcaveat::correctionHeaderCue("Correct Plan: Cast nothing right now."),
+                  "#W67-AV I3 `Correct Plan:` is an announced retraction header");
+            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
+                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
+                  "#W67-AV I3 123v126 s114 the announced correction wins over the retracted Damnation");
+        }
+        // MUST-NOT-MATCH: "Wait," stays deliberation. 130v146 s24 answers
+        // `CHOICE: 0 (pass)` at an UPKEEP window, rambles "Wait,, Lay Waste
+        // targets a land" and writes a MAIN-PHASE intent - admitting the word
+        // would turn that right answer into a wrong one.
+        {
+            CHECK(!gptcaveat::correctionHeaderCue("Wait,, Lay Waste targets a land.")
+                      && !gptcaveat::correctionHeaderCue("But wait, I have Intruder Alarm.")
+                      && !gptcaveat::correctionHeaderCue("However, the Wolf survives."),
+                  "#W67-AV I3 MUST-NOT-MATCH deliberation vocabulary is still not an announcement");
+            size_t ss = 0, se = 0, ls = 0;
+            const string r = "CHOICE: 0 (pass)\n"
+                             "Wait,, Lay Waste targets a land. I can cast Hammer of Bogardan.\n"
+                             "CHOICE: 1 (Cast Damnation)";
+            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls) && r.substr(ss, se - ss) == " 0 (pass)",
+                  "#W67-AV I3 130v146 s24 an unannounced later line is still thinking-out-loud");
+        }
+        // NEGATIVE: the anchor did NOT move. The corpus scores the PLAN-relative
+        // anchor 4/9 against first-wins-plus-corrections' own 4/9 on the nine
+        // replies where the anchors disagree, and only 75.0% of replies carry a
+        // line-leading PLAN at all - so first-wins stands and the protocol still
+        // says so.
+        CHECK(string(kReplyProtocol).find("the FIRST one is the one that runs") != string::npos
+                  && string(kReplyProtocol).find("The LAST answer line you write is the one that runs")
+                     == string::npos,
+              "#W67-AV I3 NEGATIVE the answer anchor is unchanged: first-wins, corrections supersede");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

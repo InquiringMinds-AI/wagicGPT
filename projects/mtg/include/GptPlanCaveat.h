@@ -743,6 +743,20 @@ inline bool correctionHeaderCue(const std::string& line)
         "correction", "corrections", "corrected", "re-evaluating", "reevaluating",
         "re-evaluation", "revised", "revising", "revision", "on reflection",
         "on second thought", "actually", "scratch that", "disregard the above",
+        //#W67-AV (I3, deck123 HIGH-2). ONE MEASURED TOKEN. Counted over the
+        //three-line window this function is read in, across every later coded
+        //line in the wave-66 corpus: "wait" 14, "actually" 9, "however" 3,
+        //"correction" 1, "correct plan" 1. The last is 123v126 seq 114 - `CHOICE:
+        //3 (Cast Damnation)`, "Correct Plan: Cast nothing right now.", `CHOICE: 6`
+        //- and the unheard announcement cast the Damnation over the seat's own 102
+        //creatures and decided the game. "wait" is the most frequent and stays
+        //OUT: 130v146 seq 24 answers `CHOICE: 0 (pass)` at an UPKEEP window,
+        //rambles "Wait,, Lay Waste targets a land..." and writes `CHOICE: 1 (Cast
+        //Hammer of Bogardan)`, a main-phase intent - admitting it turns a right
+        //answer into a wrong one. Deliberation vocabulary is still not an
+        //announcement (#W66-AR); this adds the one announced HEADER the corpus
+        //wrote that the set did not name.
+        "correct plan", "corrected plan",
         "final answer"
     };
     std::string lc = toLower(line);
@@ -768,6 +782,105 @@ inline bool correctionHeaderCue(const std::string& line)
             return true;
     }
     return false;
+}
+
+//#W67-AV (I1, engine HIGH-1; deck130/126/125/123/162 HIGH-1). THE HEADING WORD
+//BEFORE THE LABEL. #W66-AR named the protocol's three sections REASONING /
+//ANSWER / PLAN, and the model transcribed two of them as literal line-leading
+//labels: 50 of the wave-66 corpus's 83 `unparsed_reply` records had written the
+//answer in the exact label syntax behind one of them - 46 of those behind the
+//single token `ANSWER:` - and every label scanner in the engine skips only
+//" \t*#->`" before it compares, so `ANSWER: CHOICE: 3 (Cast nothing right now)`
+//was prose and no answer was found. The worst is 126v162 seq 10, `ANSWER: PUT:
+//44` at a reveal: the reveal was refused and an Idyllic Tutor was voided.
+//The set is CLOSED and it is the measured one: the wave-66 corpus writes exactly
+//five distinct heading tokens before a label (`ANSWER:` 51, `So ` 4,
+//`CORRECTION:` 1, `The answer is ` 1, `Therefore,` 1); this set matches 53 of
+//those 56 lines - see the exclusion note on kHeadsPhrase/kHeadsClosed - and
+//nothing else in the corpus. The prefixes it must NOT eat are in the same
+//corpus and are all rejected by it: `PLAN: Turn 10 ...`, `REASONING: I have
+//Sorin ... CHOICE: 1 is better than CHOICE: 3.`, `4. Attack: I have no
+//Vampires.`, `However, the Branch B rule says "..."`, `But wait, ...`.
+//Two rails make this safe to call from every seam: the skip happens ONLY when a
+//real answer label with a payload follows it (so no reply that parses today
+//stops parsing), and `PLAN` and `REASONING` are deliberately not heads - a plan
+//line and a reasoning line are not answers at any seam.
+//`s` is the offset the caller has already advanced past markdown decoration;
+//`end` bounds the line. Returns the offset the label compare should use.
+inline size_t answerHeadingSkip(const std::string& text, size_t s, size_t end)
+{
+    if (s >= end || end > text.size())
+        return s;
+    //Two forms, because a bare connective is NOT safe as a head. `kHeadsPhrase`
+    //NAMES the answer, so a space may follow it ("The answer is CHOICE: 2");
+    //`kHeadsClosed` must be closed by ':' or ',' ("ANSWER:", "CORRECTION:").
+    //DELIBERATELY EXCLUDED: "So", "Therefore", "Thus". The corpus writes them
+    //before a label 5 times, but a bare connective before a label is the shape
+    //three shipped rules already own and pin - #W48-E1's post-plan prose recode
+    //("So, CHOICE: 0 (pass)."), `restatedCombatDirective`'s clean restatement
+    //("So ATTACK: A1, A2, A3.") and its MUST-NOT-MATCH ("So BLOCKS: whatever
+    //keeps me alive longest.", prose that is not a declaration). Admitting the
+    //connective here would promote that prose to a line-leading answer at every
+    //seam, ahead of the cleanliness tests those rules exist to apply. The 2
+    //decisions it leaves behind (`So PUT: 1, 8.` at the discard seam, 125v130
+    //s258/s194) are caught by #W67-AV I2's re-ask instead of by Baka.
+    static const char * kHeadsPhrase[] = {
+        "the answer line is", "the answer is", "my answer is", "my choice is",
+        "the chosen row is"
+    };
+    static const char * kHeadsClosed[] = {
+        "the answer line", "final answer", "my answer", "the answer", "answer",
+        "correction", "corrections", "corrected", "correct plan",
+        "revised answer", "revised", "conclusion", "decision"
+        //NOT bare "final": `Final: BLOCKS: B1:A2.` is the shape #W62-AA R2 pins
+        //as a post-answer RESTATEMENT read by restatedCombatDirective's clean
+        //test, and the corpus never writes it as a heading. "final answer" is
+        //above, where the corpus's own vocabulary puts it.
+    };
+    static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
+    const size_t nPhrase = sizeof(kHeadsPhrase) / sizeof(kHeadsPhrase[0]);
+    const size_t nClosed = sizeof(kHeadsClosed) / sizeof(kHeadsClosed[0]);
+    for (size_t k = 0; k < nPhrase + nClosed; k++)
+    {
+        const bool phrase = (k < nPhrase);
+        const char * head = phrase ? kHeadsPhrase[k] : kHeadsClosed[k - nPhrase];
+        const size_t n = std::strlen(head);
+        if (end - s < n)
+            continue;
+        bool m = true;
+        for (size_t i = 0; i < n && m; i++)
+            m = ((char) std::tolower((unsigned char) text[s + i]) == head[i]);
+        if (!m)
+            continue;
+        size_t e = s + n;
+        if (e < end && (text[e] == ':' || text[e] == ','))
+            e++;
+        else if (phrase && e < end && (text[e] == ' ' || text[e] == '\t'))
+            ; //an answer-naming phrase may be closed by a space
+        else
+            continue;
+        while (e < end && (text[e] == ' ' || text[e] == '\t'))
+            e++;
+        if (e <= s || e >= end)
+            continue;
+        for (size_t li = 0; li < sizeof(kLabels) / sizeof(kLabels[0]); li++)
+        {
+            const size_t ln = std::strlen(kLabels[li]);
+            if (end - e < ln)
+                continue;
+            bool lm = true;
+            for (size_t i = 0; i < ln && lm; i++)
+                lm = ((char) std::tolower((unsigned char) text[e + i]) == kLabels[li][i]);
+            if (!lm)
+                continue;
+            size_t pp = e + ln;
+            while (pp < end && (text[pp] == ' ' || text[pp] == '\t'))
+                pp++;
+            if (pp < end)
+                return e; //a real label with a payload follows the heading
+        }
+    }
+    return s;
 }
 
 //#W66-AR (H2b/MED): does this text contain an ANNOUNCED retraction on a line of
