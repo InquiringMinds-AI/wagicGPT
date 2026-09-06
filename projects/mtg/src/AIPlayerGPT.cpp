@@ -4961,6 +4961,26 @@ static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOppos
 //candidates' powers are in hand).
 static const size_t kPotentialBlockersEnumerateMax = 4;
 
+//#W69-BI (K7, deck146 MED): ONE candidate entry of that tag. The survival
+//verdict closes as its own parenthesis and the blocking-trigger price follows
+//it as a sibling - the shape the BLOCKERS window has printed since #W56-B
+//(D13), which the attackers window never adopted: 14 of the corpus's 18
+//`(neither dies` renders read `(neither dies (blocking trigger: they may gain
+//2))`, so the closed literal three guides quote matched nothing. Nothing is
+//deleted and no row moves; the same words sit one parenthesis later. Pure over
+//its five arguments, so the composed row is provable without a board.
+static string attackerBlockerEntry(const string& name, int power, int toughness,
+                                   const string& outcome, const string& blockTrigger)
+{
+    std::ostringstream e;
+    e << name << " (" << power << "/" << toughness << ")";
+    if (!outcome.empty())
+        e << " (" << outcome << ")";
+    if (!blockTrigger.empty())
+        e << " (" << blockTrigger << ")";
+    return e.str();
+}
+
 //#W48-D4 (wave-47 ledger, HIGH; cost deck146 a game). The collapsed form picks
 //its ONE representative by BODY SIZE, and since lane K folded the life price
 //into these outcomes the decision this tag serves is about PRICE. 146-vs-126
@@ -6205,9 +6225,20 @@ static string tappedSourceAnimateClause()
 //declared on its controller's turn spends the attack (Katilda `put 1/1
 //counters [cost: {4}{g}{w}, Tap]` taken at Upkeep, 8 of 9 mana, the 4/4 then
 //tapped through combat - deck152 vs162 seq22).
+//#W69-BI (K7, deck152 LOW): ONE LITERAL FOR ONE FACT. This clause and
+//`paymentTapsClause` state the same thing - this action taps that body, so it
+//cannot attack this turn - in two different spellings, and `152v162` s25 printed
+//BOTH on one row (23 prompts carry `{tapping `, 19 carry `{paying this taps: `).
+//A guide rule could not key on the fact without quoting two strings, and the one
+//guide that quotes it (deck152) quotes `{paying this taps:`. So this emitter now
+//composes the SAME clause, with the same restriction words, from the same
+//builder: nothing is deleted, one spelling less to teach. `{tapping ` stays on
+//stripNarrationDecoration's list - older narration still carries it.
 static string tapCostBeforeCombatClause(const string& name)
 {
-    return " {tapping " + name + " now: it cannot attack this turn}";
+    std::vector<std::string> names(1, name);
+    std::vector<int> restrictions(1, (int) TAP_RESTRICT_NO_ATTACK);
+    return paymentTapsClause(names, restrictions);
 }
 
 //#W47 (R10, wave-46 MED, 18 emissions at one seat pair): the clause is called
@@ -8102,8 +8133,20 @@ string narrationFoldPaidSources(const string& body)
         for (size_t k = 0; k + 1 < tail.size(); k++)
             if (tail[k] == ';' && tail[k + 1] == ' ')
                 n++;
+        //#W69-BI (K7, BD-9 FAIL / engine LOW-1): THE BRANCH THE FOLD MISSED IS
+        //THIS GUARD. Every surviving past-turn `- Paid ... with X` line in
+        //`matchups-20260906-134120` - 467 of 467 in the last prompt of each of
+        //the 42 seats, 435 of them multi-source corpus-wide - reached this line
+        //and was skipped because ` (paid with 2 sources)` is exactly as long as
+        //` with Plains #1; Swamp` and ` (paid with 1 source)` is LONGER than
+        //` with Plains #1`. The guard is right (a fold must not grow the line);
+        //the four words in front of the count were the cost. `(2 sources)` says
+        //the same thing after a line that already begins `- Paid {cost} for
+        //CARD`, and it is shorter than every source list it replaces: 466 of
+        //those 467 lines now fold, 2,374 B off one prompt per seat. No guide
+        //keys on the old literal (checked against all seven live guides).
         std::ostringstream o;
-        o << L.substr(0, w) << " (paid with " << n << " source"
+        o << L.substr(0, w) << " (" << n << " source"
           << (n == 1 ? "" : "s") << ")";
         if (o.str().size() >= L.size())
             continue; //never make a line longer
@@ -14480,6 +14523,54 @@ string AIPlayerGPT::transportOutcomeStamp(long curlCode, long httpStatus, bool e
     return o.str();
 }
 
+//#W69-BI (K7, engine MED-3): THE INSTRUMENT THAT COULD NOT PROVE ITSELF.
+//Counted first on `matchups-20260906-134120` (42 seats, 2,414 records): the
+//`transport` field appears on 0 records and `attempt_ms` on 0, because both
+//were CONDITIONAL emitters - `transport` was pushed only for a non-200 or
+//empty body, `attempt_ms` only when a retry set two legs - and this corpus had
+//0 wall misses, 0 retries and 0 non-200 replies. Nothing was mis-wired; the
+//fields were unfalsifiable from any clean corpus, which is exactly what the
+//wave-68 engine seat could not distinguish ("that cannot be distinguished from
+//not wired without a window"). Both now write on EVERY record that spent a
+//round trip: a successful trip stamps `curl=0,http=200,empty=0` (the same
+//builder, so a failed trip's stamp is byte-identical to what shipped), and a
+//single-attempt record publishes its one leg. A record with no round trip
+//(cache/reuse, latency -1) still writes neither - there is nothing to stamp.
+//Pure over the recorded numbers, so PARSETEST pins the shape without a server.
+static string transportRecordField(const std::vector<std::string>& failures,
+                                   const std::string& roundTripStamp, long latencyMs)
+{
+    if (!failures.empty())
+    {
+        string s;
+        for (size_t i = 0; i < failures.size(); i++)
+            s += (i ? ";" : "") + failures[i];
+        return s; //every failed attempt, as #W59-H (K1) wrote them
+    }
+    if (latencyMs < 0)
+        return ""; //no round trip was spent on this record
+    return roundTripStamp;
+}
+
+//#W69-BI (K7): the legs of THIS record's round trip(s). Two entries when a
+//retry ran (#W68-BC J2, unchanged), one entry on the ordinary path, none when
+//no call was made. A reader can now divide `latency_ms` by attempt without
+//having to know whether the absence of the field means "one call" or "not
+//wired".
+static std::vector<long> attemptMsField(long firstMs, long secondMs, long latencyMs)
+{
+    std::vector<long> a;
+    if (firstMs >= 0 || secondMs >= 0)
+    {
+        a.push_back(firstMs);
+        a.push_back(secondMs);
+        return a;
+    }
+    if (latencyMs >= 0)
+        a.push_back(latencyMs);
+    return a;
+}
+
 //#W55-E (D5b): stale-drop prompt-drift localiser. Prints the first byte at which
 //the rebuilt prompt diverges from the one in flight, both neighbourhoods, and
 //both lengths - which is enough to name the SECTION (narration / situation
@@ -14957,6 +15048,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //the next translog record this seat writes, so the corpus can price
             //the drops without a stderr at all.
             mAsyncDropStamps.push_back(asyncDropStamp(armName, driftKind, dropOutcome));
+            mAsyncDropsGame++; //#W69-BI (K7): counted at the drop, not at the flush
             if (++mStaleDropStreak >= kStaleLivelockLimit)
             {
                 DebugTrace("AIPlayerGPT: " << mStaleDropStreak
@@ -15561,7 +15653,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -16301,6 +16393,10 @@ static string refusedChosenText(int choice, const char * fallback,
     return o.str();
 }
 
+//#W69-BI (K7): defined with the repeat-row machinery below; the record writer
+//is the first consumer, so it is declared here.
+static int repeatAnnotationCount(const string& row);
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -16376,12 +16472,18 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["http_status"] = mLastHttpStatus;
     //#W59-H (K1): every non-200/empty attempt, not merely the final attempt.
     //A scalar keeps the schema simple; `;` separates the bounded retry pair.
-    if (!mLastTransportOutcomes.empty())
+    //#W69-BI (K7): ...and the ordinary round trip's own stamp, so the field is
+    //present on every record that made a call and its absence means exactly one
+    //thing (no call was made).
     {
-        string transport;
-        for (size_t i = 0; i < mLastTransportOutcomes.size(); i++)
-            transport += (i ? ";" : "") + mLastTransportOutcomes[i];
-        rec["transport"] = transport;
+        const string transport = transportRecordField(
+            mLastTransportOutcomes,
+            transportOutcomeStamp(mLastCurlResult, mLastHttpStatus, false,
+                                  gptConnectTimeoutMs(mTimeoutMs), mLastLatencyMs,
+                                  mTimeoutMs),
+            mLastLatencyMs);
+        if (!transport.empty())
+            rec["transport"] = transport;
     }
     //Answer-locked decode-garbage retry: mark the record and note the first
     //(garbage) attempt's latency separately; latency_ms above already carries the
@@ -16394,12 +16496,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W68-BC (J2): the LEGS of a retried decision, so a p90/max consumer can
     //tell one 1233 s round trip from a 900 s miss plus a 333 s success. Two
     //numbers, always in attempt order; absent on a single-attempt record.
-    if (mLastAttemptFirstMs >= 0 || mLastAttemptSecondMs >= 0)
+    //#W69-BI (K7): one entry on the single-attempt path as well.
     {
-        std::vector<long> attempts;
-        attempts.push_back(mLastAttemptFirstMs);
-        attempts.push_back(mLastAttemptSecondMs);
-        rec["attempt_ms"] = attempts;
+        const std::vector<long> attempts = attemptMsField(mLastAttemptFirstMs,
+                                                          mLastAttemptSecondMs,
+                                                          mLastLatencyMs);
+        if (!attempts.empty())
+            rec["attempt_ms"] = attempts;
     }
     //#W54-B (D9): a reply that ANSWERED at or past 95% of the configured
     //deadline gets its own stamp and the elapsed fraction, so "the model
@@ -16443,6 +16546,21 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         && rowSaysNoOp((*optionTexts)[choice - 1])
         && planArguesAgainstRow(reply, (*optionTexts)[choice - 1]))
         appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
+    //#W69-BI (K7): the take of a row the engine has already marked as repeated
+    //this turn. Stamped only where the answer STANDS (a refusal record carries
+    //its own fallback and executed nothing), with the annotation's own number.
+    if (recordChoiceIsRowIndex(kind) && (!fallback || !*fallback) && choice >= 1 && optionTexts
+        && choice <= (int) optionTexts->size())
+    {
+        const int repeatSeen = repeatAnnotationCount((*optionTexts)[choice - 1]);
+        if (repeatSeen >= 0)
+        {
+            std::ostringstream rs;
+            rs << "repeat_annotated_take(n=" << repeatSeen << ")";
+            appendParseNote(&mLastParseNote, rs.str().c_str());
+            mRepeatAnnotatedTakes++;
+        }
+    }
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
     mLastAttemptFirstMs = -1; //#W68-BC (J2): consumed with it
     mLastAttemptSecondMs = -1;
@@ -16873,6 +16991,23 @@ void AIPlayerGPT::logGameEnd()
         //#W53-N (D2): windows the model's own HOLD row closed. Not a window
         //removed - a window the model answered once and did not want re-put.
         {"hold_windows_skipped", mHoldWindowsSkipped},
+        //#W69-BI (K7, engine MED-5): the same total by suppression class.
+        {"hold_windows_skipped_priority", mHoldWindowsSkippedPriority},
+        {"hold_windows_skipped_cast", mHoldWindowsSkippedCast},
+        //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
+        //per-decision `async_drops` field is consumed with its record, so this
+        //is the only place a reader can take the game's number from.
+        {"async_drops", mAsyncDropsGame},
+        //#W69-BI (K7, deck130 LOW): takes of a row carrying the
+        //`[repeat: activated this turn N times already]` annotation.
+        {"repeat_annotated_takes", mRepeatAnnotatedTakes},
+        //#W69-BI (K7, deck146 MED): the attacker-line blocker forecast census -
+        //rows rendered, rows with two or more candidates, rows that carried a
+        //GANG BLOCK verdict, rows printed in the collapsed form.
+        {"blocker_forecast_rows", mBlockerForecastRows},
+        {"blocker_forecast_multi", mBlockerForecastMulti},
+        {"blocker_forecast_gang", mBlockerForecastGang},
+        {"blocker_forecast_collapsed", mBlockerForecastCollapsed},
         //#W67-AX (I7): casting windows held by the model's own reservation
         //decline (see reserveDeclineHonoured). A window the model answered once
         //and whose arithmetic nothing in the step can move - not a window removed.
@@ -26213,6 +26348,12 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         return false;
     }
     mHoldWindowsSkipped++;
+    //#W69-BI (K7, engine MED-5): and the suppression CLASS - which seam's latch
+    //closed the window. The two counters sum to the total above.
+    if (strcmp(seam, "cast") == 0)
+        mHoldWindowsSkippedCast++;
+    else
+        mHoldWindowsSkippedPriority++;
     //#W57-A (D31): the running SAVING was already on this line (verified on the
     //wave-56 corpus: 1,236 lines carrying "N windows held this game", equal to
     //the sum of `hold_windows_skipped` over all 42 gameend records) - the
@@ -26580,7 +26721,9 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
     if (creatureCount >= 0)
         o << "you control " << creatureCount << " creatures right now; ";
     o << "you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
-      << shortName << " x<N>)\"; the engine performs it N times, re-checking the cost each"
+      << shortName << " x<N>)\" - N is a DIGIT you choose, and copying this row's"
+         " name with the letter N still in it names no count and is refused and"
+         " re-asked; the engine performs it N times, re-checking the cost each"
          " iteration and stopping early if it becomes unpayable, then returns priority to you"
          " here; N is at most " << kRepeatRowMax
       //#W62-W (D17, deck123 MED-3): the engine REFUSES a counted take on this
@@ -26626,6 +26769,34 @@ static string repeatRowStopClause(int creatureCount, int statedStop)
         o << "so this window has " << (statedStop - creatureCount)
           << " to add before it reaches your own stop - past your stop = a wasted window}";
     return o.str();
+}
+
+//#W69-BI (K7, deck130 LOW; BA-7 first half FAIL). WHY THE STOP GUARD DID NOT
+//SEE THE TAGGED ROW: it never looks at the tag. `repeatPastStop` is built from
+//the model's OWN two numbers - a PLAN naming a stop and the count it is at -
+//and `[repeat: activated this turn N times already]` is an ENGINE fact about
+//this turn. Counted on `matchups-20260906-134120`: 4 takes of an annotated row
+//(all deck130 vs126, s27/s36/s37/s38, the fourth Goblin sacrifice at the face),
+//and NOT ONE of those four replies states a stop or a count in its PLAN, so
+//`repeatPlanStopAndCurrent` returns false and no stop is violated. There is no
+//stop to enforce and inventing one would be a ceiling of the engine's own,
+//which the doctrine forbids - so what is owed is a RECORD: the annotation's own
+//number, on the record of the take, and a game total beside it. Whether the tag
+//changes behaviour becomes a cross-tab next corpus instead of a prompt grep.
+//Pure over the row text; -1 = the row carries no annotation.
+static int repeatAnnotationCount(const string& row)
+{
+    static const char * kMark = "[repeat: activated this turn ";
+    const size_t at = row.find(kMark);
+    if (at == string::npos)
+        return -1;
+    size_t i = at + strlen(kMark);
+    if (i >= row.size() || !isdigit((unsigned char) row[i]))
+        return -1;
+    int n = 0;
+    while (i < row.size() && isdigit((unsigned char) row[i]))
+        n = n * 10 + (row[i++] - '0');
+    return n;
 }
 
 //#W68-BA (J1, engine HIGH-1; deck123 MED-1): is the taken row the BASE row that
@@ -30252,6 +30423,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (src && src->isTapped() && !src->isCreature()
             && out.str().find("becomes ") != string::npos)
             out << tappedSourceAnimateClause();
+        string paidTapsClause; //#W69-BI (K7): read by the self-tap clause below
         if (src && c->getConvertedCost() > 0 && !c->hasX()
             && !getManaPool()->canAfford(c, src->has(Constants::ANYTYPEOFMANAABILITY)))
         {
@@ -30273,7 +30445,8 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
                 }
             }
-            out << paymentTapsClause(taps, tapRestrict);
+            paidTapsClause = paymentTapsClause(taps, tapRestrict);
+            out << paidTapsClause;
         }
         if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
         {
@@ -30281,7 +30454,11 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
                 if (dynamic_cast<TapCost *>(c->extraCosts->costs[i]))
                     tapsSelf = true;
-            if (tapsSelf)
+            //#W69-BI (K7): both clauses now share one spelling, so a row whose
+            //payment clause ALREADY names this source would print the same
+            //sentence twice (`152v162` s25 printed the two spellings on one
+            //row). One fact, one clause.
+            if (tapsSelf && paidTapsClause.find(src->getDisplayName()) == string::npos)
                 out << tapCostBeforeCombatClause(src->getDisplayName());
         }
         //#W51-E D9: what this payment strands in the hand.
@@ -34016,8 +34193,25 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             }
             else
             {
-                corr << "[RE-ASK] You chose the repeat row but named no count. Answer again with"
-                        " the number of repeats on the CHOICE line, in the row's own format.";
+                //#W69-BI (K7, deck123 MED-2): both corpus firings (`123v162`
+                //s23 and s25) copied the ROW'S OWN NAME - "..., repeated N
+                //times, then stop" - so the reply's coded line carried the
+                //letter N and no digit, while its PLAN stated the count
+                //("this window: Create human x6"). The refusal now quotes what
+                //was written and names the substitution, instead of pointing at
+                //"the row's own format" - which is the string that was copied.
+                corr << "[RE-ASK] Your CHOICE line named no count (\""
+                     << quotedChoiceLine << "\"): the letter N on that row is a"
+                        " placeholder, not an answer. Answer again with a DIGIT in"
+                        " its place, appended to the row's short name as \"x<count>\""
+                        " - for example \"CHOICE: " << choice << " (";
+                //the BASE row's short name - the repeat row's own text ends
+                //in the placeholder this refusal is about.
+                if (choice >= 1 && choice - 1 < (int) repeatBaseRow.size()
+                    && repeatBaseRow[(size_t) choice - 1] >= 0
+                    && repeatBaseRow[(size_t) choice - 1] < (int) shownLines.size())
+                    corr << repeatShortName(shownLines[(size_t) repeatBaseRow[(size_t) choice - 1]]);
+                corr << " x6)\" - or 0 (pass).";
                 fb = "repeat_count_reask";
                 mPriorityReaskKind = "repeat_count";
             }
@@ -37906,10 +38100,26 @@ static int payRepeatCollapse(const vector<string>& optionTexts, const vector<int
         const int n = atoi(optionTexts[i].c_str() + 4);
         if (n <= 0 || paid[i] < 0)
             return -1;
+        //#W69-BI (K7, deck152 LOW / BD-6 FAIL). THE IDENTITY TEST INCLUDED THE
+        //ROWS THAT ARE NOT IN THE BAND. It demanded the SAME `paid` on every
+        //add-N row, but a rung the mana reaches in full pays its own N - so
+        //`add 1` pays 1 while every capped rung pays the ceiling, and the test
+        //returned -1 for every menu with a ceiling above 1. Measured on
+        //`matchups-20260906-134120`: 6 band windows, 120 add-N rows, 19,782 B.
+        //The three windows at ceiling 0 or 1 collapsed (rows 54-56 B); the three
+        //at ceiling 2 collapsed NOTHING and ran 5,682 / 6,100 / 3,330 B with 18
+        //rows each reading "pays for 2 of them and stops" - the deck-152 LOW's
+        //"18 unusable rows" and BD-6's un-shortened band are ONE defect, here.
+        //The band is the CAPPED rungs only, which is what the second loop below
+        //(`n <= common` -> its own row) has always assumed; a fully-payable rung
+        //is skipped rather than failing the whole menu. At a ceiling of 0 or 1
+        //this selects exactly the rows it selected before, byte for byte.
+        if (paid[i] >= n)
+            continue; //the mana reaches this rung in full: it is its own row
         if (common < 0)
             common = paid[i];
         else if (paid[i] != common)
-            return -1;
+            return -1; //two different stopping points: not one identical band
     }
     //A menu whose rows the mana pays for in full has no unreachable band.
     if (addRows < 2 || common < 0)
@@ -41681,7 +41891,15 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         std::ostringstream bt;
         {
         std::ostringstream & o = bt;
-        o << "blocking trigger" << (outBlockTrigger ? ", this combat" : "") << ": ";
+        //#W69-BI (K7): the ", this combat" marker belongs to the BLOCKERS
+        //window's brace form (#W56-B D13). On the ATTACKERS line the clause is
+        //handed out only to move it OUT of the verdict's parenthesis, and four
+        //live guides quote its text verbatim - "(blocking trigger: they gain
+        //N)" / "(blocking trigger: they may gain 2)" (deck130 l.177, deck146
+        //l.128 and l.248, deck152 l.72). The words stay exactly as they print
+        //today; only the parenthesis they sit in moves.
+        o << "blocking trigger" << ((outBlockTrigger && !attackerSeat) ? ", this combat" : "")
+          << ": ";
         //#W47-R3: when a converter of that side's is in play the gain and the
         //drain are ONE fact, so they are printed as one clause. The certain and
         //the "may" halves are kept apart exactly as above - a single number is
@@ -41956,9 +42174,16 @@ static int blockPairMaterialRank(MTGCardInstance * blocker, MTGCardInstance * at
 //#W54-M (A22): 'blockerOnAttacker' is combatPreventionKind(blocker, attacker),
 //asked once by the caller and shared with its gang/price tests (it was probed
 //three times per pairing).
+//#W69-BI (K7, deck146 MED): `outBlockTrigger` is threaded so the ATTACKERS
+//window can print the gain as a SIBLING of the survival verdict, exactly as the
+//blockers window has since #W56-B (D13). Left NULL the trigger nests inside the
+//verdict and the row reads `(neither dies (blocking trigger: they may gain 2))`
+//- 14 of the corpus's 18 `(neither dies` renders - so the closed literal three
+//guides quote never matches. Default NULL keeps every other caller identical.
 static string combatAttackOutcome(CombatWindowCache& cw, MTGCardInstance * attacker, MTGCardInstance * blocker,
                                   int blockerOnAttacker,
-                                  bool foeLifeLoop = false) //#W63-AB (E1)
+                                  bool foeLifeLoop = false, //#W63-AB (E1)
+                                  string * outBlockTrigger = NULL) //#W69-BI (K7)
 {
     return combatTradePreviewStats(cw.statOf(blocker), cw.statOf(attacker),
                                    combatPreventionKind(attacker, blocker),
@@ -41966,7 +42191,7 @@ static string combatAttackOutcome(CombatWindowCache& cw, MTGCardInstance * attac
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
                                    true, blocker->life,
                                    cw.converterOf(blocker->controller()),
-                                   NULL, NULL, NULL, NULL, NULL, foeLifeLoop); //#W63-AB (E1)
+                                   outBlockTrigger, NULL, NULL, NULL, NULL, foeLifeLoop); //#W63-AB (E1)
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -43702,6 +43927,10 @@ int AIPlayerGPT::chooseAttackers()
                     if (!c->couldBlockIfItAttacked(attackers[j]))
                         continue;
                     string outcome;
+                    //#W69-BI (K7): the blocking-trigger gain, taken OUT of the
+                    //verdict string so `(neither dies)` closes as its own head
+                    //and the price follows it as a sibling parenthesis.
+                    string entryBlockTrigger;
                     //#W54-M (A22): the blocker's damage-to-attacker verdict is
                     //asked ONCE per pairing and read by the gang/price tests below.
                     const int cOnAttacker = combatPreventionKind(c, attackers[j]);
@@ -43717,17 +43946,20 @@ int AIPlayerGPT::chooseAttackers()
                                                           cOnAttacker,
                                                           combatPreventionKindToPlayer(attackers[j], c->controller()),
                                                           true, c->life,
-                                                          cw.converterOf(c->controller()));
+                                                          cw.converterOf(c->controller()),
+                                                          &entryBlockTrigger); //#W69-BI (K7)
                     }
                     else
                         outcome = combatAttackOutcome(cw, attackers[j], c, cOnAttacker,
-                                                      oppLoopClosed); //#W63-AB (E1)
-                    std::ostringstream e;
-                    e << c->name << instanceHandle(c)
-                      << " (" << c->power << "/" << c->toughness << ")";
-                    if (!outcome.empty())
-                        e << " (" << outcome << ")";
-                    entries.push_back(e.str());
+                                                      oppLoopClosed, //#W63-AB (E1)
+                                                      &entryBlockTrigger); //#W69-BI (K7)
+                    //#W69-BI (K7): the price, after the closed verdict, never
+                    //inside it. Nothing is deleted - the same words, one
+                    //parenthesis later.
+                    const string entryText = attackerBlockerEntry(c->name + instanceHandle(c),
+                                                                 c->power, c->toughness,
+                                                                 outcome, entryBlockTrigger);
+                    entries.push_back(entryText);
                     if (cOnAttacker != kPreventNone) //#W54-M (A22)
                         gangOk = false;
                     gangPowers.push_back(c->power > 0 ? c->power : 0);
@@ -43749,7 +43981,7 @@ int AIPlayerGPT::chooseAttackers()
                     {
                         biggestPower = c->power;
                         biggestToughness = c->toughness;
-                        biggest = e.str();
+                        biggest = entryText;
                     }
                     //#W48-D4: and the most expensive one, by the life it gives.
                     {
@@ -43773,7 +44005,7 @@ int AIPlayerGPT::chooseAttackers()
                         if (price > priciestPrice)
                         {
                             priciestPrice = price;
-                            priciest = e.str();
+                            priciest = entryText;
                         }
                     }
                 }
@@ -43838,7 +44070,24 @@ int AIPlayerGPT::chooseAttackers()
             string pb = potentialBlockersTag(entries, biggest, bbNote, gangNote,
                                              priciest, sumNote); //#W48-D4 / #W63-AB (E4b)
             if (!pb.empty())
+            {
                 anyPotentialBlockers = true;
+                //#W69-BI (K7, deck146 MED): the census that tells a DEAD
+                //surface from one whose window never arose. Counted on the
+                //wave-68 corpus by hand: 48 rows carried this tag, 33 with one
+                //candidate and 15 with two, none with more than four and none
+                //needing two bodies to kill the attacker - so `- GANG BLOCK:`
+                //and the collapsed form rendered 0 times while both emitters
+                //were reachable. The record now says which of the four it was,
+                //per game, instead of a grep over 42 prompt files.
+                mBlockerForecastRows++;
+                if (entries.size() >= 2)
+                    mBlockerForecastMulti++;
+                if (!gangNote.empty())
+                    mBlockerForecastGang++;
+                if (entries.size() > kPotentialBlockersEnumerateMax)
+                    mBlockerForecastCollapsed++;
+            }
             ln << pb;
             if (noneCouldBlock && minB < 2)
                 ln << noPotentialBlockersTag();
@@ -57479,9 +57728,14 @@ void AIPlayerGPT::runParseSelfTest()
               "#W49-T D11 NEGATIVE lands-only payment prints nothing");
         CHECK(tappedSourceAnimateClause() == " [this land is TAPPED: animated, it still cannot attack this turn]",
               "#W49-T D11 the tapped-source animate marker is restriction-first");
+        //#W69-BI (K7): one literal for one fact - the clause is now the
+        //`{paying this taps: ...}` builder's, with the same restriction words.
         CHECK(tapCostBeforeCombatClause("Katilda, Dawnhart Prime")
-              == " {tapping Katilda, Dawnhart Prime now: it cannot attack this turn}",
-              "#W49-T D11 the {T}-before-combat clause");
+              == " {paying this taps: Katilda, Dawnhart Prime - it cannot attack this turn}",
+              "#W49-T D11 / #W69-BI K7 the {T}-before-combat clause, in the one tap spelling");
+        CHECK(tapCostBeforeCombatClause("Katilda, Dawnhart Prime").find("{tapping ")
+                  == string::npos,
+              "#W69-BI K7 MUST-NOT-MATCH the second spelling is gone from the emitter");
         // ECHO SHAPE: the annotations strip and the rows still bind to their index.
         {
             vector<string> menu;
@@ -74850,7 +75104,7 @@ static const char * kW50Y_r94 =
                 "- Paid {1}{u} for Essence Scatter with Island #1; Island #2\n";
             const string folded = narrationFoldPaidSources(body);
             cout << "     " << folded << "\n";
-            CHECK(folded.find("- Paid {3}{b}{w} for Kaya the Inexorable (paid with 5 sources)\n")
+            CHECK(folded.find("- Paid {3}{b}{w} for Kaya the Inexorable (5 sources)\n")
                       != string::npos,
                   "#W68-BD MED POSITIVE a past-turn payment keeps its cost and its card and folds"
                   " its sources to a count");
@@ -74861,8 +75115,9 @@ static const char * kW50Y_r94 =
             CHECK(folded.find("- You cast Kaya the Inexorable") != string::npos
                       && folded.find("=== Turn 11 - YOUR turn ===") == 0,
                   "#W68-BD MED POSITIVE nothing else in the log moves");
-            CHECK(folded.size() + 106 == body.size(),
-                  "#W68-BD MED POSITIVE the fold is a saving, measured");
+            CHECK(folded.size() + 116 == body.size(),
+                  "#W68-BD MED / #W69-BI K7 POSITIVE the fold is a saving, measured - 10 B more"
+                  " per line than the wave-68 wording");
             CHECK(narrationFoldPaidSources("- Paid {w} for Plains with Plains #1\n")
                       == "- Paid {w} for Plains with Plains #1\n"
                   && narrationFoldPaidSources("") == "",
@@ -75085,6 +75340,219 @@ static const char * kW50Y_r94 =
               "#W68-BA J6 POSITIVE the dead row buys ONE extra ask after the budget is spent - and only one");
         CHECK(Pin::asks(false) == 1,
               "#W68-BA J6 MUST-NOT-MATCH with no self-contradiction the budget still buys exactly one re-ask");
+    }
+
+    // ======================================================================
+    // #W69-BI (K7): the records that said nothing, and the surfaces nobody saw.
+    // Every number below is COUNTED on ~/.Wagic/ai/gpt/selfplay-runs/
+    // matchups-20260906-134120 (42 seats, 2,414 records) before the fix.
+    // ======================================================================
+    cout << "\n[#W69-BI] K7 the transport stamp and the attempt legs, on every round trip\n";
+    {
+        // COUNTED: `transport` on 0 of 2,414 records, `attempt_ms` on 0, with
+        // 0 wall misses, 0 retries and 0 non-200 replies in the whole corpus.
+        // Both emitters were conditional, so a clean corpus could not tell
+        // "conditional" from "not wired" (engine seat MED-3).
+        const string ok = AIPlayerGPT::transportOutcomeStamp(0, 200, false, 20000, 10600, 900000);
+        cout << "     " << ok << "\n";
+        CHECK(ok == "curl=0,http=200,empty=0",
+              "#W69-BI K7 POSITIVE a successful round trip stamps curl/http/empty");
+        CHECK(ok.find("phase=") == string::npos && ok.find("connect_ms") == string::npos,
+              "#W69-BI K7 MUST-NOT-MATCH no phase and no connect budget are claimed for a"
+              " trip that did not fail");
+        std::vector<std::string> none;
+        CHECK(transportRecordField(none, ok, 10600) == ok,
+              "#W69-BI K7 POSITIVE the corpus median round trip (10,600 ms) now carries the field");
+        CHECK(transportRecordField(none, ok, -1).empty(),
+              "#W69-BI K7 MUST-NOT-MATCH a cache/reuse record (latency -1) stamps nothing");
+        std::vector<std::string> wall;
+        wall.push_back("curl=28,http=0,empty=1,connect_ms=20000,phase=wall");
+        CHECK(transportRecordField(wall, ok, 900035) == wall[0],
+              "#W69-BI K7 POSITIVE a failed attempt's stamp is unchanged - the ok stamp never"
+              " replaces it (the wave-67 900,035 ms wall miss)");
+        wall.push_back("curl=0,http=200,empty=0");
+        CHECK(transportRecordField(wall, ok, 1233411)
+                  == "curl=28,http=0,empty=1,connect_ms=20000,phase=wall;curl=0,http=200,empty=0",
+              "#W69-BI K7 POSITIVE both attempts, ';'-joined, as #W59-H K1 wrote them");
+        std::vector<long> one = attemptMsField(-1, -1, 10600);
+        CHECK(one.size() == 1 && one[0] == 10600,
+              "#W69-BI K7 POSITIVE the single-attempt record publishes its one leg");
+        std::vector<long> two = attemptMsField(900035, 333376, 1233411);
+        CHECK(two.size() == 2 && two[0] == 900035 && two[1] == 333376,
+              "#W69-BI K7 POSITIVE the retried record is #W68-BC J2's two legs, unchanged");
+        CHECK(attemptMsField(-1, -1, -1).empty(),
+              "#W69-BI K7 MUST-NOT-MATCH no round trip, no legs");
+    }
+
+    cout << "\n[#W69-BI] K7 the counter band forms whenever the mana STOPS short\n";
+    {
+        // COUNTED: 6 Intrepid Adversary windows, 120 `add N counters` rows,
+        // 19,782 B. The three at a ceiling of 0 or 1 collapsed; the three at a
+        // ceiling of 2 collapsed NOTHING (5,682 / 6,100 / 3,330 B) because the
+        // identity test failed on `add 1`, a rung the mana pays for in full.
+        vector<string> menu;
+        menu.push_back("don't add any counter");
+        for (int n = 1; n <= 20; n++)
+        {
+            std::ostringstream r;
+            r << "add " << n << " counter" << (n == 1 ? "" : "s");
+            menu.push_back(r.str());
+        }
+        vector<int> paid2, paid1, paidAll;
+        paid2.push_back(-1); paid1.push_back(-1); paidAll.push_back(-1);
+        for (int n = 1; n <= 20; n++)
+        {
+            paid2.push_back(n <= 2 ? n : 2);   //152v125 s24: 4 spendable, 2 payments
+            paid1.push_back(n <= 1 ? n : 1);   //the ceiling-1 window that already collapsed
+            paidAll.push_back(n);              //every rung reachable in full
+        }
+        vector<bool> band; int lo = 0, hi = 0, pd = 0;
+        const int keep = payRepeatCollapse(menu, paid2, band, lo, hi, pd);
+        CHECK(keep == 20 && lo == 3 && hi == 20 && pd == 2,
+              "#W69-BI K7 POSITIVE at a ceiling of 2 the band is rows 3..20, kept on the 20 row");
+        int collapsed = 0;
+        for (size_t i = 0; i < band.size(); i++)
+            if (band[i]) collapsed++;
+        CHECK(collapsed == 17 && !band[0] && !band[1] && !band[2] && band[3] && band[20 - 1],
+              "#W69-BI K7 POSITIVE 17 rows collapse and the two rungs the mana REACHES keep"
+              " their own text (deck152 LOW's 18 unusable rows, less the kept one)");
+        vector<bool> band1; int lo1 = 0, hi1 = 0, pd1 = 0;
+        CHECK(payRepeatCollapse(menu, paid1, band1, lo1, hi1, pd1) == 20
+                  && lo1 == 2 && hi1 == 20 && pd1 == 1,
+              "#W69-BI K7 POSITIVE the ceiling-1 window selects exactly what it selected before");
+        vector<bool> bandA; int loA = 0, hiA = 0, pdA = 0;
+        CHECK(payRepeatCollapse(menu, paidAll, bandA, loA, hiA, pdA) == -1,
+              "#W69-BI K7 MUST-NOT-MATCH a menu the mana pays for in full has no band");
+        vector<int> paidUnknown = paid2;
+        paidUnknown[5] = -1;
+        vector<bool> bandU; int loU = 0, hiU = 0, pdU = 0;
+        CHECK(payRepeatCollapse(menu, paidUnknown, bandU, loU, hiU, pdU) == -1,
+              "#W69-BI K7 MUST-NOT-MATCH one unknown rung and nothing is proven identical");
+        CHECK(payRepeatBandRowTag(2) == " {same effect right now: adds 2 counters}",
+              "#W69-BI K7 ECHO the shortened rung's clause is #W68-BD's, unchanged");
+    }
+
+    cout << "\n[#W69-BI] K7 the past-turn payment fold is shorter than the list it replaces\n";
+    {
+        // REPRO deck146v125 s35, verbatim - one of the 435 multi-source lines
+        // that survived BD-9's fold because ` (paid with 2 sources)` is exactly
+        // as long as ` with Plains #1; Swamp`.
+        const string body =
+            "=== Turn 8 - YOUR turn ===\n"
+            "- Paid {b}{w} for Silverquill Silencer with Plains #1; Swamp\n"
+            "- Paid {w} for Plains with Plains #2\n"
+            "=== Turn 9 - opponent's turn ===\n"
+            "- Paid {1}{u} for Essence Scatter with Island #1; Island #2\n";
+        const string folded = narrationFoldPaidSources(body);
+        cout << "     " << folded << "\n";
+        CHECK(folded.find("- Paid {b}{w} for Silverquill Silencer (2 sources)\n") != string::npos,
+              "#W69-BI K7 POSITIVE the s35 line folds - it did not before");
+        CHECK(folded.find("- Paid {w} for Plains (1 source)\n") != string::npos,
+              "#W69-BI K7 POSITIVE a single-source past payment folds too (452 of the 467"
+              " survivors were single-source)");
+        CHECK(folded.find("- Paid {1}{u} for Essence Scatter with Island #1; Island #2")
+                  != string::npos,
+              "#W69-BI K7 MUST-NOT-MATCH the CURRENT turn is untouched");
+        CHECK(folded.size() < body.size(),
+              "#W69-BI K7 POSITIVE the fold never grows the log");
+    }
+
+    cout << "\n[#W69-BI] K7 the repeat annotation's own count, on the record of the take\n";
+    {
+        // deck130v126 s38, verbatim shape: the fourth sacrifice at the face.
+        const string row = "Deal 2 damage with Siege-Gang Commander targeting the opponent"
+                           " {right now: takes 2 damage} [repeat: activated this turn 3 times"
+                           " already; you have taken it 3 times in a row with no other action"
+                           " in between]";
+        CHECK(repeatAnnotationCount(row) == 3,
+              "#W69-BI K7 POSITIVE the annotation's own number is read off the taken row");
+        CHECK(repeatAnnotationCount("Deal 2 damage with Siege-Gang Commander targeting the"
+                                    " opponent {right now: takes 2 damage}") == -1,
+              "#W69-BI K7 MUST-NOT-MATCH an unannotated row stamps nothing");
+        CHECK(repeatAnnotationCount("[repeat: activated this turn N times already]") == -1,
+              "#W69-BI K7 MUST-NOT-MATCH a row with no digit after the mark stamps nothing");
+        CHECK(repeatAnnotationCount("Equip with Lightning Greaves [repeat: activated this turn"
+                                    " 12 times already.]") == 12,
+              "#W69-BI K7 POSITIVE a two-digit count is read whole");
+    }
+
+    cout << "\n[#W69-BI] K7 the repeat row says its own placeholder is not an answer\n";
+    {
+        // REPRO 123v162 s23 and s25: both replies copied the row's NAME, which
+        // carries the letter N, and both cost a `repeat_count_reask`.
+        const string row = repeatRowLine("Create human with Thraben Doomsayer", 2, 5);
+        CHECK(row.find("Create human with Thraben Doomsayer, repeated N times, then stop") == 0,
+              "#W69-BI K7 POSITIVE the row's head is unchanged - deck123's guide keys on it");
+        CHECK(row.find("N is a DIGIT you choose, and copying this row's name with the letter N"
+                       " still in it names no count and is refused and re-asked") != string::npos,
+              "#W69-BI K7 POSITIVE the row states what the two corpus replies got wrong");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer, repeated N"
+                               " times, then stop)") < 0,
+              "#W69-BI K7 REPRO the copied name still names no count (the re-ask is owed)");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x6)") == 6,
+              "#W69-BI K7 MUST-NOT-MATCH a substituted digit is read exactly as before");
+        {
+            vector<string> menu;
+            menu.push_back("Create human with Thraben Doomsayer [cost: Tap]");
+            menu.push_back(row);
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 2 (Create human with Thraben Doomsayer x6)", 2, &menu,
+                              &stale, &src) == 2,
+              "#W69-BI K7 ECHO the row still binds by name with the count appended");
+        }
+    }
+
+    cout << "\n[#W69-BI] K7 (neither dies) closes before its price\n";
+    {
+        // deck146 MED: `Perimeter Captain (0/4) (neither dies (blocking trigger:
+        // they may gain 2))` - 14 of the corpus's 18 `(neither dies` renders
+        // nest the price inside the verdict, so the closed literal three guides
+        // quote never matches.
+        CombatTradeStat cap = { 0, 4, false, false, false, false, false, false,
+                                false, false, false, 0, 2 }; //Perimeter Captain, may gain 2
+        CombatTradeStat atk = { 2, 2, false, false, false, false, false, false,
+                                false, false, false, 0, 0 };
+        const string nested = combatTradePreviewStats(cap, atk, kPreventNone, kPreventNone,
+                                                      kPreventNone, true, -1, false);
+        cout << "     nested: (" << nested << ")\n";
+        CHECK(nested == "neither dies (blocking trigger: they may gain 2)",
+              "#W69-BI K7 REPRO the shipped nested form, verbatim");
+        string trig;
+        const string head = combatTradePreviewStats(cap, atk, kPreventNone, kPreventNone,
+                                                    kPreventNone, true, -1, false, &trig);
+        cout << "     sibling: (" << head << ") (" << trig << ")\n";
+        CHECK(head == "neither dies",
+              "#W69-BI K7 POSITIVE with the trigger handed out the verdict is the bare literal");
+        CHECK(trig == "blocking trigger: they may gain 2",
+              "#W69-BI K7 POSITIVE the price is the same words, one parenthesis later - the"
+              " literal four live guides quote is unchanged");
+        const string row = attackerBlockerEntry("Perimeter Captain", 0, 4, head, trig);
+        cout << "     row: " << row << "\n";
+        CHECK(row == "Perimeter Captain (0/4) (neither dies) (blocking trigger: they may"
+                     " gain 2)",
+              "#W69-BI K7 POSITIVE the composed attacker-line entry, verbatim");
+        CHECK(attackerBlockerEntry("Perimeter Captain", 0, 4, nested, string())
+                  == "Perimeter Captain (0/4) (neither dies (blocking trigger: they may gain 2))",
+              "#W69-BI K7 REPRO the wave-68 row this replaces, verbatim");
+        CHECK(attackerBlockerEntry("Wall of Omens", 0, 4, "neither dies", string())
+                  == "Wall of Omens (0/4) (neither dies)",
+              "#W69-BI K7 MUST-NOT-MATCH a candidate with no price gains no parenthesis");
+        CHECK(row.find("(neither dies)") != string::npos,
+              "#W69-BI K7 POSITIVE the guides' closed literal matches the composed row");
+        CHECK(nested.find("(neither dies)") == string::npos,
+              "#W69-BI K7 MUST-NOT-MATCH it did not match the nested form");
+        // ECHO: the entry rides the bracketed attacker tag, which the reply
+        // scanner drops whole - an echoed A-line still parses as a declaration.
+        {
+            vector<string> ents;
+            ents.push_back(row);
+            const string tag = potentialBlockersTag(ents, ents[0]);
+            vector<bool> sel;
+            CHECK(parseAttackerSet("ATTACK: A1" + tag, 2, sel) == 1 && sel.size() == 2
+                      && sel[0] && !sel[1],
+                  "#W69-BI K7 ECHO the sibling price inside the tag does not break the"
+                  " declaration parse");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
