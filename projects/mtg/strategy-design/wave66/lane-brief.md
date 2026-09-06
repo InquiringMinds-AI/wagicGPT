@@ -153,3 +153,30 @@ against the sorcery-speed punisher in hand (162v123 s11/14) — the `{reserve:}`
 own-draw-step window. MED (engine MED-3): reveal windows stall the engine 835 s total (max 139 s) — measure where the time
 goes (`reveal_wait_driver_*` records) and report; fix only if the cause is a wait the driver can skip. Read
 wave65/lane-AL.md, wave64/lane-AJ.md (transient-clause hold), wave65/engine-seat.md §3 MED-3 first.
+
+## Lane AU — the five findings of wave66/codex-review.md (fix or refute, each with evidence)
+Worktree: worktrees/lanes/w66-AU (base = master after the AQ-AT merge = c2ec05117 + the review commit). Read
+wave66/codex-review.md in full, then the lane report each finding touches (lane-AS.md for #1, lane-AQ.md for #2/#3,
+lane-AT.md for #4, lane-AR.md for #5); wave65/lane-AP.md shows the expected shape of a CONFIRMED/REFUTED table. For EACH
+finding: VERIFY against the code first (REFUTED with the line that proves it, or CONFIRMED with a reproduction — a PARSETEST
+case failing on the current tree); fix every CONFIRMED one in the general form.
+#1 is HIGH and a doctrine breach (a blind cache): `holdKeyRow` (~`:24107`) must forgive only the LIFE-TOTAL projections the
+finding class was about (`you would be at N`, `at N or lower`, the DRAW PRICE figure) — enumerate the forgiven clauses by
+their WORDS, never by "any digit inside braces"; a kill count, damage, price, survivor count, or verdict word change
+re-opens the hold. Re-verify at the corpus lines lane AS used (152v162 s42->43, 130v126 s37->38) that those still hold, and
+add a MUST-RE-OPEN case for `kills 0 of` -> `kills 1 of`. #2 is HIGH: `receiveEvent` (~`:18075`) counts every library->hand
+move in the draw phase; `drawsStillAhead` (~`:11095`) subtracts it from the scheduled forecast. Attribute a resolved draw to
+the forecast only when its source is the draw step or a static extra-draw permanent the forecast counted (the event's
+source card / the turn-based draw), never a cantrip or a stack-resolved draw the forecast excluded; when provenance cannot
+be known, subtract the MINIMUM (the turn-based draw once) and say the extras remain pending. PARSETEST the Howling Mine +
+cantrip shape. #3 is MED: `engineKindForScript` (~`:19250`) treats any `:token(` as a repeatable engine — Wagic's colon
+also opens one-shot triggers (`@movedto(this|mybattlefield):token(...)`). Repeatable = an activated ability (`{T}:`, mana
+cost `:`) or an `@each`/upkeep/attack/`@combat` trigger; a `@movedto(this|...)` ETB is ONE-SHOT. Fix the negative case at
+~`:68689` to use the real grammar. #4 is MED: `attackersHeldSickLine` (~`:3653`) claims "entered this turn" and "attacks
+from next turn" for every omitted sick body; the caller (~`:40632`) checks neither. Say only what is known: "summoning
+sick (cannot attack this turn)"; add "can attack next turn" only when `canAttack` would be true absent sickness
+(no CANTATTACK/defender/unpaid attack cost); fix the PARSETEST pin at ~`:68341`. #5 is MED: `askExemplar` (~`:31699`)
+defaults to row 1 when EVERY row is a no-op — exemplify `0 (pass)` when passing is legal, else state "every row does
+nothing right now; pick the least harmful" and exemplify no row; fix the pin at ~`:68970`. Gate as usual (suite THREADS=1
+0 failed, AI count, PARSETEST 0 failed, RED evidence per confirmed finding). Tag `#W66-AU (Rn)`. Write wave66/lane-AU.md
+with the CONFIRMED/REFUTED table.
