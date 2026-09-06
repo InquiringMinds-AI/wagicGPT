@@ -388,6 +388,12 @@ private:
     // strategy-design/wave54/lane-M.md. WAGIC_GPT_AUDIT_M_OFF=1 disables every
     // lane-M behaviour at runtime (the "was it me?" flag).
     int mAskCacheTurn = -1;          //A17: the turn mAskCache was last cleared on
+    //#W66-AQ (H1): draws already RESOLVED inside the current draw step, per
+    //seat, keyed on the turn they were counted in. Read by the DRAW FORECAST so
+    //it charges only the draws still ahead; a stale turn key reads as 0.
+    int mDrawStepTurn = -1;
+    int mDrawStepDrawsMine = 0;
+    int mDrawStepDrawsTheirs = 0;
     string mAskSituationPrefill;     //A19: a caller's already-rendered situation, consumed by the NEXT askModel
     int mWindowReach = -1;           //A21: potentialColorReach memo for one render window (-1 = not yet)
     bool mWindowReachArmed = false;  //A21: armed by chooseOrderedAction around its describeAction loop

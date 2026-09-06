@@ -81,6 +81,10 @@ static void blockTriggeredLifeFor(MTGCardInstance * blocker, int& sure, int& may
 static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
                                bool blkFirstStrike, int atkPower, bool atkFirstStrike,
                                bool atkDeathtouch, bool blkDoubleStrike = false);
+//#W66-AQ (H10): same reason again - the three detectors it asks are defined far
+//below and OUTSIDE the anonymous namespace, while its first caller (the sweeper
+//roster walk) is inside it, so the declaration lives at file scope.
+static const char * engineKindForScript(const string& magicText);
 
 namespace
 {
@@ -1974,7 +1978,10 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
                                 std::vector<std::string> * mySurvivors = NULL,
                                 //#W61-U (C10): the creatures a damage wipe would
                                 //hit, with the P/T the survivor split reads.
-                                std::vector<WipeVictim> * theirAttackers = NULL)
+                                std::vector<WipeVictim> * theirAttackers = NULL,
+                                //#W66-AQ (H10): which of THEIRS are engines
+                                //rather than bodies, from the same walk.
+                                std::vector<std::string> * theirEngines = NULL)
 {
     theirs = theirsAttack = mine = 0;
     if (theirOnly)
@@ -2006,6 +2013,10 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
         if (theirNames) //#W60-O (B7)
             theirNames->push_back(sweeperVictimName(c)
                                   + sweeperRegenerationTail(c, destroyKind));
+        if (theirEngines) //#W66-AQ (H10)
+            if (const char * ek = engineKindForScript(c->magicText))
+                theirEngines->push_back(c->getDisplayName() + instanceHandle(c)
+                                        + " - a " + ek);
         if (boardCreatureCanAttackNow(c, live))
         {
             theirsAttack++;
@@ -2108,6 +2119,7 @@ struct CastRowBoardAnswer
 {
     int theirs;
     int mine;
+    string engines; //#W66-AQ (H10): the ones of THEIRS that are not bodies
     CastRowBoardAnswer() : theirs(-1), mine(-1) {}
 };
 
@@ -2164,6 +2176,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
     //creature, and `bury` gives no regeneration window that `destroy` does.
     std::vector<std::string> theirSurvivors, mySurvivors;
     std::vector<WipeVictim> theirAttackers; //#W61-U (C10)
+    std::vector<std::string> theirEngines; //#W66-AQ (H10)
     int destroyKind = 0;
     if (sweepVerb && strcmp(sweepVerb, "destroys") == 0)
         destroyKind = lowText.find("bury all(creature)") != string::npos ? 2 : 1;
@@ -2172,7 +2185,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
                              destroyKind,
                              sweepVerb ? &theirSurvivors : NULL,
                              sweepVerb ? &mySurvivors : NULL,
-                             attackPunisher ? &theirAttackers : NULL)) //#W61-U (C10)
+                             attackPunisher ? &theirAttackers : NULL,
+                             sweepVerb ? &theirEngines : NULL)) //#W61-U (C10) / #W66-AQ (H10)
         return "";
     if (edict)
     {
@@ -2267,6 +2281,11 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         {
             ans->theirs = theirs;
             ans->mine = mine;
+            //#W66-AQ (H10): and which of those bodies are engines.
+            std::ostringstream eng;
+            for (size_t ei = 0; ei < theirEngines.size(); ei++)
+                eng << (ei ? ", " : "") << theirEngines[ei];
+            ans->engines = eng.str();
         }
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames,
                              theirSurvivors, mySurvivors); //#W60-Q (R6)
@@ -4002,14 +4021,28 @@ static string stackLifePhrase(int delta, bool toMe)
 //finished-subtraction register as INCOMING THIS COMBAT and the crack-back
 //line, so the claim shape is the one the pilot already reads. Pure over
 //(total, life).
+//#W66-AQ (H4, deck125 HIGH-1): the ONE life-after-stack term. `125v162` seq 36
+//printed `ON THE STACK: 13 damage to you - you would be at -8; that would KILL
+//you` and, three lines below, `X=4 is the largest listed X whose NET (-4) leaves
+//you alive, at 1` - the X ladder started from the CURRENT life while the same
+//prompt had already computed the post-stack one (5 of 8 stack-damage windows).
+//Both surfaces now subtract through this function, so they cannot disagree.
+//A negative loss is never a gain (the stack block only ever sums losses). Pure.
+static int lifeAfterPendingStack(int life, int stackLossToMe)
+{
+    if (life < 0)
+        return life;
+    return life - (stackLossToMe > 0 ? stackLossToMe : 0);
+}
+
 static string pendingStackDamageLine(int dmgToMe, int myLife)
 {
     if (dmgToMe <= 0 || myLife < 0)
         return "";
+    const int after = lifeAfterPendingStack(myLife, dmgToMe); //#W66-AQ (H4)
     std::ostringstream o;
-    o << "ON THE STACK: " << dmgToMe << " damage to you - you would be at "
-      << (myLife - dmgToMe);
-    if (myLife - dmgToMe <= 0)
+    o << "ON THE STACK: " << dmgToMe << " damage to you - you would be at " << after;
+    if (after <= 0)
         o << "; that would KILL you";
     return o.str();
 }
@@ -4244,6 +4277,39 @@ static int stackLifeLossBefore(GameObserver * observer, Player * seat, MTGCardIn
         total += stackObjectLifeLossToSeat(it, seat, NULL);
     }
     return total;
+}
+
+//#W66-AQ (H4): the whole pending life loss against `seat` from the stack as it
+//stands - the same walk, the same per-object reader and the same filters the
+//situation block's `ON THE STACK:` total is built from (NOT_RESOLVED, a spell
+//or an ability, respondable), so the number the X badge subtracts is the number
+//that prompt already printed. `exclude` drops one card's own objects, which is
+//how a spell being announced avoids pricing itself.
+bool stackObjectIsRespondable(bool hasSource, bool sourceIsEmblemMarker); //#W66-AQ (H4)
+static int pendingStackLifeLossToSeat(GameObserver * observer, Player * seat,
+                                      MTGCardInstance * exclude = NULL)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return 0;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return 0;
+    int total = 0;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
+            continue;
+        if (!stackObjectIsRespondable(it->source != NULL,
+                                      it->source && it->source->hasType(Subtypes::TYPE_EMBLEM)))
+            continue;
+        if (exclude && it->source == exclude)
+            continue;
+        total += stackObjectLifeLossToSeat(it, seat, NULL);
+    }
+    return total > 0 ? total : 0;
 }
 
 //#W53-P (D4): the ability half of one stack line, read off the LIVE object.
@@ -10971,13 +11037,54 @@ static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const strin
 //life and the verdict. The verdict is deliberately CONDITIONAL on the forecast
 //resolving as printed ("if it resolves as forecast") - the step's own card may
 //already be drawn, so the count is a forecast and is not re-derived here.
+//#W66-AQ (H1, engine HIGH-1 / deck152 HIGH-2). The forecast charged the WHOLE
+//step on every window served INSIDE it. `123v162` seq 138-153 print the
+//identical `resolving NOW ... 6 x 1 = 6 life LOST BY YOU ... you would be at 1`
+//for 16 consecutive windows while the seat's life falls 7 -> 3, and at seq 152
+//(life 4, one point still owed) the same line reads `you would be at -2; that
+//KILLS you` - a death claim over a cost of which 1 point remained. The seat
+//lived at 3 and won. `152` seqs 41-49 read `draws 4 cards = 4 x 4 = 16` beside
+//`ON THE STACK: 7 damage`.
+//
+//The step's SIZE is still the step's size - nothing is deleted - but the price
+//is charged on the draws STILL AHEAD. `resolvedInStep` is the count of this
+//seat's library->hand moves already seen inside THIS draw step (receiveEvent
+//counts them; the narration the same prompt carries lists them by name, so the
+//subtraction is checkable against the log). Clamped to the step size, so the
+//remainder is never negative, and applied only when `stepIsNow` - a forecast of
+//a step that has not begun has nothing resolved in it. Pure over its inputs.
+static int drawsStillAhead(int stepSize, int resolvedInStep, bool stepIsNow)
+{
+    if (!stepIsNow || resolvedInStep <= 0)
+        return stepSize;
+    if (resolvedInStep >= stepSize)
+        return 0;
+    return stepSize - resolvedInStep;
+}
+
+//The sentence that states the subtraction. Empty when nothing has resolved, so
+//a step that has not started renders byte-identically to wave 65.
+static string drawsResolvedClause(int stepSize, int remaining)
+{
+    const int done = stepSize - remaining;
+    if (done <= 0)
+        return "";
+    std::ostringstream o;
+    o << " - " << done << " of them " << (done == 1 ? "has" : "have")
+      << " ALREADY been drawn and paid for in this step (they are in the log above), so "
+      << remaining << (remaining == 1 ? " is" : " are") << " still to come";
+    return o.str();
+}
+
 static string theirDrawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
                                         int perDraw, const string& loopCaution = "", //#W60-N (B6)
-                                        bool stepIsNow = false, int holderLife = -1) //#W62-X (D8)
+                                        bool stepIsNow = false, int holderLife = -1, //#W62-X (D8)
+                                        int resolvedInStep = 0) //#W66-AQ (H1)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
         k += extras[i].second;
+    const int left = drawsStillAhead(k, resolvedInStep, stepIsNow); //#W66-AQ (H1)
     std::ostringstream o;
     o << "DRAW FORECAST (theirs): their "
       << (stepIsNow ? "draw step, resolving NOW," : "next draw step")
@@ -10995,6 +11102,7 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
         }
         o << ")";
     }
+    o << drawsResolvedClause(k, left); //#W66-AQ (H1)
     if (perDraw > 0)
     {
         //#W63-AC (E13, engine MED-9): "N life to you from your punishers above"
@@ -11002,14 +11110,23 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
         //a point of life - Underworld Dreams, Fate Unraveler and Ob Nixilis are
         //all `damage:N` to the DRAWER. The number is life the drawer loses; the
         //sentence now says so, and says the pilot's own life does not move.
-        o << " = " << k << " x " << perDraw << " = " << (k * perDraw)
-          << " life LOST BY THEM to your punishers above (that is life removed"
-             " from their total; you gain none of it)";
-        if (holderLife >= 0) //#W62-X (D8)
+        //#W66-AQ (H1): charged on the draws STILL AHEAD, never on the ones the
+        //log above already shows resolved and paid.
+        if (left <= 0)
+            o << " = 0 life LOST BY THEM to your punishers above from the rest of"
+                 " this step (the whole step has already resolved)";
+        else
         {
-            o << " - if it resolves as forecast they would be at " << (holderLife - k * perDraw);
-            if (holderLife - k * perDraw <= 0)
-                o << "; that KILLS them";
+            o << " = " << left << " x " << perDraw << " = " << (left * perDraw)
+              << " life LOST BY THEM to your punishers above (that is life removed"
+                 " from their total; you gain none of it)";
+            if (holderLife >= 0) //#W62-X (D8)
+            {
+                o << " - if " << (left == k ? "it resolves" : "the rest resolves")
+                  << " as forecast they would be at " << (holderLife - left * perDraw);
+                if (holderLife - left * perDraw <= 0)
+                    o << "; that KILLS them";
+            }
         }
     }
     o << ".";
@@ -11021,11 +11138,13 @@ static string theirDrawStepForecastText(int base, const std::vector<std::pair<st
 //review names.
 static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
                                    int perDraw, const string& loopCaution = "", //#W60-N (B6)
-                                   bool stepIsNow = false, int holderLife = -1) //#W62-X (D8)
+                                   bool stepIsNow = false, int holderLife = -1, //#W62-X (D8)
+                                   int resolvedInStep = 0) //#W66-AQ (H1)
 {
     int k = base;
     for (size_t i = 0; i < extras.size(); i++)
         k += extras[i].second;
+    const int left = drawsStillAhead(k, resolvedInStep, stepIsNow); //#W66-AQ (H1)
     std::ostringstream o;
     o << "DRAW FORECAST: your "
       << (stepIsNow ? "draw step, resolving NOW," : "next draw step")
@@ -11037,17 +11156,27 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
             o << " + " << extras[i].first << " " << extras[i].second;
         o << ")";
     }
+    o << drawsResolvedClause(k, left); //#W66-AQ (H1)
     if (perDraw > 0)
     {
         //#W63-AC (E13, engine MED-9): the mirror. "N life to the punishers
         //above" names no loser at all; this number is life the PILOT loses.
-        o << " = " << k << " x " << perDraw << " = " << (k * perDraw)
-          << " life LOST BY YOU to their punishers above";
-        if (holderLife >= 0) //#W62-X (D8)
+        //#W66-AQ (H1): on the draws STILL AHEAD - the 16-window false death
+        //verdict of `123v162` seq 152 is this subtraction not being made.
+        if (left <= 0)
+            o << " = 0 life LOST BY YOU to their punishers above from the rest of"
+                 " this step (the whole step has already resolved)";
+        else
         {
-            o << " - if it resolves as forecast you would be at " << (holderLife - k * perDraw);
-            if (holderLife - k * perDraw <= 0)
-                o << "; that KILLS you";
+            o << " = " << left << " x " << perDraw << " = " << (left * perDraw)
+              << " life LOST BY YOU to their punishers above";
+            if (holderLife >= 0) //#W62-X (D8)
+            {
+                o << " - if " << (left == k ? "it resolves" : "the rest resolves")
+                  << " as forecast you would be at " << (holderLife - left * perDraw);
+                if (holderLife - left * perDraw <= 0)
+                    o << "; that KILLS you";
+            }
         }
     }
     o << ".";
@@ -11070,11 +11199,14 @@ static string drawStepForecastText(int base, const std::vector<std::pair<std::st
 static string drawForecastBlock(bool theirs, int base,
                                 const std::vector<std::pair<std::string, int> >& extras,
                                 int perDraw, const string& loopClause,
-                                bool stepIsNow, int holderLife)
+                                bool stepIsNow, int holderLife,
+                                int resolvedInStep = 0) //#W66-AQ (H1)
 {
     const string line = theirs
-        ? theirDrawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife)
-        : drawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife);
+        ? theirDrawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife,
+                                    resolvedInStep)
+        : drawStepForecastText(base, extras, perDraw, loopClause, stepIsNow, holderLife,
+                               resolvedInStep);
     return line.empty() ? line : (string("\n") + line);
 }
 
@@ -11648,7 +11780,8 @@ static string xLibraryCeilingClause(int capX, int drawPerX, int library,
 static string xMonotoneMarker(int capX, int lifePerX, int drawPerX,
                               int netAtCap = kXNetNotSupplied, int life = -1,
                               int safeX = -1, int netAtSafeX = kXNetNotSupplied,
-                              const string& libraryClause = "") //#W64-AH (F1)
+                              const string& libraryClause = "", //#W64-AH (F1)
+                              int stackLossToMe = 0) //#W66-AQ (H4)
 {
     if (capX < 1 || (lifePerX <= 0 && drawPerX <= 0))
         return "";
@@ -11667,13 +11800,28 @@ static string xMonotoneMarker(int capX, int lifePerX, int drawPerX,
     //(6 of 6 X menus in the wave-60 corpus), so it must never endorse an X that
     //kills the pilot in silence. The row already prints the NET; the badge now
     //carries the same number to its conclusion, and names the rung that lives.
-    if (netAtCap != kXNetNotSupplied && life >= 0 && life + netAtCap <= 0)
+    //#W66-AQ (H4, deck125 HIGH-1): the ladder starts from the life the stack
+    //LEAVES, not from the life total printed above it. `125v162` seq 36 read
+    //`ON THE STACK: 13 damage to you - you would be at -8; that would KILL you`
+    //in the same prompt as `X=4 ... leaves you alive, at 1`. With no stack
+    //damage `stackLossToMe` is 0 and every byte below is as wave 65 wrote it.
+    const int xLifeBase = lifeAfterPendingStack(life, stackLossToMe); //#W66-AQ (H4)
+    if (netAtCap != kXNetNotSupplied && life >= 0 && xLifeBase + netAtCap <= 0)
     {
-        o << " - but NET " << netAtCap << " life for this cast puts you at "
-          << (life + netAtCap) << "; this KILLS you";
-        if (safeX >= 1 && netAtSafeX != kXNetNotSupplied)
+        o << " - but NET " << netAtCap << " life for this cast";
+        if (stackLossToMe > 0)
+            o << ", counted from the " << xLifeBase << " life the " << stackLossToMe
+              << " damage ALREADY ON THE STACK leaves you on,";
+        o << " puts you at " << (xLifeBase + netAtCap) << "; this KILLS you";
+        //#W66-AQ (H4): and the named rung must itself survive the same base -
+        //a survival claim is never restated from a ladder computed against a
+        //different life total.
+        if (safeX >= 1 && netAtSafeX != kXNetNotSupplied && xLifeBase + netAtSafeX > 0)
             o << ". X=" << safeX << " is the largest listed X whose NET (" << netAtSafeX
-              << ") leaves you alive, at " << (life + netAtSafeX);
+              << ") leaves you alive, at " << (xLifeBase + netAtSafeX);
+        else if (stackLossToMe > 0 && xLifeBase <= 0)
+            o << ". No listed X leaves you alive - the stack alone puts you at "
+              << xLifeBase << ", whatever you announce";
         else
             o << ". No listed X leaves you alive";
     }
@@ -11739,7 +11887,8 @@ static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool names
 static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX,
                                   int netAtCap = kXNetNotSupplied, int life = -1,
                                   int safeX = -1, int netAtSafeX = kXNetNotSupplied,
-                                  const string& libraryClause = "", int libX = -1); //#W61-S (C10) / #W64-AH (F1)
+                                  const string& libraryClause = "", int libX = -1,
+                                  int stackLossToMe = 0); //#W61-S (C10) / #W64-AH (F1) / #W66-AQ (H4)
 //#W61-U (C10): the same two, for the sweep counts the cast row hands the menu.
 static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut);
 static void xTradeCountsAt(const std::vector<XDamVictim>& victims, int x, int & theirs, int & mine);
@@ -11760,7 +11909,8 @@ static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * op
 //unsupplied when the row prints no NET.
 static void xNetLadder(MTGCardInstance * card, Player * me, int capX,
                        int lifePerX, int drawPerX,
-                       int& netAtCap, int& safeX, int& netAtSafeX)
+                       int& netAtCap, int& safeX, int& netAtSafeX,
+                       int stackLossToMe = 0) //#W66-AQ (H4)
 {
     netAtCap = kXNetNotSupplied;
     safeX = -1;
@@ -11787,7 +11937,8 @@ static void xNetLadder(MTGCardInstance * card, Player * me, int capX,
     {
         const int nx = xNetLifeForX(x, lifePerX, drawPerX, theirsPer, pn.str(),
                                     handAfterCast, handLimit, perDiscard, discardPunishers);
-        if (me->life + nx > 0)
+        //#W66-AQ (H4): "leaves you alive" is measured after the stack resolves.
+        if (lifeAfterPendingStack(me->life, stackLossToMe) + nx > 0)
         {
             safeX = x;
             netAtSafeX = nx;
@@ -11864,8 +12015,13 @@ string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * a
             }
             base += "}";
             //#W61-S (C10): the badge carries the row's own NET to its conclusion.
+            //#W66-AQ (H4): the damage already on the stack, excluding this
+            //card's own objects, so a cast in response prices what precedes it.
+            const int xStackLoss = pendingStackLifeLossToSeat(card ? card->getObserver() : NULL,
+                                                             me, card);
             int netAtCap = kXNetNotSupplied, safeX = -1, netAtSafeX = kXNetNotSupplied;
-            xNetLadder(card, me, sv.maxX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX);
+            xNetLadder(card, me, sv.maxX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX,
+                       xStackLoss);
             //#W64-AH (F1): the library ceiling on the same ladder.
             int lib = -1, reserve = 1;
             string reserveWhy;
@@ -11875,7 +12031,7 @@ string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * a
                                         me ? me->life : -1, safeX, netAtSafeX,
                                         xLibraryCeilingClause(sv.maxX, drawPerX, lib, reserve,
                                                               reserveWhy, libX),
-                                        libX); //#W57-E (D20) / #W64-AH (F1)
+                                        libX, xStackLoss); //#W57-E (D20) / #W64-AH (F1)
         }
         return base;
     }
@@ -12253,7 +12409,8 @@ static void forcedCleanupInputs(MTGCardInstance * card, Player * me, Player * op
 //(maxX <= 0: the row already says the mana affords only X=0).
 static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int drawPerX,
                                   int netAtCap, int life, int safeX, int netAtSafeX,
-                                  const string& libraryClause, int libX)
+                                  const string& libraryClause, int libX,
+                                  int stackLossToMe) //#W66-AQ (H4)
 {
     if (sv.maxX <= 0)
         return "";
@@ -12264,7 +12421,8 @@ static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int dra
         //inside the badge says why; the affordable cap is still printed, so no
         //legal X is hidden and nothing the model relies on is deleted.
         return xCastRowMarkerFrom(xMonotoneMarker(sv.maxX, lifePerX, drawPerX, netAtCap,
-                                                  life, safeX, netAtSafeX, libraryClause),
+                                                  life, safeX, netAtSafeX, libraryClause,
+                                                  stackLossToMe), //#W66-AQ (H4)
                                   (libX >= 0 && libX < sv.maxX) ? libX : sv.maxX,
                                   true); //#W61-S (C10) / #W64-AH (F1)
     string mk;
@@ -12325,8 +12483,12 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         if (markX && markerText)
         {
             //#W61-S (C10): the same fold on the menu the badge is obeyed on.
+            //#W66-AQ (H4): the same post-stack base on the screen the pick is
+            //made on.
+            const int xStackLoss = pendingStackLifeLossToSeat(obs, me, card);
             int netAtCap = kXNetNotSupplied, safeX = -1, netAtSafeX = kXNetNotSupplied;
-            xNetLadder(card, me, capX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX);
+            xNetLadder(card, me, capX, lifePerX, drawPerX, netAtCap, safeX, netAtSafeX,
+                       xStackLoss);
             //#W64-AH (F1): the same library ceiling, on the screen the pick is
             //actually made on (`125v126` seq 528 is the menu, not the cast row).
             int lib = -1, reserve = 1;
@@ -12337,7 +12499,8 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
                                         xLibraryCeilingClause(capX, drawPerX, lib, reserve,
                                                               reserveWhy,
                                                               xLibraryCeilingX(capX, drawPerX,
-                                                                               lib, reserve)));
+                                                                               lib, reserve)),
+                                        xStackLoss); //#W66-AQ (H4)
             if (!mm.empty())
             {
                 *markX = capX;
@@ -17764,6 +17927,37 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);
 
+    //#W66-AQ (H1, engine HIGH-1): count the library->hand moves that happen
+    //INSIDE a draw step, for whichever seat's step it is. This is the term the
+    //DRAW FORECAST subtracts so it prices the draws still ahead instead of
+    //re-charging the whole step on every window served inside it (`123v162`
+    //seq 138-153 re-charged it 16 times and turned a false KILLS verdict at
+    //seq 152). Keyed on the turn, so a step that has not begun reads 0; the
+    //opening deal is excluded by `mDealDone`, which the mulligan arm above
+    //also gates on.
+    if (mDealDone && observer)
+    {
+        if (WEventZoneChange * dz = dynamic_cast<WEventZoneChange *>(event))
+        {
+            Player * dw = (dz->card && dz->to) ? dz->to->owner : NULL;
+            if (dw && dw->game && dz->from == dw->game->library && dz->to == dw->game->hand
+                && observer->currentPlayer == dw
+                && (int) observer->getCurrentGamePhase() == (int) MTG_PHASE_DRAW)
+            {
+                if (observer->turn != mDrawStepTurn)
+                {
+                    mDrawStepTurn = observer->turn;
+                    mDrawStepDrawsMine = 0;
+                    mDrawStepDrawsTheirs = 0;
+                }
+                if (dw == this)
+                    mDrawStepDrawsMine++;
+                else
+                    mDrawStepDrawsTheirs++;
+            }
+        }
+    }
+
     //Opening deal & mulligans: collapse own draws into the buffered
     //opening-hand line, and keep the opponent's hidden deal/mulligan churn
     //("puts a card into their hand/library" x7) out of the narration.
@@ -18900,6 +19094,55 @@ string AIPlayerGPT::serializePregameState()
 //provable in PARSETEST without a board.
 static bool lifeToDamageConverterScript(const string& magicText); //defined with its class docs below
 static bool lifeLossMirrorScript(const string& magicText); //#W49-U D5, same place
+static string toLowerCopy(const string & s); //#W66-AQ (H10): fwd (defined below)
+
+//#W66-AQ (H10, deck130 HIGH-3 / deck162 HIGH-2). Two brackets counted BODIES
+//and called the result a price. `130v123` seq 44 printed `board sweep: THEIRS 1
+/// YOURS 2 ... (it takes more of YOURS than of THEIRS)` where THEIRS-1 was
+//Bloodline Keeper under Intruder Alarm - the seat cycled Starstorm and died at
+//-78 to 40+ vampires. `162v126` seq 15's forced-sacrifice header said "the one
+//that pays the least" and pointed at Fate Unraveler while the SAME prompt
+//listed Fate Unraveler under `DRAW PUNISHERS on the battlefield: yours`.
+//
+//No new detector is invented: this asks the three the prompt already runs -
+//the repeatable token maker (an activated or triggered `token(` line: the
+//`{T}:token(Vampire...)` on both faces of Bloodline Keeper), the draw punisher
+//(`drawPunisherClause`, the scan behind the DRAW PUNISHERS paragraph) and the
+//two halves of the life loop (`lifeToDamageConverterScript` /
+//`lifeLossMirrorScript`, the scan behind `lifeLoopProvenWin`). Returns NULL for
+//an ordinary body, in which case every byte downstream is as wave 65 wrote it.
+//Pure over the script text.
+static const char * engineKindForScript(const string& magicText)
+{
+    if (magicText.empty())
+        return NULL;
+    //A repeatable token maker: a `token(` that hangs off a COST or a TRIGGER
+    //(both write a ':' ahead of it on the same line). A one-shot ETB
+    //`token(...)` with no ':' is a body's arrival, not an engine.
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        const size_t nl = magicText.find('\n', lp);
+        const string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        const string low = toLowerCopy(line);
+        const size_t tk = low.find("token(");
+        if (tk == string::npos)
+            continue;
+        if (low.rfind(':', tk) != string::npos)
+            return "TOKEN ENGINE (it makes more permanents, one per activation)";
+    }
+    int per = 0;
+    bool cond = false;
+    if (drawPunisherClause(magicText, per, cond))
+        return "DRAW PUNISHER (it bills every card the other player draws)";
+    if (lifeToDamageConverterScript(magicText))
+        return "LIFE-LOOP HALF (a life-to-damage converter)";
+    if (lifeLossMirrorScript(magicText))
+        return "LIFE-LOOP HALF (a life-loss mirror)";
+    return NULL;
+}
+
 
 //#W49-U D5 (wave-48 ledger HIGH = R12, a lost game: deck152 vs126 seq 25 went
 //20 -> 0 in one combat with BOTH halves on the opponent's battlefield and the
@@ -22405,9 +22648,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //Y's D3 direction-correct clause. YOUR draw step under THEIR
                 //punishers - the number is life YOU lose, which is what enters
                 //a loop of THEIRS.
+                //#W66-AQ (H1): and how much of that step has ALREADY resolved.
+                const int myDone = (observer && observer->turn == mDrawStepTurn)
+                                   ? mDrawStepDrawsMine : 0;
                 out << drawForecastBlock(false, 1, extras, theirsPer,
                                          loopCautionForLine(this, opp, true),
-                                         myDrawNow, life);
+                                         myDrawNow, life, myDone);
             }
             //#W50-X D16: the punisher's own seat - what THEIR next draw step
             //pays this chair. Same scan, seats swapped.
@@ -22422,9 +22668,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //punishers - the number is life THEY lose. A loop of theirs is
                 //NOT entered by it (the wave-61 deck162 HIGH-1 false surface);
                 //a loop of YOURS is.
+                //#W66-AQ (H1): same subtraction on the punisher's own seat.
+                const int theirDone = (observer && observer->turn == mDrawStepTurn)
+                                      ? mDrawStepDrawsTheirs : 0;
                 out << drawForecastBlock(true, 1, theirExtras, minePer,
                                          loopCautionForLine(this, opp, false),
-                                         theirDrawNow, opp->life);
+                                         theirDrawNow, opp->life, theirDone);
             }
         }
     }
@@ -22950,6 +23199,9 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 22, "{modes live right now:") == 0)
                 || (in.compare(i, 27, "{this mode has a legal obje") == 0)
                 || (in.compare(i, 15, "{DEAD right now") == 0)
+                //#W66-AQ (H9): the third bucket of the same census - a board
+                //fact of THIS window, never history.
+                || (in.compare(i, 20, "{HALF DEAD right now") == 0)
                 //#W55-D: D9's three discard verdicts and D22's public-visibility
                 //tag are the same species - each is true of the board while the
                 //window is open and says nothing that belongs in history.
@@ -25743,16 +25995,31 @@ static string duplicateVerdictTag(int cheaperRow, const string& cheaperName, int
 //the marker says - and priced in the same bracket rather than endorsed bare
 //(the wave-60 lesson from the best-X badge that recommended a lethal NET).
 //Pure over (theirs, mine, measured rows), so the whole table is PARSETEST-pinned.
-static string boardSweepMarker(int theirs, int mine, int measuredRows)
+//#W66-AQ (H10, deck130 HIGH-3): the count is a count of BODIES, and
+//`130v123` seq 44's THEIRS-1 was Bloodline Keeper under Intruder Alarm - one
+//body by the count, an unbounded token loop on the board. The tally is not
+//re-weighted (no invented value ranking): the ENGINES it removes are NAMED, and
+//the "more of YOURS than of THEIRS" comparison says out loud that it is
+//comparing bodies. With no engine among THEIRS the string is byte-identical to
+//wave 65. Pure over its four inputs.
+static string boardSweepMarker(int theirs, int mine, int measuredRows,
+                               const string& theirEngines = "") //#W66-AQ (H10)
 {
     if (theirs <= 0 || measuredRows < 1)
         return "";
     std::ostringstream o;
-    o << " [<- board sweep: THEIRS " << theirs << " / YOURS " << mine << " - "
+    o << " [<- board sweep: THEIRS " << theirs;
+    if (!theirEngines.empty())
+        o << " (including " << theirEngines << ")";
+    o << " / YOURS " << mine << " - "
       << (measuredRows == 1 ? "the only row on this menu that prices a board sweep"
                             : "no other row on this menu prices a bigger sweep of THEIRS");
     if (mine > theirs)
         o << " (it takes more of YOURS than of THEIRS)";
+    if (!theirEngines.empty())
+        o << ". THAT COUNT IS BODIES, NOT VALUE: what it takes of THEIRS includes"
+             " the engine(s) named above, and an engine keeps producing while it"
+             " is on the board, so a body-for-body comparison does not price it";
     o << "]";
     return o.str();
 }
@@ -25764,7 +26031,8 @@ static string boardSweepMarker(int theirs, int mine, int measuredRows)
 //each row's clause.
 static void applyBoardSweepMark(std::vector<std::string>& rows,
                                 const std::vector<int>& theirs,
-                                const std::vector<int>& mine)
+                                const std::vector<int>& mine,
+                                const std::vector<std::string> * engines = NULL) //#W66-AQ (H10)
 {
     int measured = 0, best = -1;
     for (size_t i = 0; i < rows.size() && i < theirs.size() && i < mine.size(); i++)
@@ -25780,7 +26048,9 @@ static void applyBoardSweepMark(std::vector<std::string>& rows,
     }
     if (best < 0)
         return;
-    rows[best] += boardSweepMarker(theirs[best], mine[best], measured);
+    const string eng = (engines && (size_t) best < engines->size())
+                       ? (*engines)[best] : string(); //#W66-AQ (H10)
+    rows[best] += boardSweepMarker(theirs[best], mine[best], measured, eng);
 }
 
 static void applyDuplicateEffectTags(std::vector<std::string>& rows,
@@ -26260,7 +26530,8 @@ static string removalVictimTag(const string& verb, const std::vector<std::string
 //the other player is paid that creature's TOUGHNESS. The generic wording
 //("pick the target it will affect") inverts the value ordering, and the seat
 //picked its 7/7 while writing "denying them life gain". Pure.
-static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent, int gain)
+static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent, int gain,
+                                      const string& engineRows = "") //#W66-AQ (H10)
 {
     std::ostringstream q;
     q << "FORCED SACRIFICE OF ONE OF YOUR OWN CREATURES: ";
@@ -26291,12 +26562,27 @@ static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent,
     else if (gain == 2)
         q << ", and - where the rows differ - the one that GAINS YOU THE MOST";
     q << "), and answer with the chosen creature's name.";
+    //#W66-AQ (H10, deck162 HIGH-2): the toughness tie-break ranks BODIES.
+    //`162v126` seq 15 offered Shield Sphere (pays 5) and Fate Unraveler (pays
+    //4), and "the one that pays the least" pointed at Fate Unraveler - the same
+    //permanent the prompt listed three paragraphs above under `DRAW PUNISHERS
+    //on the battlefield: yours`. No row is removed and no row is re-ordered:
+    //the rows that are ENGINES are named, and the tie-break is scoped to say it
+    //does not price them.
+    if (!engineRows.empty())
+        q << " NOT ALL OF THESE ARE BODIES: " << engineRows
+          << ". The toughness ranking above prices life only, and it does not price"
+             " what an engine keeps doing while it is on the battlefield - so read"
+             " that tie-break as applying to the rows that are NOT named here, and if"
+             " you sacrifice one that is, say in your PLAN that you are giving up"
+             " that engine on purpose.";
     return q.str();
 }
 
 //The per-row price. `gain` 0 names no beneficiary (the script did not say who),
 //1 the other player, 2 the deciding seat. Pure.
-static string forcedSacrificeRowTag(int gain, int toughness)
+static string forcedSacrificeRowTag(int gain, int toughness,
+                                    const char * engineKind = NULL) //#W66-AQ (H10)
 {
     std::ostringstream o;
     o << " [you SACRIFICE this";
@@ -26304,6 +26590,9 @@ static string forcedSacrificeRowTag(int gain, int toughness)
         o << "; they gain " << toughness << " life (its toughness)";
     else if (gain == 2)
         o << "; you gain " << toughness << " life (its toughness)";
+    //#W66-AQ (H10): the row's own half of the header's scope clause.
+    if (engineKind)
+        o << "; THIS IS NOT JUST A BODY: " << engineKind;
     o << "]";
     return o.str();
 }
@@ -26387,6 +26676,13 @@ struct GptModalMode
     string label;
     string outerSpec;
     string subSpec;
+    //#W66-AQ (H9): does each half of the pair exist at all, and does it carry
+    //payload that happens with no target? A `choice` line with two halves of
+    //which ONE has no legal object is not a dead mode - it is a HALF-dead pair
+    //that still does the other half, and the wave-65 census called it dead.
+    bool outerPayload;
+    bool subPresent;
+    GptModalMode() : outerPayload(false), subPresent(false) {}
 };
 static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>& out)
 {
@@ -26444,6 +26740,7 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
                         m.subSpec = spec;
                     }
                 }
+                m.subPresent = true; //#W66-AQ (H9)
                 rest = rest.substr(0, ab); //the outer payload only
                 restLow = toLowerCopy(rest);
             }
@@ -26454,6 +26751,29 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
             size_t oe = rest.find(')', op + 7);
             if (oe != string::npos)
                 m.outerSpec = rest.substr(op + 7, oe - (op + 7));
+        }
+        //#W66-AQ (H9): does the OUTER half do anything once its target spec is
+        //taken out? `choice name(You draw and sacrifice creature) draw:1
+        //controller && life:-1 controller && ability$!...!$ opponent` has no
+        //outer target at all and still resolves its draw and its life loss, so
+        //a dead sub-half leaves a HALF-dead pair, not a dead mode.
+        {
+            string payload = rest;
+            size_t tp2 = toLowerCopy(payload).find("target(");
+            if (tp2 != string::npos)
+            {
+                size_t te2 = payload.find(')', tp2 + 7);
+                if (te2 != string::npos)
+                    payload = payload.substr(0, tp2) + payload.substr(te2 + 1);
+                else
+                    payload = payload.substr(0, tp2);
+            }
+            for (size_t pi = 0; pi < payload.size(); pi++)
+                if (isalnum((unsigned char) payload[pi]))
+                {
+                    m.outerPayload = true;
+                    break;
+                }
         }
         out.push_back(m);
     }
@@ -26478,7 +26798,8 @@ static bool modalChoiceModes(const string& magicText, std::vector<GptModalMode>&
 //a partial price stated as a total would be its own false surface, so the tag
 //says what it counts. Pure over (script, label, the two life totals).
 string modeEffectPriceTag(const string& script, const string& optionLabel,
-                          int myLife, int oppLife)
+                          int myLife, int oppLife,
+                          int theirDrawPunisherPerDraw = 0) //#W66-AQ (H9)
 {
     if (optionLabel.empty())
         return "";
@@ -26575,12 +26896,28 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
     std::ostringstream o;
     o << " {this mode right now:";
     bool first = true;
-    if (myLifeDelta != 0)
+    //#W66-AQ (H9, deck146 HIGH-2): the mode's own `life:-1 controller` was the
+    //whole price, and the opponent's draw punisher - printed in the SAME prompt,
+    //and already folded by the cast row's DRAW GRANT bracket - was not counted.
+    //`146v162` seq 24 said "you would be at 17" on a mode that draws the seat a
+    //card under Underworld Dreams, which makes it 16. Nothing is deleted: the
+    //mode's own figure is still named, and the punisher term is named beside it.
+    const int punishLoss = (theirDrawPunisherPerDraw > 0 && myDraw > 0)
+                           ? myDraw * theirDrawPunisherPerDraw : 0;
+    const int netMe = myLifeDelta - punishLoss;
+    if (myLifeDelta != 0 || punishLoss > 0)
     {
-        o << (first ? " " : "; ") << (myLifeDelta < 0 ? "you LOSE " : "you gain ")
-          << (myLifeDelta < 0 ? -myLifeDelta : myLifeDelta) << " life - you would be at "
-          << (myLife + myLifeDelta);
-        if (myLife + myLifeDelta <= 0)
+        o << (first ? " " : "; ");
+        if (myLifeDelta != 0)
+            o << (myLifeDelta < 0 ? "you LOSE " : "you gain ")
+              << (myLifeDelta < 0 ? -myLifeDelta : myLifeDelta) << " life";
+        else
+            o << "this mode takes no life from you directly";
+        if (punishLoss > 0)
+            o << ", and their draw punishers take " << punishLoss << " more for the "
+              << myDraw << " card" << (myDraw == 1 ? "" : "s") << " it makes you draw";
+        o << " - you would be at " << (myLife + netMe);
+        if (myLife + netMe <= 0)
             o << "; THIS KILLS YOU";
         first = false;
     }
@@ -26759,13 +27096,15 @@ string tapUntapBranchTag(const string& script, const string& optionLabel,
 //rebuilds of the same window (wave61/corpus-livelock.md).
 static string modeRowAnnotations(const string& script, const string& optionLabel,
                                  int myLife, int oppLife,
-                                 int candidatesCanBlockTapped, int candidatesDoNotUntap)
+                                 int candidatesCanBlockTapped, int candidatesDoNotUntap,
+                                 int theirDrawPunisherPerDraw = 0) //#W66-AQ (H9)
 {
     if (script.empty() || optionLabel.empty())
         return "";
     return tapUntapBranchTag(script, optionLabel,
                              candidatesCanBlockTapped, candidatesDoNotUntap)
-           + modeEffectPriceTag(script, optionLabel, myLife, oppLife);
+           + modeEffectPriceTag(script, optionLabel, myLife, oppLife,
+                                theirDrawPunisherPerDraw);
 }
 
 //#W65-AL (G1): the board counts the tap/untap tag reads, off the side a "TAPS
@@ -26854,10 +27193,16 @@ string namedCardVisibilityTag(int theirBattlefield, int theirGraveyard,
 }
 
 //The clause. Pure over the two name lists, so the wording is provable.
+//#W66-AQ (H9): the census gained a THIRD bucket. A `choice` line whose two
+//halves are one live and one dead is not a dead mode - it still does the live
+//half - and calling it dead is what let `146v162` seq 24 read the mode ask as
+//"whole modes" and take one. The bucket is OMITTED when empty, so a board with
+//no half-dead pair renders exactly as wave 65 wrote it.
 static string modalModesTag(const std::vector<std::string>& live,
+                            const std::vector<std::string>& halfDead,
                             const std::vector<std::string>& dead)
 {
-    if (live.empty() && dead.empty())
+    if (live.empty() && halfDead.empty() && dead.empty())
         return "";
     std::ostringstream o;
     o << " {modes live right now: ";
@@ -26865,6 +27210,13 @@ static string modalModesTag(const std::vector<std::string>& live,
         o << "none";
     for (size_t i = 0; i < live.size(); i++)
         o << (i ? ", " : "") << live[i];
+    if (!halfDead.empty())
+    {
+        o << "; HALF DEAD (one half of the pair has no legal object, so it does"
+             " only the other half): ";
+        for (size_t i = 0; i < halfDead.size(); i++)
+            o << (i ? ", " : "") << halfDead[i];
+    }
     o << "; dead (no legal object right now): ";
     if (dead.empty())
         o << "none";
@@ -26872,6 +27224,37 @@ static string modalModesTag(const std::vector<std::string>& live,
         o << (i ? ", " : "") << dead[i];
     o << "}";
     return o.str();
+}
+
+//#W66-AQ (H9): the per-mode verdict, pure over the mode's two half-descriptions
+//and the two object counts (-1 = the half carries no target requirement).
+//kModeLive 0 / kModeHalfDead 1 / kModeDead 2.
+static int modalModeVerdict(bool outerIsSpec, int outerCount, bool outerPayload,
+                            bool subIsSpec, int subCount, bool subPresent)
+{
+    const int deadHalves = ((outerIsSpec && outerCount == 0) ? 1 : 0)
+                         + ((subIsSpec && subCount == 0) ? 1 : 0);
+    if (deadHalves == 0)
+        return 0;
+    const int liveHalves = ((outerIsSpec && outerCount != 0) ? 1 : 0)
+                         + ((!outerIsSpec && outerPayload) ? 1 : 0)
+                         + ((subIsSpec && subCount != 0) ? 1 : 0)
+                         + ((!subIsSpec && subPresent) ? 1 : 0);
+    return liveHalves > 0 ? 1 : 2;
+}
+
+//#W66-AQ (H9): the ROW form of the same verdict - the tag the mode ask carries,
+//so the ask and the cast row's census state one fact in two places. The live
+//and dead strings are wave-65's, byte for byte.
+static string modeLivenessRowTag(int verdict)
+{
+    if (verdict == 0)
+        return " {this mode has a legal object right now}";
+    if (verdict == 1)
+        return " {HALF DEAD right now: one half of this mode has NO legal object on the"
+               " board, so taking this row does only its other half - it is not the whole"
+               " mode the label names}";
+    return " {DEAD right now: no legal object for this mode}";
 }
 //The one impure half: how many objects each spec can see, asked of the engine's
 //own TargetChooser rather than re-derived. -1 = no requirement (always live).
@@ -26893,24 +27276,60 @@ static int modalSpecObjectCount(GameObserver * observer, MTGCardInstance * card,
     SAFE_DELETE(tc);
     return n;
 }
+//#W66-AQ (H9): ONE census, three buckets, and the per-label verdict map the
+//mode ask reads. `script` is the text the menu was built from - the arm-time
+//snapshot when the subject pointer is gone - and `card` is only the object the
+//engine's TargetChooser is asked through.
 static bool modalModeLiveness(GameObserver * observer, MTGCardInstance * card,
-                              std::vector<std::string>& live, std::vector<std::string>& dead)
+                              const string& script,
+                              std::vector<std::string>& live,
+                              std::vector<std::string>& halfDead,
+                              std::vector<std::string>& dead,
+                              std::vector<int> * verdicts = NULL)
 {
     live.clear();
+    halfDead.clear();
     dead.clear();
+    if (verdicts)
+        verdicts->clear();
     if (!observer || !card)
         return false;
     std::vector<GptModalMode> modes;
-    if (!modalChoiceModes(card->magicText, modes))
+    if (!modalChoiceModes(script, modes))
         return false;
     for (size_t i = 0; i < modes.size(); i++)
     {
         int outer = modalSpecObjectCount(observer, card, modes[i].outerSpec);
         int sub = modalSpecObjectCount(observer, card, modes[i].subSpec);
-        bool isLive = (outer != 0) && (sub != 0);
-        (isLive ? live : dead).push_back(modes[i].label);
+        const int v = modalModeVerdict(!modes[i].outerSpec.empty(), outer, modes[i].outerPayload,
+                                       !modes[i].subSpec.empty(), sub, modes[i].subPresent);
+        if (verdicts)
+            verdicts->push_back(v);
+        (v == 0 ? live : (v == 1 ? halfDead : dead)).push_back(modes[i].label);
     }
-    return !live.empty() || !dead.empty();
+    return !live.empty() || !halfDead.empty() || !dead.empty();
+}
+
+//#W66-AQ (H9): the subject of a resolving `auto=choice` menu sits in no game
+//zone by the time the menu arms - which is exactly why `req.contextCard` is
+//NULL at the CHOOSE_MENU seam (#W65-AL) and why the census never reached the
+//ask the corpus exercises. The SCRIPT snapshot identifies the instance
+//exactly, so it is matched on `magicText` rather than on a name; an unmatched
+//script yields NULL and the seam renders no census at all rather than guessing.
+static MTGCardInstance * modalSubjectFromScript(Player * me, const string& script)
+{
+    if (!me || !me->game || script.empty())
+        return NULL;
+    MTGGameZone * zones[4] = { me->game->graveyard, me->game->stack,
+                               me->game->inPlay, me->game->exile };
+    for (int z = 0; z < 4; z++)
+    {
+        MTGGameZone * zone = zones[z];
+        for (int i = 0; zone && i < zone->nb_cards; i++)
+            if (zone->cards[i] && zone->cards[i]->magicText == script)
+                return zone->cards[i];
+    }
+    return NULL;
 }
 //Damage, destroy, sacrifice, or a removal-class move, anywhere inside the
 //cost/nested/multi wrapping a loyalty or activated ability rides in.
@@ -32386,6 +32805,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
     vector<int> rowUses; //#W54-C (D18): sources this row spends, -1 = unpriceable
     vector<int> rowSweepTheirs, rowSweepMine; //#W61-U (C10): the board this row clears
+    vector<string> rowSweepEngines; //#W66-AQ (H10): which of THEIRS are engines
     vector<string> rowNames; //#W56-B (D15): the card each row casts
     vector<int> rowCosts; //#W56-B (D15): the converted cost it would pay, -1 = unknown ({X})
     vector<string> opts; //"Cast nothing" is appended LAST (positional
@@ -33127,9 +33547,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //right now - the fact the engine must already compute to build the
         //mode sub-menu, carried on the refusable window that precedes it.
         {
-            std::vector<std::string> liveM, deadM;
-            if (modalModeLiveness(observer, card, liveM, deadM))
-                o << modalModesTag(liveM, deadM);
+            std::vector<std::string> liveM, halfM, deadM;
+            if (modalModeLiveness(observer, card, card->magicText, liveM, halfM, deadM))
+                o << modalModesTag(liveM, halfM, deadM); //#W66-AQ (H9)
         }
         //#W48 D8: and the price of what it DRAWS, when the opponent punishes
         //draws. The summary line on the same screen states the standing rate;
@@ -33254,6 +33674,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         rowUses.push_back(rowUsed); //#W54-C (D18)
         rowSweepTheirs.push_back(rowSweep.theirs); //#W61-U (C10)
         rowSweepMine.push_back(rowSweep.mine);
+        rowSweepEngines.push_back(rowSweep.engines); //#W66-AQ (H10)
         //#W56-B (D15): identity + price of this row, for the menu pass below.
         rowNames.push_back(card->name);
         {
@@ -33317,7 +33738,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W61-U (C10): and the board-sweep ranking, on the same menu copy and
         //for the same reason - a row cannot know its own number until the
         //suppression filter and any re-ask removal have settled.
-        applyBoardSweepMark(menu, rowSweepTheirs, rowSweepMine);
+        applyBoardSweepMark(menu, rowSweepTheirs, rowSweepMine, &rowSweepEngines);
         //#W56-B (D15): and the same-card/same-verdict comparison, on the same
         //menu copy and for the same reason - a row cannot know its own number
         //until the suppression filter and any re-ask removal have settled.
@@ -33504,6 +33925,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             rowSweepTheirs.erase(rowSweepTheirs.begin() + pick);
             rowSweepMine.erase(rowSweepMine.begin() + pick);
+            if (pick < (int) rowSweepEngines.size()) //#W66-AQ (H10): stay parallel
+                rowSweepEngines.erase(rowSweepEngines.begin() + pick);
         }
         if (pick < (int) rowNames.size()) //#W56-B (D15): same, for the duplicate pass
             rowNames.erase(rowNames.begin() + pick);
@@ -34729,17 +35152,22 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         }
         else
         {
-            std::vector<std::string> liveM, deadM;
-            if (ctx && modalModeLiveness(observer, ctx, liveM, deadM))
+            //#W66-AQ (H9): the same three-bucket census as the cast row, so the
+            //two screens cannot disagree about which pairs are only half alive.
+            std::vector<std::string> liveM, halfM, deadM;
+            if (ctx && modalModeLiveness(observer, ctx, ctx->magicText, liveM, halfM, deadM))
                 for (size_t mi = 0; mi < shownModes.size(); mi++)
                 {
                     string low = toLowerCopy(shownModes[mi]);
                     for (size_t li = 0; li < liveM.size(); li++)
                         if (toLowerCopy(liveM[li]) == low)
-                            shownModes[mi] += " {this mode has a legal object right now}";
+                            shownModes[mi] += modeLivenessRowTag(0);
+                    for (size_t hi = 0; hi < halfM.size(); hi++)
+                        if (toLowerCopy(halfM[hi]) == low)
+                            shownModes[mi] += modeLivenessRowTag(1);
                     for (size_t di = 0; di < deadM.size(); di++)
                         if (toLowerCopy(deadM[di]) == low)
-                            shownModes[mi] += " {DEAD right now: no legal object for this mode}";
+                            shownModes[mi] += modeLivenessRowTag(2);
                 }
             //#W60-O (B8): which branch taps what, and the untap-step timing.
             //#W60-Q (R5): with the two engine states that falsify its general
@@ -34756,11 +35184,17 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 const string modeScript = ctx ? ctx->magicText : req.contextText;
                 int canBlockTapped = 0, doNotUntap = 0;
                 modeTapCounts(opponent(), canBlockTapped, doNotUntap);
+                //#W66-AQ (H9): the punisher term on this seam too - one
+                //convention across the two menu kinds.
+                vector<string> mMineP, mTheirsP;
+                int mMinePer = 0, mTheirsPer = 0;
+                drawPunisherScan(this, opponent(), mMineP, mMinePer, mTheirsP, mTheirsPer);
                 for (size_t mi = 0; mi < shownModes.size() && mi < req.optionTexts.size(); mi++)
                     shownModes[mi] += modeRowAnnotations(modeScript, req.optionTexts[mi],
                                                          life,
                                                          opponent() ? opponent()->life : 0,
-                                                         canBlockTapped, doNotUntap);
+                                                         canBlockTapped, doNotUntap,
+                                                         mTheirsPer);
             }
         }
         string modeHeader;
@@ -35427,6 +35861,28 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         {
             int canBlockTapped = 0, doNotUntap = 0;
             modeTapCounts(opponent(), canBlockTapped, doNotUntap);
+            //#W66-AQ (H9, deck146 HIGH-1/2). Two facts the cast row one window
+            //earlier already carries, and this ask - the one the seat answers -
+            //did not. (a) The live/dead/half-dead CENSUS: `146v162` seq 23's
+            //cast row named 7 of Silverquill Command's 9 pairs dead, and seq 24
+            //offered rows 1 and 4 with no tag at all and priced rows 5 and 6 -
+            //both HALF dead - as whole modes; the seat took row 6 and lost the
+            //game. The subject is in no zone by now (ctx is NULL here), so it
+            //is recovered by matching the arm-time script. (b) The opponent's
+            //DRAW PUNISHER rate, which the cast row's DRAW GRANT bracket folds
+            //and this ask did not: "you would be at 17" under Underworld Dreams
+            //is 16.
+            vector<string> modeMineP, modeTheirsP;
+            int modeMinePer = 0, modeTheirsPer = 0;
+            drawPunisherScan(this, opponent(), modeMineP, modeMinePer,
+                             modeTheirsP, modeTheirsPer);
+            std::vector<std::string> liveM, halfM, deadM;
+            bool haveCensus = false;
+            {
+                MTGCardInstance * subj = ctx ? ctx : modalSubjectFromScript(this, menuScript);
+                haveCensus = modalModeLiveness(observer, subj, menuScript,
+                                               liveM, halfM, deadM);
+            }
             for (size_t li = 0; li < opts.size() && li < req.optionTexts.size(); li++)
             {
                 //A pay-life row (the shockland pay-or-tap class) has ALREADY
@@ -35438,7 +35894,21 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                     continue;
                 opts[li] += modeRowAnnotations(menuScript, req.optionTexts[li], life,
                                                opponent() ? opponent()->life : 0,
-                                               canBlockTapped, doNotUntap);
+                                               canBlockTapped, doNotUntap,
+                                               modeTheirsPer); //#W66-AQ (H9)
+                if (haveCensus) //#W66-AQ (H9)
+                {
+                    const string rowLow = toLowerCopy(req.optionTexts[li]);
+                    for (size_t ci = 0; ci < liveM.size(); ci++)
+                        if (toLowerCopy(liveM[ci]) == rowLow)
+                            opts[li] += modeLivenessRowTag(0);
+                    for (size_t ci = 0; ci < halfM.size(); ci++)
+                        if (toLowerCopy(halfM[ci]) == rowLow)
+                            opts[li] += modeLivenessRowTag(1);
+                    for (size_t ci = 0; ci < deadM.size(); ci++)
+                        if (toLowerCopy(deadM[ci]) == rowLow)
+                            opts[li] += modeLivenessRowTag(2);
+                }
             }
         }
     }
@@ -36451,10 +36921,23 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 }
             }
         }
+        //#W66-AQ (H10): the engines among the rows, collected once for both the
+        //per-row tag and the header's tie-break scope.
+        string sacEngineRows;
         if (forcedSacrifice)
             for (size_t ti = 0; ti < targets.size() && ti < opts.size(); ti++)
                 if (MTGCardInstance * vc = dynamic_cast<MTGCardInstance *>(targets[ti]))
-                    opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness);
+                {
+                    const char * ek = engineKindForScript(vc->magicText); //#W66-AQ (H10)
+                    opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness, ek);
+                    if (ek)
+                    {
+                        if (!sacEngineRows.empty())
+                            sacEngineRows += ", ";
+                        sacEngineRows += vc->getDisplayName() + instanceHandle(vc)
+                                         + " is a " + ek;
+                    }
+                }
 
         //#W54-D (D25, R185): the forced-loss list is ordered cheapest-first, so
         //the header's own advice ("usually your LEAST valuable: a spare land")
@@ -36625,7 +37108,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         }
         else if (forcedSacrifice)
         {
-            q << buildForcedSacrificeAsk(effectName, sacByOpponent, sacGain);
+            q << buildForcedSacrificeAsk(effectName, sacByOpponent, sacGain,
+                                         sacEngineRows); //#W66-AQ (H10)
         }
         else if (dungeonSelect)
         {
@@ -56302,26 +56786,28 @@ static const char * kW50Y_r94 =
                   "#W54-C D5 NEGATIVE an unnamed choice line annotates NOTHING rather than guessing");
         }
         {
-            std::vector<std::string> live, dead;
+            std::vector<std::string> live, dead, nothing;
             live.push_back("Return creature and you draw");
             dead.push_back("Creature gains 3/3 and sacrifice creature");
-            CHECK(modalModesTag(live, dead)
+            //#W66-AQ (H9): the wave-54 shapes are unchanged when no pair is
+            //HALF dead - the third bucket is omitted, not printed empty.
+            CHECK(modalModesTag(live, nothing, dead)
                   == " {modes live right now: Return creature and you draw;"
                      " dead (no legal object right now): Creature gains 3/3 and sacrifice creature}",
                   "#W54-C D5 the cast row's clause names both halves");
-            std::vector<std::string> nothing;
-            CHECK(modalModesTag(live, nothing)
+            CHECK(modalModesTag(live, nothing, nothing)
                   == " {modes live right now: Return creature and you draw;"
                      " dead (no legal object right now): none}",
                   "#W54-C D5 an all-live menu says so rather than dropping the clause");
-            CHECK(modalModesTag(nothing, dead)
+            CHECK(modalModesTag(nothing, nothing, dead)
                   == " {modes live right now: none;"
                      " dead (no legal object right now): Creature gains 3/3 and sacrifice creature}",
                   "#W54-C D5 an all-dead menu says none, never nothing");
-            CHECK(modalModesTag(nothing, nothing).empty(),
+            CHECK(modalModesTag(nothing, nothing, nothing).empty(),
                   "#W54-C D5 NEGATIVE no parsed modes at all: no clause");
             vector<string> menu;
-            menu.push_back("Cast Silverquill Command {2}{b}{w}" + modalModesTag(live, dead));
+            menu.push_back("Cast Silverquill Command {2}{b}{w}"
+                           + modalModesTag(live, nothing, dead));
             menu.push_back("Cast nothing right now");
             bool stale = false; string src;
             CHECK(parseChoice("CHOICE: 1 (Cast Silverquill Command {2}{b}{w})", 2, &menu, &stale) == 1
@@ -67627,6 +68113,326 @@ static const char * kW50Y_r94 =
               "#W66-AT MED-3 a cache hit explains nothing, so the whole wait is the residual");
         CHECK(revealWaitUnexplainedSecs(0, 900000) == 0,
               "#W66-AT MED-3 MUST-NOT-MATCH the residual is never negative");
+    }
+
+    // ================= #W66-AQ: wave-66 known bugs H1 / H4 / H9 / H10 =================
+    cout << "\n[#W66-AQ H1] the DRAW FORECAST charges the draws STILL AHEAD, not the whole step\n";
+    {
+        // THE CORPUS LINE. `123v162` seq 138-153: sixteen consecutive windows
+        // inside ONE draw step, all rendering the same forecast while the seat's
+        // life falls 7 -> 3, and seq 152 turning it into a death verdict over a
+        // cost of which one point remained. Both are reproduced here from the
+        // rendered strings, and both are answered by the same subtraction.
+        std::vector<std::pair<std::string, int> > mines;
+        mines.push_back(std::make_pair(std::string("Howling Mine #1"), 1));
+        mines.push_back(std::make_pair(std::string("Howling Mine #2"), 1));
+        mines.push_back(std::make_pair(std::string("Howling Mine #3"), 1));
+        mines.push_back(std::make_pair(std::string("Dictate of Kruphix #1"), 1));
+        mines.push_back(std::make_pair(std::string("Dictate of Kruphix #2"), 1));
+        const string kS138 =
+            "DRAW FORECAST: your draw step, resolving NOW, draws 6 cards (1 + Howling Mine #1 1"
+            " + Howling Mine #2 1 + Howling Mine #3 1 + Dictate of Kruphix #1 1"
+            " + Dictate of Kruphix #2 1) = 6 x 1 = 6 life LOST BY YOU to their punishers above"
+            " - if it resolves as forecast you would be at 1. This draw step is COMPULSORY -"
+            " no row on any menu declines it.";
+        // NEGATIVE / regression: nothing resolved yet, so the shipped line is
+        // byte-identical to what the corpus printed at seq 138.
+        CHECK(drawStepForecastText(1, mines, 1, "", true, 7, 0) == kS138,
+              "#W66-AQ H1 NEGATIVE with nothing resolved the corpus line is byte-identical to"
+              " wave 65 (`123v162` seq 138)");
+        // POSITIVE: five of the six have resolved and been paid for (the same
+        // prompt's narration lists them by name), life is 4, one point is owed.
+        const string s152 = drawStepForecastText(1, mines, 1, "", true, 4, 5);
+        CHECK(s152.find("5 of them have ALREADY been drawn and paid for in this step") != string::npos
+                  && s152.find("so 1 is still to come") != string::npos
+                  && s152.find("= 1 x 1 = 1 life LOST BY YOU") != string::npos
+                  && s152.find("if the rest resolves as forecast you would be at 3") != string::npos,
+              "#W66-AQ H1 POSITIVE `123v162` seq 152 charges the ONE draw still ahead and lands"
+              " the seat on the 3 it actually lived at");
+        // MUST-NOT-MATCH: the false death verdict is gone, and the stale total
+        // with it.
+        CHECK(s152.find("KILLS") == string::npos
+                  && s152.find("= 6 x 1 = 6 life") == string::npos
+                  && s152.find("you would be at -2") == string::npos,
+              "#W66-AQ H1 MUST-NOT-MATCH seq 152's `you would be at -2; that KILLS you` cannot"
+              " be printed over a step with one point left in it");
+        // The whole step already resolved: no charge, and still no verdict.
+        const string done = drawStepForecastText(1, mines, 1, "", true, 4, 6);
+        CHECK(done.find("= 0 life LOST BY YOU to their punishers above from the rest of this step")
+                  != string::npos
+                  && done.find("KILLS") == string::npos
+                  && done.find("would be at") == string::npos,
+              "#W66-AQ H1 POSITIVE a fully-resolved step charges nothing and claims no life total");
+        // deck152's shape: `draws 4 cards = 4 x 4 = 16` beside 7 on the stack.
+        {
+            std::vector<std::pair<std::string, int> > d152;
+            d152.push_back(std::make_pair(std::string("Howling Mine #1"), 1));
+            d152.push_back(std::make_pair(std::string("Dictate of Kruphix #1"), 1));
+            d152.push_back(std::make_pair(std::string("Underworld Dreams feeder"), 1));
+            const string half = drawStepForecastText(1, d152, 4, "", true, 20, 2);
+            CHECK(half.find("draws 4 cards") != string::npos
+                      && half.find("= 2 x 4 = 8 life LOST BY YOU") != string::npos
+                      && half.find("= 4 x 4 = 16") == string::npos,
+                  "#W66-AQ H1 POSITIVE deck152's `4 x 4 = 16` is 8 once two of the four are paid;"
+                  " the step SIZE is still printed");
+        }
+        // MUST-NOT-MATCH: a step that has not begun has nothing resolved in it,
+        // whatever the counter says.
+        CHECK(drawStepForecastText(1, mines, 1, "", false, 7, 5)
+                  == drawStepForecastText(1, mines, 1, "", false, 7, 0),
+              "#W66-AQ H1 MUST-NOT-MATCH a NEXT-step forecast never subtracts a count from a"
+              " step it is not inside");
+        // The mirror seat takes the same subtraction.
+        {
+            const string theirs = theirDrawStepForecastText(1, mines, 1, "", true, 4, 5);
+            CHECK(theirs.find("= 1 x 1 = 1 life LOST BY THEM") != string::npos
+                      && theirs.find("KILLS") == string::npos,
+                  "#W66-AQ H1 POSITIVE the punisher's own seat subtracts the same way");
+            CHECK(theirDrawStepForecastText(1, mines, 1, "", true, 7, 0)
+                      == theirDrawStepForecastText(1, mines, 1, "", true, 7, 0),
+                  "#W66-AQ H1 the theirs line is stable across two builds of the same window");
+        }
+        // The arithmetic itself, as a table.
+        CHECK(drawsStillAhead(6, 0, true) == 6 && drawsStillAhead(6, 5, true) == 1
+                  && drawsStillAhead(6, 6, true) == 0 && drawsStillAhead(6, 9, true) == 0
+                  && drawsStillAhead(6, 5, false) == 6 && drawsStillAhead(6, -3, true) == 6,
+              "#W66-AQ H1 the remainder is clamped at both ends and only applies inside the step");
+        CHECK(drawsResolvedClause(6, 6).empty() && drawsResolvedClause(6, 5)
+                  == " - 1 of them has ALREADY been drawn and paid for in this step (they are in"
+                     " the log above), so 5 are still to come",
+              "#W66-AQ H1 the subtraction sentence agrees in number and is empty when nothing"
+              " has resolved");
+        // ECHO SHAPE: the forecast is a SENTENCE in the board frame, not an
+        // option annotation - it opens no brace or bracket channel the model
+        // could echo into an answer.
+        CHECK(s152.find('{') == string::npos && s152.find('[') == string::npos,
+              "#W66-AQ H1 ECHO the new clause opens no annotation channel");
+    }
+
+    cout << "\n[#W66-AQ H4] the X ladder starts from the life the STACK leaves\n";
+    {
+        // THE CORPUS LINE. `125v162` seq 36: the same prompt printed
+        // `ON THE STACK: 13 damage to you - you would be at -8; that would KILL
+        // you` and `X=4 is the largest listed X whose NET (-4) leaves you alive,
+        // at 1`. One term now feeds both.
+        CHECK(lifeAfterPendingStack(5, 13) == -8 && lifeAfterPendingStack(5, 0) == 5
+                  && lifeAfterPendingStack(5, -4) == 5 && lifeAfterPendingStack(-1, 3) == -1,
+              "#W66-AQ H4 the life-after-stack term: a loss subtracts, a non-loss does not, and"
+              " an unknown life stays unknown");
+        CHECK(pendingStackDamageLine(13, 5)
+                  == "ON THE STACK: 13 damage to you - you would be at -8; that would KILL you",
+              "#W66-AQ H4 the ON THE STACK line is unchanged and now shares that term");
+        const string s36 = xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 13);
+        CHECK(s36.find("counted from the -8 life the 13 damage ALREADY ON THE STACK leaves you on")
+                  != string::npos
+                  && s36.find("puts you at -13; this KILLS you") != string::npos
+                  && s36.find("No listed X leaves you alive - the stack alone puts you at -8")
+                     != string::npos,
+              "#W66-AQ H4 POSITIVE `125v162` seq 36's badge prices X from the post-stack life the"
+              " same prompt computed");
+        CHECK(s36.find("leaves you alive, at 1") == string::npos
+                  && s36.find("X=4 is the largest listed X") == string::npos,
+              "#W66-AQ H4 MUST-NOT-MATCH the survivable-X claim cannot stand under 13 lethal"
+              " damage already on the stack");
+        // NEGATIVE: with no stack damage every byte is wave 65's.
+        CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0)
+                  == " [<- largest affordable X - X=5 gains 5 life and draws 5 cards; no listed X"
+                     " does more - but NET -5 life for this cast puts you at 0; this KILLS you."
+                     " X=4 is the largest listed X whose NET (-4) leaves you alive, at 1]",
+              "#W66-AQ H4 NEGATIVE an empty stack renders the wave-65 badge byte for byte");
+        CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4) == xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0),
+              "#W66-AQ H4 NEGATIVE the default argument is the empty stack");
+        // POSITIVE: a survivable rung still survives, measured after the stack.
+        const string safe = xMonotoneMarker(9, 1, 1, -20, 20, 3, -10, "", 5);
+        CHECK(safe.find("counted from the 15 life the 5 damage ALREADY ON THE STACK leaves you on")
+                  != string::npos
+                  && safe.find("leaves you alive, at 5") != string::npos,
+              "#W66-AQ H4 POSITIVE a rung that survives the stack is still named, at the total"
+              " that follows it");
+        // MUST-NOT-MATCH: an unpriced ladder claims nothing either way.
+        CHECK(xMonotoneMarker(5, 1, 1, kXNetNotSupplied, 5, -1, kXNetNotSupplied, "", 13)
+                  .find("KILLS") == string::npos,
+              "#W66-AQ H4 MUST-NOT-MATCH a row that prints no NET gets no verdict from the stack");
+        // ECHO SHAPE: the badge is one `[<- ...]` group, opened once and closed.
+        CHECK(s36[0] == ' ' && s36[1] == '[' && s36[s36.size() - 1] == ']'
+                  && s36.find(']') == s36.size() - 1,
+              "#W66-AQ H4 ECHO the badge is a single bracket group");
+    }
+
+    cout << "\n[#W66-AQ H9] one mode census on both seams, and the punisher folded into it\n";
+    {
+        const string sqFull =
+            "choice name(Creature gains 3/3 and return creature) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && ability$!name(Return creature)"
+            " name(Return creature) target(creature[manacost<=2]|mygraveyard)"
+            " moveto(mybattlefield)!$ controller\n"
+            "choice name(Creature gains 3/3 and you draw) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 controller && life:-1 controller\n"
+            "choice name(Creature gains 3/3 and opponent draws) target(creature)"
+            " transforms((,newability[3/3],flying)) ueot && draw:1 opponent && life:-1 opponent\n"
+            "choice name(You draw and sacrifice creature) draw:1 controller && life:-1 controller"
+            " && ability$!name(Sacrifice creature) name(Sacrifice creature)"
+            " notaTarget(creature|mybattlefield) sacrifice!$ opponent\n";
+        // (a) THE CENSUS. `146v162` seq 23's cast row named seven of the nine
+        // pairs dead; seq 24's ask - the window the seat answers - tagged none
+        // of them, priced `you draw and sacrifice creature` as a whole mode, and
+        // the seat took it. The pair is HALF dead: the sacrifice half has no
+        // legal object, the draw half always happens.
+        std::vector<GptModalMode> modes;
+        CHECK(modalChoiceModes(sqFull, modes) && modes.size() == 4,
+              "#W66-AQ H9 the corpus card's four exercised lines parse");
+        CHECK(modes[3].outerSpec.empty() && modes[3].outerPayload
+                  && modes[3].subPresent && modes[3].subSpec == "creature|opponentbattlefield",
+              "#W66-AQ H9 `You draw and sacrifice creature` has an untargeted half that always"
+              " happens and a granted half with a target set");
+        CHECK(modalModeVerdict(false, -1, true, true, 0, true) == 1,
+              "#W66-AQ H9 POSITIVE a dead granted half beside an unconditional payload is HALF"
+              " dead, not dead (`146v162` seq 24 row 5/6)");
+        CHECK(modalModeVerdict(true, 3, false, true, 0, true) == 1
+                  && modalModeVerdict(true, 0, false, true, 4, true) == 1,
+              "#W66-AQ H9 POSITIVE either half dead with the other live is HALF dead");
+        CHECK(modalModeVerdict(true, 3, false, false, -1, false) == 0
+                  && modalModeVerdict(true, 3, false, true, 2, true) == 0,
+              "#W66-AQ H9 NEGATIVE nothing dead is live, exactly as wave 65 counted it");
+        CHECK(modalModeVerdict(true, 0, false, false, -1, false) == 2
+                  && modalModeVerdict(true, 0, false, true, 0, true) == 2,
+              "#W66-AQ H9 MUST-NOT-MATCH a single dead requirement, or two, is still DEAD - the"
+              " half-dead bucket never swallows a wholly dead mode");
+        CHECK(modeLivenessRowTag(0) == " {this mode has a legal object right now}"
+                  && modeLivenessRowTag(2) == " {DEAD right now: no legal object for this mode}",
+              "#W66-AQ H9 NEGATIVE the two wave-65 row tags are byte-identical");
+        CHECK(modeLivenessRowTag(1).find("{HALF DEAD right now:") != string::npos
+                  && modeLivenessRowTag(1).find("does only its other half") != string::npos,
+              "#W66-AQ H9 POSITIVE the third tag says what taking the row actually gets");
+        {
+            std::vector<std::string> live, half, dead;
+            live.push_back("Creature gains 3/3 and you draw");
+            half.push_back("You draw and sacrifice creature");
+            dead.push_back("Creature gains 3/3 and return creature");
+            const string tag = modalModesTag(live, half, dead);
+            CHECK(tag.find("; HALF DEAD (one half of the pair has no legal object, so it does only"
+                           " the other half): You draw and sacrifice creature;") != string::npos,
+                  "#W66-AQ H9 POSITIVE the cast row's census carries the same third bucket, so"
+                  " the two screens cannot disagree");
+            std::vector<std::string> none;
+            CHECK(modalModesTag(live, none, dead).find("HALF DEAD") == string::npos,
+                  "#W66-AQ H9 NEGATIVE with no half-dead pair the bucket is omitted, not printed"
+                  " empty");
+            // ECHO SHAPE.
+            vector<string> menu;
+            menu.push_back("You draw and sacrifice creature" + modeLivenessRowTag(1));
+            menu.push_back("Creature gains 3/3 and you draw" + modeLivenessRowTag(0));
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (You draw and sacrifice creature)", 2, &menu, &stale,
+                              NULL, NULL, false) == 1,
+                  "#W66-AQ H9 ECHO a HALF DEAD row still answers as its own number");
+            CHECK(stripNarrationDecoration(menu[0]) == "You draw and sacrifice creature",
+                  "#W66-AQ H9 ECHO the HALF DEAD group leaves no residue in the narrated record");
+        }
+        // (b) THE PUNISHER TERM. `146v162` seq 24's mode ask said "you would be
+        // at 17" for a mode that draws the seat a card under Underworld Dreams,
+        // which makes it 16 - and the cast row one window earlier had already
+        // folded exactly that rate into its DRAW GRANT bracket.
+        const string bare = modeEffectPriceTag(sqFull, "Creature gains 3/3 and you draw", 18, 17);
+        CHECK(bare == modeEffectPriceTag(sqFull, "Creature gains 3/3 and you draw", 18, 17, 0)
+                  && bare.find("you LOSE 1 life - you would be at 17") != string::npos,
+              "#W66-AQ H9 NEGATIVE with no draw punisher on their board the wave-65 bytes stand");
+        const string folded = modeEffectPriceTag(sqFull, "Creature gains 3/3 and you draw", 18, 17, 1);
+        CHECK(folded.find("you LOSE 1 life, and their draw punishers take 1 more for the 1 card it"
+                          " makes you draw - you would be at 16") != string::npos,
+              "#W66-AQ H9 POSITIVE `146v162` seq 24's 17 is 16 once Underworld Dreams is counted");
+        CHECK(modeEffectPriceTag(sqFull, "Creature gains 3/3 and opponent draws", 18, 17, 1)
+                  == modeEffectPriceTag(sqFull, "Creature gains 3/3 and opponent draws", 18, 17, 0),
+              "#W66-AQ H9 MUST-NOT-MATCH a mode that draws THEM a card is never billed to the"
+              " seat's own punisher rate");
+        CHECK(modeEffectPriceTag(sqFull, "Creature gains 3/3 and you draw", 2, 17, 1)
+                  .find("you would be at 0; THIS KILLS YOU") != string::npos
+                  && modeEffectPriceTag(sqFull, "Creature gains 3/3 and you draw", 2, 17, 0)
+                     .find("KILLS") == string::npos,
+              "#W66-AQ H9 POSITIVE the lethality verdict follows the folded number - the mode's"
+              " own point alone was not fatal at 2 life, the pair is");
+        // MUST-NOT-MATCH: the fold never invents a life clause where the mode
+        // moves no life and draws the seat nothing.
+        CHECK(modeEffectPriceTag(sqFull, "Creature gains 3/3 and return creature", 18, 17, 3).empty(),
+              "#W66-AQ H9 MUST-NOT-MATCH a grant-only mode is still annotated with nothing");
+        // ECHO SHAPE: one {this mode right now: ...} channel, opened once.
+        CHECK(folded.find("{this mode right now:") == 1
+                  && folded.find('}') == folded.size() - 1
+                  && stripNarrationDecoration("Creature gains 3/3 and you draw" + folded)
+                     == "Creature gains 3/3 and you draw",
+              "#W66-AQ H9 ECHO the folded price is still one brace group and leaves no residue");
+    }
+
+    cout << "\n[#W66-AQ H10] the two body-count brackets name the ENGINES they are counting\n";
+    {
+        // The three detectors the prompt already runs, asked of the corpus's own
+        // scripts. Bloodline Keeper (`130v123` seq 44's THEIRS-1) and Fate
+        // Unraveler (`162v126` seq 15's "pays the least" row).
+        const string keeper = "{T}:token(Vampire,Creature Vampire,2/2,black,flying)\n"
+                              "{B}:flip(backside) restriction{type(vampire|mybattlefield)~morethan~4}";
+        const string unraveler = "@drawfoeof(player):damage:1 opponent";
+        const string vanilla = "flying";
+        const string oneShotToken = "token(Soldier,Creature Soldier,1/1,white)";
+        CHECK(engineKindForScript(keeper)
+                  && string(engineKindForScript(keeper)).find("TOKEN ENGINE") == 0,
+              "#W66-AQ H10 POSITIVE Bloodline Keeper's `{T}:token(...)` is a token ENGINE");
+        CHECK(engineKindForScript(unraveler)
+                  && string(engineKindForScript(unraveler)).find("DRAW PUNISHER") == 0,
+              "#W66-AQ H10 POSITIVE Fate Unraveler is the draw punisher the same prompt lists");
+        CHECK(engineKindForScript(vanilla) == NULL && engineKindForScript("") == NULL
+                  && engineKindForScript(oneShotToken) == NULL,
+              "#W66-AQ H10 MUST-NOT-MATCH an ordinary body, and a ONE-SHOT token arrival with no"
+              " cost or trigger ahead of it, are not engines");
+        // THE SWEEP BRACKET. `130v123` seq 44 rendered THEIRS 1 / YOURS 2 with
+        // the parenthetical that it takes more of YOURS - over a Bloodline
+        // Keeper under Intruder Alarm. The seat cycled Starstorm and died at -78.
+        const string engines = "Bloodline Keeper - a TOKEN ENGINE (it makes more permanents,"
+                               " one per activation)";
+        const string swept = boardSweepMarker(1, 2, 1, engines);
+        CHECK(swept.find("board sweep: THEIRS 1 (including Bloodline Keeper - a TOKEN ENGINE")
+                  != string::npos
+                  && swept.find("(it takes more of YOURS than of THEIRS)") != string::npos
+                  && swept.find("THAT COUNT IS BODIES, NOT VALUE") != string::npos,
+              "#W66-AQ H10 POSITIVE the sweep bracket names the engine inside the count and says"
+              " the comparison it prints is a body count");
+        CHECK(boardSweepMarker(1, 2, 1)
+                  == " [<- board sweep: THEIRS 1 / YOURS 2 - the only row on this menu that prices"
+                     " a board sweep (it takes more of YOURS than of THEIRS)]",
+              "#W66-AQ H10 NEGATIVE with no engine among THEIRS the wave-65 bracket is byte-"
+              "identical");
+        CHECK(boardSweepMarker(0, 2, 1, engines).empty()
+                  && boardSweepMarker(3, 1, 0, engines).empty(),
+              "#W66-AQ H10 NEGATIVE a row that sweeps nothing of theirs, or a menu with no"
+              " measured row, is still unmarked");
+        CHECK(swept[0] == ' ' && swept[1] == '[' && swept[swept.size() - 1] == ']',
+              "#W66-AQ H10 ECHO the sweep bracket is one group, opened once and closed");
+        // THE FORCED SACRIFICE. `162v126` seq 15: "the one that pays the least"
+        // pointed at Fate Unraveler while the same prompt printed it under
+        // `DRAW PUNISHERS on the battlefield: yours`.
+        const string sacEngines = "Fate Unraveler is a DRAW PUNISHER (it bills every card the"
+                                  " other player draws)";
+        const string askE = buildForcedSacrificeAsk("Tribute to Hunger", true, 1, sacEngines);
+        const string askBare = buildForcedSacrificeAsk("Tribute to Hunger", true, 1);
+        CHECK(askE.find("the one that pays the least") != string::npos
+                  && askE.find("NOT ALL OF THESE ARE BODIES: Fate Unraveler is a DRAW PUNISHER")
+                     != string::npos
+                  && askE.find("applying to the rows that are NOT named here") != string::npos,
+              "#W66-AQ H10 POSITIVE the tie-break is scoped off the named engine rather than"
+              " ranking it by toughness");
+        CHECK(askBare == buildForcedSacrificeAsk("Tribute to Hunger", true, 1, "")
+                  && askBare.find("NOT ALL OF THESE ARE BODIES") == string::npos
+                  && askE.compare(0, askBare.size(), askBare) == 0,
+              "#W66-AQ H10 NEGATIVE with no engine on the list the wave-65 ask is byte-identical,"
+              " and the new sentence is only ever appended to it");
+        CHECK(forcedSacrificeRowTag(1, 4) == " [you SACRIFICE this; they gain 4 life (its toughness)]",
+              "#W66-AQ H10 NEGATIVE an ordinary body's row tag is unchanged");
+        CHECK(forcedSacrificeRowTag(1, 4, engineKindForScript(unraveler))
+                  .find("; THIS IS NOT JUST A BODY: DRAW PUNISHER") != string::npos,
+              "#W66-AQ H10 POSITIVE the engine row carries the same fact the header scopes on");
+        CHECK(stripNarrationDecoration("Fate Unraveler (3/4)"
+                  + forcedSacrificeRowTag(1, 4, engineKindForScript(unraveler)))
+                  .find("THIS IS NOT JUST A BODY") == string::npos,
+              "#W66-AQ H10 ECHO the row tag leaves no residue in the narrated record");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
