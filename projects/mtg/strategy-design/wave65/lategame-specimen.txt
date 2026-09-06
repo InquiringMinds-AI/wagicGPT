@@ -1,0 +1,366 @@
+file: 1788683508-ai_baka_deck146-0x561e625af1e0-vs-ai_baka_deck126.jsonl
+seq: 62 | kind: ask | turn: 27 | my_life: 17 | opp_life: 13 | chosen: opponent draws and sacrifice creature
+why this one: the LATE (turn 27) Silverquill Command modal window - the exact CHOOSE_MENU seam wave-64 G1 rendered 0 of 23 rows on; it now carries the {this mode right now:} price on all four priced rows, in the correct chair, and the seat took the mode billed to the OPPONENT (wave 64 it took the self-billing mode at 5 and 3 life and lost at 0).
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Hive of the Eye Tyrant; Swamp; Silverquill Silencer; Kaya the Inexorable; Nadaar, Selfless Paladin; Hive of the Eye Tyrant; Kaya the Inexorable
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Swamp
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Swamp
+- Phase: Main phase 1
+- You played Hive of the Eye Tyrant
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Command
+- Phase: Main phase 1
+- You played Swamp
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Lolth, Spider Queen
+- Phase: Main phase 1
+- You played Hive of the Eye Tyrant
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+- Opponent cast Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got 4 loyalty counters (now 4)
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Soul Shatter
+- Phase: Main phase 1
+- Paid {2}{b} for Soul Shatter with Swamp #1; Hive of the Eye Tyrant #1; Swamp #2
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- You used: sacrifice a creature or planeswalker with Soul Shatter targeting Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad was put into the opponent's graveyard from the battlefield
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 19)
+- Opponent gained 1 life (now 21)
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Triumphant Adventurer
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 18)
+- Opponent gained 1 life (now 22)
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Command
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Silverquill Command
+- You discarded Silverquill Command (that Silverquill Command was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 17)
+- Opponent gained 1 life (now 23)
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- Paid {3}{b}{w} for Kaya the Inexorable with Swamp #1; Plains; Hive of the Eye Tyrant #1; Swamp #2; Hive of the Eye Tyrant #2
+- You cast Kaya the Inexorable (that Kaya the Inexorable was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Kaya the Inexorable resolved and entered the battlefield
+- Your Kaya the Inexorable got 5 loyalty counters (now 5)
+- You used: -3: exile non-land permanent with Kaya the Inexorable targeting Overgrown Battlement
+- Your Kaya the Inexorable lost 3 loyalty counters (now 2)
+- Opponent's Overgrown Battlement was exiled from the battlefield
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+- Phase: Combat damage
+- Opponent's Vampire dealt 1 damage to you (now 16)
+- Opponent gained 1 life (now 24)
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You chose Brightclimb Pathway (menu text: Play Land) for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Paid {b}{w} for Triumphant Adventurer with Swamp #1; Plains
+- You cast Triumphant Adventurer
+- Your Triumphant Adventurer resolved and entered the battlefield
+- Paid {2}{w} for Nadaar, Selfless Paladin with Brightclimb Pathway; Hive of the Eye Tyrant #1; Swamp #2
+- You cast Nadaar, Selfless Paladin
+- Your Nadaar, Selfless Paladin resolved and entered the battlefield
+- You targeted Lost Mine of Phandelver with Nadaar, Selfless Paladin's ability (choose a new dungeon)
+- You used: choose a new dungeon with Nadaar, Selfless Paladin targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You used: +1: don't target any creature with Kaya the Inexorable
+- Your Kaya the Inexorable got a loyalty counter
+- You revealed your Triumphant Adventurer from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Triumphant Adventurer went to your library
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+- Phase: Blockers
+- You declared blockers: Nadaar, Selfless Paladin blocks Vampire
+- Phase: Combat damage
+- Your Nadaar, Selfless Paladin dealt 3 damage to Vampire
+- Opponent's Vampire dealt 1 damage to Nadaar, Selfless Paladin
+- Opponent gained 1 life (now 25)
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Barrowin of Clan Undurr
+- Phase: Main phase 1
+- Paid {2}{b}{w} for Barrowin of Clan Undurr with Swamp #1; Plains; Hive of the Eye Tyrant #1; Swamp #2
+- You cast Barrowin of Clan Undurr
+- Your Barrowin of Clan Undurr resolved and entered the battlefield
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- You used: goblin lair with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+- Paid {b}{w} for Silverquill Silencer with Hive of the Eye Tyrant #2; Brightclimb Pathway
+- You cast Silverquill Silencer
+- Your Silverquill Silencer resolved and entered the battlefield
+- You used: Choose a name with Silverquill Silencer
+- You named "Pride Guardian" with Silverquill Silencer
+- Your Silverquill Silencer named Pride Guardian
+- You used: -3: exile non-land permanent with Kaya the Inexorable targeting Perimeter Captain
+- Your Kaya the Inexorable lost 3 loyalty counters (now 0)
+- Your Kaya the Inexorable was put into your graveyard from the battlefield
+- Opponent's Perimeter Captain was exiled from the battlefield
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Nadaar, Selfless Paladin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose dark pool (room 5 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Each opponent loses 1 life and you gain 1 life.} for Lost Mine of Phandelver
+- You used: dark pool with Lost Mine of Phandelver
+- You gained 1 life (now 17)
+- Opponent lost 1 life (now 24)
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Soul Shatter
+- You used: dungeon completed with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your command zone to your zone
+- Opponent gained 3 life (now 27)
+- Opponent gained 3 life (now 30)
+- Opponent gained 3 life (now 33)
+- Opponent gained 3 life (now 36)
+- You assigned Triumphant Adventurer's combat damage to Pride Guardian (0/3) in position 1 (x3)
+- You assigned Triumphant Adventurer's combat damage to Pride Guardian (0/3) in position 2 (x3)
+- You assigned Triumphant Adventurer's combat damage to Pride Guardian (0/3) in position 3 (x3)
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 1 damage to Pride Guardian (x2)
+- Opponent's Pride Guardian died (that Pride Guardian was 1 of 3 copies on the opponent's battlefield; the other 2 are still there) (x2)
+- Your Nadaar, Selfless Paladin dealt 3 damage to Wall of Omens
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Shineshadow Snarl
+- Paid {2}{b} for Soul Shatter with Swamp #1; Plains; Brightclimb Pathway
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- You used: sacrifice a creature or planeswalker with Soul Shatter targeting Wall of Omens
+- Opponent's Wall of Omens died
+- Phase: Attackers
+- You declared attackers: Nadaar, Selfless Paladin, Barrowin of Clan Undurr, Silverquill Silencer
+- Phase: Blockers
+- You targeted Lost Mine of Phandelver with Nadaar, Selfless Paladin's ability (choose a new dungeon)
+- You used: choose a new dungeon with Nadaar, Selfless Paladin targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Silverquill Silencer from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Silverquill Silencer went to your library
+- Opponent gained 3 life (now 39)
+- Opponent gained 3 life (now 42)
+- Phase: Combat damage
+- Your Silverquill Silencer dealt 4 damage to Pride Guardian
+- Your Barrowin of Clan Undurr dealt 4 damage to Pride Guardian
+- Your Nadaar, Selfless Paladin dealt 3 damage to the opponent (now 39)
+- Opponent's Pride Guardian died (x2)
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- You targeted Goblin (2/2) with Tribute to Hunger's ability (gain life equal to its toughness)
+- Opponent used: Gain life equal to its toughness with Tribute to Hunger targeting Goblin
+- Your Goblin died
+- Your Goblin (token) ceased to exist and left your graveyard
+- Opponent gained 2 life (now 41)
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Shineshadow Snarl
+- Paid {3}{b}{w} for Kaya the Inexorable with Swamp #1; Plains; Hive of the Eye Tyrant #1; Swamp #2; Hive of the Eye Tyrant #2
+- You cast Kaya the Inexorable
+- Your Kaya the Inexorable resolved and entered the battlefield
+- Your Kaya the Inexorable got 5 loyalty counters (now 5)
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Nadaar, Selfless Paladin, Barrowin of Clan Undurr, Silverquill Silencer
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- You used: goblin lair with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose storeroom (room 4 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Put a +1/+1 counter on target creature.} for Lost Mine of Phandelver
+- You targeted Nadaar, Selfless Paladin (3/3) with Lost Mine of Phandelver's ability (storeroom)
+- You used: storeroom with Lost Mine of Phandelver targeting Nadaar, Selfless Paladin
+- Your Nadaar, Selfless Paladin got a +1/+1 counter from Lost Mine of Phandelver (now 4/4)
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 2 damage to the opponent (now 39)
+- Your Silverquill Silencer dealt 4 damage to the opponent (now 35)
+- Your Barrowin of Clan Undurr dealt 4 damage to the opponent (now 31)
+- Your Nadaar, Selfless Paladin dealt 4 damage to the opponent (now 27)
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Swamp
+- Phase: Main phase 1
+- You played Swamp
+- Paid {3}{b}{b} for Lolth, Spider Queen with Swamp #1; Hive of the Eye Tyrant #1; Plains; Brightclimb Pathway; Swamp #2
+- You cast Lolth, Spider Queen
+- Your Lolth, Spider Queen resolved and entered the battlefield
+- Your Lolth, Spider Queen got 4 loyalty counters (now 4)
+- You used: -3: create spiders with Lolth, Spider Queen
+- Your Lolth, Spider Queen lost 3 loyalty counters (now 1)
+- Your Lolth, Spider Queen created 2 2/1 Spider tokens
+- You used: -3: exile non-land permanent with Kaya the Inexorable targeting Perimeter Captain
+- Your Kaya the Inexorable lost 3 loyalty counters (now 2)
+- Opponent's Perimeter Captain was exiled from the battlefield
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Nadaar, Selfless Paladin, Barrowin of Clan Undurr, Silverquill Silencer, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Pelakka Predation
+- You used: dungeon completed with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your command zone to your zone
+- You targeted Lost Mine of Phandelver with Triumphant Adventurer's ability (choose a new dungeon)
+- You used: choose a new dungeon with Triumphant Adventurer targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Shineshadow Snarl from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Shineshadow Snarl went to your library
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 2 damage to the opponent (now 25)
+- Your Goblin dealt 2 damage to the opponent (now 23)
+- Your Silverquill Silencer dealt 4 damage to the opponent (now 19)
+- Your Barrowin of Clan Undurr dealt 4 damage to the opponent (now 15)
+- Your Nadaar, Selfless Paladin dealt 4 damage to the opponent (now 11)
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- You targeted Goblin (2/2) with Tribute to Hunger's ability (gain life equal to its toughness)
+- Opponent used: Gain life equal to its toughness with Tribute to Hunger targeting Goblin
+- Your Goblin died
+- Your Goblin (token) ceased to exist and left your graveyard
+- Opponent gained 2 life (now 13)
+- Your Lolth, Spider Queen got a loyalty counter
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Triumphant Adventurer
+- Phase: Main phase 1
+- Paid {b}{w} for Triumphant Adventurer with Swamp #1; Plains
+- You cast Triumphant Adventurer
+- Your Triumphant Adventurer resolved and entered the battlefield
+- You used: Pelakka Caverns with Pelakka Predation -> PLAY THIS AS A LAND: puts "Pelakka Caverns" onto the battlefield as a land (taps for {B}). It costs no mana and uses no stack, and it USES YOUR LAND DROP for this turn, so "Pelakka Predation" leaves your hand with it and that face can no longer be cast.
+- You played Pelakka Caverns
+- Paid {2}{b}{w} for Silverquill Command with Hive of the Eye Tyrant #1; Brightclimb Pathway; Swamp #2; Hive of the Eye Tyrant #2
+- You cast Silverquill Command
+- Your Silverquill Command resolved and went to your graveyard
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 17 | Opponent life: 13
+Opponent life trend: turn 25: 27, turn 26: 11, turn 27: 13, now 13 (-14 since turn 25).
+Dungeons completed (you): 2 - effects that check "completed a dungeon" (e.g. a completed-dungeon anthem) are ACTIVE for you.
+Mana available: 3 total (three untapped sources, tapped automatically when you cast; colours you can make: {b}{w} (sources that can make each: {W} 2, {B} 3 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Shineshadow Snarl #1 {b} or {w}; Shineshadow Snarl #2 {b} or {w}; Swamp #3 {b}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (0 cards): (none)
+Your battlefield (19 permanents listed, of which 7 are creatures, 6 of them able to attack right now, and 10 are lands): Swamp #1 [tapped]; Hive of the Eye Tyrant #1 [tapped]; Swamp #2 [tapped]; Hive of the Eye Tyrant #2 [tapped]; Plains [tapped]; Brightclimb Pathway [tapped]; Triumphant Adventurer #1 {b}{w} (2/2) (printed 1/1) [first strike, deathtouch]; Nadaar, Selfless Paladin {2}{w} (4/4) (printed 3/3) [vigilance] [counters: 1x +1/+1]; Barrowin of Clan Undurr {2}{b}{w} (4/4) (printed 3/3); Silverquill Silencer {b}{w} (4/3) (printed 3/2) [named: Pride Guardian]; Shineshadow Snarl #1; Shineshadow Snarl #2; Kaya the Inexorable {3}{b}{w} [planeswalker] [counters: 2x loyalty] {effect: "+1: Put a ghostform counter on up to one target nontoken creature. It... -- -3: Exile target nonland permanent. -- -7: You get an emblem with "At the beginning of your upkeep, you may cast a legendary spell from your hand, from your graveyard, or from..."}; Swamp #3; Lolth, Spider Queen {3}{b}{b} [planeswalker] [counters: 2x loyalty] {effect: "Whenever a creature you control dies, put a... -- 0: You draw a card and you lose 1 life. -- -3: Create two 2/1 black Spider creature... -- -8: You get an emblem with "Whenever an opponent is dealt combat damage by one or more creatures you control, if that player lost less than..."}; Spider #1 (3/2) (printed 2/1) [reach, menace (can't be blocked except by two or more creatures)]; Spider #2 (3/2) (printed 2/1) [reach, menace (can't be blocked except by two or more creatures)]; Triumphant Adventurer #2 {b}{w} (2/2) (printed 1/1) [first strike, deathtouch] [summoning sick - cannot attack this turn, but CAN block]; Pelakka Caverns [tapped]
+Opponent battlefield (10 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 10 are lands): Savannah; Woodland Cemetery #1; Bayou; Woodland Cemetery #2; Scrubland #1 [tapped]; Scrubland #2; Isolated Chapel; Plains [tapped]; Swamp [tapped]; Sunpetal Grove
+Their untapped sources: 7 (colours they could make: {g}{b}{w})
+Opponent hand size: 0 | Opponent library: 39 cards
+Your library: 38 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 27): Cast Silverquill Command targeting my Triumphant Adventurer #1 for +3/+3 and flying, and target the opponent for the draw/draw mode (they draw 1, lose 1 life). Then attack with all untapped creatures (Nadaar, Barrowin, Silencer, TA#1, Spiders) to finish the opponent who is at 12 life.
+
+Choose an option for Silverquill Command:
+1. creature gains 3/3 and return creature
+2. creature gains 3/3 and you draw {this mode right now: you LOSE 1 life - you would be at 16; you draw 1 (life and draws only: anything else this mode does is in the row label and the card text)}
+3. creature gains 3/3 and opponent draws {this mode right now: they LOSE 1 life - they would be at 12; they draw 1 (life and draws only: anything else this mode does is in the row label and the card text)}
+4. creature gains 3/3 and sacrifice creature
+5. you draw and sacrifice creature {this mode right now: you LOSE 1 life - you would be at 16; you draw 1 (life and draws only: anything else this mode does is in the row label and the card text)}
+6. opponent draws and sacrifice creature {this mode right now: they LOSE 1 life - they would be at 12; they draw 1 (life and draws only: anything else this mode does is in the row label and the card text)}
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (creature gains 3/3 and return creature)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
