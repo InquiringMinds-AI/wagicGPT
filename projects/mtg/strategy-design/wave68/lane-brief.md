@@ -143,3 +143,30 @@ band row to label + `(same effect right now)`; narration 484 lines / 30.5 kB pos
 and bucket it; the opponent's library size as a deck-out forecast when it is within 3 draws (162 LOW); gates asked for
 types the opponent has none of (152 s59) — say "none" instead of asking. Read wave67/lane-AW.md (I9a), wave66/lane-AQ.md
 (H9 census), wave67/deck146/review.md first.
+
+## Lane BE — the eight findings of wave68/codex-review.md (fix or refute, each with evidence)
+Worktree: worktrees/lanes/w68-BE (base = master after the BA-BD merge = 95e8f11c3 + the review commit). Read
+wave68/codex-review.md in full, then the lane report each finding touches (lane-BA.md for #1/#3/#4, lane-BC.md for #2/#8,
+lane-BD.md for #5/#7, lane-BB.md for #6); wave67/lane-AZ.md shows the expected shape of a CONFIRMED/REFUTED table.
+#1 FIRST, it is a real defect the orchestrator verified: `AIPlayerGPT.cpp:15516` col 379 carries `//#W68-BA (J3/J6)` INSIDE
+the constructor initializer list and comments out the 30 initializers after it (mAttacksDoneTurn, mPassDeclineTurn,
+mLoopAbility/Click/Count, mRepeatAbility/Click/Remaining/Total/Done/NoProgress/Absent, ...) — undefined reads at every
+seat construction. Move the comment off the line, verify every member of that list is initialized (diff the list
+against the header's members), and add a guard: a PARSETEST-time or build-time check that no `//` occurs inside the
+ctor initializer list (python over the source in the gate script, or `-Wreorder`/`-Weffc++` evidence) so this class
+cannot recur. #2 HIGH: the legend-rule clause says "you KEEP the one you pick" but `MTGRules.cpp:4102`'s AAMover moves
+the SELECTED target to the graveyard — verify the engine's semantics by fixture (two same-named walkers at 1 and 8
+loyalty, pick one, assert which survives) and make the clause say what the engine does; fix the pin at ~`:74058`. #3
+HIGH doctrine: extending the stop clamp to the plain activation row converts an explicitly re-affirmed `CHOICE: 1` into a
+pass (~`:33987`, pin at ~`:74705`) — after the stop-conflict re-ask, a SECOND explicit answer for ONE activation executes
+ONE activation (the model's own stop applies to counted takes; a single explicit take is the model overriding its own
+plan, which it may do); clamp only counted rows; fix the pin. #4 MED: the combat seams (attackers ~`:44244`, blockers)
+delegate to Baka on a cap-truncated reply with no label — wire `reply_truncated_reask` there as J3 promised. #5 MED: the
+edict crack-back "STILL KILLS you" is a worst-case bound, not a verdict — they choose the sacrifice; print the bound as a
+bound ("can still reach N; a kill is POSSIBLE, not certain") and drop "that is the one they will give up"; fix ~`:74500`.
+#6 MED: the announcement-decline clause claims the floating pool is FORFEITED while `castAbandonedNarration` says it is
+still floating — say the truth: the mana stays floating until end of step, spendable on another row (name whether a row
+can use it); fix ~`:74244`. #7 MED: the deck-out countdown must fold `CANTMILLLOSE`/`CANTLOSE`/`CANTWIN` (helper takes zone
+counts only — pass the flags); fix ~`:74526`. #8 LOW: per-attempt `deadline_pct` divides by the original deadline —
+divide each attempt by its own budget. Gate as usual (suite THREADS=1 0 failed, AI count, PARSETEST 0 failed, RED
+evidence per confirmed finding). Tag `#W68-BE (Rn)`. Write wave68/lane-BE.md with the CONFIRMED/REFUTED table.
