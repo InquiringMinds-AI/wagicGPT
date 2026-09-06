@@ -2139,8 +2139,13 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
 //(`notaTarget(creature|mybattlefield) ... targetedplayer`), so the seat's own
 //half is not a curiosity: it is half of the row's own enumeration. Pure over
 //(count, name, toughness, who gains).
+//#W68-BB (J9, deck123 HIGH-1): at N > 1 the clause said "you gain its
+//toughness" and stopped - an unknown, on the one row that could have answered a
+//lethal stack (`123v162` s32: 25 creatures, 3 damage on the stack, 2 life). The
+//seat CHOOSES which of its own creatures is sacrificed, so the gain has a real
+//ceiling: its largest toughness. Named as a ceiling, never as a promise.
 static string edictSelfClause(int myCreatures, const string& onlyName, int onlyToughness,
-                              bool targetGains)
+                              bool targetGains, int myMaxToughness = 0) //#W68-BB (J9)
 {
     std::ostringstream o;
     if (myCreatures <= 0)
@@ -2157,7 +2162,12 @@ static string edictSelfClause(int myCreatures, const string& onlyName, int onlyT
     {
         o << "one of them, your choice";
         if (targetGains)
+        {
             o << ", and you gain its toughness";
+            if (myMaxToughness > 0)
+                o << " - you pick which, so up to " << myMaxToughness
+                  << " (your largest toughness)"; //#W68-BB (J9)
+        }
     }
     return o.str();
 }
@@ -2300,15 +2310,20 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         if (spellCanTargetSelf(card))
         {
             MTGCardInstance * myOnly = NULL;
+            int myMaxT = 0; //#W68-BB (J9): the ceiling of a gain the seat picks
             Player * meP = card->controller();
             MTGGameZone * mbf = (meP && meP->game) ? meP->game->inPlay : NULL;
             for (int mi2 = 0; mbf && mi2 < mbf->nb_cards; mi2++)
                 if (mbf->cards[mi2] && mbf->cards[mi2]->isCreature())
+                {
                     myOnly = mbf->cards[mi2];
+                    if (myOnly->toughness > myMaxT)
+                        myMaxT = myOnly->toughness;
+                }
             selfClause = edictSelfClause(mine,
                             (mine == 1 && myOnly)
                                 ? myOnly->getDisplayName() + instanceHandle(myOnly) : string(),
-                            myOnly ? myOnly->toughness : 0, targetGains);
+                            myOnly ? myOnly->toughness : 0, targetGains, myMaxT);
         }
         //#W57-C (D11): at N == 1 the victim is DETERMINED, so the stack can be
         //asked about it exactly as the highest-MV branch above asks about its
@@ -12168,23 +12183,44 @@ static const int kXNetNotSupplied = -1000000;
 //windows took the maximum X; two of them decked the seat from a won board. The
 //fact rides the option now, in its own braced channel, and it states the
 //remainder rather than a verdict - the badge above already carries the verdict.
-//`stackPending` is the same `stackPendingDrawsFor` number the ceiling reserves
-//against, so the row and the badge cannot disagree. Pure over three ints.
-static string xLibraryRowClause(int cards, int library, int stackPending)
+//#W68-BB (J4, deck125 HIGH-1/2; lane AW's "the row and the header cannot name
+//different values" FALSIFIED by the corpus). `125v130` s90 printed the header
+//"3 draws are already owed ... X=1 is the largest listed X the library pays
+//for" over option 6 `{library: this draws 4 of your 4 library cards - 0 left}`,
+//and the seat took option 6 and emptied its library with 3 undeclinable draws
+//owed. Both surfaces were TRUE and they answered different questions: the
+//header folded the whole reserve (draw step + stack + upkeep draws), the row
+//folded only the STACK term (`stackPendingDrawsFor`), which was 0 on that
+//board - the two Staff of Nin upkeep draws live on the battlefield, not the
+//stack, so `; M more pending` rendered 0 times in the whole corpus. The row
+//now takes the SAME `owedDraws` reserve `xLibraryCeilingClause` and
+//`xAnnounceLibraryNote` are built from, so the largest drawing row that does
+//NOT carry the deck warning is exactly `xLibraryCeilingX` - one arithmetic,
+//two surfaces (pinned as an identity in PARSETEST). Pure over three ints.
+static string xLibraryRowClause(int cards, int library, int owedDraws)
 {
     if (cards <= 0 || library < 0)
         return "";
+    const int owed = owedDraws > 0 ? owedDraws : 0;
+    const int left = cards >= library ? 0 : (library - cards);
     std::ostringstream o;
     o << " {library: this draws " << cards << " of your " << library
       << " library card" << (library == 1 ? "" : "s") << " - "
-      << (cards >= library ? 0 : (library - cards)) << " left";
+      << left << " left";
     if (cards > library)
         o << ", which is " << (cards - library) << " MORE than the library holds:"
              " you would be asked to draw from an EMPTY library and LOSE the game"
              " as that draw is attempted";
-    if (stackPending > 0)
-        o << "; " << stackPending << " more draw" << (stackPending == 1 ? "" : "s")
-          << " already pending on the stack, which you cannot decline";
+    else if (owed > 0)
+    {
+        o << "; " << owed << " draw" << (owed == 1 ? " is" : "s are")
+          << " already owed that you cannot decline";
+        if (left < owed)
+            o << " and only " << left << " would be left: you would be asked to draw"
+                 " from an EMPTY library and LOSE the game as that draw is attempted";
+        else
+            o << ", and the " << left << " left still pays them";
+    }
     o << "}";
     return o.str();
 }
@@ -12520,7 +12556,7 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
                                     int handAfterCast = -1, int handLimit = -1,
                                     int perDiscard = 0, const string& discardPunishers = "",
                                     int stackedDraws = 0, //#W63-AC (E2)
-                                    int library = -1, int stackPending = 0) //#W67-AW (I4)
+                                    int library = -1, int owedDraws = 0) //#W67-AW (I4) / #W68-BB (J4)
 {
     out.clear();
     for (int x = capX; x >= 0; x--)
@@ -12531,7 +12567,7 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
         //#W67-AW (I4): the library remainder for THIS row's draws, appended in
         //its own brace so the `{X pricing: ...}` block is byte-identical.
         if (drawPerX > 0)
-            row += xLibraryRowClause(x * drawPerX, library, stackPending);
+            row += xLibraryRowClause(x * drawPerX, library, owedDraws);
         out.push_back(row);
     }
 }
@@ -13166,9 +13202,12 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         int rowLib = -1, rowReserve = 1, rowStack = 0;
         string rowWhy;
         xLibraryReserve(me, card, rowLib, rowReserve, rowWhy, &rowStack);
+        //#W68-BB (J4): the WHOLE reserve, which is what the header and the
+        //ceiling function use - the stack term alone left the row silent about
+        //every upkeep draw the badge above it was reserving for.
         xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out,
                                 handAfterCast, handLimit, perDiscard, discardPunishers,
-                                stackedDraws, rowLib, rowStack); //#W67-AW (I4)
+                                stackedDraws, rowLib, rowReserve); //#W67-AW (I4) / #W68-BB (J4)
         //#W56-C (D7 b): the monotone menu's own marker, on the largest X, via
         //the same one-row-marked plumbing the kill families use.
         if (markX && markerText)
@@ -22975,21 +23014,35 @@ enum HandCastVerdict
 //halves) that actually failed; it is APPENDED, so the full rule is still
 //printed and nothing the model relies on is deleted, and an empty `timingWhy`
 //is byte-identical to wave 66.
+//#W68-BB (J5, deck130 HIGH-2): the tag counted UNTAPPED SOURCES and said
+//nothing about mana already floating, so `130v126` s29 read `Spark Spray {r}
+//[instant] [cannot pay now: needs 1 mana, you have 0 untapped sources]` two
+//lines under `Already in pool: {r}{r}{r}{r}{r}{r}{c} (7 mana ALREADY produced
+//and floating right now)` - and one line above its own offered `1. Cast Spark
+//Spray` row. Measured on the corpus: 74 of 110 floating-pool prompts carried a
+//cannot-pay tag (264 tags), 9 of them naming a card the SAME prompt offered a
+//Cast row for. The pool is now folded into the affordability test AND named in
+//the sentence; with an empty pool (`floating == 0`) every byte is wave 67's.
 string handCastabilityTag(int verdict, int need, int sources, const string& cost,
-                          const string& timingWhy = "") //#W67-AW (M2)
+                          const string& timingWhy = "", //#W67-AW (M2)
+                          int floating = 0) //#W68-BB (J5)
 {
     std::ostringstream o;
+    std::ostringstream haveO;
+    haveO << sources << " untapped source" << (sources == 1 ? "" : "s");
+    if (floating > 0)
+        haveO << " and " << floating << " mana already floating";
+    const string have = haveO.str();
     switch (verdict)
     {
     case kHandCastableNow:
         return " [castable now]";
     case kHandNeedsMana:
-        o << " [cannot pay now: needs " << need << " mana, you have " << sources
-          << " untapped source" << (sources == 1 ? "" : "s") << "]";
+        o << " [cannot pay now: needs " << need << " mana, you have " << have << "]";
         return o.str();
     case kHandNeedsColours:
-        o << " [cannot pay now: needs " << cost << ", your " << sources
-          << " untapped source" << (sources == 1 ? "" : "s") << " cannot pay it]";
+        o << " [cannot pay now: needs " << cost << ", your " << have
+          << " cannot pay it]";
         return o.str();
     case kHandSorcerySpeed:
         o << " [no cast row now: sorcery speed - only in your own main phase"
@@ -23394,6 +23447,15 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         }
         GptManaPolicy castPolicy(this);
         ManaCost * castPool = ManaEngine::potentialMana(this, castPolicy);
+        //#W68-BB (J5): `potentialMana` is the UNTAPPED PRODUCERS only; the
+        //payment planner (`ManaEngine::planPayment`, which `payable` falls
+        //through to) adds `getManaPool()` before it plans. This scan asked the
+        //narrower question and then printed its answer as a verdict about the
+        //cast, which is how a prompt came to carry a cannot-pay tag and an
+        //offered Cast row for the same card. Same pool, same test.
+        const int handFloating = getManaPool()->getConvertedCost();
+        if (handFloating > 0)
+            castPool->add(getManaPool());
         std::set<string> castableNow;
         {
             vector<LegalActionsOracle::Cast> casts =
@@ -23426,13 +23488,14 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                         == PlayRestriction::CANT_PLAY)
                 verdict = kHandRestricted;
             else if (!LegalActionsOracle::payable(this, castPolicy, hc, castPool))
-                verdict = (need > sources) ? kHandNeedsMana : kHandNeedsColours;
+                verdict = (need > sources + handFloating) ? kHandNeedsMana
+                                                          : kHandNeedsColours; //#W68-BB (J5)
             else
                 //Every gate the oracle checks before its name dedupe has passed,
                 //so the remaining one is 601.2c: a mandatory target, none legal.
                 verdict = kHandNoLegalTarget;
             string tag = handCastabilityTag(verdict, need, sources, costStr,
-                                            sorceryWhy); //#W67-AW (M2)
+                                            sorceryWhy, handFloating); //#W67-AW (M2) / #W68-BB (J5)
             //#W62-W (D15): and the land face, if this spell has one.
             const string backLand = mdfcHandBackLandName(hc);
             if (!backLand.empty())
@@ -24583,6 +24646,12 @@ static string stripNarrationDecoration(const string& in)
                 //#W63-AC (E5): the rung ceiling explains THIS menu's top row
                 //and says nothing about what happened.
                 || (in.compare(i, 15, "{rung ceiling: ") == 0)
+                //#W68-BB (J5): the post-announcement decline's forfeiture clause
+                //prices THIS window's pool; the moment the step ends it is false.
+                || (in.compare(i, 24, "{declining now FORFEITS ") == 0)
+                //#W68-BB (J9): the pending stack's death verdict is true of the
+                //stack in front of the model, and of nothing afterwards.
+                || (in.compare(i, 20, "{answers the stack: ") == 0)
                 //#W64-AH (F11): the crack-back cover tag prices a line that is
                 //true of THIS window's board and false the moment combat
                 //happens - decision-time pricing, never history.
@@ -24929,9 +24998,48 @@ string AIPlayerGPT::paymentReceipt(ManaCost * cost, MTGCardInstance * target,
                               names, poolConvertedCost > 0);
 }
 
+//#W68-BB (J5, deck130 HIGH-1): what a post-announcement decline actually
+//costs. `130v126` s21-s24: the seat announced Starstorm, six sources and a
+//Talisman were tapped into the pool, and the X menu offered
+//`Decline - do not cast this after all (the announcement is cancelled and the
+//card stays in your hand)` - true about the CARD and silent about the mana.
+//The seat declined at T10, the pool emptied at end of step and the deck's own
+//lethal line went with it (`130v162` s70-s73 is the same shape). The clause is
+//printed only when mana is actually floating, so a decline with an empty pool
+//is byte-identical to wave 67. Pure over one int.
+static string xDeclineForfeitClause(int floating)
+{
+    if (floating <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {declining now FORFEITS the " << floating << " mana already paid: the card comes"
+         " back to your hand but the mana does not - your sources stay tapped, and any"
+         " floating mana you do not spend before this step ends is lost}";
+    return o.str();
+}
+
+//#W68-BB (J5): the receipt says a cost was PAID; nothing said the spell it was
+//paid for never happened. Written at the decline, in the narration's own voice.
+static string castAbandonedNarration(const string& card, int floating)
+{
+    std::ostringstream o;
+    o << (card.empty() ? string("That spell") : card)
+      << " was NOT cast: you declined after the payment above, so it is back in your hand";
+    if (floating > 0)
+        o << " and the " << floating << " mana that paid for it is still floating, unspent";
+    return o.str();
+}
+
 void AIPlayerGPT::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources)
 {
     appendNarration(paymentReceipt(cost, target, sources, getManaPool()->getConvertedCost()));
+    //#W68-BB (J5): remember whose receipt this was, so a decline on the very
+    //next menu can say the cast did not happen.
+    if (target && cost && cost->getConvertedCost())
+    {
+        mPaidPendingCard = target->getDisplayName();
+        mPaidPendingStep = stepKey();
+    }
 }
 
 //#W51-D (D18): the translog's `turn` is the narration's turn. The narration
@@ -25451,6 +25559,59 @@ static string holdKeyRow(const string& row)
     return holdKeyLifeProjectionsNormalised(core); //#W66-AS (H7) + #W66-AU (R1)
 }
 
+//#W68-BB (J9, deck123 HIGH-1): `123v162` s32 printed
+//`ON THE STACK: 3 damage to you - you would be at -1; that would KILL you` in
+//the board frame and then, ~40 lines later, a three-row menu. The seat wrote
+//"Stack resolves (damage to 2)", took the Hold row, and died. The verdict is a
+//fact about the ROWS THAT DECLINE - taking one IS taking the damage - so it is
+//repeated on them, the way the blockers seam repeats its own lethal verdict on
+//the screen the declaration is made on. Rendered ONLY when the pending stack is
+//lethal; nothing is capped, no row is removed, and a non-lethal stack leaves
+//every row byte-identical to wave 67. A POSITIVE `{answers the stack: yes}` on
+//a row that would prevent it is deliberately NOT claimed - no per-row life-gain
+//magnitude exists that could carry it without risking a false claim. Pure.
+static string stackDeathRowClause(int stackLossToMe, int myLife)
+{
+    if (stackLossToMe <= 0 || myLife < 0)
+        return "";
+    const int after = myLife - stackLossToMe;
+    if (after > 0)
+        return "";
+    std::ostringstream o;
+    o << " {answers the stack: NO - " << stackLossToMe << " damage is ALREADY ON THE STACK,"
+         " and taking this row lets it resolve: that puts you at " << after
+      << " and KILLS you}";
+    return o.str();
+}
+
+//The rows that decline: the model's own hold row and the cast-nothing row.
+static void appendStackDeathToDeclineRows(std::vector<string>& rows,
+                                          int stackLossToMe, int myLife) //#W68-BB (J9)
+{
+    const string clause = stackDeathRowClause(stackLossToMe, myLife);
+    if (clause.empty())
+        return;
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].compare(0, 14, "Hold priority:") == 0
+            || rows[i].compare(0, 12, "Cast nothing") == 0)
+            rows[i] += clause;
+}
+
+//#W68-BB (J9, deck162 MED-3): the hold latch reads ROWS, and the CRACK-BACK
+//verdict lives in the board frame, so a hold taken while the crack-back was
+//survivable stayed held after it turned lethal (`162v146` s19/s20;
+//`hold_windows_skipped` 56 in the game that was lost). The verdict WORD - not
+//the number, which AU R1 deliberately normalises out of the key - joins the
+//held set as its own marker, so survive -> LETHAL re-opens the window. It can
+//only ADD re-opens: no window is ever removed by it. Pure over three ints.
+static string crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife)
+{
+    if (ableAttackers <= 0 || maxDamage <= 0)
+        return "[crack-back verdict: none]";
+    return (myLife - maxDamage <= 0) ? string("[crack-back verdict: LETHAL]")
+                                     : string("[crack-back verdict: you survive]");
+}
+
 static bool holdStillStands(const std::set<string>& heldRows,
                             const std::vector<string>& nowRows,
                             const char ** whyOut)
@@ -25603,6 +25764,15 @@ static int holdRowIndexOf(const std::vector<string> * optionTexts)
 //correctly. D11b's reword removes the head collision at its source as well.
 //What remains genuinely ambiguous is handled at the branch below.
 
+//#W68-BB (J9): the crack-back verdict as the hold latch sees it, off the same
+//`crackBackTotalOver` walk the CRACK-BACK NEXT TURN line is printed from.
+string AIPlayerGPT::crackBackVerdictNow()
+{
+    int atk = 0;
+    const int dmg = crackBackTotalOver(opponent(), &atk);
+    return crackBackVerdictKey(atk, dmg, life);
+}
+
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
 //took the HOLD row this turn, at this seam, and the board it took it on is
 //still the board in front of it with no row it has not already seen. Every
@@ -25619,7 +25789,12 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     if (it == mHoldRows.end())
         return false; //held elsewhere, never at this seam: this question is owed
     const char * why = "";
-    if (!holdStillStands(it->second, rows, &why))
+    //#W68-BB (J9): recomputed HERE, off the live board, not read from the last
+    //prompt - a latched copy would notice the change one window late, which is
+    //exactly the window the seat dies in.
+    std::vector<string> rowsWithVerdict = rows;
+    rowsWithVerdict.push_back(crackBackVerdictNow());
+    if (!holdStillStands(it->second, rowsWithVerdict, &why))
     {
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         //#W63-AD (E10, engine HIGH-2). THE PROMISE WAS BROKEN BY THE NEIGHBOUR.
@@ -25673,6 +25848,7 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
     for (size_t i = 0; i < rows.size(); i++)
         s.insert(holdKeyRow(rows[i])); //#W56-A (D1) + #W63-AD (E10): byte for byte
                                        //but for the pass row's phase clause
+    s.insert(holdKeyRow(crackBackVerdictNow())); //#W68-BB (J9)
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - later " << seam
                << " windows are held until one of these rows changes"); //#W61-U (C14)
@@ -30279,6 +30455,37 @@ static void appendParseNote(std::string * noteOut, const char * sig)
     *noteOut += sig;
 }
 
+//#W68-BB (J4, deck125): the ANNOUNCE_X menu is the one menu whose row NAMES
+//are numbers - `X = 4` at row 1, `X = 2` at row 4. `125v162` s90 answered
+//`CHOICE: 2 (X = 2)`: the coded index says row 2 (X = 4) and the name says row
+//4 (X = 2), which the generic rule scores as a number/name disagreement and
+//re-asks (`index_name_conflict`, 1 of the corpus's 7 fallbacks; s91 recovered
+//with `CHOICE: 4 (X = 2)`, one wasted round trip). But on THIS menu the name is
+//not an echo of a row's prose - it is the value the model is announcing, and it
+//is unique on the list, so it is an answer, not an ambiguity: the same reading
+//`#W66-AS` gives the hold row's own unique label. Recognised from the rows
+//themselves (two or more `X = <digits>` rows, every other row a decline/hold),
+//so no seam has to declare what it is. Pure over the option list.
+static bool menuIsBareXAnnounce(const std::vector<string> * options)
+{
+    if (!options)
+        return false;
+    size_t xRows = 0;
+    for (size_t i = 0; i < options->size(); i++)
+    {
+        const string& r = (*options)[i];
+        if (r.compare(0, 4, "X = ") == 0 && r.size() > 4 && isdigit((unsigned char) r[4]))
+        {
+            xRows++;
+            continue;
+        }
+        if (r.compare(0, 7, "Decline") == 0 || r.compare(0, 14, "Hold priority:") == 0)
+            continue;
+        return false; //a row this menu class does not have: not an X menu
+    }
+    return xRows >= 2;
+}
+
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
@@ -30991,6 +31198,14 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 if (exactNameRemap)
                 {
                     appendParseNote(noteOut, "name_over_index"); //#W52-J D6
+                    //#W68-BB (J4): on the X menu the name IS the value. Stamped
+                    //and resolved to the named row, never re-asked.
+                    if (menuIsBareXAnnounce(optionTexts))
+                    {
+                        appendParseNote(noteOut, "x_value_named");
+                        appendParseNote(noteOut, "index_name_unique_name");
+                        return echoRemap;
+                    }
                     //#W66-AR (MED, engine MED-1). #W65-AO G8/6 routed a
                     //number/name disagreement to ONE re-ask - but only inside
                     //parseChoice's RESERVED-NAME branches (hold/pass), so on an
@@ -32477,6 +32692,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //removed from the record - the row the model took said this.
     //#W61-U (C14): measured over the same rows the latch reads, before the
     //latch consumes the window, so a held window still updates the memory.
+    //#W68-BB (J9): the pending stack's death verdict, on the rows that decline
+    //to answer it - BEFORE the hold latch reads them, so a hold taken on a
+    //lethal screen is held over a row that says so.
+    appendStackDeathToDeclineRows(shownLines,
+                                  pendingStackLifeLossToSeat(observer, this), life);
     const string holdNote = holdReopenNote("priority", shownLines);
     if (holdRow > 0 && holdHonoured("priority", shownLines))
     {
@@ -35753,6 +35973,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //the rows the latch reads and BEFORE the latch consumes the window (a
         //held window still updates the memory). Only attempt 0 measures: a
         //re-ask menu is the same window with a row removed, not a new one.
+        appendStackDeathToDeclineRows(menu,
+                                      pendingStackLifeLossToSeat(observer, this),
+                                      life); //#W68-BB (J9)
         if (attempt == 0)
             mCastHoldNote = holdReopenNote("cast", menu);
         mNextAskPromptNote += mCastHoldNote;
@@ -37171,8 +37394,9 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //whose only affordable X does nothing go back to the hand.
         const size_t xRowCount = shown.size();
         if (req.canDecline)
-            shown.push_back("Decline - do not cast this after all"
-                            " (the announcement is cancelled and the card stays in your hand)");
+            shown.push_back(string("Decline - do not cast this after all"
+                            " (the announcement is cancelled and the card stays in your hand)")
+                            + xDeclineForfeitClause(getManaPool()->getConvertedCost())); //#W68-BB (J5)
         //#W67-AW (I4): the ceiling sentence, on the screen the number is picked
         //on. Built from the SAME reserve and the same ceiling function the rows
         //and the badge use, so the three surfaces cannot name different values.
@@ -37197,9 +37421,20 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             return kChoicePending;
         if (req.canDecline && pick == (int) xRowCount)
         {
+            //#W68-BB (J5): the receipt above this line said the cost was paid.
+            //Say that the spell it paid for is not happening.
+            const string paidFor = ctx ? ctx->getDisplayName() : string();
+            if (!mPaidPendingCard.empty() && mPaidPendingStep == stepKey()
+                && (paidFor.empty() || paidFor == mPaidPendingCard))
+            {
+                appendNarration(castAbandonedNarration(mPaidPendingCard,
+                                                       getManaPool()->getConvertedCost()));
+                mPaidPendingCard.clear();
+            }
             act.choice = -1; //applyMenuChoice clicks the menu's own Cancel row
             return 0;
         }
+        mPaidPendingCard.clear(); //#W68-BB (J5): this announcement is going through
         if (pick >= 0 && pick < (int) xRowCount)
             pick = (int) req.optionTexts.size() - 1 - pick; //shown space -> index==X space
         else if (pick < 0)
@@ -71854,18 +72089,24 @@ static const char * kW50Y_r94 =
         CHECK(xLibraryRowClause(21, 22, 0)
                   == " {library: this draws 21 of your 22 library cards - 1 left}",
               "#W67-AW I4 REPRO the s273 row now prices the draw against the library");
+        //#W68-BB (J4): the third argument is now the WHOLE owed-draw reserve, not
+        //the stack term alone, and the clause says whether the remainder pays it.
         CHECK(xLibraryRowClause(13, 14, 2)
-                  == " {library: this draws 13 of your 14 library cards - 1 left; 2 more draws"
-                     " already pending on the stack, which you cannot decline}",
-              "#W67-AW I4 POSITIVE the s130 row names the pending stack draws too");
+                  == " {library: this draws 13 of your 14 library cards - 1 left; 2 draws are"
+                     " already owed that you cannot decline and only 1 would be left: you would be"
+                     " asked to draw from an EMPTY library and LOSE the game as that draw is"
+                     " attempted}",
+              "#W67-AW I4 / #W68-BB J4 POSITIVE the s130 row names the draws already owed and"
+              " prices the remainder against them");
         CHECK(xLibraryRowClause(20, 14, 0).find("6 MORE than the library holds") != string::npos
                   && xLibraryRowClause(20, 14, 0).find("- 0 left") != string::npos,
               "#W67-AW I4 POSITIVE a row that outruns the library says so and never prints a"
               " negative remainder");
         CHECK(xLibraryRowClause(1, 1, 1)
-                  == " {library: this draws 1 of your 1 library card - 0 left; 1 more draw already"
-                     " pending on the stack, which you cannot decline}",
-              "#W67-AW I4 the singular forms agree with their counts");
+                  == " {library: this draws 1 of your 1 library card - 0 left; 1 draw is already"
+                     " owed that you cannot decline and only 0 would be left: you would be asked to"
+                     " draw from an EMPTY library and LOSE the game as that draw is attempted}",
+              "#W67-AW I4 / #W68-BB J4 the singular forms agree with their counts");
         // MUST-NOT-MATCH: X=0 draws nothing and an unknown library claims nothing.
         CHECK(xLibraryRowClause(0, 22, 0).empty() && xLibraryRowClause(5, -1, 0).empty(),
               "#W67-AW I4 MUST-NOT-MATCH no draws, or no known library, no clause");
@@ -72596,6 +72837,305 @@ static const char * kW50Y_r94 =
         CHECK(lr.find("4 + 4") == string::npos && lr.find("loyalty") == string::npos,
               "#W68-BC MED MUST-NOT-MATCH the RULE clause carries no per-copy number - the"
               " loyalty rides each ROW (describeTarget), where the pick is made");
+    }
+
+
+    cout << "\n[#W68-BB] J4 ONE ceiling, TWO surfaces: the 125v130 s90 numbers\n";
+    {
+        // REPRO `125v130` s90 (t43) verbatim. Library 4; the header reserved 3
+        // undeclinable draws (the draw step plus TWO Staff of Nin upkeep draws,
+        // both on the battlefield, neither on the stack) and said
+        // "X=1 is the largest listed X the library pays for"; option 6 read
+        // `{library: this draws 4 of your 4 library cards - 0 left}` and nothing
+        // else. The seat took option 6 and emptied its library with 3 owed draws
+        // it could not decline. `; M more pending` rendered 0 times in the whole
+        // corpus because the row's third argument was the STACK term only.
+        const string s90Why = "your next draw step, which you cannot decline, plus Staff of"
+                              " Nin's upkeep draw, plus Staff of Nin's upkeep draw";
+        const int s90Lib = 4, s90Reserve = 3, s90CapX = 9, s90DrawPerX = 1;
+        CHECK(xLibraryRowClause(4, 4, 0)
+                  == " {library: this draws 4 of your 4 library cards - 0 left}",
+              "#W68-BB J4 REPRO the s90 row the seat obeyed, byte for byte: the stack term was 0,"
+              " so the row said nothing about the 3 draws already owed");
+        // ONE FUNCTION, BOTH SURFACES, ONE CALL EACH, from the same pair of
+        // numbers: `xLibraryCeilingX` decides the header's value, and the same
+        // arithmetic decides which rows carry the deck warning.
+        const int libX = xLibraryCeilingX(s90CapX, s90DrawPerX, s90Lib, s90Reserve);
+        const string header = xAnnounceLibraryNote(s90CapX, s90DrawPerX, s90Lib, s90Reserve,
+                                                   s90Why, libX);
+        vector<string> rows;
+        xLifeDrawRowAnnotations(s90CapX, 1, s90DrawPerX, 0, "", rows,
+                                -1, -1, 0, "", 0, s90Lib, s90Reserve);
+        CHECK(libX == 1 && rows.size() == 10,
+              "#W68-BB J4 REPRO the ceiling is X=1 and the menu is X=9 down to X=0");
+        CHECK(header.find("3 draws are already owed that you cannot decline") != string::npos
+                  && header.find("X=1 is the largest value on this menu the library pays for")
+                     != string::npos,
+              "#W68-BB J4 POSITIVE the header states the reserve and the value it pays for");
+        // rows[i] is X = capX - i.
+        const string rowX4 = rows[(size_t) (s90CapX - 4)];
+        const string rowX1 = rows[(size_t) (s90CapX - 1)];
+        CHECK(rowX4.find(" {library: this draws 4 of your 4 library cards - 0 left; 3 draws are"
+                         " already owed that you cannot decline and only 0 would be left: you"
+                         " would be asked to draw from an EMPTY library and LOSE the game as that"
+                         " draw is attempted}") != string::npos,
+              "#W68-BB J4 POSITIVE the row the seat took now carries the same 3 owed draws the"
+              " header reserves for");
+        CHECK(rowX1.find("3 draws are already owed that you cannot decline, and the 3 left still"
+                         " pays them") != string::npos,
+              "#W68-BB J4 POSITIVE the row AT the ceiling says the remainder pays the owed draws");
+        // THE IDENTITY: the largest drawing row with no deck warning IS the
+        // header's ceiling. A header and a row can no longer name different
+        // values without this failing.
+        int largestSafeX = -1;
+        for (int x = s90CapX; x >= 1; x--)
+        {
+            const string& r = rows[(size_t) (s90CapX - x)];
+            if (r.find("LOSE the game") == string::npos)
+            {
+                largestSafeX = x;
+                break;
+            }
+        }
+        CHECK(largestSafeX == libX,
+              "#W68-BB J4 the largest row that does not deck the seat IS the header's ceiling -"
+              " one arithmetic, both surfaces");
+        // MUST-NOT-MATCH: with nothing owed the clause is wave 67's, byte for byte.
+        CHECK(xLibraryRowClause(21, 22, 0)
+                  == " {library: this draws 21 of your 22 library cards - 1 left}"
+                  && xLibraryRowClause(0, 22, 3).empty()
+                  && xLibraryRowClause(5, -1, 3).empty(),
+              "#W68-BB J4 MUST-NOT-MATCH nothing owed, no draws, or no known library: the wave-67"
+              " clause exactly");
+        // ECHO SHAPE: still one brace channel, and still stripped from history.
+        {
+            const string r = xLibraryRowClause(4, 4, 3);
+            CHECK(r[0] == ' ' && r[1] == '{' && r[r.size() - 1] == '}'
+                      && r.find('[') == string::npos
+                      && (int) std::count(r.begin(), r.end(), '{') == 1
+                      && (int) std::count(r.begin(), r.end(), '}') == 1,
+                  "#W68-BB J4 ECHO the widened clause still opens exactly one brace and closes it");
+            CHECK(stripNarrationDecoration("X = 4" + r) == "X = 4",
+                  "#W68-BB J4 ECHO the widened clause never enters history");
+        }
+    }
+
+    cout << "\n[#W68-BB] J4 the X menu's row NAME is the X value, not an index conflict\n";
+    {
+        // REPRO `125v162` s90: `CHOICE: 2 (X = 2)` - the coded index points at
+        // row 2 (X = 4), the name at row 4 (X = 2). Wave 67 scored that as a
+        // number/name disagreement and burned a round trip (`index_name_conflict`,
+        // 1 of the corpus's 7 fallbacks); s91 answered `CHOICE: 4 (X = 2)`.
+        vector<string> xMenu;
+        xMenu.push_back("X = 5 {X pricing: X=5 - you gain 5 life and draw 5 cards}");
+        xMenu.push_back("X = 4 {X pricing: X=4 - you gain 4 life and draw 4 cards}");
+        xMenu.push_back("X = 3 {X pricing: X=3 - you gain 3 life and draw 3 cards}");
+        xMenu.push_back("X = 2 {X pricing: X=2 - you gain 2 life and draw 2 cards}");
+        xMenu.push_back("X = 1 {X pricing: X=1 - you gain 1 life and draw 1 card}");
+        xMenu.push_back("X = 0 {X pricing: X=0 - this cast does NOTHING}");
+        xMenu.push_back("Decline - do not cast this after all"
+                        " (the announcement is cancelled and the card stays in your hand)");
+        CHECK(menuIsBareXAnnounce(&xMenu),
+              "#W68-BB J4 REPRO the s90 menu is recognised from its own rows");
+        string xNote;
+        bool xStale = false;
+        //the label-stripped segment, as the seam hands it over (#W52-J D6)
+        const int k = parseChoice("2 (X = 2)", (int) xMenu.size(), &xMenu, &xStale,
+                                  NULL, &xNote, false);
+        CHECK(k == 4,
+              "#W68-BB J4 POSITIVE the answer is the X the reply NAMED, which is row 4");
+        CHECK(xNote.find("x_value_named") != string::npos
+                  && xNote.find("index_name_unique_name") != string::npos,
+              "#W68-BB J4 POSITIVE the divergence is still stamped - it is resolved, not hidden");
+        CHECK(xNote.find("index_name_conflict") == string::npos,
+              "#W68-BB J4 MUST-NOT-MATCH the X menu never raises index_name_conflict, so no round"
+              " trip is spent asking the reply to repeat what it already said");
+        // NEGATIVE: an ordinary menu with the SAME shape still re-asks.
+        vector<string> plainMenu;
+        plainMenu.push_back("Cast Alpha");
+        plainMenu.push_back("Cast Beta");
+        plainMenu.push_back("Cast Gamma");
+        CHECK(!menuIsBareXAnnounce(&plainMenu) && !menuIsBareXAnnounce(NULL),
+              "#W68-BB J4 NEGATIVE an ordinary menu, and no menu at all, are not X menus");
+        string pNote;
+        const int pk = parseChoice("1 (Cast Gamma)", (int) plainMenu.size(), &plainMenu,
+                                   &xStale, NULL, &pNote, false);
+        CHECK(pk == 3 && pNote.find("index_name_conflict") != string::npos
+                  && pNote.find("x_value_named") == string::npos,
+              "#W68-BB J4 NEGATIVE the generic number/name rule is untouched off the X menu");
+        // NEGATIVE: one X row does not make an X menu.
+        vector<string> oneX;
+        oneX.push_back("X = 2 {X pricing: X=2}");
+        oneX.push_back("Cast Alpha");
+        CHECK(!menuIsBareXAnnounce(&oneX),
+              "#W68-BB J4 NEGATIVE a single X row beside a foreign row is not the X menu");
+    }
+
+    cout << "\n[#W68-BB] J5 the cannot-pay tag counts the mana already floating\n";
+    {
+        // REPRO `130v126` s29: 0 untapped sources, 7 red-ish mana floating, a
+        // `Cast Spark Spray` row offered on the SAME screen. Corpus census: 74 of
+        // 110 floating-pool prompts carried a cannot-pay tag (264 tags), 9 of them
+        // naming a card that prompt also offered a Cast row for.
+        CHECK(handCastabilityTag(kHandNeedsMana, 1, 0, "{r}", "", 7)
+                  == " [cannot pay now: needs 1 mana, you have 0 untapped sources and 7 mana"
+                     " already floating]",
+              "#W68-BB J5 POSITIVE the tag names the pool the payment planner already spends");
+        CHECK(handCastabilityTag(kHandNeedsColours, 3, 1, "{1}{w}{w}", "", 2)
+                  == " [cannot pay now: needs {1}{w}{w}, your 1 untapped source and 2 mana already"
+                     " floating cannot pay it]",
+              "#W68-BB J5 POSITIVE the colour branch counts it too");
+        // MUST-NOT-MATCH: an empty pool leaves every byte as wave 67 wrote it.
+        CHECK(handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}", "", 0)
+                  == handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}")
+                  && handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}")
+                     == " [cannot pay now: needs 5 mana, you have 3 untapped sources]",
+              "#W68-BB J5 MUST-NOT-MATCH with no floating mana the tag is wave 67's, byte for"
+              " byte");
+        CHECK(handCastabilityTag(kHandCastableNow, 1, 0, "{r}", "", 7) == " [castable now]",
+              "#W68-BB J5 the castable verdict is a verdict, not an arithmetic report");
+        // ECHO SHAPE: one bracket channel, opened and closed.
+        {
+            const string t = handCastabilityTag(kHandNeedsMana, 1, 0, "{r}", "", 7);
+            CHECK(t[0] == ' ' && t[1] == '[' && t[t.size() - 1] == ']'
+                      && (int) std::count(t.begin(), t.end(), '[') == 1
+                      && (int) std::count(t.begin(), t.end(), ']') == 1,
+                  "#W68-BB J5 ECHO the widened tag opens exactly one bracket and closes it");
+        }
+    }
+
+    cout << "\n[#W68-BB] J5 a post-announcement decline says what it costs\n";
+    {
+        // REPRO `130v126` s21-s24: six sources and a Talisman were tapped into
+        // the pool for Starstorm, the X menu offered a decline that spoke only
+        // about the CARD, the seat took it, and the pool emptied at end of step.
+        CHECK(xDeclineForfeitClause(6)
+                  == " {declining now FORFEITS the 6 mana already paid: the card comes back to"
+                     " your hand but the mana does not - your sources stay tapped, and any"
+                     " floating mana you do not spend before this step ends is lost}",
+              "#W68-BB J5 POSITIVE the decline row states the mana it strands");
+        CHECK(xDeclineForfeitClause(0).empty() && xDeclineForfeitClause(-1).empty(),
+              "#W68-BB J5 MUST-NOT-MATCH with an empty pool the decline row is wave 67's");
+        {
+            const string c = xDeclineForfeitClause(6);
+            CHECK(c[0] == ' ' && c[1] == '{' && c[c.size() - 1] == '}'
+                      && (int) std::count(c.begin(), c.end(), '{') == 1
+                      && (int) std::count(c.begin(), c.end(), '}') == 1,
+                  "#W68-BB J5 ECHO the forfeiture clause opens exactly one brace and closes it");
+            CHECK(stripNarrationDecoration("Decline - do not cast this after all" + c)
+                      == "Decline - do not cast this after all",
+                  "#W68-BB J5 ECHO the forfeiture clause never enters history");
+        }
+        // The narration side: three `Paid {r}{r}{x} for Starstorm` receipts were
+        // written for a spell that never went on the stack (s25-s31).
+        CHECK(castAbandonedNarration("Starstorm", 6)
+                  == "Starstorm was NOT cast: you declined after the payment above, so it is back"
+                     " in your hand and the 6 mana that paid for it is still floating, unspent",
+              "#W68-BB J5 POSITIVE the narration says the cast did not happen");
+        CHECK(castAbandonedNarration("Starstorm", 0)
+                  == "Starstorm was NOT cast: you declined after the payment above, so it is back"
+                     " in your hand",
+              "#W68-BB J5 with nothing floating the line claims nothing about mana");
+        CHECK(castAbandonedNarration("Starstorm", 6).find('{') == string::npos
+                  && castAbandonedNarration("Starstorm", 6).find('[') == string::npos,
+              "#W68-BB J5 ECHO the narration line opens no annotation channel");
+    }
+
+    cout << "\n[#W68-BB] J9 the stack's death verdict rides the rows that let it resolve\n";
+    {
+        // REPRO `123v162` s32: `ON THE STACK: 3 damage to you - you would be at
+        // -1; that would KILL you` in the board frame, ~40 lines above a
+        // three-row menu; the seat wrote "Stack resolves (damage to 2)", took
+        // the Hold row, and died at 2 life.
+        CHECK(stackDeathRowClause(3, 2)
+                  == " {answers the stack: NO - 3 damage is ALREADY ON THE STACK, and taking this"
+                     " row lets it resolve: that puts you at -1 and KILLS you}",
+              "#W68-BB J9 POSITIVE the verdict is repeated where the answer is given");
+        CHECK(stackDeathRowClause(3, 20).empty() && stackDeathRowClause(0, 2).empty()
+                  && stackDeathRowClause(3, -1).empty(),
+              "#W68-BB J9 MUST-NOT-MATCH a survivable stack, no stack, and an unknown life total"
+              " all print nothing");
+        CHECK(stackDeathRowClause(2, 2).find("puts you at 0 and KILLS you") != string::npos,
+              "#W68-BB J9 exactly-lethal is lethal");
+        vector<string> s32;
+        s32.push_back("Cast Devour Flesh {1}{b} {right now: they control 2 creatures - they choose"
+                      " which one; YOU control 25 creatures - targeting yourself sacrifices one of"
+                      " them, your choice, and you gain its toughness}");
+        s32.push_back("Hold priority: pass now, and do not ask me again - this turn or later -"
+                      " until one of the rows above changes");
+        s32.push_back("Cast nothing right now");
+        appendStackDeathToDeclineRows(s32, 3, 2);
+        CHECK(s32[0].find("answers the stack") == string::npos
+                  && s32[1].find("answers the stack: NO") != string::npos
+                  && s32[2].find("answers the stack: NO") != string::npos,
+              "#W68-BB J9 POSITIVE the hold row and the cast-nothing row carry it; a row that does"
+              " something is not given a verdict the engine cannot prove");
+        {
+            vector<string> alive(s32.begin(), s32.begin() + 1);
+            alive.push_back("Hold priority: pass now");
+            alive.push_back("Cast nothing right now");
+            const vector<string> before(alive);
+            appendStackDeathToDeclineRows(alive, 3, 20);
+            CHECK(alive == before,
+                  "#W68-BB J9 MUST-NOT-MATCH a non-lethal stack leaves every row byte-identical");
+        }
+        // The self-edict's gain now names the ceiling the seat itself picks -
+        // the number s32's row 1 left as "its toughness".
+        CHECK(edictSelfClause(25, "", 0, true, 4)
+                  .find("one of them, your choice, and you gain its toughness - you pick which, so"
+                        " up to 4 (your largest toughness)") != string::npos,
+              "#W68-BB J9 POSITIVE a gain the seat chooses has a stated ceiling");
+        CHECK(edictSelfClause(58, "", 0, true) == edictSelfClause(58, "", 0, true, 0),
+              "#W68-BB J9 MUST-NOT-MATCH with no toughness known the wave-67 clause is unchanged");
+    }
+
+    cout << "\n[#W68-BB] J9 a hold re-opens when the CRACK-BACK verdict WORD changes\n";
+    {
+        // REPRO `162v146` s19/s20: the crack-back line lives in the board frame,
+        // and the hold latch reads ROWS - so a hold taken while the crack-back
+        // was survivable stayed held after it crossed into lethal
+        // (`hold_windows_skipped` 56 in the game that was lost). AU R1's six
+        // enumerated clauses deliberately normalise the life NUMBER out of the
+        // key; the VERDICT is the term that has to survive it.
+        CHECK(crackBackVerdictKey(4, 11, 8) == "[crack-back verdict: LETHAL]"
+                  && crackBackVerdictKey(4, 11, 20) == "[crack-back verdict: you survive]"
+                  && crackBackVerdictKey(0, 0, 20) == "[crack-back verdict: none]"
+                  && crackBackVerdictKey(4, 0, 20) == "[crack-back verdict: none]",
+              "#W68-BB J9 POSITIVE the three verdicts are three distinct keys");
+        CHECK(crackBackVerdictKey(4, 11, 11) == "[crack-back verdict: LETHAL]",
+              "#W68-BB J9 exactly-lethal crack-back is LETHAL");
+        std::set<string> held;
+        vector<string> rowsNow;
+        rowsNow.push_back("Hold priority: pass now, and do not ask me again");
+        rowsNow.push_back("Cast nothing right now");
+        for (size_t i = 0; i < rowsNow.size(); i++)
+            held.insert(holdKeyRow(rowsNow[i]));
+        held.insert(holdKeyRow(crackBackVerdictKey(4, 11, 20))); //taken while survivable
+        const char * why = "";
+        {
+            vector<string> same(rowsNow);
+            same.push_back(crackBackVerdictKey(4, 11, 20));
+            CHECK(holdStillStands(held, same, &why) && string(why).empty(),
+                  "#W68-BB J9 the hold stands while the verdict word is the one it was taken on");
+        }
+        {
+            vector<string> lethal(rowsNow);
+            lethal.push_back(crackBackVerdictKey(4, 11, 8));
+            CHECK(!holdStillStands(held, lethal, &why),
+                  "#W68-BB J9 MUST-RE-OPEN survive -> LETHAL re-opens the window even though every"
+                  " printed row is byte-identical");
+        }
+        {
+            // AU R1 stays true: the life NUMBER alone still does not re-open.
+            vector<string> moved;
+            moved.push_back("Hold priority: pass now, and do not ask me again");
+            moved.push_back("Cast nothing right now");
+            moved.push_back(crackBackVerdictKey(4, 11, 20));
+            CHECK(holdStillStands(held, moved, &why),
+                  "#W68-BB J9 NEGATIVE the marker adds a term; it removes none of AU R1's");
+        }
+        CHECK(holdKeyRow(crackBackVerdictKey(4, 11, 8)) == "[crack-back verdict: LETHAL]",
+              "#W68-BB J9 ECHO the marker carries no digits, so no anchor can normalise it away");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
