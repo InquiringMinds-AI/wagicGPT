@@ -153,9 +153,34 @@ void DecisionManager::applyDeclareAttackers(const DecisionRequest & req, const D
         if (pwRule && pwRule->isReactingToClick(card))
         {
             g->cardClick(card, pwRule);
+            //#W65-AM (G2, engine HIGH-2): the wave-64 answer was gated on
+            //`al->menuObject`, and that pointer is ALWAYS NULL here.
+            //MTGPlaneswalkerAttackRule::reactToClick builds a MenuAbility and
+            //calls resolve(), which only ADDS it to the action layer;
+            //MenuAbility::Update is what calls setCustomMenuObject, and that
+            //runs on the FOLLOWING tick. So the answer was never given: the
+            //fall-through below declared an ordinary attack at the PLAYER, and
+            //when the walker menu finally armed a tick later its answer ran
+            //toggleAttacker on an already-declared attacker, which REMOVES it
+            //from combat. Both corpus walker attacks delivered 0 damage that
+            //way (123v126 seq 25: 5 damage vanished, Sorin kept all 4 loyalty,
+            //their life unchanged at 23).
+            //MenuAbility::resolve has already set `triggered`, so the menu is
+            //answerable right now at the same entry point
+            //ButtonPressedOnMultipleChoice would reach a tick later. Answered
+            //BY IDENTITY (this card's own menu, the newest one), never by
+            //"whatever menu is armed" - another seat's or another rule's menu
+            //must not be consumed by an attack declaration.
             ActionLayer * al = g->mLayers ? g->mLayers->actionLayer() : NULL;
-            if (al && al->menuObject)
-                al->ButtonPressedOnMultipleChoice(pwIndex);
+            for (size_t k = al ? al->mObjects.size() : 0; k-- > 1;)
+            {
+                MenuAbility * ma = dynamic_cast<MenuAbility *>((MTGAbility *) al->mObjects[k]);
+                if (!ma || !ma->triggered || ma->processed || ma->source != card)
+                    continue;
+                ma->reactToChoiceClick(NULL, pwIndex, (int) k);
+                ma->removeMenu = true; //the click closed it, as the layer would
+                break;
+            }
             if (card->isAttacker())
                 continue; //declared at the walker
         }

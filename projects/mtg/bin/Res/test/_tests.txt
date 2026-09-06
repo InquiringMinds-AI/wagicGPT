@@ -1379,3 +1379,5 @@ w63af_announce_x_no_hard_cap.txt
 w63af_pending_draws_see_drawaction.txt
 ai_mdfc_front_face_keeps_main1_w64ai.txt
 w64ai_attack_planeswalker.txt
+w65am_gpt_attack_planeswalker_damage.txt
+w65am_gpt_attack_second_planeswalker.txt
