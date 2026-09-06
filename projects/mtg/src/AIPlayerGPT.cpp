@@ -243,7 +243,20 @@ const char * kReplyProtocol =
     //nothing comes before the label.
     "Reply in three parts, in this order: your working, then one answer line, then your PLAN line - "
     "and nothing after the PLAN line. Do not put a heading over any part of it.\n"
-    "Your working comes FIRST: a few short sentences, at most. Think the decision through "
+    //#W68-BA (J3, engine FAILs AV4/AV5): THE BUDGET, STATED IN WORDS, BESIDE THE
+    //CAP THAT ENFORCES IT. Wave 67 spent its protocol words on ORDER and won the
+    //order (answer-first 98.9%) while the reasoning simply moved past the label -
+    //662,814 bytes of it, and 88,567 s of reply generation across 42 seats. The
+    //corpus says the whole job needs 246 B at the median and 499 B at p90; the
+    //replies that cost the minutes are the 4% that run past 1,000 B. So the
+    //number is said here in the model's own units (sentences), and
+    //gptSeamMaxTokens makes it true in the request. Nothing is removed: the
+    //model may still write whatever it wants inside the budget.
+    "Your working comes FIRST: THREE short sentences at most, and never more than five. "
+    "That is a budget, not a style note - your reply has a hard length limit, and a reply "
+    "that reaches it before it has written its answer line is thrown away and asked again. "
+    "Do not restate the board, re-derive a number the decision already printed for you, or "
+    "list options you have already ruled out. Think the decision through "
     "here, where it is safe to change your mind. Nothing in this part is kept and nothing in it is "
     "read as an answer - but write the answer LABEL (CHOICE:, ATTACK:, BLOCKS:, PUT:) exactly ONCE "
     "in your whole reply, on the answer line itself and never inside your reasoning, because the "
@@ -15024,8 +15037,12 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 //Returns how many there are; optionally hands back where the FIRST one's line
 //ends (the post-answer meter's origin) and the normalised payload of the first
 //and last (whether the reply ended on the answer it began with).
+//#W68-BA (J3): `firstLabelStart` is the offset of the FIRST line-leading
+//coded label, so the two-sided overrun meter measures the pre-answer side
+//against the same offset every seam parses from (heading skip included).
 static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
-                                string * firstPayload, string * lastPayload)
+                                string * firstPayload, string * lastPayload,
+                                size_t * firstLabelStart = NULL)
 {
     static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
     string low = content;
@@ -15076,6 +15093,7 @@ static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
                 {
                     if (firstLineEnd) *firstLineEnd = end;
                     if (firstPayload) *firstPayload = pay;
+                    if (firstLabelStart) *firstLabelStart = s; //#W68-BA (J3)
                 }
                 if (lastPayload) *lastPayload = pay;
                 break;
@@ -15296,8 +15314,11 @@ void AIPlayerGPT::flushWallMissRecord(const char * classOverride)
     writeTransLog("wall_miss", base, "", -1, 0, "", wmClass.c_str(), NULL);
 }
 
-int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
+int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
+                                    const char * seam)
 {
+    if (seam && *seam)
+        mRequestSeam = seam; //#W68-BA (J3): the cap this seam decodes under
     //Mid-retry: poll the retry prompt (buildRequestBody sees mRetryActivePrompt
     //and uses the tight retry max_tokens). If the decision drifted, abandon the
     //pending retry and fall through to a fresh poll of the new decision.
@@ -15492,7 +15513,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), //#W68-BA (J3/J6) mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), //#W67-AX (I7), #W67-AZ (R7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -15825,6 +15846,29 @@ static long postAnswerOverrun(const string& reply)
     if (last == string::npos || last <= lineEnd)
         return 0;
     return (long) (last - lineEnd);
+}
+
+//#W68-BA (J3, engine FAILs AV4/AV5; deck146 HIGH-3, deck126 HIGH-1/2). THE METER
+//ONLY EVER SAW ONE SIDE OF THE LABEL. `post_answer_overrun` starts at the first
+//coded line, so a reply that reasons BEFORE its answer scores ZERO - and that is
+//exactly the shape the blockers seam writes: 126v152 s10 wrote 4,572 bytes before
+//`BLOCKS:` in 825 s and 126v123 s13 3,741 bytes in 462 s, and both metered 0.
+//Measured over the wave-67 corpus (2,301 replies carrying a body): 49,141 bytes
+//sit BEFORE a label and 662,814 AFTER one. This is the other side - from the
+//reply's first non-blank byte to the start of its first coded label - and the
+//record carries both plus their sum, so "the reasoning moved" can never again
+//read as "the reasoning shrank". Instrument only: nothing in the engine branches
+//on it. Measured on the STRIPPED reply, like every other meter here.
+static long preAnswerOverrun(const string& reply)
+{
+    size_t labelStart = string::npos;
+    if (scanCodedAnswerLines(reply, NULL, NULL, NULL, &labelStart) < 1
+        || labelStart == string::npos)
+        return 0; //no coded answer at all: the empty/unparsed classes name that
+    size_t sig = reply.find_first_not_of(" \t\r\n");
+    if (sig == string::npos || labelStart <= sig)
+        return 0;
+    return (long) (labelStart - sig);
 }
 
 //answer_replaced: the reply ended on a DIFFERENT answer than it began with -
@@ -16518,6 +16562,20 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
     rec["post_answer_overrun"] = postAnswerOverrun(reply);
+    //#W68-BA (J3): the OTHER side of the label, and the sum. Written on every
+    //record, present or zero, so the two shapes (reasoning before the answer,
+    //reasoning after it) can never be confused for one another again.
+    {
+        const long preOver = preAnswerOverrun(reply);
+        rec["pre_answer_overrun"] = preOver;
+        rec["reply_overrun"] = preOver + postAnswerOverrun(reply);
+    }
+    //#W68-BA (J3): the cap this reply was decoded under, and whether it bit.
+    //A corpus that cannot see the cap cannot tell a short reply from a cut one.
+    if (mLastRequestMaxTokens > 0 && !userMsg.empty())
+        rec["max_tokens"] = mLastRequestMaxTokens;
+    if (mLastFinishLength && !userMsg.empty())
+        rec["reply_truncated"] = 1;
     //#W49-S (D2): false whenever the EXECUTED answer is the reply's first coded
     //line (the seam that executed says so via mAnswerReplacedFalse); deck146
     //vs126 seq 48 read `answer_replaced: true` on a record whose first line was
@@ -26476,6 +26534,21 @@ static string repeatRowStopClause(int creatureCount, int statedStop)
     return o.str();
 }
 
+//#W68-BA (J1, engine HIGH-1; deck123 MED-1): is the taken row the BASE row that
+//an appended "[repeat: ...]" row shadows? repeatBaseRow[i] holds, for each
+//appended repeat row i, the index of the real row it repeats; a `choice` whose
+//zero-based index appears as one of those VALUES is a single activation of the
+//very ability the repeat row counts. Pure; PARSETEST pins both directions.
+static bool rowIsRepeatBase(const std::vector<int>& repeatBaseRow, int choice)
+{
+    if (choice < 1)
+        return false;
+    for (size_t i = 0; i < repeatBaseRow.size(); i++)
+        if (repeatBaseRow[i] == choice - 1)
+            return true;
+    return false;
+}
+
 //The N named on the reply's CHOICE line. Two shapes are accepted: the row's own
 //exemplar ("x50", "x 50") and the natural-language form ("50 times"). The 'x'
 //form requires a non-alphanumeric character before the x so a card name ending
@@ -26769,6 +26842,31 @@ static bool proseNamesOtherMenuRow(const string& replyIn, const std::vector<stri
     return false;
 }
 
+//#W68-BA (J6): is this row the menu's own DECLINE? A reply whose prose says
+//"this window is a pass" CONFIRMS such a row rather than contradicting it - the
+//#W54-A (D2b) exemption the priority seam gives its HOLD row, stated once for
+//every seam. Same vocabulary menuRowProseName already treats as a non-name.
+static bool rowIsDeclineRow(const string& row)
+{
+    string core = stripRenderAnnotationsLc(row);
+    size_t a = core.find_first_not_of(" \t");
+    if (a == string::npos)
+        return false;
+    core = core.substr(a);
+    static const char * kDeclines[] = { "cast nothing", "pass", "hold", "done", "decline",
+                                        "do nothing", "no blockers", "no attackers" };
+    for (size_t i = 0; i < sizeof(kDeclines) / sizeof(kDeclines[0]); i++)
+    {
+        const size_t n = strlen(kDeclines[i]);
+        //#W68-BA (J6): the decline word must END - "Passage of Time" is a spell,
+        //not a pass row, and "Holdout" is not "Hold".
+        if (core.compare(0, n, kDeclines[i]) == 0
+            && (core.size() == n || !isalnum((unsigned char) core[n])))
+            return true;
+    }
+    return false;
+}
+
 //#W51-C (D4b): the PLAN line says this window is a pass. Scanned on PLAN-
 //labelled lines only (post-think): "this window: pass" / "stop reached" -
 //the answer-first protocol writes the count before the subtraction, so a
@@ -26795,8 +26893,22 @@ static bool proseNamesOtherMenuRow(const string& replyIn, const std::vector<stri
 //contradiction of it, re-asked, and the second reply passed. A verdict written
 //before the answer the engine took is evidence about a line the engine did not
 //run. 0 = the whole reply (the shape every other caller wants).
+//#W68-BA (J6, deck130 HIGH-3; deck123 HIGH-2; engine MED). ONE PREDICATE, EVERY
+//SEAM. The shape "the reply declares X and then says in its own words that it is
+//not doing X" is one defect, and this function was its only reader - scoped to
+//"choice:" and to the word "pass", so it could only ever see the priority seam.
+//The corpus says the combat seams write it too, in their own words: 5 of the 74
+//attackers replies declared attackers under prose naming a pass (130v126 s24 ran
+//`ATTACK: A1-A4` under "I must NOT attack ... I will pass combat" - 6 life into a
+//lifegain deck, the game lost 0/34; also 130v125 s51/s58/s63 and 123v162 s24).
+//`seamVocab` selects the label the evidence must follow and the words that ARE
+//the verdict at that seam; every guard is shared and unchanged - post-think only,
+//evidence only from the latched line's region, negations and deferrals rejected.
+//seamVocab 0 = CHOICE (byte-identical to every shipped caller), 1 = ATTACK,
+//2 = BLOCKS.
 static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL,
-                                   size_t fromStripped = 0)
+                                   size_t fromStripped = 0,
+                                   const char * label = "choice:", int seamVocab = 0)
 {
     string text = replyIn;
     size_t thinkEnd = text.rfind("</think>");
@@ -26812,10 +26924,49 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
     {
         size_t eol = low.find('\n', scan);
         string line = low.substr(scan, (eol == string::npos) ? string::npos : eol - scan);
-        if (line.find("this window: pass") != string::npos
-            || line.find("this window pass") != string::npos
-            || line.find("window: pass") != string::npos
-            || line.find("stop reached") != string::npos)
+        static const char * kPlanCuesChoice[] = {
+            "this window: pass", "this window pass", "window: pass", "stop reached" };
+        //#W68-BA (J6): the combat seams' own words for the same act.
+        static const char * kPlanCuesAttack[] = {
+            "do not attack", "don't attack", "must not attack", "will not attack",
+            "no attackers", "attack with nothing", "pass combat", "no attacks this turn" };
+        static const char * kPlanCuesBlocks[] = {
+            "do not block", "don't block", "must not block", "will not block",
+            "no blocks", "no blockers", "block with nothing" };
+        const char * const * planCues = kPlanCuesChoice;
+        size_t nPlanCues = sizeof(kPlanCuesChoice) / sizeof(kPlanCuesChoice[0]);
+        if (seamVocab == 1) { planCues = kPlanCuesAttack; nPlanCues = sizeof(kPlanCuesAttack) / sizeof(kPlanCuesAttack[0]); }
+        else if (seamVocab == 2) { planCues = kPlanCuesBlocks; nPlanCues = sizeof(kPlanCuesBlocks) / sizeof(kPlanCuesBlocks[0]); }
+        //#W68-BA (J6): the combat verdict must be about THIS combat. "I will not
+        //attack WITH A2" excludes one attacker and "I will not attack NEXT TURN"
+        //is about a later one; neither reverses the declaration just written. The
+        //PLAN-cue path gets the same deferral test the sentence-opener path has
+        //always had (a cue that owns the word " with " is exempt from that half).
+        static const char * kCueDefer[] = { " with ", " next turn", " next window",
+                                            " later", " until ", " once ", " after " };
+        bool cueHit = false;
+        for (size_t c = 0; c < nPlanCues && !cueHit; c++)
+        {
+            size_t at = line.find(planCues[c]);
+            if (at == string::npos)
+                continue;
+            if (seamVocab != 0)
+            {
+                const string after = line.substr(at + strlen(planCues[c]), 30);
+                const bool cueOwnsWith = (string(planCues[c]).find(" with ") != string::npos);
+                bool deferred = false;
+                for (size_t d = 0; d < sizeof(kCueDefer) / sizeof(kCueDefer[0]) && !deferred; d++)
+                {
+                    if (cueOwnsWith && strcmp(kCueDefer[d], " with ") == 0)
+                        continue;
+                    deferred = (after.find(kCueDefer[d]) != string::npos);
+                }
+                if (deferred)
+                    continue;
+            }
+            cueHit = true;
+        }
+        if (cueHit)
         {
             if (matchedOut)
             {
@@ -26831,7 +26982,7 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
     }
     //#W52-J (D14): sentence openers after the CHOICE line.
     //#W56-C (D3): from the latched line's region when one was named.
-    size_t choiceAt = low.find("choice:", fromStripped);
+    size_t choiceAt = low.find(label, fromStripped); //#W68-BA (J6): the seam's label
     if (choiceAt == string::npos)
         return false;
     size_t region = low.find('\n', choiceAt);
@@ -26845,9 +26996,30 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         "the right choice is to pass", "the right play is to pass", "the correct play is to pass",
         "best to pass", "better to pass", "safer to pass"
     };
+    //#W68-BA (J6): the combat seams' verdict openers. The verdict at ATTACK and
+    //BLOCKS is itself a negation ("I will not attack"), so it is spelled out here
+    //rather than inferred, and " with " joins the deferral list at those seams -
+    //"I will not attack with A1" is a statement about ONE attacker, not the combat.
+    static const char * kOpenersAttack[] = {
+        "i will not attack", "i do not attack", "i must not attack", "i should not attack",
+        "we will not attack", "we must not attack", "we do not attack",
+        "do not attack", "don't attack", "i will pass combat", "we pass combat",
+        "i pass combat", "pass combat", "i attack with nothing", "we attack with nothing",
+        "no attacks this turn", "no attackers this turn",
+        "i hold back", "we hold back", "i will hold back", "we will hold back"
+    };
+    static const char * kOpenersBlocks[] = {
+        "i will not block", "i do not block", "i must not block", "i should not block",
+        "we will not block", "we must not block", "do not block", "don't block",
+        "i block with nothing", "no blocks this turn", "no blockers this turn",
+        "i declare no blockers", "we declare no blockers"
+    };
     static const char * kLeads[] = { "so ", "therefore ", "thus ", "hence ", "so, ", "therefore, ", "thus, " };
     static const char * kDeferrals[] = {
         " the turn", " turn", " priority after", " after ", " next window", " next turn", " later", " until ", " once "
+    };
+    static const char * kDeferralsCombat[] = {
+        " with ", " next window", " next turn", " later", " until ", " once ", " after "
     };
     size_t pos = region + 1;
     while (pos < low.size())
@@ -26872,10 +27044,25 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
                 head = head.substr(strlen(kLeads[l]));
                 break;
             }
-        for (size_t k = 0; k < sizeof(kOpeners) / sizeof(kOpeners[0]); k++)
+        //#W68-BA (J6): the seam's own opener and deferral tables.
+        const char * const * openers = kOpeners;
+        size_t nOpeners = sizeof(kOpeners) / sizeof(kOpeners[0]);
+        const char * const * deferrals = kDeferrals;
+        size_t nDeferrals = sizeof(kDeferrals) / sizeof(kDeferrals[0]);
+        if (seamVocab == 1)
         {
-            size_t n = strlen(kOpeners[k]);
-            if (head.compare(0, n, kOpeners[k]) != 0)
+            openers = kOpenersAttack; nOpeners = sizeof(kOpenersAttack) / sizeof(kOpenersAttack[0]);
+            deferrals = kDeferralsCombat; nDeferrals = sizeof(kDeferralsCombat) / sizeof(kDeferralsCombat[0]);
+        }
+        else if (seamVocab == 2)
+        {
+            openers = kOpenersBlocks; nOpeners = sizeof(kOpenersBlocks) / sizeof(kOpenersBlocks[0]);
+            deferrals = kDeferralsCombat; nDeferrals = sizeof(kDeferralsCombat) / sizeof(kDeferralsCombat[0]);
+        }
+        for (size_t k = 0; k < nOpeners; k++)
+        {
+            size_t n = strlen(openers[k]);
+            if (head.compare(0, n, openers[k]) != 0)
                 continue;
             if (head.size() > n && isalnum((unsigned char) head[n]))
                 continue; //"passes"/"passing" - not the verdict word
@@ -26885,9 +27072,9 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
             //"pass priority after combat"); "and hope ... next turn" far
             //down the sentence is not a deferral.
             string near = rest.substr(0, 30);
-            for (size_t d = 0; d < sizeof(kDeferrals) / sizeof(kDeferrals[0]) && !deferred; d++)
-                deferred = (rest.compare(0, strlen(kDeferrals[d]), kDeferrals[d]) == 0)
-                           || (strlen(kDeferrals[d]) > 5 && near.find(kDeferrals[d]) != string::npos);
+            for (size_t d = 0; d < nDeferrals && !deferred; d++)
+                deferred = (rest.compare(0, strlen(deferrals[d]), deferrals[d]) == 0)
+                           || (strlen(deferrals[d]) > 5 && near.find(deferrals[d]) != string::npos);
             if (deferred)
                 break;
             if (matchedOut)
@@ -26905,6 +27092,19 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         pos = sentEnd + 1;
     }
     return false;
+}
+
+//#W68-BA (J6): the reversal predicate, named for what it does and addressed by
+//seam. 0 = CHOICE (ask/priority), 1 = ATTACK, 2 = BLOCKS. The PUT seam is
+//deliberately NOT wired: a reveal has no "decline" answer to reverse to, so
+//there is no second answer a re-ask could ask for.
+static bool proseReversesDeclaration(const string& replyIn, int seamVocab,
+                                     string * matchedOut = NULL)
+{
+    static const char * kSeamLabels[] = { "choice:", "attack:", "blocks:" };
+    if (seamVocab < 0 || seamVocab > 2)
+        return false;
+    return planSaysPassThisWindow(replyIn, matchedOut, 0, kSeamLabels[seamVocab], seamVocab);
 }
 
 //#W52-J (D14): does the reply carry a PLAN line at all (post-think)? A
@@ -30144,6 +30344,59 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     return out.str();
 }
 
+//#W68-BA (J3, engine FAILs AV4/AV5; deck146 HIGH-3, deck126 HIGH-1/2, deck152,
+//deck130). THE SEAM SIZES THE REPLY. Wave 67 moved the answer to the front of
+//the reply (answer-first 80.2% -> 98.9%) and the reasoning did not shrink, it
+//MOVED: post-answer overrun went 630,880 B -> 662,814 B. Measured over this
+//corpus before this was written, per seam, over the 2,301 replies that carry a
+//body: reply generation cost 88,567 s (24.6 seat-hours), the correlation between
+//a reply's true byte length and its latency is r = 0.727, and the bytes a seam
+//NEEDS - from the reply's first byte through the end of its PLAN line - are
+//ask p99.5 2,664 B, priority 3,500 B, attackers 3,110 B, blockers 4,585 B,
+//discard 477 B, reveal 397 B, bottom 489 B, against replies that run to
+//10,951 B. Everything past the PLAN line is already thrown away by the record
+//trim, so it is decode time bought and binned.
+//So each seam carries its own max_tokens, sized so the cap's byte-equivalent
+//(~3.5 B per token for this model's English output) clears that seam's p99 need.
+//Replayed over the same corpus, this set reaches the cap on 53 of 2,301 replies
+//(2.3%), leaves 83,720 B (10.4%) ungenerated - about 6,060 s of the 88,567 -
+//costs ONE extra ask on the 9 replies (0.39%) that had not written their label
+//by then, and clips part of a PLAN line on 19 (0.8%). The configured value and
+//WAGIC_GPT_MAXTOKENS stay the CEILING: a seam cap is never larger than what the operator set, and
+//WAGIC_GPT_SEAMTOKENS=0 turns the whole mechanism off (the disable flag every
+//output-affecting change ships, so "was it the cap?" is one env var).
+//This is NOT a cap on any CHOICE: no row is withheld, no window is closed, no
+//legal answer is removed. A reply cut before it writes its label earns ONE
+//re-ask that quotes the cap (`reply_truncated_reask`) and never the heuristic.
+static long gptSeamMaxTokens(const char * seam, long ceilingTokens)
+{
+    if (!seam || !*seam)
+        return ceilingTokens;
+    struct SeamCap { const char * seam; long tokens; };
+    static const SeamCap kCaps[] = {
+        { "ask",       640 }, //p99 need 1,630 B; 640 tok ~= 2,240 B, 9x the median reply
+        { "priority",  768 }, //p99 need 2,041 B
+        { "attackers", 768 }, //p99 need 2,161 B
+        { "blockers",  896 }, //the bundled seam, p90 need 810 B (n=33, so p99 is the max)
+        { "discard",   384 }, //max need 477 B
+        { "reveal",    384 }, //max need 397 B
+        { "bottom",    384 }, //max need 489 B
+    };
+    for (size_t i = 0; i < sizeof(kCaps) / sizeof(kCaps[0]); i++)
+        if (strcmp(seam, kCaps[i].seam) == 0)
+            return (ceilingTokens > 0 && ceilingTokens < kCaps[i].tokens)
+                   ? ceilingTokens : kCaps[i].tokens;
+    return ceilingTokens; //an unnamed seam keeps the ceiling
+}
+
+//#W68-BA (J3): the disable flag. WAGIC_GPT_SEAMTOKENS=0 restores the single
+//ceiling for every seam, so a corpus can be run with and without the caps.
+static bool gptSeamTokensDisabled()
+{
+    const char * e = getenv("WAGIC_GPT_SEAMTOKENS");
+    return e && *e && atol(e) == 0;
+}
+
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
     //Phase-2 of the thinking budget: the same decision prompt, plus the
@@ -30228,6 +30481,12 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
         maxTokens = atol(mt);
+    //#W68-BA (J3): the seam's own budget, never above the ceiling just resolved.
+    //Skipped when the owner has set an explicit thinking budget (that dial is
+    //already the length answer and is his), and skipped when the mechanism is
+    //disabled.
+    if (!(mThinking && mReasoningBudget > 0) && !gptSeamTokensDisabled())
+        maxTokens = gptSeamMaxTokens(mRequestSeam.c_str(), maxTokens);
     //Answer-locked retry: the re-ask needs only the coded line, so cap it tight
     //to fail fast to the heuristic instead of burning another long spiral. This
     //wins over any larger configured/env default for the retry request only.
@@ -30237,6 +30496,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt && !timeoutRetry)
         maxTokens = forceClose ? kAnswerReserveTokens : 512;
 
+    mLastRequestMaxTokens = maxTokens; //#W68-BA (J3): recorded on the next record
     json request = {
         {"model", mModel},
         {"messages", messages},
@@ -33188,6 +33448,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     {
         mPriorityReaskBoard.clear();
         mPriorityReaskLine.clear();
+        mPriorityNoopReaskBoard.clear(); //#W68-BA (J6): its own one-shot, same board
         mPriorityReaskKind.clear();
     }
     if (!mPriorityReaskBoard.empty())
@@ -33234,7 +33495,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     else
     {
         string content;
-        if (pollCompletionRetry(userMsg, content) == kChoicePending)
+        if (pollCompletionRetry(userMsg, content, "priority") == kChoicePending)
         {
             //Round trip in flight: no action this tick. The Act override
             //keeps the empty clickstream from being committed as a pass.
@@ -33372,6 +33633,21 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             namedCount = -1;
             appendParseNote(&mLastParseNote, "repeat_count_zero_pass");
         }
+        //#W68-BA (J1, engine HIGH-1; deck123 MED-1). THE STOP GUARD WAS BLIND TO
+        //THE ROW THE MODEL ACTUALLY PRESSES. `repeatPastStop` was gated on
+        //namedCount >= 1 - the counted "[repeat: ... N times]" row - and only 4
+        //records in the whole wave-67 corpus carry a count at all. All 20 takes
+        //past a stated stop rode the PLAIN row that the repeat row shadows, where
+        //repeatRowTaken is false by construction: the guard, its clamp and AZ R2's
+        //boundary were unreachable, which is why `repeat_past_stop` and
+        //`repeat_clamped_to_own_stop` both read 0 while 123v126 walked M 24 -> 35
+        //against a stated stop of 23 across 13 windows of turns 17-18 (20 of the 41
+        //windows that rendered `your stated stop=` executed past it). A base row IS
+        //one activation of the same ability, so the model's own subtraction holds it
+        //on the same terms, with a count of 1. Nothing is capped and no row is
+        //withheld: this only decides whether the model is ASKED once more.
+        const bool repeatBaseTaken = (!repeatRowTaken && choice >= 1 && choice <= index
+                                      && rowIsRepeatBase(repeatBaseRow, choice));
         //#W51-C (D4b): a count on the repeat row under a PLAN line that says
         //this window is a pass is a contradiction -> one re-ask quoting both.
         //#W52-J (D14): the conflict covers EVERY taken row, not only the
@@ -33408,8 +33684,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //The re-ask now needs the prose to point at ANOTHER row of THIS menu -
         //a contradiction the model can actually resolve.
         string rivalRowName;
-        bool planChoiceConflict = passVerdictInProse
-                                  && proseNamesOtherMenuRow(content, shownLines, choice, &rivalRowName);
+        //#W68-BA (J6, deck123 HIGH-2; engine MED). THE NARROWING TOOK EVERY
+        //CANDIDATE. Over the wave-67 corpus `decision_reversed_in_prose` fired 15
+        //times and `plan_choice_conflict_narrowed` fired 15 times: the rival-row
+        //requirement removed 100% of the re-asks - and 12 of the 20 J1 takes past a
+        //stated stop carried exactly that reversal ("This window: pass") and ran. A
+        //reply that says in its own words that this window is a pass HAS named a
+        //rival answer: row 0, which is on every one of these menus. Requiring it to
+        //ALSO name another row by name is requiring a second, different
+        //contradiction. The re-ask now fires on the reversal itself; the
+        //rival-named half stays as a stamp so the census still partitions the shape.
+        const bool rivalRowNamed = passVerdictInProse
+                                   && proseNamesOtherMenuRow(content, shownLines, choice, &rivalRowName);
+        bool planChoiceConflict = passVerdictInProse;
         //#W57-A (D16): the BROAD census is stamped on the BROAD condition. Wave
         //56 promised the old stamp would be kept beside the narrowed one and
         //then wrote it on `planChoiceConflict` - the narrowed condition - so
@@ -33424,9 +33711,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //evidence about the game rather than about the instrument.
         if (passVerdictInProse)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
-        if (passVerdictInProse && !planChoiceConflict)
-            //the narrowing, measured: the shape that used to buy a round trip
-            appendParseNote(&mLastParseNote, "plan_choice_conflict_narrowed");
+        if (passVerdictInProse && !rivalRowNamed)
+            //#W68-BA (J6): the same partition, under a name that is now TRUE - the
+            //reversal no longer needs a rival row to buy its round trip, so calling
+            //this half "narrowed" would report a suppression that no longer happens.
+            appendParseNote(&mLastParseNote, "plan_choice_conflict_no_rival_named");
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
@@ -33453,8 +33742,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             }
         }
         int planStop = -1, planCurrent = -1;
+        //#W68-BA (J1): the count the stop test holds this take to - the count named
+        //on the repeat row, or the single activation a base row IS.
+        const int stopTestCount = repeatRowTaken ? namedCount : (repeatBaseTaken ? 1 : -1);
         const bool repeatPastStop =
-            repeatRowTaken && namedCount >= 1 && replyHasPlanLine(content)
+            stopTestCount >= 1 && replyHasPlanLine(content)
             && repeatPlanStopAndCurrent(content, &planStop, &planCurrent)
             && planStop - planCurrent <= 0;
         //#W52-J (D6): number and name point at different rows and the name is
@@ -33479,17 +33771,63 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                        && (size_t) choice <= shownLines.size()
                                        && rowSaysNoOp(shownLines[choice - 1])
                                        && planArguesAgainstRow(content, shownLines[choice - 1]));
+        //#W68-BA (J3): the length cap BIT before the model wrote its label. That is
+        //not an unparseable reply and it is not the model declining - it is the
+        //engine's own budget landing mid-sentence, so it buys ONE re-ask that says
+        //so and quotes the number, and never the heuristic.
+        const bool replyTruncated = (mLastFinishLength && !content.empty()
+                                     && codedAnswerCount(content) == 0);
+        //#W68-BA (J6, engine MED; 123 s41 -> s43): the no-op re-ask is EXEMPT from
+        //the board's single re-ask, because it is a different question. s41 spent
+        //the board's budget on a named_row miss; s43 then answered the corrected
+        //question with a Devour Flesh whose own row read "they control 0 creatures -
+        //at 0 this does nothing" over a PLAN that said the same, and it was cast at
+        //7 life. One extra ask per board, latched separately so it cannot loop.
+        if (!content.empty() && mPriorityReaskBoard == boardKey && noopPlanConflict
+            && mPriorityNoopReaskBoard != boardKey && choice >= 1 && choice <= index)
+        {
+            mPriorityNoopReaskBoard = boardKey;
+            std::ostringstream corr;
+            corr << "[RE-ASK] You chose row " << choice << " (\""
+                 << stripNarrationDecoration(shownLines[choice - 1])
+                 << "\"), whose own note on this list says it does nothing right now, and your"
+                    " reply says so too. Answer again: that row if you meant it anyway, the number"
+                    " of the row you want instead, or 0 (pass).";
+            mPriorityReaskLine = corr.str();
+            mPriorityReaskKind = "noop_plan";
+            if (!parseNote.empty())
+                mLastParseNote = parseNote;
+            writeTransLog("priority", userMsg, content, choice, index, "",
+                          "plan_contradicts_noop_row_reask", &renderRows);
+            setNotice("the chosen row does nothing and the reply says so - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: plan_contradicts_noop_row_reask (budget-exempt) -> re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected, "priority");
+            return NULL; //in flight; decisionPending() holds the pass
+        }
         if (!content.empty() && mPriorityReaskBoard != boardKey
             && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict
                 || planMissing || repeatPastStop || indexNameConflict || noopPlanConflict
-                || labelMissing)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2)
+                || labelMissing || replyTruncated)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2) #W68-BA (J3)
         {
             std::ostringstream corr;
             const char * fb;
             //#W56-C (D3): quote what the engine ran, not the reply's first try.
             const string quotedChoiceLine = haveLatchedLine ? latchedChoiceLine
                                                             : firstLabelledLine(content, "choice:");
-            if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
+            if (replyTruncated) //#W68-BA (J3): the cap bit; say so and quote it
+            {
+                corr << "[RE-ASK] Your last reply ran to its length limit of "
+                     << mLastRequestMaxTokens
+                     << " tokens before it wrote an answer line, so none of it could be used."
+                        " Answer again and put the answer FIRST: one line beginning with"
+                        " \"CHOICE: \" - the number of the row you want from the list, then that"
+                        " row's short name in parentheses, or 0 (pass) - with at most one short"
+                        " sentence of working before it.";
+                fb = "reply_truncated_reask";
+                mPriorityReaskKind = "reply_truncated";
+            }
+            else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
             {
                 corr << "[RE-ASK] Your reply has no answer line. Answer again with one line that"
                         " BEGINS with \"CHOICE: \" - the number of the row you want from the list,"
@@ -33541,14 +33879,24 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "plan_missing";
                 mPriorityReaskKind = "plan_missing";
             }
-            else if (repeatPastStop) //#W66-AS (H3)
+            else if (repeatPastStop) //#W66-AS (H3) #W68-BA (J1)
             {
-                corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
-                     << quotedChoiceLine << "\") but your own PLAN puts you at " << planCurrent
-                     << " with your stop at " << planStop
-                     << ", so every repeat in this window is past the stop you set. Answer again:"
-                        " 0 (pass) to stop here, or the repeat row with the stop you actually"
-                        " intend and a count that does not pass it.";
+                if (repeatRowTaken)
+                    corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
+                         << quotedChoiceLine << "\") but your own PLAN puts you at " << planCurrent
+                         << " with your stop at " << planStop
+                         << ", so every repeat in this window is past the stop you set. Answer again:"
+                            " 0 (pass) to stop here, or the repeat row with the stop you actually"
+                            " intend and a count that does not pass it.";
+                else
+                    //#W68-BA (J1): the same refusal for the single activation of the
+                    //same ability - the model's own two numbers, its own subtraction.
+                    corr << "[RE-ASK] Your CHOICE line activates row " << choice << " (\""
+                         << quotedChoiceLine << "\") once more, but your own PLAN puts you at "
+                         << planCurrent << " with your stop at " << planStop
+                         << ", so this activation is past the stop you set. Answer again:"
+                            " 0 (pass) to stop here, or the row you want with the stop you"
+                            " actually intend.";
                 fb = "repeat_past_stop";
                 mPriorityReaskKind = "repeat_past_stop";
             }
@@ -33561,6 +33909,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         " of the row you want instead, or 0 (pass).";
                 fb = "plan_contradicts_noop_row_reask";
                 mPriorityReaskKind = "noop_plan";
+                mPriorityNoopReaskBoard = boardKey; //#W68-BA (J6): one-shot, spent here
             }
             else
             {
@@ -33584,7 +33933,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                     : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
-            pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected);
+            pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected, "priority");
             //mLastAskKey is left as it was: the corrected question's own key
             //differs from it, so the next tick polls (and eventually consumes)
             //the corrected call rather than replaying this failed answer.
@@ -33594,7 +33943,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
         {
             //the second answer for this state, whatever it is, is final
-            if (mPriorityReaskKind == "label_missing") //#W67-AV (I2)
+            if (mPriorityReaskKind == "reply_truncated") //#W68-BA (J3)
+                appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
+                                                                : (choice >= 0 ? "reply_truncated_reask_recovered"
+                                                                               : "reply_truncated_reask_unanswered"));
+            else if (mPriorityReaskKind == "label_missing") //#W67-AV (I2)
                 appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
                                                               : (choice >= 0 ? "label_missing_reask_recovered"
                                                                              : "label_missing_reask_unanswered"));
@@ -33627,19 +33980,23 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 //stands). Both numbers are recorded verbatim.
                 if (repeatPastStop)
                 {
-                    const int allowed = repeatStopClampCount(namedCount, planStop, planCurrent);
+                    //#W68-BA (J1): the count the clamp performs is the count the
+                    //guard tested - the named repeats, or the ONE activation a base
+                    //row is. On this branch stop - M <= 0, so `allowed` is 0 and the
+                    //window resolves as the pass the model's own arithmetic demands.
+                    const int allowed = repeatStopClampCount(stopTestCount, planStop, planCurrent);
                     if (allowed >= 0)
                     {
                         std::ostringstream cs;
-                        cs << "repeat_clamped_to_own_stop(named=" << namedCount
+                        cs << "repeat_clamped_to_own_stop(named=" << stopTestCount
                            << ",stated_M=" << planCurrent << ",stated_stop=" << planStop
                            << ",executed=" << allowed << ")";
                         appendParseNote(&mLastParseNote, cs.str().c_str());
-                        stopClampReceipt = repeatStopClampReceipt(namedCount, planCurrent,
+                        stopClampReceipt = repeatStopClampReceipt(stopTestCount, planCurrent,
                                                                   planStop, allowed);
                         //#W67-AZ (R2): one repetition left is one repetition RUN -
                         //the receipt above says so, and the row performs it.
-                        if (!repeatStopExecutesNothing(allowed))
+                        if (!repeatStopExecutesNothing(allowed) && repeatRowTaken)
                             namedCount = allowed;
                         else
                         {
@@ -34262,7 +34619,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     mLogWindowKind = askWindowKindForAsk(decision, options);
     string userMsg = assemblePrompt(userTail, NULL, &tailStr); //#W62-fix: notes stay out of the slot key
     string content;
-    if (pollCompletionRetry(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content, "ask") == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
 
     //Plan split BEFORE choice parsing: plan prose is full of numbers. Restrict
@@ -34401,14 +34758,73 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     const bool noopPlanConflict = (choice >= 1 && choice <= (int) options.size() && !content.empty()
                                    && rowSaysNoOp(options[choice - 1])
                                    && planArguesAgainstRow(content, options[choice - 1]));
+    //#W68-BA (J6, deck123 HIGH-2). ONE REVERSAL PREDICATE, EVERY SEAM. The whole
+    //wave-67 corpus stamped `decision_reversed_in_prose` 15 times and all 15 were
+    //at the PRIORITY seam - not because the shape does not occur here, but because
+    //nothing at this seam ever called the predicate. 123v130 s43 answered Devour
+    //Flesh, then wrote "at 0 creatures does nothing... I will hold priority", and
+    //cast it. The evidence is read from the LATCHED line's region (#W56-C D3), the
+    //menu's own decline row is exempt (a pass verdict CONFIRMS it), and the
+    //consequence is the same ONE re-ask every other self-contradiction earns - the
+    //second answer executes as given, whatever it is.
+    string askLatchedLine, askPassVerdict;
+    size_t askLatchedFrom = 0;
+    const bool askHaveLatched = latchedCodedChoiceLine(content, choice, (int) options.size(),
+                                                       &options, &askLatchedLine, &askLatchedFrom);
+    const bool askReversedInProse = (choice >= 1 && choice <= (int) options.size() && !content.empty()
+                                     && !rowIsDeclineRow(options[choice - 1])
+                                     && planSaysPassThisWindow(content, &askPassVerdict,
+                                                               askHaveLatched ? askLatchedFrom : 0));
+    if (askReversedInProse)
+        appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+    //#W68-BA (J3): the length cap bit before the model wrote its label.
+    const bool replyTruncated = (mLastFinishLength && !content.empty()
+                                 && codedAnswerCount(content) == 0);
     //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
     //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
     //creatures)" over a 4-row Main-1 cast menu.
+    //#W68-BA (J6, engine MED; 123 s41 -> s43): the no-op re-ask is EXEMPT from
+    //this seam's one-per-ask budget, because it is a different question. s41 spent
+    //the budget on a named_row miss and s43 then cast a row whose own note said
+    //"at 0 creatures this does nothing" over a PLAN that said the same, at 7 life.
+    //One extra ask per ask key, latched separately so it cannot loop.
+    if (reasked && noopPlanConflict && mAskNoopReaskKey != askKey0
+        && choice >= 1 && choice <= (int) options.size())
+    {
+        mAskNoopReaskKey = askKey0;
+        std::ostringstream corr;
+        corr << "[RE-ASK] You chose row " << choice << " (\""
+             << stripNarrationDecoration(options[choice - 1])
+             << "\"), whose own note on this list says it does nothing right now, and your reply"
+                " says so too. Answer again: that row if you meant it anyway, or the number of"
+                " the row you want instead.";
+        mAskReaskKey = askKey0;
+        mAskReaskLine = corr.str();
+        mAskReaskKind = "noop_plan";
+        if (!parseNote.empty())
+            mLastParseNote = parseNote;
+        writeTransLog("ask", userMsg, content, choice, (int) options.size(), "",
+                      "plan_contradicts_noop_row_reask", &options);
+        setNotice("the chosen row does nothing and the reply says so - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: plan_contradicts_noop_row_reask (budget-exempt) -> re-asking once");
+        string corrected;
+        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
+        return kChoicePending; //the caller unwinds; the corrected call answers later
+    }
     if ((namedRowFail || passOnNoPass || indexNameConflict || noopPlanConflict
-         || labelMissing) && !reasked) //#W67-AV (I2)
+         || labelMissing || askReversedInProse || replyTruncated) && !reasked) //#W67-AV (I2) #W68-BA (J3/J6)
     {
         std::ostringstream corr;
-        if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
+        if (replyTruncated) //#W68-BA (J3): the cap bit; say so and quote it
+        {
+            corr << "[RE-ASK] Your last reply ran to its length limit of " << mLastRequestMaxTokens
+                 << " tokens before it wrote an answer line, so none of it could be used. Answer"
+                    " again and put the answer FIRST: one line beginning with \"CHOICE: \" - the"
+                    " number of the row you want from the list, then that row's short name in"
+                    " parentheses - with at most one short sentence of working before it.";
+            mAskReaskKind = "reply_truncated";
+        }
+        else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
         {
             corr << "[RE-ASK] Your reply has no answer line. Answer again with one line that"
                     " BEGINS with \"CHOICE: \" - the number of the row you want from the list, then"
@@ -34438,7 +34854,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " you want and that row's own short name.";
             mAskReaskKind = "index_name";
         }
-        else
+        else if (noopPlanConflict)
         {
             //#W66-AR (H8): quote the row's OWN verdict and the reply's own
             //sentence, so the contradiction the model must resolve is visible.
@@ -34448,28 +34864,51 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " says so too. Answer again: that row if you meant it anyway, or the number of"
                     " the row you want instead.";
             mAskReaskKind = "noop_plan";
+            mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
         }
-        const char * fb = labelMissing ? "label_missing_reask" //#W67-AV (I2)
+        else
+        {
+            //#W68-BA (J6): the reversal, quoted back with the line it contradicts.
+            corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
+                 << (askHaveLatched ? askLatchedLine : firstLabelledLine(content, "choice:"))
+                 << "\") but your reply says this window is a pass (\"" << askPassVerdict
+                 << "\"). Answer again with the number of the row you want performed now.";
+            mAskReaskKind = "plan_choice";
+        }
+        const char * fb = replyTruncated ? "reply_truncated_reask" //#W68-BA (J3)
+                          : labelMissing ? "label_missing_reask" //#W67-AV (I2)
                           : namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask"
-                          : indexNameConflict ? "index_name_conflict" : "plan_contradicts_noop_row_reask";
+                          : indexNameConflict ? "index_name_conflict"
+                          : noopPlanConflict ? "plan_contradicts_noop_row_reask"
+                                             : "plan_choice_conflict"; //#W68-BA (J6)
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
-        setNotice(labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
+        setNotice(replyTruncated ? "that reply hit its length limit - asking again" //#W68-BA (J3)
+                  : labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
                   : namedRowFail ? "that answer named nothing on the list - asking again"
                   : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
                   : indexNameConflict ? "the number and the name disagree - asking again"
-                                      : "the chosen row does nothing and the reply says so - asking again", 5.0f);
+                  : noopPlanConflict ? "the chosen row does nothing and the reply says so - asking again"
+                                     : "the choice contradicts the reply's pass - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
-        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected);
+        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
         return kChoicePending; //the caller unwinds; the corrected call answers later
     }
     if (reasked)
     {
-        if (mAskReaskKind == "label_missing") //#W67-AV (I2): executes as given either way
+        if (mAskReaskKind == "reply_truncated") //#W68-BA (J3): executes as given either way
+            appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
+                                                            : (choice >= 1 ? "reply_truncated_reask_recovered"
+                                                                           : "reply_truncated_reask_unanswered"));
+        else if (mAskReaskKind == "plan_choice") //#W68-BA (J6): likewise
+            appendParseNote(&mLastParseNote, askReversedInProse ? "plan_choice_conflict_exhausted"
+                                                                : (choice >= 1 ? "plan_choice_conflict_recovered"
+                                                                               : "plan_choice_conflict_unanswered"));
+        else if (mAskReaskKind == "label_missing") //#W67-AV (I2): executes as given either way
             appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
                                                           : (choice >= 1 ? "label_missing_reask_recovered"
                                                                          : "label_missing_reask_unanswered"));
@@ -43707,11 +44146,22 @@ int AIPlayerGPT::chooseAttackers()
                 " and A3 at them); an attacker written without a >W# attacks them;";
     tail << " then a PLAN: line only if the reply"
             " rules call for one. Write nothing else.";
+    //#W68-BA (J6, deck130 HIGH-3): this seam's ONE prose-reversal re-ask per turn.
+    //The correction is appended here on the tick that re-polls, exactly as the
+    //blockers seam does with its gang correction - the changed text is what makes
+    //the corrected question a fresh call instead of a replay of the answer that
+    //earned it. The latch is cleared when the turn moves on.
+    if (mAttackReaskTurn != observer->turn)
+        mAttackReaskLine.clear();
+    const bool attackReasked = (mAttackReaskTurn == observer->turn && !mAttackReaskLine.empty());
+    if (attackReasked)
+        tail << "\n" << mAttackReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
-    string userMsg = assemblePrompt(tail.str());
+    const string attackTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
+    string userMsg = assemblePrompt(attackTail);
 
     string content;
-    if (pollCompletionRetry(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content, "attackers") == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
     //Plan split BEFORE the attacker-set parse: numbers (and words like
@@ -43800,6 +44250,43 @@ int AIPlayerGPT::chooseAttackers()
         return AIPlayerBaka::chooseAttackers();
     }
 
+    //#W68-BA (J6, deck130 HIGH-3): the declaration contradicts the reply's own
+    //words. 130v126 s24 wrote `ATTACK: A1, A2, A3, A4` under a PLAN that said "I
+    //must NOT attack ... I will pass combat", sent 4 creatures into a lifegain
+    //deck at 6 life and lost the game 0/34; 4 more replies in the same corpus
+    //(130v125 s51/s58/s63, 123v162 s24) wrote the same shape. Nothing is
+    //overridden and no declaration is dropped: the question is put ONCE more with
+    //both halves quoted, and whatever comes back is what runs.
+    {
+        string attackReversal;
+        if (result >= 1 && !content.empty() && !attackReasked
+            && mAttackReaskTurn != observer->turn
+            && proseReversesDeclaration(content, 1, &attackReversal))
+        {
+            appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+            mAttackReaskTurn = observer->turn;
+            std::ostringstream corr;
+            corr << "[RE-ASK] Your ATTACK line declares attackers, but your reply says this"
+                    " combat is a pass (\"" << attackReversal << "\"). Answer again with one"
+                    " ATTACK: line - the attackers you mean to declare, or \"ATTACK: none\" to"
+                    " attack with nobody this turn.";
+            mAttackReaskLine = corr.str();
+            writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
+                          "", "attack_reversed_in_prose_reask", &shownLines);
+            setNotice("the attack contradicts the reply's pass - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: attack_reversed_in_prose -> re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(attackTail + "\n" + mAttackReaskLine),
+                                corrected, "attackers");
+            return 1; //in flight; nothing declared yet, re-poll next tick
+        }
+        if (attackReasked)
+            appendParseNote(&mLastParseNote,
+                            proseReversesDeclaration(content, 1)
+                                ? "attack_reversed_in_prose_exhausted"
+                                : (result >= 1 ? "attack_reversed_in_prose_recovered"
+                                               : "attack_reversed_in_prose_unanswered"));
+    }
     //#W64-AI (F4): read the >W# suffixes off the line the declaration came
     //from. A malformed or out-of-range suffix binds nothing and the attacker
     //simply attacks the player - the declaration is never lost to it.
@@ -44767,11 +45254,25 @@ int AIPlayerGPT::chooseBlockers()
     //instead of replaying the rejected answer.
     if (mBlockIllegalReaskTurn == observer->turn && mBlocksDoneTurn != observer->turn)
         tail << prunedPairsReaskClause(mBlockIllegalReaskPairs);
+    //#W68-BA (J6): this seam's own prose-reversal correction, on its own latch -
+    //a gang conflict, an all-illegal assignment and a reply that contradicts its
+    //own declaration are three different failures and none may spend another's
+    //single arm. 0 windows of this shape occurred at the blockers seam in the
+    //wave-67 corpus (33 records); it is wired because the predicate is one
+    //predicate, and its firing rate is a wave-68 measurement, not a claim.
+    if (mBlockRevReaskTurn != observer->turn)
+        mBlockRevReaskLine.clear();
+    const bool blockRevReasked = (mBlockRevReaskTurn == observer->turn
+                                  && !mBlockRevReaskLine.empty()
+                                  && mBlocksDoneTurn != observer->turn);
+    if (blockRevReasked)
+        tail << "\n" << mBlockRevReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
-    string userMsg = assemblePrompt(tail.str());
+    const string blockTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
+    string userMsg = assemblePrompt(blockTail);
 
     string content;
-    if (pollCompletionRetry(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content, "blockers") == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
     //Plan split BEFORE the assignment parse: a "B2" or bare numbers in the
@@ -44894,6 +45395,36 @@ int AIPlayerGPT::chooseBlockers()
     //assignment left, the HEURISTIC blocks instead of declining combat
     //outright (a blanket no-blocks maximizes incoming damage and is the
     //adjudication tiebreaker - the worst answer to default to).
+    //#W68-BA (J6): the assignment contradicts the reply's own words. Same
+    //predicate as the ask, priority and attackers seams, this seam's vocabulary.
+    //Nothing is dropped: the question is put once more and the answer runs.
+    {
+        string blockReversal;
+        if (pairs > 0 && !content.empty() && !blockRevReasked
+            && mBlockRevReaskTurn != observer->turn
+            && proseReversesDeclaration(content, 2, &blockReversal))
+        {
+            appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+            mBlockRevReaskTurn = observer->turn;
+            std::ostringstream corr;
+            corr << "[RE-ASK] Your BLOCKS line assigns blockers, but your reply says you are"
+                    " not blocking this turn (\"" << blockReversal << "\"). Answer again with"
+                    " one BLOCKS: line - the assignments you mean, or exactly \"BLOCKS: none\""
+                    " to block with nobody this turn.";
+            mBlockRevReaskLine = corr.str();
+            writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                          "", "blocks_reversed_in_prose_reask", &shownLines);
+            setNotice("the blocks contradict the reply's own words - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: blocks_reversed_in_prose -> re-asking once");
+            return 1; //next tick rebuilds the prompt WITH the correction line
+        }
+        if (blockRevReasked)
+            appendParseNote(&mLastParseNote,
+                            proseReversesDeclaration(content, 2)
+                                ? "blocks_reversed_in_prose_exhausted"
+                                : (pairs > 0 ? "blocks_reversed_in_prose_recovered"
+                                             : "blocks_reversed_in_prose_unanswered"));
+    }
     if (pairs > 0 && truncatedBlockCommitmentAbandoned(content))
     {
         int legalPairs = 0;
@@ -45511,7 +46042,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     }
 
     string content;
-    if (pollCompletionRetry(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content, "reveal") == kChoicePending)
         return 0; //decision in flight; the display waits and re-polls next tick
 
     //Plan split BEFORE the subset parse: bare numbers in the plan prose must
@@ -45834,7 +46365,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
         mLogWindowKind = kAskWindowPregame; //#W57-H (D43): hand-only, no GAME LOG
         string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need, chosenSoFar));
         string content;
-        if (pollCompletionRetry(userMsg, content) == kChoicePending)
+        if (pollCompletionRetry(userMsg, content, "bottom") == kChoicePending)
         {
             status = PREGAME_PENDING;
             return NULL; //call in flight; PreGamePhase re-polls next tick
@@ -46458,7 +46989,7 @@ int AIPlayerGPT::cleanupDiscard(int over)
         names.push_back(hand[discardOrder[j]]->name);
     if (!mEndpoint.empty())
     {
-        if (pollCompletionRetry(userMsg, content) == kChoicePending)
+        if (pollCompletionRetry(userMsg, content, "discard") == kChoicePending)
             return 1; //call in flight; the base Act neither acts nor passes
         //#W52-G (E-1): the discard ask's own label. deck162 vs deck146 seq 17:
         //"PUT: 3 (Forced Fruition)" twice, then a stray "CHOICE: 2 (Cast
@@ -46499,7 +47030,7 @@ int AIPlayerGPT::cleanupDiscard(int over)
             DebugTrace("AIPlayerGPT: cleanup discard named " << result << " distinct of "
                        << over << " (" << repeatedIdx << " repeated) - re-asking once");
             string corrected;
-            pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected);
+            pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected, "discard");
             return 1; //the caller unwinds; the corrected call answers later
         }
         if (reasked)
@@ -61680,39 +62211,47 @@ static const char * kW50Y_r94 =
         // 0 while plan_choice_conflict_narrowed read 14 - "0 conflicts" and
         // "0 counted" were the same output. The three stamps must partition:
         // broad = narrowed + firings.
+        //#W68-BA (J6, deck123 HIGH-2): the partition is RE-PINNED because the
+        // mechanism changed. On the wave-67 corpus broad = 15 and narrowed = 15:
+        // the rival-row requirement removed every candidate re-ask while 12 of the
+        // 20 takes past a stated stop carried exactly this reversal and executed.
+        // The re-ask now fires on the reversal itself, so the second stamp can no
+        // longer be called "narrowed" (nothing is narrowed away) - it is the
+        // sub-count of reversals that named no rival row, and broad == firings.
         struct Pin
         {
             static string stamps(bool passVerdictInProse, bool rivalNamed)
             {
                 string note;
-                const bool conflict = passVerdictInProse && rivalNamed;
                 if (passVerdictInProse)
                     appendParseNote(&note, "decision_reversed_in_prose");
-                if (passVerdictInProse && !conflict)
-                    appendParseNote(&note, "plan_choice_conflict_narrowed");
+                if (passVerdictInProse && !rivalNamed)
+                    appendParseNote(&note, "plan_choice_conflict_no_rival_named");
                 return note;
             }
         };
         CHECK(Pin::stamps(true, true) == "decision_reversed_in_prose",
-              "#W57-A D16 a genuine rival: the broad census counts it and the narrowing does not");
+              "#W68-BA J6 a reversal that names a rival row: counted once, and it fires");
         CHECK(Pin::stamps(true, false)
-                  == "decision_reversed_in_prose;plan_choice_conflict_narrowed",
-              "#W57-A D16 the narrowed-away shape is counted TWICE - once broad, once as the narrowing");
+                  == "decision_reversed_in_prose;plan_choice_conflict_no_rival_named",
+              "#W68-BA J6 a reversal naming no rival row is counted twice - and it fires too");
+        CHECK(Pin::stamps(true, false).find("plan_choice_conflict_narrowed") == string::npos,
+              "#W68-BA J6 NEGATIVE the retired stamp name is gone - it would report a suppression that no longer happens");
         CHECK(Pin::stamps(false, false).empty() && Pin::stamps(false, true).empty(),
               "#W57-A D16 NEGATIVE no pass verdict in the prose stamps nothing at all");
         // The property the item exists for, stated as arithmetic.
         {
-            int broad = 0, narrowed = 0, fired = 0;
+            int broad = 0, noRival = 0, fired = 0;
             const bool cases[4][2] = { {true, true}, {true, false}, {true, false}, {false, true} };
             for (int i = 0; i < 4; i++)
             {
                 const string s = Pin::stamps(cases[i][0], cases[i][1]);
                 if (s.find("decision_reversed_in_prose") != string::npos) broad++;
-                if (s.find("plan_choice_conflict_narrowed") != string::npos) narrowed++;
-                if (cases[i][0] && cases[i][1]) fired++;
+                if (s.find("plan_choice_conflict_no_rival_named") != string::npos) noRival++;
+                if (cases[i][0]) fired++; //#W68-BA (J6): the reversal IS the firing condition
             }
-            CHECK(broad == narrowed + fired && broad == 3 && narrowed == 2 && fired == 1,
-                  "#W57-A D16 broad == narrowed + firings, so a 0 in the broad column is about the game");
+            CHECK(broad == fired && broad == 3 && noRival == 2,
+                  "#W68-BA J6 every counted reversal buys the re-ask; the rival-named half is a sub-count");
         }
     }
 
@@ -74063,6 +74602,200 @@ static const char * kW50Y_r94 =
                       .find("- Paid {w} for X with A") != string::npos,
                   "#W68-BD MED MUST-NOT-MATCH a one-source line is never made LONGER");
         }
+    }
+
+
+    cout << "\n[#W68-BA] J3 the per-seam token budget, sized from the wave-67 corpus\n";
+    {
+        // Measured over matchups-20260906-102638 (2,301 replies carrying a body,
+        // 88,567 s of reply generation, r(bytes, latency) = 0.727): the bytes a
+        // seam NEEDS through the end of its PLAN line are ask p99 1,630 B,
+        // priority 2,041 B, attackers 2,161 B, blockers p90 810 B, and the small
+        // seams never exceed 489 B. Each cap's byte-equivalent (~3.5 B/token)
+        // clears its seam's p99 need; replayed over the corpus the set leaves
+        // 10.4% of the bytes ungenerated and costs 9 re-asks in 2,301 replies.
+        CHECK(gptSeamMaxTokens("ask", 6000) == 640 && gptSeamMaxTokens("priority", 6000) == 768
+                  && gptSeamMaxTokens("attackers", 6000) == 768
+                  && gptSeamMaxTokens("blockers", 6000) == 896,
+              "#W68-BA J3 POSITIVE each seam carries its own budget, blockers the largest (it bundles)");
+        CHECK(gptSeamMaxTokens("discard", 6000) == 384 && gptSeamMaxTokens("reveal", 6000) == 384
+                  && gptSeamMaxTokens("bottom", 6000) == 384,
+              "#W68-BA J3 POSITIVE the small seams, whose largest corpus reply is 489 B");
+        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("blockers", 800) == 800,
+              "#W68-BA J3 POSITIVE the configured value is the CEILING - a seam cap never raises it");
+        CHECK(gptSeamMaxTokens("mulligan", 6000) == 6000 && gptSeamMaxTokens(NULL, 6000) == 6000
+                  && gptSeamMaxTokens("", 6000) == 6000,
+              "#W68-BA J3 MUST-NOT-MATCH an unnamed seam keeps the ceiling - no seam is capped by accident");
+    }
+
+    cout << "\n[#W68-BA] J3 the overrun meter counts BOTH sides of the label\n";
+    {
+        // 126v152 s10 (blockers, 825 s): 4,572 bytes of working BEFORE `BLOCKS:`
+        // and 0 after it. post_answer_overrun scored 0 on that reply and on
+        // 126v123 s13 (3,741 B, 462 s) - the two slowest blockers replies in the
+        // corpus were invisible to the only length meter the engine had.
+        const string answerLast =
+            "The opponent is attacking with Intrepid Adversary (4/2 lifelink). I have two"
+            " defenders: Pride Guardian (0/3) and Wall of Omens (0/4).\n"
+            "According to Rule #5 (Blocking), I must evaluate the trade.\n"
+            "BLOCKS: B1:A1";
+        CHECK(postAnswerOverrun(answerLast) == 0 && preAnswerOverrun(answerLast) > 150,
+              "#W68-BA J3 REPRO the 126v152 s10 shape: the shipped meter reads 0, the new side reads the working");
+        const string answerFirst =
+            "BLOCKS: B1:A1\n\nPLAN: hold the Wall back and chump with the Guardian.";
+        CHECK(preAnswerOverrun(answerFirst) == 0 && postAnswerOverrun(answerFirst) > 0,
+              "#W68-BA J3 MUST-NOT-MATCH an answer-first reply scores ZERO on the pre side");
+        CHECK(preAnswerOverrun("\n\n  CHOICE: 3 (Cast Example Card)") == 0,
+              "#W68-BA J3 MUST-NOT-MATCH leading blank space is not working - it is not counted");
+        CHECK(preAnswerOverrun("I am still thinking about this window.") == 0
+                  && postAnswerOverrun("I am still thinking about this window.") == 0,
+              "#W68-BA J3 MUST-NOT-MATCH a reply with no coded answer scores 0 on both sides");
+        CHECK(preAnswerOverrun("ANSWER: CHOICE: 3 (Cast Example Card)") == 8
+                  && postAnswerOverrun("ANSWER: CHOICE: 3 (Cast Example Card)") == 0,
+              "#W68-BA J3 ECHO a #W67-AV I1 heading is measured as the 8 bytes it is - the meter"
+              " reports to the LABEL, never to the line, so no heading is silently forgiven");
+    }
+
+    cout << "\n[#W68-BA] J3 the protocol states the budget in words\n";
+    {
+        const string proto = kReplyProtocol;
+        CHECK(proto.find("THREE short sentences at most") != string::npos
+                  && proto.find("hard length limit") != string::npos,
+              "#W68-BA J3 POSITIVE the length budget is stated where the model composes the reply");
+        CHECK(proto.find("the FIRST one is the one that runs") != string::npos,
+              "#W68-BA J3 MUST-NOT-MATCH first-wins is untouched - this wave moved no anchor");
+        CHECK(proto.find("Reply in three parts, in this order: your working,") != string::npos,
+              "#W68-BA J3 MUST-NOT-MATCH the #W67-AV I3 section-naming fix is untouched");
+    }
+
+    cout << "\n[#W68-BA] J1 the stated stop applies to ANY activation of the same ability\n";
+    {
+        // 123v130 s27 and s48, verbatim. Both took the PLAIN row (choice 1) that
+        // the appended repeat row shadows, so repeatRowTaken was false and the
+        // whole #W66-AS/#W67-AY guard was unreachable: `repeat_past_stop` and
+        // `repeat_clamped_to_own_stop` both read 0 across 2,436 records while 20
+        // takes ran past a stated stop.
+        const string s27 =
+            "CHOICE: 1 (Create vampire with Bloodline Keeper #1)\n\n"
+            "PLAN: L=19, C=1 (Sigarda), stop=23; M=24 now (23 Vampires + 2 B.K.)."
+            " Fire chain in opponent's turn to build army. Next window: repeat taps"
+            " until M reaches 23, then pass. Attack next turn with all Vampires and"
+            " Bloodline Keeper #2.";
+        const string s48 =
+            "CHOICE: 1 (Create vampire with Bloodline Keeper #1)\n\n"
+            "PLAN: L=19, C=1 (Sigarda), stop=23; M=35 now. I will tap Bloodline Keeper #1"
+            " to create a token, bringing M to 36.";
+        int stop = -1, cur = -1;
+        CHECK(repeatPlanStopAndCurrent(s27, &stop, &cur) && stop == 23 && cur == 24,
+              "#W68-BA J1 REPRO 123 s27 states its own stop=23 and its own M=24");
+        CHECK(parseRepeatCount(s27) < 0 && parseRepeatCount(s48) < 0,
+              "#W68-BA J1 REPRO neither reply names a COUNT - which is why the namedCount gate never saw them");
+        stop = -1; cur = -1;
+        CHECK(repeatPlanStopAndCurrent(s48, &stop, &cur) && stop == 23 && cur == 35,
+              "#W68-BA J1 REPRO 123 s48, twelve windows later: same stated stop, M walked to 35");
+        // the row map: the appended repeat row at index 3 repeats the base row 0
+        std::vector<int> baseMap;
+        baseMap.push_back(-1); baseMap.push_back(-1); baseMap.push_back(-1); baseMap.push_back(0);
+        CHECK(rowIsRepeatBase(baseMap, 1),
+              "#W68-BA J1 POSITIVE row 1 IS the base row the repeat row counts - one activation of the same ability");
+        CHECK(!rowIsRepeatBase(baseMap, 2) && !rowIsRepeatBase(baseMap, 3)
+                  && !rowIsRepeatBase(baseMap, 0) && !rowIsRepeatBase(baseMap, -1),
+              "#W68-BA J1 MUST-NOT-MATCH an unrelated row, the repeat row itself and a pass are not base takes");
+        // the count the guard tests, and what the model's own subtraction performs
+        const int stopTestCount = 1; //a base-row take is ONE repetition
+        CHECK(repeatStopClampCount(stopTestCount, 23, 24) == 0
+                  && repeatStopExecutesNothing(repeatStopClampCount(stopTestCount, 23, 24)),
+              "#W68-BA J1 POSITIVE the single activation at M=24 against stop=23 performs the model's own zero");
+        CHECK(repeatStopClampCount(stopTestCount, 23, 35) == 0,
+              "#W68-BA J1 POSITIVE twelve windows later the same arithmetic gives the same zero");
+        CHECK(repeatStopClampCount(stopTestCount, 23, 20) == -1,
+              "#W68-BA J1 MUST-NOT-MATCH an activation INSIDE the stated stop is not clamped at all");
+    }
+
+    cout << "\n[#W68-BA] J6 one reversal predicate, every seam, each seam's own words\n";
+    {
+        // 130v126 s24, verbatim: `ATTACK: A1, A2, A3, A4` under a PLAN that says
+        // "I must NOT attack ... I will pass combat". Four creatures into a
+        // lifegain deck at 6 life; the game was lost 0/34. The corpus stamped
+        // `decision_reversed_in_prose` 15 times, all 15 at the PRIORITY seam,
+        // because nothing else ever called the predicate (0 of 74 at ATTACK).
+        const string s24 =
+            "ATTACK: A1, A2, A3, A4\n\n"
+            "PLAN: Opponent has Sanguine Bond and Exquisite Blood (implied by life gain engine)"
+            " or just Sanguine Bond + Defender walls. I must NOT attack into the defenders while"
+            " they have Sanguine Bond. I will pass combat.";
+        string why;
+        CHECK(proseReversesDeclaration(s24, 1, &why) && !why.empty(),
+              "#W68-BA J6 REPRO 130v126 s24: the declaration contradicts the reply's own PLAN");
+        CHECK(!proseReversesDeclaration(s24, 0) && !proseReversesDeclaration(s24, 2),
+              "#W68-BA J6 MUST-NOT-MATCH the CHOICE and BLOCKS arms do not learn the attack vocabulary");
+        CHECK(!proseReversesDeclaration("ATTACK: A1, A3\n\nPLAN: I will not attack with A2 - it"
+                                        " has to stay home to block their flier.", 1),
+              "#W68-BA J6 MUST-NOT-MATCH \"I will not attack WITH A2\" is about one attacker, not the combat");
+        CHECK(!proseReversesDeclaration("ATTACK: A1\n\nPLAN: I attack with A1 now and I will not"
+                                        " attack next turn while the Wall is up.", 1),
+              "#W68-BA J6 MUST-NOT-MATCH a refusal deferred to a LATER turn is not this window's verdict");
+        CHECK(proseReversesDeclaration("BLOCKS: B1:A1\n\nPLAN: I will not block this turn; the"
+                                       " life total can take it.", 2),
+              "#W68-BA J6 POSITIVE the BLOCKS arm reads the same shape in its own words");
+        CHECK(!proseReversesDeclaration("BLOCKS: B1:A1, B2:A2\n\nPLAN: I will not block with B3 -"
+                                        " it stays back for the flier.", 2),
+              "#W68-BA J6 MUST-NOT-MATCH a per-creature exclusion is not a reversal of the assignment");
+        // the CHOICE arm is byte-identical to every shipped caller
+        CHECK(planSaysPassThisWindow("CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: M is"
+                                     " 26, stop is 24. So we pass."),
+              "#W68-BA J6 MUST-NOT-MATCH the CHOICE arm still answers exactly as #W52-J shipped it");
+    }
+
+    cout << "\n[#W68-BA] J6 a pass verdict CONFIRMS a decline row, and never re-asks it\n";
+    {
+        CHECK(rowIsDeclineRow("Cast nothing right now") && rowIsDeclineRow("Hold priority {right"
+                              " now: they have 2 untapped lands}")
+                  && rowIsDeclineRow("Done") && rowIsDeclineRow("Decline"),
+              "#W68-BA J6 POSITIVE the menu's own decline rows are recognised at every seam");
+        CHECK(!rowIsDeclineRow("Cast Devour Flesh {1}{b}")
+                  && !rowIsDeclineRow("Create vampire with Bloodline Keeper #1")
+                  && !rowIsDeclineRow("Passage of Time {2}{u}"),
+              "#W68-BA J6 MUST-NOT-MATCH a real play is not a decline, even when its name starts with \"Pass\"");
+    }
+
+    cout << "\n[#W68-BA] J6 the no-op re-ask is exempt from the board's single budget\n";
+    {
+        // 123 s41 -> s43, verbatim row and reply. s41 spent the board's one
+        // re-ask on a named_row miss; s43 then answered the corrected question
+        // with a row whose OWN note says it does nothing, over a PLAN that says
+        // the same, and the dead spell was cast at 7 life.
+        const string deadRow =
+            "Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does"
+            " nothing; YOU control 0 creatures - targeting yourself does nothing} {leaves 1 of"
+            " your 3 untapped mana sources untapped}";
+        const string s43 =
+            "CHOICE: 2 (Cast Devour Flesh)\n\n"
+            "PLAN: Cast Devour Flesh to sacrifice nothing (waste) or hold if I can't find a"
+            " target? No, Devour Flesh at 0 creatures does nothing. I will hold priority.";
+        CHECK(AIPlayerGPT::rowSaysNoOp(deadRow) && AIPlayerGPT::planArguesAgainstRow(s43, deadRow),
+              "#W68-BA J6 REPRO 123 s43: both statements that the row is dead are present, as wave 67 measured");
+        // the gate, mirrored: the exemption is ONE extra ask per ask key.
+        struct Pin
+        {
+            static int asks(bool noop)
+            {
+                string budgetKey, noopKey;
+                const string askKey = "board+question";
+                int asked = 0;
+                //first window: the budget buys the named_row re-ask
+                budgetKey = askKey; asked++;
+                //second answer: the budget is spent, the no-op latch is not
+                if (noop && budgetKey == askKey && noopKey != askKey) { noopKey = askKey; asked++; }
+                //third answer, same board, same contradiction: nothing more is bought
+                if (noop && budgetKey == askKey && noopKey != askKey) { noopKey = askKey; asked++; }
+                return asked;
+            }
+        };
+        CHECK(Pin::asks(true) == 2,
+              "#W68-BA J6 POSITIVE the dead row buys ONE extra ask after the budget is spent - and only one");
+        CHECK(Pin::asks(false) == 1,
+              "#W68-BA J6 MUST-NOT-MATCH with no self-contradiction the budget still buys exactly one re-ask");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

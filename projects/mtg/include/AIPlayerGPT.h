@@ -698,6 +698,18 @@ private:
     int mBlockIllegalReaskTurn;
     string mBlockIllegalReaskPairs;
 
+    //#W68-BA (J6, deck130 HIGH-3): the combat seams' ONE prose-reversal re-ask
+    //per turn, and the correction line the next tick re-appends to the prompt
+    //(the ask/priority seams' pattern - the changed text is what makes the
+    //corrected question a different call instead of a replay). 5 of the 74
+    //wave-67 attackers replies declared attackers under prose that named a pass;
+    //130v126 s24 executed `ATTACK: A1-A4` under "I must NOT attack ... I will
+    //pass combat" and lost the game 0/34.
+    int mAttackReaskTurn;
+    string mAttackReaskLine;
+    int mBlockRevReaskTurn;
+    string mBlockRevReaskLine;
+
     //Parse-shape signature for the NEXT translog record (parseChoice noteOut,
     //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
     //note can never leak onto a later, unrelated record.
@@ -902,7 +914,10 @@ private:
     //kChoicePending while either attempt is in flight; 0 with the reply content
     //once done (the retry's reply, which may itself still be unusable -> the
     //caller's heuristic fallback). NEVER retries ordinary unparsed replies.
-    int pollCompletionRetry(const string& userMsg, string& content);
+    //#W68-BA (J3): `seam` names the decision seam this request belongs to, so
+    //buildRequestBody can size max_tokens from the corpus measurement for that
+    //seam (gptSeamMaxTokens). NULL/absent keeps the configured ceiling.
+    int pollCompletionRetry(const string& userMsg, string& content, const char * seam = NULL);
     //True when a completed reply is a decode-COLLAPSE (token garbage): no
     //well-formed coded answer line AND a long reply that is either
     //repetition-signatured or >=30% markup/non-ASCII with near-zero prose. The
@@ -1218,6 +1233,20 @@ private:
     string mAskReaskKey;
     string mAskReaskLine;
     string mAskReaskKind; //"named_row" | "no_pass" (#W50-Y D9)
+    //#W68-BA (J3, engine FAILs AV4/AV5): the SEAM the request in flight belongs
+    //to, set by pollCompletionRetry and read by buildRequestBody, and the
+    //max_tokens that request actually carried (recorded, so a corpus can prove
+    //which cap a reply was decoded under). Never enters a prompt, an ask key or
+    //an option-set key.
+    string mRequestSeam;
+    long mLastRequestMaxTokens;
+    //#W68-BA (J6, deck123 HIGH-2): the no-op re-ask's OWN one-shot, so a row the
+    //model itself calls dead is still questioned once when the board's single
+    //re-ask has already been spent on a different failure (123 s41 spent it on a
+    //named_row miss and s43 then cast a Devour Flesh its own PLAN called dead,
+    //at 7 life). Keyed exactly like the budget it is exempt from.
+    string mAskNoopReaskKey;
+    string mPriorityNoopReaskBoard;
     //#W60-M (B3): the cleanup-discard channel's own one re-ask. Keyed on the
     //ask TEXT (the hand and the count are in it), cleared when the discard
     //completes. The discard prompt states it is the only ask for those cards,
