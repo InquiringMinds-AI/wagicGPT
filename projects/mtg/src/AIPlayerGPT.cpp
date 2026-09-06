@@ -4463,6 +4463,34 @@ static int stackObjectLifeLossToSeat(Interruptible * it, Player * seat, string *
 //instead: it is reported as OPTIONAL, and it is not reserved against - an
 //under-count leaves the ceiling generous, which is the only direction that
 //cannot cost a legal line (the rule this scan's own header states).
+//#W69-BH (K4a, deck125 HIGH; wave-68 lane BB's fold still under-counted):
+//WHO the pending draw is FOR. The scan below asked `dynamic_cast<Player *>` of
+//the AADrawer's target and counted nothing else, while `AADrawer::resolve`
+//asks `MTGAbility::getPlayerFromTarget` - which maps a CARD target to its
+//controller. `@each my upkeep:draw:1` with no target keyword (Staff of Nin;
+//`who == UNSET`, target = the source card) therefore scanned as ZERO draws for
+//anybody, while `draw:1 controller` (Howling Mine) set `who = CONTROLLER` and
+//getTarget() handed back a Player - which is why the wave-63 evidence looked
+//like the walk worked. Corpus proof (matchups-20260906-134120, 2,282 prompts):
+//the reserve's stack term rendered `plus the N draws already on the stack`
+//exactly ZERO times, and both of the corpus's own-upkeep ANNOUNCE_X windows
+//with a pending Staff trigger (`125v126` s91 and s110) printed a reserve of 1
+//where the truth was 2 - s110 read a ceiling of X=7 against a true X=6, the
+//seat announced 7 and decked itself at 65 life. Same mapping the resolution
+//uses, so the count and the resolution cannot disagree. Pure over the target.
+static Player * stackDrawRecipient(Targetable * t)
+{
+    if (!t)
+        return NULL;
+    if (Player * p = dynamic_cast<Player *>(t))
+        return p;
+    if (MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t))
+        return c->controller();
+    if (Interruptible * it = dynamic_cast<Interruptible *>(t))
+        return it->source ? it->source->controller() : NULL;
+    return NULL;
+}
+
 static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int& cards,
                                   int& mayCards, bool underMay = false,
                                   const vector<Targetable *> * chosen = NULL)
@@ -4480,7 +4508,7 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
             else if (Targetable * one = dr->getTarget())
                 tgts.push_back(one);
             for (size_t ti = 0; ti < tgts.size(); ti++)
-                if (n > 0 && dynamic_cast<Player *>(tgts[ti]) == seat)
+                if (n > 0 && stackDrawRecipient(tgts[ti]) == seat) //#W69-BH (K4a)
                 {
                     if (underMay)
                         mayCards += n;
@@ -6154,7 +6182,16 @@ static string sorceryReserveClause(int left, const string& name, const string& c
     if (!cost.empty())
         o << " " << cost;
     o << " in your hand needs " << need << " - it is SORCERY SPEED, so your main phase this"
-         " turn is its last window}";
+         " turn is its last window."
+         //#W69-BH (K6b, deck162 MED-2): the clause ended in its two OPERANDS
+         //("leaves 3 sources, and ... needs 5") where every sibling clause on
+         //the same screen ends in a verdict word (SURVIVE / KILLS you / does
+         //nothing), and the subtraction was left for the reader. The guard
+         //above is `need <= left -> ""`, so wherever this prints the answer is
+         //already decided: the card cannot be cast this turn after this row.
+         " VERDICT: taking this row STRANDS "
+      << name << " this turn - " << left << " source" << (left == 1 ? "" : "s")
+      << " cannot pay " << need << ", and it has no window after your main phase}";
     return o.str();
 }
 
@@ -22614,6 +22651,10 @@ struct CrackBackAttackerFact
     int power;          //what this body adds to the crack-back total
     int blockersNeeded; //CR 509.1c: menace 2, "three or more" 3, else 1
     bool coverable;     //a CHECKED body this row adds may legally block it
+    //#W69-BH (K6a): which of the seat's ALREADY-UNTAPPED creatures may legally
+    //block this attacker, by index into the caller's own list of them. Empty on
+    //every pre-wave-69 call, and then every figure below is byte-identical.
+    std::vector<int> existingBlockers;
     CrackBackAttackerFact() : power(0), blockersNeeded(1), coverable(false) {}
 };
 static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
@@ -22646,10 +22687,21 @@ static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
 //    because 9 - 7 > 0. Where the total is a floor the screen cannot say the
 //    crack-back is survivable, so the row prices the cover it adds and says
 //    plainly that it is pricing a floor. On a CEILING the gate is unchanged.
+//#W69-BH (K6a, deck162 MED-1): THE COVER COUNTED ONLY THE ROW'S OWN NEW BODY.
+//`162v152` s15 printed "Counting only the checked bodies you cover 5 of 13 ...
+//you would be at 4" beside a battlefield holding an untapped Master of the Feast
+//(5/5) and an untapped Fate Unraveler (3/4) - two legal blockers the same
+//opponent's attack has to get through, and the only survival arithmetic on the
+//screen left both of them out; s19 read "at 0" the same way. The bodies already
+//standing are the same fact the blockers screen declares from two turns later,
+//and the render already knows them. They are folded FIRST (they are certain -
+//no cast is required to have them), each body is assigned to at most one
+//attacker, and the row's own bodies then cover what is left.
 static string crackBackBlockerRowTag(int total, int myLife,
                                      int checkedBodies, int uncheckedBodies,
                                      const std::vector<CrackBackAttackerFact>& atk,
-                                     bool totalIsFloor = false)
+                                     bool totalIsFloor = false,
+                                     int existingBodies = 0) //#W69-BH (K6a)
 {
     const int bodies = checkedBodies + uncheckedBodies;
     if (bodies <= 0 || total <= 0 || atk.empty())
@@ -22666,9 +22718,32 @@ static string crackBackBlockerRowTag(int total, int myLife,
     //for a token as much as for the cast card.
     int coveredFloor = 0, spareFloor = checkedBodies, unblockable = 0;
     int coveredCeil = 0, spareCeil = bodies;
+    //#W69-BH (K6a): the bodies already standing, spent first and each spent
+    //ONCE. `existingBlockers` names them per attacker, so a body that can only
+    //block one of two attackers is never counted against both.
+    int coveredExisting = 0;
+    std::vector<char> usedExisting(existingBodies > 0 ? (size_t) existingBodies : 0, 0);
     for (size_t i = 0; i < sorted.size(); i++)
     {
         const int need = sorted[i].blockersNeeded > 0 ? sorted[i].blockersNeeded : 1;
+        if (existingBodies > 0)
+        {
+            std::vector<int> pick;
+            for (size_t k = 0; k < sorted[i].existingBlockers.size()
+                               && (int) pick.size() < need; k++)
+            {
+                const int bi = sorted[i].existingBlockers[k];
+                if (bi >= 0 && bi < existingBodies && !usedExisting[(size_t) bi])
+                    pick.push_back(bi);
+            }
+            if ((int) pick.size() >= need)
+            {
+                for (size_t k = 0; k < pick.size(); k++)
+                    usedExisting[(size_t) pick[k]] = 1;
+                coveredExisting += sorted[i].power;
+                continue; //this attacker is already answered; no new body spent
+            }
+        }
         if (!sorted[i].coverable)
             unblockable++;
         else if (need <= spareFloor)
@@ -22682,6 +22757,10 @@ static string crackBackBlockerRowTag(int total, int myLife,
             coveredCeil += sorted[i].power;
         }
     }
+    if (coveredExisting > total)
+        coveredExisting = total;
+    coveredFloor += coveredExisting;
+    coveredCeil += coveredExisting;
     if (coveredFloor > total)
         coveredFloor = total;
     if (coveredCeil > total)
@@ -22716,7 +22795,22 @@ static string crackBackBlockerRowTag(int total, int myLife,
           << (checkedBodies == 1 ? "it" : "them")
           << " at all (evasion, protection, or a block needing more bodies than"
              " this row adds).";
-    o << " Counting only the checked bodies you cover " << coveredFloor << " of "
+    //#W69-BH (K6a): the bodies already standing, named as their own term before
+    //the total, so the reader can check the subtraction against the board line.
+    if (existingBodies > 0)
+        o << " You ALSO already control " << existingBodies << " untapped creature"
+          << (existingBodies == 1 ? "" : "s")
+          << " that can block on their turn without casting anything, and this"
+             " clause counts " << (existingBodies == 1 ? "it" : "them")
+          << " FIRST: on " << (existingBodies == 1 ? "its" : "their")
+          << " own " << (existingBodies == 1 ? "it covers " : "they cover ")
+          << coveredExisting << " of " << total
+          << " (each of them blocks at most ONE attacker, and none is counted"
+             " against two).";
+    o << (existingBodies > 0
+              ? " Counting those bodies AND the checked new ones you cover "
+              : " Counting only the checked bodies you cover ")
+      << coveredFloor << " of "
       << total << ", leaving " << leftFloor << " -> you would be at "
       << (myLife - leftFloor);
     if (totalIsFloor)
@@ -22861,15 +22955,36 @@ static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor,
 //CHECKED body; the token bodies its script creates have no instance and are
 //counted as unchecked. A card that cannot block at all (CANTBLOCK, or it enters
 //tapped) is neither: it is known not to be cover.
+//#W69-BH (K6a): `me`/`existingOut` add the seat's ALREADY-UNTAPPED creatures.
+//A creature that is tapped NOW stays tapped through the whole of their turn
+//(the seat's permanents untap in the SEAT's untap step, not theirs), so only an
+//untapped body is cover; legality is asked of the same engine call the row's
+//own body is asked with, so no evasion rule can drift between the two.
 static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies,
                                 std::vector<CrackBackAttackerFact>& out,
-                                int& checkedBodies, int& uncheckedBodies)
+                                int& checkedBodies, int& uncheckedBodies,
+                                Player * me = NULL, int * existingOut = NULL)
 {
     out.clear();
     checkedBodies = 0;
     uncheckedBodies = 0;
+    if (existingOut)
+        *existingOut = 0;
     if (!opp || !opp->game || !opp->game->inPlay || !card)
         return;
+    std::vector<MTGCardInstance *> standing; //#W69-BH (K6a)
+    if (me && me->game && me->game->inPlay)
+        for (int si = 0; si < me->game->inPlay->nb_cards; si++)
+        {
+            MTGCardInstance * sc = me->game->inPlay->cards[si];
+            if (!sc || sc == card || !sc->isCreature() || sc->isTapped())
+                continue;
+            if (sc->basicAbilities[(int) Constants::CANTBLOCK] || !sc->canBlock())
+                continue;
+            standing.push_back(sc);
+        }
+    if (existingOut)
+        *existingOut = (int) standing.size();
     const bool selfIsBody = card->isCreature();
     const bool selfBlocks = selfIsBody
                             && !card->basicAbilities[(int) Constants::CANTBLOCK]
@@ -22888,6 +23003,9 @@ static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies
         f.power = pw;
         f.blockersNeeded = c->minBlockersRequired();
         f.coverable = selfBlocks && card->canBlockPairwise(c) != 0;
+        for (size_t sj = 0; sj < standing.size(); sj++) //#W69-BH (K6a)
+            if (standing[sj]->canBlockPairwise(c) != 0)
+                f.existingBlockers.push_back((int) sj);
         out.push_back(f);
     }
 }
@@ -23126,6 +23244,26 @@ static int assignableRemainderDamage(const vector<int>& damage,
 //= not ranked, and then no material claim is made at all). `declineLife` >= 0
 //means the header is NOT lethal and carries the life declining leaves.
 //Pure over its inputs, so every wording is provable without a board.
+//#W69-BH (K6d, deck152 MED): the SECOND line the header never printed. Pure
+//over the pairing list and the two damage figures, so both numbers and the
+//comparison are provable without a board. Empty whenever there is nothing to
+//offer (no pairing, or the material line lets in no more damage than the life
+//line already does, in which case the life line already IS the material line).
+static string blockKeepAlternativeClause(const string& pairings, int keepDamage,
+                                         int bestCase)
+{
+    if (pairings.empty() || keepDamage < 0 || bestCase < 0 || keepDamage <= bestCase)
+        return "";
+    std::ostringstream o;
+    o << " ALTERNATIVE, chosen for MATERIAL instead of life: " << pairings
+      << " - every blocker in it survives, and it lets in " << keepDamage
+      << " combat damage instead of " << bestCase << " ("
+      << (keepDamage - bestCase) << " more damage, and it spends no creature)."
+         " Both lines are legal: the one above is the lowest life, this one is the"
+         " lowest material cost.";
+    return o.str();
+}
+
 static string blockAssignmentClause(const vector<string>& blockerNames,
                                     const vector<string>& attackerNames,
                                     const vector<int>& match,
@@ -24256,6 +24394,46 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                     blockersDying++;
                             }
                         }
+                        //#W69-BH (K6d, deck152 MED): THE ONLY NAMED ASSIGNMENT
+                        //SPENT MATERIAL. `152v146` s15 and s19 both printed
+                        //"chosen for the LIFE ONLY - it does not preserve your
+                        //material", and both times the seat answered exactly the
+                        //named assignment (2 of 2). The disclaimer is true and it
+                        //is not an alternative: a header that names one line names
+                        //the line that gets copied. So the OTHER search is run and
+                        //NAMED beside it - the assignment that keeps every blocker
+                        //alive (every pairing whose material rank is a survival
+                        //rank), with the damage it lets in instead. Nothing is
+                        //removed: both lines are printed and the pilot picks.
+                        string keepAltClause;
+                        if (!rankMatrix.empty() && blockersDying > 0)
+                        {
+                            vector<vector<char> > keepCan = can;
+                            for (size_t bi = 0; bi < keepCan.size() && bi < rankMatrix.size(); bi++)
+                                for (size_t dj = 0; dj < keepCan[bi].size(); dj++)
+                                    if (dj >= rankMatrix[bi].size() || rankMatrix[bi][dj] < 3)
+                                        keepCan[bi][dj] = 0;
+                            vector<int> keepMatch;
+                            int keepDamage = assignableRemainderDamage(faceDamage, keepCan,
+                                                                      &facePreventable, &keepMatch);
+                            if (keepDamage >= 0)
+                                keepDamage += trampleOverflow;
+                            int keepPairs = 0;
+                            std::ostringstream kn;
+                            for (size_t bi = 0; bi < keepMatch.size() && bi < canNames.size(); bi++)
+                            {
+                                const int kj = keepMatch[bi];
+                                if (kj < 0 || kj >= (int) declaredNames.size())
+                                    continue;
+                                kn << (keepPairs++ ? "; " : "") << canNames[bi]
+                                   << " blocks " << declaredNames[kj];
+                            }
+                            if (keepPairs > 0)
+                            {
+                                keepAltClause = blockKeepAlternativeClause(kn.str(),
+                                                                          keepDamage, bestCase);
+                            }
+                        }
                         //#W64-AG (F8a): the ranks of the pairings the clause is
                         //about to NAME, so its material claim is the ranking it
                         //actually performed and it can name the bodies it spends.
@@ -24334,6 +24512,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                                    match, blockersDying,
                                                                    lethalScreen, matchRank,
                                                                    lethalScreen ? -1 : declineLife);
+                        if (!bestCaseAssignment.empty()) //#W69-BH (K6d)
+                            bestCaseAssignment += keepAltClause;
                     }
                     //#W61-R (C2): the same map, asked how many of them can be
                     //blocked at once.
@@ -26961,6 +27141,23 @@ static bool rowIsDeclineRow(const string& row)
     return false;
 }
 
+//#W69-BH (K4c, deck125 HIGH-3): the predicate both re-ask seams now use. The
+//shipped one was `rowSaysNoOp(row) AND planArguesAgainstRow(reply, row)` - two
+//independent statements that the take is dead - and the wave-68 corpus took a
+//K=0 sweeper row 14 times over 12 distinct (game, turn) with the reply saying
+//nothing about it (146 s11/s20, 152 s39, 123 s10/s40/s41/s66/s104, 130
+//s28/s33/s56/s58, 162 s8/s61), against ONE fire of the plan form (130 s20,
+//where the re-ask worked and s21 declined). The ROW'S OWN zero is the engine's
+//own statement about the row and earns the same ONE re-ask by itself; the
+//reply's agreement is now only what the corrected question gets to quote. The
+//menu's own decline rows stay exempt: a pass verdict confirms a dead row, it
+//does not contradict it. Nothing is capped and no row is removed - the second
+//answer executes as given, whatever it is. Pure over the row.
+static bool noopRowEarnsReask(const string& row)
+{
+    return AIPlayerGPT::rowSaysNoOp(row) && !rowIsDeclineRow(row);
+}
+
 //#W51-C (D4b): the PLAN line says this window is a pass. Scanned on PLAN-
 //labelled lines only (post-think): "this window: pass" / "stop reached" -
 //the answer-first protocol writes the count before the subtraction, so a
@@ -27497,6 +27694,123 @@ string damagePlayerVerdict(int dmg, int life, bool isMe,
     o << "}";
     return o.str();
 }
+
+//#W69-BH (K4b, deck125 HIGH): the row that averts a deck-out priced NOTHING.
+//`Life with Elixir of Immortality [cost: {2}, Tap]` rendered 412 times in the
+//wave-68 corpus (matchups-20260906-134120) carrying only its card text, while
+//every neighbouring activation row carried a `{right now: ...}` verdict - and
+//at `125v126` s111 it stood on a menu beside a ping with `Your library: 1 cards`
+//and a 19-card graveyard, and the seat pinged. The decision-relevant fact is
+//not the life: it is that this row REBUILDS THE LIBRARY. Pure over three
+//counts, so the arithmetic is provable without a board.
+static string graveyardRefillRowClause(int graveyard, int library)
+{
+    if (graveyard <= 0 || library < 0)
+        return "";
+    std::ostringstream o;
+    o << " {right now: shuffles your " << graveyard << "-card graveyard and this card"
+         " back into your library - your library goes from " << library << " to "
+      << (library + graveyard + 1) << " card" << ((library + graveyard + 1) == 1 ? "" : "s")
+      << "}";
+    return o.str();
+}
+
+//#W69-BH (K4b): does THIS row do that? Two independent facts, both required.
+//(1) the ability chain the row is built from actually shuffles (an AAShuffle
+//under it), and (2) the source's own script carries BOTH move literals
+//(`moveto(mylibrary)` with `all(*|mygraveyard)`), which is what makes the count
+//above EXACT rather than a guess - the whole graveyard plus this card. A card
+//that shuffles without them, or carries them without shuffling, gets NO clause:
+//a wrong magnitude is strictly worse than an absent one (N-158h's rule).
+static bool abilityShufflesGraveyardIntoLibrary(MTGAbility * a, MTGCardInstance * src,
+                                                int depth = 0)
+{
+    if (!a || !src || depth > 5)
+        return false;
+    bool shuffles = (dynamic_cast<AAShuffle *>(a) != NULL);
+    if (!shuffles)
+    {
+        if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+            shuffles = abilityShufflesGraveyardIntoLibrary(na->ability, src, depth + 1);
+        if (!shuffles)
+            if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+                for (size_t i = 0; i < ma->abilities.size() && !shuffles; i++)
+                    shuffles = abilityShufflesGraveyardIntoLibrary(ma->abilities[i], src,
+                                                                   depth + 1);
+    }
+    if (!shuffles)
+        return false;
+    if (depth > 0)
+        return true; //the literal check belongs to the outermost call
+    const string mt = scriptLower(src->magicText);
+    return mt.find("moveto(mylibrary)") != string::npos
+           && mt.find("all(*|mygraveyard)") != string::npos;
+}
+
+//#W69-BH (K6c, deck162 MED-2 / engine): the POSITIVE twin of #W68-BB's
+//`{answers the stack: NO}`. That verdict rendered 4 times in the wave-68 corpus
+//and the seat took the declining row all 4 times: a screen that only ever says
+//which rows LOSE names no row that wins. A row answers the stack when taking it
+//leaves the seat alive through the damage already on it - and the seat has
+//priority, so anything taken now goes ON TOP of that stack and resolves FIRST.
+//Claimed ONLY off a life gain the render can prove (a plain numeric `life:N`
+//for this seat, read from the ability the row is built from - see
+//abilitySelfLifeGainNow); a removal of the SOURCE is deliberately NOT claimed,
+//because destroying the source does nothing to an ability already on the stack.
+//Pure over three ints.
+static string stackAnswerYesRowClause(int gain, int stackLossToMe, int myLife)
+{
+    if (gain <= 0 || stackLossToMe <= 0 || myLife < 0)
+        return "";
+    if (myLife - stackLossToMe > 0)
+        return ""; //#W68-BB (J9): the verdict pair is printed on a lethal stack only
+    if (myLife + gain - stackLossToMe <= 0)
+        return ""; //it does not answer it; the NO clause on the decline rows stands
+    std::ostringstream o;
+    o << " {answers the stack: YES - " << stackLossToMe << " damage is ALREADY ON THE"
+         " STACK and would put you at " << (myLife - stackLossToMe)
+      << ", which KILLS you. You have priority, so taking this row resolves BEFORE that"
+         " damage and gains you " << gain << ": you would be at "
+      << (myLife + gain - stackLossToMe) << " when the stack finishes, and you LIVE}";
+    return o.str();
+}
+
+//#W69-BH (K6c): the life THIS row gains THIS seat, and only where it is a
+//plain positive integer the render can stand behind. Same three rails the
+//pending-draw walk keeps: never the RNG, never a resolution-time variable
+//(`thatmuch`), and the recipient is resolved through stackDrawRecipient - the
+//mapping AALifer::resolve itself uses - so the clause and the resolution cannot
+//disagree. An expression this cannot evaluate yields 0 and NO clause.
+static int abilitySelfLifeGainNow(MTGAbility * a, Player * seat, int depth = 0)
+{
+    if (!a || !seat || depth > 5)
+        return 0;
+    int total = 0;
+    if (AALifer * al = dynamic_cast<AALifer *>(a))
+    {
+        const string& s = al->life_s;
+        bool numeric = !s.empty();
+        for (size_t i = 0; i < s.size(); i++)
+            if (!isdigit((unsigned char) s[i]))
+            {
+                numeric = false;
+                break;
+            }
+        if (numeric && stackDrawRecipient(al->getTarget()) == seat)
+        {
+            const int n = atoi(s.c_str());
+            if (n > 0)
+                total += n;
+        }
+    }
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        total += abilitySelfLifeGainNow(na->ability, seat, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            total += abilitySelfLifeGainNow(ma->abilities[i], seat, depth + 1);
+    return total;
+}
+
 static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth);
 static string toLowerCopy(const string & s);
 
@@ -30187,6 +30501,22 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             if (AADamager * adp = unwrapDamagerAbility(action.ability, 0))
                 if (adp->d.find("rand") == string::npos && adp->getDamage() > 0)
                     out << damagePlayerVerdict(adp->getDamage(), pt->life, pt == this);
+    }
+
+    //#W69-BH (K4b): the library this row rebuilds, and (K6c) whether the life
+    //it gains answers a stack that is about to kill this seat. Both read the
+    //ABILITY this row is built from, never the card's other lines.
+    if (action.ability)
+    {
+        MTGCardInstance * gsrc = action.click ? action.click : action.ability->source;
+        if (gsrc && game && game->graveyard && game->library
+            && abilityShufflesGraveyardIntoLibrary(action.ability, gsrc))
+            out << graveyardRefillRowClause(game->graveyard->nb_cards,
+                                            game->library->nb_cards);
+        const int bhLoss = pendingStackLifeLossToSeat(observer, this);
+        if (bhLoss > 0)
+            out << stackAnswerYesRowClause(abilitySelfLifeGainNow(action.ability, this),
+                                           bhLoss, life);
     }
 
     //Localize the cost onto the action itself. The menu text describes the
@@ -33870,9 +34200,21 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //#W66-AR (H8): the same self-contradiction gate the ask seam runs - the
         //row's own zero-verdict plus the reply's own agreement with it. One
         //predicate, both seams; the second answer executes as given.
-        const bool noopPlanConflict = (choice >= 1 && choice <= index && !content.empty()
-                                       && (size_t) choice <= shownLines.size()
-                                       && rowSaysNoOp(shownLines[choice - 1])
+        //#W69-BH (K4c, deck125 HIGH-3): OFF THE ROW'S OWN ZERO. The conjunction
+        //required the PLAN to argue against the row as well, so a take of a row
+        //whose own clause already reads zero went through in silence whenever
+        //the reply said nothing about it. Corpus count (wave-68,
+        //matchups-20260906-134120): 14 K=0 sweeper takes over 12 distinct
+        //(game, turn) - `146` s11/s20, `152` s39, `123` s10/s40/s41/s66/s104,
+        //`130` s28/s33/s56/s58, `162` s8/s61 - against ONE fire of the plan
+        //form (`130` s20, where the re-ask worked and s21 declined). The row's
+        //own zero is the engine's own statement about the row; it earns the
+        //same ONE re-ask on its own, and the second answer executes as given.
+        //The decline rows are exempt: a pass verdict is not a contradiction.
+        const bool noopRowZero = (choice >= 1 && choice <= index && !content.empty()
+                                  && (size_t) choice <= shownLines.size()
+                                  && noopRowEarnsReask(shownLines[choice - 1]));
+        const bool noopPlanConflict = (noopRowZero
                                        && planArguesAgainstRow(content, shownLines[choice - 1]));
         //#W68-BA (J3): the length cap BIT before the model wrote its label. That is
         //not an unparseable reply and it is not the model declining - it is the
@@ -33886,32 +34228,34 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //question with a Devour Flesh whose own row read "they control 0 creatures -
         //at 0 this does nothing" over a PLAN that said the same, and it was cast at
         //7 life. One extra ask per board, latched separately so it cannot loop.
-        if (!content.empty() && mPriorityReaskBoard == boardKey && noopPlanConflict
+        if (!content.empty() && mPriorityReaskBoard == boardKey && noopRowZero
             && mPriorityNoopReaskBoard != boardKey && choice >= 1 && choice <= index)
         {
             mPriorityNoopReaskBoard = boardKey;
             std::ostringstream corr;
             corr << "[RE-ASK] You chose row " << choice << " (\""
                  << stripNarrationDecoration(shownLines[choice - 1])
-                 << "\"), whose own note on this list says it does nothing right now, and your"
-                    " reply says so too. Answer again: that row if you meant it anyway, the number"
+                 << "\"), whose own note on this list says it does nothing right now"
+                 << (noopPlanConflict ? ", and your reply says so too" : "")
+                 << ". Answer again: that row if you meant it anyway, the number"
                     " of the row you want instead, or 0 (pass).";
             mPriorityReaskLine = corr.str();
             mPriorityReaskKind = "noop_plan";
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "",
-                          "plan_contradicts_noop_row_reask", &renderRows);
-            setNotice("the chosen row does nothing and the reply says so - asking again", 5.0f);
-            DebugTrace("AIPlayerGPT: plan_contradicts_noop_row_reask (budget-exempt) -> re-asking once");
+                          noopPlanConflict ? "plan_contradicts_noop_row_reask"
+                                           : "noop_row_zero_reask", &renderRows); //#W69-BH (K4c)
+            setNotice("the chosen row's own note says it does nothing - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: noop row re-ask (budget-exempt) -> re-asking once");
             string corrected;
             pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected, "priority");
             return NULL; //in flight; decisionPending() holds the pass
         }
         if (!content.empty() && mPriorityReaskBoard != boardKey
             && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict
-                || planMissing || repeatPastStop || indexNameConflict || noopPlanConflict
-                || labelMissing || replyTruncated)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2) #W68-BA (J3)
+                || planMissing || repeatPastStop || indexNameConflict || noopRowZero
+                || labelMissing || replyTruncated)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2) #W68-BA (J3) #W69-BH (K4c)
         {
             std::ostringstream corr;
             const char * fb;
@@ -34003,14 +34347,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "repeat_past_stop";
                 mPriorityReaskKind = "repeat_past_stop";
             }
-            else if (noopPlanConflict) //#W66-AR (H8)
+            else if (noopRowZero) //#W66-AR (H8) #W69-BH (K4c)
             {
                 corr << "[RE-ASK] You chose row " << choice << " (\""
                      << stripNarrationDecoration(shownLines[choice - 1])
-                     << "\"), whose own note on this list says it does nothing right now, and your"
-                        " reply says so too. Answer again: that row if you meant it anyway, the number"
+                     << "\"), whose own note on this list says it does nothing right now"
+                     << (noopPlanConflict ? ", and your reply says so too" : "")
+                     << ". Answer again: that row if you meant it anyway, the number"
                         " of the row you want instead, or 0 (pass).";
-                fb = "plan_contradicts_noop_row_reask";
+                fb = noopPlanConflict ? "plan_contradicts_noop_row_reask"
+                                      : "noop_row_zero_reask"; //#W69-BH (K4c)
                 mPriorityReaskKind = "noop_plan";
                 mPriorityNoopReaskBoard = boardKey; //#W68-BA (J6): one-shot, spent here
             }
@@ -34032,7 +34378,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                       : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
                       : repeatPastStop ? "the repeat row was taken past its own stop - asking again" //#W66-AS (H3)
-                      : noopPlanConflict ? "the chosen row does nothing and the reply says so - asking again"
+                      : noopRowZero ? "the chosen row's own note says it does nothing - asking again"
                                     : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
@@ -34123,8 +34469,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
                 appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                    : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
-            else if (mPriorityReaskKind == "noop_plan") //#W66-AR (H8)
-                appendParseNote(&mLastParseNote, noopPlanConflict ? "plan_contradicts_noop_row_exhausted"
+            else if (mPriorityReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c)
+                appendParseNote(&mLastParseNote, noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                                                   : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
                                                                                  : "plan_contradicts_noop_row_unanswered"));
             else if (repeatRowTaken)
@@ -34868,8 +35214,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //nothing about it is ambiguous, so it earns the same ONE re-ask every other
     //self-contradicting reply gets; the second answer executes as given, whatever
     //it is. The predicate is the shipped one, unchanged - only its consequence.
-    const bool noopPlanConflict = (choice >= 1 && choice <= (int) options.size() && !content.empty()
-                                   && rowSaysNoOp(options[choice - 1])
+    //#W69-BH (K4c): the row's own zero, alone, is the trigger at this seam too -
+    //the PLAN half is only what the corrected question gets to quote back.
+    const bool noopRowZero = (choice >= 1 && choice <= (int) options.size() && !content.empty()
+                              && noopRowEarnsReask(options[choice - 1]));
+    const bool noopPlanConflict = (noopRowZero
                                    && planArguesAgainstRow(content, options[choice - 1]));
     //#W68-BA (J6, deck123 HIGH-2). ONE REVERSAL PREDICATE, EVERY SEAM. The whole
     //wave-67 corpus stamped `decision_reversed_in_prose` 15 times and all 15 were
@@ -34901,15 +35250,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //the budget on a named_row miss and s43 then cast a row whose own note said
     //"at 0 creatures this does nothing" over a PLAN that said the same, at 7 life.
     //One extra ask per ask key, latched separately so it cannot loop.
-    if (reasked && noopPlanConflict && mAskNoopReaskKey != askKey0
+    if (reasked && noopRowZero && mAskNoopReaskKey != askKey0
         && choice >= 1 && choice <= (int) options.size())
     {
         mAskNoopReaskKey = askKey0;
         std::ostringstream corr;
         corr << "[RE-ASK] You chose row " << choice << " (\""
              << stripNarrationDecoration(options[choice - 1])
-             << "\"), whose own note on this list says it does nothing right now, and your reply"
-                " says so too. Answer again: that row if you meant it anyway, or the number of"
+             << "\"), whose own note on this list says it does nothing right now"
+             << (noopPlanConflict ? ", and your reply says so too" : "")
+             << ". Answer again: that row if you meant it anyway, or the number of"
                 " the row you want instead.";
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
@@ -34917,15 +35267,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "",
-                      "plan_contradicts_noop_row_reask", &options);
-        setNotice("the chosen row does nothing and the reply says so - asking again", 5.0f);
-        DebugTrace("AIPlayerGPT: plan_contradicts_noop_row_reask (budget-exempt) -> re-asking once");
+                      noopPlanConflict ? "plan_contradicts_noop_row_reask"
+                                       : "noop_row_zero_reask", &options); //#W69-BH (K4c)
+        setNotice("the chosen row's own note says it does nothing - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: noop row re-ask (budget-exempt) -> re-asking once");
         string corrected;
         pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
         return kChoicePending; //the caller unwinds; the corrected call answers later
     }
-    if ((namedRowFail || passOnNoPass || indexNameConflict || noopPlanConflict
-         || labelMissing || askReversedInProse || replyTruncated) && !reasked) //#W67-AV (I2) #W68-BA (J3/J6)
+    if ((namedRowFail || passOnNoPass || indexNameConflict || noopRowZero
+         || labelMissing || askReversedInProse || replyTruncated) && !reasked) //#W67-AV (I2) #W68-BA (J3/J6) #W69-BH (K4c)
     {
         std::ostringstream corr;
         if (replyTruncated) //#W68-BA (J3): the cap bit; say so and quote it
@@ -34967,14 +35318,15 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     " you want and that row's own short name.";
             mAskReaskKind = "index_name";
         }
-        else if (noopPlanConflict)
+        else if (noopRowZero) //#W69-BH (K4c)
         {
             //#W66-AR (H8): quote the row's OWN verdict and the reply's own
             //sentence, so the contradiction the model must resolve is visible.
             corr << "[RE-ASK] You chose row " << choice << " (\""
                  << stripNarrationDecoration(options[choice - 1])
-                 << "\"), whose own note on this list says it does nothing right now, and your reply"
-                    " says so too. Answer again: that row if you meant it anyway, or the number of"
+                 << "\"), whose own note on this list says it does nothing right now"
+                 << (noopPlanConflict ? ", and your reply says so too" : "")
+                 << ". Answer again: that row if you meant it anyway, or the number of"
                     " the row you want instead.";
             mAskReaskKind = "noop_plan";
             mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
@@ -34993,6 +35345,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                           : namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask"
                           : indexNameConflict ? "index_name_conflict"
                           : noopPlanConflict ? "plan_contradicts_noop_row_reask"
+                          : noopRowZero ? "noop_row_zero_reask" //#W69-BH (K4c)
                                              : "plan_choice_conflict"; //#W68-BA (J6)
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
@@ -35004,7 +35357,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                   : namedRowFail ? "that answer named nothing on the list - asking again"
                   : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
                   : indexNameConflict ? "the number and the name disagree - asking again"
-                  : noopPlanConflict ? "the chosen row does nothing and the reply says so - asking again"
+                  : noopRowZero ? "the chosen row's own note says it does nothing - asking again"
                                      : "the choice contradicts the reply's pass - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
@@ -35031,8 +35384,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         else if (mAskReaskKind == "index_name") //#W52-J D6: the second answer executes as given
             appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                : (choice >= 1 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
-        else if (mAskReaskKind == "noop_plan") //#W66-AR (H8): executes as given either way
-            appendParseNote(&mLastParseNote, noopPlanConflict ? "plan_contradicts_noop_row_exhausted"
+        else if (mAskReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c)
+            appendParseNote(&mLastParseNote, noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                                               : (choice >= 1 ? "plan_contradicts_noop_row_recovered"
                                                                              : "plan_contradicts_noop_row_unanswered"));
         else
@@ -36834,12 +37187,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 //own block legality, and the bodies are split into checked and
                 //unchecked - see crackBackCoverFacts.
                 std::vector<CrackBackAttackerFact> cbAtk;
-                int cbChecked = 0, cbUnchecked = 0;
-                crackBackCoverFacts(opponent(), card, bodies, cbAtk, cbChecked, cbUnchecked);
+                int cbChecked = 0, cbUnchecked = 0, cbExisting = 0; //#W69-BH (K6a)
+                crackBackCoverFacts(opponent(), card, bodies, cbAtk, cbChecked, cbUnchecked,
+                                    this, &cbExisting); //#W69-BH (K6a)
                 //#W65-AL (G4): and WHICH number this is - crackBackScreenTotal
                 //already reports whether the line above calls it a floor.
                 o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked,
-                                            cbAtk, cbFloor);
+                                            cbAtk, cbFloor, cbExisting); //#W69-BH (K6a)
             }
         }
         //#W68-BD (J8, deck126 MED): and, on a row that REMOVES one of their
@@ -72040,7 +72394,11 @@ static const char * kW50Y_r94 =
         CHECK(r.find(" {reserve: this row is INSTANT SPEED") == 0
                   && r.find("leaves 1 source,") != string::npos
                   && r.find("Ob Nixilis, the Hate-Twisted {3}{b}{b} in your hand needs 5") != string::npos
-                  && r.find("SORCERY SPEED, so your main phase this turn is its last window}")
+                  //#W69-BH (K6b): the clause no longer ENDS at "last window" -
+                  //it now ends in the verdict word its siblings end in. The
+                  //wave-66 substring is still present, verbatim, up to the "}"
+                  //that moved; this case pins both halves.
+                  && r.find("SORCERY SPEED, so your main phase this turn is its last window.")
                      != string::npos,
               "#W66-AT deck162 MED: the flash row states what the sorcery-speed card still needs");
         CHECK(sorceryReserveClause(5, "Ob Nixilis, the Hate-Twisted", "{3}{b}{b}", 5).empty(),
@@ -75085,6 +75443,229 @@ static const char * kW50Y_r94 =
               "#W68-BA J6 POSITIVE the dead row buys ONE extra ask after the budget is spent - and only one");
         CHECK(Pin::asks(false) == 1,
               "#W68-BA J6 MUST-NOT-MATCH with no self-contradiction the budget still buys exactly one re-ask");
+    }
+
+
+    //---- #W69-BH: K4 (the X ceiling's missing term, the row that averts a
+    //deck-out, the no-op re-ask off the ROW) and K6 (the crack-back cover, the
+    //reserve verdict, the positive stack answer, the material alternative) ----
+    cout << "\n[#W69-BH] K4a the pending-draw scan resolves the RECIPIENT the way the resolution does\n";
+    {
+        //The defect is a TARGET-KIND one, so the pure half that can be pinned
+        //here is the mapping itself; the live half rides
+        //bin/Res/test/w69bh_staff_upkeep_draw_reserve.txt, which puts a real
+        //`@each my upkeep:draw:1` trigger on the stack and asks the same scan.
+        CHECK(stackDrawRecipient(NULL) == NULL,
+              "#W69-BH K4a MUST-NOT-MATCH a null target names no recipient");
+        //`125v126` s110 verbatim, with the term the corpus proved missing:
+        //library 8, one Staff trigger unresolved, own upkeep (so the battlefield
+        //walk is deliberately skipped by #W64-AK R9) -> reserve 2, ceiling 6.
+        CHECK(xLibraryReserveCount(1, 1) == 2,
+              "#W69-BH K4a REPRO 125v126 s110: draw step + ONE pending stack draw = 2");
+        CHECK(xLibraryCeilingX(12, 1, 8, 2) == 6,
+              "#W69-BH K4a REPRO 125v126 s110: from a library of 8 the true ceiling is X=6");
+        CHECK(xLibraryCeilingX(12, 1, 8, 1) == 7,
+              "#W69-BH K4a the shipped ceiling of X=7 is exactly what a reserve of 1 yields");
+        CHECK(xLibraryReserveWhy(1, 1).find("plus the 1 draw already on the stack,"
+                                            " which you cannot decline either") != string::npos,
+              "#W69-BH K4a the stack term SAYS what it folded (0 renders in the whole wave-68 corpus)");
+        CHECK(xLibraryReserveWhy(1, 0).find("already on the stack") == string::npos,
+              "#W69-BH K4a MUST-NOT-MATCH with an empty stack the wave-66 sentence is unchanged");
+        {
+            //The identity #W68-BB pinned, re-checked at s110's numbers: the
+            //largest drawing row carrying no deck warning is the header's X.
+            const int lib = 8, res = 2, capX = 12;
+            const int ceil = xLibraryCeilingX(capX, 1, lib, res);
+            bool ok = true;
+            for (int x = 1; x <= capX; x++)
+            {
+                const bool warns = xLibraryRowClause(x, lib, res).find("LOSE the game")
+                                   != string::npos;
+                if ((x <= ceil) == warns)
+                    ok = false;
+            }
+            CHECK(ok, "#W69-BH K4a every row at or below the ceiling is warning-free, every row above warns");
+        }
+    }
+
+    cout << "\n[#W69-BH] K4b the row that rebuilds the library says so\n";
+    {
+        //`125v126` s111: library 1, graveyard 19, the Elixir row on the menu
+        //beside a ping - and 412 renders of that row corpus-wide with no verdict.
+        const string e = graveyardRefillRowClause(19, 1);
+        CHECK(e.find(" {right now: shuffles your 19-card graveyard and this card back into"
+                     " your library - your library goes from 1 to 21 cards}") == 0,
+              "#W69-BH K4b REPRO 125v126 s111: the Elixir row prices the library it rebuilds");
+        CHECK(graveyardRefillRowClause(0, 1).empty()
+                  && graveyardRefillRowClause(19, -1).empty(),
+              "#W69-BH K4b MUST-NOT-MATCH an empty graveyard or an unknown library makes no claim");
+        CHECK(!AIPlayerGPT::rowSaysNoOp("Life with Elixir of Immortality [cost: {2}, Tap]"
+                                        + graveyardRefillRowClause(19, 1)),
+              "#W69-BH K4b the new verdict is never read as a no-op by the zero-predicate");
+        CHECK(!AIPlayerGPT::rowSaysNoOp("Life with Elixir of Immortality [cost: {2}, Tap]"
+                                        + graveyardRefillRowClause(1, 0)),
+              "#W69-BH K4b nor at its smallest live numbers");
+        {
+            vector<string> m;
+            m.push_back("Life with Elixir of Immortality [cost: {2}, Tap]"
+                        + graveyardRefillRowClause(19, 1));
+            const string sm = stripNarrationDecoration(m[0]);
+            CHECK(sm.find("Life with Elixir of Immortality") == 0
+                      && sm.find("right now") == string::npos
+                      && sm.find("shuffles") == string::npos
+                      && sm.find("}") == string::npos,
+                  "#W69-BH K4b echo shape: the clause leaves no residue in the narration");
+        }
+    }
+
+    cout << "\n[#W69-BH] K4c the no-op re-ask fires off the ROW'S OWN zero, plan or no plan\n";
+    {
+        //The 14 takes the wave-68 corpus counted (146 s11/s20, 152 s39,
+        //123 s10/s40/s41/s66/s104, 130 s28/s33/s56/s58, 162 s8/s61) share ONE
+        //shape: the row's own clause reads zero and the reply says nothing about
+        //it, so the shipped conjunction could not fire on any of them.
+        const string dead = "Cast Supreme Verdict {1}{u}{w}{w}"
+                            " {right now: destroys 0 of their creatures}";
+        const string silent = "CHOICE: 1 (Cast Supreme Verdict)\nPLAN: Stabilise the board"
+                              " and win with Elspeth.";
+        CHECK(AIPlayerGPT::rowSaysNoOp(dead) && !rowIsDeclineRow(dead),
+              "#W69-BH K4c REPRO the row's own clause reads zero and it is not a decline row");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(silent, dead),
+              "#W69-BH K4c REPRO the reply argues nothing - the shipped conjunction cannot fire");
+        //the predicate BOTH seams now call, exactly as they call it
+        CHECK(noopRowEarnsReask(dead),
+              "#W69-BH K4c POSITIVE the row-only predicate fires where the conjunction did not");
+        CHECK(!noopRowEarnsReask("Cast Damnation {2}{b}{b}"
+                                 " {right now: destroys 2 of their creatures}"),
+              "#W69-BH K4c MUST-NOT-MATCH a live magnitude is never a no-op");
+        CHECK(!noopRowEarnsReask("Cast nothing right now {right now: destroys 0 of their creatures}")
+                  && !noopRowEarnsReask("Hold priority: pass now, and do not ask me again"),
+              "#W69-BH K4c MUST-NOT-MATCH the decline rows are exempt - a pass is not a contradiction");
+    }
+
+    cout << "\n[#W69-BH] K6a the crack-back cover counts the bodies already standing\n";
+    {
+        //`162v152` s15: total 13 from 3 attackers, life 12, one new body covering
+        //5 - beside an untapped Master of the Feast and an untapped Fate
+        //Unraveler that the clause left out entirely.
+        std::vector<CrackBackAttackerFact> atk(3);
+        atk[0].power = 5; atk[0].coverable = true;
+        atk[1].power = 5; atk[1].existingBlockers.push_back(0);
+        atk[2].power = 3; atk[2].existingBlockers.push_back(1);
+        const string with = crackBackBlockerRowTag(13, 12, 1, 0, atk, true, 2);
+        CHECK(with.find("You ALSO already control 2 untapped creatures that can block on their"
+                        " turn without casting anything") != string::npos
+                  && with.find("they cover 8 of 13") != string::npos,
+              "#W69-BH K6a REPRO 162v152 s15: the two standing bodies are counted, and named as their own term");
+        CHECK(with.find("Counting those bodies AND the checked new ones you cover 13 of 13,"
+                        " leaving 0 -> you would be at 12") != string::npos,
+              "#W69-BH K6a the arithmetic folds both pools, each body spent once");
+        {
+            //the same board with NO standing bodies is byte-identical to wave 68
+            const string without = crackBackBlockerRowTag(13, 12, 1, 0, atk, true, 0);
+            CHECK(without.find("You ALSO already control") == string::npos
+                      && without.find("Counting only the checked bodies you cover 5 of 13")
+                         != string::npos,
+                  "#W69-BH K6a MUST-NOT-MATCH with no standing body every byte is wave 68's");
+        }
+        {
+            //ONE body that can legally block BOTH attackers is spent once only
+            std::vector<CrackBackAttackerFact> two(2);
+            two[0].power = 6; two[0].existingBlockers.push_back(0);
+            two[1].power = 4; two[1].existingBlockers.push_back(0);
+            //one NEW body that can block nothing, so the figures isolate the
+            //standing pool (the tag exists only on a row that adds a body).
+            const string t = crackBackBlockerRowTag(10, 5, 1, 0, two, false, 1);
+            CHECK(t.find("on its own it covers 6 of 10") != string::npos
+                      && t.find("you cover 6 of 10, leaving 4 -> you would be at 1, which you SURVIVE")
+                         != string::npos,
+                  "#W69-BH K6a a single standing body answers ONE attacker, never two");
+        }
+        {
+            //menace: one standing body is not enough for a 2-blocker attacker
+            std::vector<CrackBackAttackerFact> men(1);
+            men[0].power = 7; men[0].blockersNeeded = 2; men[0].existingBlockers.push_back(0);
+            CHECK(crackBackBlockerRowTag(7, 4, 1, 0, men, false, 1)
+                      .find("on its own it covers 0 of 7") != string::npos,
+                  "#W69-BH K6a MUST-NOT-MATCH one body does not cover an attacker that needs two");
+        }
+    }
+
+    cout << "\n[#W69-BH] K6b the reserve clause ends in a verdict word\n";
+    {
+        const string r = sorceryReserveClause(1, "Ob Nixilis, the Hate-Twisted", "{3}{b}{b}", 5);
+        CHECK(r.find("VERDICT: taking this row STRANDS Ob Nixilis, the Hate-Twisted this turn"
+                     " - 1 source cannot pay 5, and it has no window after your main phase}")
+                  != string::npos,
+              "#W69-BH K6b REPRO 162v130 s16: the clause ends in the verdict, not in its two operands");
+        CHECK(sorceryReserveClause(2, "Teferi's Puzzle Box", "{4}", 4)
+                  .find("2 sources cannot pay 4") != string::npos,
+              "#W69-BH K6b the verdict's plural reads as a plural");
+        CHECK(sorceryReserveClause(5, "Ob Nixilis", "{3}{b}{b}", 5).empty(),
+              "#W69-BH K6b MUST-NOT-MATCH a remainder that pays for it strands nothing, and no verdict prints");
+        {
+            vector<string> m;
+            m.push_back("Cast Dictate of Kruphix {1}{u}{u}"
+                        + sorceryReserveClause(1, "Ob Nixilis", "{3}{b}{b}", 5));
+            CHECK(stripNarrationDecoration(m[0]) == "Cast Dictate of Kruphix {1}{u}{u}",
+                  "#W69-BH K6b echo shape: the longer clause still leaves no residue");
+        }
+    }
+
+    cout << "\n[#W69-BH] K6c the positive twin of the stack verdict\n";
+    {
+        //at 3 life against 4 damage on the stack, a row that gains 5 answers it
+        CHECK(stackAnswerYesRowClause(5, 4, 3)
+                  == " {answers the stack: YES - 4 damage is ALREADY ON THE STACK and would put"
+                     " you at -1, which KILLS you. You have priority, so taking this row resolves"
+                     " BEFORE that damage and gains you 5: you would be at 4 when the stack"
+                     " finishes, and you LIVE}",
+              "#W69-BH K6c POSITIVE a life gain that outlasts the stack is named as the answer");
+        CHECK(stackAnswerYesRowClause(1, 4, 3).empty(),
+              "#W69-BH K6c MUST-NOT-MATCH a gain too small to outlast the stack (3 + 1 - 4 = 0) claims nothing");
+        CHECK(stackAnswerYesRowClause(5, 4, 9).empty(),
+              "#W69-BH K6c MUST-NOT-MATCH a survivable stack prints neither verdict (the pair is lethal-only)");
+        CHECK(stackAnswerYesRowClause(0, 4, 3).empty()
+                  && stackAnswerYesRowClause(5, 0, 3).empty(),
+              "#W69-BH K6c MUST-NOT-MATCH no gain, or no stack, no claim");
+        {
+            //the NO verdict on the decline rows is untouched, and the two never
+            //appear on the same row
+            vector<string> rows;
+            rows.push_back("Life with Elixir of Immortality [cost: {2}, Tap]"
+                           + stackAnswerYesRowClause(5, 4, 3));
+            rows.push_back("Hold priority: pass now");
+            appendStackDeathToDeclineRows(rows, 4, 3);
+            CHECK(rows[0].find("{answers the stack: YES") != string::npos
+                      && rows[0].find("{answers the stack: NO") == string::npos
+                      && rows[1].find("{answers the stack: NO") != string::npos,
+                  "#W69-BH K6c the two verdicts split cleanly across the action row and the decline row");
+            const string sy = stripNarrationDecoration(rows[0]);
+            CHECK(sy.find("Life with Elixir of Immortality") == 0
+                      && sy.find("answers the stack") == string::npos
+                      && sy.find("}") == string::npos,
+                  "#W69-BH K6c echo shape: the YES clause leaves no residue");
+        }
+    }
+
+    cout << "\n[#W69-BH] K6d the blockers header names the material line beside the life line\n";
+    {
+        //`152v146` s15/s19: the only NAMED assignment spent Sigarda, and the seat
+        //copied it 2 of 2.
+        const string alt = blockKeepAlternativeClause("Sigarda, Champion of Light blocks"
+                                                      " Intrepid Adversary", 5, 2);
+        CHECK(alt == " ALTERNATIVE, chosen for MATERIAL instead of life: Sigarda, Champion of"
+                     " Light blocks Intrepid Adversary - every blocker in it survives, and it"
+                     " lets in 5 combat damage instead of 2 (3 more damage, and it spends no"
+                     " creature). Both lines are legal: the one above is the lowest life, this"
+                     " one is the lowest material cost.",
+              "#W69-BH K6d REPRO 152v146 s15: the material line is named beside the life line");
+        CHECK(blockKeepAlternativeClause("A blocks B", 2, 2).empty()
+                  && blockKeepAlternativeClause("A blocks B", 1, 2).empty(),
+              "#W69-BH K6d MUST-NOT-MATCH when the life line already keeps the material there is no second line");
+        CHECK(blockKeepAlternativeClause("", 5, 2).empty()
+                  && blockKeepAlternativeClause("A blocks B", -1, 2).empty(),
+              "#W69-BH K6d MUST-NOT-MATCH no pairing, or no figure, no claim");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
