@@ -144,3 +144,17 @@ Verified against A208 (12111-12115), A240 (12649-12652), A327 (13985-13989), A21
   matching the deck's goal; for a TRADE marker the guide counts THEIRS/YOURS and REJECTS the mark when YOURS is
   longer, outranking "answer the mark" until the render fix; named as the sole exception to no-derived-counts.
 Room: prose only (illustrative quotes and section 3 / 4.x wording); no rule removed. v2 = 39,964 bytes.
+
+## Revision 6 — findings adjudicated (Astra round 5, skill-v2-codex-review-r5.md)
+
+Verified against A287 (13289-13298), A271 (13049-13059), A294 (13388-13403), DoD 7340-7343.
+- #19 CONFIRMED (Revision 5 invented a "sole exception"). The no-derived-counts rule now lists BOTH authorised
+  exceptions — the A287 two-true-surfaces route-around and the A319 trade-marker rejection — in 4.1 and at the
+  marker bullet.
+- #20 CONFIRMED. A271's threshold-unreachable branch restored in Blockers: when no assignment brings remaining
+  damage below life, decline the chump and keep the bodies; every ordering rule states that branch.
+- #21 CONFIRMED. A294: whitespace normalised on BOTH sides — prompts and the whole guide file — in the literal audit
+  and the quote-literals bullet; a wrapped obsolete quotation no longer survives the guide grep.
+- #22 CONFIRMED. Belief-correcting retirement now requires BOTH the render carrying the corrective fact AND zero
+  breaks across two corpora with the triggering shape (DoD 7340-7343).
+Room: prose only (section 1/2.2/3/4.x wording, illustrative quotes); no rule removed. v2 = 39,998 bytes.

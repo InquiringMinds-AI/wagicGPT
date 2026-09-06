@@ -3,11 +3,10 @@
 ## 1. Purpose and reader
 
 You are a REVIEW SEAT: an agent that reads one deck's games from a corpus and proposes edits to
-that deck's strategy guide. Seats NEVER edit `bin/Res`: in an ordinary review the live guide
-(`bin/Res/ai/baka/deck<N>_strategy.txt`) is read and any revision is staged as
+that deck's strategy guide. Seats NEVER edit `bin/Res`: in an ordinary review the live guide is read
+and any revision is staged as
 `wave<N>/deck<N>/strategy.txt` beside `review.md` for the orchestrator to install; in the rewrite
-workflow `guide-rewrite-brief.md` is the contract (staged `strategy.txt` + `changes.md`); this
-file governs guide content only.
+workflow `guide-rewrite-brief.md` is the contract; this file governs guide content only.
 
 The guide's reader is the playing model that reads the guide fresh at EVERY decision
 under a prompt printing the board, hand, mana and a numbered menu of legal rows. It has no
@@ -55,7 +54,7 @@ situations (5-10): a situation and the right answer, no game references.
 
 Opening order is thesis -> engine -> rules; the MULLIGAN rule is the first rule under (3) — the
 first ask the model answers must not sit below combat sections. [A69] Plain prose and short lists; no
-headers naming waves, seats or corpora; no "you did"; no counts or ledgers.
+headers naming waves, seats or corpora; no "you did", counts or ledgers.
 
 **Size**: hard ceiling 20,000 bytes; expect 8,000-16,000 — if a rule does not fit, it was not a
 rule. **Verification** (both numbers in the final message and review.md): `stat -c %s` <= 20000;
@@ -73,7 +72,7 @@ differ from the reply's conclusion. [A116]
 **Classify PERCEPTION vs STRATEGY first.** Was the fact the pilot needed PRINTED on the row it
 answered? If not (missing render, truncated targets, parse fault, an unasked engine decision)
 it routes to the engine/render ledger, not the guide. One exception: a quantity
-computable from TWO true printed surfaces may be carried as an arithmetic route-around, with its retirement
+computable from TWO true printed surfaces may be carried as a route-around, with its retirement
 condition in review.md, deleted when the render fix lands; it never says a printed value may be
 wrong. A defect in a PREGAME count (hand header, mana-sources line) is a correctness item above
 any in-game render item, never answered by the guide alone. [A44, A127, A152, A197, A236, A273,
@@ -96,65 +95,65 @@ for the imperative that mandates it. [A157, A204, A225, A261, A316, A321]
 
 **KEEP is a success verdict.** A rule that held is left alone; a wave whose predictions all passed
 writes the fewest lines. "No open lane" and "the ceiling is the deck" are legitimate verdicts; the
-rotation call is made on open lanes, not the record, with a per-loss "window / no window" list.
+rotation call is made on open lanes, not the record, with a per-loss window / no-window list.
 [A167, A220, A267, A325]
 
 **Evidence for an edit** is a window count on the edit's own literal — offers, takes, split
-`raw / live / consequential` (live = a better row existed on screen) — with the distinct
+`raw / live / consequential` (live = a better row was on screen) — with the distinct
 (game, turn) count beside every N of M (same-turn repeats are one decision). Never a win rate, a rate whose denominator the engine moved, or one favourable
 sample. Report offers per card: three restrictions and a 0% take is a card never cast.
 "Violated-unpunished" is its own verdict and never loosens a rule; a rule broken 40% of its
 firings over three corpora is one the pilot does not have. A PASS with no window in which the
-rule could have broken is UNTESTED, with its cause (window never arose / string did not print /
-deck cannot produce it). Count where the pilot CITED the rule; list the decisions the
+rule could have broken is UNTESTED, with its cause (no window / string did not print / deck cannot
+produce it). Count where the pilot CITED the rule; list the decisions the
 guide has no rule for, correct ones included, and write the rule that sanctions them. A routing
 rule and a reporting ritual are scored differently; a rung's exit test is two-sided — exhausted
 when its artefact is never produced OR produced without changing the decision. [A21, A45, A63,
 A64, A87, A93, A109, A118, A181, A186, A198, A212, A216, A242, A275, A283, A292, A303]
 
 **Counting discipline.** Every N of M names its FIELD, UNIT (row-instance / record / window) and
-MASK — the field is chosen to fit the claim and DISCLOSED: a literal inside an option row is
+MASK — the field fits the claim and is DISCLOSED: a literal inside an option row is
 counted from the rendered `prompt`, while `options_text`, `prompt`
 and `chosen_text` each remain valid for their own measurement, and a byte-identical
 `options_text` repeat stays a valid pinned predicate; an annotation census enumerates the strings it
 counted; a log-line census quotes an observed instance, never a paraphrase; disagreeing counts are
 re-derived, never averaged; a stderr-to-translog join anchors on the window, not a card name. A seat whose window count moved by more than a
 factor says so at the top of its file and marks per-window rates incomparable; compare this
-corpus's windows PER SEAT-TURN against the previous corpus, because that is what separates lost
-opportunities from shorter games (the distinct (game, turn) count measures clustering, not
-exposure). The seat file
+corpus's windows PER SEAT-TURN against the previous corpus — that separates lost opportunities
+from shorter games (the distinct (game, turn) count measures clustering, not exposure). The seat file
 carries window counts by kind and offers by phase per repeatable activation; zero windows two
 corpora running is unreachable-in-pool. A decision class handled correctly only
 from a render clause new this corpus is a finding ("what this bought"); the guide owes it the
 scope sentence the pilot left unstated. [A117, A208, A217, A223, A230, A240, A295, A298]
 
-**Predictions.** A prediction pins its predicate inside its own sentence, as executable words; the
+**Predictions.** A prediction pins its predicate inside its own sentence, in executable words; the
 ledger records the denominator with the verdict, marks a target met on one unit and missed on
 another SPLIT, and where a lane narrowed a docket item's scope scores both, the gap a new item. A paired guide-and-render edit's falsifier is the prior loss's own window; no such
 window twice running is UNTESTABLE-AT-THIS-SEAT, at a third the check moves to a row annotation. A corpus-level metric shift is explained by the within-corpus
 control in which the rival explanation predicts the opposite sign; a per-game mechanism claim is
 scored by correlation across ALL games, coefficient printed; a new telemetry stamp reports the
-fraction of its record kind carrying it. A control guide (a deliberately withheld affordance) is
-declared with its price and runs at most three corpora; a stable same-signed ratio over three
+fraction of its record kind carrying it. A control guide (a withheld affordance) is declared with its
+price and runs at most three corpora; a stable same-signed ratio over three
 CLOSES the question and releases it. Calibration: a row the guide does not name is
 taken at roughly one-twentieth the rate of a row it instructs the pilot to take — price a render
 proposal that will not be written into a guide at the untaught rate. [A132,
 A231, A260, A262, A263, A276, A299, A300, A312, A327, A329]
 
 **Before writing a new rule**: walk it against the render's vocabulary and find its falsifier by
-reading; diff coverage against the other guides — losses usually trace to sections a sibling has
-and this one lacks; where a sibling holds a shared literal at zero breaks, its sentence is the fix,
+reading; diff coverage against the other guides — losses usually trace to sections a sibling
+has and this one lacks; where a sibling holds a shared literal at zero breaks, its sentence is the fix,
 ported as a copy; when a lane ships a count or tag on a row, re-key every rule that derived that
 quantity the same wave, by the QUESTION the old clause answered. [A59, A81, A121, A144, A154, A169,
 A187, A203, A279]
 
 **Run the literal audit first.** For every string the guide quotes as something the pilot sees:
-count renders on the rows the rule governs (rendered `prompt`, whitespace-normalised), count
-old-string renders (expect 0), and where the literal carries a number the engine COMPUTED check
+count renders on the rows the rule governs, count old-string renders (expect 0) — with
+whitespace normalised on BOTH sides, the prompts and the whole guide file, because a quotation
+wrapped across a newline survives a plain grep — and where the literal carries a number the engine COMPUTED check
 it against the record's own game-state field, full population where the field exists or a stated
 sample where not — presence is not truth [A259]; grep the guide for
-sentences assuming the old string. A marker on a new seam or a sentence describing a screen the
-engine no longer prints is a defect whether or not the rule held. A zero-hit literal is a defect
+sentences assuming the old string. A marker on a new seam or a sentence describing a screen no longer
+printed is a defect whether or not the rule held. A zero-hit literal is a defect
 ONLY when its window arose and the string did not print; window never arose but branch REACHABLE
 = UNTESTED, rule STAYS (compress its anecdote, never the rule); deck cannot produce the window =
 text cut. [A200, A243, A283] Act on every removal condition in review.md that has come due; count
@@ -165,8 +164,8 @@ A128, A168, A188, A209, A210, A239, A268, A289, A311, A318, A320]
 prediction (window class, literal, refuting number, "a hit is a break only if"), each trim's
 prediction, each rule's removal condition in
 its class (information-supplying: one corpus with the render carrying the fact; belief-correcting:
-zero breaks across two corpora with the triggering shape; or "none"), and the byte count against
-a named baseline. [A15, A20, A61, A201, A270, A285, A288, A328]
+BOTH the render now carrying the corrective fact AND zero breaks across two corpora with the
+triggering shape; or "none"), and the byte count against a named baseline. [A15, A20, A61, A201, A270, A285, A288, A328]
 
 **How to write a rule.** CONDITION on what the prompt PRINTS (a number, tag or quoted literal on
 the row being answered) -> ACTION as the line the reply emits.
@@ -178,11 +177,11 @@ highest-cost first, "stop at the first that answers." [A11, A27, A60, A79, A126]
 what the lines print, the rows on the menu — then the right answer and the one printed fact that
 decides it; never a past game (the seq stays in review.md). Situations are explanatory and fully
 concrete. A REPLY TEMPLATE — a sentence the guide asks the pilot to EMIT — is the opposite: a
-shape with blanks the screen fills, never a finished sentence (which gets copied onto screens
-where it is false). [A105, A126]
+shape with blanks the screen fills, never a finished sentence (copied onto screens where it is
+false). [A105, A126]
 
-**What earns bytes.** The engine order, rules keyed to printed strings, deck facts the prompt does
-not print, the exclusion lists that close absolutes. Cut, in order: worked examples on rules that
+**What earns bytes.** The engine order, rules keyed to printed strings, deck facts the prompt
+does not print, exclusion lists that close absolutes. Cut, in order: worked examples on rules that
 hold; derivations the render now performs — only once the marked row has been followed at N/N
 across two corpora, with the prediction that a miss restores the derivation (one "answer the
 marked row" sentence stays); restatements; anecdotes about hands that
@@ -198,8 +197,9 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
 
 - Every rule input is a number or tag the prompt prints: no derived counts, no running tallies
   across windows, no mood words. An unrendered input becomes a constant or a printed proxy, said
-  so; never tell the pilot to count harder (sole exception: the trade-marker count below). [A33,
-  A72, A155, A237]
+  so; never tell the pilot to count harder. Two authorised exceptions only: the A287 route-around
+  (a quantity from two true printed surfaces, e.g. header land number plus named hand cards) and
+  the A319 trade-marker count below. [A33, A72, A155, A237]
 - Take the quantity from the surface nearest the choice — option row, then dedicated line, then
   header; a substring inside a composite line fails by crowding. Name the UNIT the rule reads or an
   aggregate eats it. A price rule quotes the row's printed number, never
@@ -209,13 +209,13 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   analyses to one number, give one boundary one threshold — two thresholds for one boundary is a
   contradiction resolved by whichever was read last. [A48, A50, A73]
 - A threshold is a constant against a printed finished number, never a relation between two moving
-  totals — EXCEPT where the danger IS the relation between two printed numbers:
-  then "if <printed A> is at or above <printed B>"; a constant cannot narrow either, a second
-  printed literal sorts the cases. [A192, A214, A255]
+  totals — EXCEPT where the danger IS the relation between two printed numbers: then "if <printed
+  A> is at or above <printed B>"; a constant cannot narrow either, a second printed literal sorts
+  the cases. [A192, A214, A255]
 - A constant floor is a proxy: name what it stands for and, where the render prints the proxy's
   own inputs, write the card's own test instead; a constant at 100% obedience is the one to audit. A threshold's test is two-sided —
   crossings ABOVE and compliance failures BELOW; one crossed unpunished and disobeyed underneath
-  is inert and is REPLACED by an evidenced condition, not kept because its sunset was unmet.
+  is inert and is REPLACED by an evidenced condition.
   Re-measure its WHY each wave; a confirmed WHY that no longer implies the rule is a deletion.
   [A84, A142, A331]
 - A cap lives in the sentence of the verb it caps; the menu-reading step points at a number
@@ -224,15 +224,15 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   A23, A86]
 - Restate the stop wherever the imperative lives — an imperative said three times outvotes a stop
   said once; every take-it / send-all instruction carries its exception inline; a card note that
-  can collide with a procedure names which wins; a rule gaining an exception gives it to every
-  line summarising it, same edit. [A6, A11, A24, A51]
-- Absolutes split on the edge case, edge case FIRST ("if X is the ONLY creature listed: none");
-  audit a class absolute by constructing its least-harmful member. [A12, A135]
+  can collide with a procedure names which wins; a rule gaining an exception gives it to every line
+  summarising it, same edit. [A6, A11, A24, A51]
+- Absolutes split on the edge case, edge case FIRST; audit a class absolute by constructing its
+  least-harmful member. [A12, A135]
 - Every absolute has a recorded falsifier — the board on which it is false — as a named exception
   or a lethal carve-out ABOVE it as a numbered check; an absolute a rendered price can switch off names its SUBSTITUTE in the same sentence.
   [A30, A71, A123, A308, A315]
 - Every "any row" / "never" absolute carries its exclusion list inline, drawn from every other
-  stop, closed by "when every row is one of these, the answer is <decline>"; a rule offering
+  stop, closed by "when every row is one of these, answer <decline>"; a rule offering
   alternatives says what to do when none is on screen, do-nothing row promoted. [A185, A234, A277]
 - Three or more branches: numbered checks in decision order, highest-cost first, "stop at the
   first that answers" — never a paragraph of exceptions (prose is resolved by narrative fit). [A27]
@@ -254,7 +254,8 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   becomes a comparison of two on-screen rates; a prohibition names what the card is held FOR. An
   exclusion rule keys on the rendered clause that identifies members;
   both the braked and the exempt branch get imperatives. A brake is an operation run LAST: (1)
-  the literal byte-for-byte; (2) where to look — the row about to be named; (3) the releases,
+  the literal byte-for-byte; (2) where to look — the row being
+  named; (3) the releases,
   enumerated and closed; (4) a verdict on the answer already chosen (if present and no release
   applies, name the next row). An anti-anchor clause names the LOSING row too; leaks are counted
   in the exclusion, not the trigger. [A16, A156, A179, A206, A227, A253, A280, A281, A290, A322,
@@ -274,15 +275,15 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   conditional annotation gets its untagged branch; a substring
   printed once per list member carries the list's cardinality; a re-key is audited for coverage
   over the rule's own windows. [A82, A111, A202, A221, A252, A269]
-- Counts read off a line quote the collapsed handle once (`#1-#5 x5`) with the arithmetic;
+- Counts read off a line quote the collapsed handle once with the arithmetic;
   never lean on an enumerating clause for a count unless it states how many. [A91, A178, A249]
 - Where the render marks the answer, line one is "answer the mark"; the derivation is retired only
   under the two-corpus N/N threshold (section 3) and stays for the unmarked case. Obeying a
   marker is CONDITIONAL on its definition matching the deck's goal: where a marker prices a TRADE
-  the guide supplies its own arithmetic — count the names after `THEIRS:` and after `YOURS:`; if
-  YOURS is the longer list the marker is NOT the answer — and that rejection outranks "answer the
-  mark" until the render fix ships. This is the one named exception to the no-derived-counts rule
-  above. [A110, A284, A319]
+  the guide supplies its own arithmetic — count the names after `THEIRS:` and `YOURS:`; if YOURS
+  is longer the marker is NOT the answer — and that rejection outranks "answer the
+  mark" until the render fix ships — one of the two named exceptions to no-derived-counts. [A110,
+  A284, A319]
 - A rendered count is not a predicate: beside the number write the sentence it proves and its
   tense; key countables to an always-present surface, header as fallback; say what does NOT reset
   at turn start. [A5, A13, A107]
@@ -303,7 +304,7 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
 - A rule must be true at the window it FIRES in, not where it was learned (an announce-X rule
   with a cast-menu premise is false by construction). [A306]
 - One rule, one place, at its firing seam; elsewhere a pointer — except a deciding FACT, restated
-  at every phase where it decides (4.3). Class facts live in one named block; the card section
+  at each phase where it decides (4.3). Class facts live in one named block; the card section
   points, never restates; the situations list is derived from the rules, every branch present.
   [A96, A177, A190, A286, A307]
 - Emit grammars carry the pass answer beside them (`CHOICE: 0 (pass)`, never `x0`); list asks
@@ -316,12 +317,12 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
 
 - Read one late-turn prompt verbatim first; key rules to what it prints.
 - The trust doctrine: never teach doubt of a printed value. Its converse: a printed row is the
-  engine's assertion the action is legal and payable NOW; plan, log and last turn's memory are
-  not evidence against it. A hand card with no `Cast` row is not castable now; a printed row is
-  payable. A route-around (section 3) uses only true surfaces as inputs; "the
-  number may be wrong" is never written. [A99, A151, A159, A250, A287]
-- The carried `YOUR PLAN` block is NOT a render; a guide may prefer a current `{right now:}`
-  clause over it. [A207] A per-row verdict describes the BOARD; the stack is not the board — a rule about a card that can
+  engine's assertion the action is legal and payable NOW; plan, log and memory are not evidence
+  against it. A hand card with no `Cast` row is not castable now; a printed row is
+  payable. A route-around (section 3) uses only true surfaces; "the number may
+  be wrong" is never written. [A99, A151, A159, A250, A287]
+- The carried `YOUR PLAN` block is NOT a render; a guide may prefer a current `{right now:}` clause
+  over it. [A207] A per-row verdict describes the BOARD; the stack is not the board — a rule about a card that can
   already be on the stack reads `ON THE STACK` by name. A verdict is a fact about a row FAMILY;
   where a sibling family prints no verdict, say so as a card fact ("these rows print no result —
   read the toughness yourself") under the absence conditions below. [A139, A278]
@@ -329,10 +330,10 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   latches onto quoted text as guide advice. [A1] An ABSENCE claim about the render goes false the
   day the field ships and licenses doubt meanwhile; it is allowed only with three receipts in
   review.md: the grep that re-verifies it, the primitive that
-  explains it, and a prediction built to detect the fix with the instruction to delete the
-  sentence that wave. Otherwise forbidden; phrase around what IS printed. [A99, A238]
+  explains it, and a fix-detecting prediction that deletes
+  the sentence that wave. Otherwise forbidden; phrase around what IS printed. [A99, A238]
 - Quote engine literals verbatim, in quotes, never dissolved into the sentence's grammar — the
-  audit that keeps them true is a grep. A literal that gains a clause is a new literal; a marker
+  audit that keeps them true is a whitespace-normalised grep of guide and prompts alike. A literal that gains a clause is a new literal; a marker
   that moves seams makes every sentence about its location stale; a NUMBER added to a clause a
   rule treats as a flag turns the rule into arithmetic over it. A dead literal is audit debt, not
   by itself a behaviour failure. [A209, A210, A226, A258, A264, A318]
@@ -342,13 +343,13 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   survives them. [A30, A55]
 - A rule keyed to a tag with a collapsed form keys to the PRESENCE of one instance plus the
   collapse's count word, never to how many you can see. [A91]
-- Never write guide text whose goal is a shorter reply; a rendered fact still gets restated. [A100]
+- Never write guide text whose goal is a shorter reply; rendered facts still get restated. [A100]
 
 ### 4.3 Card facts and Oracle verification
 
 - Every card claim (cost, MV, P/T, loyalty, colours a land makes, targeting, zone, return path,
-  mechanism) is written from the primitive at draft time and
-  re-checked every wave, never from memory. Retrieve the real Oracle text first; where Oracle and
+  mechanism) is written from the primitive at draft time and re-checked every wave, never from
+  memory. Retrieve the real Oracle text first; where Oracle and
   primitive disagree the guide states what the ENGINE delivers and the seat routes the script fix.
   Print the integer beside every mana symbol. [A43, A47, A145, A164]
 - A by-name property list ("these lands make black") is static in a game where permanents rewrite
@@ -356,12 +357,11 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   are card-fact claims: check the primitive for a return path (`canplayfromexile`, `moveto`,
   `transforms`) and write the effect actually delivered. [A75, A164]
 - Once per deck, run the decklist against the primitives for structural traps: legendary
-  duplicates (a dead second copy), non-stacking effects, conditions this deck cannot act on (a
-  hold "until their enchantment is gone" with no enchantment removal is an unconditional rule
-  wearing a condition), instants/flash (a deck with none says so: a castable card would be a row).
+  duplicates (a dead second copy), non-stacking effects, conditions this deck cannot act on (a hold
+  with no way to end it is an unconditional rule wearing a condition), instants/flash (a deck with none says so: a castable card would be a row).
   [A68, A229, A247]
-- A card whose conditional text the pilot could read backwards ("whenever an OPPONENT loses
-  life") gets an explicit false sentence in the always-false voice. State a printed evasion or
+- A card whose conditional text the pilot could read backwards gets an explicit false sentence in
+  the always-false voice. State a printed evasion or
   type-identity fact twice — as a capability and as an attack/mulligan order — a fact stated for
   one phase does not reach the phase where it decides. [A174; wave-26 lineage]
 - Printed-power floors are blind to engines: exempt creatures whose text contains `{T}:`,
@@ -405,21 +405,20 @@ A66, A67, A69, A80, A119, A131, A143, A153, A171, A222]
 **Land drop.** Always has an owner line: "a `Play <land>` row is taken every window it appears
 unless <printed condition>". Fetch lands, Treasure and rocks offered as a row are taught as a
 cost, not a choice: the prompt's mana count first, the first window second, the colour third; a
-fetch rule keyed to `(you cannot make {W} right now)` says what to do when the tag is absent. [A46,
-A166, A269]
+fetch rule keyed to `(you cannot make {W} right now)` says what to do when the tag is absent.
+[A46, A166, A269]
 
 **What to cast.** One ordered cast list per guide; card sections hang off its entries. Rank is
 also order in time: an X or mana-hungry top entry goes first in the turn. A deploy floor
 ("if a creature is offered, cast one") enumerates the engine-marked dead forms it does not reach
-(`[legendary:` second copy, `at 0 this does nothing`, own-target-only rows, `[finds only ... none
-left]`). One sentence per guide refuses "nothing else was castable" by name: a menu with nothing
+(`[legendary:` second copy, `at 0 this does nothing`, own-target-only rows, dead-Tutor rows). One sentence per guide refuses "nothing else was castable" by name: a menu with nothing
 worth casting is answered with the decline row. A small menu-level section covers facts about the
 list itself: two rows naming one card (prefer the cheaper), a strict-subset row, collapsed runs.
 [A62, A130, A184, A194, A246, A266]
 
 **Holds, passes, activations.** Every hold names its release. A repeatable activation carries an
 already-on check on a rendered field (the battlefield line already reads (3/3) -> pass) and a
-checklist reading the permanent's printed state and the payment's source line. A
+checklist of the permanent's printed state and the payment's source line. A
 permanent whose ability can be offered in upkeep gets a section keyed to the row's forms; decks
 with upkeep mana sinks carry a "your upkeep" block reading
 the hand and land count and naming what upkeep must leave untapped. A stop condition is testable
@@ -429,22 +428,24 @@ only against a number the action moves. [A40, A88, A113, A129, A147]
 (`(you kill it, your attacker lives)` -> SEND; no blocker tag -> SEND). Team rules decide
 one A-line at a time, with the sole-attacker branch and
 per-creature stops. Outnumbering their blockers is not safety — THEY choose which attacker to
-block and pick the one their block wins; an attacking creature does not block. Prefer total-power
+block, and pick the one their block wins; an attacking creature does not block. Prefer total-power
 to biggest-power gates. Where mana comes from creatures or activations tap attackers, the lethal
 count is the first check of the turn, above the deploy floor, and the survival gate sits at the
 ask that SPENDS the resource. A creature singled out on defence is singled out on offence. [A8,
 A9, A19, A36, A54, A56, A77, A112, A163, A182, A205]
 
 **Blockers.** The survival gate sits ABOVE the ladder: at a LETHAL header first assign enough
-"deals N" to bring the remainder below printed life, re-checking after each assignment; only then
-rank trades. Step 1 says which body is spent (tokens first — a token row prints no mana cost),
-numbered, before any trade. The ladder, render-keyed, shared across guides, one deck constant: rung 0 `(neither dies)` always; rung 1 `(you kill it, your blocker lives)` always; rung
+"deals N" to bring the remainder below printed life, re-checking after each assignment; if NO
+assignment brings it below life, the header is not asking for a block — decline the chump and keep
+the bodies, and every ordering rule states this threshold-unreachable branch; only then rank
+trades. Step 1 says which body is spent (tokens first — a token row prints no mana cost), numbered,
+before any trade. The ladder, render-keyed, shared across guides, one deck constant: rung 0 `(neither dies)` always; rung 1 `(you kill it, your blocker lives)` always; rung
 2 `(both die)` unless theirs is worth less; rung 3 `(your blocker dies, attacker lives)` only when
 the header's "you would be at N" is at or below the deck's floor — with the trample carve-out
 (block stops nothing) and the menace carve-out (one blocker stops nothing). `BLOCKS: none`
-permission is the FIRST line, as one comparison. A
-per-card exception is keyed to the B-row parenthesis and the header N, never the attacker's
-identity. A damage rule says a kill the header prices is a different question. [A2, A3, A25, A58,
+permission is the FIRST line, as one comparison. A per-card exception is keyed to the B-row
+parenthesis and the header N, never the attacker's identity; a damage rule says a kill the header
+prices is a different question. [A2, A3, A25, A58,
 A60, A101, A141, A148, A271; wave-40 HL3]
 
 **Targets and X.** Gate on the rendered tag (`[defender]`, `[flying]`), never a numeric proxy;
@@ -458,12 +459,12 @@ Buff placement asks a connection question before a size one. [A41, A49, A57, A74
 A274]
 
 **Discard (cleanup) and list answers.** An ordered numbered list with "stop at the first name you
-find", an anti-anchor clause (never `PUT: 1` because it is first), a printed string per step, and
-a comparison step for any superlative. [A136, A143, A215, A248]
+find", an anti-anchor clause (never `PUT: 1` because it is first), a printed string per step, a
+comparison step for any superlative. [A136, A143, A215, A248]
 
 **Matchups.** One paragraph per pool mechanic that has beaten this deck, keyed to printed facts
 (their line, untapped count, the `LIFE-TO-DAMAGE CONVERTER` / `DRAW PUNISHERS` lines), escalated
-form first, in render vocabulary; read the opponent's battlefield line wherever a tag there
+form first; read the opponent's battlefield line wherever a tag there
 prices one of your rows. Each imperative is audited against what the row
 says the action does on that board — priced fatal, the sentence is cut. Both branches of a
 catastrophic/ordinary rule get their own literal and imperative. [A114, A146, A180, A183, A219]
@@ -475,15 +476,15 @@ action's offer rate. [A18, A34]
 
 - **History in the guide** (A332): seq, corpus, wave and seat citations, "this
   corpus", "previous games", "you did X N times", WHAT THIS COST paragraphs, control notes,
-  size-band numbers. Superseded as GUIDE content only (each still holds for review.md):
+  size-band numbers. Superseded as guide content only (all hold for review.md):
   A61, A194, A238 (count half), A272, A291, A323, A305, A310, A285(c), A320, A232.
 - Quoting prompt text to argue with it; finished reply templates the pilot can copy;
   prohibition-only sections; rules stated only as their exception; a fourth paraphrase of a rule
   that failed three times with the fact printed. [A1, A36, A98, A102, A105, A138, A273]
 - Unreachable conditions: a release this deck cannot act on, a hold with no release, a carve-out
   that cannot satisfy the rule above it. [A8, A68, A191, A280]
-- Opponent-modelling without verifying their actions are narrated on this seat's prompt; text for
-  a window class this deck never acts in or cannot produce. [wave-40 HL2; A243]
+- Opponent-modelling without verifying their actions are narrated on this seat's prompt; text for a
+  window class this deck cannot act in. [wave-40 HL2; A243]
 - Descriptions of engine behaviour — write the card fact. [A127, A136] Frequency adjectives the corpus did not exercise: `rarely|often|usually|regularly|
   typically|seldom|expect|most of the time|by default|almost never`. [wave-31 HL6, wave-40 HL9]
 - Equivalences ("both are correct") where an imperative is needed; a mechanism the render refutes,
