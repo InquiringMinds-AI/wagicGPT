@@ -17,8 +17,8 @@
 - Cited only as SUPERSEDED-in-guide by A332 (section 5): 61 (partly), 194, 232, 238, 272, 285(c),
   291, 305, 310, 320 (as guide text), 323 = 11.
 - Dropped as non-rules (wave results, rotation, telemetry, engine forensics, ledger bookkeeping),
-  26: 84, 117, 132, 167, 198, 208, 217, 222, 223, 230, 231, 240, 259, 260, 262, 263, 276, 295, 296,
-  297, 298, 299, 300, 312, 327, 329.
+  24 (after Revision 2 restored 84 and 259): 117, 132, 167, 198, 208, 217, 222, 223, 230, 231, 240,
+  260, 262, 263, 276, 295, 296, 297, 298, 299, 300, 312, 327, 329.
 - Could not locate: none. Could not classify: none — but see "not verified".
 
 ## Where the old skill contradicts Amendment 332 (guide content only; each still holds for review.md)
@@ -61,5 +61,33 @@
   carries "wave-40 HL3"-style lineage tags); the grep is a GUIDE gate, not a skill gate. `deck125`
   appears once, inside the verbatim ruling.
 - No guide was rewritten against v2 yet; v2 is unproven at a seat.
-- Byte count: v2 = 39,894 bytes (ceiling 40,000; the 15-30 KB expectation was not met — the harvest
-  of 305 rules at one or two sentences each did not compress further without dropping tags).
+- Byte count: v2 = 39,982 bytes after Revision 2 (ceiling 40,000; the 15-30 KB expectation was not met —
+  ~307 rules at one or two sentences each did not compress further without dropping tags).
+
+## Revision 2 — findings adjudicated (Astra review, skill-v2-codex-review.md)
+
+Each finding was checked against the cited v2 lines and the original amendment text before acting.
+- #1 CONFIRMED (v2 literal audit + checklist 4 ordered deletion of any zero-hit literal). Fixed: delete
+  only where the window arose and the string did not print; window never arose / deck cannot produce
+  it = UNTESTED, rule STAYS, anecdote may compress. [A200, A283 added]
+- #2 CONFIRMED (A84 was in the dropped list). Restored under the constant-floor bullet: count crossings
+  ABOVE and compliance failures BELOW; an inert threshold is REPLACED by an evidenced condition; the
+  WHY is re-measured each wave and a confirmed WHY that no longer implies its rule is a deletion.
+- #3 CONFIRMED (A259 dropped; audit tested presence only). Restored as the audit's fourth check: a
+  computed number in a literal is verified against the record's game-state field, full population
+  where the field exists or a stated sample where not.
+- #4 CONFIRMED (blanket "never state what the render does not print" contradicted the A139 bullet).
+  Replaced with A238's qualified permission (re-verification grep + explaining primitive + fix-detecting
+  prediction, recorded in review.md); the A139 bullet now points at those conditions.
+- #5 CONFIRMED (A105's template rule was applied to all worked situations). Section 3 now separates
+  explanatory SITUATIONS (concrete board + right answer, required by A332/brief) from REPLY TEMPLATES
+  the guide asks the pilot to emit (shape with blanks).
+- #6 CONFIRMED (blanks "filled BEFORE the CHOICE line" vs "PLAN written AFTER"). Resolved: blanks are
+  computed first, CHOICE written first, PLAN second carrying the numbers (A282 governs). A330 restored
+  as ONE ritual per guide; an unavoidable second names its owning window class and what to write
+  elsewhere, and the rarer, higher-stakes ritual displaces the frequent one.
+- #7 CONFIRMED (checklist 8 dedup vs 4.3 cross-phase restatement). Checklist 8 and the one-rule-one-
+  place bullet now carry the exception: a deciding FACT is restated at each phase where it decides.
+Other changes: sections 1, 2.2, 3, 4.x, 5, 6 tightened for bytes (no rules removed; 4.5's history,
+cross-guide and hard-cap bullets now point at section 5 / checklist 10 / the 2.2 doctrine line).
+A84, A200, A259, A283 no longer dropped; dropped-as-non-rule count is 24. v2 = 39,982 bytes (ceiling 40,000).
