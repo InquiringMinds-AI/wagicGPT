@@ -131,3 +131,16 @@ Verified against A119 (10743-10761), A153, A222, A284, A69, the rewrite brief 21
   it belongs in lane briefs and is the only amendment now untagged. Tagged: 330 of 331.
 Room: prose only — 4.5 merged into 5, checklist compressed to pointers, illustrative parentheticals and
 section-3/4.x wording tightened; no rule removed. v2 = 39,995 bytes.
+
+## Revision 5 — findings adjudicated (Astra round 4, skill-v2-codex-review-r4.md)
+
+Verified against A208 (12111-12115), A240 (12649-12652), A327 (13985-13989), A217 (12276-12287), A319 (13842-13849).
+- #16 CONFIRMED. "rendered prompt, never options_text" replaced by choose-and-DISCLOSE: rendered prompt for a literal
+  inside an option row; options_text / prompt / chosen_text each valid for their own measurement; a byte-identical
+  options_text repeat stays a valid pinned predicate.
+- #17 CONFIRMED. A217's normalisation restored: windows compared PER SEAT-TURN against the previous corpus to
+  separate lost opportunities from shorter games; the (game, turn) count is stated as clustering, not exposure.
+- #18 CONFIRMED. A319's rejection restored with precedence: obeying a marker is conditional on its definition
+  matching the deck's goal; for a TRADE marker the guide counts THEIRS/YOURS and REJECTS the mark when YOURS is
+  longer, outranking "answer the mark" until the render fix; named as the sole exception to no-derived-counts.
+Room: prose only (illustrative quotes and section 3 / 4.x wording); no rule removed. v2 = 39,964 bytes.
