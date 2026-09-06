@@ -200,6 +200,9 @@ int AbilityFactory::parseCastRestrictions(MTGCardInstance * card, Player * playe
                         TargetChooser * ttc = tcf.createTargetChooser(rtc,card);
                         mod = atoi(comparasion[i].substr(end+1).c_str());
                         bool withoutProtections = true;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                        if (getenv("WAGIC_DAYNIGHTPROBE") && (rtc.find("day") != string::npos || rtc.find("night") != string::npos)) { int cnt = ttc->countValidTargets(true); fprintf(stderr, "[dnprobe] count '%s' src=%s -> %d; battlefield:", rtc.c_str(), card ? card->getName().c_str() : "-", cnt); for (int pi = 0; pi < 2; pi++) { MTGGameZone * z = observer->players[pi]->game->inPlay; for (int ci = 0; ci < z->nb_cards; ci++) { MTGCardInstance * c = z->cards[ci]; fprintf(stderr, " [p%d %s/lc=%s emblem=%d zone=%s canTarget=%d]", pi + 1, c->getName().c_str(), c->getLCName().c_str(), (int) c->hasType(Subtypes::TYPE_EMBLEM), c->currentZone == z ? "inPlay" : "OTHER", (int) ttc->canTarget(c, true)); } } fprintf(stderr, "\n"); fflush(stderr); }
+#endif
                         if(i == 2)
                         {
                             secondAmount = ttc->countValidTargets(withoutProtections);

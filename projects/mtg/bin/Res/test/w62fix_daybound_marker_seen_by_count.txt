@@ -1,27 +1,41 @@
 #NAME: daybound - a Night marker in play is SEEN by Brutal Cathar's day/night count
 #Wave-62 corpus 152v125 HUNG (88,232 Day/Night stack adds, 265k live card instances):
-#lane Z's designation-marker exclusion (TargetChooser::canTarget) also hid the marker
-#from `type(*[day;night]|battlefield)~equalto~0`, so casting Brutal Cathar with a Night
-#marker already in play cast a SECOND, opposite marker and the two flipped each other's
-#permanents forever. Fixed: a chooser that names a marker (Emblem type, marker name,
-#or its negation) accepts markers.
-#The markers are invisible to zone asserts and the harness gives the Cathar's ETB no
-#target, so the assert alone cannot tell the trees apart: measured on this probe, the
-#pre-fix body produced 71 "Action added to stack: Day/Night" lines, the fix 2 (the one
-#marker's own traffic). The corpus hang (88,232) is the RED; this file is the guard
-#that the cast still resolves and the Cathar sits in play with a marker already out.
+#lane Z's designation-marker exclusion (TargetChooser::canTarget) hid the marker from
+#`type(*[day;night]|battlefield)~equalto~0`, so casting Brutal Cathar with a Night
+#marker already in play cast a SECOND, opposite marker and the two flipped each
+#other's permanents forever.
+#WAVE-63 CORRECTION: the wave-62 fix (9230a94c3) put marker acceptance on the TYPE
+#chooser, but `*[day;night]` builds a DESCRIPTOR chooser - the count still read 0 and
+#this fixture looped 73 times on that very binary while passing (markers are invisible
+#to zone asserts; the "2 adds" reading recorded then was wrong). Now the descriptor
+#chooser accepts markers it names, and the RED is readable: Lexicon Synthetic Night
+#Counter loses its controller 5 life at each upkeep while more than one Night marker
+#is out. RED before the fix: the loop leaves two Night markers (plus Days) and life 15
+#at the next upkeep. GREEN: one Night, life 20, and the Cathar transformed by the
+#Night lord into Moonrage Brute.
 [INIT]
 firstmain
 [PLAYER1]
 hand:Brutal Cathar
+inplay:Lexicon Synthetic Night Counter
 manapool:{2}{W}
 [PLAYER2]
 inplay:Night
 [DO]
 Brutal Cathar
+next
+next
+next
+next
+next
+next
+next
+next
 [ASSERT]
-firstmain
+upkeep
 [PLAYER1]
-inplay:Brutal Cathar
+inplay:Moonrage Brute,Lexicon Synthetic Night Counter
+life:20
 [PLAYER2]
+life:20
 [END]

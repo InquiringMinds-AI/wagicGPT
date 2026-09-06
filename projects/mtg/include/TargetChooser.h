@@ -201,6 +201,8 @@ class DescriptorTargetChooser: public TargetZoneChooser
 public:
     CardDescriptor * cd;
     bool withoutProtections;
+    //#W63-fix (wave-63 corpus 152v162 + 152v130 HUNG): a descriptor that names a marker means it.
+    virtual bool acceptsDesignationMarkers() const;
     DescriptorTargetChooser(GameObserver *observer, CardDescriptor * _cd, MTGCardInstance * card = NULL, int _maxtargets = 1, bool other = false,bool targetMin = false);
     DescriptorTargetChooser(GameObserver *observer, CardDescriptor * _cd, int * _zones, int nbzones, MTGCardInstance * card = NULL, int _maxtargets = 1, bool other = false,bool targetMin = false);
     virtual bool canTarget(Targetable * target,bool withoutProtections = false);

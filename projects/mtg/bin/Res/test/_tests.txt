@@ -1363,6 +1363,7 @@ w62y_announce_x_cancel_keeps_card.txt
 w62Z_designation_marker_not_a_permanent.txt
 w62aa_cast_route_x_decline.txt
 w62fix_daybound_marker_seen_by_count.txt
+w63fix_daybound_flip_casts_no_second_marker.txt
 w63ae_nadaar_other_creatures_only.txt
 w63ae_nadaar_still_pumps_others.txt
 mossborn_hydra_doubling_one_event.txt

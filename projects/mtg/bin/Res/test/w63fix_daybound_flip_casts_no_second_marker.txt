@@ -1,0 +1,34 @@
+#NAME: daybound - the marker's own Day->Night flip must not make the transformed werewolf cast a SECOND marker
+#Wave-63 corpus: 152v162 and 152v130 HUNG (5.5k / 40k "Action added to stack: Day|Night"
+#lines). Shape: a Day marker in play beside Brutal Cathar; the turn ends with no spell
+#cast, so at the next untap the marker flips to Night, Night's lord transforms the
+#Cathar into Moonrage Brute, and the Brute's enter script `if type(*[day;night]|
+#battlefield)~equalto~0 then castcard(Night)` counted ZERO markers beside the live one
+#and cast a second Night. `*[day;night]` is a DESCRIPTOR chooser, whose marker
+#acceptance was the base-class false (the wave-62 fix covered the type chooser only).
+#Markers are invisible to zone asserts, so the RED is read through a test-only
+#creature: Lexicon Synthetic Night Counter loses its controller 5 life at each upkeep
+#while more than one Night marker is on the battlefield (a plain TYPE chooser, which
+#sees markers). RED before the fix: life 15 at the turn-1 upkeep (two Night markers).
+#GREEN: life 20 (one marker, flipped in place) and the Cathar transformed by the lord.
+#Placement order matters: the marker is listed BEFORE the Cathar so the Cathar's own
+#enter script sees it (listing the Cathar first casts a legitimate Day beside the
+#placed one - two markers, the wave-62 shape - which is not what this file tests).
+[INIT]
+secondmain
+[PLAYER1]
+inplay:Day,Brutal Cathar,Lexicon Synthetic Night Counter
+[PLAYER2]
+[DO]
+next
+next
+next
+next
+[ASSERT]
+upkeep
+[PLAYER1]
+inplay:Moonrage Brute,Lexicon Synthetic Night Counter
+life:20
+[PLAYER2]
+life:20
+[END]

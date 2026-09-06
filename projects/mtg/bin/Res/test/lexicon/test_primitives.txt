@@ -6393,6 +6393,18 @@ auto={0}:name(Last row) life:1 controller
 text=Test-only: exposes two activated rows for stale menu compaction.
 [/card]
 [card]
+id=2100000604
+name=Lexicon Synthetic Night Counter
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@each upkeep:if type(night|battlefield)~morethan~1 then life:-5 controller
+text=Test-only: at each upkeep, if more than one Night marker is on the battlefield, its controller loses 5 life (a marker count through the TYPE chooser, which sees markers).
+[/card]
+[card]
 id=2100000900
 name=W60Q Twin Trigger Angel
 rarity=C

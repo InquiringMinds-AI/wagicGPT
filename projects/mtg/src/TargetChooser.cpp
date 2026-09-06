@@ -1938,6 +1938,35 @@ bool TypeTargetChooser::acceptsDesignationMarkers() const
     return false;
 }
 
+//#W63-fix (wave-63 corpus: 152v162 and 152v130 HUNG at 5.5k / 40k Day|Night stack adds).
+//`type(*[day;night]|battlefield)` - the count every daybound/nightbound card runs
+//before casting a marker - is `*` plus bracketed attributes, which the factory
+//builds as a DESCRIPTOR chooser, not a type chooser. The wave-62 fix above lived
+//on TypeTargetChooser only, so this chooser kept the base-class `false` and the
+//count read 0 beside a live marker on every binary since D16 (the wave-62 fixture's
+//"2 adds" reading was wrong: it loops 73 times on the 9230a94c3 binary too - the
+//markers are invisible to zone asserts, so nothing failed). Consequence: the
+//moment a marker flips (Day->Night at an untap after a spell-less turn) its lord
+//transforms the werewolf, whose new face counts 0 markers and casts the opposite
+//one; two opposite markers then flip each other's permanents forever. A
+//descriptor whose type list (positive or negated - `[nonight]`) or name names a
+//marker accepts markers; every other descriptor still never sees one (D16 stands).
+bool DescriptorTargetChooser::acceptsDesignationMarkers() const
+{
+    if (!cd)
+        return false;
+    for (size_t i = 0; i < cd->types.size(); i++)
+        if (typeNamesDesignationMarker(cd->types[i] < 0 ? -cd->types[i] : cd->types[i]))
+            return true;
+    if (cd->compareName.size())
+    {
+        int id = MTGAllCards::findType(cd->compareName, false);
+        if (id >= 0 && typeNamesDesignationMarker(id))
+            return true;
+    }
+    return false;
+}
+
 bool TypeTargetChooser::canTarget(Targetable * target,bool withoutProtections)
 {
     if (!TargetZoneChooser::canTarget(target,withoutProtections)) return false;
