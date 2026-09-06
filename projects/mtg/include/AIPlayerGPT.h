@@ -1261,6 +1261,13 @@ private:
     //and only while the screen it was chosen on is still the screen.
     int mHoldTurn;
     std::map<string, std::set<string> > mHoldRows;
+    //#W68-BB (J5): the card the last payment receipt was written for, and the
+    //step it was written in. A post-announcement decline consumes it and says
+    //in the narration that the cast did NOT happen - the receipt alone reads as
+    //a cast that resolved (`130v126` s21-s31 wrote three `Paid {r}{r}{x} for
+    //Starstorm` lines for a spell that never went on the stack).
+    string mPaidPendingCard;
+    string mPaidPendingStep;
     int mHoldWindowsSkipped; //gameend report field
     //#W67-AX (I7): the RESERVATION decline, honoured the way the hold row is.
     //`162v130` seq 16 -> 17 and 18 -> 19: the model declined a `{reserve:}` row
@@ -1333,6 +1340,9 @@ private:
     //when the hold still stands (the caller passes without a model call);
     //clears the latch and returns false on any re-opener.
     bool holdHonoured(const char * seam, const std::vector<string>& rows);
+    //#W68-BB (J9): the crack-back verdict WORD, recomputed off the live board,
+    //as a member of the held row set.
+    string crackBackVerdictNow();
     //#W61-U (C14): the prompt-only note stating which of the two hold regimes
     //this menu is in, measured against the previous window's rows at this seam.
     string holdReopenNote(const char * seam, const std::vector<string>& rows);
