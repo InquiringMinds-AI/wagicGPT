@@ -3550,11 +3550,55 @@ static string chosenNameNarration(bool mine, const string& cardName, const strin
     return (mine ? "Your " : "Opponent's ") + cardName + " named " + chosen;
 }
 
+//#W66-AT (engine MED-3): the residual a reveal record's wait leaves once its
+//own round trip is subtracted. Pure so the arithmetic is provable; -1 latency
+//(a cache hit or reuse) explains nothing, so the whole wait is the residual.
+static long revealWaitUnexplainedSecs(long waitSecs, long latencyMs)
+{
+    const long tripSecs = latencyMs > 0 ? (latencyMs / 1000) : 0L;
+    const long residual = waitSecs - tripSecs;
+    return residual > 0 ? residual : 0L;
+}
+
+//#W66-AT (H6): the two scopes wave 34 settled, as a predicate a case can pin.
+//`inPlay` because a hand or graveyard target has no attack this turn to
+//restrict; `controllerIsActivePlayer` because on the defender's board "cannot
+//attack this turn" is trivially true of everything and reads as a restriction
+//on the coming combat that it is not (N-166f). Pure.
+static bool summoningSickRowApplies(bool sick, bool inPlay, bool controllerIsActivePlayer)
+{
+    return sick && inPlay && controllerIsActivePlayer;
+}
+
 static string summoningSickTag(bool canBlock)
 {
     return canBlock
         ? " [summoning sick - cannot attack this turn, but CAN block]"
         : " [summoning sick - cannot attack this turn, and it cannot block either]";
+}
+
+//#W66-AT (H6): the attackers window's other half. The candidate list is
+//`canAttack()`-gated, so a summoning-sick body is simply ABSENT from it - and a
+//silent omission is the shape the model confabulates into (the trust doctrine's
+//third rule). `152v162` seq 35-37 wrote "Attack with Intrepid Adversary #1,
+//Intrepid Adversary #2, and Briarbridge Tracker" as its PLAN in a window where
+//the Tracker was summoning sick; the next window's attackers list had two rows,
+//and the plan named three. Naming the bodies held out, and why, is a true token
+//added: no row is created (they are still not choosable) and none is removed.
+//Only the ATTACK restriction is claimed here - the block permission is a
+//per-creature fact the board line already carries with its own can't-block test.
+static string attackersHeldSickLine(const std::vector<std::string>& names)
+{
+    if (names.empty())
+        return "";
+    std::ostringstream o;
+    o << "NOT offered above and NOT able to attack this turn (summoning sick: entered"
+         " this turn without haste) - ";
+    for (size_t i = 0; i < names.size(); i++)
+        o << (i ? "; " : "") << names[i];
+    o << ". They attack from your NEXT turn on; a plan that names one of them as an"
+         " attacker THIS turn cannot be executed.\n";
+    return o.str();
 }
 
 //N-166b (wave-34 audit, b1 F-09 / b4 F7 - an 84/84 mismatch at one batch, 5/125
@@ -5683,6 +5727,52 @@ static int paymentTapRestrictionOf(MTGCardInstance * ps, bool beforeAttack, bool
 //costs nothing while the same card picked for {R} costs 1 - priced per PICK,
 //never per card. The resulting life is stated as a number and the lethal
 //case is named outright. Pure, so the shape is provable in PARSETEST.
+//#W66-AT (deck130 MED): the NEGATIVE half of the same fact. The board line
+//says "CAUTION - some usable mana sources DAMAGE YOU when tapped for mana
+//(auto-tap when you cast may spend them)"; the per-row clause below prints only
+//when the plan DOES spend one, so a row whose plan spends none says nothing at
+//all - and "may" plus silence is not a verdict. `130v126` seq 32: two Talisman
+//of Impulse (1 damage each) on a board carrying BOTH halves of the opponent's
+//life LOOP, so any nonzero payment was fatal; six castable cards, every row's
+//auto-tap plan spending four Mountains and no Talisman, no row saying so, and
+//the seat answered "Cast nothing right now" with the plan "no safe play
+//exists" and held for the rest of the game. The row already asked
+//`selectAutoTapProducers` which sources it would tap - this states its answer
+//when the answer is "none of the ones that hurt you".
+//#W66-AT (deck162 MED): the mirror of #W52-L's strand clause, for the window
+//that clause has no opinion about. An INSTANT-SPEED row offered in the seat's
+//OWN upkeep or draw step can wait - its own last window this turn is the end of
+//the OPPONENT's turn - while a SORCERY-SPEED card in hand has exactly one
+//window left, this turn's main phase, and the mana this row spends comes out of
+//it first. `162v123` seq 11 and 14 took Dictate of Kruphix (Flash) in the seat's
+//own DRAW step with Ob Nixilis, the Hate-Twisted stranded in hand; the row named
+//what it stranded at instant speed and said nothing about the sorcery-speed half.
+//Pure over the numbers the row already has: `left` is what the row leaves, and
+//`need` is the stranded card's converted cost.
+static string sorceryReserveClause(int left, const string& name, const string& cost, int need)
+{
+    if (name.empty() || need <= 0 || need <= left)
+        return "";
+    std::ostringstream o;
+    o << " {reserve: this row is INSTANT SPEED - it still has a window at the end of THEIR"
+         " turn. Taking it HERE, before your main phase, leaves " << left
+      << " source" << (left == 1 ? "" : "s") << ", and " << name;
+    if (!cost.empty())
+        o << " " << cost;
+    o << " in your hand needs " << need << " - it is SORCERY SPEED, so your main phase this"
+         " turn is its last window}";
+    return o.str();
+}
+
+static string paymentNoLifeCostClause(bool boardHasHarmSource, int totalDamage, int used)
+{
+    if (!boardHasHarmSource || totalDamage > 0 || used <= 0)
+        return "";
+    return " {paying this costs you NO life: the auto-tap plan for this row taps none of"
+           " the sources named in the CAUTION line above - that line says auto-tap MAY"
+           " spend them, and for this row it does not}";
+}
+
 static string paymentLifeCostClause(const std::vector<std::string>& names,
                                     const std::vector<int>& damage, int life)
 {
@@ -12409,6 +12499,26 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
     o << targetZoneTag(me, c); //#W43-9: the shared owner/zone tag
     if (c->isTapped())
         o << " [tapped]";
+    //#W66-AT (H6, deck152 HIGH-1 / MED-1): summoningSickTag had exactly ONE
+    //caller - the battlefield serializer - so a TARGET row carried
+    //`[doesn't untap ...]` and every other keyword and never the one
+    //restriction the choice in front of it turned on. `152v162` seq 35-37 put
+    //all three Luminarch Aspirant +1/+1 counters on a Briarbridge Tracker cast
+    //that turn, each reply writing the plan "Attack with ... Briarbridge
+    //Tracker"; the board line above said it was summoning sick and the ROW did
+    //not, and the row is what the answer is chosen off. That was the only
+    //deck152 game and it was lost. The tag is the SAME function the board line
+    //uses, on the SAME predicate (hasSummoningSickness = entered this turn, no
+    //haste, is a creature), with the SAME two scopes wave 34 settled: the
+    //permanent must be in play (a hand or graveyard target has no attack this
+    //turn to restrict) and its controller must be the ACTIVE player (N-166f:
+    //on the defender's board "cannot attack this turn" is trivially true of
+    //everything and reads as a restriction on the coming combat that it is not).
+    if (c->getObserver()
+        && summoningSickRowApplies(c->hasSummoningSickness() != 0,
+                                   c->isInPlay(c->getObserver()) != 0,
+                                   c->controller() == c->getObserver()->currentPlayer))
+        o << summoningSickTag(!c->has(Constants::CANTBLOCK));
     //Dungeon SELECTION target (N-146c): the generic 110-char snippet TRUNCATED
     //the room list at ~1-2 rooms, hiding the completion room + payoff the value
     //pick depends on (Lost Mine completes in 3 rooms vs Tomb's 4 vs Mad Mage's
@@ -15260,6 +15370,23 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //is ~0 is inference time, and only a driver half that grows is a stall.
         rec["reveal_wait_driver_ticks"] = mRevealStallDriverTicks;
         rec["reveal_wait_driver_secs"] = mRevealStallDriverSecs;
+        //#W66-AT (engine MED-3): and the subtraction a reviewer has to do by
+        //hand to read the pair above, done here once. The wave-65 seat read
+        //`reveal_wait_driver_secs: 0` on all 16 corpus reveals as "the wait is
+        //engine-side, not model-side" and docketed 835 s of engine stall; the
+        //same 16 records carry `reveal_wait_secs` equal to `latency_ms / 1000`
+        //on every one of them (107/106146, 139/139015, 68/68246 ...), so the
+        //whole 835 s was the seat's own round trips and there was no engine
+        //wait to skip. The driver-half figure CANNOT say that on its own, by
+        //construction: its progress signature treats a call in flight as
+        //progress, so it resets on every poll and can never accumulate while
+        //the model is answering. `reveal_wait_unexplained_secs` is the residual
+        //the round trip does not account for - the only figure on this record
+        //that a future stall would move, and 0 means there is nothing here to
+        //fix. A cache hit (`latency_ms` -1) explains nothing, so the whole wait
+        //is the residual.
+        rec["reveal_wait_unexplained_secs"] =
+            (int) revealWaitUnexplainedSecs(mRevealStallSecs, mLastLatencyMs);
         if (mRevealStallParked)
         {
             rec["reveal_stall"] = true;
@@ -20126,6 +20253,45 @@ static string crackBackAnimatorEntry(const string& name, int bestPower,
     return o.str();
 }
 
+//#W66-AT (deck146 MED): the land-drop row prices MANA and nothing else. A
+//creature-land is a BODY the land drop puts on the board without spending a
+//cast, and `146v125` seq 84/85 declined Hive of the Eye Tyrant twice, in the
+//same turn, at 2 life on a board with no creatures - the row said only that it
+//entered tapped. The detector is the one the crack-back screen already runs on
+//the opponent's board (#W63-AC E5): an activated `becomes(creature ...)` rung
+//with a cost head. The CHEAPEST rung is the one the row wants, so the walk is
+//run at rising reach and stops at the first that arms - the same affordability
+//pricer, asked "from how little", and no new parse. Silent on every land that
+//has no such rung, which is nearly all of them.
+static string landDropThreatTag(const string& rawScript)
+{
+    //The script is matched LOWERCASED, exactly as the crack-back walk does
+    //(`scriptLower(c->magicText)`): the primitives write `becomes(Creature
+    //Beholder^3/3^black^menace)` with a capital C, so a case-sensitive find
+    //would silently answer "not a manland" for the very card this item is about.
+    const string mt = scriptLower(rawScript);
+    if (mt.find("becomes(creature") == string::npos)
+        return "";
+    int pw = -1;
+    string cost;
+    for (int reach = 0; reach <= 20; reach++)
+    {
+        if (!crackBackBestAnimateRung(mt, false, reach, -1, pw, cost))
+            continue;
+        std::ostringstream o;
+        o << " {also a THREAT: this land ANIMATES - it has an activated ability that turns"
+             " it into a creature";
+        if (!cost.empty())
+            o << ", cheapest rung " << cost;
+        if (pw >= 0)
+            o << " for " << pw << " power";
+        o << ". Playing it deploys a body without spending a cast; its own mana is not"
+             " available to that cost (a land tapped for mana is tapped)}";
+        return o.str();
+    }
+    return "";
+}
+
 static string crackBackFloorSources(Player * opp)
 {
     if (!opp || !opp->game || !opp->game->inPlay)
@@ -22788,6 +22954,15 @@ static string stripNarrationDecoration(const string& in)
                 //tag are the same species - each is true of the board while the
                 //window is open and says nothing that belongs in history.
                 || (in.compare(i, 8, "{spare: ") == 0)
+                //#W66-AT (H5 / deck146 MED / deck162 MED): the discard ask's
+                //NOT-spare polarity marker, the land-drop threat tag and the
+                //instant-speed reservation are the same species as every entry
+                //here - each is true of THIS window's board or hand and false
+                //the moment the window closes, and each rides a RENDERED row the
+                //model may echo back, so none of them may enter history.
+                || (in.compare(i, 12, "{NOT spare: ") == 0)
+                || (in.compare(i, 16, "{also a THREAT: ") == 0)
+                || (in.compare(i, 10, "{reserve: ") == 0)
                 || (in.compare(i, 15, "{dead right now") == 0)
                 || (in.compare(i, 24, "{you already control one") == 0)
                 || (in.compare(i, 14, "{visible now: ") == 0)
@@ -24730,6 +24905,75 @@ static int spellPTDropAmount(GameObserver * observer, MTGCardInstance * src)
         return plainPTDrop(morbidLive ? ifM : ifN);
     }
     return scriptPTDrop(low);
+}
+
+//#W66-AT (deck130 MED): the cast-mode menu drops the cast row's own kill
+//arithmetic. `130v152` seq 77 offered `Cast Spark Spray {r} {kills 0 of the 1
+//CREATURE target at 1 damage - and 1 to the opponent at life 25 leaves them at
+//24}` and the seat still wrote "Kill Brutal Cathar with Spark Spray" as its
+//plan; one window later the mode menu for the SAME card read `1. Cast Card
+//Normally [cost: {r}] {card text: ...}` with no verdict of any kind, and the
+//seat took it. The verdict is RECOMPUTED from the board of THIS window - never
+//carried across from the earlier render, which could be stale - off the same
+//four predicates the cast row uses and the same two summary emitters, so the
+//two seams can differ only where the board actually moved between them.
+//The enumeration is deliberately narrower than the cast row's five-zone walk:
+//that walk is wide because it also PRINTS the target list, and the kill test it
+//feeds already discards everything that is not a battlefield creature.
+static string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card)
+{
+    if (!g || !me || !card)
+        return "";
+    bool deathtouch = false;
+    const int dmg = spellSingleDamageAmount(card, deathtouch);
+    const int drop = dmg ? 0 : spellPTDropAmount(g, card);
+    if (dmg <= 0 && drop <= 0)
+        return "";
+    TargetChooserFactory tcf(g);
+    TargetChooser * tc = tcf.createTargetChooser(card);
+    if (!tc)
+        return "";
+    std::vector<std::string> killed, killedMine;
+    int creatureTargets = 0;
+    for (int pi = 0; pi < 2; pi++)
+    {
+        Player * pp = g->players[pi];
+        if (!pp || !pp->game || !pp->game->inPlay)
+            continue;
+        MTGGameZone * bf = pp->game->inPlay;
+        if (!tc->targetsZone(bf))
+            continue;
+        for (int cj = 0; cj < bf->nb_cards; cj++)
+        {
+            MTGCardInstance * kc = bf->cards[cj];
+            if (!kc || !kc->isCreature() || !tc->canTarget(kc))
+                continue;
+            creatureTargets++;
+            const bool dies = dmg > 0
+                ? damageKillsTarget(dmg, kc->life,
+                                    kc->basicAbilities[Constants::INDESTRUCTIBLE] != 0,
+                                    deathtouch)
+                : ptDropKillsTarget(drop, kc->life);
+            if (!dies)
+                continue;
+            if (kc->controller() == me)
+                killedMine.push_back(kc->getDisplayName() + instanceHandle(kc));
+            else
+                killed.push_back(kc->getDisplayName() + instanceHandle(kc));
+        }
+    }
+    std::ostringstream mag;
+    if (dmg > 0)
+        mag << dmg << " damage";
+    else
+        mag << "-" << drop << "/-" << drop;
+    Player * oppP = me->opponent();
+    const string playerTail = castPlayerDamageTail(dmg, oppP && tc->canTarget(oppP),
+                                                   oppP ? oppP->life : -1, me->life, 0);
+    const string out = castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
+                                          killedMine);
+    SAFE_DELETE(tc);
+    return out;
 }
 
 //#W51-E D7 (wave-50 E-4, 11/11 Hive animations taken in UPKEEP, 0 in a main
@@ -31771,7 +32015,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                            //#W61-T (C7): the tapped-land fact, on the row that plays it.
                            //#W62-W (D1): resolved against the battlefield this
                            //same prompt prints, where the gate is decidable.
-                           + landEntersTappedTagResolved(lands[li].card, this));
+                           + landEntersTappedTagResolved(lands[li].card, this)
+                           //#W66-AT (deck146 MED): and the half the mana clause
+                           //never priced - this land is also a creature.
+                           + landDropThreatTag(lands[li].card->magicText));
         opts.push_back(kLandDropDeclineRow);
 
         std::ostringstream q;
@@ -32134,6 +32381,37 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 if (best)
                     o << strandsHandCardTag(used, untappedSources, best->getDisplayName(),
                                             best->getManaCost()->toString(), bestNeed);
+                //#W66-AT (deck162 MED): the sorcery-speed half, and only in the
+                //window where the two speeds differ - the seat's own turn, before
+                //its main phase, on a row that can itself wait. The most
+                //EXPENSIVE stranded sorcery-speed card is named: it is the one
+                //the remainder is furthest from, and the one a plan is built on.
+                if ((card->hasType(Subtypes::TYPE_INSTANT) || card->has(Constants::FLASH))
+                    && observer && observer->currentPlayer == this
+                    && observer->getCurrentGamePhase() < MTG_PHASE_FIRSTMAIN)
+                {
+                    MTGCardInstance * sorc = NULL;
+                    int sorcNeed = 0;
+                    for (int hi = 0; hi < game->hand->nb_cards; hi++)
+                    {
+                        MTGCardInstance * hc = game->hand->cards[hi];
+                        if (!hc || hc == card || hc->hasType(Subtypes::TYPE_LAND) || !hc->getManaCost())
+                            continue;
+                        if (hc->hasType(Subtypes::TYPE_INSTANT) || hc->has(Constants::FLASH))
+                            continue; //that card has the same freedom this row has
+                        int need = hc->getManaCost()->getConvertedCost();
+                        if (need <= 0 || need > untappedSources || need <= left)
+                            continue;
+                        if (!sorc || need > sorcNeed)
+                        {
+                            sorc = hc;
+                            sorcNeed = need;
+                        }
+                    }
+                    if (sorc)
+                        o << sorceryReserveClause(left, sorc->getDisplayName(),
+                                                  sorc->getManaCost()->toString(), sorcNeed);
+                }
             }
             //#W49-D11: the creatures this payment taps, and whether that costs
             //the attack (only on the caster's turn, before attackers are declared).
@@ -32156,6 +32434,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             }
             //#W52-K D7: the life this payment plan spends, and where it leaves you.
             o << paymentLifeCostClause(painNames, painDamage, life);
+            //#W66-AT (deck130 MED): and where it does not.
+            {
+                int painTotal = 0;
+                for (size_t pz = 0; pz < painDamage.size(); pz++)
+                    if (painDamage[pz] > 0)
+                        painTotal += painDamage[pz];
+                o << paymentNoLifeCostClause(!ManaEngine::selfDamageManaSources(this).empty(),
+                                             painTotal, used);
+            }
             //#W60-L (B1): same subtraction, into the row's win fold.
             for (size_t pdi = 0; pdi < painDamage.size(); pdi++)
                 if (painDamage[pdi] > 0)
@@ -34610,6 +34897,10 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 else if (ctx->getManaCost())
                     cost = ctx->getManaCost()->toString();
                 opts[i] += castModeRowTag(cost, printedFirstClause(ctx->text));
+                //#W66-AT (deck130 MED): the cast row's own live verdict, on the
+                //row that casts. Silent for every card the predicates cannot
+                //price, exactly as on the cast menu.
+                opts[i] += castKillVerdictNow(observer, this, ctx);
                 castRowIdx = (int) i; //#W57-C (D21)
                 castCostStr = cost;
                 castClauseStr = printedFirstClause(ctx->text);
@@ -39242,6 +39533,27 @@ int AIPlayerGPT::chooseAttackers()
                 evasiveRows++;
         totalsTail << attackerBlockerCountLine(blockerCount, evasiveRows,
                                          (int) rowNoLegalBlock.size());
+        //#W66-AT (H6): and the bodies the candidate walk left out because they
+        //are summoning sick. Same predicate as the board line, membership tested
+        //against the permuted candidate vector so a creature that IS offered can
+        //never appear here.
+        {
+            std::vector<std::string> sickNames;
+            if (game && game->inPlay)
+                for (int si = 0; si < game->inPlay->nb_cards; si++)
+                {
+                    MTGCardInstance * sc = game->inPlay->cards[si];
+                    if (!sc || !sc->isCreature() || !sc->hasSummoningSickness())
+                        continue;
+                    bool offered = false;
+                    for (size_t aj = 0; aj < attackers.size() && !offered; aj++)
+                        if (attackers[aj] == sc)
+                            offered = true;
+                    if (!offered)
+                        sickNames.push_back(sc->getDisplayName() + instanceHandle(sc));
+                }
+            totalsTail << attackersHeldSickLine(sickNames);
+        }
         //#W60-L (B11): and the arithmetic that count line stops one step short
         //of. `guaranteed` counts every attacker nothing of theirs may block, then
         //the SMALLEST powers among the rest that their blocker count cannot
@@ -41862,6 +42174,89 @@ string discardAlreadyControlClause(const string& onBattlefield)
     return " {you already control one: " + onBattlefield + "}";
 }
 
+//#W66-AT (H5, deck125 HIGH-2): the discard ask priced its rows correctly and
+//then ORDERED against every price it printed. `125v126` seq 55: row 1 was
+//Supreme Verdict `{right now: destroys 7 of their creatures ...}`, rows 5/6/8
+//were lands carrying `{spare: you control 10 lands already ...}`, and the seat
+//answered `PUT: 1`. Corpus-wide, 31 discard asks, 12 offered at least one
+//`{spare:` row and only 6 discarded spares only. Two causes, both here: hand
+//order is the row order (so the row the model favours is whichever card the
+//zone happens to hold first), and the polarity is one-sided - the disposable
+//rows are MARKED and the ones that must be kept are not, so a bare row reads
+//as the neutral choice.
+//Both are fixed by ADDING, never by removing: no row leaves the list, the
+//numbers still map one-for-one onto hand positions through the existing
+//`outOrder` permutation (the same rail the copy-collapse already rides,
+//un-permuted by `unpermuteSelection` at the caller), and every verdict a row
+//carried it still carries.
+//`discardDisposabilityClass` is the ORDER, read off the row's OWN printed
+//verdicts so the list cannot disagree with the text on it: a spare land first
+//(the engine has already said this hand does not need it), then a card the
+//engine priced as doing NOTHING on this board, then rows it could not price,
+//then a card whose verdict says it still does something - the cast-row value
+//ranking, inverted, which is what a DISCARD ask wants. Ties keep hand order.
+int discardDisposabilityClass(bool isLand, const string& row)
+{
+    if (isLand)
+        return row.find(" {spare: ") != string::npos ? 0 : 2;
+    if (row.find(" {dead right now: ") != string::npos)
+        return 1;
+    if (row.find(" {right now: ") != string::npos)
+        return 3;
+    return 2;
+}
+
+//The order itself: a stable bucket sort over the class vector. Separated from
+//the emitter so the permutation the answer parser depends on is provable
+//without a game (the corpus-ask case in the self-test runs this exact call).
+void discardDisposabilityOrder(const std::vector<int>& classes, std::vector<size_t>& order)
+{
+    order.clear();
+    for (int cls = 0; cls <= 3; cls++)
+        for (size_t c = 0; c < classes.size(); c++)
+            if (classes[c] == cls)
+                order.push_back(c);
+}
+
+//And the composition of two permutations: printed position k is `inner[k]` in
+//the disposability list, which is `outer[inner[k]]` in HAND order. This is the
+//value `outOrder` carries out to `cleanupDiscard`, where `unpermuteSelection`
+//uses it to turn the model's numbers back into hand positions.
+void composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner,
+                     std::vector<size_t>& out)
+{
+    out.clear();
+    for (size_t k = 0; k < inner.size(); k++)
+        out.push_back(inner[k] < outer.size() ? outer[inner[k]] : inner[k]);
+}
+
+//The default sentence. Printed only when the list actually holds a spare row,
+//so a hand with nothing spare reads exactly as it did before.
+string discardSpareDefaultLine(int spareRows, int over)
+{
+    if (spareRows <= 0)
+        return "";
+    std::ostringstream o;
+    o << "DEFAULT ANSWER: discard the spare land. " << spareRows << " row"
+      << (spareRows == 1 ? " below is" : "s below are") << " marked {spare: ...} - a"
+         " surplus land this hand no longer needs, and the rows are ordered most"
+         " disposable FIRST, so the spare rows are the low numbers. Every other row"
+         " is marked {NOT spare: ...} and costs you whatever that row's own verdict"
+         " says it does. Take a {NOT spare: ...} row"
+      << (over == 1 ? "" : " for any of these discards")
+      << " only when your plan names the reason.\n";
+    return o.str();
+}
+
+//The other side of the polarity. A row that is not a spare land says so, in the
+//same vocabulary, so the unmarked row is no longer the neutral-looking one.
+string discardNotSpareTag(bool anySpare, bool isSpare)
+{
+    if (!anySpare || isSpare)
+        return "";
+    return " {NOT spare: a real card, not a surplus land}";
+}
+
 //W50-W (D4): the cleanup discard ask. Header is a free function so PARSETEST
 //can pin its numbers without a game.
 //#W60-N (B5, wave-59 deck125 HIGH-1): the header did the CR 514.1 arithmetic
@@ -41901,6 +42296,11 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
                                               vector<size_t> * outOrder)
 {
     std::ostringstream tail;
+    //#W66-AT (H5): the header is composed here and EMITTED below, after the rows
+    //have been classified - the default sentence it now carries names how many
+    //spare rows the list holds, which is not known until the rows exist. Nothing
+    //else writes to `tail` in between, so the emitted order is unchanged.
+    string headerText;
     {
         //#W60-N (B5): the price of the discard this ask is about to force.
         vector<string> mineD, theirsD;
@@ -41909,8 +42309,8 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         std::ostringstream dn;
         for (size_t di = 0; di < theirsD.size(); di++)
             dn << (di ? ", " : "") << theirsD[di];
-        tail << cleanupDiscardHeaderText((int) hand.size(), limit, over, theirsPerD,
-                                         dn.str(), life);
+        headerText = cleanupDiscardHeaderText((int) hand.size(), limit, over, theirsPerD,
+                                              dn.str(), life);
     }
     if (outOrder)
     {
@@ -41976,6 +42376,7 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
             highestHandCost = cc;
     }
     vector<string> discardRows;
+    vector<int> discardClass; //#W66-AT (H5): parallel to discardRows
     bool anyVerdict = false; //#W57-C (D8): does the legend below have anything to explain?
     for (size_t j = 0; j < hand.size(); j++)
     {
@@ -42036,18 +42437,47 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
             }
         }
         discardRows.push_back(row.str());
+        //#W66-AT (H5): the row's disposability, read off the verdicts the row
+        //itself just printed.
+        discardClass.push_back(discardDisposabilityClass(hand[j]->hasType(Subtypes::TYPE_LAND),
+                                                         discardRows.back()));
     }
     {
+        //#W66-AT (H5): order by disposability, ties keeping hand order (a stable
+        //selection over the class vector). This is a PERMUTATION - every row is
+        //still on the list, and `dispOrder` is composed with the copy-collapse
+        //order below so the number the model answers with still resolves to the
+        //hand position it names.
+        int spareRows = 0;
+        for (size_t c = 0; c < discardClass.size(); c++)
+            if (discardClass[c] == 0)
+                spareRows++;
+        vector<size_t> dispOrder;
+        discardDisposabilityOrder(discardClass, dispOrder);
+        //#W66-AT (H5): the polarity marker, applied before the permutation so a
+        //row and its class can never come apart.
+        for (size_t c = 0; c < discardRows.size(); c++)
+            discardRows[c] += discardNotSpareTag(spareRows > 0, discardClass[c] == 0);
+        vector<string> orderedRows;
+        orderedRows.reserve(dispOrder.size());
+        for (size_t k = 0; k < dispOrder.size(); k++)
+            orderedRows.push_back(discardRows[dispOrder[k]]);
         //#W55-D (D18): the same collapse every other list gets - three copies of
         //one card in hand printed three byte-different rows only because of the
         //copy ordinal. The caller un-permutes the reply.
-        vector<size_t> discardOrder;
-        groupNumberedRows(discardRows, discardOrder);
+        vector<size_t> groupOrder;
+        groupNumberedRows(orderedRows, groupOrder);
         vector<string> shownDiscard;
-        shownDiscard.reserve(discardRows.size());
-        for (size_t k = 0; k < discardOrder.size(); k++)
-            shownDiscard.push_back(discardRows[discardOrder[k]]);
+        shownDiscard.reserve(orderedRows.size());
+        for (size_t k = 0; k < groupOrder.size(); k++)
+            shownDiscard.push_back(orderedRows[groupOrder[k]]);
+        //#W66-AT (H5): composition - printed position k is disposability
+        //position groupOrder[k], which is hand position dispOrder[...].
+        vector<size_t> discardOrder;
+        composeRowOrder(dispOrder, groupOrder, discardOrder);
         bool discardRanged = false;
+        tail << headerText;
+        tail << discardSpareDefaultLine(spareRows, over); //#W66-AT (H5)
         tail << joinNumberedRows(shownDiscard, &discardRanged);
         if (discardRanged)
             tail << kOptionRangeNote;
@@ -66351,6 +66781,241 @@ static const char * kW50Y_r94 =
         // The PROTOCOL and the function agree about the unit.
         CHECK(string(kReplyProtocol).find("400 CHARACTERS") != string::npos,
               "#W65-AP R7 the protocol says CHARACTERS, and now that is what is counted");
+    }
+
+
+    cout << "\n[#W66-AT] H5 discard disposability / H6 summoning sickness / MED clauses\n";
+    {
+        // ---- H5: the corpus ask, 125v126 seq 55, row for row ----
+        // The eight hand rows as the emitter built them that window; the card
+        // text is elided (it is not what the classifier reads) and every verdict
+        // clause is verbatim from the record.
+        vector<string> rows;
+        rows.push_back("Supreme Verdict {1}{u}{w}{w} (sorcery) {card text: ...}"
+                       " {right now: destroys 7 of their creatures (all of them carry a"
+                       " restriction against attacking), 0 of yours - THEIRS: Pride Guardian #1"
+                       " (0/3) [defender]}");
+        rows.push_back("Final Judgment {4}{w}{w} (sorcery) {card text: ...}"
+                       " {right now: exiles 7 of their creatures (all of them carry a"
+                       " restriction against attacking), 0 of yours - THEIRS: Pride Guardian #1"
+                       " (0/3) [defender]}");
+        rows.push_back("Path to Exile (copy 1 of 2 in your hand) {w} (instant) {card text: ...}");
+        rows.push_back("Path to Exile (copy 2 of 2 in your hand) {w} (instant) {card text: ...}");
+        rows.push_back("Seachrome Coast (land) {card text: ...} {spare: you control 10 lands"
+                       " already; the most expensive card in your hand you could still reach costs 6}");
+        rows.push_back("Island (copy 1 of 2 in your hand) (land) {card text: U} {spare: you control"
+                       " 10 lands already; the most expensive card in your hand you could still"
+                       " reach costs 6}");
+        rows.push_back("Sphinx's Revelation {u}{u}{w}{x} (instant) {card text: ...}");
+        rows.push_back("Island (copy 2 of 2 in your hand) (land) {card text: U} {spare: you control"
+                       " 10 lands already; the most expensive card in your hand you could still"
+                       " reach costs 6}");
+        const bool isLand[8] = { false, false, false, false, true, true, false, true };
+        vector<int> cls;
+        for (size_t i = 0; i < rows.size(); i++)
+            cls.push_back(discardDisposabilityClass(isLand[i], rows[i]));
+        // REPRO: the classes the corpus rows earn.
+        CHECK(cls[0] == 3 && cls[1] == 3 && cls[2] == 2 && cls[3] == 2
+                  && cls[4] == 0 && cls[5] == 0 && cls[6] == 2 && cls[7] == 0,
+              "#W66-AT H5 REPRO 125v126 s55: the two sweepers class LAST, the three spare lands FIRST");
+        vector<size_t> disp;
+        discardDisposabilityOrder(cls, disp);
+        CHECK(disp.size() == 8 && disp[0] == 4 && disp[1] == 5 && disp[2] == 7
+                  && disp[6] == 0 && disp[7] == 1,
+              "#W66-AT H5 the printed order leads with the spare lands and ends with the sweepers");
+        // MUST-NOT-MATCH: the permutation is a permutation - every hand
+        // position appears exactly once, so no row is dropped or duplicated.
+        {
+            vector<int> seenN(8, 0);
+            for (size_t k = 0; k < disp.size(); k++)
+                seenN[disp[k]]++;
+            bool onceEach = true;
+            for (size_t k = 0; k < seenN.size(); k++)
+                if (seenN[k] != 1)
+                    onceEach = false;
+            CHECK(onceEach, "#W66-AT H5 MUST-NOT-MATCH the reorder drops and duplicates nothing");
+        }
+        // The ANSWER still resolves: compose with the copy-collapse order the
+        // same way the emitter does, render, answer "1", un-permute, and land on
+        // the hand position of the first spare land (Seachrome Coast, index 4).
+        {
+            vector<int> cls2(cls);
+            vector<string> ordered;
+            for (size_t k = 0; k < disp.size(); k++)
+                ordered.push_back(rows[disp[k]] + discardNotSpareTag(true, cls2[disp[k]] == 0));
+            vector<size_t> groupOrder;
+            groupNumberedRows(ordered, groupOrder);
+            vector<size_t> composed;
+            composeRowOrder(disp, groupOrder, composed);
+            CHECK(composed.size() == 8 && composed[0] == 4,
+                  "#W66-AT H5 composed printed position 1 is hand position 4 - the first spare land");
+            vector<bool> send(8, false);
+            send[0] = true;
+            unpermuteSelection(composed, 8, send);
+            CHECK(send[4] && !send[0] && !send[1],
+                  "#W66-AT H5 \"PUT: 1\" discards the SPARE LAND, not the sweeper it used to name");
+        }
+        // The polarity marker, both directions.
+        CHECK(discardNotSpareTag(true, false) == " {NOT spare: a real card, not a surplus land}",
+              "#W66-AT H5 the non-spare row is marked");
+        CHECK(discardNotSpareTag(true, true).empty(),
+              "#W66-AT H5 NEGATIVE a spare row is never marked NOT spare");
+        CHECK(discardNotSpareTag(false, false).empty(),
+              "#W66-AT H5 MUST-NOT-MATCH a list with no spare row marks nothing at all");
+        // The default sentence: present only with a spare row, and it names the count.
+        {
+            const string d = discardSpareDefaultLine(3, 1);
+            CHECK(d.find("DEFAULT ANSWER: discard the spare land.") == 0
+                      && d.find("3 rows below are") != string::npos,
+                  "#W66-AT H5 the default sentence leads the ask and names the spare count");
+            CHECK(discardSpareDefaultLine(0, 1).empty(),
+                  "#W66-AT H5 NEGATIVE no spare row, no default sentence - the ask is unchanged");
+            CHECK(discardSpareDefaultLine(1, 1).find("1 row below is") != string::npos,
+                  "#W66-AT H5 the singular reads as a singular");
+        }
+        // ECHO SHAPE: the new brace group leaves no residue in the record and the
+        // marked row still answers by number.
+        {
+            vector<string> menu;
+            menu.push_back("Seachrome Coast (land) {spare: you control 10 lands already}");
+            menu.push_back("Supreme Verdict {1}{u}{w}{w} (sorcery)"
+                           + discardNotSpareTag(true, false));
+            CHECK(stripNarrationDecoration(menu[1]) == "Supreme Verdict {1}{u}{w}{w} (sorcery)",
+                  "#W66-AT H5 echo shape: {NOT spare: ...} strips clean off the narrated row");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 2 (Supreme Verdict)", 2, &menu, &stale, NULL, NULL, false) == 2,
+                  "#W66-AT H5 echo: the marked row still answers as its own number");
+        }
+    }
+    {
+        // ---- H6: the summoning-sick tag reaches the row that decides ----
+        // The target row from 152v162 seq 35, rebuilt with the tag the row was
+        // missing. The tag is the SAME string the board line uses.
+        // The gate the row is emitted under, both scopes, both directions.
+        CHECK(summoningSickRowApplies(true, true, true),
+              "#W66-AT H6 an active player's summoning-sick battlefield creature gets the tag");
+        CHECK(!summoningSickRowApplies(false, true, true),
+              "#W66-AT H6 NEGATIVE a creature that is not summoning sick is never tagged");
+        CHECK(!summoningSickRowApplies(true, false, true),
+              "#W66-AT H6 MUST-NOT-MATCH a hand or graveyard target has no attack this turn to restrict");
+        CHECK(!summoningSickRowApplies(true, true, false),
+              "#W66-AT H6 MUST-NOT-MATCH (N-166f) the defender's board carries no attack restriction clause");
+        const string sick = summoningSickTag(true);
+        CHECK(sick == " [summoning sick - cannot attack this turn, but CAN block]",
+              "#W66-AT H6 the target row borrows the board line's tag byte for byte");
+        {
+            vector<string> rows;
+            rows.push_back("Intrepid Adversary #1 (3/1) [lifelink] [your battlefield]");
+            rows.push_back("Briarbridge Tracker (4/3) [vigilance] [your battlefield]" + sick);
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 2 (Briarbridge Tracker)", 2, &rows, &stale, NULL, NULL, false) == 2,
+                  "#W66-AT H6 echo: a target row carrying the tag still answers by name");
+            CHECK(stripNarrationDecoration(rows[1]).find("summoning sick") == string::npos,
+                  "#W66-AT H6 echo shape: the bracket leaves no residue in the record");
+        }
+        // The attackers window's held-out line.
+        {
+            vector<string> sickNames;
+            sickNames.push_back("Briarbridge Tracker");
+            sickNames.push_back("Luminarch Aspirant #2");
+            const string line = attackersHeldSickLine(sickNames);
+            CHECK(line.find("NOT offered above and NOT able to attack this turn") == 0
+                      && line.find("Briarbridge Tracker; Luminarch Aspirant #2") != string::npos
+                      && line[line.size() - 1] == '\n',
+                  "#W66-AT H6 the attackers window names the bodies its candidate walk left out");
+            CHECK(attackersHeldSickLine(vector<string>()).empty(),
+                  "#W66-AT H6 NEGATIVE no summoning-sick body, no line");
+            // MUST-NOT-MATCH (N-139k's rule): no affirmative attack licence for
+            // THIS turn can appear in the line the model reads.
+            CHECK(line.find("can attack this turn") == string::npos
+                      && line.find("NEXT turn") != string::npos,
+                  "#W66-AT H6 MUST-NOT-MATCH restriction first: the only attack licence named is NEXT turn");
+        }
+    }
+    {
+        // ---- deck130 MED: the per-row auto-tap verdict, negative half ----
+        CHECK(paymentNoLifeCostClause(true, 0, 4)
+                  == " {paying this costs you NO life: the auto-tap plan for this row taps none of"
+                     " the sources named in the CAUTION line above - that line says auto-tap MAY"
+                     " spend them, and for this row it does not}",
+              "#W66-AT deck130 MED: a plan that spends no damaging source says so");
+        CHECK(paymentNoLifeCostClause(false, 0, 4).empty(),
+              "#W66-AT deck130 MED NEGATIVE: no damaging source on the board, no clause");
+        CHECK(paymentNoLifeCostClause(true, 1, 4).empty(),
+              "#W66-AT deck130 MED MUST-NOT-MATCH: a plan that DOES pay life gets the priced clause, not this one");
+        CHECK(paymentNoLifeCostClause(true, 0, 0).empty(),
+              "#W66-AT deck130 MED NEGATIVE: a row that taps nothing makes no claim about the tap plan");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Dwarven Blastminer {1}{r} (1/1)" + paymentNoLifeCostClause(true, 0, 2));
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Dwarven Blastminer {1}{r} (1/1)",
+                  "#W66-AT deck130 MED echo shape: the clause leaves no residue");
+        }
+    }
+    {
+        // ---- deck162 MED: the sorcery-speed reservation ----
+        const string r = sorceryReserveClause(1, "Ob Nixilis, the Hate-Twisted", "{3}{b}{b}", 5);
+        CHECK(r.find(" {reserve: this row is INSTANT SPEED") == 0
+                  && r.find("leaves 1 source,") != string::npos
+                  && r.find("Ob Nixilis, the Hate-Twisted {3}{b}{b} in your hand needs 5") != string::npos
+                  && r.find("SORCERY SPEED, so your main phase this turn is its last window}")
+                     != string::npos,
+              "#W66-AT deck162 MED: the flash row states what the sorcery-speed card still needs");
+        CHECK(sorceryReserveClause(5, "Ob Nixilis, the Hate-Twisted", "{3}{b}{b}", 5).empty(),
+              "#W66-AT deck162 MED NEGATIVE: a remainder that still pays for it strands nothing");
+        CHECK(sorceryReserveClause(1, "", "{3}{b}{b}", 5).empty()
+                  && sorceryReserveClause(1, "Ob Nixilis", "{3}{b}{b}", 0).empty(),
+              "#W66-AT deck162 MED MUST-NOT-MATCH: no name or no cost, no claim");
+        CHECK(sorceryReserveClause(2, "Teferi's Puzzle Box", "{4}", 4).find("leaves 2 sources,")
+                  != string::npos,
+              "#W66-AT deck162 MED the plural reads as a plural");
+    }
+    {
+        // ---- deck146 MED: the land-drop threat tag, off the real primitive ----
+        // Hive of the Eye Tyrant, written exactly as borderline.txt writes it
+        // (capital C in becomes(Creature ...) - the case the walk must survive).
+        const string hive =
+            "if compare(type:land:myBattlefield)~morethan~2 then tap(noevent)\n"
+            "{T}:Add{B}\n"
+            "{3}{B}:name(Becomes beholder) transforms((,newability[becomes(Creature Beholder^3/3^black^menace) ueot],newability[_ATTACKING_name(Exile card) target(*|opponentgraveyard) moveto(exile)])) ueot";
+        const string tag = landDropThreatTag(hive);
+        CHECK(tag.find(" {also a THREAT: this land ANIMATES") == 0
+                  && tag.find("cheapest rung {3}{b}") != string::npos
+                  && tag.find("for 3 power") != string::npos,
+              "#W66-AT deck146 MED REPRO 146v125 s84/85: the Hive row names the body it deploys");
+        CHECK(landDropThreatTag("R").empty()
+                  && landDropThreatTag("{T}:Add{W}").empty(),
+              "#W66-AT deck146 MED NEGATIVE: a plain land carries no threat tag");
+        CHECK(landDropThreatTag("becomes(Creature Hydra^9/9^green)").empty(),
+              "#W66-AT deck146 MED MUST-NOT-MATCH: a STATIC animation with no cost head is not an activated rung");
+        {
+            vector<string> menu;
+            menu.push_back("Play Hive of the Eye Tyrant" + tag);
+            menu.push_back(kLandDropDeclineRow);
+            CHECK(stripNarrationDecoration(menu[0]) == "Play Hive of the Eye Tyrant",
+                  "#W66-AT deck146 MED echo shape: the threat tag leaves no residue");
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 1 (Play Hive of the Eye Tyrant)", 2, &menu, &stale,
+                              NULL, NULL, false) == 1,
+                  "#W66-AT deck146 MED echo: the tagged land row still answers as row 1");
+        }
+    }
+    {
+        // ---- engine MED-3: the reveal wait's residual ----
+        // The corpus's own sixteen pairs: wait seconds beside the record's own
+        // latency_ms. Every one of them is explained by the round trip.
+        CHECK(revealWaitUnexplainedSecs(107, 106146) <= 1
+                  && revealWaitUnexplainedSecs(139, 139015) == 0
+                  && revealWaitUnexplainedSecs(68, 68246) == 0
+                  && revealWaitUnexplainedSecs(54, 54747) == 0
+                  && revealWaitUnexplainedSecs(561, 560586) <= 1,
+              "#W66-AT MED-3 REPRO: the 835 s of reveal wait is the seat's own round trips");
+        CHECK(revealWaitUnexplainedSecs(500, 10000) == 490,
+              "#W66-AT MED-3 a REAL engine stall is what this figure is for");
+        CHECK(revealWaitUnexplainedSecs(30, -1) == 30,
+              "#W66-AT MED-3 a cache hit explains nothing, so the whole wait is the residual");
+        CHECK(revealWaitUnexplainedSecs(0, 900000) == 0,
+              "#W66-AT MED-3 MUST-NOT-MATCH the residual is never negative");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
