@@ -90,4 +90,24 @@ Each finding was checked against the cited v2 lines and the original amendment t
   place bullet now carry the exception: a deciding FACT is restated at each phase where it decides.
 Other changes: sections 1, 2.2, 3, 4.x, 5, 6 tightened for bytes (no rules removed; 4.5's history,
 cross-guide and hard-cap bullets now point at section 5 / checklist 10 / the 2.2 doctrine line).
-A84, A200, A259, A283 no longer dropped; dropped-as-non-rule count is 24. v2 = 39,982 bytes (ceiling 40,000).
+A84, A200, A259, A283 no longer dropped; dropped-as-non-rule count is 24 (23 after Revision 3). v2 = 39,982 bytes (ceiling 40,000).
+
+## Revision 3 — findings adjudicated (Astra round 2, skill-v2-codex-review-r2.md)
+
+Verified each against the cited v2 lines and A200/A243/A283, A79/A282, A153, A198, A287, the reviewer
+brief (staged wave68/deck<N>/strategy.txt) and the rewrite brief (bin/Res forbidden) before acting.
+- #1 CONFIRMED regression. Retention now keyed to REACHABILITY (A200): window never arose but reachable
+  = UNTESTED, keep; deck structurally cannot produce it = cut (consistent with A243, now tagged there).
+- #6 CONFIRMED not resolved. The A79 "first line of your answer is <number>" instruction is removed and
+  marked retired; the number is written in the PLAN line; order is compute -> CHOICE -> PLAN (A282).
+- #8 CONFIRMED. A153(b),(c) restored: 2 lands / no coverage at keeping 7 and 6 added to the hand set;
+  where a second shippable property survives, the look-N PLAN is tested against the look-N+1 hand.
+- #9 CONFIRMED. A198 restored: the distinct (game, turn) count is reported beside every N of M.
+- #10 CONFIRMED. The perception classifier carries A287's route-around exception (arithmetic over two
+  true printed surfaces, retirement condition in review.md); the 4.2 bullet now points at it.
+- #11 CONFIRMED. Section 1 now says seats never edit bin/Res, distinguishes ordinary review (staged
+  strategy.txt beside review.md, orchestrator installs) from the rewrite workflow (guide-rewrite-brief.md
+  is the contract there), and drops "the whole contract".
+Room: prose tightened (prompt-surface inventory, "Read the games", KEEP, section-5 history bullet, combat/
+holds/land/matchups/4.1 wording) and four section-5 anti-pattern bullets that only restated 4.1 rules
+were removed (tags live in 4.1; A14 moved to the cap bullet). No rule removed. v2 = 39,990 bytes.
