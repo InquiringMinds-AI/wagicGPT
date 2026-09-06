@@ -1385,3 +1385,5 @@ w66as_loop_autopass.txt
 w66as_loop_autopass_has_action.txt
 w67AX_reveal_refusal_takes_legal_card.txt
 w68BC_ward_targets_the_spell_not_a_random_zone.txt
+legend_rule_pick_dies_w68be.txt
+legend_rule_pick_dies2_w68be.txt
