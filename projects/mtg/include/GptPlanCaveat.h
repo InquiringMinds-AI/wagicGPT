@@ -626,8 +626,19 @@ inline std::string planScratchpadCut(const std::string& plan)
             break;
         sentenceSeen = true;
         size_t s = stop + 1;
+        // #W64-AJ (E14a, engine seat LOW-1): the guard skipped whitespace and
+        // quotes only, so a self-correction that OPENS A BRACKET was not at a
+        // sentence start by this walk and survived the cut - `130v126@1788653538`
+        // seq 35 carried "... Cast nothing right now. (Wait, the choice is to
+        // cast Starstorm." into the served plan (1 of 2,801). The opener is
+        // punctuation the model wraps an aside in; it is not part of the marker
+        // and it is not a word, so it is skipped exactly as a quote is. The
+        // marker list itself is unchanged: "Wait until their end step" still has
+        // no comma and still does not cut.
         while (s < low.size() && (low[s] == ' ' || low[s] == '\t' || low[s] == '\r'
-                                  || low[s] == '\n' || low[s] == '"' || low[s] == '\''))
+                                  || low[s] == '\n' || low[s] == '"' || low[s] == '\''
+                                  || low[s] == '(' || low[s] == '[' || low[s] == '*'
+                                  || low[s] == '`'))
             s++;
         if (s >= low.size())
             break;
