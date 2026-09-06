@@ -5,7 +5,7 @@ Repo /home/magi/Projects/wagicGPT, game dir projects/mtg. Use python for translo
 wagic; write only under projects/mtg/strategy-design/wave69/. Never write mechanisms as the
 owner's positions. Report what you did NOT check.
 
-CORPUS (wave 69, binary = master __HASH__ = wave-68 close d8772a91c + wave-69 step 1: lanes BF (K2 caps re-fitted from the
+CORPUS (wave 69, binary = master f152d0df4 = wave-68 close d8772a91c + wave-69 step 1: lanes BF (K2 caps re-fitted from the
 corpus — ask 640->768, discard/reveal/bottom 384->512, nothing tightened; truncation re-ask at EVERY seam; a recovery that
 changes the answer is `reply_truncated_answer_changed`; protocol: a correction goes BEFORE the PLAN line; K3 the reversal
 predicate reads only the correction zone between the coded line and PLAN, plus `proseNegatesTakenRow` for a negation
@@ -21,7 +21,7 @@ CARD — the stack term had rendered 0 times in 2,282 prompts; `stackDrawRecipie
 material-preserving assignment), BI (K7 `transport`/`attempt_ms` were conditional emitters that never triggered — now on
 every round trip; async_drops + hold-suppression counters in gameend; `repeat_annotated_take`; GANG BLOCK proven reachable
 (census added); `(neither dies)` head restored; band rows + Adversary rows = one payRepeatCollapse defect; `Paid ... with`
-fold; one tap literal `{paying this taps:}`), and BJ (__BJ_SUMMARY__); read wave69/known-bugs.md,
+fold; one tap literal `{paying this taps:}`), and BJ (the Fable review's 8 findings all confirmed + fixed — the duplicated tap clause removed (F1), the crack-back cover counts standing bodies only once attacks are settled or the body has vigilance/defender/cantattack (F2), the refill +1 requires `all(this)` (F3), the ALTERNATIVE line states lethal (F4), library surfaces fold parked cards via `libraryCountWithParked` while the Tutor payload STRANDING stays open with a fireOneShot/addObserver hypothesis (F5), the negation test requires a governed verb phrase (F6), floating mana folded into cannot-pay (F7), `noop_row_retaken` (F8); a `_DEBUG` census DebugTraces any row stating a braced clause twice); read wave69/known-bugs.md,
 wave69/lane-{BF,BG,BH,BI,BJ}.md and wave69/codex-review.md (FABLE seat this wave — the Codex pool was exhausted) for what
 changed and each lane's falsifiable predictions. Lane-flagged questions for the engine seat: (1) `reply_truncated` per
 seam under the re-fitted caps, `reply_truncated_reask` at the small seams, `reply_truncated_answer_changed` — did any cap
