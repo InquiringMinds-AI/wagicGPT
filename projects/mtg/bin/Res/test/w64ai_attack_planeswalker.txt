@@ -1,0 +1,45 @@
+#NAME: An attack can be sent at the SECOND planeswalker, and the index is the battlefield's (#W64-AI F4)
+#DESC: Wave-63 deck152 HIGH-2: no decision surface anywhere offered attacking a
+#DESC: planeswalker. 0 of the corpus's attackers prompts named one, and at
+#DESC: 152v162 seq 17 a 3-loyalty Ob Nixilis faced three unblockable attackers on
+#DESC: a creatureless board, survived, and dealt 6 of the damage that killed the
+#DESC: seat. The wave-64 fix renders the opponent's walkers as W# rows and routes
+#DESC: an "A#>W#" reply through MTGPlaneswalkerAttackRule, answering that rule's
+#DESC: own choice menu with the W index.
+#DESC: This fixture pins the ENGINE assumption that routing rests on: the walker
+#DESC: menu is built by walking the opponent's BATTLEFIELD in order, so menu
+#DESC: index k is the k-th planeswalker/battle on that battlefield - which is the
+#DESC: order DecisionManager::buildDeclareAttackers enumerates req.attackTargets
+#DESC: in. Two walkers make the claim discriminating: `choice 1` on the attack
+#DESC: menu takes "Attack a Planeswalker", `choice 1` on the walker menu takes
+#DESC: the SECOND one, and only Jace dies - Garruk keeps its 3 loyalty and the
+#DESC: defending player's life is untouched, because damage sent at a walker
+#DESC: never reduces a life total.
+#DESC: NOTE (stated in strategy-design/wave64/lane-AI.md): this is a PIN, not a
+#DESC: red-on-base repro. The engine path it pins is old; what wave 64 added is
+#DESC: the rows, the A#>W# grammar and the apply routing, and the suite has no
+#DESC: endpoint with which to put an ATTACK: line to a model.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Garruk Wildspeaker,Jace Beleren
+life:20
+[DO]
+goto attackers
+Hill Giant
+choice 1
+choice 1
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Garruk Wildspeaker
+graveyard:Jace Beleren
+life:20
+[END]

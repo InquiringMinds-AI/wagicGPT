@@ -1,0 +1,68 @@
+#NAME: Answering a menu must not also pass priority (#W64-AI F3)
+#DESC: Wave-63 deck152 HIGH-1: playing a pathway/MDFC land's FRONT face consumed
+#DESC: the rest of main phase 1. Corpus-wide the front face left 0 of 15 same-turn
+#DESC: main-1 windows and the back face 5 of 6; it cost 9 damage at 152v125 seq 74
+#DESC: (no attackers window at all that turn) and pushed Intrepid Adversary to
+#DESC: main 2 at 152v162 seq 16, a game lost with the opponent on 3.
+#DESC: MECHANISM: a two-faced land in hand has TWO reacting rules, so the click
+#DESC: arms a menu. AIPlayerBaka::computeActions answers an armed menu IN PLACE
+#DESC: (doReactTo / DecisionManager::applyMenuChoice) and queues no click, so
+#DESC: Act's empty clickstream read as "nothing left this phase" and committed a
+#DESC: pass in the SAME tick. Whether that pass took effect depended on what the
+#DESC: answer put on the stack: the FRONT face's "Play Land" row resolves with no
+#DESC: stack object, so nothing refused it; the BACK face's {0} row is an
+#DESC: activated ability whose stack object trips userRequestNextGamePhase's
+#DESC: unresolved-stack gate. That is the whole front/back asymmetry.
+#DESC: FIX: a tick that answered a menu defers its pass to the next tick (with a
+#DESC: bounded floor so a re-arming menu cannot hold a phase for ever).
+#DESC: WITNESS: P1 holds Branchloft Pathway (front face, taps for {G}) and Raging
+#DESC: Goblin, with a Mountain already untapped. It plays the pathway through the
+#DESC: two-row menu, then - only if main 1 survives the land drop - casts the
+#DESC: HASTE Goblin off the Mountain and attacks: P2 20 -> 19. PRE-FIX the pass
+#DESC: fired on the menu answer, the Goblin was cast in main 2 instead, no attack
+#DESC: happened and P2 finished on 20 (measured RED on be2e88282: "life problem
+#DESC: for player 1. Expected 19, got 20"). The same fixture with a plain Forest
+#DESC: in place of the pathway (no menu) passes on BOTH binaries, which is what
+#DESC: makes the menu the discriminator rather than the AI's attack policy.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mountain,Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:19
+[END]

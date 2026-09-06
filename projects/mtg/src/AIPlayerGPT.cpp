@@ -8120,6 +8120,29 @@ string activationVerbPhrase(bool mine)
     return mine ? "You used: " : "Opponent used: ";
 }
 
+//#W64-AI (F12, deck126 HIGH): WHICH SEAT the activation line credits. The event
+//carries `controller` = GameObserver::currentlyActing at activation time, which
+//is the player CLICKING - and for an ability GRANTED to another player by a
+//`targetedplayer` construct (Tribute to Hunger: `ability$ ... sacrifice!$
+//targetedplayer`, mtg.txt:124075) that is the TARGETED player, not the player
+//whose card the ability is on. Both chairs then read the actor backwards: the
+//caster's log said "Opponent used: Gain life equal to its toughness with Tribute
+//to Hunger" and the opponent's said "You used:", 8 occurrences over 5 games,
+//while the life lines that follow ("You gained 5 life") were correct. Under the
+//trust doctrine a rendered actor is an instruction, and in the one deck whose
+//win condition is keyed on WHO gains life it is a load-bearing lie.
+//
+//The card the ability is ON is the object doing the thing, so its controller is
+//the actor - which also fixes the sibling case where one of this seat's own
+//abilities fires while the OPPONENT holds priority. When the card's controller
+//is unknown the event's own value stands.
+//Pure over the two facts, so PARSETEST can pin both directions.
+bool activationActorIsMine(bool activatorIsMe, bool cardControllerKnown,
+                           bool cardControllerIsMine)
+{
+    return cardControllerKnown ? cardControllerIsMine : activatorIsMe;
+}
+
 //W41-3(a) / W42-D2: THE ONE narration of an activation, rendered from whichever
 //chair is reading it. Both seats' logs describe the same activation - the actor
 //as "You used: X with <Card>", the peer as "Opponent used: X with <Card>" -
@@ -13971,7 +13994,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
-      mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false),
+      mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false), mRevealStallDriverTicks(0), mRevealStallDriverSecs(0),
       mWallMissPending(false), mWallMissLatencyMs(-1), //#W61-U (C13)
       mWallMissEvents(0), mWallMissUnrecorded(0),
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
@@ -14856,6 +14879,19 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reveal_wait_ticks"] = mRevealStallTicks;
         rec["reveal_wait_secs"] = mRevealStallSecs;
+        //#W64-AI (F14, engine HIGH-3): the SAME wait, measured by the driver's
+        //full progress signature, in which a model poll counts as progress. The
+        //wave-63 finding read 152v146@1788653548 seq31's `reveal_wait_secs: 561`
+        //(62% of all reveal wait time in 21 games) as a floor that would not
+        //release; the record's own `latency_ms` on that line is 560586, so the
+        //561 s WAS the round trip and the guard was correctly not firing. The
+        //structural figure cannot say that on its own - it is built to treat a
+        //call in flight as no progress - so a reviewer had no way to separate
+        //"the engine held this reveal" from "the seat was waiting for its own
+        //answer". These two fields are that separation: a wait whose driver half
+        //is ~0 is inference time, and only a driver half that grows is a stall.
+        rec["reveal_wait_driver_ticks"] = mRevealStallDriverTicks;
+        rec["reveal_wait_driver_secs"] = mRevealStallDriverSecs;
         if (mRevealStallParked)
         {
             rec["reveal_stall"] = true;
@@ -14868,6 +14904,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mRevealStallSecs = 0;
         mRevealStallPhase = -1;
         mRevealStallParked = false;
+        mRevealStallDriverTicks = 0; //#W64-AI (F14)
+        mRevealStallDriverSecs = 0;
     }
     //#W58-C (D4): the stale drops this seat took since its last record. One
     //token per drop, "<arm>/<slot-key half that moved>/<outcome>", and the
@@ -14934,12 +14972,15 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
 //budget is the only thing that acts on a stall. Last writer wins: the driver
 //calls this every tick it is parked, so the figures a record carries are the
 //figures at the tick that wrote it.
-void AIPlayerGPT::noteRevealStall(int ticks, long secs, int driverPhase, bool parked)
+void AIPlayerGPT::noteRevealStall(int ticks, long secs, int driverPhase, bool parked,
+                                  int driverTicks, long driverSecs)
 {
     mRevealStallTicks = ticks;
     mRevealStallSecs = secs;
     mRevealStallPhase = driverPhase;
     mRevealStallParked = parked;
+    mRevealStallDriverTicks = driverTicks; //#W64-AI (F14)
+    mRevealStallDriverSecs = driverSecs;
 }
 
 void AIPlayerGPT::logEngineResolution(const char * kind, const string& what,
@@ -17893,7 +17934,14 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //the primitive parser lower-cased. When that token IS a card - the MDFC
         //back faces - print the collection's casing, so this line names the same
         //object the row head, `chosen_text` and the board block name.
-        return abilityActivationNarration(mine,
+        //#W64-AI (F12): the VERB's chair is the card's controller, not the
+        //clicking player (see activationActorIsMine). `mine` above still
+        //gates the consumed-decision de-dup, which is keyed on the seat that
+        //ACTED and must not move.
+        Player * cardCtrl = e->source->controller();
+        const bool narrationMine = activationActorIsMine(mine, cardCtrl != NULL,
+                                                         cardCtrl == this);
+        return abilityActivationNarration(narrationMine,
                                           scriptTokenDisplayCase(e->abilityText, e->source),
                                           owningName + handle,
                                           targetListPhrase(this, e->targets, false));
@@ -36042,6 +36090,62 @@ static int becomesBlockedSelfPump(const string& text, int& dp, int& dt)
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
                             const vector<string> * optionNames = NULL, bool echoBinds = false,
                             int * repeatedOut = NULL);
+//#W64-AI (F4, deck152 HIGH-2): the ATTACK line's optional TARGET suffix.
+//`A1>W2` (also `A1 -> W2`, `a1>w2`) sends attacker A1 at the opponent's second
+//listed planeswalker/battle instead of at the player; an attacker written
+//without a suffix attacks the player, which is every reply written before this
+//wave. Deliberately a SEPARATE pass over the same line parseAttackerSet reads:
+//the A-index grammar already skips a digit glued to a letter ("W2"), so a
+//suffixed row still declares its attacker even if this pass drops the suffix,
+//and the declaration can never be lost to a malformed target.
+//out[] is 1-based walker numbers, 0 = the player. FIRST-WINS per attacker (the
+//same rule the A-set uses); an out-of-range A# or W# is dropped, that pair
+//only. Returns how many targets were bound. Pure.
+static int parseAttackerTargets(const string& line, size_t nAttackers, size_t nTargets,
+                                vector<int>& out)
+{
+    out.assign(nAttackers, 0);
+    int bound = 0;
+    if (!nTargets)
+        return 0;
+    for (size_t i = 0; i + 1 < line.size(); i++)
+    {
+        if (line[i] != 'A' && line[i] != 'a')
+            continue;
+        char prev = (i > 0) ? line[i - 1] : ' ';
+        if (isalnum((unsigned char) prev))
+            continue; //inside a word, not a row label
+        size_t j = i + 1;
+        if (!isdigit((unsigned char) line[j]))
+            continue;
+        int a = 0;
+        while (j < line.size() && isdigit((unsigned char) line[j]))
+            a = a * 10 + (line[j++] - '0');
+        while (j < line.size() && (line[j] == ' ' || line[j] == '-'))
+            j++;
+        if (j >= line.size() || line[j] != '>')
+            continue;
+        j++;
+        while (j < line.size() && line[j] == ' ')
+            j++;
+        if (j >= line.size() || (line[j] != 'W' && line[j] != 'w'))
+            continue;
+        j++;
+        if (j >= line.size() || !isdigit((unsigned char) line[j]))
+            continue;
+        int w = 0;
+        while (j < line.size() && isdigit((unsigned char) line[j]))
+            w = w * 10 + (line[j++] - '0');
+        if (a < 1 || a > (int) nAttackers || w < 1 || w > (int) nTargets)
+            continue;
+        if (out[a - 1])
+            continue; //first wins
+        out[a - 1] = w;
+        bound++;
+    }
+    return bound;
+}
+
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
                                  const vector<string> * blockerNames = NULL,
                                  const vector<string> * attackerNames = NULL,
@@ -37897,10 +38001,54 @@ int AIPlayerGPT::chooseAttackers()
                  << " untapped after attacking.\n";
         }
     }
+    //#W64-AI (F4, deck152 HIGH-2): the attack's OTHER legal destination. The
+    //engine has had MTGPlaneswalkerAttackRule for years and no prompt ever said
+    //so - 0 of the corpus's attackers windows named a planeswalker, and at
+    //152v162 seq 17 a 3-loyalty Ob Nixilis faced three unblockable attackers on
+    //a creatureless board, survived, and dealt 6 of the damage that killed the
+    //seat. Rows only (nothing is removed and nothing is suggested): the default
+    //answer shape is unchanged, so a reply that names no target attacks the
+    //player exactly as before. The order is the contract's, which is the
+    //engine's own menu order, so the W# the model writes IS the index the apply
+    //path clicks.
+    if (!req.attackTargets.empty())
+    {
+        tail << "Their planeswalkers/battles - you may send any attacker at ONE of"
+                " these INSTEAD of at them:\n";
+        for (size_t w = 0; w < req.attackTargets.size(); w++)
+        {
+            MTGCardInstance * pw = req.attackTargets[w];
+            int loyalty = 0;
+            if (pw->counters && pw->counters->mCount)
+                for (size_t c = 0; c < pw->counters->counters.size(); c++)
+                {
+                    Counter * ct = pw->counters->counters[c];
+                    if (ct && ct->nb > 0 && ct->name.find("loyalty") != string::npos)
+                        loyalty += ct->nb;
+                }
+            tail << " W" << (w + 1) << ". " << pw->getDisplayName() << instanceHandle(pw)
+                 << (pw->hasType(Subtypes::TYPE_BATTLE) ? " [battle]" : " [planeswalker]");
+            if (loyalty > 0)
+                tail << " [" << loyalty << " loyalty left: combat damage removes that"
+                         " many counters, and it dies at 0]";
+            tail << "\n";
+        }
+        tail << "Damage sent at a planeswalker does NOT reduce their life total, and"
+                " a planeswalker they still control keeps activating its abilities"
+                " every turn. Blocking works the same either way: they may block an"
+                " attacker whichever it is aimed at.\n";
+    }
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
-            " attack with nobody this turn; then a PLAN: line only if the reply"
+            " attack with nobody this turn;";
+    //#W64-AI (F4): the suffix is stated ONLY when a target row exists, so a
+    //window with no planeswalker on their board reads exactly as it did.
+    if (!req.attackTargets.empty())
+        tail << " to send one at a planeswalker/battle instead of at them, write"
+                " that attacker as A#>W# (e.g. \"ATTACK: A1>W1, A3\" sends A1 at W1"
+                " and A3 at them); an attacker written without a >W# attacks them;";
+    tail << " then a PLAN: line only if the reply"
             " rules call for one. Write nothing else.";
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     string userMsg = assemblePrompt(tail.str());
@@ -37929,6 +38077,10 @@ int AIPlayerGPT::chooseAttackers()
     //to a usable declaration. (Prose-salvage was NOT the cause - it fires only
     //when result<0; here the mis-parse produced result>=1.)
     int result = -1;
+    //#W64-AI (F4): the exact line the declaration was read from - the >W#
+    //target suffixes are parsed from THAT line and no other, so a target can
+    //never be picked up from a discarded CoT line.
+    string takenText;
     if (!content.empty())
     {
         string stripped = content;
@@ -37942,7 +38094,7 @@ int AIPlayerGPT::chooseAttackers()
         {
             vector<bool> s;
             int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
-            if (r >= 0) { send = s; result = r; takenLine = (int) li; break; } //first usable declaration
+            if (r >= 0) { send = s; result = r; takenLine = (int) li; takenText = attackLines[li]; break; } //first usable declaration
         }
         //#W62-Z (D9): ...and a declaration the model re-states in PROSE after
         //its coded line, before its PLAN:, is the same self-correction the
@@ -37957,7 +38109,10 @@ int AIPlayerGPT::chooseAttackers()
                 {
                     attackLines.push_back(restated);
                     if (takenLine < 0)
+                    {
                         takenLine = 0;
+                        takenText = restated; //#W64-AI (F4)
+                    }
                     appendParseNote(&mLastParseNote, "attack_restated_prose_taken");
                 }
             }
@@ -37975,6 +38130,7 @@ int AIPlayerGPT::chooseAttackers()
                 send = s;
                 result = r;
                 takenLine = (int) li;
+                takenText = attackLines[li]; //#W64-AI (F4)
                 appendParseNote(&mLastParseNote, "attack_last_line_taken");
             }
             break;
@@ -37985,7 +38141,11 @@ int AIPlayerGPT::chooseAttackers()
     //Fallback for a reply that named attackers WITHOUT a line-leading ATTACK:
     //label (consumePlan's short-bare-answer path) - unchanged behavior.
     if (result < 0 && !content.empty())
+    {
         result = parseAttackerSet(decisionPart, attackers.size(), send, &attackerNames);
+        if (result >= 0)
+            takenText = decisionPart; //#W64-AI (F4)
+    }
 
     //Repeat-loop salvage: an unparsed (non-empty) reply may be a decode spiral
     //that stated a valid ATTACK: line before degenerating - recover the last
@@ -38024,6 +38184,18 @@ int AIPlayerGPT::chooseAttackers()
         return AIPlayerBaka::chooseAttackers();
     }
 
+    //#W64-AI (F4): read the >W# suffixes off the line the declaration came
+    //from. A malformed or out-of-range suffix binds nothing and the attacker
+    //simply attacks the player - the declaration is never lost to it.
+    vector<int> attackTargetPick;
+    if (!req.attackTargets.empty() && !takenText.empty())
+    {
+        int bound = parseAttackerTargets(takenText, attackers.size(),
+                                         req.attackTargets.size(), attackTargetPick);
+        if (bound)
+            appendParseNote(&mLastParseNote, "attack_walker_target");
+    }
+
     //Answer through the contract: the manager applies the declaration.
     //Attack-COST creatures still need the policy to pre-pay mana (see the
     //contract header) before the apply.
@@ -38040,7 +38212,17 @@ int AIPlayerGPT::chooseAttackers()
             observer->cardClick(attackers[j], MTGAbility::ATTACK_COST);
         }
         act.attackers.push_back(attackers[j]);
+        //#W64-AI (F4): the target this row named, parallel to act.attackers.
+        //0 (or an absent/dropped suffix) is the player, which is every reply
+        //this seat wrote before this wave.
+        MTGCardInstance * pwTarget = NULL;
+        if (j < attackTargetPick.size() && attackTargetPick[j] >= 1
+            && attackTargetPick[j] <= (int) req.attackTargets.size())
+            pwTarget = req.attackTargets[attackTargetPick[j] - 1];
+        act.attackerTargets.push_back(pwTarget);
         declared += (declared.empty() ? "" : ", ") + attackers[j]->name;
+        if (pwTarget)
+            declared += " -> " + pwTarget->getDisplayName();
     }
     DecisionManager::applyDeclareAttackers(req, act);
     writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
@@ -62843,6 +63025,77 @@ static const char * kW50Y_r94 =
             CHECK(parseChoice("CHOICE: 1 (Cast Siege-Gang Commander)", 2, &copts, &stale, NULL) == 1
                   && !stale,
                   "#W64-AH F11 echo: the annotated cast row still binds by its short name");
+        }
+    }
+
+    {
+        // ---- #W64-AI (F12): the activation line credits the CARD's controller ----
+        cout << "\n[W64-AI] F12 a targetedplayer-granted ability names the right actor\n";
+        // REPRO (deck126 HIGH, 8 occurrences / 5 games): my Tribute to Hunger's
+        // granted sacrifice is ACTIVATED by the targeted opponent, so the event's
+        // controller is THEM while the card is mine.
+        CHECK(activationActorIsMine(false /*activator is the opponent*/,
+                                    true /*card controller known*/,
+                                    true /*the card is MINE*/),
+              "#W64-AI F12 REPRO my Tribute to Hunger reads \"You used:\", not \"Opponent used:\"");
+        // ...and the mirror: their copy is theirs, whoever clicks.
+        CHECK(!activationActorIsMine(true, true, false),
+              "#W64-AI F12 REPRO THEIR granted ability is theirs even when I am the actor");
+        // MUST-NOT-MATCH: an ordinary activation of my own card is unchanged.
+        CHECK(activationActorIsMine(true, true, true),
+              "#W64-AI F12 MUST-NOT-MATCH my own activation of my own card is still mine");
+        CHECK(!activationActorIsMine(false, true, false),
+              "#W64-AI F12 MUST-NOT-MATCH their own activation of their own card is still theirs");
+        // NEGATIVE: with no card controller the event's own value stands.
+        CHECK(activationActorIsMine(true, false, false)
+              && !activationActorIsMine(false, false, true),
+              "#W64-AI F12 NEGATIVE an unknown card controller falls back to the activator");
+        // ECHO SHAPE: the rendered line for the repro, both chairs.
+        CHECK(abilityActivationNarration(activationActorIsMine(false, true, true),
+                                         "Gain life equal to its toughness", "Tribute to Hunger",
+                                         "Master of the Feast")
+              == "You used: Gain life equal to its toughness with Tribute to Hunger"
+                 " targeting Master of the Feast",
+              "#W64-AI F12 ECHO the caster's line reads You used:");
+        CHECK(abilityActivationNarration(activationActorIsMine(true, true, false),
+                                         "Gain life equal to its toughness", "Tribute to Hunger",
+                                         "Pride Guardian")
+              == "Opponent used: Gain life equal to its toughness with Tribute to Hunger"
+                 " targeting Pride Guardian",
+              "#W64-AI F12 ECHO the peer's line reads Opponent used:");
+    }
+    {
+        // ---- #W64-AI (F4): the ATTACK line's >W# target suffix ----
+        cout << "\n[W64-AI] F4 A#>W# binds an attacker to a planeswalker\n";
+        std::vector<int> t;
+        CHECK(parseAttackerTargets("ATTACK: A1>W1, A3", 3, 1, t) == 1
+              && t.size() == 3 && t[0] == 1 && t[1] == 0 && t[2] == 0,
+              "#W64-AI F4 POSITIVE A1>W1 binds A1 to W1 and leaves A3 on the player");
+        CHECK(parseAttackerTargets("ATTACK: A1 -> W2, A2>w1", 2, 2, t) == 2
+              && t[0] == 2 && t[1] == 1,
+              "#W64-AI F4 POSITIVE the spaced arrow form and a lowercase w both bind");
+        // MUST-NOT-MATCH: no suffix at all is the pre-wave-64 answer - nothing bound.
+        CHECK(parseAttackerTargets("ATTACK: A1, A2, A3", 3, 2, t) == 0
+              && t[0] == 0 && t[1] == 0 && t[2] == 0,
+              "#W64-AI F4 MUST-NOT-MATCH a plain declaration binds no target");
+        // MUST-NOT-MATCH: an out-of-range W# (or A#) drops THAT pair only.
+        CHECK(parseAttackerTargets("ATTACK: A1>W5, A2>W1", 2, 2, t) == 1
+              && t[0] == 0 && t[1] == 1,
+              "#W64-AI F4 MUST-NOT-MATCH an out-of-range W# drops that pair only");
+        CHECK(parseAttackerTargets("ATTACK: A1>W1", 3, 0, t) == 0,
+              "#W64-AI F4 NEGATIVE with no walker offered nothing can bind");
+        // FIRST-WINS, the same rule the A-set uses.
+        CHECK(parseAttackerTargets("ATTACK: A1>W1, A1>W2", 1, 2, t) == 1 && t[0] == 1,
+              "#W64-AI F4 first-wins: a second target for the same attacker is dropped");
+        // A word ending in a letter+digit is not a row label.
+        CHECK(parseAttackerTargets("Plan: swing at PA1>W1 next turn", 2, 2, t) == 0,
+              "#W64-AI F4 MUST-NOT-MATCH a digit glued to a word is not an A row");
+        // ...and the DECLARATION still parses off the same line, suffix and all.
+        {
+            std::vector<bool> s;
+            std::vector<string> names; names.push_back("Wolf"); names.push_back("Katilda");
+            CHECK(parseAttackerSet("ATTACK: A1>W1, A2", 2, s, &names) == 2 && s[0] && s[1],
+                  "#W64-AI F4 the A-set parse is unchanged by the >W# suffix");
         }
     }
 
