@@ -46,6 +46,19 @@ public:
     Player * player;
     //DECLARE_ATTACKERS: creatures that may be declared (not yet attacking)
     std::vector<MTGCardInstance*> candidates;
+    //#W64-AK (R1, wave-64 codex review finding 1): an attack has TWO legal
+    //destination classes and they are gated by DIFFERENT predicates -
+    //`canAttack()` (CANTATTACK, FLYERSONLY) for the player, `canAttack(true)`
+    //(CANTPWATTACK) for a planeswalker or battle, which is the gate
+    //MTGPlaneswalkerAttackRule::isReactingToClick itself applies. Wave 64 built
+    //the candidate set from the PLAYER predicate alone, so a creature that may
+    //legally attack a planeswalker but not the player was removed from the
+    //decision entirely - a legal option deleted, which is the doctrine breach.
+    //These two say, per candidate and parallel to `candidates`, which
+    //destinations that creature may be sent at; a consumer that permutes the
+    //candidate order must permute them with it.
+    std::vector<bool> candidateMayAttackPlayer;
+    std::vector<bool> candidateMayAttackTarget;
     //#W64-AI (F4): DECLARE_ATTACKERS - the opposing PLANESWALKERS (and
     //battles) an attacker may be sent at instead of the player, in the exact
     //order MTGPlaneswalkerAttackRule::reactToClick builds its choice menu, so

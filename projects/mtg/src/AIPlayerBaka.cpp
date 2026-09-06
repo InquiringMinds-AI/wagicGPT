@@ -2,6 +2,7 @@
 
 #include "AIPlayerBaka.h"
 #include "DecisionContract.h"
+#include "LegalActions.h" //#W64-AK (R2): the "nothing legal remains" gate
 #include "ManaEngine.h"
 #include "CardDescriptor.h"
 #include "AIStats.h"
@@ -5547,6 +5548,23 @@ int AIPlayerBaka::Act(float dt)
         //through regardless. menuObject is READ here only - no seam that owns
         //it (ActionLayer, the contract's applyMenuChoice, the GPT menu seam)
         //changes behaviour, and nothing here enters any ask or slot key.
+        //#W64-AK (R2, wave-64 codex review finding 2). THE FLOOR WAS A BARE
+        //COUNT, AND A BARE COUNT REMOVES LEGAL ACTIONS. As shipped, the 25th
+        //consecutive menu-answering tick fell straight through to
+        //userRequestNextGamePhase - so a repeatable payment or a chained
+        //mandatory-choice sequence that resolved 25 menus while this seat still
+        //held priority lost whatever cast or activation stood after them, for no
+        //reason but that a counter expired. That is the doctrine breach the F3
+        //deferral itself exists to avoid (no window removed). The floor stays,
+        //because wave-58's hang class is real - a driver that never passes is a
+        //dead game - but it now fires only where passing removes NOTHING:
+        //LegalActionsOracle::hasAnyLegalAction is the engine's own phase-aware
+        //"can this player do anything at all", and it is deliberately permissive
+        //(when in doubt it answers yes), so the floor errs toward keeping the
+        //window rather than closing it. Its firing is RECORDED - mMenuPassForced
+        //is counted and rides out on the next translog record - because a
+        //livelock breaker nobody can see fire is a livelock breaker nobody can
+        //adjudicate.
         const bool menuAnswered = menuOpenBefore && menuLayer && !menuLayer->menuObject;
         if (!menuAnswered)
             mMenuPassHold = 0;
@@ -5556,6 +5574,19 @@ int AIPlayerBaka::Act(float dt)
             DebugTrace("AIPLAYER: menu answered this tick - deferring the priority pass ("
                        << mMenuPassHold << "/" << kMenuPassHoldMax << ")");
             return 0;
+        }
+        else if (LegalActionsOracle::hasAnyLegalAction(this))
+        {
+            mMenuPassHold++;
+            DebugTrace("AIPLAYER: menu pass floor reached at " << mMenuPassHold
+                       << " but a legal action remains - not passing");
+            return 0;
+        }
+        else
+        {
+            mMenuPassForced++;
+            DebugTrace("AIPLAYER: menu pass floor fired at " << mMenuPassHold
+                       << " with no legal action left (forced pass #" << mMenuPassForced << ")");
         }
         if (observer->isInterrupting == this)
         {

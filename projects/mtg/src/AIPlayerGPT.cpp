@@ -4938,8 +4938,6 @@ static bool gangKillsAttacker(int atkPower, int atkToughness, bool atkFirstStrik
     if (atkToughness <= 0 || g.empty())
         return false;
     int budget = (atkFirstStrike && atkPower > 0) ? atkPower : 0;
-    if (budget > 64)
-        budget = 64; //bounded: the DP below is O(items x budget)
     int mandatory = 0, plainPower = 0;
     bool deathtouchSurvives = false;
     vector<int> cost, keep;
@@ -4964,6 +4962,24 @@ static bool gangKillsAttacker(int atkPower, int atkToughness, bool atkFirstStrik
             cost.push_back(c);
             keep.push_back(p);
         }
+    }
+    //#W64-AK (R8, wave-64 codex review finding 8): the budget was CLAMPED to 64
+    //"because the DP is O(items x budget)", silently and in the direction that
+    //LIES: a 100/25 first-striker blocked by four 20/30s could really remove
+    //three of them (75 of its 100), leaving 20 - not lethal - while the clamped
+    //budget removed two and reported the remaining 40 as a kill. A verdict that
+    //claims a kill the board does not contain is exactly what F7 was written to
+    //stop. There is a bound that is a FACT rather than a constant: no first
+    //strike damage beyond `mandatory + the cost of every removable blocker` can
+    //buy anything at all, because there is nothing left to spend it on. Sizing
+    //the budget from the board keeps the DP the same size the board is and
+    //removes the clamp entirely, so the verdict is exact at every board size.
+    {
+        long long spendable = mandatory;
+        for (size_t i = 0; i < cost.size(); i++)
+            spendable += cost[i];
+        if ((long long) budget > spendable)
+            budget = (int) spendable;
     }
     if (deathtouchSurvives || mandatory > budget)
     {
@@ -11252,6 +11268,23 @@ static int xLibraryCeilingX(int capX, int drawPerX, int library, int reserve)
 //ceiling generous, which is the direction that cannot cost a legal line.
 //`why` names every card in the reserve so the arithmetic is checkable against
 //the board the same prompt prints.
+//#W64-AK (R9, wave-64 codex review finding 9): is this seat's NEXT UPKEEP
+//still ahead of the draw the reserve is reserving for? The reserve's first
+//card is the seat's next draw step; an upkeep draw is owed on top of it only
+//when that upkeep has not already happened. Turn order is untap -> upkeep ->
+//draw, so the one window where it has is the seat's OWN upkeep: the trigger
+//has already gone on the stack there, and the very next draw step is this
+//turn's. Everywhere else - the seat's own turn from the draw step onward, and
+//the whole of the opponent's turn - the next draw step is next turn's, and
+//next turn's upkeep comes before it. Without this the badge reserved a Staff
+//of Nin draw that could not occur before the draw it was reserving against and
+//called a legal X unaffordable, which is the doctrine breach (a legal option
+//removed) in the direction F1 exists to prevent. Pure over the two facts.
+static bool xReserveUpkeepAhead(bool myTurn, int phase)
+{
+    return !(myTurn && phase == (int) MTG_PHASE_UPKEEP);
+}
+
 static void xLibraryReserve(Player * me, int& library, int& reserve, string& why)
 {
     library = -1;
@@ -11261,6 +11294,12 @@ static void xLibraryReserve(Player * me, int& library, int& reserve, string& why
         return;
     library = me->game->library->nb_cards;
     if (!me->game->inPlay)
+        return;
+    //#W64-AK (R9): an unknown observer answers "ahead", which keeps the reserve
+    //generous - the direction that never claims a bigger X than the library has.
+    GameObserver * xob = me->getObserver();
+    if (xob && !xReserveUpkeepAhead(xob->currentPlayer == me,
+                                    (int) xob->getCurrentGamePhase()))
         return;
     for (int i = 0; i < me->game->inPlay->nb_cards; i++)
     {
@@ -14710,6 +14749,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"opp_life", opponent() ? opponent()->life : 0},
         {"latency_ms", mLastLatencyMs},
     };
+    //#W64-AK (R2): the menu-pass floor's firings, on the first record after
+    //they happened. Written only when nonzero, and cleared with the record, so
+    //a livelock breaker that fires is visible in the corpus rather than silent.
+    if (mMenuPassForced > 0)
+    {
+        rec["menu_pass_forced"] = mMenuPassForced;
+        mMenuPassForced = 0;
+    }
     //audit-L (A24): the status the transport saw, on the record that consumed
     //it (a 200 says nothing new and is not written; 0 = no status came back).
     if (mLastHttpStatus != 0 && mLastHttpStatus != 200)
@@ -16914,19 +16961,22 @@ static bool planLineOpensWithConnective(const string& line)
 static bool lineIsCodedAnswerLine(const string& line)
 {
     static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
-    //COLUMN 0, deliberately: markdown/quote furniture is skipped but INDENTATION
-    //is not. The protocol's own rule is that "an answer written inside your PLAN
-    //SENTENCE is part of the plan"; an indented or wrapped coded line is inside
-    //the deliberation, and #W63-AD's demotion still applies to it. A line that
-    //begins at the left margin is a top-level answer, which is what the
-    //`130v126@1788653538` seq 29 shape (`ATTACK: A4` at column 0 after a blank
-    //line) is. Keeping the indented case IN the block is what stops this
-    //narrowing from retiring the E6b exclusion altogether.
+    //#W64-AK (R5, wave-64 codex review finding 5): INDENTATION IS NOT PLAN
+    //MEMBERSHIP. Wave 64 wrote this skip as `*` and `#` only and called it
+    //"column 0, deliberately", but the seam that DECIDES an answer,
+    //`findAnswerLabelLine`, skips ' ', '\t', '*' and '#' before it matches a
+    //label - and so do `codedAnswerLineAt` and the menu parser. So a reply
+    //ending `CHOICE: 1 / PLAN: reconsidering / <two spaces>CHOICE: 2` had its
+    //correction RECOGNISED as a coded line by every scanner, kept INSIDE the
+    //plan block by this predicate alone, and then demoted by #W63-AD's
+    //exclusion: the pilot's own correction lost to the answer it was
+    //correcting, and the wave-64 PARSETEST case pinned that as the expectation.
+    //The predicate's stated invariant is that a line it calls an answer is a
+    //line the answer seam can execute; the fix is to make the skip set the
+    //same set, so the two can no longer disagree about the same bytes.
     size_t s = 0;
-    //`findAnswerLabelLine` is the seam that DECIDES an answer, and it tolerates
-    //exactly `*` and `#` on the label line; the terminator matches it, so a line
-    //this predicate calls an answer is a line that seam can execute.
-    while (s < line.size() && (line[s] == '*' || line[s] == '#'))
+    while (s < line.size() && (line[s] == ' ' || line[s] == '\t'
+                               || line[s] == '*' || line[s] == '#'))
         s++;
     for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
     {
@@ -20000,21 +20050,10 @@ static bool crackBackScreenTotal(Player * me, Player * opp, GameObserver * obs,
 //punisher trigger and passed. What the row needs is arithmetic the engine
 //already has.
 //The per-attacker half of the crack-back walk, so the total the LINE prints and
-//the cover a ROW claims are literally the same bodies. Largest first.
-static void crackBackAttackerPowers(Player * opp, std::vector<int>& powers)
-{
-    powers.clear();
-    if (!opp || !opp->game || !opp->game->inPlay)
-        return;
-    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
-    {
-        const int pw = crackBackBodyContribution(opp->game->inPlay->cards[i]);
-        if (pw > 0)
-            powers.push_back(pw);
-    }
-    std::sort(powers.begin(), powers.end());
-    std::reverse(powers.begin(), powers.end());
-}
+//the cover a ROW claims are literally the same bodies.
+//#W64-AK (R4/R7): a bare power list cannot say who may block whom, so the walk
+//now emits crackBackCoverFacts' per-attacker records instead and this
+//power-only form is retired with its single caller.
 
 //#W64-AH (F11): how many BLOCKING BODIES casting this card puts on the seat's
 //board - the creature itself, plus the creature tokens its own untriggered /
@@ -20075,38 +20114,178 @@ static int castBodiesAdded(MTGCardInstance * card)
 //lives - a crack-back the same screen has already called lethal - because a
 //clause on every cast row is a clause nobody reads (the D9 discipline). Each
 //blocker stops at most ONE attacker, so B bodies cover at most the B LARGEST
-//attackers; that is a CEILING and it is named as one, and the evasion the
-//per-attacker tags already price is named as excluded from it. Pure over its
-//four inputs.
-static string crackBackBlockerRowTag(int total, int myLife, int bodies,
-                                     const std::vector<int>& powers)
+//attackers.
+//#W64-AK (R4/R7, wave-64 codex review findings 4 and 7). AS SHIPPED THIS TAG
+//SAID "which you survive" ON A LINE IT COULD NOT SURVIVE. The cover was raw
+//count against raw power: every creature spell counted as a blocker, and every
+//crack-back attacker counted as blockable. At 3 life against a lone 5/5 FLYER,
+//a ground creature's row computed `5 -> 0` and printed the survival verdict for
+//a combat in which that body may not legally block at all (R4); a body that
+//ENTERS TAPPED, or carries CANTBLOCK, was counted the same way for a combat it
+//is not even present in (R7). The disclaimer under it named evasion as excluded
+//AFTER the verdict was already stated - a true footnote cannot repair a false
+//verdict, and under the trust doctrine the verdict is the instruction.
+//So the cover now folds legality, and folds it from the ENGINE's own pairwise
+//gate rather than from a keyword list of this seam's own (see
+//crackBackCoverFacts): each attacker carries whether a body this row adds may
+//legally block it and how many blockers a legal block of it needs (menace,
+//"three or more"), and the bodies are split into the ones whose legality is
+//CHECKED and the ones that are not checkable here (tokens, which have no
+//instance to ask). A survival verdict is printed only when the CHECKED bodies
+//alone already survive - more blockers can only lower the damage, so that
+//verdict cannot be overturned by the uncounted ones. When they would decide it,
+//the row says so and prints NO verdict, which is the brief's other allowed
+//answer. Pure over its inputs, so the whole table is provable without a board.
+struct CrackBackAttackerFact
 {
-    if (bodies <= 0 || total <= 0 || myLife - total > 0 || powers.empty())
+    int power;          //what this body adds to the crack-back total
+    int blockersNeeded; //CR 509.1c: menace 2, "three or more" 3, else 1
+    bool coverable;     //a CHECKED body this row adds may legally block it
+    CrackBackAttackerFact() : power(0), blockersNeeded(1), coverable(false) {}
+};
+static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
+                                   const CrackBackAttackerFact& b)
+{
+    return a.power > b.power;
+}
+static string crackBackBlockerRowTag(int total, int myLife,
+                                     int checkedBodies, int uncheckedBodies,
+                                     const std::vector<CrackBackAttackerFact>& atk)
+{
+    const int bodies = checkedBodies + uncheckedBodies;
+    if (bodies <= 0 || total <= 0 || myLife - total > 0 || atk.empty())
         return "";
-    int covered = 0;
-    for (size_t i = 0; i < powers.size() && (int) i < bodies; i++)
-        covered += powers[i];
-    if (covered > total)
-        covered = total;
-    const int left = total - covered;
+    std::vector<CrackBackAttackerFact> sorted(atk);
+    std::sort(sorted.begin(), sorted.end(), crackBackFactPowerDesc);
+    //FLOOR: only the bodies whose block legality is checked, against only the
+    //attackers the engine says they may legally block. CEILING: every body this
+    //row adds, against every attacker, which is the figure the shipped tag
+    //printed as if it were the truth. The set constraint (menace, "three or
+    //more") binds both, because it is a property of the ATTACKER and is known
+    //for a token as much as for the cast card.
+    int coveredFloor = 0, spareFloor = checkedBodies, unblockable = 0;
+    int coveredCeil = 0, spareCeil = bodies;
+    for (size_t i = 0; i < sorted.size(); i++)
+    {
+        const int need = sorted[i].blockersNeeded > 0 ? sorted[i].blockersNeeded : 1;
+        if (!sorted[i].coverable)
+            unblockable++;
+        else if (need <= spareFloor)
+        {
+            spareFloor -= need;
+            coveredFloor += sorted[i].power;
+        }
+        if (need <= spareCeil)
+        {
+            spareCeil -= need;
+            coveredCeil += sorted[i].power;
+        }
+    }
+    if (coveredFloor > total)
+        coveredFloor = total;
+    if (coveredCeil > total)
+        coveredCeil = total;
+    const int leftFloor = total - coveredFloor;
+    const int leftCeil = total - coveredCeil;
     std::ostringstream o;
     o << " {crack-back cover: the CRACK-BACK NEXT TURN line above is " << total
-      << " from " << powers.size() << " of their creatures and puts you at "
-      << (myLife - total) << ". This adds " << bodies << " blocker"
-      << (bodies == 1 ? "" : "s")
+      << " from " << sorted.size() << " of their creatures and puts you at "
+      << (myLife - total) << ". This adds " << bodies
+      << (bodies == 1 ? " body" : " bodies")
       << " - a creature that arrives this turn CAN block on their turn"
-         " (summoning sickness stops attacking, not blocking). Each blocker stops"
-         " at most ONE attacker, so at BEST these cover the " << bodies
-      << " biggest: " << covered << " of " << total << ", leaving " << left
-      << " -> you would be at " << (myLife - left);
-    if (myLife - left > 0)
-        o << ", which you survive";
+         " (summoning sickness stops attacking, not blocking). Each blocker"
+         " stops at most ONE attacker.";
+    o << " CHECKED: " << checkedBodies << " of them "
+      << (checkedBodies == 1 ? "is a body" : "are bodies")
+      << " whose block legality against these attackers this row computed";
+    if (uncheckedBodies > 0)
+        o << ", and " << uncheckedBodies
+          << (uncheckedBodies == 1 ? " is a token this row has no instance to ask"
+                                   : " are tokens this row has no instance to ask");
+    o << ".";
+    if (checkedBodies > 0 && unblockable > 0)
+        o << " " << unblockable << " of their " << sorted.size()
+          << " could not legally be blocked by "
+          << (checkedBodies == 1 ? "it" : "them")
+          << " at all (evasion, protection, or a block needing more bodies than"
+             " this row adds).";
+    o << " Counting only the checked bodies you cover " << coveredFloor << " of "
+      << total << ", leaving " << leftFloor << " -> you would be at "
+      << (myLife - leftFloor);
+    if (myLife - leftFloor > 0)
+    {
+        o << ", which you SURVIVE - and more blockers can only lower that, so"
+             " nothing uncounted here overturns it";
+    }
+    else if (uncheckedBodies > 0)
+    {
+        o << ". If EVERY uncounted body could also legally block, the cover rises"
+             " to " << coveredCeil << " of " << total << " and you would be at "
+          << (myLife - leftCeil)
+          << ". THIS IS NOT A SURVIVAL VERDICT: whether those bodies may block"
+             " these attackers is not established here, so this row does not say"
+             " whether you survive";
+    }
     else
+    {
         o << ", which still KILLS you";
-    o << ". This is a ceiling: it excludes evasion (flying, menace, protection,"
-         " landwalk) and any removal they draw - read the per-attacker tags"
-         " above for what these bodies may not legally block.}";
+    }
+    o << ". Removal or a trick they draw is excluded either way - read the"
+         " per-attacker tags above for the rest.}";
     return o.str();
+}
+
+//#W64-AK (R7): does this card ENTER TAPPED? A body that arrives tapped is not a
+//blocker on their turn at all, and the shipped cover counted it as one. The
+//engine's own script idiom for it is `tap(noevent)` (Kabira Crossroads, every
+//tapland, and the creature forms of the same), which is the string the fetch-row
+//clause already reads a land's tap state off. Deliberately unqualified: a card
+//whose text contains that token for some OTHER reason is treated as arriving
+//tapped, which UNDER-counts the cover and can only make the row's claim smaller.
+static bool castBodyEntersTapped(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    return scriptLower(card->magicText).find("tap(noevent)") != string::npos;
+}
+
+//#W64-AK (R4/R7): the per-attacker legality the cover is computed from, asked of
+//the ENGINE (MTGCardInstance::canBlockPairwise - the exact body canBlock() runs,
+//extracted in W41-13 so no evasion rule can drift between a prediction and the
+//block the engine will later allow) rather than re-derived from keywords here.
+//The cast card is the one prospective body with an instance to ask, so it is the
+//CHECKED body; the token bodies its script creates have no instance and are
+//counted as unchecked. A card that cannot block at all (CANTBLOCK, or it enters
+//tapped) is neither: it is known not to be cover.
+static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies,
+                                std::vector<CrackBackAttackerFact>& out,
+                                int& checkedBodies, int& uncheckedBodies)
+{
+    out.clear();
+    checkedBodies = 0;
+    uncheckedBodies = 0;
+    if (!opp || !opp->game || !opp->game->inPlay || !card)
+        return;
+    const bool selfIsBody = card->isCreature();
+    const bool selfBlocks = selfIsBody
+                            && !card->basicAbilities[(int) Constants::CANTBLOCK]
+                            && !castBodyEntersTapped(card);
+    checkedBodies = selfBlocks ? 1 : 0;
+    uncheckedBodies = bodies - (selfIsBody ? 1 : 0);
+    if (uncheckedBodies < 0)
+        uncheckedBodies = 0;
+    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * c = opp->game->inPlay->cards[i];
+        const int pw = crackBackBodyContribution(c);
+        if (pw <= 0)
+            continue;
+        CrackBackAttackerFact f;
+        f.power = pw;
+        f.blockersNeeded = c->minBlockersRequired();
+        f.coverable = selfBlocks && card->canBlockPairwise(c) != 0;
+        out.push_back(f);
+    }
 }
 
 
@@ -25269,7 +25448,28 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
         end = nl;
     if (end == string::npos)
         end = low.size();
-    const string seg = low.substr(bgn, end - bgn);
+    string seg = low.substr(bgn, end - bgn);
+    //#W64-AK (R6, wave-64 codex review finding 6): a granted ability is a
+    //BLOCK, not a clause. `ability$! ... !$ opponent` hands its whole payload
+    //to another player, and that payload may itself be several `&&` clauses -
+    //`choice name(Gift) ability$!name(x) draw:1 controller && life:-3
+    //controller!$ opponent` is one grant of two clauses. The clause loop below
+    //skipped only the `&&` clause the marker fell in, so the second clause was
+    //priced on THIS seat: at 3 life the row read "you LOSE 3 ... THIS KILLS
+    //YOU" for a drain aimed at the opponent - the same actor inversion the
+    //deck126 HIGH class is, on the surface F6 built to stop it. The block is
+    //excised whole before any clause is read; an unterminated `ability$!`
+    //truncates the segment, because an unreadable payload must price nothing.
+    for (size_t gb = seg.find("ability$!"); gb != string::npos; gb = seg.find("ability$!"))
+    {
+        const size_t ge = seg.find("!$", gb + 9);
+        if (ge == string::npos)
+        {
+            seg = seg.substr(0, gb);
+            break;
+        }
+        seg = seg.substr(0, gb) + seg.substr(ge + 2);
+    }
     int myLifeDelta = 0, oppLifeDelta = 0, myDraw = 0, oppDraw = 0;
     bool parsed = false;
     size_t cp = 0;
@@ -25280,6 +25480,8 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
         cp = (amp == string::npos) ? seg.size() + 1 : amp + 2;
         //A sub-ability handed to another controller inverts the actor of every
         //word inside it (the deck126 HIGH class), so its payload is not priced.
+        //#W64-AK (R6): the whole block is already gone from `seg` above; this
+        //stays as the backstop for a marker no excision could pair.
         if (clause.find("ability$!") != string::npos)
             continue;
         for (int kind = 0; kind < 2; kind++)
@@ -31697,9 +31899,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (bodies > 0
                 && crackBackScreenTotal(this, opponent(), getObserver(), cbTotal, cbFloor))
             {
-                std::vector<int> cbPowers;
-                crackBackAttackerPowers(opponent(), cbPowers);
-                o << crackBackBlockerRowTag(cbTotal, life, bodies, cbPowers);
+                //#W64-AK (R4/R7): the cover is computed against each attacker's
+                //own block legality, and the bodies are split into checked and
+                //unchecked - see crackBackCoverFacts.
+                std::vector<CrackBackAttackerFact> cbAtk;
+                int cbChecked = 0, cbUnchecked = 0;
+                crackBackCoverFacts(opponent(), card, bodies, cbAtk, cbChecked, cbUnchecked);
+                o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked, cbAtk);
             }
         }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
@@ -37625,6 +37831,38 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     return -1; //unusable
 }
 
+//#W64-AK (R1, wave-64 codex review finding 1): the row's own DESTINATION fact.
+//A creature that may attack a planeswalker but not the player is a legal attack
+//this seat may declare, and the only shape that declares it is `A#>W#` - a row
+//that did not say so would be a row the model cannot legally take. Emitted only
+//where it is TRUE and only where a target row exists to name; the ordinary
+//attacker (may attack them, and a walker too when one is there) reads byte for
+//byte as it did, so no window without this class changes. Pure over two facts.
+static string attackerDestinationTag(bool mayAttackPlayer, bool mayAttackTarget)
+{
+    if (mayAttackPlayer || !mayAttackTarget)
+        return "";
+    return " [may NOT attack them: this one can only be sent at a planeswalker"
+           " or battle, so it counts only when you write it as A#>W#]";
+}
+
+//#W64-AK (R1): and the aggregate below must not price it as damage to their
+//life. Every aggregate says what it excludes (the standing rule); this is the
+//sentence for the exclusion this class creates.
+static string walkerOnlyExclusionLine(int walkerOnlyRows)
+{
+    if (walkerOnlyRows <= 0)
+        return "";
+    std::ostringstream o;
+    o << "That total EXCLUDES " << walkerOnlyRows << " creature"
+      << (walkerOnlyRows == 1 ? "" : "s") << " above that may NOT attack them at"
+         " all: damage from "
+      << (walkerOnlyRows == 1 ? "it" : "them")
+      << " can only go at a planeswalker or battle, and never at their life"
+         " total.\n";
+    return o.str();
+}
+
 int AIPlayerGPT::chooseAttackers()
 {
     //Only drive the declare-attackers step; anywhere else, stay out of the way.
@@ -37654,7 +37892,25 @@ int AIPlayerGPT::chooseAttackers()
         for (size_t j = 0; j < ord.size(); j++)
             perm.push_back(attackers[ord[j]]);
         attackers.swap(perm);
+        //#W64-AK (R1): the contract's per-candidate destination legality is
+        //PARALLEL to `candidates`, so it moves with the permutation or the A#
+        //labels would carry another creature's legality.
+        vector<bool> permPlayer, permTarget;
+        for (size_t j = 0; j < ord.size(); j++)
+        {
+            permPlayer.push_back(ord[j] < req.candidateMayAttackPlayer.size()
+                                 ? req.candidateMayAttackPlayer[ord[j]] : true);
+            permTarget.push_back(ord[j] < req.candidateMayAttackTarget.size()
+                                 ? req.candidateMayAttackTarget[ord[j]] : false);
+        }
+        req.candidateMayAttackPlayer.swap(permPlayer);
+        req.candidateMayAttackTarget.swap(permTarget);
     }
+    //#W64-AK (R1): a row's own destination legality, read only through these.
+    #define W64AK_MAY_PLAYER(j) ((j) < req.candidateMayAttackPlayer.size() \
+                                 ? req.candidateMayAttackPlayer[(j)] : true)
+    #define W64AK_MAY_TARGET(j) ((j) < req.candidateMayAttackTarget.size() \
+                                 ? req.candidateMayAttackTarget[(j)] : false)
 
     //ONE bundled decision for the whole attack. Per-creature asks decided
     //each attacker in isolation (a bad line for alpha strikes and racing)
@@ -37699,6 +37955,8 @@ int AIPlayerGPT::chooseAttackers()
         //for the "(P/T)" above; name the consequence at the line that decides,
         //mirroring the validated blocker text.
         ln << zeroPowerAttackerTag(attackers[j]->power);
+        //#W64-AK (R1): which destinations THIS creature may legally be sent at.
+        ln << attackerDestinationTag(W64AK_MAY_PLAYER(j), W64AK_MAY_TARGET(j));
         //W41-13: the hold-back half of the decision. Which of THEIR creatures
         //this body could not block if kept home, asked of the engine's own
         //pairwise gate rather than predicted from keywords.
@@ -37968,6 +38226,11 @@ int AIPlayerGPT::chooseAttackers()
         //Infect takes nothing (poison), double strike takes it twice.
         {
             int rp = attackers[j]->power > 0 ? attackers[j]->power : 0;
+            //#W64-AK (R1): a creature that may not attack THEM contributes
+            //nothing to a total about their life total. Counted separately and
+            //disclosed under the aggregate, never silently folded in.
+            if (!W64AK_MAY_PLAYER(j))
+                rp = 0;
             if (attackers[j]->basicAbilities[Constants::INFECT])
             {
                 rowInfect.push_back(true);
@@ -38101,6 +38364,14 @@ int AIPlayerGPT::chooseAttackers()
                                     infectExcluded, suppressed, blockGain,
                                     attackDeclarationPunishers(oppL),
                                     playerHasLifeLoop(oppL)); //#W62-X (D2)
+            //#W64-AK (R1): and the exclusion this wave's new row class creates.
+            {
+                int walkerOnlyRows = 0;
+                for (size_t j = 0; j < attackers.size(); j++)
+                    if (!W64AK_MAY_PLAYER(j))
+                        walkerOnlyRows++;
+                tail << walkerOnlyExclusionLine(walkerOnlyRows);
+            }
         }
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
@@ -38423,8 +38694,35 @@ int AIPlayerGPT::chooseAttackers()
     string declared;
     for (size_t j = 0; j < attackers.size(); j++)
     {
-        if (!send[j] || !attackers[j]->canAttack())
+        if (!send[j])
             continue;
+        //#W64-AK (R1): the guard is the DESTINATION's predicate, not the
+        //player's. `attackers[j]->canAttack()` deleted every walker-only
+        //attacker here even after the contract offered it and the model named
+        //it. A row that may only attack a planeswalker needs a target: when the
+        //reply named one it is used; when their board has exactly ONE such
+        //permanent that is the only legal reading of "attack with this", so it
+        //is bound rather than dropped; with several, the seat cannot choose for
+        //the model and the attacker is left home with the omission RECORDED.
+        MTGCardInstance * pwTarget = NULL;
+        if (j < attackTargetPick.size() && attackTargetPick[j] >= 1
+            && attackTargetPick[j] <= (int) req.attackTargets.size())
+            pwTarget = req.attackTargets[attackTargetPick[j] - 1];
+        if (!W64AK_MAY_PLAYER(j))
+        {
+            if (!W64AK_MAY_TARGET(j))
+                continue;
+            if (!pwTarget)
+            {
+                if (req.attackTargets.size() == 1)
+                    pwTarget = req.attackTargets[0];
+                else
+                {
+                    appendParseNote(&mLastParseNote, "attack_walker_target_missing");
+                    continue;
+                }
+            }
+        }
         if (attackers[j]->attackCost)
         {
             MTGAbility * a = observer->mLayers->actionLayer()->getAbility(MTGAbility::ATTACK_COST);
@@ -38434,11 +38732,8 @@ int AIPlayerGPT::chooseAttackers()
         act.attackers.push_back(attackers[j]);
         //#W64-AI (F4): the target this row named, parallel to act.attackers.
         //0 (or an absent/dropped suffix) is the player, which is every reply
-        //this seat wrote before this wave.
-        MTGCardInstance * pwTarget = NULL;
-        if (j < attackTargetPick.size() && attackTargetPick[j] >= 1
-            && attackTargetPick[j] <= (int) req.attackTargets.size())
-            pwTarget = req.attackTargets[attackTargetPick[j] - 1];
+        //this seat wrote before this wave. #W64-AK (R1) resolved it above,
+        //because a walker-only row's legality depends on it.
         act.attackerTargets.push_back(pwTarget);
         declared += (declared.empty() ? "" : ", ") + attackers[j]->name;
         if (pwTarget)
@@ -38453,6 +38748,8 @@ int AIPlayerGPT::chooseAttackers()
     DebugTrace("AIPlayerGPT: declared attack (" << result << " of " << attackers.size() << ") in one reply");
     return 1;
 }
+#undef W64AK_MAY_PLAYER
+#undef W64AK_MAY_TARGET
 
 //#W53-M (D1): how many of a parsed block assignment's pairings the ENGINE
 //already said this seat may make - counted against the same legal set the B#
@@ -62219,10 +62516,21 @@ static const char * kW50Y_r94 =
         // The shape the bound addresses: a coded line written INSIDE the plan
         // paragraph - the span planParagraphBound keeps and mCurrentPlan carries.
         //#W64-AJ (F13): the fixture's in-plan line is INDENTED. Wave 63 wrote it
-        //at column 0, which #W64-AJ's narrowed bound now classes as a second
-        //top-level answer (see the F13 block below); a line written inside the
-        //deliberation is what this exclusion was always about, and every
-        //assertion under it is unchanged.
+        //at column 0, which #W64-AJ's narrowed bound classed as a second
+        //top-level answer.
+        //#W64-AK (R5, wave-64 codex review finding 5): INDENTATION IS NOT PLAN
+        //MEMBERSHIP EITHER. `findAnswerLabelLine` - the seam that decides an
+        //answer - skips leading spaces and tabs before it matches a label, so
+        //the indented line below was an ANSWER to every scanner while the plan
+        //terminator alone called it prose, and the pilot's own correction lost
+        //to the answer it was correcting. The two now use the same skip set,
+        //which is what these assertions pin: the bounded and unbounded walks
+        //AGREE on this reply. The consequence is stated plainly - with the
+        //terminator and the answer scanners aligned, no line-leading coded
+        //answer line can sit inside the plan block at all, so E6b's exclusion
+        //now fires only on lines the answer seam would refuse anyway
+        //(placeholders, prompt echoes) and the plan CARRY is what still stops
+        //the line being re-served as deliberation.
         const string r41 = "CHOICE: 1 (Liliana's Caress)\n"
                            "PLAN: exile Liliana's Caress and hope\n"
                            "this holds, because if I target it I am dead\n"
@@ -62231,14 +62539,19 @@ static const char * kW50Y_r94 =
         CHECK(ps != string::npos && r41.compare(ps, 5, "PLAN:") == 0,
               "#W63-AD E6b the plan block starts at the first LINE-LEADING PLAN: marker");
         const size_t pe = planBlockEndOffset(r41, ps);
+        CHECK(r41.compare(pe, 3, "   ") == 0 && r41.find("CHOICE: 2", pe) == pe + 3,
+              "#W64-AK R5 the plan block ENDS at the indented correction - it is an answer line");
         size_t s1 = 0, e1 = 0, l1 = 0;
         CHECK(findAnswerLabelLine(r41, "CHOICE:", s1, e1, l1, NULL, NULL, ps, pe)
-              && r41.substr(s1, e1 - s1) == " 1 (Liliana's Caress)",
-              "#W63-AD E6b POSITIVE the committed answer stands: the in-plan recode is not read");
+              && r41.substr(s1, e1 - s1).find("Ob Nixilis") != string::npos,
+              "#W64-AK R5 POSITIVE an indented top-level correction is read as the answer");
         size_t s2 = 0, e2 = 0, l2 = 0;
         CHECK(findAnswerLabelLine(r41, "CHOICE:", s2, e2, l2)
-              && r41.substr(s2, e2 - s2).find("Ob Nixilis") != string::npos,
-              "#W63-AD E6b ...and the UNBOUNDED walk is what shipped: it took the in-plan line");
+              && s1 == s2 && e1 == e2 && l1 == l2,
+              "#W64-AK R5 ...and the bounded walk now AGREES with the unbounded one, which is"
+              " the disagreement the finding is about");
+        CHECK(planParagraphBound(r41.substr(ps)).find("CHOICE: 2") == string::npos,
+              "#W64-AK R5 MUST-NOT-MATCH the carried plan still does not re-serve the answer line");
         // MUST-NOT-MATCH 1: a compliant reply is byte-identical under the bound.
         {
             const string ok = "CHOICE: 4 (Cast Teferi's Puzzle Box)\nPLAN: draw them out.";
@@ -62262,17 +62575,19 @@ static const char * kW50Y_r94 =
                   && r34.substr(x, y - x).find("pass") != string::npos,
                   "#W63-AD E6b MUST-NOT-MATCH a recode AFTER the plan block still wins");
         }
-        // The FAIL-SAFE: a reply whose only coded line is inside the plan block
-        // is still answered - the exclusion demotes, it never deletes.
+        // The FAIL-SAFE: a reply whose only coded line follows the plan marker is
+        // still answered. Under #W64-AK R5 it is answered by the BOUNDED walk
+        // directly - the block ends at the line - so the unbounded fallback is
+        // no longer what rescues this shape.
         {
-            const string only = "PLAN: I will take it\n  CHOICE: 2 (Cast Bolt)"; //#W64-AJ: indented
+            const string only = "PLAN: I will take it\n  CHOICE: 2 (Cast Bolt)";
             const size_t a = firstLineLeadingPlanPos(only);
-            size_t x = 0, y = 0, z = 0;
-            CHECK(!findAnswerLabelLine(only, "CHOICE:", x, y, z, NULL, NULL,
-                                       a, planBlockEndOffset(only, a)),
-                  "#W63-AD E6b the bounded walk finds nothing when the plan block holds the only line");
-            CHECK(findAnswerLabelLine(only, "CHOICE:", x, y, z),
-                  "#W63-AD E6b ...and the unbounded fallback still answers that window");
+            size_t x = 0, y = 0, z = 0, u1 = 0, u2 = 0, u3 = 0;
+            CHECK(findAnswerLabelLine(only, "CHOICE:", x, y, z, NULL, NULL,
+                                      a, planBlockEndOffset(only, a))
+                  && findAnswerLabelLine(only, "CHOICE:", u1, u2, u3)
+                  && x == u1 && y == u2,
+                  "#W64-AK R5 the bounded and unbounded walks answer this window identically");
         }
         // NEGATIVE: a mid-line "your plan:" quoted out of the prompt is not the
         // marker, so it cannot bound anything (the #W54-A rule, unchanged).
@@ -62283,8 +62598,11 @@ static const char * kW50Y_r94 =
               && planBlockEndOffset("CHOICE: 1 (x)", string::npos) == string("CHOICE: 1 (x)").size(),
               "#W63-AD E6b NEGATIVE no marker, no bound: the whole reply stays readable");
         // The record's adjudication datum: which side of the bound it fell on.
-        CHECK(codedAnswerLineInPlanBlock(r41, 2) && !codedAnswerLineInPlanBlock(r41, 1),
-              "#W63-AD E6b latched_line_in_plan is true for the in-plan line and false for line 1");
+        //#W64-AK (R5): neither coded line is in the plan block now - the second
+        //ENDS it. The record datum is unchanged in meaning; what changed is the
+        //answer, which is the point of the finding.
+        CHECK(!codedAnswerLineInPlanBlock(r41, 2) && !codedAnswerLineInPlanBlock(r41, 1),
+              "#W64-AK R5 latched_line_in_plan is false for an indented top-level correction");
         CHECK(!codedAnswerLineInPlanBlock("CHOICE: 1 (x)\nCHOICE: 2 (y)", 2),
               "#W63-AD E6b MUST-NOT-MATCH with no plan block nothing is inside one");
     }
@@ -63224,39 +63542,91 @@ static const char * kW50Y_r94 =
               "#W64-AH F10 MUST-NOT-MATCH the opponent's forecast makes no claim about your rows");
     }
 
-    cout << "\n[#W64-AH F11] castable bodies against a lethal crack-back (deck130 HIGH-2)\n";
+    cout << "\n[#W64-AH F11 / #W64-AK R4+R7] cover against a lethal crack-back, with legality\n";
     {
         // REPRO 162 seq 43: 1 life, crack-back 6 across 2 attackers (4 and 2),
         // Siege-Gang Commander castable = its own 2/2 plus three 1/1 Goblins.
-        std::vector<int> powers;
-        powers.push_back(4);
-        powers.push_back(2);
-        const string tag = crackBackBlockerRowTag(6, 1, 4, powers);
+        // The 2/2 is the CHECKED body (it has an instance the engine can be
+        // asked about); the three tokens are not checkable at this seam.
+        std::vector<CrackBackAttackerFact> atk(2);
+        atk[0].power = 4; atk[0].blockersNeeded = 1; atk[0].coverable = true;
+        atk[1].power = 2; atk[1].blockersNeeded = 1; atk[1].coverable = true;
+        const string tag = crackBackBlockerRowTag(6, 1, 1, 3, atk);
         cout << "     " << tag << "\n";
         CHECK(tag.find("{crack-back cover: the CRACK-BACK NEXT TURN line above is 6 from 2"
                        " of their creatures and puts you at -5.") != string::npos,
               "#W64-AH F11 REPRO the row restates the very line five lines above it");
-        CHECK(tag.find("This adds 4 blockers") != string::npos
+        CHECK(tag.find("This adds 4 bodies") != string::npos
               && tag.find("summoning sickness stops attacking, not blocking") != string::npos,
               "#W64-AH F11 REPRO the four bodies, and the rule that lets them block on their turn");
-        CHECK(tag.find("at BEST these cover the 4 biggest: 6 of 6, leaving 0 -> you would be"
-                       " at 1, which you survive") != string::npos,
-              "#W64-AH F11 REPRO the crack-back arithmetic the seat did nowhere");
-        CHECK(tag.find("This is a ceiling: it excludes evasion") != string::npos,
-              "#W64-AH F11 the aggregate says what it excludes");
-        // One body against two attackers covers ONE of them, and the verdict follows.
-        CHECK(crackBackBlockerRowTag(6, 1, 1, powers)
-                  .find("cover the 1 biggest: 4 of 6, leaving 2 -> you would be at -1,"
-                        " which still KILLS you") != string::npos,
-              "#W64-AH F11 one blocker stops one attacker, and the row says the line still kills");
+        CHECK(tag.find("CHECKED: 1 of them is a body whose block legality against these"
+                       " attackers this row computed, and 3 are tokens this row has no"
+                       " instance to ask.") != string::npos,
+              "#W64-AK R7 the row says WHICH of its bodies the cover figure is made of");
+        CHECK(tag.find("Counting only the checked bodies you cover 4 of 6, leaving 2 ->"
+                       " you would be at -1") != string::npos,
+              "#W64-AK R4 the floor is computed from the bodies whose legality is known");
+        CHECK(tag.find("the cover rises to 6 of 6 and you would be at 1. THIS IS NOT A"
+                       " SURVIVAL VERDICT") != string::npos,
+              "#W64-AK R4 the optimistic figure is still printed - as a ceiling, with no verdict");
+        CHECK(tag.find("which you SURVIVE") == string::npos,
+              "#W64-AK R4 MUST-NOT-MATCH no survival claim rests on bodies that were not checked");
+        // R4 REPRO, the review's own board: 3 life, their only attacker is a 5/5
+        // FLYER, the cast row is a GROUND creature - one checked body that may not
+        // legally block it. The shipped tag computed 5 -> 0 and said "which you
+        // survive"; the cover is now 0 and no survival is claimed.
+        {
+            std::vector<CrackBackAttackerFact> fly(1);
+            fly[0].power = 5; fly[0].blockersNeeded = 1; fly[0].coverable = false;
+            const string t = crackBackBlockerRowTag(5, 3, 1, 0, fly);
+            cout << "     " << t << "\n";
+            CHECK(t.find("1 of their 1 could not legally be blocked by it at all") != string::npos,
+                  "#W64-AK R4 REPRO the flyer is named as uncoverable by this body");
+            CHECK(t.find("you cover 0 of 5, leaving 5 -> you would be at -2,"
+                         " which still KILLS you") != string::npos,
+                  "#W64-AK R4 REPRO the ground body covers nothing and the row says the line kills");
+            CHECK(t.find("which you SURVIVE") == string::npos,
+                  "#W64-AK R4 REPRO MUST-NOT-MATCH the shipped 5 -> 0 survival claim is gone");
+        }
+        // R7: a body that CANNOT block (CANTBLOCK, or it enters tapped) is neither
+        // checked nor unchecked - it is known not to be cover.
+        {
+            const string t = crackBackBlockerRowTag(6, 1, 0, 0, atk);
+            CHECK(t.empty(), "#W64-AK R7 MUST-NOT-MATCH a row whose only body cannot block claims nothing");
+            const string u = crackBackBlockerRowTag(6, 1, 0, 3, atk);
+            CHECK(u.find("Counting only the checked bodies you cover 0 of 6, leaving 6") != string::npos
+                  && u.find("THIS IS NOT A SURVIVAL VERDICT") != string::npos,
+                  "#W64-AK R7 with no checked body the floor is zero and no verdict is printed");
+        }
+        // The affirmative verdict survives where it is EARNED: checked bodies alone
+        // already cover enough, and more blockers can only help.
+        {
+            std::vector<CrackBackAttackerFact> two(2);
+            two[0].power = 4; two[0].blockersNeeded = 1; two[0].coverable = true;
+            two[1].power = 2; two[1].blockersNeeded = 1; two[1].coverable = true;
+            CHECK(crackBackBlockerRowTag(6, 3, 1, 0, two)
+                      .find("leaving 2 -> you would be at 1, which you SURVIVE") != string::npos,
+                  "#W64-AK R4 an earned survival verdict is still stated affirmatively");
+        }
+        // CR 509.1c: a MENACE attacker needs two bodies before it is covered at all.
+        {
+            std::vector<CrackBackAttackerFact> men(1);
+            men[0].power = 4; men[0].blockersNeeded = 2; men[0].coverable = true;
+            CHECK(crackBackBlockerRowTag(4, 1, 1, 0, men)
+                      .find("you cover 0 of 4") != string::npos,
+                  "#W64-AK R4 one body cannot cover an attacker that needs two blockers");
+            CHECK(crackBackBlockerRowTag(4, 1, 2, 0, men)
+                      .find("you cover 4 of 4") != string::npos,
+                  "#W64-AK R4 ...and two bodies can");
+        }
         // MUST-NOT-MATCH: the clause is for the lethal case only, and for rows that make bodies.
-        CHECK(crackBackBlockerRowTag(6, 20, 4, powers).empty(),
+        CHECK(crackBackBlockerRowTag(6, 20, 1, 3, atk).empty(),
               "#W64-AH F11 MUST-NOT-MATCH a survivable crack-back carries no cover clause");
-        CHECK(crackBackBlockerRowTag(6, 1, 0, powers).empty(),
+        CHECK(crackBackBlockerRowTag(6, 1, 0, 0, atk).empty(),
               "#W64-AH F11 MUST-NOT-MATCH a row that makes no body claims no cover");
-        std::vector<int> noPowers;
-        CHECK(crackBackBlockerRowTag(6, 1, 4, noPowers).empty()
-              && crackBackBlockerRowTag(0, 1, 4, powers).empty(),
+        std::vector<CrackBackAttackerFact> none;
+        CHECK(crackBackBlockerRowTag(6, 1, 1, 3, none).empty()
+              && crackBackBlockerRowTag(0, 1, 1, 3, atk).empty(),
               "#W64-AH F11 MUST-NOT-MATCH with no crack-back on the screen there is nothing to point at");
         // ECHO: decision-time pricing, so no residue in the narrated record, and a
         // reply echoing the annotated row still binds.
@@ -63273,7 +63643,6 @@ static const char * kW50Y_r94 =
                   "#W64-AH F11 echo: the annotated cast row still binds by its short name");
         }
     }
-
     {
         // ---- #W64-AI (F12): the activation line credits the CARD's controller ----
         cout << "\n[W64-AI] F12 a targetedplayer-granted ability names the right actor\n";
@@ -63411,9 +63780,13 @@ static const char * kW50Y_r94 =
         CHECK(lineIsCodedAnswerLine("ATTACK: A4") && lineIsCodedAnswerLine("*CHOICE: 2 (x)")
               && lineIsCodedAnswerLine("#BLOCKS: B1:A1") && lineIsCodedAnswerLine("PUT: 1"),
               "#W64-AJ F13 POSITIVE a column-0 coded line, with or without markdown furniture");
-        CHECK(!lineIsCodedAnswerLine("  ATTACK: A4") && !lineIsCodedAnswerLine("\tCHOICE: 2"),
-              "#W64-AJ F13 MUST-NOT-MATCH an INDENTED coded line is inside the deliberation -"
-              " the protocol's own rule, and what keeps the E6b exclusion alive");
+        //#W64-AK (R5): wave 64 pinned the INDENTED case as a MUST-NOT-MATCH; the
+        //answer scanners never agreed, so the pin was the defect. Indentation is
+        //furniture here exactly as `*` and `#` are.
+        CHECK(lineIsCodedAnswerLine("  ATTACK: A4") && lineIsCodedAnswerLine("\tCHOICE: 2")
+              && lineIsCodedAnswerLine(" * PUT: 1"),
+              "#W64-AK R5 POSITIVE an indented coded line is an answer line, as every answer"
+              " scanner already reads it");
         CHECK(!lineIsCodedAnswerLine("ATTACK:") && !lineIsCodedAnswerLine("So ATTACK: A4 wins")
               && !lineIsCodedAnswerLine("PLAN: attack with A4"),
               "#W64-AJ F13 MUST-NOT-MATCH a payload-less label, a mid-sentence quote and a"
@@ -63424,20 +63797,23 @@ static const char * kW50Y_r94 =
         CHECK(planParagraphBound("I will hold the removal and\nATTACK: A4")
               == "I will hold the removal and",
               "#W64-AJ F13 ...and the carried plan does not re-serve the answer line either");
-        // The indented shape is unchanged: still in the block, still demoted, and
-        // the demotion is what `plan_answer_line_ignored` counts (the bounded and
-        // unbounded walks disagree, which is the note's own condition).
+        //#W64-AK (R5): the indented shape is a CORRECTION, not deliberation - the
+        //two walks agree on it and it wins, which is what every answer scanner
+        //already did with the same bytes.
         {
             const string ind = "CHOICE: 1 (Cast Bolt)\nPLAN: burn it and\n   CHOICE: 2 (pass)\n";
             const size_t a = firstLineLeadingPlanPos(ind);
             const size_t e = planBlockEndOffset(ind, a);
             size_t b1 = 0, b2 = 0, bl = 0, u1 = 0, u2 = 0, ul = 0;
             CHECK(findAnswerLabelLine(ind, "CHOICE:", b1, b2, bl, NULL, NULL, a, e)
-                  && findAnswerLabelLine(ind, "CHOICE:", u1, u2, ul) && bl != ul,
-                  "#W64-AJ F13 the indented in-plan line still loses to the committed answer,"
-                  " and the two walks disagree - the condition plan_answer_line_ignored records");
-            CHECK(ind.substr(b1, b2 - b1).find("Bolt") != string::npos,
-                  "#W64-AJ F13 ...and the answer that stands is the committed one");
+                  && findAnswerLabelLine(ind, "CHOICE:", u1, u2, ul) && bl == ul,
+                  "#W64-AK R5 the bounded and unbounded walks no longer disagree on an"
+                  " indented correction");
+            CHECK(ind.substr(b1, b2 - b1).find("pass") != string::npos,
+                  "#W64-AK R5 ...and the answer that stands is the CORRECTION, not the line"
+                  " it corrects");
+            CHECK(planParagraphBound("burn it and\n   CHOICE: 2 (pass)") == "burn it and",
+                  "#W64-AK R5 ...and the carried plan stops at it");
         }
         // NEGATIVE: every wave-63 terminator still terminates.
         CHECK(planBlockEndOffset("PLAN: hold.\n\ntail", firstLineLeadingPlanPos("PLAN: hold.\n\ntail"))
@@ -63597,6 +63973,145 @@ static const char * kW50Y_r94 =
         }
         CHECK(landEntersTappedTag("{T}:Add{W}", "Plains").empty(),
               "#W64-AJ NEGATIVE a land with no tap gate carries no bracket at all");
+    }
+
+    // ==================== #W64-AK (the wave-64 codex review) ====================
+
+    cout << "\n[#W64-AK R1] an attacker that may only be sent at a planeswalker\n";
+    {
+        // The class the candidate walk deleted: CANTATTACK (or a Form of the
+        // Dragon-style FLYERSONLY on a ground body) fails canAttack(), while
+        // canAttack(true) - the gate MTGPlaneswalkerAttackRule itself applies -
+        // still says yes. The row has to say the ONLY shape that declares it.
+        CHECK(attackerDestinationTag(false, true)
+                  == " [may NOT attack them: this one can only be sent at a planeswalker"
+                     " or battle, so it counts only when you write it as A#>W#]",
+              "#W64-AK R1 POSITIVE the walker-only attacker's row names its only legal"
+              " destination and the shape that reaches it");
+        // MUST-NOT-MATCH: every ordinary attacker reads exactly as it did, with or
+        // without a walker on their board - the default answer shape is unchanged.
+        CHECK(attackerDestinationTag(true, true).empty()
+              && attackerDestinationTag(true, false).empty()
+              && attackerDestinationTag(false, false).empty(),
+              "#W64-AK R1 MUST-NOT-MATCH a creature that may attack THEM carries no tag,"
+              " and neither does one with no legal destination at all");
+        // The aggregate says what it excludes (the standing rule for every total).
+        CHECK(walkerOnlyExclusionLine(1)
+                  == "That total EXCLUDES 1 creature above that may NOT attack them at all:"
+                     " damage from it can only go at a planeswalker or battle, and never at"
+                     " their life total.\n",
+              "#W64-AK R1 the damage-to-their-life total discloses the rows it leaves out");
+        CHECK(walkerOnlyExclusionLine(2).find("EXCLUDES 2 creatures") != string::npos
+              && walkerOnlyExclusionLine(2).find("damage from them") != string::npos,
+              "#W64-AK R1 the sentence agrees in number with the count it prints");
+        CHECK(walkerOnlyExclusionLine(0).empty(),
+              "#W64-AK R1 MUST-NOT-MATCH with no such row the aggregate is byte-identical");
+        // ECHO: the tag is a decision-time annotation, so it leaves no residue.
+        CHECK(stripNarrationDecoration("A1. Grizzly Bears #1 (2/2)"
+                                       + attackerDestinationTag(false, true))
+                  == "A1. Grizzly Bears #1 (2/2)",
+              "#W64-AK R1 echo: the destination tag never enters history");
+    }
+
+    cout << "\n[#W64-AK R6] a granted ability BLOCK is skipped whole, not one clause\n";
+    {
+        // REPRO (the review's own board): the whole payload is handed to the
+        // opponent, and the second clause was priced on this seat at 3 life.
+        const string granted = "choice name(Gift) ability$!name(x) draw:1 controller"
+                               " && life:-3 controller!$ opponent";
+        const string t = modeEffectPriceTag(granted, "Gift", 3, 20);
+        cout << "     [" << t << "]\n";
+        CHECK(t.empty(),
+              "#W64-AK R6 REPRO nothing inside a granted block is priced - the row makes no"
+              " claim rather than a false one");
+        CHECK(t.find("THIS KILLS YOU") == string::npos && t.find("LOSE 3") == string::npos,
+              "#W64-AK R6 REPRO MUST-NOT-MATCH the false lethal verdict is gone");
+        // A clause OUTSIDE the block is still this seat's and is still priced.
+        const string mixed = "choice name(Gift) ability$!name(x) draw:1 controller"
+                             " && life:-3 controller!$ opponent && life:2 controller";
+        CHECK(modeEffectPriceTag(mixed, "Gift", 3, 20).find("you gain 2 life") != string::npos,
+              "#W64-AK R6 POSITIVE the caster's own clause beside the grant is still priced");
+        // An unterminated marker prices nothing after it (unreadable payload).
+        CHECK(modeEffectPriceTag("choice name(Gift) ability$!life:-3 controller", "Gift", 3, 20)
+                  .empty(),
+              "#W64-AK R6 MUST-NOT-MATCH an unpaired ability$! truncates rather than guesses");
+        // NEGATIVE: an ordinary modal row is unchanged.
+        CHECK(modeEffectPriceTag("choice name(Return creature and you draw) draw:1 controller"
+                                 " && life:-1 controller", "Return creature and you draw", 1, 20)
+                  .find("THIS KILLS YOU") != string::npos,
+              "#W64-AK R6 NEGATIVE the F6 repro is untouched - a row with no grant still prices");
+    }
+
+    cout << "\n[#W64-AK R8] the gang-block budget is sized from the board, not clamped\n";
+    {
+        // REPRO (the review's own board): a 100/25 FIRST-STRIKER blocked by four
+        // 20/30s. Its 100 first-strike damage removes THREE of them (75), leaving
+        // 20 - below its toughness, so it lives. The shipped clamp gave it 64,
+        // which buys two removals and reports the remaining 40 as lethal.
+        vector<GangBlockerStat> g;
+        for (int i = 0; i < 4; i++)
+        {
+            GangBlockerStat s;
+            s.power = 20; s.toughness = 30; s.deathtouch = false; s.firstStrike = false;
+            g.push_back(s);
+        }
+        int dmg = 0;
+        bool dt = false;
+        const bool kills = gangKillsAttacker(100, 25, true, false, g, &dmg, &dt);
+        cout << "     100/25 first-striker vs four 20/30: kills=" << kills
+             << " damage=" << dmg << "\n";
+        CHECK(!kills && dmg == 20,
+              "#W64-AK R8 REPRO the attacker removes three blockers and survives on 20 -"
+              " the clamped budget claimed a kill on 40");
+        // NEGATIVE: a budget the board CAN spend is unchanged, so every shape the
+        // clamp never reached prices exactly as it did.
+        {
+            vector<GangBlockerStat> h;
+            GangBlockerStat a; a.power = 2; a.toughness = 2; a.deathtouch = false; a.firstStrike = false;
+            GangBlockerStat c2; c2.power = 3; c2.toughness = 3; c2.deathtouch = false; c2.firstStrike = false;
+            h.push_back(a); h.push_back(c2);
+            int d2 = 0;
+            CHECK(!gangKillsAttacker(2, 4, true, false, h, &d2, NULL) && d2 == 3,
+                  "#W64-AK R8 NEGATIVE a small first-striker spends its whole budget as before"
+                  " - it removes the 2/2 and takes 3, which its 4 toughness survives");
+            int d3 = 0;
+            CHECK(gangKillsAttacker(2, 6, false, false, h, &d3, NULL) == false && d3 == 5,
+                  "#W64-AK R8 NEGATIVE no first strike, no budget, no change");
+        }
+        // The bound is a FACT: extra power past the cost of removing everything
+        // buys nothing, so a 1000-power first-striker reads the same as one with
+        // exactly enough.
+        {
+            int d4 = 0, d5 = 0;
+            const bool k4 = gangKillsAttacker(1000, 25, true, false, g, &d4, NULL);
+            const bool k5 = gangKillsAttacker(120, 25, true, false, g, &d5, NULL);
+            CHECK(k4 == k5 && d4 == d5 && d4 == 0,
+                  "#W64-AK R8 budget past the total removal cost changes nothing - it removes"
+                  " every blocker either way");
+        }
+    }
+
+    cout << "\n[#W64-AK R9] an upkeep draw is reserved only while that upkeep is ahead\n";
+    {
+        // REPRO: the caster's OWN upkeep, after Staff of Nin's trigger resolved.
+        // The imminent draw step is this turn's, and the next Staff draw is next
+        // turn's - it cannot happen before the draw being reserved against.
+        CHECK(!xReserveUpkeepAhead(true, (int) MTG_PHASE_UPKEEP),
+              "#W64-AK R9 REPRO in the seat's own upkeep the next upkeep draw is NOT ahead"
+              " of the imminent draw step");
+        // POSITIVE: everywhere else it is - the untap step (upkeep still to come),
+        // the seat's own main phases (the next draw step is next turn's, and next
+        // turn's upkeep precedes it), and the whole of the opponent's turn.
+        CHECK(xReserveUpkeepAhead(true, (int) MTG_PHASE_UNTAP)
+              && xReserveUpkeepAhead(true, (int) MTG_PHASE_FIRSTMAIN)
+              && xReserveUpkeepAhead(true, (int) MTG_PHASE_SECONDMAIN)
+              && xReserveUpkeepAhead(false, (int) MTG_PHASE_UPKEEP)
+              && xReserveUpkeepAhead(false, (int) MTG_PHASE_FIRSTMAIN),
+              "#W64-AK R9 POSITIVE every other window has the upkeep ahead of the draw");
+        // And the ceiling the reserve feeds moves with it: 12 cards, one draw per
+        // X. With the Staff draw owed the best X is 10; without it, 11.
+        CHECK(xLibraryCeilingX(20, 1, 12, 2) == 10 && xLibraryCeilingX(20, 1, 12, 1) == 11,
+              "#W64-AK R9 the badge's ceiling is one higher once the stale reserve is dropped");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

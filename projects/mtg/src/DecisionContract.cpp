@@ -19,9 +19,6 @@ bool DecisionManager::buildDeclareAttackers(Player * p, DecisionRequest & req)
     cd.init();
     cd.setType("creature");
     MTGCardInstance * card = NULL;
-    while ((card = cd.nextmatch(p->game->inPlay, card)))
-        if (!card->isAttacker() && card->canAttack())
-            req.candidates.push_back(card);
     //#W64-AI (F4, deck152 HIGH-2): the OTHER thing an attack can be aimed at.
     //The engine has supported attacking a planeswalker for years
     //(MTGPlaneswalkerAttackRule) but no decision surface ever offered it: 0 of
@@ -43,6 +40,32 @@ bool DecisionManager::buildDeclareAttackers(Player * p, DecisionRequest & req)
             if (c && (c->hasType(Subtypes::TYPE_PLANESWALKER) || c->hasType(Subtypes::TYPE_BATTLE)))
                 req.attackTargets.push_back(c);
         }
+    }
+    //#W64-AK (R1, wave-64 codex review finding 1): the candidate walk runs AFTER
+    //the target walk, because whether a planeswalker exists is half of whether a
+    //creature has any legal attack at all. `canAttack()` gates the PLAYER
+    //(CANTATTACK, FLYERSONLY); `canAttack(true)` gates a planeswalker or battle
+    //(CANTPWATTACK), and it is the same call MTGPlaneswalkerAttackRule's own
+    //isReactingToClick makes. A creature that fails the first and passes the
+    //second has a legal attack this seat may declare, and wave 64 dropped it
+    //from `candidates` before any consumer could see it - the row was never
+    //rendered, so no reply could name it. Each candidate now carries which
+    //destinations it may be sent at, and both later guards ask that instead of
+    //re-asking the player predicate.
+    req.candidateMayAttackPlayer.clear();
+    req.candidateMayAttackTarget.clear();
+    while ((card = cd.nextmatch(p->game->inPlay, card)))
+    {
+        if (card->isAttacker())
+            continue;
+        const bool mayPlayer = card->canAttack() != 0;
+        const bool mayTarget = !req.attackTargets.empty() && card->canAttack(true) != 0
+                               && !card->isPhased;
+        if (!mayPlayer && !mayTarget)
+            continue;
+        req.candidates.push_back(card);
+        req.candidateMayAttackPlayer.push_back(mayPlayer);
+        req.candidateMayAttackTarget.push_back(mayTarget);
     }
     return !req.candidates.empty();
 }
@@ -101,7 +124,10 @@ void DecisionManager::applyDeclareAttackers(const DecisionRequest & req, const D
         bool offered = false;
         for (size_t j = 0; !offered && j < req.candidates.size(); j++)
             offered = req.candidates[j] == card;
-        if (!offered || card->isAttacker() || !card->canAttack())
+        //#W64-AK (R1): the PLAYER predicate is no longer the gate on being
+        //declared at all - a creature offered for a planeswalker attack fails it
+        //by construction. It is re-asked below, on the one route it governs.
+        if (!offered || card->isAttacker())
             continue;
         //#W64-AI (F4): a declared planeswalker/battle target rides the
         //ENGINE's own planeswalker-attack rule, whose reactToClick arms a
@@ -133,6 +159,13 @@ void DecisionManager::applyDeclareAttackers(const DecisionRequest & req, const D
             if (card->isAttacker())
                 continue; //declared at the walker
         }
+        //#W64-AK (R1): the ordinary attack rule sends this creature at the
+        //PLAYER, so the player predicate is asked HERE. A creature that may only
+        //attack a planeswalker and whose walker route did not take (no rule
+        //armed, an unpaid attack cost, a stale target) simply does not attack -
+        //it is never sent somewhere it may not go.
+        if (!card->canAttack())
+            continue;
         g->cardClick(card, MTGAbility::MTG_ATTACK_RULE);
     }
 }
