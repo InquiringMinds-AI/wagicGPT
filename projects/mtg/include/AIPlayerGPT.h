@@ -1198,6 +1198,15 @@ private:
     string mPriorityReaskBoard;
     string mPriorityReaskLine;
     string mPriorityReaskKind; //"named_row" | "repeat_count" | "plan_choice" (#W51-C D4) | "plan_missing" | "index_name" (#W52-J)
+    //#W67-AY (I6, deck123 HIGH-1/HIGH-4): the LAST stop the pilot stated in a
+    //PLAN, and the count it said it was at when it stated it. Written wherever a
+    //reply's plan is read (consumePlan and the priority seam), never cleared -
+    //so the repeat row's verdict clause and the past-stop refusal read the same
+    //two numbers, and the clause survives the refusal that drops the carry.
+    //Report/render values only: neither ever enters mPromptTail, an ask key or
+    //an option-set key (the clause is a {...} group, stripped from all three).
+    int mStatedStop;
+    int mStatedStopCount;
     //Same mechanism for askModel (cast menus, targets, modes): keyed on the
     //ORIGINAL askKey (state + question), the corrected question is asked once.
     string mAskReaskKey;
