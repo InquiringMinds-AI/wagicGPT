@@ -1383,3 +1383,4 @@ w65am_gpt_attack_planeswalker_damage.txt
 w65am_gpt_attack_second_planeswalker.txt
 w66as_loop_autopass.txt
 w66as_loop_autopass_has_action.txt
+w67AX_reveal_refusal_takes_legal_card.txt

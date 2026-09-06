@@ -1253,6 +1253,29 @@ private:
     int mHoldTurn;
     std::map<string, std::set<string> > mHoldRows;
     int mHoldWindowsSkipped; //gameend report field
+    //#W67-AX (I7): the RESERVATION decline, honoured the way the hold row is.
+    //`162v130` seq 16 -> 17 and 18 -> 19: the model declined a `{reserve:}` row
+    //(the row's own clause says the mana it spends strands a sorcery-speed card
+    //in hand), the window re-opened inside the SAME step because one count
+    //inside a `{feeds:}` clause had moved, and the model flipped and cast the
+    //row it had just reserved against - at 1 life, with exactly lethal in hand.
+    //Nothing that re-opens such a window can change the arithmetic: the reserve
+    //is a function of the seat's untapped sources. So a decline taken on a menu
+    //carrying a reserve row covers the REST OF THAT STEP while (a) the rows
+    //still stand by holdStillStands' own byte test and (b) the untapped-source
+    //count has not moved. See reserveDeclineStillStands for why the row test is
+    //the engine's own CANDIDATE NAMES and not the hold key or the rendered rows:
+    //the corpus's own rows move by WORDS between those windows (a hold-shaped
+    //latch would have held nothing), and the annotation stripper cannot survive
+    //a mana symbol nested inside the reserve clause.
+    //Nothing here reaches mPromptTail, the ask key or the async slot key.
+    string mReserveDeclineKey;
+    int mReserveDeclineSources;
+    int mReserveDeclineTurn;
+    int mReserveDeclinePhase;
+    int mReserveDeclineWindows; //gameend report field
+    bool reserveDeclineHonoured(const string& castSetKey, int untappedSources);
+    void takeReserveDecline(const string& castSetKey, int untappedSources);
     //#W66-AS (H3 second half): consecutive windows auto-passed inside a proven
     //opponent life LOOP because the oracle says this seat has NO legal action
     //at all. Narrated once, as a receipt, when the run ends.
@@ -1401,7 +1424,19 @@ private:
     int mRecoverySeq;
     string mRecoveryClass;
     string mRecoveryKind;
+    //#W67-AX (I7): ...and WHAT ANSWERED. The wave-66 corpus wrote `choice: -1`
+    //and `chosen_text: "<refused: unparsed_reply>"` on 76 of its 83 fallbacks,
+    //so 51 of them were unadjudicable: the engine seat could not say whether a
+    //refusal cost a game without reconstructing the heuristic's action from the
+    //NEXT window's narration. The heuristic's answer is known only after the
+    //seam has returned, which is after the fallback record is written - so it
+    //is stamped onto the recovery record that already trails that fallback.
+    //Report-only: nothing in the engine reads these, and no key or tail moves.
+    string mRecoveryExecSeam;
+    string mRecoveryExecText;
+    int mRecoveryExecRow; //1-based printed row, 0 = a pass/no-op, -1 = unknown
     void flushRecoveryRecord();
+    void noteHeuristicExecuted(const char * seam, int row, const string& text);
     //#W53-Q (D24): the latch's gate, pure so PARSETEST can pin it.
     static bool handedToHeuristic(int choice, const char * fallback);
     //#W54-B (D9): a reply that ANSWERED after eating the whole deadline is
