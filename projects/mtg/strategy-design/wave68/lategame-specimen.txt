@@ -1,0 +1,416 @@
+file: /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260906-134120/1788720083-ai_baka_deck125-0x556d8c8487c0-vs-ai_baka_deck146.jsonl  seq 129  turn 69  (ask / ANNOUNCE_X, life 70 vs 17, latency 7.9 s, prompt 29,243 B)
+why this one: the deepest turn in the corpus at which a single render decided the game - the wave-68 J4 library ceiling. 20 mana floating, X affordable to 17, library 10 cards, 2 undeclinable draws owed; rows 1-9 all carry LOSE the game, and the header names X=8 as the largest X the library pays for. The seat took exactly X=8 and went on to win 80 to -1. Taking option 1 (X=17), the row a pure life/cards reading picks, would have decked it on the spot.
+answer taken: option 10, "X = 8" (chosen_text begins "X = 8 {X pricing: X=8 - you gain 8 life and draw 8 cards} {library: this draws 8 of your 10 library cards - 2 left; 2 draws are already owed that you cannot decline, and the 2 left still pays them}")
+---- FULL PROMPT VERBATIM BELOW ----
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Cancel, Sphinx's Revelation x2, Essence Scatter x4, Final Judgment, Seachrome Coast x2, Path to Exile x2, Island x2, Supreme Verdict x2, Plains; opponent - Nadaar, Selfless Paladin x3, Silverquill Command x4, Silverquill Silencer x2, Vanishing Verse x4, Lolth, Spider Queen x3, Acererak the Archlich x3, Emeria's Call, Plains, Soul Shatter x3, Pelakka Predation, Kaya the Inexorable x2, Triumphant Adventurer x3; exiled at trim: you - Lightmine Field, Staff of Nin, Elixir of Immortality; opponent - Silverquill Silencer x2, Barrowin of Clan Undurr)
+- You drew Elixir of Immortality
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Glacial Fortress
+- Phase: Cleanup
+- Cleanup discard (hand 15, limit 7): you chose Tundra, Final Judgment, Sphinx's Revelation, Supreme Verdict, Seachrome Coast, Seachrome Coast, Sphinx's Revelation, Elixir of Immortality
+- You discarded Tundra
+- You discarded Final Judgment
+- You discarded Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+- You discarded Seachrome Coast (that Seachrome Coast was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Seachrome Coast
+- You discarded Sphinx's Revelation
+- You discarded Elixir of Immortality
+=== Turn 45 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent's Kaya the Inexorable got a loyalty counter
+- Opponent used: +1: don't target any creature with Kaya the Inexorable
+- Phase: Combat damage
+- Opponent's Angel dealt 4 damage to you (now 37)
+- Opponent's Angel dealt 4 damage to you (now 33)
+=== Turn 46 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Essence Scatter
+- You discarded Essence Scatter
+=== Turn 47 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Triumphant Adventurer
+- Paid {1}{u}{u} for Dream Fracture (paid with 3 sources)
+- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Triumphant Adventurer was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Elixir of Immortality
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Phase: Combat damage
+- Opponent's Angel dealt 4 damage to you (now 29)
+- Opponent's Angel dealt 4 damage to you (now 25)
+- Phase: Cleanup
+- Opponent discarded Plains
+=== Turn 48 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- Paid {1} for Elixir of Immortality with Plains #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality (paid with 2 sources)
+- Paid {w} for Path to Exile with Plains #4
+- You targeted Angel #1 (4/4) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Angel was exiled from the battlefield (that Angel was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Angel (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Paid {w} for Path to Exile with Plains #5
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Angel was exiled from the battlefield
+- Opponent's Angel (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Opponent's Swamp entered the battlefield from the opponent's library
+- You gained 5 life (now 30)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (16 cards) into your library with Elixir of Immortality
+=== Turn 49 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Acererak the Archlich
+- Paid {3}{u}{w} for Fall of the Gavel (paid with 5 sources)
+- You cast Fall of the Gavel
+- Opponent's Acererak the Archlich was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 35)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 50 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 51 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Soul Shatter
+=== Turn 52 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- Paid {6} for Staff of Nin (paid with 6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 21)
+=== Turn 53 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Pelakka Predation
+- Paid {1}{u}{u} for Cancel (paid with 3 sources)
+- You cast Cancel
+- Opponent's Kaya the Inexorable lost 3 loyalty counters (now 3)
+- Opponent used: -3: exile non-land permanent with Kaya the Inexorable targeting Staff of Nin
+- Paid {1}{u}{u} for Dream Fracture (paid with 3 sources)
+- You targeted Pelakka Predation with Dream Fracture
+- You cast Dream Fracture
+- Opponent's Pelakka Predation was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Island
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Your Staff of Nin was exiled from the battlefield
+- Your Cancel resolved and went to your graveyard
+- Phase: Cleanup
+- Opponent discarded Vanishing Verse
+=== Turn 54 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Island
+=== Turn 55 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent's Kaya the Inexorable got a loyalty counter
+- Opponent used: +1: don't target any creature with Kaya the Inexorable
+=== Turn 56 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+=== Turn 57 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lolth, Spider Queen
+- Paid {1}{u}{u} for Dream Fracture (paid with 3 sources)
+- You cast Dream Fracture
+- Opponent's Lolth, Spider Queen was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Sphinx's Revelation
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Phase: Cleanup
+- Opponent discarded Vanishing Verse
+=== Turn 58 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (paid with 17 sources)
+- You announced X = 14 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 14 life (now 49)
+- You drew Essence Scatter
+- You drew Island (x2)
+- You drew Cancel
+- You drew Elixir of Immortality
+- You drew Essence Scatter
+- You drew Staff of Nin
+- You drew Essence Scatter
+- You drew Fall of the Gavel
+- You drew Tundra
+- You drew Supreme Verdict
+- You drew Dream Fracture
+- You drew Supreme Verdict
+- You drew Fall of the Gavel
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Tundra
+- Paid {1} for Elixir of Immortality with Tundra #3
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 16, limit 7): you chose Path to Exile, Path to Exile, Supreme Verdict, Path to Exile, Essence Scatter, Island, Island, Supreme Verdict, Supreme Verdict
+- You discarded Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Path to Exile
+- You discarded Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+=== Turn 59 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Barrowin of Clan Undurr
+- Opponent's Barrowin of Clan Undurr resolved and entered the battlefield
+- Opponent ventured into Lost Mine of Phandelver: venture step 3 of that run
+- Opponent used: storeroom with Lost Mine of Phandelver targeting Barrowin of Clan Undurr
+- Opponent's Barrowin of Clan Undurr got a +1/+1 counter from Lost Mine of Phandelver (now 4/4)
+- Opponent's Kaya the Inexorable lost 3 loyalty counters (now 1)
+- Opponent used: -3: exile non-land permanent with Kaya the Inexorable targeting Elixir of Immortality
+- Your Elixir of Immortality was exiled from the battlefield
+- Opponent cast Silverquill Command
+- Opponent's Silverquill Command resolved and went to the opponent's graveyard
+- Opponent used: creature gains 3/3 and return creature with Silverquill Command targeting Barrowin of Clan Undurr
+- Opponent used: return creature with Silverquill Command targeting Triumphant Adventurer
+- Opponent's Triumphant Adventurer entered the battlefield from the opponent's graveyard
+- Opponent cast Silverquill Command
+- Opponent's Silverquill Command resolved and went to the opponent's graveyard
+- Opponent used: creature gains 3/3 and return creature with Silverquill Command targeting Triumphant Adventurer
+- Opponent used: return creature with Silverquill Command targeting Triumphant Adventurer
+- Opponent's Triumphant Adventurer entered the battlefield from the opponent's graveyard
+- Opponent used: Pelakka Caverns with Pelakka Predation
+- Opponent played Pelakka Caverns
+=== Turn 60 - YOUR turn ===
+- Phase: Draw
+- You drew Lightmine Field
+- Phase: Main phase 1
+- Paid {6} for Staff of Nin (paid with 6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- Paid {2}{w}{w} for Lightmine Field (paid with 4 sources)
+- You cast Lightmine Field
+- Your Lightmine Field resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting Kaya the Inexorable
+- Your Staff of Nin dealt 1 damage to Kaya the Inexorable
+- Opponent's Kaya the Inexorable lost a loyalty counter
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield
+=== Turn 61 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Kaya the Inexorable
+- Paid {3}{u}{w} for Fall of the Gavel (paid with 5 sources)
+- You cast Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Kaya the Inexorable was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 54)
+- Your Fall of the Gavel resolved and went to your graveyard
+- Phase: Blockers
+- Your Lightmine Field dealt 1 damage to Triumphant Adventurer
+- Opponent's Triumphant Adventurer died (that Triumphant Adventurer was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Your Lightmine Field dealt 1 damage to Triumphant Adventurer
+- Opponent's Triumphant Adventurer died
+- Your Lightmine Field dealt 1 damage to Barrowin of Clan Undurr (x3)
+- Opponent ventured into Lost Mine of Phandelver: venture step 4 of that run
+- Opponent drew a card
+- Opponent used: dungeon completed with Lost Mine of Phandelver
+- Opponent's Lost Mine of Phandelver moved from the opponent's command zone to the opponent's zone
+- Opponent used: choose a new dungeon with Triumphant Adventurer targeting Lost Mine of Phandelver
+- Opponent's Lost Mine of Phandelver moved from the opponent's zone to the opponent's zone
+- Opponent ventured into Lost Mine of Phandelver: venture step 1 of that run
+- Opponent revealed their Agadeem's Awakening from their library
+- Opponent used: Place on top with Lost Mine of Phandelver
+- Opponent put the revealed Agadeem's Awakening into their library
+- Opponent used: return creature with Barrowin of Clan Undurr targeting Triumphant Adventurer
+- Opponent's Triumphant Adventurer entered the battlefield from the opponent's graveyard
+- Phase: Combat damage
+- Opponent's Barrowin of Clan Undurr dealt 4 damage to you (now 50)
+- Phase: Main phase 2
+- Opponent played Brightclimb Pathway
+=== Turn 62 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting Triumphant Adventurer
+- Your Staff of Nin dealt 1 damage to Triumphant Adventurer
+- Opponent's Triumphant Adventurer died
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile
+- Opponent's Barrowin of Clan Undurr was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 63 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Vanishing Verse
+- Paid {3}{u}{w} for Fall of the Gavel (paid with 5 sources)
+- You cast Fall of the Gavel
+- Opponent's Vanishing Verse was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 55)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 64 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 20)
+- Phase: Draw
+- You drew Final Judgment
+=== Turn 65 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Brightclimb Pathway
+=== Turn 66 - YOUR turn ===
+- Phase: Upkeep
+- You drew Emrakul, the Aeons Torn
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- Paid {15} for Emrakul, the Aeons Torn (paid with 15 sources)
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+- Opponent cast Soul Shatter
+- Paid {1}{u}{u} for Cancel (paid with 3 sources)
+- You cast Cancel
+- Opponent cast Soul Shatter
+- Opponent's Soul Shatter resolved and went to the opponent's graveyard
+- Opponent used: sacrifice a creature or planeswalker with Soul Shatter targeting Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn died
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (18 cards) into your library with Emrakul, the Aeons Torn
+- Opponent's Soul Shatter was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 67 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (paid with 18 sources)
+- You announced X = 15 for Sphinx's Revelation
+- You cast Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You gained 15 life (now 70)
+- You drew Seachrome Coast
+- You drew Tundra
+- You drew Cancel
+- You drew Fall of the Gavel
+- You drew Path to Exile (x2)
+- You drew Island
+- You drew Dream Fracture (x2)
+- You drew Cancel
+- You drew Supreme Verdict (x2)
+- You drew Island
+- You drew Essence Scatter
+- You drew Plains
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Tundra
+- Phase: Cleanup
+- Cleanup discard (hand 22, limit 7): you chose Essence Scatter, Essence Scatter, Essence Scatter, Final Judgment, Seachrome Coast, Sphinx's Revelation, Seachrome Coast, Path to Exile, Path to Exile, Island, Supreme Verdict, Supreme Verdict, Island, Essence Scatter, Plains
+- You discarded Essence Scatter (that Essence Scatter was 1 of 4 copies in your hand; the other 3 are still there)
+- You discarded Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Final Judgment
+- You discarded Seachrome Coast (that Seachrome Coast was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Sphinx's Revelation
+- You discarded Seachrome Coast
+- You discarded Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Path to Exile
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+- You discarded Island
+- You discarded Essence Scatter
+- You discarded Plains
+=== Turn 68 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Barrowin of Clan Undurr
+- Opponent's Barrowin of Clan Undurr resolved and entered the battlefield
+- Opponent ventured into Lost Mine of Phandelver: venture step 2 of that run
+- Opponent used: goblin lair with Lost Mine of Phandelver
+- Opponent's Lost Mine of Phandelver created a 1/1 Goblin token
+- Opponent cast Silverquill Command
+- Opponent's Silverquill Command resolved and went to the opponent's graveyard
+- Opponent used: creature gains 3/3 and return creature with Silverquill Command targeting Goblin
+- Opponent used: return creature with Silverquill Command targeting Triumphant Adventurer
+- Opponent's Triumphant Adventurer entered the battlefield from the opponent's graveyard
+=== Turn 69 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Seachrome Coast #1; Tundra #1; Glacial Fortress #1; Island #1; Plains #1; Seachrome Coast #2; Tundra #2; Plains #2; Island #2; Plains #3; Glacial Fortress #2; Glacial Fortress #3; Plains #4; Island #3; Glacial Fortress #4; Plains #5; Island #4; Tundra #3; Tundra #4; Island #5
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 70 | Opponent life: 17
+Opponent life trend: turn 66: 20, turn 67: 19, turn 69: 18, now 17 (-3 since turn 66).
+Dungeons completed (opponent): 4
+Mana available: 0 total (no untapped sources - nothing of yours can be tapped for mana in this window; an untap step, a land drop or a mana ability is what changes that. The payment rule does not change with the count: mana of ANY colour pays a generic cost like {2}) | Already in pool: {u}{u}{u}{u}{u}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w} (20 mana ALREADY produced and floating right now - this is SEPARATE from the 0 untapped sources counted above, not a different count of it; spend the floating mana first)
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (8 cards): Dream Fracture (copy 1 of 3 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Cancel (copy 1 of 2 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Fall of the Gavel (copy 2 of 2 in your hand) {3}{u}{w} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Dream Fracture (copy 2 of 3 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Dream Fracture (copy 3 of 3 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Cancel (copy 2 of 2 in your hand) {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Sphinx's Revelation {u}{u}{w}{x} [instant] [castable now]
+Your battlefield (22 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 20 are lands): Glacial Fortress #1-#4 [tapped] x4; Island #1-#5 [tapped] x5; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1-#5 [tapped] x5; Seachrome Coast #1 [tapped]; Seachrome Coast #2 [tapped]; Staff of Nin {6} [artifact] [tapped]; Tundra #1-#4 [tapped] x4
+Your graveyard (17 cards): Cancel {1}{u}{u}; Sphinx's Revelation {u}{u}{w}{x} x2; Essence Scatter {1}{u} x4; Final Judgment {4}{w}{w}; Seachrome Coast x2; Path to Exile {w} x2; Island x2; Supreme Verdict {1}{u}{w}{w} x2; Plains
+Opponent battlefield (21 permanents listed, of which 3 are creatures, 3 of them without a restriction against attacking, and 18 are lands): Barrowin of Clan Undurr {2}{b}{w} (3/3); Brightclimb Pathway #3; Brightclimb Pathway #4; Brightclimb Pathway #1 [tapped]; Brightclimb Pathway #2 [tapped]; Emeria, Shattered Skyclave [tapped]; Goblin (1/1); Pelakka Caverns; Plains #4; Plains #5; Plains #1-#3 [tapped] x3; Shineshadow Snarl #1-#3 x3; Swamp #3; Swamp #4; Swamp #1 [tapped]; Swamp #2 [tapped]; Triumphant Adventurer {b}{w} (1/1) [deathtouch]
+Their graveyard (30 cards): Nadaar, Selfless Paladin {2}{w} (creature 3/3) x3; Silverquill Command {2}{b}{w} x4; Silverquill Silencer {b}{w} (creature 3/2) x2; Vanishing Verse {b}{w} x4; Lolth, Spider Queen {3}{b}{b} x3; Acererak the Archlich {2}{b} (creature 5/5) x3; Emeria's Call {4}{w}{w}{w}; Plains; Soul Shatter {2}{b} x3; Pelakka Predation {2}{b}; Kaya the Inexorable {3}{b}{w} x2; Triumphant Adventurer {b}{w} (creature 1/1) x3
+Their untapped sources: 10 (colours they could make: {b}{w})
+CRACK-BACK NEXT TURN: 3 of their creatures will be able to attack (tapped ones untap first), for up to 5 - you would be at 65
+Opponent hand size: 1 | Opponent library: 6 cards
+Artifacts in play: you 1 | opponent 0
+Your library: 10 cards
+
+Announce the value of X for Sphinx's Revelation. You can afford X up to 17 with your current mana - higher values are NOT offered (they are unaffordable), so do not plan around an X above 17. Every listed value is affordable; option 1 is the LARGEST X (X = 17). YOUR LIBRARY IS THE SECOND CEILING on this menu: it holds 10 cards and every point of X draws 1, so X=17 draws 17 of them. 2 draws are already owed that you cannot decline (your next draw step, which you cannot decline, plus Staff of Nin's upkeep draw), and the draw you cannot make is the game. X=8 is the largest value on this menu the library pays for. Reply with the OPTION number, not the X value:
+1. X = 17 {X pricing: X=17 - you gain 17 life and draw 17 cards} {library: this draws 17 of your 10 library cards - 0 left, which is 7 MORE than the library holds: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted} {leaves 0 of your 20 floating mana unspent - this X spends your whole pool} [<- largest affordable X - X=17 gains 17 life and draws 17 cards; no listed X does more - but LIBRARY CEILING: X=17 draws 17 from a library of 10 cards: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted. X=8 is the largest listed X the library pays for (10 cards, holding 2 back for your next draw step, which you cannot decline, plus Staff of Nin's upkeep draw)]
+2-7. X = 16 down to X = 11 - one option per X in that range, largest X first, each reading the same line with its own number: option 2 is "X = 16 {X pricing: X=16 - you gain 16 life and draw 16 cards} {library: this draws 16 of your 10 library cards - 0 left, which is 6 MORE than the library holds: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted} {leaves 1 of your 20 floating mana unspent}" and option 7 is "X = 11 {X pricing: X=11 - you gain 11 life and draw 11 cards} {library: this draws 11 of your 10 library cards - 0 left, which is 1 MORE than the library holds: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted} {leaves 6 of your 20 floating mana unspent}" x6
+8. X = 10 {X pricing: X=10 - you gain 10 life and draw 10 cards} {library: this draws 10 of your 10 library cards - 0 left; 2 draws are already owed that you cannot decline and only 0 would be left: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted} {leaves 7 of your 20 floating mana unspent}
+9. X = 9 {X pricing: X=9 - you gain 9 life and draw 9 cards} {library: this draws 9 of your 10 library cards - 1 left; 2 draws are already owed that you cannot decline and only 1 would be left: you would be asked to draw from an EMPTY library and LOSE the game as that draw is attempted} {leaves 8 of your 20 floating mana unspent}
+10-16. X = 8 down to X = 2 - one option per X in that range, largest X first, each reading the same line with its own number: option 10 is "X = 8 {X pricing: X=8 - you gain 8 life and draw 8 cards} {library: this draws 8 of your 10 library cards - 2 left; 2 draws are already owed that you cannot decline, and the 2 left still pays them} {leaves 9 of your 20 floating mana unspent}" and option 16 is "X = 2 {X pricing: X=2 - you gain 2 life and draw 2 cards} {library: this draws 2 of your 10 library cards - 8 left; 2 draws are already owed that you cannot decline, and the 8 left still pays them} {leaves 15 of your 20 floating mana unspent}" x7
+17. X = 1 {X pricing: X=1 - you gain 1 life and draw 1 card} {library: this draws 1 of your 10 library cards - 9 left; 2 draws are already owed that you cannot decline, and the 9 left still pays them} {leaves 16 of your 20 floating mana unspent}
+18. X = 0 {X pricing: X=0 - this cast does NOTHING: you gain 0 life and draw 0 cards, and the spell is spent} {leaves 17 of your 20 floating mana unspent}
+19. Decline - do not cast this after all (the announcement is cancelled and the card stays in your hand) {declining strands the 20 mana already paid: the card comes back to your hand, your sources STAY TAPPED, and the 20 mana stays floating in your pool. No row on this list can spend it - this list only sets X for the cast you are cancelling - but any other spell or ability you take before this step ends can, and whatever is still floating when the step ends is lost}
+An option whose number is a RANGE ("5-430.") is that many SEPARATE options whose text was identical apart from the instance ordinal, printed once. Every number in the range is a real, separately choosable option: 5 is the option for the first instance of the printed #N range, 6 the next, and so on to the last. When the collapsed row carries NO #N ordinal, the options in the range are interchangeable copies of the same thing and any number in the range picks one of them. A range whose row reads "(copies 3-6 of 6 in this list)" is the same thing in that list's own copy notation: each number in the range is one of those copies, in order. A line reading "The same 4 options as 8-11, with <source> #2 as the source instead of #1" is that many SEPARATE options that pair up ONE FOR ONE with the options in the range it names: its first number is the same choice as the first number of that range, its second the same as the second, and so on - the only difference is which copy of the source does it. Nothing is hidden: read the option you want off the range it names. A row reading "X = 12 down to X = 2" is one option per X in that range, largest X first: its first number is X = 12, the next X = 11, and so on to X = 2. The two options it quotes in full are the two ENDS of that run, and every option between them reads the same line with its own X. Answer with ONE number from inside the range exactly as you would any other option number.
+
+On a line of its own write CHOICE: followed by the number of your choice (the LAST row of this menu declines: it is a real answer, not a fallback) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (X = 17)" (a worked example of the format, written out from row 1 of this list - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
