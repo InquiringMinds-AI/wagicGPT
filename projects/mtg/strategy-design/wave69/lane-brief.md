@@ -146,3 +146,33 @@ lines survive the fold (BD-9 FAIL) — find the branch the fold misses. Two lite
 vs `{paying this taps:}`) — one literal. 18 unusable counter rows on the Adversary menu (152 LOW) — collapse per BD's band
 rule. Read wave68/lane-BC.md (record fields), lane-BD.md (band rows, Paid fold), lane-BA.md (J1), wave68/engine-seat.md
 §1 census first.
+
+## Lane BJ — the eight findings of wave69/codex-review.md (Fable seat; fix or refute, each with evidence)
+Worktree: worktrees/lanes/w69-BJ (base = master after the BF-BI merge = 02201b130 + the review commit). Read
+wave69/codex-review.md in full, then the lane report each finding touches (lane-BI.md for F1/F7, lane-BH.md for
+F2/F3/F4/F8, lane-BG.md for F5/F8, lane-BF.md for F6); wave68/lane-BE.md shows the expected shape of a CONFIRMED/REFUTED
+table. For EACH finding: VERIFY against the code first (REFUTED with the line that proves it, or CONFIRMED with a
+reproduction — a PARSETEST case failing on the current tree); fix every CONFIRMED one in the general form.
+F1 HIGH (merge defect): `AIPlayerGPT.cpp:~31076-31082` — BG's hunk kept `out << paymentTapsClause(...)` and BI's added
+`paidTapsClause = paymentTapsClause(...); out << paidTapsClause;` after it: the clause prints twice on every affordable-
+by-tap cast row. Keep ONE (BI's, the de-duplicated builder) and PARSETEST a rendered row for exactly one occurrence. F2
+HIGH: K6a's cover counts the seat's untapped creatures as certain crack-back blockers in the seat's OWN main phase 1,
+before it attacks (`crackBackCoverFacts` ~23179-23215, clause ~23011-23025) — a body that attacks this turn is tapped
+through their turn. Fold standing bodies only in MAIN 2 / after the attack declaration, or count only bodies the
+attackers screen would NOT send (say which and why); a must-attack body never counts. F3 MED: K4b's refill clause gates
+on `moveto(mylibrary)` + `all(*|mygraveyard)` and claims "+1 this card" for cards that EXILE themselves (Feldon's Cane
+mtg.txt:39576, Campfire borderline.txt:15766) — require `all(this)` (Elixir) for the +1, else L+N. F4 MED: K6d's
+ALTERNATIVE line can name a LETHAL assignment without saying so (`blockKeepAlternativeClause` ~23472; caller ~24629 on a
+`lethalScreen`) — print "lets in 7 instead of 4 — 7 KILLS you at 6" when it does. F5 MED (composition BG x BH): after K1
+the game continues with `library 0` and 41 parked cards because the Tutor's return payload is STILL stranded; every K4
+surface then reads 0 — root-cause the stranded `StackAbility` (why does the option-one payload never resolve?) if it is
+reachable in a fixture, else make the library surfaces count parked-out-of-library cards as library (`Your library: 0 (+41
+revealed, returning)`) and ledger it. F6 MED-LOW: `proseNegatesTakenRow` (~27854) is bag-of-words within a sentence and
+fires on approving prose ("I cannot let their board grow, so Damnation now") — require the negation to govern the verb
+phrase that names the row (negation ... [verb] ... row-name within N words, no intervening clause boundary `, so` / `;` /
+`because`), PARSETEST the two approving shapes as MUST-NOT-MATCH and s34 as POSITIVE. F7 LOW: K5(c) "0 mana available"
+ignores floating mana (`potentialColorReach` counts producers only) — fold the pool. F8 LOW: K4c x K5(a) — the priced
+tapped-animation row now earns the no-op re-ask, and `plan_contradicts_noop_row_exhausted` fires on a legitimate second
+take — stamp the second take `noop_row_retaken`, not `_exhausted`. Gate as usual (suite THREADS=1 0 failed, AI count,
+PARSETEST 0 failed, RED evidence per confirmed finding). Tag `#W69-BJ (Rn)`. Write wave69/lane-BJ.md with the
+CONFIRMED/REFUTED table.
