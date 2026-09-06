@@ -1230,6 +1230,18 @@ private:
     int mHoldTurn;
     std::map<string, std::set<string> > mHoldRows;
     int mHoldWindowsSkipped; //gameend report field
+    //#W66-AS (H3 second half): consecutive windows auto-passed inside a proven
+    //opponent life LOOP because the oracle says this seat has NO legal action
+    //at all. Narrated once, as a receipt, when the run ends.
+    int mLoopAutoPassRun;
+public:
+    //#W66-AS (H3 second half): the auto-pass predicate and its board reader,
+    //public so the test-suite driver command `assertloopautopass` can pin them
+    //against a REAL board (the suite has no model seat, so nothing else could).
+    static bool loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction);
+    static bool loopAutoPassFor(Player * p);
+private:
+    bool loopAutoPassWindow(); //the per-window gate, and the receipt
     //#W57-A (D4): the repeat count of the take being logged, consumed by
     //writeTransLog into `repeat_n`. Report only; nothing in the engine reads it.
     int mLastRepeatN;

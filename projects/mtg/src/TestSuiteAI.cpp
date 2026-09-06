@@ -1709,6 +1709,31 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertloopautopass ") == 0)
+    {
+        //#W66-AS (H3 second half): pin the auto-pass gate against a REAL board.
+        //The suite has no model seat, so the seam itself cannot be driven here;
+        //what CAN be driven is the predicate the seam consults, with the same
+        //two inputs it reads live (the opponent's proven life LOOP, and this
+        //player's own hasAnyLegalAction). Syntax:
+        //  assertloopautopass <0|1> [1|2]     (default player 1)
+        string rest = action.substr(19);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        int seat = 0;
+        if (rest.size() > 2 && rest[2] == '2')
+            seat = 1;
+        Player * lp = observer->players[seat];
+        int got = AIPlayerGPT::loopAutoPassFor(lp) ? 1 : 0;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertloopautopass: player " << (seat + 1)
+                      << " expected " << expect << " got " << got
+                      << " (anyLegalAction="
+                      << (LegalActionsOracle::hasAnyLegalAction(lp) ? 1 : 0)
+                      << ") [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
     {
         //W48: pin the DISPLAY/oracle predicates the human borders read

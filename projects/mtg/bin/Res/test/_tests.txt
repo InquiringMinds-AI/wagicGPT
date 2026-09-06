@@ -1381,3 +1381,5 @@ ai_mdfc_front_face_keeps_main1_w64ai.txt
 w64ai_attack_planeswalker.txt
 w65am_gpt_attack_planeswalker_damage.txt
 w65am_gpt_attack_second_planeswalker.txt
+w66as_loop_autopass.txt
+w66as_loop_autopass_has_action.txt

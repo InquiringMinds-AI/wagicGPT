@@ -1,0 +1,26 @@
+#W66-AS (H3, second half). The other face: the SAME proven-closed opponent loop,
+#but this seat holds a legal answer (Shock, payable from the pool). The window is
+#a real decision and the ask still goes out - the auto-pass removes no window
+#that has a row in it. This is the negative that makes the positive above mean
+#something.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Shock
+manapool:{R}
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[DO]
+assertloopautopass 0 1
+[ASSERT]
+firstmain
+[PLAYER1]
+hand:Shock
+manapool:{R}
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[END]
