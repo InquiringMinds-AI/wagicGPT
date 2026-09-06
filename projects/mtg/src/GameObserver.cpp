@@ -574,13 +574,24 @@ static int chooserStallFloor(bool suiteGame)
 
 void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
 {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //WAGIC_ADVANCEPROBE=1: name the gate that refused this request (owner, Vita
+    //vpk26: an advance refused with no visible reason read as a softlock).
+    static const bool advProbe = getenv("WAGIC_ADVANCEPROBE") != NULL;
+#define ADVANCE_REFUSED(why) do { if (advProbe) { fprintf(stderr, "[advanceprobe] t=%d ph=%d step=%d refused: %s\n", turn, (int) mCurrentGamePhase, (int) combatStep, why); fflush(stderr); } } while (0)
+#else
+#define ADVANCE_REFUSED(why) do { } while (0)
+#endif
     //W53-DELVER (owner Vita report 2026-08-28; generalised per his note to every
     //step trigger - end of turn, the opponent's upkeep, ...): no phase advance
     //while the human seat has a reveal display open or about to open. Applies
     //to the AI's own pass on ITS turn too, so a "beginning of each upkeep"
     //display of the human's is not stepped over by the opponent's advance.
     if (allowInterrupt && humanDisplayOpen())
+    {
+        ADVANCE_REFUSED("human display open");
         return;
+    }
     //W53-DELVER, the REQUEST side (reproduced on build 9 in the desktop GUI:
     //the phase-advance key is HELD across ticks by JGE - a right-click here, the
     //trigger on the Vita - so the request that pushed the turn along landed in
@@ -602,7 +613,10 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
         || (currentPlayer && currentPlayer->playMode == Player::MODE_TEST_SUITE);
     if (allowInterrupt && !scriptedSeat && !(mSettledPhase == mCurrentGamePhase && mSettledTurn == turn
         && mSettledStep == (int) combatStep && mPhaseTicks >= 1))
+    {
+        ADVANCE_REFUSED("phase not settled");
         return;
+    }
 
     if(getCurrentTargetChooser() && getCurrentTargetChooser()->maxtargets == 1000)
     {
@@ -612,7 +626,10 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
             cardClick(getCurrentTargetChooser()->source, 0, false);
     }
     if (allowInterrupt && mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+    {
+        ADVANCE_REFUSED("unresolved stack");
         return;
+    }
     //#W57-F (D38): the chooser gate, with a LIVELOCK BREAKER behind it. The
     //refusal itself is right - a seat about to click a target must not have the
     //phase pulled out from under it - but it is UNCONDITIONAL, and nothing in
@@ -647,7 +664,10 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
         const bool answerable = !chooserSeat || !chooserSeat->isAI()
             || chooserSeat->aiDecisionInFlight();
         if (answerable || mChooserBlockRefusals < chooserStallFloor(mSuiteGame))
+        {
+            ADVANCE_REFUSED("target chooser open");
             return;
+        }
         DebugTrace("GameObserver: target chooser armed by " << chooserSeat->getDisplayName()
                    << " has refused " << mChooserBlockRefusals
                    << " consecutive phase advances with no seat able to answer it - releasing");
@@ -674,7 +694,10 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     // If we deem that an extra cost payment needs to be made, don't allow the next game phase to proceed.
     // Here's what I find weird - if the extra cost is something like a sacrifice, doesn't that imply a TargetChooser?
     if (WaitForExtraPayment(NULL)) 
+    {
+        ADVANCE_REFUSED("extra payment pending");
         return;
+    }
     //W43-1 (CR 509.1c): the declare-blockers step is not ACCEPTED while the
     //declaration is illegal. A menace attacker blocked by exactly one creature
     //(or a "three or more" attacker blocked by two) is not a legal set, and the
@@ -703,6 +726,7 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
                      bad->getName().c_str(), need);
             setAdvanceRefusal(msg, 4.0f);
         }
+        ADVANCE_REFUSED("illegal block declaration");
         return;
     }
     /*if (OpenedDisplay)//dont let us fly through all the phases with grave and library box still open.
