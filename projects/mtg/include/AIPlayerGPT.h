@@ -391,9 +391,15 @@ private:
     //#W66-AQ (H1): draws already RESOLVED inside the current draw step, per
     //seat, keyed on the turn they were counted in. Read by the DRAW FORECAST so
     //it charges only the draws still ahead; a stale turn key reads as 0.
+    //#W66-AU (R2): ...and only the draws the forecast ACTUALLY counted - the
+    //turn-based draw and the static extra-draw permanents. A cantrip or an
+    //activated ability resolving in the same step lands in mDrawStepOther*,
+    //which is never subtracted and is stated on the line instead.
     int mDrawStepTurn = -1;
     int mDrawStepDrawsMine = 0;
     int mDrawStepDrawsTheirs = 0;
+    int mDrawStepOtherMine = 0;
+    int mDrawStepOtherTheirs = 0;
     string mAskSituationPrefill;     //A19: a caller's already-rendered situation, consumed by the NEXT askModel
     int mWindowReach = -1;           //A21: potentialColorReach memo for one render window (-1 = not yet)
     bool mWindowReachArmed = false;  //A21: armed by chooseOrderedAction around its describeAction loop

@@ -135,8 +135,8 @@ WEventCardBlocked::WEventCardBlocked(MTGCardInstance * card,MTGCardInstance * op
 {
 }
 
-WEventcardDraw::WEventcardDraw(Player * player, int nb_cards) :
-    player(player), nb_cards(nb_cards)
+WEventcardDraw::WEventcardDraw(Player * player, int nb_cards, MTGCardInstance * source) :
+    player(player), nb_cards(nb_cards), source(source) //#W66-AU (R2)
 {
 }
 
