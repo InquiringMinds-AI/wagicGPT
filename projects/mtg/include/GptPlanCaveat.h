@@ -593,6 +593,63 @@ inline bool planTargetAbsent(const std::string& planRaw, const std::string& opts
 // cut is stated by the caller through planTruncationNote, exactly as the length
 // bound states its own. Nothing the model relies on is deleted - the model is
 // told how much of what it wrote was dropped and asked to restate it.
+//#W66-AR (MED, deck126; repro 126v125 seq 45-57). THE PLAN NAMES A CARD IN NO
+//VISIBLE ZONE. planActionsStale is a claim about THIS MENU and it is silenced by
+//two things the repro had: the plan's clause was about a LATER turn
+//(planClauseIsFuture), and the card was in the seat's own vocabulary because
+//that vocabulary includes the LIBRARY. So "On my next turn, cast Idyllic Tutor
+//to find Exquisite Blood" was carried verbatim for fifteen turns while no card
+//of that name was in the hand, on either battlefield, or in any graveyard - the
+//model planned around a card it could not reach and never drew.
+//This is a different claim from planActionsStale's and it is made separately: a
+//card the plan affirmatively acts on is in the LIBRARY only. `libraryNames` is
+//the seat's library, `visibleNames` every zone the prompt renders (both hands it
+//can see, both battlefields, both graveyards, both exiles). FUTURE clauses count
+//here - a plan for next turn is exactly the shape that goes stale unseen - but a
+//NEGATED clause ("do not cast X") never does. Returns the first such name.
+inline bool planNamesLibraryOnlyCard(const std::string& planRaw,
+                                     const std::vector<std::string>& libraryNames,
+                                     const std::vector<std::string>& visibleNames,
+                                     std::string * outName)
+{
+    if (planRaw.empty() || libraryNames.empty())
+        return false;
+    const std::string plan = toLower(planRaw);
+    std::set<std::string> visible;
+    for (size_t v = 0; v < visibleNames.size(); v++)
+    {
+        const std::string full = toLower(visibleNames[v]);
+        visible.insert(full);
+        visible.insert(shortName(full));
+    }
+    std::set<std::string> seen;
+    for (size_t n = 0; n < libraryNames.size(); n++)
+    {
+        const std::string full = toLower(libraryNames[n]);
+        if (full.size() < 4)
+            continue;
+        const std::string nm = shortName(full);
+        if (nm.size() < 4 || !seen.insert(nm).second)
+            continue;
+        if (visible.count(nm) || visible.count(full))
+            continue; //a copy IS somewhere the model can see: nothing to say
+        size_t pos = 0;
+        while ((pos = plan.find(nm, pos)) != std::string::npos)
+        {
+            const size_t ws = pos > 40 ? pos - 40 : 0;
+            const std::string win = plan.substr(ws, pos - ws);
+            if (windowHasVerb(win) && !windowNegated(win))
+            {
+                if (outName)
+                    *outName = libraryNames[n];
+                return true;
+            }
+            pos += nm.size();
+        }
+    }
+    return false;
+}
+
 inline std::string planScratchpadCut(const std::string& plan)
 {
     if (plan.size() < 2)
@@ -664,6 +721,73 @@ inline std::string planScratchpadCut(const std::string& plan)
     return plan;
 }
 
+//#W66-AR (H2b). THE RETRACTION HEADER, ONE DEFINITION. #W65-AO's
+//gptAnswerCorrectionCue is a SUBSTRING test over the correcting line or the one
+//directly above it. 123v126 seq 36 wrote "Correction: ... M (41) is already
+//above stop (33)" TWO non-blank lines above its `CHOICE: 0 (pass)` and the
+//adjacency window could not see it: 30 activations ran on the retracted line.
+//A wider window cannot stay a substring test - "no correction is needed"
+//anywhere in a paragraph would arm it - so the wider window reads only an
+//ANNOUNCED header: the cue at the START of the line (markdown decoration
+//tolerated) and immediately closed by ':', ',', '.' or the end of the line.
+//That is exactly the form both corpus retractions took ("Correction:",
+//"Re-evaluating:") and it excludes ordinary prose that merely contains the
+//word. Deliberation vocabulary ("wait", "hmm", "however", "let me re-read") is
+//NOT here, for the same reason #W65-AO kept it out of the substring set.
+//Lives in this header because two consumers need the SAME set: the answer
+//selector in AIPlayerGPT.cpp and the plan-carry truncation note below, which
+//has to say when the bytes it dropped contained a retraction.
+inline bool correctionHeaderCue(const std::string& line)
+{
+    static const char * kHeads[] = {
+        "correction", "corrections", "corrected", "re-evaluating", "reevaluating",
+        "re-evaluation", "revised", "revising", "revision", "on reflection",
+        "on second thought", "actually", "scratch that", "disregard the above",
+        "final answer"
+    };
+    std::string lc = toLower(line);
+    size_t s = 0;
+    while (s < lc.size() && (lc[s] == ' ' || lc[s] == '\t' || lc[s] == '*'
+                             || lc[s] == '#' || lc[s] == '-' || lc[s] == '>'))
+        s++;
+    for (size_t k = 0; k < sizeof(kHeads) / sizeof(kHeads[0]); k++)
+    {
+        const size_t n = std::strlen(kHeads[k]);
+        if (lc.compare(s, n, kHeads[k]) != 0)
+            continue;
+        const size_t e = s + n;
+        if (e >= lc.size())
+            return true; //the whole line IS the header
+        const char c = lc[e];
+        if (c == ':' || c == ',' || c == '.' || c == '!' || c == '\r')
+            return true;
+        //"Correction -" / "Correction (2)" read as announcements too; a bare
+        //space does NOT ("actually I could also block" is deliberation).
+        if ((c == ' ' || c == '\t') && e + 1 < lc.size()
+            && (lc[e + 1] == '-' || lc[e + 1] == ':'))
+            return true;
+    }
+    return false;
+}
+
+//#W66-AR (H2b/MED): does this text contain an ANNOUNCED retraction on a line of
+//its own? Used on the bytes the plan carry is about to DROP.
+inline bool textHasCorrectionHeader(const std::string& text)
+{
+    size_t at = 0;
+    while (at <= text.size())
+    {
+        const size_t nl = text.find('\n', at);
+        const std::string line = text.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+        if (correctionHeaderCue(line))
+            return true;
+        if (nl == std::string::npos)
+            break;
+        at = nl + 1;
+    }
+    return false;
+}
+
 inline const char * planTruncationMarker()
 {
     return " [...the rest of your plan was not carried - restate it if you still mean it]";
@@ -678,7 +802,17 @@ inline const char * planTruncationMarker()
 // cut, which is the one fact that tells the model its PLAN line was a
 // deliberation stream rather than a plan. Pure over (kept, original) so the
 // composed shape is provable; a plan the bound did not touch is byte-identical.
-inline std::string planTruncationNote(size_t keptChars, size_t originalChars)
+//#W66-AR (MED, deck126): `droppedCorrection` says the dropped bytes contained an
+//ANNOUNCED retraction (correctionHeaderCue). The cut keeps the FIRST sentences
+//and the model's corrections live at the END of a deliberating PLAN line, so on
+//29 of 183 deck126 windows the carry served the premise and dropped the sentence
+//that withdrew it - a true fragment in a false scope, which the trust doctrine
+//treats as a lie. Nothing is added to what is carried (the bound is the owner's
+//400 characters); what is added is the ONE fact the model needs to know the
+//fragment is not the whole answer. Default false, so every shipped note and
+//every shipped pin is byte-identical.
+inline std::string planTruncationNote(size_t keptChars, size_t originalChars,
+                                      bool droppedCorrection = false)
 {
     // The wave-60 literal is kept verbatim as the head - deck guides and the
     // shipped PARSETEST pins read it - and the measured size rides after it.
@@ -688,6 +822,8 @@ inline std::string planTruncationNote(size_t keptChars, size_t originalChars)
     if (originalChars > keptChars)
         o << ": " << (originalChars - keptChars) << " further characters, of "
           << originalChars << " you wrote";
+    if (droppedCorrection)
+        o << ", and what was dropped included a line correcting what you see above";
     o << " - restate it in a sentence or two if you still mean it]";
     return o.str();
 }
@@ -756,7 +892,9 @@ inline std::string planCarryBound(const std::string& plan, size_t maxChars)
     if (out.empty())
         return plan; // nothing survived the cut: carry the plan as it stands
     //#W65-AP (R7): the note counts what the protocol counts - characters.
-    return out + planTruncationNote(utf8Length(out), utf8Length(plan)); //#W62-Z (D16)
+    //#W66-AR (MED): and says whether the bytes it dropped announced a retraction.
+    return out + planTruncationNote(utf8Length(out), utf8Length(plan),
+                                    textHasCorrectionHeader(plan.substr(out.size()))); //#W62-Z (D16)
 }
 
 // #W60-Q (R8). THE COMPOSED PATH. planCarryBound's marker ends in ']', and the
@@ -786,10 +924,14 @@ inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
         const std::string head = " [...the rest of your plan was not carried";
         const size_t m = out.rfind(head);
         const std::string kept = (m == std::string::npos) ? out : out.substr(0, m);
-        return kept + planTruncationNote(utf8Length(kept), utf8Length(plan)); //#W65-AP (R7)
+        //#W66-AR (MED): the drop is measured against the plan the model WROTE, so
+        //the retraction test reads the same span the number above counts.
+        return kept + planTruncationNote(utf8Length(kept), utf8Length(plan),
+                                         textHasCorrectionHeader(plan.substr(kept.size()))); //#W65-AP (R7)
     }
     if (core.size() < plan.size())
-        return core + planTruncationNote(utf8Length(core), utf8Length(plan)); //#W65-AP (R7)
+        return core + planTruncationNote(utf8Length(core), utf8Length(plan),
+                                         textHasCorrectionHeader(plan.substr(core.size()))); //#W65-AP (R7)
     char last = out.empty() ? '.' : out[out.size() - 1];
     if (last != '.' && last != '!' && last != '?')
     {
