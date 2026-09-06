@@ -1384,3 +1384,4 @@ w65am_gpt_attack_second_planeswalker.txt
 w66as_loop_autopass.txt
 w66as_loop_autopass_has_action.txt
 w67AX_reveal_refusal_takes_legal_card.txt
+w68BC_ward_targets_the_spell_not_a_random_zone.txt

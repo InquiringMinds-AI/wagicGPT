@@ -12973,7 +12973,7 @@ toughness=5
 [card]
 name=Boreal Elemental
 abilities=flying
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Flying -- Spells your opponents cast that target Boreal Elemental cost {2} more to cast.
 mana={4}{U}
 type=Creature
@@ -14482,7 +14482,7 @@ name=Bronze Guardian
 abilities=double strike
 anyzone=type:artifact:myBattlefield/5 cdaactive
 auto=_WARD2_
-auto=@targeted(other artifact|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(other artifact|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Double strike -- Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.) -- Other artifacts you control have ward {2}. -- Bronze Guardian's power is equal to the number of artifacts you control.
 mana={4}{W}
 type=Artifact Creature
@@ -15691,7 +15691,7 @@ type=Sorcery
 [card]
 name=Callaphe, Beloved of the Sea
 auto=type:manaU:mybattlefield/3 cdaactive
-auto=@targeted(*[creature;enchantment]|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
+auto=@targeted(*[creature;enchantment]|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
 text=Callaphe's power is equal to your devotion to blue. (Each {U} in the mana costs of permanents you control counts toward your devotion to blue.) -- Creatures and enchantments you control have "Spells your opponents cast that target this permanent cost {1} more to cast".
 mana={1}{U}{U}
 type=Legendary Enchantment Creature
@@ -18434,7 +18434,7 @@ toughness=5
 [/card]
 [card]
 name=Charix, the Raging Isle
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto={3}:type:island:myBattlefield/-type:island:myBattlefield ueot
 text=Spells your opponents cast that target Charix, the Raging Isle cost {2} more to cast. -- {3}:Charix gets +X/-X until end of turn, where X is the number of Islands you control.
 mana={2}{U}{U}
@@ -22067,7 +22067,7 @@ toughness=3
 [card]
 name=Coppercoat Vanguard
 auto=lord(other *[human]|myBattlefield) 1/0
-auto=@targeted(other *[human]|myBattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentzones) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
+auto=@targeted(other *[human]|myBattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentstack) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
 text=Each other Human you control gets +1/+0 and has ward {1}. (Whenever it becomes the target of a spell or ability an opponent controls, counter it unless that player pays {1}.)
 mana={1}{W}
 type=Creature
@@ -23959,7 +23959,7 @@ toughness=4
 [card]
 name=Cultist of the Absolute
 auto=lord(creature[iscommander]|mybattlefield) transforms((,newability[3/3],flying,deathtouch,newability[@each my upkeep:name(Sacrifice a creature) sacrifice notaTarget(creature|myBattlefield)]))
-auto=@targeted(creature[iscommander]|mybattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
+auto=@targeted(creature[iscommander]|mybattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
 text=Commander creatures you own get +3/+3 and have flying, deathtouch, "Ward-Pay 3 life," and "At the beginning of your upkeep, sacrifice a creature."
 mana={B}
 type=Legendary Enchantment
@@ -28072,7 +28072,7 @@ type=Sorcery
 [/card]
 [card]
 name=Diffusion Sliver
-auto=@targeted(creature[sliver]|myBattlefield) from(*|opponentstack,opponentbattlefield,opponentexile,opponenthand,opponentlibrary):target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(creature[sliver]|myBattlefield) from(*|opponentstack,opponentbattlefield,opponentexile,opponenthand,opponentlibrary):target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Whenever a Sliver creature you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays {2}.
 mana={1}{U}
 type=Creature
@@ -32046,7 +32046,7 @@ toughness=2
 [/card]
 [card]
 name=Dwarven Forge-Chanter
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
 auto=@movedTo(*[-creature]|mystack):1/1 ueot
 text=Ward-Pay 2 life. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays 2 life.) -- Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)
 mana={1}{R}
@@ -35287,7 +35287,7 @@ toughness=4
 [card]
 name=Esior, Wardwing Familiar
 abilities=flying,partner
-auto=@targeted(*[iscommander]|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
+auto=@targeted(*[iscommander]|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
 text=Flying -- Spells your opponents cast that target one or more commanders you control cost {3} more to cast. -- Partner (You can have two commanders if both have partner.)
 mana={1}{U}
 type=Legendary Creature
@@ -41073,7 +41073,7 @@ toughness=2
 name=Flowering of the White Tree
 auto=lord(creature[legendary]|myBattlefield) 2/1
 auto=lord(creature[-legendary]|myBattlefield) 1/1
-auto=@targeted(creature[legendary]|myBattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentzones) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
+auto=@targeted(creature[legendary]|myBattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentstack) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
 text=Legendary creatures you control get +2/+1 and have ward {1}. -- Nonlegendary creatures you control get +1/+1.
 mana={W}{W}
 type=Legendary Enchantment
@@ -42533,7 +42533,7 @@ type=Snow Instant
 [/card]
 [card]
 name=Frost Titan
-auto=@targeted(this) from(opponent):target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(opponent):target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto=target(*) transforms((,newability[tap],newability[frozen]))
 auto=_ATTACKING_target(*) transforms((,newability[tap],newability[frozen]))
 text=Whenever Frost Titan becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays {2}. -- Whenever Frost Titan enters or attacks, tap target permanent. It doesn't untap during its controller's next untap step.
@@ -43613,7 +43613,7 @@ name=Gargantuan Slabhorn
 abilities=trample
 auto=_WARD2_
 auto=lord(other *[isflipped]|myBattlefield) trample
-auto=@targeted(other *[isflipped]|myBattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(other *[isflipped]|myBattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Trample, ward {2} -- Other transformed permanents you control have trample and ward {2}.
 color=green,blue
 type=Creature
@@ -44447,7 +44447,7 @@ toughness=4
 [/card]
 [card]
 name=Gev, Scaled Scorch
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
 auto=@movedTo(other creature|mybattlefield) restriction{compare(oplifelost)~morethan~0}:all(trigger) counter(1/1) ueot
 auto=@movedTo(Lizard|mystack):damage:1 target(opponent)
 text=Ward-Pay 2 life. -- Other creatures you control enter with an additional +1/+1 counter on them for each opponent who lost life this turn. -- Whenever you cast a Lizard spell, Gev, Scaled Scorch deals 1 damage to target opponent.
@@ -60434,7 +60434,7 @@ toughness=1
 [card]
 name=Jubilant Skybonder
 abilities=flying
-auto=@targeted(creature|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(creature|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Flying -- Creatures you control with flying have "Spells your opponents cast that target this creature cost 2 more to cast."
 mana={1}{WU}{WU}
 type=Creature
@@ -60752,7 +60752,7 @@ type=Instant
 [/card]
 [card]
 name=Kaervek's Torch
-autostack=@targeted(this) from(*[instant;sorcery]|opponentcastingzone):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+autostack=@targeted(this) from(*[instant;sorcery]|opponentcastingzone):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto=name(Damage any target) name(Damage any target) damage:X target(anytarget)
 text=As long as Kaervek's Torch is on the stack, spells that target it cost {2} more to cast. -- Kaervek's Torch deals X damage to any target.
 mana={X}{R}
@@ -63408,7 +63408,7 @@ toughness=3
 [/card]
 [card]
 name=Kopala, Warden of Waves
-auto=@targeted(merfolk|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(merfolk|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Spells your opponents cast that target a Merfolk you control cost {2} more to cast. -- Abilities your opponents activate that target a Merfolk you control cost {2} more to activate.
 mana={1}{U}{U}
 type=Legendary Creature
@@ -72293,26 +72293,26 @@ toughness=3
 [/card]
 [card]
 name=Minthara, Merciless Soul
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~1}:choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentzones) transforms((,newability[pay[[1]] name(pay 1 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~2}:choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[2]] name(pay 2 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~3}:choice name(This spell costs 3 more) name(This spell costs 3 more) target(*|opponentzones) transforms((,newability[pay[[3]] name(pay 3 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~4}:choice name(This spell costs 4 more) name(This spell costs 4 more) target(*|opponentzones) transforms((,newability[pay[[4]] name(pay 4 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~5}:choice name(This spell costs 5 more) name(This spell costs 5 more) target(*|opponentzones) transforms((,newability[pay[[5]] name(pay 5 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~6}:choice name(This spell costs 6 more) name(This spell costs 6 more) target(*|opponentzones) transforms((,newability[pay[[6]] name(pay 6 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~7}:choice name(This spell costs 7 more) name(This spell costs 7 more) target(*|opponentzones) transforms((,newability[pay[[7]] name(pay 7 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~8}:choice name(This spell costs 8 more) name(This spell costs 8 more) target(*|opponentzones) transforms((,newability[pay[[8]] name(pay 8 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~9}:choice name(This spell costs 9 more) name(This spell costs 9 more) target(*|opponentzones) transforms((,newability[pay[[9]] name(pay 9 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~10}:choice name(This spell costs 10 more) name(This spell costs 10 more) target(*|opponentzones) transforms((,newability[pay[[10]] name(pay 10 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~11}:choice name(This spell costs 11 more) name(This spell costs 11 more) target(*|opponentzones) transforms((,newability[pay[[11]] name(pay 11 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~12}:choice name(This spell costs 12 more) name(This spell costs 12 more) target(*|opponentzones) transforms((,newability[pay[[12]] name(pay 12 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~13}:choice name(This spell costs 13 more) name(This spell costs 13 more) target(*|opponentzones) transforms((,newability[pay[[13]] name(pay 13 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~14}:choice name(This spell costs 14 more) name(This spell costs 14 more) target(*|opponentzones) transforms((,newability[pay[[14]] name(pay 14 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~15}:choice name(This spell costs 15 more) name(This spell costs 15 more) target(*|opponentzones) transforms((,newability[pay[[15]] name(pay 15 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~16}:choice name(This spell costs 16 more) name(This spell costs 16 more) target(*|opponentzones) transforms((,newability[pay[[16]] name(pay 16 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~17}:choice name(This spell costs 17 more) name(This spell costs 17 more) target(*|opponentzones) transforms((,newability[pay[[17]] name(pay 17 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~18}:choice name(This spell costs 18 more) name(This spell costs 18 more) target(*|opponentzones) transforms((,newability[pay[[18]] name(pay 18 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~19}:choice name(This spell costs 19 more) name(This spell costs 19 more) target(*|opponentzones) transforms((,newability[pay[[19]] name(pay 19 mana) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~morethan~19}:choice name(This spell costs 20 more) name(This spell costs 20 more) target(*|opponentzones) transforms((,newability[pay[[20]] name(pay 20 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~1}:choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentstack) transforms((,newability[pay[[1]] name(pay 1 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~2}:choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[2]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~3}:choice name(This spell costs 3 more) name(This spell costs 3 more) target(*|opponentstack) transforms((,newability[pay[[3]] name(pay 3 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~4}:choice name(This spell costs 4 more) name(This spell costs 4 more) target(*|opponentstack) transforms((,newability[pay[[4]] name(pay 4 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~5}:choice name(This spell costs 5 more) name(This spell costs 5 more) target(*|opponentstack) transforms((,newability[pay[[5]] name(pay 5 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~6}:choice name(This spell costs 6 more) name(This spell costs 6 more) target(*|opponentstack) transforms((,newability[pay[[6]] name(pay 6 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~7}:choice name(This spell costs 7 more) name(This spell costs 7 more) target(*|opponentstack) transforms((,newability[pay[[7]] name(pay 7 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~8}:choice name(This spell costs 8 more) name(This spell costs 8 more) target(*|opponentstack) transforms((,newability[pay[[8]] name(pay 8 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~9}:choice name(This spell costs 9 more) name(This spell costs 9 more) target(*|opponentstack) transforms((,newability[pay[[9]] name(pay 9 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~10}:choice name(This spell costs 10 more) name(This spell costs 10 more) target(*|opponentstack) transforms((,newability[pay[[10]] name(pay 10 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~11}:choice name(This spell costs 11 more) name(This spell costs 11 more) target(*|opponentstack) transforms((,newability[pay[[11]] name(pay 11 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~12}:choice name(This spell costs 12 more) name(This spell costs 12 more) target(*|opponentstack) transforms((,newability[pay[[12]] name(pay 12 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~13}:choice name(This spell costs 13 more) name(This spell costs 13 more) target(*|opponentstack) transforms((,newability[pay[[13]] name(pay 13 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~14}:choice name(This spell costs 14 more) name(This spell costs 14 more) target(*|opponentstack) transforms((,newability[pay[[14]] name(pay 14 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~15}:choice name(This spell costs 15 more) name(This spell costs 15 more) target(*|opponentstack) transforms((,newability[pay[[15]] name(pay 15 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~16}:choice name(This spell costs 16 more) name(This spell costs 16 more) target(*|opponentstack) transforms((,newability[pay[[16]] name(pay 16 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~17}:choice name(This spell costs 17 more) name(This spell costs 17 more) target(*|opponentstack) transforms((,newability[pay[[17]] name(pay 17 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~18}:choice name(This spell costs 18 more) name(This spell costs 18 more) target(*|opponentstack) transforms((,newability[pay[[18]] name(pay 18 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~equalto~19}:choice name(This spell costs 19 more) name(This spell costs 19 more) target(*|opponentstack) transforms((,newability[pay[[19]] name(pay 19 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones) restriction{compare(hascntexperience)~morethan~19}:choice name(This spell costs 20 more) name(This spell costs 20 more) target(*|opponentstack) transforms((,newability[pay[[20]] name(pay 20 mana) donothing?fizzle])) oneshot
 auto=@each my end restriction{revolt}:name(Put experience counter) counter(0/0,1,Experience)
 auto=@each my end restriction{revolt}:alterexperience:1 controller
 auto=lord(creature|mybattlefield) pexperience/0 nonstatic
@@ -73074,7 +73074,7 @@ toughness=9
 [/card]
 [card]
 name=Mishra, Tamer of Mak Fawa
-auto=@targeted(*|myBattlefield) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(*|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) target(*|mybattlefield) sacrifice])) oneshot
+auto=@targeted(*|myBattlefield) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(*|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) target(*|mybattlefield) sacrifice])) oneshot
 auto=lord(artifact|mygraveyard) {1}{B}{R}:name(Unearth) moveto(mybattlefield) and!( transforms((,haste,newability[unearth],newability[exiledeath])) forever )! asSorcery
 text=Permanents you control have "Ward-Sacrifice a permanent." -- Each artifact card in your graveyard has unearth {1}{B}{R}. ({1}{B}{R}: Return the card from your graveyard to the battlefield. It gains haste. Exile it at the beginning of the next end step or if it would leave the battlefield. Unearth only as a sorcery.)
 mana={3}{B}{R}
@@ -73995,7 +73995,7 @@ name=Moonrage Brute
 abilities=first strike,nightbound
 backside=Brutal Cathar
 auto=if type(*[day;night]|battlefield)~equalto~0 then if type(*[nonight]|battlefield)~equalto~0 then name(It becomes night) name(It becomes night) name(It becomes night) activate castcard(noevent named!:Night:!)
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
 text=First strike -- Ward-Pay 3 life. -- Nightbound (If a player casts at least two spells during their own turn, it becomes day next turn) // Brutal Cathar
 type=Creature
 subtype=Werewolf
@@ -77464,7 +77464,7 @@ name=Nine-Fingers Keene
 abilities=menace
 aicode=activate transforms((,newability[if type(*[gate;zpos<=9]|mylibrary)~morethan~0 then target(*[gate;zpos<=9]|mylibrary) moveto(mybattlefield) and!( if type(*[gate]|mybattlefield)~morethan~8 then all(*[zpos<=9]|mylibrary) moveto(hand) else all(*[zpos<=9]|mylibrary) moveto(myreveal) and!( bottomoflibrary )! )!],newability[if type(*[gate;zpos<=9]|mylibrary)~equalto~0 then if type(*[gate]|mybattlefield)~morethan~8 then all(*[zpos<=9]|mylibrary) moveto(hand) else all(*[zpos<=9]|mylibrary) moveto(myreveal) and!( bottomoflibrary )!])) ueot
 auto=@combatdamaged(player) from(this):name(Look top 9 cards) reveal:9 optionone name(Put gate in play) target(<upto:1>*[gate]|reveal) moveto(mybattlefield) optiononeend optiontwo if type(*[gate]|mybattlefield)~morethan~8 then name(Put in hand) all(*|myreveal) moveto(hand) else name(Put On Bottom) target(*|reveal) bottomoflibrary and!( all(*|myreveal) bottomoflibrary )! bottomoflibrary optiontwoend revealend
-auto=@targeted(*[iscommander]|mybattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 9 life more) name(This spell costs 9 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:9}]] name(pay 9 life) donothing?fizzle])) oneshot
+auto=@targeted(*[iscommander]|mybattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 9 life more) name(This spell costs 9 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:9}]] name(pay 9 life) donothing?fizzle])) oneshot
 text=Menace -- Ward-Pay 9 life. -- Whenever Nine-Fingers Keene deals combat damage to a player, look at the top nine cards of your library. You may put a Gate card from among them onto the battlefield. Then if you control nine or more Gates, put the rest into your hand. Otherwise, put the rest on the bottom of your library in a random order.
 mana={1}{B}{G}{U}
 type=Legendary Creature
@@ -81346,7 +81346,7 @@ type=Instant
 [card]
 name=Ovika, Enigma Goliath
 abilities=flying
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs 3 mana and 3 life more) name(This spell costs 3 mana and 3 life more) target(*|opponentzones) transforms((,newability[pay[[{3}{L:3}]] name(pay 3 mana and 3 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs 3 mana and 3 life more) name(This spell costs 3 mana and 3 life more) target(*|opponentstack) transforms((,newability[pay[[{3}{L:3}]] name(pay 3 mana and 3 life) donothing?fizzle])) oneshot
 auto=@movedTo(*[-creature]|mystack):name(Create goblin) all(trigger[to]) transforms((,newability[name(Create goblin) token(Phyrexian Goblin^Creature Phyrexian Goblin^1/1^red)*manacost and!( transforms((,haste)) ueot )!])) ueot
 text=Flying -- Ward {3}, Pay 3 life. -- Whenever you cast a noncreature spell, create X 1/1 red Phyrexian Goblin creature tokens, where X is the mana value of that spell. They gain haste until end of turn.
 mana={5}{U}{R}
@@ -81417,7 +81417,7 @@ toughness=4
 [card]
 name=Owlin Shieldmage
 abilities=flying
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
 text=Flying -- Ward-Pay 3 life. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays 3 life.)
 mana={3}{W}{B}
 type=Creature
@@ -83431,26 +83431,26 @@ name=Phyrexian Fleshgorger
 abilities=lifelink,menace
 other={1}{B}{B} name(Prototype)
 auto=alternative becomes(,3/3,black)
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~1}:choice name(This spell costs 1 life more) name(This spell costs 1 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:1}]] name(pay 1 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~2}:choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~3}:choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~4}:choice name(This spell costs 4 life more) name(This spell costs 4 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:4}]] name(pay 4 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~5}:choice name(This spell costs 5 life more) name(This spell costs 5 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:5}]] name(pay 5 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~6}:choice name(This spell costs 6 life more) name(This spell costs 6 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:6}]] name(pay 6 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~7}:choice name(This spell costs 7 life more) name(This spell costs 7 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:7}]] name(pay 7 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~8}:choice name(This spell costs 8 life more) name(This spell costs 8 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:8}]] name(pay 8 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~9}:choice name(This spell costs 9 life more) name(This spell costs 9 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:9}]] name(pay 9 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~10}:choice name(This spell costs 10 life more) name(This spell costs 10 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:10}]] name(pay 10 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~11}:choice name(This spell costs 11 life more) name(This spell costs 11 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:11}]] name(pay 11 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~12}:choice name(This spell costs 12 life more) name(This spell costs 12 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:12}]] name(pay 12 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~13}:choice name(This spell costs 13 life more) name(This spell costs 13 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:13}]] name(pay 13 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~14}:choice name(This spell costs 14 life more) name(This spell costs 14 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:14}]] name(pay 14 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~15}:choice name(This spell costs 15 life more) name(This spell costs 15 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:15}]] name(pay 15 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~16}:choice name(This spell costs 16 life more) name(This spell costs 16 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:16}]] name(pay 16 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~17}:choice name(This spell costs 17 life more) name(This spell costs 17 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:17}]] name(pay 17 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~18}:choice name(This spell costs 18 life more) name(This spell costs 18 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:18}]] name(pay 18 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~19}:choice name(This spell costs 19 life more) name(This spell costs 19 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:19}]] name(pay 19 life) donothing?fizzle])) oneshot
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~morethan~19}:choice name(This spell costs 20 life more) name(This spell costs 20 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:20}]] name(pay 20 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~1}:choice name(This spell costs 1 life more) name(This spell costs 1 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:1}]] name(pay 1 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~2}:choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~3}:choice name(This spell costs 3 life more) name(This spell costs 3 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:3}]] name(pay 3 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~4}:choice name(This spell costs 4 life more) name(This spell costs 4 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:4}]] name(pay 4 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~5}:choice name(This spell costs 5 life more) name(This spell costs 5 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:5}]] name(pay 5 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~6}:choice name(This spell costs 6 life more) name(This spell costs 6 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:6}]] name(pay 6 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~7}:choice name(This spell costs 7 life more) name(This spell costs 7 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:7}]] name(pay 7 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~8}:choice name(This spell costs 8 life more) name(This spell costs 8 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:8}]] name(pay 8 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~9}:choice name(This spell costs 9 life more) name(This spell costs 9 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:9}]] name(pay 9 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~10}:choice name(This spell costs 10 life more) name(This spell costs 10 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:10}]] name(pay 10 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~11}:choice name(This spell costs 11 life more) name(This spell costs 11 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:11}]] name(pay 11 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~12}:choice name(This spell costs 12 life more) name(This spell costs 12 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:12}]] name(pay 12 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~13}:choice name(This spell costs 13 life more) name(This spell costs 13 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:13}]] name(pay 13 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~14}:choice name(This spell costs 14 life more) name(This spell costs 14 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:14}]] name(pay 14 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~15}:choice name(This spell costs 15 life more) name(This spell costs 15 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:15}]] name(pay 15 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~16}:choice name(This spell costs 16 life more) name(This spell costs 16 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:16}]] name(pay 16 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~17}:choice name(This spell costs 17 life more) name(This spell costs 17 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:17}]] name(pay 17 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~18}:choice name(This spell costs 18 life more) name(This spell costs 18 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:18}]] name(pay 18 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~equalto~19}:choice name(This spell costs 19 life more) name(This spell costs 19 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:19}]] name(pay 19 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones) restriction{compare(p)~morethan~19}:choice name(This spell costs 20 life more) name(This spell costs 20 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:20}]] name(pay 20 life) donothing?fizzle])) oneshot
 text=Prototype {1}{B}{B} - 3/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.) -- Menace, lifelink -- Ward-Pay life equal to Phyrexian Fleshgorger's power.
 mana={7}
 type=Artifact Creature
@@ -87029,7 +87029,7 @@ type=Enchantment
 name=Purging Stormbrood // Absorb Essence
 abilities=flying
 restriction=can play creature
-auto=@targeted(this) from(*|opponentzones):choice name(Pay 2 life) name(Pay 2 life) target(*|opponentzones) transforms((,newability[pay[[{L:2}]] name(Pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(Pay 2 life) name(Pay 2 life) target(*|opponentstack) transforms((,newability[pay[[{L:2}]] name(Pay 2 life) donothing?fizzle])) oneshot
 auto=may removeallcounters(all) target(*|battlefield)
 other={1}{W} name(Omen:Absorb Essence) instant
 auto=alternative target(creature) transforms((,newability[2/2],newability[lifelink],newability[hexproof])) ueot
@@ -87109,7 +87109,7 @@ type=Instant
 [/card]
 [card]
 name=Pursued Whale
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 3 more) name(This spell costs 3 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{3}]] name(pay 3 mana) donothing?fizzle])) oneshot
 auto=token(Pirate Pur) opponent
 text=When Pursued Whale enters, each opponent creates a 1/1 red Pirate creature token with "This creature can't block" and "Creatures you control attack each combat if able." -- Spells your opponents cast that target Pursued Whale cost 3 more to cast.
 mana={5}{U}{U}
@@ -87931,7 +87931,7 @@ toughness=5
 [card]
 name=Radagast, Wizard of Wilds
 auto=_WARD1_
-auto=@targeted(bird|mybattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentzones) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
+auto=@targeted(bird|mybattlefield) from(*|opponentzones):choice name(This spell costs 1 more) name(This spell costs 1 more) target(*|opponentstack) transforms((,newability[pay[[{1}]] name(pay 1 mana) donothing?fizzle])) oneshot
 auto=@movedTo(*[manacost>=5]|mystack):name(Choose one) transforms((,newability[choice name(Create beast) token(Beast Rad)],newability[choice name(Create bird) token(Bird^Creature Brid^2/2^blue^flying)])) oneshot
 text=Ward {1} -- Beasts and Birds you control have ward {1}. -- Whenever you cast a spell with mana value 5 or greater, choose one -- Create a 3/3 green Beast creature token. -- Create a 2/2 blue Bird creature token with flying.
 mana={2}{G}{U}
@@ -90578,7 +90578,7 @@ toughness=3
 [/card]
 [card]
 name=Refraction Elemental
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
 auto=@movedTo(*|mystack):name(Damage 2) damage:2 opponent
 text=Ward-Pay 2 life. -- Whenever you cast a spell, Refraction Elemental deals 2 damage to each opponent.
 color=red
@@ -96936,7 +96936,7 @@ toughness=3
 [/card]
 [card]
 name=Saruman of Many Colors
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a discard) name(This spell costs a discard) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(enchantment|myhand)~morethan~0 then choice name(Discard an enchantment) name(Discard an enchantment) target(enchantment|myhand) reject],newability[if type(*[instant;sorcery]|myhand)~morethan~0 then choice name(Discard an instant or sorcery) name(Discard an instant or sorcery) target(*[instant;sorcery]|myhand) reject])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a discard) name(This spell costs a discard) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(enchantment|myhand)~morethan~0 then choice name(Discard an enchantment) name(Discard an enchantment) target(enchantment|myhand) reject],newability[if type(*[instant;sorcery]|myhand)~morethan~0 then choice name(Discard an instant or sorcery) name(Discard an instant or sorcery) target(*[instant;sorcery]|myhand) reject])) oneshot
 auto=@movedto(*|mystack) restriction{thisturn(*|mystack)~equalto~1,type(*|opponentlibrary)~morethan~0}:name(Opponent mills 2 cards) deplete:2 opponent && ability$!name(Exile and cast copy) name(Exile and cast copy) target(*[enchantment;instant;sorcery]|opponentgraveyard) moveto(opponentexile) and!( activate castcard(copied) )!!$ controller
 text=Ward-Discard an enchantment, instant, or sorcery card. -- Whenever you cast your second spell each turn, each opponent mills two cards. When one or more cards are milled this way, exile target enchantment, instant, or sorcery card with equal or lesser mana value than that spell from an opponent's graveyard. Copy the exiled card. You may cast the copy without paying its mana cost.
 mana={3}{W}{U}{B}
@@ -96988,7 +96988,7 @@ auto=@movedTo(*[-creature&manacost=17]|mystack):name(Amass orcs 17) if type(army
 auto=@movedTo(*[-creature&manacost=18]|mystack):name(Amass orcs 18) if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters) name(Put 1/1 counters) notaTarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.18)])) forever else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black) and!( name(Put 1/1 counters) counter(1/1.18) notaTarget(army|myBattlefield) )!
 auto=@movedTo(*[-creature&manacost=19]|mystack):name(Amass orcs 19) if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters) name(Put 1/1 counters) notaTarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.19)])) forever else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black) and!( name(Put 1/1 counters) counter(1/1.19) notaTarget(army|myBattlefield) )!
 auto=@movedTo(*[-creature&manacost>=19]|mystack):name(Amass orcs 20) if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters) name(Put 1/1 counters) notaTarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.20)])) forever else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black) and!( name(Put 1/1 counters) counter(1/1.20) notaTarget(army|myBattlefield) )!
-auto=@targeted(*[orc;goblin]|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(*[orc;goblin]|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Whenever you cast a noncreature spell, amass Orcs X, where X is that spell's mana value. (Put X +1/+1 counters on an Army you control. It's also an Orc. If you don't control an Army, create a 0/0 black Orc Army creature token first.) -- Goblins and Orcs you control have ward {2}.
 mana={1}{U}{B}{R}
 type=Legendary Creature
@@ -97125,7 +97125,7 @@ toughness=9
 [/card]
 [card]
 name=Sauron, the Dark Lord
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(artifact[legendary]|myBattlefield)~morethan~0 then choice name(Sacrifice a legendary artifact) name(Sacrifice a legendary artifact) target(artifact[legendary]|mybattlefield) sacrifice],newability[if type(creature[legendary]|myBattlefield)~morethan~0 then choice name(Sacrifice a legendary creature) name(Sacrifice a legendary creature) target(creature[legendary]|mybattlefield) sacrifice])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(artifact[legendary]|myBattlefield)~morethan~0 then choice name(Sacrifice a legendary artifact) name(Sacrifice a legendary artifact) target(artifact[legendary]|mybattlefield) sacrifice],newability[if type(creature[legendary]|myBattlefield)~morethan~0 then choice name(Sacrifice a legendary creature) name(Sacrifice a legendary creature) target(creature[legendary]|mybattlefield) sacrifice])) oneshot
 auto=@movedTo(*|opponentstack):name(Amass orcs 1) ability$!name(Amass orcs 1) _AMASSORC1_!$ controller
 auto=@combatdamaged(player) from(army|mybattlefield):name(The ring tempts you) ability$!name(The ring tempts you) _RINGTEMPTS_!$ controller
 auto=@ringtemptedof(player):may name(Discard and draw) discard:type:*:myhand controller && draw:4 controller
@@ -100885,7 +100885,7 @@ name=Shelob, Child of Ungoliant
 abilities=deathtouch
 auto=_WARD2_
 auto=lord(other spider|myBattlefield) deathtouch
-auto=@targeted(other spider|myBattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(other spider|myBattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto=@vampired(creature) from(spider|myBattlefield):may name(Copy creature damaged by spider) all(trigger[to]) clone and!( transforms((removetypes,newability[becomes(Artifact Food) forever],newability[{2}{T}{S}:name(Sacrifice and gain 3 life) life:3 controller])) forever )!
 text=Deathtouch, ward {2} -- Other Spiders you control have deathtouch and ward {2}. -- Whenever another creature dealt damage this turn by a Spider you controlled dies, create a token that's a copy of that creature, except it's a Food artifact with "{2}, {T}, Sacrifice this artifact: You gain 3 life," and it loses all other card types.
 mana={4}{B}{G}
@@ -103054,7 +103054,7 @@ type=Instant
 [card]
 name=Sire of Seven Deaths
 abilities=first strike,lifelink,menace,reach,trample,vigilance
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 7 life more) name(This spell costs 7 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:7}]] name(pay 7 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 7 life more) name(This spell costs 7 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:7}]] name(pay 7 life) donothing?fizzle])) oneshot
 text=First strike, vigilance -- Menace, trample -- Reach, lifelink -- Ward-Pay 7 life.
 mana={7}
 type=Creature
@@ -107273,7 +107273,7 @@ toughness=3
 [card]
 name=Sphinx of New Prahv
 abilities=flying,vigilance
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Flying, vigilance -- Spells your opponents cast that target Sphinx of New Prahv cost 2 more to cast.
 mana={W}{W}{U}{U}
 type=Creature
@@ -112794,7 +112794,7 @@ toughness=3
 name=Syr Elenora, the Discerning
 anyzone=type:*:myhand/4 cdaactive
 auto=draw:1 controller
-auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(this) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 text=Syr Elenora, the Discerning's power is equal to the number of cards in your hand. -- When Syr Elenora enters, draw a card. -- Spells your opponents cast that target Syr Elenora cost 2 more to cast.
 mana={3}{U}{U}
 type=Legendary Creature
@@ -117066,7 +117066,7 @@ toughness=4
 [card]
 name=Thran Power Suit
 auto=teach(creature) transforms((,newability[thisforeach(auras > 0) 1/1],newability[thisforeach(gear > 0) 1/1]))
-auto=@targeted(mytgt) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(mytgt) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto={2}:equip
 text=Equipped creature gets +1/+1 for each Aura and Equipment attached to it and has ward {2}. (Whenever equipped creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.) -- Equip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)
 mana={2}
@@ -121467,7 +121467,7 @@ toughness=5
 [card]
 name=Ulamog's Dreadsire
 abilities=vigilance
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(*[manacost>=1]|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) target(*[manacost>=1]|mybattlefield) sacrifice])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(*[manacost>=1]|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) target(*[manacost>=1]|mybattlefield) sacrifice])) oneshot
 auto={T}:create(eldrazi:creature eldrazi:10/10)
 text=Vigilance -- Ward-Sacrifice a permanent with mana value 1 or greater. -- {T}: Create a 10/10 colorless Eldrazi creature token.
 mana={10}
@@ -124052,7 +124052,7 @@ toughness=2
 [card]
 name=Vein Ripper
 abilities=flying
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(creature|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) notaTarget(creature|mybattlefield) sacrifice])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(creature|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) notaTarget(creature|mybattlefield) sacrifice])) oneshot
 auto=@movedTo(creature|graveyard) from(battlefield):life:2 controller
 auto=@movedTo(creature|graveyard) from(battlefield):target(opponent) life:-2 targetedplayer
 text=Flying -- Ward-Sacrifice a creature. -- Whenever a creature dies, target opponent loses 2 life and you gain 2 life.
@@ -129861,7 +129861,7 @@ toughness=4
 [/card]
 [card]
 name=Wondrous Crucible
-auto=@targeted(*|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentzones) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
+auto=@targeted(*|mybattlefield) from(*|opponentzones):choice name(This spell costs 2 more) name(This spell costs 2 more) target(*|opponentstack) transforms((,newability[pay[[{2}]] name(pay 2 mana) donothing?fizzle])) oneshot
 auto=@each my end:name(Mill and exile) deplete:2 controller && ability$!name(Exile a random card) name(Exile a random card) target(*[-land]|opponentgraveyard) moveto(opponentexile) and!( transforms((,newability[if cantargetcard(*[-instant;-sorcery]|*) then choice name(Cast the copy) name(Cast the copy) clone],newability[if cantargetcard(*[instant;sorcery]|*) then choice name(Cast the copy) name(Cast the copy) activate castcard(copied)],newability[choice name(Don't cast copy) donothing])) oneshot )!!$ opponent
 text=Permanents you control have ward {2}. -- At the beginning of your end step, mill two cards, then exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying its mana cost. (A copy of a permanent spell becomes a token.)
 mana={7}
@@ -130752,7 +130752,7 @@ toughness=5
 [/card]
 [card]
 name=Ygra, Eater of All
-auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentzones) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(Food|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) notaTarget(Food|mybattlefield) sacrifice])) oneshot
+auto=@targeted(this) from(*|opponentzones):choice name(This spell costs a sacrifice) name(This spell costs a sacrifice) target(*|opponentstack) transforms((,newability[choice name(Counter spell) target(*|mystack) fizzle],newability[if type(Food|myBattlefield)~morethan~0 then choice name(Sacrifice a permanent) name(Sacrifice a permanent) notaTarget(Food|mybattlefield) sacrifice])) oneshot
 auto=lord(other creature) transforms((Food artifact,newability[{2}{T}{S}:life:3]))
 auto=@movedto(graveyard) from(Food|battlefield):counter(1/1,2)
 text=Ward-Sacrifice a Food. -- Other creatures are Food artifacts in addition to their other types and have "{2}, {T}, Sacrifice this permanent: You gain 3 life." -- Whenever a Food is put into a graveyard from the battlefield, put two +1/+1 counters on Ygra, Eater of All.
@@ -131719,7 +131719,7 @@ toughness=3
 [/card]
 [card]
 name=Zul Ashur, Lich Lord
-auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentzones) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
+auto=@targeted(this|myBattlefield) from(*[instant;sorcery]|opponentzones):choice name(This spell costs 2 life more) name(This spell costs 2 life more) target(*[instant;sorcery]|opponentstack) transforms((,newability[pay[[{L:2}]] name(pay 2 life) donothing?fizzle])) oneshot
 auto={T}:target(creature[zombie]|mygraveyard) transforms((,newability[canPlayFromGraveyard])) ueot
 text=Ward-Pay 2 life. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays 2 life.) -- {T}: You may cast target Zombie creature card from your graveyard this turn.
 mana={1}{B}

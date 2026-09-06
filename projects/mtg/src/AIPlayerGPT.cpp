@@ -13351,6 +13351,15 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
             o << " [" << tag << "]";
     }
     o << targetZoneTag(me, c); //#W43-9: the shared owner/zone tag
+    //#W68-BC (MED, deck146 s51): a planeswalker's loyalty is its whole answer,
+    //and the TARGET row never carried it. 146 s51 is the legend-rule pick
+    //between two Lolths, both rows reading "[planeswalker] [your battlefield]"
+    //with no number on either - and the reply invented one ("Lolth #2 enters
+    //with 4 + 4 = 8 loyalty counters"). The board line already prints
+    //`[counters: Nx loyalty]`; the row is what the answer is chosen off.
+    if (c->hasType(Subtypes::TYPE_PLANESWALKER) && c->counters
+        && c->counters->hasCounter("loyalty", 0, 0))
+        o << " [loyalty " << c->counters->hasCounter("loyalty", 0, 0)->nb << "]";
     if (c->isTapped())
         o << " [tapped]";
     //#W66-AT (H6, deck152 HIGH-1 / MED-1): summoningSickTag had exactly ONE
@@ -14280,6 +14289,36 @@ long AIPlayerGPT::deadlineTenthsPct(long latencyMs, long timeoutMs)
     return (latencyMs * 1000) / timeoutMs;
 }
 
+//#W68-BC (J2): the same fraction for a record that spent TWO round trips. The
+//shipped field divided the SUMMED latency by ONE deadline, so 162v126 s13
+//(900,035 ms miss + 333,376 ms retry against a 900,000 ms deadline) published
+//`deadline_pct 137.0` - the corpus signature for "a call ran past its
+//deadline" - on a record where NEITHER leg did. The honest figure is the
+//worst ATTEMPT: what any single call cost of the deadline it was given. The
+//sum is not lost; it is `latency_ms`, and the legs are `attempt_ms`.
+long AIPlayerGPT::deadlineTenthsPctOfAttempts(long firstMs, long secondMs, long timeoutMs)
+{
+    const long a = deadlineTenthsPct(firstMs, timeoutMs);
+    const long b = deadlineTenthsPct(secondMs, timeoutMs);
+    return a > b ? a : b;
+}
+
+//#W68-BC (J2): whether a SECOND attempt fits inside what is left of this
+//decision's deadline. The transport arm already asked this question
+//(remainingTransportRetryMs); the wall arm did not - it set mRetryBudgetMs = 0,
+//which the request builder reads as "no override", i.e. a fresh FULL deadline,
+//so one decision could burn 2x WAGIC_GPT_TIMEOUT (1800 s on this corpus's
+//dial). A wall miss has spent the whole deadline by definition, so the
+//remainder is 0 and there is no second attempt to buy: the heuristic answers
+//and the record says `wall_miss_no_retry`. Lane AX read the transport arm's
+//arithmetic and concluded a wall miss already got no retry; the corpus says
+//otherwise - 4 wall misses, all 4 armed a retry, 1 of them consumed a second
+//333 s deadline (162v126 s13) and 3 were abandoned when the decision drifted.
+bool AIPlayerGPT::retryFitsInDeadline(long deadlineMs, long firstLatencyMs)
+{
+    return remainingTransportRetryMs(deadlineMs, firstLatencyMs) > 0;
+}
+
 bool AIPlayerGPT::isLongReply(long latencyMs, long timeoutMs, bool answered)
 {
     //the SAME >= 95% mark the worker's timeout test uses, on the answered side
@@ -15042,14 +15081,19 @@ static string wallMissClassFor(const string& phase)
 //The abandoned ask gets its own zero-choice record, carrying the prompt the
 //model never answered. Additive: no window is removed, no retry is spent, and
 //nothing in the engine reads it.
-void AIPlayerGPT::flushWallMissRecord()
+void AIPlayerGPT::flushWallMissRecord(const char * classOverride)
 {
     if (!mWallMissPending)
         return;
     string base = mWallMissBase;
     mWallMissPending = false;
     mWallMissBase.clear();
-    mWallMissUnrecorded++;
+    //#W68-BC (J2): a miss written down BECAUSE no retry was bought is not an
+    //"unrecorded" (abandoned) miss - it has its own counter and its own class.
+    if (classOverride)
+        mWallMissNoRetry++;
+    else
+        mWallMissUnrecorded++;
     //#W61-U (C13): the abandoned ask's OWN round trip, restored onto the record
     //that reports it. Without it the record read `latency_ms: -1` (a cache hit)
     //for a decision that had just spent the entire deadline, and carried no
@@ -15064,7 +15108,7 @@ void AIPlayerGPT::flushWallMissRecord()
     string phase;
     for (size_t i = 0; i < mLastTransportOutcomes.size() && phase.empty(); i++)
         phase = transportStampPhase(mLastTransportOutcomes[i]);
-    const string wmClass = wallMissClassFor(phase);
+    const string wmClass = classOverride ? string(classOverride) : wallMissClassFor(phase); //#W68-BC (J2)
     writeTransLog("wall_miss", base, "", -1, 0, "", wmClass.c_str(), NULL);
 }
 
@@ -15087,6 +15131,12 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             //Retry finished: sum both attempts' latency into the record's field,
             //spend this decision's one retry, and hand back the retry reply
             //(possibly still unusable -> the caller's heuristic answers).
+            //#W68-BC (J2): keep BOTH legs before the sum overwrites the field.
+            //`latency_ms` stays the seat's total wait for the decision (what
+            //the harness's cost accounting needs); `attempt_ms` is what each
+            //call actually cost, and deadline_pct is computed from these.
+            mLastAttemptFirstMs = mRetryFirstLatencyMs;
+            mLastAttemptSecondMs = mLastLatencyMs;
             if (mLastLatencyMs >= 0 && mRetryFirstLatencyMs >= 0)
                 mLastLatencyMs += mRetryFirstLatencyMs;
             mRetryDoneBase = userMsg;
@@ -15177,15 +15227,34 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
     //account.
     const bool transportFailure = retryableTransportFailure(
         mLastCurlResult, mLastHttpStatus, content.empty());
-    const long transportBudgetMs = remainingTransportRetryMs(mTimeoutMs, mLastLatencyMs);
-    if (content.empty() && userMsg != mRetryDoneBase
+    const long retryBudgetMs = remainingTransportRetryMs(mTimeoutMs, mLastLatencyMs);
+    //#W68-BC (J2): ONE remainder rule for BOTH arms. The wall arm used to pass
+    //mRetryBudgetMs = 0, which buildRequestBody reads as "no override" - a
+    //fresh, FULL deadline - so a decision that had already spent 900 s could
+    //spend 900 s more. `retryFitsInDeadline` is that arithmetic, and on a wall
+    //miss it is false: the decision goes to the heuristic and SAYS SO, in a
+    //`wall_miss_no_retry` record written here rather than a second deadline.
+    //Nothing is capped and no window is removed - the heuristic answers the
+    //same window it would have answered at 1800 s.
+    if (content.empty() && mLastTimeout && userMsg != mRetryDoneBase
+        && !retryFitsInDeadline(mTimeoutMs, mLastLatencyMs))
+    {
+        mWallMissEvents++;
+        mWallMissLatencyMs = mLastLatencyMs;
+        mWallMissPending = true;
+        mWallMissBase = userMsg;
+        setNotice("no reply from the model - the heuristic answers", 3.0f);
+        DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
+                   << "s - the deadline is spent, no retry - heuristic");
+        flushWallMissRecord("wall_miss_no_retry");
+        return 0; //the caller's heuristic answers this decision
+    }
+    if (content.empty() && userMsg != mRetryDoneBase && retryBudgetMs > 0
         && (mLastTimeout
-            || (transportFailure && !mLastStaleLivelock && transportBudgetMs > 0)))
+            || (transportFailure && !mLastStaleLivelock)))
     {
         mRetryFirstLatencyMs = mLastLatencyMs;
-        //A wall miss has nothing left of its deadline by definition; 0 means
-        //"the full deadline again", which is exactly what D10 shipped.
-        mRetryBudgetMs = mLastTimeout ? 0 : transportBudgetMs;
+        mRetryBudgetMs = retryBudgetMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
         //#W55-E (D23): arm the wall-miss account on a DEADLINE miss. Whichever comes
@@ -15207,7 +15276,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             setNotice("the connection failed - asking once more", 3.0f);
             DebugTrace("AIPlayerGPT: transport failed (curl=" << mLastCurlResult
                        << ", http=" << mLastHttpStatus << ") - one retry with "
-                       << transportBudgetMs << " ms of the deadline left");
+                       << retryBudgetMs << " ms of the deadline left");
         }
         return kChoicePending; //next tick polls the retry
     }
@@ -15249,6 +15318,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false), mRevealStallDriverTicks(0), mRevealStallDriverSecs(0),
       mWallMissPending(false), mWallMissLatencyMs(-1), //#W61-U (C13)
       mWallMissEvents(0), mWallMissUnrecorded(0),
+      mWallMissNoRetry(0), //#W68-BC (J2)
+      mLastAttemptFirstMs(-1), mLastAttemptSecondMs(-1), //#W68-BC (J2)
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
@@ -15806,12 +15877,14 @@ void AIPlayerGPT::flushRecoveryRecord()
     const string execSeam = mRecoveryExecSeam;
     const string execText = mRecoveryExecText;
     const int execRow = mRecoveryExecRow;
+    const string execBy = mRecoveryExecBy; //#W68-BC (MED)
     mRecoverySeq = -1;              //cleared BEFORE the write, per the flush idiom
     mRecoveryClass.clear();
     mRecoveryKind.clear();
     mRecoveryExecSeam.clear();
     mRecoveryExecText.clear();
     mRecoveryExecRow = -1;
+    mRecoveryExecBy.clear(); //#W68-BC (MED)
     json rec = {
         {"seq", mTransSeq++},
         {"kind", "recovery"},
@@ -15843,6 +15916,7 @@ void AIPlayerGPT::flushRecoveryRecord()
         rec["executed_seam"] = execSeam;
         rec["executed_choice"] = execRow;
         rec["executed_text"] = execText;
+        rec["executed_by"] = execBy.empty() ? string("heuristic") : execBy; //#W68-BC (MED)
     }
     transLogWrite(rec.dump()); //audit-L (L4)
 }
@@ -15858,6 +15932,20 @@ void AIPlayerGPT::noteHeuristicExecuted(const char * seam, int row, const string
     mRecoveryExecSeam = seam;
     mRecoveryExecRow = row;
     mRecoveryExecText = text;
+    mRecoveryExecBy = "heuristic"; //#W68-BC (MED)
+}
+
+//#W68-BC (MED, engine MED-1): the re-ask's own resolution, stamped where the
+//second answer becomes final. Same guard as the heuristic stamp - a stamp with
+//no pending recovery is dropped.
+void AIPlayerGPT::noteReaskExecuted(const char * seam, int row, const string& text)
+{
+    if (mRecoverySeq < 0 || !seam || !*seam)
+        return;
+    mRecoveryExecSeam = seam;
+    mRecoveryExecRow = row;
+    mRecoveryExecText = text;
+    mRecoveryExecBy = "reask";
 }
 
 //#W67-AZ (R7): the driver's own last-resort pick, recorded. Counted for the
@@ -16027,6 +16115,16 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["retry"] = 1;
         mLastRetry = false;
     }
+    //#W68-BC (J2): the LEGS of a retried decision, so a p90/max consumer can
+    //tell one 1233 s round trip from a 900 s miss plus a 333 s success. Two
+    //numbers, always in attempt order; absent on a single-attempt record.
+    if (mLastAttemptFirstMs >= 0 || mLastAttemptSecondMs >= 0)
+    {
+        std::vector<long> attempts;
+        attempts.push_back(mLastAttemptFirstMs);
+        attempts.push_back(mLastAttemptSecondMs);
+        rec["attempt_ms"] = attempts;
+    }
     //#W54-B (D9): a reply that ANSWERED at or past 95% of the configured
     //deadline gets its own stamp and the elapsed fraction, so "the model
     //nearly missed the wall" stops reading as "the model answered". No
@@ -16044,7 +16142,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //by arithmetic, was absent exactly where it was needed. -1 (cache/reuse, or
     //no deadline configured) still writes nothing.
     {
-        const long tenths = deadlineTenthsPct(mLastLatencyMs, mTimeoutMs);
+        //#W68-BC (J2): PER ATTEMPT. On a single-attempt record both legs are
+        //-1 and this is exactly the shipped figure; on a retried record it is
+        //the worst leg instead of the sum-over-one-deadline that published
+        //`deadline_pct 137.0` for a decision in which no call ran past its
+        //deadline (162v126 s13).
+        const long tenths = (mLastAttemptFirstMs >= 0 || mLastAttemptSecondMs >= 0)
+            ? deadlineTenthsPctOfAttempts(mLastAttemptFirstMs, mLastAttemptSecondMs, mTimeoutMs)
+            : deadlineTenthsPct(mLastLatencyMs, mTimeoutMs);
         if (tenths >= 0)
             rec["deadline_pct"] = tenths / 10.0;
     }
@@ -16063,6 +16168,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         && planArguesAgainstRow(reply, (*optionTexts)[choice - 1]))
         appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    mLastAttemptFirstMs = -1; //#W68-BC (J2): consumed with it
+    mLastAttemptSecondMs = -1;
     mLastHttpStatus = 0; //audit-L (A24): consumed with it
     mLastCurlResult = -1; //#W59-H (K1): consumed with it
     mLastTransportOutcomes.clear(); //#W59-H (K1): consumed with it
@@ -16498,6 +16605,7 @@ void AIPlayerGPT::logGameEnd()
         //than infers - the wave-54 answer to "2 events, 1 record" was silence.
         {"wall_miss_events", mWallMissEvents},
         {"wall_miss_unrecorded", mWallMissUnrecorded},
+        {"wall_miss_no_retry", mWallMissNoRetry}, //#W68-BC (J2)
     };
     transLogWrite(rec.dump()); //audit-L (L4)
     //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
@@ -16515,7 +16623,8 @@ void AIPlayerGPT::logGameEnd()
                << "; repeated identical asks re-served from the seat's own answer: "
                << mRepeatAskAnswersReserved
                << "; deadline misses: " << mWallMissEvents
-               << " (" << mWallMissUnrecorded << " unrecorded)");
+               << " (" << mWallMissUnrecorded << " unrecorded, "
+               << mWallMissNoRetry << " no-retry)"); //#W68-BC (J2)
     if (mTransLog.is_open())
         mTransLog.close(); //the game's last record
 }
@@ -26570,6 +26679,25 @@ const char * kSelfTargetClause = " {this hits YOUR permanent}";
 //damage rows carried the outcome the spell rows beside them carried. Creature
 //targets reuse damageTargetVerdict byte-for-byte; a planeswalker's answer is
 //its loyalty, so it gets its own pure table (provable in PARSETEST).
+//#W68-BC (MED, deck146 s51): the legend-rule ask's missing sentence. The
+//model is owed the RULE (CR 704.5j) and the one thing about it that is most
+//easily assumed wrong - the copies do not merge. Pure, so PARSETEST pins the
+//wording; the loyalty numbers ride the ROWS (describeTarget), not this clause,
+//because they are per-copy facts and the clause is the rule.
+string legendRuleTargetClause(const string& name, int copies)
+{
+    std::ostringstream o;
+    o << " LEGEND RULE (CR 704.5j): you control " << copies
+      << " legendary permanents named \"" << name
+      << "\" - you KEEP the one you pick here and the other"
+      << (copies > 2 ? "s go" : " goes")
+      << " to its owner's graveyard now. The copies do NOT merge: no counters,"
+         " no damage, no attachments and no abilities move between them, so the"
+         " one you keep has exactly what is already printed on its row and"
+         " nothing from the other" << (copies > 2 ? "s" : "") << ".";
+    return o.str();
+}
+
 string damagePlaneswalkerVerdict(int dmg, int loyalty)
 {
     std::ostringstream o;
@@ -32843,6 +32971,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (repeatRowTaken)
                 appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
                                                                  : "repeat_count_reask_exhausted");
+            //#W68-BC (MED, engine MED-1): the re-ask's SECOND answer is final
+            //here - stamp it onto the recovery record the first (failed) answer
+            //opened, before writeTransLog flushes that record. 0 is a pass and
+            //is stated as one; a second answer that still failed to parse
+            //(choice < 0) stamps nothing and leaves the heuristic's own site to
+            //speak.
+            if (choice >= 0)
+                noteReaskExecuted("priority", choice,
+                                  (choice >= 1 && choice <= (int) shownLines.size())
+                                      ? shownLines[choice - 1] : string());
             mPriorityReaskKind.clear();
         }
         //#W67-AY (I6): the receipt, in the narration, before the window's own
@@ -33659,6 +33797,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         else
             appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                           : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
+        //#W68-BC (MED, engine MED-1): same stamp at the casting seam.
+        if (choice >= 0)
+            noteReaskExecuted("cast", choice,
+                              (choice >= 1 && choice <= (int) options.size())
+                                  ? options[choice - 1] : string());
     }
     mPrevWindowRows = options; //#W51-C D3: this window is now the prior one
     if (content.empty())
@@ -39000,6 +39143,24 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             if (!dc || !dc->hasType(Subtypes::TYPE_DUNGEON))
                 dungeonSelect = false;
         }
+        //#W68-BC (MED, deck146 s51): the LEGEND RULE pick. MTGNewLegend::
+        //MoveLegend builds a `*[-mutated;legendary;share!name!]|mybattlefield`
+        //chooser over an AAMover-to-owner's-graveyard, so the seat met it as a
+        //bare "TARGET CHOICE for Lolth, Spider Queen - its \"put a card into
+        //the graveyard\" ability" over two identically-described rows: the RULE
+        //was never stated and neither copy's loyalty was printed. The reply
+        //invented the merge ("4 + 4 = 8"). Detected off engine facts only -
+        //two or more candidates, every one a legendary permanent on MY
+        //battlefield sharing the source's name.
+        bool legendRuleSelect = targets.size() >= 2 && tc->source;
+        for (size_t i = 0; i < targets.size() && legendRuleSelect; i++)
+        {
+            MTGCardInstance * lc = dynamic_cast<MTGCardInstance *>(targets[i]);
+            if (!lc || lc->controller() != this
+                || !lc->hasType(Subtypes::TYPE_LEGENDARY)
+                || lc->getName() != tc->source->getName())
+                legendRuleSelect = false;
+        }
         //#W60-O (B12): the source's own text, when it conditions on ONE of the
         //dungeons on this menu by name, rides that dungeon's row. Read off the
         //printed text of the card that is venturing (walked through the
@@ -39182,6 +39343,12 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
           << effectName << "\")";
         //N-146q: a compound mode's target ask names which part this pick feeds.
         q << compoundModeTargetNote(abilityName);
+        //#W68-BC (MED, deck146 s51): name the rule this pick IS. Append-only:
+        //no row is added, removed or reordered, and the answer index is
+        //untouched - the model is told what it is deciding and what the choice
+        //does NOT do.
+        if (legendRuleSelect)
+            q << legendRuleTargetClause(tc->source->getName(), (int) targets.size());
         }
 
         //W35 owner ruling class (3): the target ask's own instructional text
@@ -72374,6 +72541,61 @@ static const char * kW50Y_r94 =
               "#W67-AZ R2 POSITIVE a stop already passed narrates ZERO, and executes zero");
         CHECK(repeatStopClampReceipt(20, 20, 26, 6).find("ran 6 of them this window") != string::npos,
               "#W67-AZ R2 MUST-NOT-MATCH the multi-repeat wording is byte-identical to wave 67's");
+    }
+
+    //---- #W68-BC (J2): the wall arm's retry budget, and the deadline meter ----
+    {
+        //The corpus's OWN numbers. 162v126 s13 published latency_ms 1233411
+        //(900035 + 333376) and deadline_pct 137.0 against a 900,000 ms
+        //deadline. NEITHER leg ran past the deadline.
+        CHECK(AIPlayerGPT::deadlineTenthsPct(1233411, 900000) == 1370,
+              "#W68-BC J2 REPRO the shipped meter divides the SUM by ONE deadline: 137.0%");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(900035, 333376, 900000) == 1000,
+              "#W68-BC J2 POSITIVE per-attempt: the worst LEG of 162v126 s13 is 100.0%, not 137.0%");
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(900035, 333376, 900000) != 1370,
+              "#W68-BC J2 MUST-NOT-MATCH the per-attempt figure is never the summed one");
+        CHECK(AIPlayerGPT::deadlineTenthsPct(333376, 900000) == 370,
+              "#W68-BC J2 POSITIVE the retry leg on its own is 37.0% of the deadline");
+        //A single-attempt record keeps the shipped figure exactly: both legs -1.
+        CHECK(AIPlayerGPT::deadlineTenthsPctOfAttempts(-1, -1, 900000) == -1
+                  && AIPlayerGPT::deadlineTenthsPctOfAttempts(868729, -1, 900000) == 965,
+              "#W68-BC J2 POSITIVE one knowable leg is that leg; no leg at all is -1");
+        //The budget. All four of this corpus's wall misses armed a second FULL
+        //deadline (mRetryBudgetMs = 0 = "no override"); one of them spent it.
+        CHECK(!AIPlayerGPT::retryFitsInDeadline(900000, 900035)
+                  && !AIPlayerGPT::retryFitsInDeadline(900000, 900025)
+                  && !AIPlayerGPT::retryFitsInDeadline(900000, 900022),
+              "#W68-BC J2 POSITIVE every wall miss in the corpus (900035/900025/900022 ms)"
+              " has ZERO remainder, so no second attempt is bought");
+        CHECK(AIPlayerGPT::retryFitsInDeadline(900000, 20000)
+                  && AIPlayerGPT::retryFitsInDeadline(900000, 2502),
+              "#W68-BC J2 POSITIVE a connect-phase failure still retries inside the remainder");
+        CHECK(!AIPlayerGPT::retryFitsInDeadline(900000, -1)
+                  && !AIPlayerGPT::retryFitsInDeadline(0, 2500),
+              "#W68-BC J2 MUST-NOT-MATCH an unknowable latency or no deadline buys nothing");
+        //Lane AX's falsified claim, stated as a case: the arithmetic it read is
+        //the TRANSPORT arm's, and the wall arm never called it.
+        CHECK(AIPlayerGPT::remainingTransportRetryMs(900000, 900035) == 0,
+              "#W68-BC J2 REPRO AX's premise IS true of remainingTransportRetryMs - the wall"
+              " arm simply did not use it (mRetryBudgetMs = 0 means the full deadline again)");
+    }
+
+    //---- #W68-BC (MED, deck146 s51): the legend-rule ask says the rule ----
+    {
+        const string lr = legendRuleTargetClause("Lolth, Spider Queen", 2);
+        CHECK(lr.find("LEGEND RULE (CR 704.5j)") != string::npos
+                  && lr.find("2 legendary permanents named \"Lolth, Spider Queen\"") != string::npos,
+              "#W68-BC MED POSITIVE the clause names the rule and the copies");
+        CHECK(lr.find("do NOT merge") != string::npos
+                  && lr.find("no counters") != string::npos,
+              "#W68-BC MED POSITIVE it denies the merge the reply invented (\"4 + 4 = 8\")");
+        CHECK(lr.find(" goes to its owner's graveyard now") != string::npos
+                  && legendRuleTargetClause("Lolth, Spider Queen", 3)
+                         .find("s go to its owner's graveyard now") != string::npos,
+              "#W68-BC MED POSITIVE the clause agrees in number with the copy count");
+        CHECK(lr.find("4 + 4") == string::npos && lr.find("loyalty") == string::npos,
+              "#W68-BC MED MUST-NOT-MATCH the RULE clause carries no per-copy number - the"
+              " loyalty rides each ROW (describeTarget), where the pick is made");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
