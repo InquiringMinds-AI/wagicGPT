@@ -37,7 +37,7 @@ nonzero on how many); (5) the X ceiling — any deck-out, any X row whose `{libr
 actual library; (6) the reservation-decline latch — how often it held, and whether it ever held across a changed board;
 (7) I9a band answers — any mis-mapped pick (a number in the band executing a different rung); (8) graveyard line — did
 any decision read it, and did boardKey re-opens rise; (9) `label_missing_salvaged` vs `label_missing_reask` counts and
-whether any salvage executed a negated sentence): __CORPUS_DIR__ (__CORPUS_STATS__).
+whether any salvage executed a negated sentence): /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260906-102638/ (21 games: 21 natural, 0 crashed, 0 hung, 101 min; 2436 records; `unparsed_reply` 0 (was 83 — AV's prediction met); 7 fallbacks total (3 `wall_miss_unrecorded_wall`, 2 `index_name_conflict`, 1 `engine_answered`, 1 `named_row_reask`); `post_answer_overrun` 1732/2436 (71%, was 60% — adjudicate against AV's protocol predictions); p90 latency 75 s, MAX 1233 s which EXCEEDS the 900 s deadline — find that record and explain how the deadline was passed; 162/152/125 4/6, 146/123 3/6, 130 2/6, 126 1/6 (126 was 3/6 on a KEPT guide); lopsided finishes 152v123 -119/8 and 146v125 0/51 — trace both).
 One JSONL per SEAT (filename
 ...deckA-<ptr>-vs-...deckB = the deckA seat): records {seq, kind, prompt, reply, choice,
 chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?, ...}; `prompt` is
