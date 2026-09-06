@@ -1415,7 +1415,8 @@ public:
     //the tick about to run. Consumed by the next `reveal` record as
     //reveal_stall / reveal_stall_secs / reveal_stall_phase - a REPORT, nothing
     //in the engine reads it.
-    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked);
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked,
+                                 int driverTicks = 0, long driverSecs = 0);
     //#W55-E (D5a): the deadline the reveal stall guard sizes its wall floor on.
     virtual long decisionDeadlineMs() { return mTimeoutMs; }
 private:
@@ -1461,6 +1462,11 @@ private:
     long mRevealStallSecs;
     int mRevealStallPhase;
     bool mRevealStallParked; //#W56-C (D12): the driver's own threshold verdict
+    //#W64-AI (F14): the DRIVER-ONLY half of the same wait - polls count as
+    //progress here, so this is time the driver was frozen with no model call
+    //in flight. Reported beside the structural figures; nothing reads it.
+    int mRevealStallDriverTicks;
+    long mRevealStallDriverSecs;
     //#W55-E (D23): a WALL MISS - the deadline reached with an empty reply - is
     //an event the seat review counts, and wave 54 had one that produced no
     //record at all (the decision was abandoned when the window auto-passed, so

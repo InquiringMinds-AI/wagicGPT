@@ -271,9 +271,16 @@ public:
     //#W56-C (D12): `parked` is the driver's OWN structural threshold, evaluated
     //by the driver with the same numbers its force-close uses. Without it the
     //seat had to guess, and stamped every wait as a stall.
-    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked)
+    //#W64-AI (F14): `driverTicks`/`driverSecs` are the DRIVER-ONLY wait - the
+    //full-signature counter, in which a model poll IS progress. `ticks`/`secs`
+    //are the structural wait, which counts a model call in flight as no
+    //progress, so the two together separate "the engine held this reveal" from
+    //"the seat was waiting for its own answer" (see AIPlayerGPT::writeTransLog).
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked,
+                                 int driverTicks = 0, long driverSecs = 0)
     {
         (void) ticks; (void) secs; (void) driverPhase; (void) parked;
+        (void) driverTicks; (void) driverSecs;
     }
 
     //#W55-E (D5a): this seat's per-decision deadline in milliseconds (0 = the

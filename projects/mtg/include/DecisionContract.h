@@ -46,6 +46,11 @@ public:
     Player * player;
     //DECLARE_ATTACKERS: creatures that may be declared (not yet attacking)
     std::vector<MTGCardInstance*> candidates;
+    //#W64-AI (F4): DECLARE_ATTACKERS - the opposing PLANESWALKERS (and
+    //battles) an attacker may be sent at instead of the player, in the exact
+    //order MTGPlaneswalkerAttackRule::reactToClick builds its choice menu, so
+    //a W# index here IS that menu's index. Empty when the engine offers none.
+    std::vector<MTGCardInstance*> attackTargets;
     //DECLARE_BLOCKERS: the declared attackers, and each available blocker
     //with the attackers it may legally block (parallel vectors)
     std::vector<MTGCardInstance*> attackers;
@@ -118,6 +123,10 @@ class DecisionAction
 public:
     //DECLARE_ATTACKERS: the chosen attacker set
     std::vector<MTGCardInstance*> attackers;
+    //#W64-AI (F4): parallel to `attackers` - the planeswalker/battle each
+    //declared attacker is sent at, NULL = the player (the pre-wave-64
+    //behaviour). Shorter than `attackers` means "the rest attack the player".
+    std::vector<MTGCardInstance*> attackerTargets;
     //DECLARE_BLOCKERS: blocker -> attacker assignments; unlisted blockers
     //stay out of combat
     std::vector<std::pair<MTGCardInstance*, MTGCardInstance*> > blocks;

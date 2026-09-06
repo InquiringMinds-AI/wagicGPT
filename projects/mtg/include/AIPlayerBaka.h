@@ -222,6 +222,11 @@ class AIPlayerBaka: public AIPlayer{
     void initTimer();
     virtual int computeActions();
     bool findingCard = false; //computeActions re-entrancy guard, per instance (see the .cpp)
+    //#W64-AI (F3): consecutive ticks on which Act deferred its priority pass
+    //because computeActions ANSWERED a menu in that tick. Reset the moment a
+    //tick answers no menu; the cap is the livelock floor (see Act).
+    int mMenuPassHold = 0;
+    static const int kMenuPassHoldMax = 24;
     //W50-W (D4): the cleanup-step hand-size discard as an AI DECISION. Before
     //this the engine discarded hand->cards[0] (the oldest card) for every AI
     //seat when the phase advanced - a combo deck lost its only Intruder Alarm

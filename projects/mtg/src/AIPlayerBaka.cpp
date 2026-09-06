@@ -5512,6 +5512,11 @@ int AIPlayerBaka::Act(float dt)
         DebugTrace("Cannot interrupt");
         return 0;
     }
+    //#W64-AI (F3): remember whether an armed menu was standing BEFORE
+    //computeActions, so the branch below can tell "answered a menu this tick"
+    //from "had nothing to do".
+    ActionLayer * menuLayer = observer->mLayers ? observer->mLayers->actionLayer() : NULL;
+    const bool menuOpenBefore = menuLayer && menuLayer->menuObject;
     if (clickstream.empty())
         computeActions();
     if (clickstream.empty())
@@ -5520,6 +5525,38 @@ int AIPlayerBaka::Act(float dt)
         //neither pass priority nor decline the interrupt
         if (decisionPending(0))
             return 0;
+        //#W64-AI (F3, deck152 HIGH-1): a tick that ANSWERED a menu is not a
+        //tick with nothing to do. computeActions handles an armed menu IN
+        //PLACE (doReactTo / DecisionManager::applyMenuChoice) and queues no
+        //click, so the empty clickstream here read as "nothing left this
+        //phase" and committed a pass in the SAME tick the menu resolved.
+        //Whether that pass took effect depended on what the answer put on the
+        //stack: a modal-DFC land's FRONT face ("Play Land") resolves with no
+        //stack object at all, so nothing refused the pass and main phase 1
+        //ended on the land drop, while the BACK face's `{0}` row is an
+        //activated ability whose stack object trips userRequestNextGamePhase's
+        //unresolved-stack gate. That is the corpus asymmetry exactly: front
+        //face -> 0 of 15 same-turn main-1 windows, back face -> 5 of 6
+        //(wave63/deck152 review; cost 9 damage at 152v125 seq 74 with no
+        //attackers window that turn). Give the seat the NEXT tick instead: if
+        //it really has nothing left it passes then, over the board the menu
+        //produced. Nothing is removed - the pass is deferred, never cancelled.
+        //FLOOR (the wave-57 D38 idiom; the brief's shared-choke-point rule): a
+        //menu that re-arms and is answered every tick must not hold the phase
+        //for ever, so after kMenuPassHoldMax consecutive holds the pass goes
+        //through regardless. menuObject is READ here only - no seam that owns
+        //it (ActionLayer, the contract's applyMenuChoice, the GPT menu seam)
+        //changes behaviour, and nothing here enters any ask or slot key.
+        const bool menuAnswered = menuOpenBefore && menuLayer && !menuLayer->menuObject;
+        if (!menuAnswered)
+            mMenuPassHold = 0;
+        else if (mMenuPassHold < kMenuPassHoldMax)
+        {
+            mMenuPassHold++;
+            DebugTrace("AIPLAYER: menu answered this tick - deferring the priority pass ("
+                       << mMenuPassHold << "/" << kMenuPassHoldMax << ")");
+            return 0;
+        }
         if (observer->isInterrupting == this)
         {
             if(observer->mExtraPayment && observer->mExtraPayment->source->controller() == this)

@@ -6,6 +6,7 @@
 #include "CardDescriptor.h"
 #include "GameObserver.h"
 #include "MTGAbility.h"
+#include "MTGRules.h" //#W64-AI (F4): MTGPlaneswalkerAttackRule
 #include "Player.h"
 #include "TargetChooser.h"
 
@@ -21,6 +22,28 @@ bool DecisionManager::buildDeclareAttackers(Player * p, DecisionRequest & req)
     while ((card = cd.nextmatch(p->game->inPlay, card)))
         if (!card->isAttacker() && card->canAttack())
             req.candidates.push_back(card);
+    //#W64-AI (F4, deck152 HIGH-2): the OTHER thing an attack can be aimed at.
+    //The engine has supported attacking a planeswalker for years
+    //(MTGPlaneswalkerAttackRule) but no decision surface ever offered it: 0 of
+    //the corpus's attackers prompts named one, and at 152v162 seq 17 a
+    //3-loyalty Ob Nixilis faced three unblockable attackers on a creatureless
+    //board, survived, and dealt 6 of the damage that killed the seat.
+    //Enumerated in the SAME walk and the same order the rule's own choice menu
+    //is built from (the opponent's battlefield, planeswalkers and battles), so
+    //index i here is index i on that menu and the apply path needs no name
+    //matching. `canAttack(true)` is the engine's own planeswalker-attack gate.
+    req.attackTargets.clear();
+    Player * opp = p->opponent();
+    if (opp && opp->game && opp->game->battlefield)
+    {
+        MTGGameZone * bf = opp->game->battlefield;
+        for (int i = 0; i < (int) bf->cards.size(); i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (c && (c->hasType(Subtypes::TYPE_PLANESWALKER) || c->hasType(Subtypes::TYPE_BATTLE)))
+                req.attackTargets.push_back(c);
+        }
+    }
     return !req.candidates.empty();
 }
 
@@ -80,6 +103,36 @@ void DecisionManager::applyDeclareAttackers(const DecisionRequest & req, const D
             offered = req.candidates[j] == card;
         if (!offered || card->isAttacker() || !card->canAttack())
             continue;
+        //#W64-AI (F4): a declared planeswalker/battle target rides the
+        //ENGINE's own planeswalker-attack rule, whose reactToClick arms a
+        //choice menu over the same list buildDeclareAttackers enumerated.
+        //Answer that menu in this tick: the attacker loop clicks the next
+        //creature immediately, and an armed menu would swallow that click.
+        //Anything the rule refuses (no walker on their board, an attack cost
+        //not paid, a phased body) falls through to the ordinary attack rule,
+        //so a target this seat may not legally take costs it nothing but the
+        //target - the declaration itself still stands.
+        MTGCardInstance * pwTarget = (i < act.attackerTargets.size()) ? act.attackerTargets[i] : NULL;
+        int pwIndex = -1;
+        for (size_t k = 0; pwTarget && k < req.attackTargets.size(); k++)
+            if (req.attackTargets[k] == pwTarget)
+                pwIndex = (int) k;
+        MTGPlaneswalkerAttackRule * pwRule = NULL;
+        if (pwIndex >= 0 && card->canAttack(true) && !card->attackPlaneswalkerCost)
+        {
+            ActionLayer * al = g->mLayers ? g->mLayers->actionLayer() : NULL;
+            for (size_t k = 1; al && !pwRule && k < al->mObjects.size(); k++)
+                pwRule = dynamic_cast<MTGPlaneswalkerAttackRule *>((MTGAbility *) al->mObjects[k]);
+        }
+        if (pwRule && pwRule->isReactingToClick(card))
+        {
+            g->cardClick(card, pwRule);
+            ActionLayer * al = g->mLayers ? g->mLayers->actionLayer() : NULL;
+            if (al && al->menuObject)
+                al->ButtonPressedOnMultipleChoice(pwIndex);
+            if (card->isAttacker())
+                continue; //declared at the walker
+        }
         g->cardClick(card, MTGAbility::MTG_ATTACK_RULE);
     }
 }

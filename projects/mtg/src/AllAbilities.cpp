@@ -977,9 +977,14 @@ void MTGRevealingCards::driveInteractiveReveal()
         //force-close below uses, so the record and the guard agree by construction.
         int fixtureTicksNow = (observer && observer->mRevealStallTicks > 0)
                               ? observer->mRevealStallTicks : 0;
+        //#W64-AI (F14): the driver-only half goes with it - the full-signature
+        //counter, in which a model poll IS progress, so the record can say
+        //whether the wait was the engine or the seat's own round trip.
+        long dWaited = mAIStallSince ? (long)(time(NULL) - mAIStallSince) : 0L;
         revCtrl->noteRevealStall(mAIStallStructTicks, waited, mAIPhase,
                                  revealStructParked(mAIStallStructTicks, waited, fixtureTicksNow,
-                                                    revCtrl->decisionDeadlineMs()));
+                                                    revCtrl->decisionDeadlineMs()),
+                                 mAIStallTicks, dWaited);
     }
     driveInteractiveRevealStep();
     if (mAIDriveDone)
