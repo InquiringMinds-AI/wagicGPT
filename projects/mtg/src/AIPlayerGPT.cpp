@@ -7729,6 +7729,268 @@ bool optionRowMentions(const string& optionText, const string& name)
 
 //#W47 (R7): `effectSkip` names the permanents this window already explains in
 //an OPTION row - see the own-battlefield call site. NULL suppresses nothing.
+//#W67-AY (I6): MOVED UP from the repeat-row block, unchanged, so the plan
+//scanner is declared before consumePlan persists what it reads. Same TU, same
+//static linkage, byte-identical body.
+static int repeatPlanScanNumber(const string& plan, const char * label)
+{
+    string low;
+    for (size_t i = 0; i < plan.size(); i++)
+        low += (char) tolower((unsigned char) plan[i]);
+    const size_t n = strlen(label);
+    size_t at = 0;
+    while ((at = low.find(label, at)) != string::npos)
+    {
+        const size_t after = at + n;
+        const bool boundedBefore = (at == 0 || !isalnum((unsigned char) low[at - 1]));
+        const bool boundedAfter = (after >= low.size() || !isalnum((unsigned char) low[after]));
+        at = after;
+        if (!boundedBefore || !boundedAfter)
+            continue; //"stopped", "master": the label is part of a word
+        size_t d = after;
+        while (d < low.size() && (low[d] == ' ' || low[d] == '=' || low[d] == ':' || low[d] == '('))
+            d++;
+        if (d + 2 < low.size() && low.compare(d, 3, "is ") == 0)
+        {
+            d += 3;
+            while (d < low.size() && low[d] == ' ')
+                d++;
+        }
+        if (d < low.size() && isdigit((unsigned char) low[d]))
+        {
+            int v = 0;
+            while (d < low.size() && isdigit((unsigned char) low[d]) && v < 1000000)
+                v = v * 10 + (low[d++] - '0');
+            return v;
+        }
+    }
+    return -1;
+}
+
+//The pilot's own stop, and the count it says it is at. Both or nothing: a
+//half-stated plan is not a stop the engine may hold anyone to.
+static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * currentOut)
+{
+    const int s = repeatPlanScanNumber(plan, "stop");
+    const int m = repeatPlanScanNumber(plan, "m");
+    if (stopOut) *stopOut = s;
+    if (currentOut) *currentOut = m;
+    return s >= 0 && m >= 0;
+}
+
+//#W67-AY (I6, deck123 HIGH-1): what the model's OWN stated stop leaves this
+//window. Returns -1 when nothing is stated or the named count is already inside
+//the stop (the count stands untouched), else the number of repeats the stop
+//allows - 0 when the stop is already reached or passed. This is the model's own
+//arithmetic on the model's own two numbers; no ceiling of the engine's own
+//invention is anywhere in it, and it is consulted only after the model has been
+//asked again and has restated a count past its own stop. Pure.
+static int repeatStopClampCount(int namedCount, int statedStop, int statedCurrent)
+{
+    if (namedCount < 1 || statedStop < 0 || statedCurrent < 0)
+        return -1; //nothing stated: there is no stop to execute
+    const int room = statedStop - statedCurrent;
+    if (room >= namedCount)
+        return -1; //the count fits inside the stop the model set - untouched
+    return room > 0 ? room : 0;
+}
+
+//#W67-AY (I8, deck146 HIGH-1): THE ZONE THE PROMPT NEVER SHOWED. Every
+//graveyard-dependent row deck146 runs (Silverquill Command's return mode,
+//Barrowin's attack trigger, Agadeem's X, Kaya's -7) is priced off a zone the
+//CURRENT SITUATION block did not contain, so at 146v130 s29/31/33 the seat spent
+//165 s re-deriving the census from fifteen turns of log, got a different answer,
+//called it a "contradiction", declined at 3 life and died. The zone is now a
+//line of the frame like the battlefields. Identical entries collapse the way the
+//battlefield line collapses (`Name xN`); beyond the group cap the REMAINDER IS
+//COUNTED IN THE LINE rather than silently dropped - an omission the model cannot
+//see is the confabulation surface the trust doctrine forbids. Pure over the
+//pre-rendered entries, so PARSETEST proves the empty, short, duplicate and
+//over-cap faces without a game.
+//#W67-AY (MED, deck123 / 126 s115): THE LOG DOES NOT BUCKET WHAT THE BOARD LINE
+//BUCKETS. 123v126 s115 (t15) carries a 208-line contiguous death batch - 96
+//byte-identical "Your Human (token) ceased to exist and left your graveyard"
+//lines and 94 "Your Human died (that Human was N of 96 copies...; the other K
+//are still there)" lines - about 14 KB of a 25 KB prompt, while the same 96
+//tokens occupy ONE collapsed entry on the battlefield line. Neither shipped
+//collapser can reach it: `collapseAdjacentDuplicate` (#W57-D) needs the
+//repeated line to be ADJACENT and the pair alternates, and the cycle holder
+//(#W48-D11) needs the repeating block to be byte-identical while the death
+//line's two ordinals change on every copy. So the bucketing happens where the
+//board line's does - at RENDER, over the composed body, after logWindowApply -
+//and it is a pure transform of the text about to be printed: mNarration, the
+//translog's `events` delta, the trim marker and every key are untouched.
+//The rule is joinZoneEntries': within one contiguous run of event lines, a
+//SHAPE (the line with its digit runs normalised) that occurs at or above the
+//floor is printed ONCE, verbatim, at the position of its first occurrence,
+//with an exact count beside it; every other line keeps its place and its
+//order. Nothing is dropped that the count does not state, and a batch with no
+//repetition renders byte-identically to before.
+static const size_t kNarrationBucketFloor = 4;
+
+static string narrationShapeKey(const string& line)
+{
+    string k;
+    bool inNum = false;
+    for (size_t i = 0; i < line.size(); i++)
+    {
+        if (isdigit((unsigned char) line[i]))
+        {
+            if (!inNum)
+                k += '#';
+            inNum = true;
+        }
+        else
+        {
+            inNum = false;
+            k += line[i];
+        }
+    }
+    return k;
+}
+
+string narrationBucketRuns(const string& body)
+{
+    if (body.empty())
+        return body;
+    vector<string> lines;
+    size_t at = 0;
+    while (at <= body.size())
+    {
+        size_t nl = body.find('\n', at);
+        if (nl == string::npos)
+        {
+            lines.push_back(body.substr(at));
+            break;
+        }
+        lines.push_back(body.substr(at, nl - at));
+        at = nl + 1;
+    }
+    std::ostringstream out;
+    size_t i = 0;
+    bool first = true;
+    while (i < lines.size())
+    {
+        if (lines[i].compare(0, 2, "- ") != 0)
+        {
+            if (!first) out << "\n";
+            first = false;
+            out << lines[i];
+            i++;
+            continue;
+        }
+        size_t j = i;
+        while (j < lines.size() && lines[j].compare(0, 2, "- ") == 0)
+            j++;
+        //one contiguous batch: lines [i, j)
+        std::map<string, int> shapeCount;
+        std::map<string, int> exactCount;
+        for (size_t k = i; k < j; k++)
+        {
+            shapeCount[narrationShapeKey(lines[k])]++;
+            exactCount[lines[k]]++;
+        }
+        bool worth = false;
+        for (std::map<string, int>::const_iterator it = shapeCount.begin();
+             it != shapeCount.end() && !worth; ++it)
+            if (it->second >= (int) kNarrationBucketFloor)
+                worth = true;
+        std::set<string> done;
+        for (size_t k = i; k < j; k++)
+        {
+            const string shape = narrationShapeKey(lines[k]);
+            const int n = shapeCount[shape];
+            if (!worth || n < (int) kNarrationBucketFloor)
+            {
+                if (!first) out << "\n";
+                first = false;
+                out << lines[k];
+                continue;
+            }
+            if (done.find(shape) != done.end())
+                continue; //already stated, with its count
+            done.insert(shape);
+            if (!first) out << "\n";
+            first = false;
+            out << lines[k];
+            if (exactCount[lines[k]] == n)
+                out << " [x" << n << " - this exact line " << n << " times in this batch]";
+            else
+                out << " [x" << n << " - " << n << " lines of this shape in this batch;"
+                    << " only the numbers in them differ]";
+        }
+        i = j;
+    }
+    return out.str();
+}
+
+//#W67-AY (I8): the entry text for one graveyard card - the name, its mana cost
+//(the number Silverquill Command's `creature[manacost<=2]` and every other
+//graveyard price is read against) and, for a creature, its printed body.
+//Nothing status-dependent: a graveyard card carries no board state.
+static void graveyardEntriesOf(MTGGameZone * z, vector<string>& out)
+{
+    if (!z)
+        return;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (!c)
+            continue;
+        std::ostringstream e;
+        e << c->getDisplayName() << manaCostToken(c);
+        if (c->isCreature())
+            e << " (creature " << c->power << "/" << c->toughness << ")";
+        out.push_back(e.str());
+    }
+}
+
+static const size_t kGraveyardGroupCap = 12;
+string graveyardZoneLine(bool mine, const vector<string>& entries)
+{
+    std::ostringstream o;
+    o << (mine ? "Your graveyard (" : "Their graveyard (") << entries.size()
+      << (entries.size() == 1 ? " card): " : " cards): ");
+    if (entries.empty())
+    {
+        o << "(none)";
+        return o.str();
+    }
+    vector<string> keys;
+    vector<int> counts;
+    for (size_t i = 0; i < entries.size(); i++)
+    {
+        size_t k = 0;
+        for (; k < keys.size(); k++)
+            if (keys[k] == entries[i])
+                break;
+        if (k == keys.size())
+        {
+            keys.push_back(entries[i]);
+            counts.push_back(1);
+        }
+        else
+            counts[k]++;
+    }
+    const size_t shown = keys.size() < kGraveyardGroupCap ? keys.size() : kGraveyardGroupCap;
+    int listed = 0;
+    for (size_t k = 0; k < shown; k++)
+    {
+        if (k)
+            o << "; ";
+        o << keys[k];
+        if (counts[k] > 1)
+            o << " x" << counts[k];
+        listed += counts[k];
+    }
+    if (shown < keys.size())
+        o << "; +" << ((int) entries.size() - listed) << " more card"
+          << (((int) entries.size() - listed) == 1 ? "" : "s") << " under "
+          << (keys.size() - shown) << " further name"
+          << ((keys.size() - shown) == 1 ? "" : "s") << " not listed here";
+    return o.str();
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
                        const char * copyScope = "your hand", bool effectText = false,
                        const std::set<string> * effectSkip = NULL,
@@ -14916,6 +15178,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mRunLastCount(0) //#W57-D (D29)
 
 {
+    mStatedStop = -1;      //#W67-AY (I6): nothing stated yet
+    mStatedStopCount = -1;
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     for (int i = 0; i < 3; i++) //#W57-E (D15)
     {
@@ -16882,7 +17146,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         int elided = 0;
         int wmode = kLogWindowFull, wturns = 0;
         logWindowSetting(wmode, wturns);
-        const string body = logWindowApply(mNarration, &elided);
+        //#W67-AY (MED): and the batch bucketing, over the composed body only.
+        const string body = narrationBucketRuns(logWindowApply(mNarration, &elided));
         u << logWindowLogHeader(elided > 0, wturns) << "\n" << body << "\n";
     }
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
@@ -18512,6 +18777,22 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         mPlanSetSeq = mTransSeq;
         mPlanSetTurn = observer ? observer->turn : 0;
         mCurrentPlan = plan;
+        //#W67-AY (I6, deck123 HIGH-4): ONE SOURCE for the row's verdict and the
+        //refusal. The stop and the count the reply states are persisted here,
+        //where every reply's plan is folded, and outlive the CARRY - which is
+        //cleared by a refusal and by every caveat gate above, and was therefore
+        //absent from 19 of the 20 windows the verdict clause was built for.
+        //Persisted, never cleared: a stop the pilot stated is the last thing it
+        //said about its own stop until it says another.
+        {
+            int stStop = -1, stNow = -1;
+            if (repeatPlanStopAndCurrent(plan, &stStop, &stNow))
+            {
+                mStatedStop = stStop;
+                mStatedStopCount = stNow;
+            }
+        }        mPlanSetTurn = observer ? observer->turn : 0;
+        mCurrentPlan = plan;
     }
     //Labeled answer (the contract): the decision is the label line's
     //remainder, wherever the label sits relative to the plan. An answer
@@ -19974,16 +20255,46 @@ string loopNonChainingClause(const string& converter, const string& mirror, bool
 //`affordClause` is the seat's own castability verdict for the held half (empty
 //when the half is in a zone the seat cannot cast from at all, in which case
 //every byte is as before).
+//#W67-AY (I8, deck146 HIGH-2): "ONE RESOLUTION FROM CLOSING" ABOUT AN EXILED
+//HALF. 146v126 s21-s33: the seat spent its own removal exiling Exquisite Blood
+//(s15/s16, s25/s26) and the banner kept telling it the pair was one resolution
+//from closing - the reward for solving the problem was a prompt insisting the
+//problem was imminent, and the three windows carrying that wording are the
+//three slowest of the game (256.5 s + 197.8 s + 220.1 s = 674 s), all spent
+//re-deriving whether the loop closes; at s32 the model talked itself into a
+//rule Sanguine Bond does not have. The zone was NAMED correctly and then
+//contradicted, which is the false-surface shape the trust doctrine forbids -
+//so the closing claim is gated on the half sitting in a zone it returns from
+//(hand, library, graveyard) rather than in exile, which no card leaves unless
+//another card says so. Nothing is deleted: the consequence of a close is still
+//stated, conditionally, and the zone is still named.
 string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
                               const string& seenWhere, bool theirs,
-                              const string& affordClause = "")
+                              const string& affordClause = "",
+                              bool halfCanReturn = true)
 {
     if (inPlayHalf.empty() || seenHalf.empty() || seenWhere.empty())
         return "";
     std::ostringstream o;
     o << "LOOP HALF PENDING: " << inPlayHalf << " is on "
       << (theirs ? "THEIR" : "YOUR") << " battlefield and the other half of the"
-         " pair, " << seenHalf << ", is " << seenWhere << ". Nothing has chained"
+         " pair, " << seenHalf << ", is " << seenWhere << ".";
+    if (!halfCanReturn)
+    {
+        o << " A card in exile does not come back unless another card says so, so"
+             " the pair is BROKEN, not one resolution from closing, and nothing"
+             " chains while it stays there. IF it ever does return and the pair"
+             " closes,"
+          << (theirs
+                  ? " any life YOU lose, and any life they gain, would chain until"
+                    " you are at 0."
+                  : " any life THEY lose, and any life you gain, would chain until"
+                    " they are at 0.");
+        if (!affordClause.empty())
+            o << " " << affordClause;
+        return o.str();
+    }
+    o << " Nothing has chained"
          " yet - the pair is one resolution from closing, and when it closes"
       << (theirs
               ? " any life YOU lose, and any life they gain, chains until you are at"
@@ -20186,10 +20497,15 @@ static string loopPendingSituationLine(Player * me, Player * opp,
             continue; //nothing in play, or the pair is already closed
         const bool wantMirror = mir.empty();
         string found, where;
-        struct { MTGGameZone * z; const char * ours; const char * theirs; } zones[] = {
-            { pl->game->graveyard, "in your graveyard", "in their graveyard" },
-            { pl->game->exile, "in your exile", "in their exile" },
-            { NULL, NULL, NULL }
+        bool halfCanReturn = true; //#W67-AY (I8)
+        //#W67-AY (I8): `back` is whether the half can RETURN to a battlefield
+        //from that zone at all. A graveyard can be recurred from and a hand can
+        //be cast from; exile is the one zone nothing leaves unless a card says
+        //so, and that is the zone the banner was lying about.
+        struct { MTGGameZone * z; const char * ours; const char * theirs; bool back; } zones[] = {
+            { pl->game->graveyard, "in your graveyard", "in their graveyard", true },
+            { pl->game->exile, "in your exile", "in their exile", false },
+            { NULL, NULL, NULL, true }
         };
         if (side == 0 && !knownOppHand.empty())
         {
@@ -20224,6 +20540,7 @@ static string loopPendingSituationLine(Player * me, Player * opp,
             {
                 found = hit;
                 where = (side == 0) ? zones[zi].theirs : zones[zi].ours;
+                halfCanReturn = zones[zi].back; //#W67-AY (I8)
             }
         }
         if (found.empty())
@@ -20260,7 +20577,8 @@ static string loopPendingSituationLine(Player * me, Player * opp,
                                                      sources, colours);
             }
         }
-        return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0, afford);
+        return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0, afford,
+                                     halfCanReturn); //#W67-AY (I8)
     }
     return "";
 }
@@ -22901,12 +23219,31 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         describeZoneCards(alt, game->inPlay, true, "your hand", true, &noSkip);
         ownBlockKey = alt.str();
     }
+    //#W67-AY (I8, deck146 HIGH-1): the seat's OWN graveyard, beside its own
+    //battlefield, on every window - including when it is empty, because "your
+    //graveyard is empty" is the fact that stops a census being re-derived from
+    //the log. The guide already forbids reconstructing it; until now the frame
+    //gave the seat nothing to obey that with.
+    {
+        vector<string> gy;
+        graveyardEntriesOf(game->graveyard, gy);
+        out << "\n" << graveyardZoneLine(true, gy);
+    }
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
                                              activeSeat == opp, oppAttacking, oppLands);
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
+        //#W67-AY (I8): theirs only when it holds something - an empty opposing
+        //graveyard prices nothing the seat can act on, and the seat's own empty
+        //one does (it is the census it would otherwise re-derive).
+        {
+            vector<string> oppGy;
+            graveyardEntriesOf(opp->game->graveyard, oppGy);
+            if (!oppGy.empty())
+                out << "\n" << graveyardZoneLine(false, oppGy);
+        }
         //#W56-B (D10): their open mana as a NUMBER, from the same engine call
         //that counts ours - one source per card, colours deduped - directly
         //under the battlefield lines it summarises.
@@ -25324,51 +25661,6 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
 //("stop=20", "stop 24", "stop: 18"; "M=68", "M 24 now", "M is 111 now",
 //"M (41)"). Pure over the reply text, so PARSETEST pins every spelling and the
 //negatives that must stay countless.
-static int repeatPlanScanNumber(const string& plan, const char * label)
-{
-    string low;
-    for (size_t i = 0; i < plan.size(); i++)
-        low += (char) tolower((unsigned char) plan[i]);
-    const size_t n = strlen(label);
-    size_t at = 0;
-    while ((at = low.find(label, at)) != string::npos)
-    {
-        const size_t after = at + n;
-        const bool boundedBefore = (at == 0 || !isalnum((unsigned char) low[at - 1]));
-        const bool boundedAfter = (after >= low.size() || !isalnum((unsigned char) low[after]));
-        at = after;
-        if (!boundedBefore || !boundedAfter)
-            continue; //"stopped", "master": the label is part of a word
-        size_t d = after;
-        while (d < low.size() && (low[d] == ' ' || low[d] == '=' || low[d] == ':' || low[d] == '('))
-            d++;
-        if (d + 2 < low.size() && low.compare(d, 3, "is ") == 0)
-        {
-            d += 3;
-            while (d < low.size() && low[d] == ' ')
-                d++;
-        }
-        if (d < low.size() && isdigit((unsigned char) low[d]))
-        {
-            int v = 0;
-            while (d < low.size() && isdigit((unsigned char) low[d]) && v < 1000000)
-                v = v * 10 + (low[d++] - '0');
-            return v;
-        }
-    }
-    return -1;
-}
-
-//The pilot's own stop, and the count it says it is at. Both or nothing: a
-//half-stated plan is not a stop the engine may hold anyone to.
-static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * currentOut)
-{
-    const int s = repeatPlanScanNumber(plan, "stop");
-    const int m = repeatPlanScanNumber(plan, "m");
-    if (stopOut) *stopOut = s;
-    if (currentOut) *currentOut = m;
-    return s >= 0 && m >= 0;
-}
 
 //#W66-AS (H3): the row's verdict, in the `{...}` form every other priced row
 //uses - so stripRenderAnnotationsLc keeps it out of the option-set key, exactly
@@ -29360,12 +29652,32 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
 //against doing it. A plan that names the card approvingly ("Cast Tribute to
 //Hunger to eat their best creature"), or argues against a DIFFERENT card,
 //never matches. Pure.
+//#W67-AY (I9b, deck126 HIGH-3): WHY THE CONJUNCTION MISSED ITS TEXTBOOK CASE.
+//126v125 s83 is the shape H8 was built for - row `Cast Tribute to Hunger
+//{right now: they control 0 creatures - at 0 this does nothing}` answered
+//`CHOICE: 1` over `PLAN: Cast Tribute to Hunger. Opponent has 0 creatures, so
+//this does nothing. This is a waste of mana and cards.` - and it did not fire,
+//for two independent reasons, both of them in this predicate:
+//  (a) the sentence that names the row carries no negative and the sentence
+//      that carries the negative names no row - it says "this". The per-sentence
+//      test cannot see an ANAPHOR, and the model writes one whenever it has just
+//      named the card. So a negative sentence whose subject is a pronoun is
+//      attributed to the row named by the sentence IMMEDIATELY before it, and to
+//      nothing else: one sentence of reach, a pronoun required, so a negative
+//      about a DIFFERENT card ("Damnation does nothing here") still never
+//      matches and a plan that never names the row still never matches.
+//  (b) s84 has no `PLAN:` marker anywhere in 5 354 bytes of prose and this
+//      returned false before reading a word of it. A reply with no plan label is
+//      not a reply with no argument (that is lane AV's item at the answer line;
+//      here it is simply the span to read), so the whole reply is the span when
+//      no marker exists.
+//And "a waste of mana and cards" - the phrase the corpus actually wrote - was
+//not in the negative vocabulary; "wasted" was. Both spellings are now in it.
 bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
 {
     size_t pos = findPlanMarker(reply, string::npos, NULL);
-    if (pos == string::npos)
-        return false;
-    string plan = reply.substr(pos + 5);
+    //#W67-AY (I9b): no marker -> the reply IS the span.
+    string plan = (pos == string::npos) ? reply : reply.substr(pos + 5);
     for (size_t i = 0; i < plan.size(); i++)
         plan[i] = (char) tolower((unsigned char) plan[i]);
     string name = optionLabel(row);
@@ -29392,9 +29704,14 @@ bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
     static const char * kAgainst[] = {
         "avoid", "do not", "don't", "does nothing", "no creature", "not worth",
         "useless", "pointless", "should not", "shouldn't", "no target",
-        "no legal target", "wasted", "instead of"
+        "no legal target", "wasted", "instead of",
+        "a waste", "waste of" //#W67-AY (I9b): 126v125 s83's own words
     };
+    //#W67-AY (I9b): a pronoun standing in for the card the previous sentence
+    //named. Word-bounded, so "thistle", "item" and "that's" are not subjects.
+    static const char * kPronoun[] = { "this", "it", "that" };
     size_t start = 0;
+    bool prevNamedRow = false;
     while (start <= plan.size())
     {
         //';' too: "Avoid casting Damnation this turn; Tribute to Hunger is
@@ -29402,10 +29719,31 @@ bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
         size_t stop = plan.find_first_of(".!?;\n", start);
         size_t end = (stop == string::npos) ? plan.size() : stop;
         string sent = plan.substr(start, end - start);
-        if (sent.find(name) != string::npos)
-            for (size_t i = 0; i < sizeof(kAgainst) / sizeof(kAgainst[0]); i++)
-                if (sent.find(kAgainst[i]) != string::npos)
-                    return true;
+        const bool namesRow = (sent.find(name) != string::npos);
+        bool against = false;
+        for (size_t i = 0; i < sizeof(kAgainst) / sizeof(kAgainst[0]) && !against; i++)
+            if (sent.find(kAgainst[i]) != string::npos)
+                against = true;
+        if (namesRow && against)
+            return true;
+        if (against && !namesRow && prevNamedRow)
+        {
+            for (size_t i = 0; i < sizeof(kPronoun) / sizeof(kPronoun[0]); i++)
+            {
+                const string w(kPronoun[i]);
+                size_t at = 0;
+                while ((at = sent.find(w, at)) != string::npos)
+                {
+                    const size_t after = at + w.size();
+                    const bool okBefore = (at == 0 || !isalnum((unsigned char) sent[at - 1]));
+                    const bool okAfter = (after >= sent.size() || !isalnum((unsigned char) sent[after]));
+                    at = after;
+                    if (okBefore && okAfter)
+                        return true;
+                }
+            }
+        }
+        prevNamedRow = namesRow;
         if (stop == string::npos)
             break;
         start = stop + 1;
@@ -31479,11 +31817,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     vector<int> repeatBaseRow;
     repeatBaseRow.assign(shown.size(), -1);
     //#W66-AS (H3): the stop the pilot last stated, read back onto the row that
-    //asks for it. From the CARRIED plan (mCurrentPlan), which is the only plan
-    //text the prompt carries forward, so the row cannot state a stop the model
-    //cannot see one line above it.
-    int carriedStop = -1;
-    repeatPlanStopAndCurrent(mCurrentPlan, &carriedStop, NULL);
+    //asks for it.
+    //#W67-AY (I6, deck123 HIGH-4): read from the PERSISTED store, not from the
+    //carry. The clause was built for the 20 windows that took a count past a
+    //stated stop and reached exactly ONE of them, because mCurrentPlan is
+    //cleared by a refusal and by the caveat gates (5 of 31 carried after a
+    //refusal, vs 288 of 337 otherwise) - so the window that most needs the
+    //verdict is the window least likely to carry it. The store is fed from the
+    //same reply PLANs the refusal reads, so both halves now state one number.
+    //The carry stays as the fallback for a plan folded before the store existed.
+    int carriedStop = mStatedStop;
+    if (carriedStop < 0)
+        repeatPlanStopAndCurrent(mCurrentPlan, &carriedStop, NULL);
     for (int rb = 0; rb < baseIndex; rb++)
     {
         if (isManaOnlyAction(shown[rb]->ability))
@@ -32013,6 +32358,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //wrote "stop=20" and then took x33 at M=68, x47 at M=153 and x200 at
         //M=230 - ten windows, each a full round trip, each past a stop the
         //reply itself restated in the same breath.
+        //#W67-AY (I6): every reply's own two numbers reach the store, whatever
+        //the reply answered - deck123 seq 76 stated "stop=26; M=40 now" on a
+        //PASS and seq 77 then rendered no verdict at all. The guard below still
+        //rests on the numbers of THIS reply (a refusal must quote the words the
+        //model just wrote), and the store is what the row renders next window.
+        {
+            int stStop = -1, stNow = -1;
+            if (repeatPlanStopAndCurrent(content, &stStop, &stNow))
+            {
+                mStatedStop = stStop;
+                mStatedStopCount = stNow;
+            }
+        }
         int planStop = -1, planCurrent = -1;
         const bool repeatPastStop =
             repeatRowTaken && namedCount >= 1 && replyHasPlanLine(content)
@@ -32151,6 +32509,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //the corrected call rather than replaying this failed answer.
             return NULL; //in flight; decisionPending() holds the pass
         }
+        string stopClampReceipt; //#W67-AY (I6)
         if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
         {
             //the second answer for this state, whatever it is, is final
@@ -32167,9 +32526,51 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
                 appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
                                                              : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
-            else if (mPriorityReaskKind == "repeat_past_stop") //#W66-AS (H3): executes as given either way
+            else if (mPriorityReaskKind == "repeat_past_stop") //#W66-AS (H3)
+            {
                 appendParseNote(&mLastParseNote, repeatPastStop ? "repeat_past_stop_exhausted"
                                                                 : (choice >= 0 ? "repeat_past_stop_recovered" : "repeat_past_stop_unanswered"));
+                //#W67-AY (I6, deck123 HIGH-1): wave 66 executed the second
+                //answer as given, and 123v126 s84/s85 is what that costs - the
+                //re-ask quoted "you at 66 with your stop at 26" and the reply
+                //came back with the IDENTICAL x34 and the IDENTICAL contradicting
+                //PLAN, and it ran (M 66 -> 100); 3 of 20 re-asks did this and
+                //produced 59 extra bodies. When the SECOND answer repeats a
+                //counted take past the stop the model itself stated, the engine
+                //performs THE STOP THE MODEL STATED - its own number, computed
+                //from its own two numbers by its own subtraction. This is not a
+                //cap: no ceiling of the engine's invention exists here, the row
+                //is never withheld, any count inside the stated stop is untouched,
+                //and a reply that states a NEW stop above its count is not
+                //clamped at all (repeatStopClampCount returns -1 and the count
+                //stands). Both numbers are recorded verbatim.
+                if (repeatPastStop)
+                {
+                    const int allowed = repeatStopClampCount(namedCount, planStop, planCurrent);
+                    if (allowed >= 0)
+                    {
+                        std::ostringstream cs;
+                        cs << "repeat_clamped_to_own_stop(named=" << namedCount
+                           << ",stated_M=" << planCurrent << ",stated_stop=" << planStop
+                           << ",executed=" << allowed << ")";
+                        appendParseNote(&mLastParseNote, cs.str().c_str());
+                        std::ostringstream rcpt;
+                        rcpt << "You named " << namedCount << " repeats again after being asked"
+                                " about it, with your own PLAN putting you at " << planCurrent
+                             << " and your stop at " << planStop << "; the engine performed the stop"
+                                " you stated and ran " << allowed << " of them this window.";
+                        stopClampReceipt = rcpt.str();
+                        if (allowed >= 2)
+                            namedCount = allowed;
+                        else
+                        {
+                            choice = 0; //the stop the model stated leaves nothing to run
+                            repeatRowTaken = false;
+                            namedCount = -1;
+                        }
+                    }
+                }
+            }
             else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
                 appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
                                                                    : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
@@ -32182,6 +32583,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                                                  : "repeat_count_reask_exhausted");
             mPriorityReaskKind.clear();
         }
+        //#W67-AY (I6): the receipt, in the narration, before the window's own
+        //line - the pilot is owed the record of what the engine performed on
+        //its behalf and off which of its own numbers (the arrival-tracing rule:
+        //a silent clamp is invisible to every counter).
+        if (!stopClampReceipt.empty())
+            narrateDecision(stopClampReceipt);
         mPrevWindowRows = shownLines; //#W51-C D3: this window is now the prior one
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
@@ -32466,11 +32873,35 @@ static string stripTrailingPT(const string& core)
 //first where the menu has one: declining IS the least harmful answer, and it is
 //a real row, not a fallback. `*usedRow` is 0 when no row is exemplified, and the
 //caller's sentence changes with it.
+//#W67-AY (MED, engine MED / deck146 s22): a row tagged `{HALF DEAD right now:
+//one half of this mode has NO legal object...}` is half an answer, and AU R5's
+//rule - a worked example may not put a row the engine has already priced down
+//into the answer slot - reaches it for the same reason it reaches a dead one.
+//It is a PREFERENCE, not a withholding: a menu whose only non-dead rows are
+//half-dead still exemplifies one, because stating the FORMAT is worth more than
+//the attraction costs (the same trade AU R5 made for the all-dead menu).
+static bool rowSaysHalfDead(const string& row)
+{
+    string low = row;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    return low.find("half dead") != string::npos;
+}
+
 static string askExemplar(const vector<string>& options, int * usedRow = NULL)
 {
     size_t pick = 0;
     bool anyLive = false;
+    //#W67-AY (MED): a WHOLLY live row first...
     for (size_t i = 0; i < options.size(); i++)
+        if (!AIPlayerGPT::rowSaysNoOp(options[i]) && !rowSaysHalfDead(options[i]))
+        {
+            pick = i;
+            anyLive = true;
+            break;
+        }
+    //...and only then a half-dead one, which is still a legal answer.
+    for (size_t i = 0; !anyLive && i < options.size(); i++)
         if (!AIPlayerGPT::rowSaysNoOp(options[i]))
         {
             pick = i;
@@ -71230,6 +71661,231 @@ static const char * kW50Y_r94 =
         CHECK(edictClause(23, "", 0, true, false, "", "", 0, -1, false, 1, 22).find('{')
                   == string::npos,
               "#W67-AW M4 ECHO the clause opens no annotation channel of its own");
+    }
+
+    cout << "\n[#W67-AY I6] the stop the model stated is the number the engine performs\n";
+    {
+        // 123v126 s84/s85 VERBATIM: the re-ask quoted "you at 66 with your stop at
+        // 26" and the second answer named the identical x34, which wave 66 ran.
+        int ex = -1;
+        CHECK(repeatStopClampCount(34, 26, 66) == 0,
+              "#W67-AY I6 POSITIVE 123v126 s85 x34 at M=66 with stop=26 -> the stated stop leaves 0");
+        CHECK(repeatStopClampCount(25, 26, 41) == 0,
+              "#W67-AY I6 POSITIVE 123v126 s82 x25 at M=41 with stop=26 -> 0");
+        CHECK(repeatStopClampCount(20, 26, 20) == 6,
+              "#W67-AY I6 POSITIVE below the stop the model's own subtraction is the number (26-20)");
+        CHECK(repeatStopClampCount(4, 26, 20) == -1,
+              "#W67-AY I6 MUST-NOT-MATCH a count INSIDE the stated stop is untouched");
+        CHECK(repeatStopClampCount(34, -1, 66) == -1 && repeatStopClampCount(34, 26, -1) == -1,
+              "#W67-AY I6 MUST-NOT-MATCH a half-stated plan states no stop to perform");
+        CHECK(repeatStopClampCount(0, 26, 66) == -1 && repeatStopClampCount(-1, 26, 66) == -1,
+              "#W67-AY I6 NEGATIVE no count named: nothing to clamp");
+        CHECK(repeatStopClampCount(200, 33, 230) == 0,
+              "#W67-AY I6 POSITIVE 123v162's x200 at M=230 with stop=33");
+        (void) ex;
+        // THE CLAUSE'S SOURCE (deck123 HIGH-4). The store the render now reads is
+        // fed by this scanner from the reply's OWN plan - including seq 76, a PASS,
+        // whose numbers seq 77 then had to render and did not.
+        int st = -1, cu = -1;
+        CHECK(repeatPlanStopAndCurrent(
+                  "PLAN: L=17, C=6, stop=26; M=40 now; this window: pass (stop reached)", &st, &cu)
+              && st == 26 && cu == 40,
+              "#W67-AY I6 POSITIVE 123v126 seq 76's PASS plan states both numbers");
+        CHECK(repeatRowStopClause(40, st).find("{right now: M=40, your stated stop=26") != string::npos
+              && repeatRowStopClause(40, st).find("ALREADY AT OR PAST") != string::npos,
+              "#W67-AY I6 POSITIVE seq 77 renders the verdict seq 76's own numbers demand");
+        // KEY SAFETY, restated for the new source: two windows whose only delta is
+        // the stated stop still key the same option set (wave61/corpus-livelock).
+        {
+            const string bare = repeatRowLine("Create human with Thraben Doomsayer", 3, 66);
+            vector<string> a, b;
+            a.push_back(bare + repeatRowStopClause(66, 26));
+            b.push_back(bare + repeatRowStopClause(66, 20));
+            CHECK(optionSetKeyOf(a) == optionSetKeyOf(b),
+                  "#W67-AY I6 KEY a stop read from the store never reaches the option-set key");
+        }
+    }
+
+    cout << "\n[#W67-AY I8] the seat's graveyard is a line of the frame, and an exiled half is not pending\n";
+    {
+        vector<string> none;
+        CHECK(graveyardZoneLine(true, none) == "Your graveyard (0 cards): (none)",
+              "#W67-AY I8 POSITIVE an empty graveyard says so - the fact that stops a re-derivation");
+        vector<string> one;
+        one.push_back("Doom Blade{1}{b}");
+        CHECK(graveyardZoneLine(true, one) == "Your graveyard (1 card): Doom Blade{1}{b}",
+              "#W67-AY I8 POSITIVE one card, singular");
+        vector<string> dup;
+        dup.push_back("Vampire Nighthawk{1}{b}{b} (creature 2/3)");
+        dup.push_back("Doom Blade{1}{b}");
+        dup.push_back("Vampire Nighthawk{1}{b}{b} (creature 2/3)");
+        CHECK(graveyardZoneLine(false, dup)
+                  == "Their graveyard (3 cards): Vampire Nighthawk{1}{b}{b} (creature 2/3) x2;"
+                     " Doom Blade{1}{b}",
+              "#W67-AY I8 POSITIVE identical entries collapse the way the battlefield line collapses");
+        {
+            vector<string> many;
+            for (int i = 0; i < 14; i++)
+            {
+                std::ostringstream e;
+                e << "Card" << i << "{1}";
+                many.push_back(e.str());
+            }
+            const string line = graveyardZoneLine(true, many);
+            CHECK(line.find("Your graveyard (14 cards): ") == 0
+                  && line.find("Card11{1}") != string::npos
+                  && line.find("Card12{1}") == string::npos
+                  && line.find("+2 more cards under 2 further names not listed here") != string::npos,
+                  "#W67-AY I8 POSITIVE beyond the group cap the REMAINDER IS COUNTED, never dropped silently");
+        }
+        CHECK(graveyardZoneLine(true, dup) == graveyardZoneLine(true, dup),
+              "#W67-AY I8 ECHO two rebuilds of one window render the same bytes");
+        CHECK(graveyardZoneLine(true, dup).find('{') != string::npos
+              && graveyardZoneLine(true, dup).find('[') == string::npos,
+              "#W67-AY I8 ECHO the line opens no bracket annotation channel (mana costs only)");
+        // deck146 HIGH-2: the exiled half.
+        const string exiled = pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond",
+                                                     "in their exile", true, "", false);
+        CHECK(exiled.find("is in their exile.") != string::npos
+              && exiled.find("BROKEN, not one resolution from closing") != string::npos
+              && exiled.find("does not come back unless another card says so") != string::npos,
+              "#W67-AY I8 POSITIVE an exiled half is named AND its zone's consequence stated");
+        CHECK(exiled.find("the pair is one resolution from closing") == string::npos
+              && exiled.find("Nothing has chained yet - ") == string::npos,
+              "#W67-AY I8 MUST-NOT-MATCH the closing claim is gone from the exile face");
+        CHECK(exiled.find("would chain until you are at 0") != string::npos,
+              "#W67-AY I8 POSITIVE the consequence is kept, conditionally - nothing is deleted");
+        CHECK(pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "in their hand"
+                                     " (a card you have been shown)", true)
+              == pendingLoopWarningText("Exquisite Blood #1", "Sanguine Bond", "in their hand"
+                                        " (a card you have been shown)", true, "", true),
+              "#W67-AY I8 NEGATIVE the returnable face is byte-identical to the shipped banner");
+        CHECK(pendingLoopWarningText("Sanguine Bond #1", "Exquisite Blood", "in your graveyard", false)
+                  .find("one resolution from closing") != string::npos,
+              "#W67-AY I8 MUST-NOT-MATCH a graveyard half is recurrable and keeps the pending claim");
+    }
+
+    cout << "\n[#W67-AY I9b] the no-op conjunction sees an anaphor, and a reply with no PLAN label\n";
+    {
+        // 126v125 s83 VERBATIM (row and reply), the case AR H8 was built for and missed.
+        const string row = "Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures -"
+                           " at 0 this does nothing} {leaves 12 of your 15 untapped mana sources"
+                           " untapped} - legal targets right now: the opponent";
+        const string s83 = "CHOICE: 1 (Cast Tribute to Hunger)\n\nPLAN: Cast Tribute to Hunger."
+                           " Opponent has 0 creatures, so this does nothing. This is a waste of"
+                           " mana and cards. I need to attack with a Vampire to trigger Sanguine Bond.";
+        CHECK(AIPlayerGPT::rowSaysNoOp(row),
+              "#W67-AY I9b POSITIVE the row half of the conjunction was never the problem");
+        CHECK(AIPlayerGPT::planArguesAgainstRow(s83, row),
+              "#W67-AY I9b POSITIVE 126v125 s83 fires: the negative sentence's subject is \"this\"");
+        // s84: 5 354 bytes of prose and no PLAN label anywhere.
+        const string s84 = "CHOICE: 1 (Cast Tribute to Hunger)\nThe opponent has no creatures, so"
+                           " Tribute to Hunger is a waste of mana here. I will pass.";
+        CHECK(AIPlayerGPT::planArguesAgainstRow(s84, row),
+              "#W67-AY I9b POSITIVE a reply with no PLAN label is still a reply with an argument");
+        CHECK(AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Casting Tribute to Hunger is a waste"
+                  " of a card right now.", row),
+              "#W67-AY I9b POSITIVE \"a waste\" is the corpus's own word and now counts");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger to eat their"
+                  " best creature. Damnation does nothing here.", row),
+              "#W67-AY I9b MUST-NOT-MATCH a negative about a DIFFERENT card, with no pronoun, misses");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 2 (Cast Chromatic Lantern)\nPLAN: Cast Chromatic Lantern. This does"
+                  " nothing much but it fixes my mana.", row),
+              "#W67-AY I9b MUST-NOT-MATCH a pronoun whose antecedent is another row's card misses");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger; it eats their"
+                  " only blocker and I gain 3.", row),
+              "#W67-AY I9b NEGATIVE an approving plan never matches");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid Damnation this turn.", row),
+              "#W67-AY I9b NEGATIVE a negative that names no row, and no anaphor, never matches");
+    }
+
+    cout << "\n[#W67-AY MED] the worked example does not point at a half-dead row\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Silverquill Command {2}{b}{w} {HALF DEAD right now: one half of this"
+                       " mode has NO legal object on the board}");
+        menu.push_back("Cast Vampire Nighthawk {1}{b}{b}");
+        menu.push_back("Cast nothing right now");
+        int used = -1;
+        const string ex = askExemplar(menu, &used);
+        CHECK(used == 2 && ex.find("Cast Vampire Nighthawk") != string::npos,
+              "#W67-AY MED POSITIVE a wholly live row is exemplified over a HALF DEAD one");
+        CHECK(exemplarSentence(ex, used).find("written out from row 2 of this list") != string::npos,
+              "#W67-AY MED POSITIVE the sentence names the row the example was written from");
+        vector<string> halfOnly;
+        halfOnly.push_back("Cast Silverquill Command {2}{b}{w} {HALF DEAD right now: one half of"
+                           " this mode has NO legal object on the board}");
+        int used2 = -1;
+        CHECK(askExemplar(halfOnly, &used2).find("Cast Silverquill Command") != string::npos
+              && used2 == 1,
+              "#W67-AY MED MUST-NOT-MATCH a half-dead row is a legal answer and is still exemplified"
+              " when nothing better exists - the FORMAT is never withheld");
+        vector<string> ordinary;
+        ordinary.push_back("Cast Doom Blade {1}{b}");
+        ordinary.push_back("Cast nothing right now");
+        int used3 = -1, used4 = -1;
+        vector<string> same = ordinary;
+        CHECK(askExemplar(ordinary, &used3) == askExemplar(same, &used4) && used3 == 1 && used4 == 1,
+              "#W67-AY MED NEGATIVE an ordinary menu's example is unchanged");
+    }
+
+    cout << "\n[#W67-AY MED] the game log buckets a death batch the way the board line buckets the board\n";
+    {
+        // 123v126 s115 (t15) VERBATIM SHAPE: 208 contiguous lines, an alternating
+        // pair, 96 of one byte-identical line and 94 of one shape whose two
+        // ordinals move. Neither shipped collapser can reach it.
+        std::ostringstream b;
+        b << "- You cast Damnation\n";
+        for (int i = 1; i <= 96; i++)
+        {
+            b << "- Your Human died (that Human was " << i << " of 96 copies on your battlefield;"
+                 " the other " << (96 - i) << " are still there)\n";
+            b << "- Your Human (token) ceased to exist and left your graveyard\n";
+        }
+        b << "- Opponent's Perimeter Captain died";
+        const string bucketed = narrationBucketRuns(b.str());
+        CHECK(bucketed.find("- You cast Damnation\n") == 0,
+              "#W67-AY MED POSITIVE a line with no repetition keeps its place and its bytes");
+        CHECK(bucketed.find("- Your Human died (that Human was 1 of 96 copies on your battlefield;"
+                            " the other 95 are still there) [x96 - 96 lines of this shape in this"
+                            " batch; only the numbers in them differ]") != string::npos,
+              "#W67-AY MED POSITIVE the moving-ordinal shape is stated ONCE, verbatim, with an exact count");
+        CHECK(bucketed.find("- Your Human (token) ceased to exist and left your graveyard"
+                            " [x96 - this exact line 96 times in this batch]") != string::npos,
+              "#W67-AY MED POSITIVE the byte-identical line the alternation hid is counted too");
+        CHECK(bucketed.find("was 2 of 96") == string::npos
+              && bucketed.find("was 96 of 96") == string::npos,
+              "#W67-AY MED POSITIVE the 190 further copies are gone from the render");
+        CHECK(bucketed.find("- Opponent's Perimeter Captain died") != string::npos,
+              "#W67-AY MED POSITIVE a one-off line inside the same batch survives verbatim");
+        CHECK(bucketed.size() * 20 < b.str().size(),
+              "#W67-AY MED POSITIVE the batch shrinks by more than an order of magnitude");
+        // MUST-NOT-MATCH: below the floor nothing is grouped and nothing moves.
+        const string small = "- Opponent drew a card\n- You cast Doom Blade\n- Opponent drew a card";
+        CHECK(narrationBucketRuns(small) == small,
+              "#W67-AY MED MUST-NOT-MATCH a batch under the floor renders byte-identically");
+        const string mixed = "Turn 15 - your turn\n- You cast Damnation\n\nTurn 16 - their turn\n"
+                             "- Opponent drew a card";
+        CHECK(narrationBucketRuns(mixed) == mixed,
+              "#W67-AY MED MUST-NOT-MATCH header and blank lines bound the batch and are untouched");
+        // The boundary is real: four identical lines SPLIT by a header do not group.
+        const string split = "- a\n- a\nTurn 2\n- a\n- a";
+        CHECK(narrationBucketRuns(split) == split,
+              "#W67-AY MED MUST-NOT-MATCH a run broken by a header is two batches, neither at the floor");
+        const string four = "- a\n- a\n- a\n- a";
+        CHECK(narrationBucketRuns(four) == "- a [x4 - this exact line 4 times in this batch]",
+              "#W67-AY MED POSITIVE the floor is 4 and the count is exact");
+        CHECK(narrationBucketRuns(bucketed) == bucketed,
+              "#W67-AY MED ECHO the transform is idempotent - two rebuilds of one window agree");
+        CHECK(narrationShapeKey("- Your Human died (that Human was 12 of 96 copies)")
+              == narrationShapeKey("- Your Human died (that Human was 7 of 96 copies)")
+              && narrationShapeKey("- Your Human died") != narrationShapeKey("- Your Vampire died"),
+              "#W67-AY MED the shape key normalises numbers and nothing else");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
