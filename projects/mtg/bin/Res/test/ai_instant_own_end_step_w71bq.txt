@@ -13,12 +13,13 @@
 #DESC: FIX: the own-turn instant-speed windows (upkeep, blockers, combat damage,
 #DESC: end step, stack empty) enter the SAME branch as a response window, which
 #DESC: still falls back to selectAbility() when no castable card is found.
-#DESC: WITNESS: P1 (AI) starts in its END STEP holding Lightning Bolt over three
-#DESC: Mountains; P2 has a Grizzly Bears and no lands. PRE-FIX (w71-BQ base
-#DESC: 77d82bbe6) the end step offers abilities only, the Bolt is still in hand at
-#DESC: P2's main phase and P2's Bears is alive. POST-FIX the Bolt is cast in the
-#DESC: end step. The assert is taken on P2's turn, after P1's last main phase has
-#DESC: already gone by, so a main-phase cast cannot produce it.
+#DESC: WITNESS: P1 (AI) starts in its OWN UPKEEP holding Lightning Bolt over three
+#DESC: Mountains; P2 has a Grizzly Bears and no lands. The assert is taken at P1's
+#DESC: own firstmain - after upkeep and draw and BEFORE any main phase - so only an
+#DESC: upkeep cast can produce it. PRE-FIX (w71-BQ base 77d82bbe6, 3 of 3 runs) the
+#DESC: upkeep offers abilities only: player 0's graveyard expected 1 got 0, hand
+#DESC: expected 1 got 2 (the Bolt is still held) and P2's Bears is alive. POST-FIX
+#DESC: the Bolt is cast in the upkeep.
 FORCEABILITY
 AICALLS 120
 [INIT]
