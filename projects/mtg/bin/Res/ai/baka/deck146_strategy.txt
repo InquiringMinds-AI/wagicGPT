@@ -81,8 +81,14 @@ unless you reveal a Plains or Swamp; Hive enters TAPPED once you control two or 
   ANSWER "tap" BY DEFAULT. Pay only when BOTH hold: (a) the untapped land turns a card in hand into
   a cast you make THIS window ("Mana available: N total", counting it); (b) "{this payment puts you
   at N}" is above the total power on their line. NEVER AT 3 LIFE OR LESS.
-- HIVE OF THE EYE TYRANT: {3}{B} - FOUR mana - for a 3/3 menace attacker until end of turn. Before
-  answering "becomes beholder" run these in order, stopping at the first that fires.
+- HIVE OF THE EYE TYRANT: {3}{B} - FOUR mana - for a 3/3 menace attacker until end of turn.
+  A Hive you already controlled as the turn began IS NOT SUMMONING SICK: animate it in your own
+  main phase and it ATTACKS THIS TURN. It needs no haste, and no window ever gives it haste.
+  AFFORDABILITY: its own mana cannot pay for it, so read "Mana available: N" as N MINUS ONE here
+  (minus one more for a second Hive you also mean to attack with) - FOUR OTHER untapped sources
+  or the row is not offered at all, and a plan naming an animation you cannot pay for is a turn
+  spent doing nothing. Before answering "becomes beholder" run these in order, stopping at the
+  first that fires.
   CHECK 0 - Add the power of every untapped creature of yours that could attack, plus 3, and weigh
     that sum against their printed life. At or above their life -> ANIMATE and swing,
     whatever the phase.
@@ -93,8 +99,6 @@ unless you reveal a Plains or Swamp; Hive enters TAPPED once you control two or 
   CHECK 2 - that Hive already carries a (P/T) on your line, or its ROW prints TAPPED in any form
     ("[this land is TAPPED: animated, it still cannot attack this turn]", "[tapped]") -> PASS. A
     tapped Hive becomes a 3/3 that neither attacks nor blocks, and the mana is gone.
-  CHECK 3 - read "Those sources, one per untapped card:": the only {b} source being a Hive already
-    at (3/3) -> PASS; animating taps that one and neither attacks.
   "[repeat: activated this turn N times already]" -> PASS unconditionally, read before anything
   else on the row; a second offer in a turn you animated buys the same 3/3.
 
@@ -241,10 +245,6 @@ whatever the tags say until one is gone, and a "[lifelink]" attacker of theirs e
 blocked or not.
 
 WORKED SITUATIONS
-- Soul Shatter listed, their line a 4-mana creature and a 5-mana walker: cast it, it takes the
-  walker. Its row reading "ONE of these 5 ... tied at MV 0": cast a body or fire Kaya instead.
 - Your Silencer's tag names three Shield Spheres and a Fate Unraveler reading "your attacker dies,
   their blocker lives": it stays home, and so does any attacker whose tag names "Pride Guardian
   (0/3) (... (blocking trigger: they gain 3))".
-- Cleanup discard, Kaya on your battlefield and a second Kaya on the list beside two Plains and
-  eight lands out: send the Kaya row printing "{you already control one:}".

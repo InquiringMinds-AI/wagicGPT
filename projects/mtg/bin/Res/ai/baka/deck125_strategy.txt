@@ -12,13 +12,9 @@ answers back into your library. Your mana is 26 lands and nothing else.
    in hand - a first Staff, an Elixir, a Path/sweeper/Lightmine Field the board calls for, a
    Revelation the three stops below allow.
 4. End your turn with {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture.
-Your plan line is this sequence of actions and nothing else:
-   "Hold the counter in my hand payable, then Staff of Nin from a row whose leaves N covers that
-   counter's cost, then an Elixir row before any ping while my library reads 16 or less, then ping
-   their face each turn - the punisher instead whenever a DRAW PUNISHERS line is printed; no
-   Emrakul while a converter of theirs is printed."
-Never append a per-card verdict to it: it is echoed atop every later window and outlives the board
-that made it. WHEN A ROW AND YOUR PLAN LINE DISAGREE, THE ROW IS TRUE.
+Your PLAN line is the actions you intend in THIS window and the next, written fresh every window -
+never the sentence the prompt echoes back to you under "YOUR PLAN".
+WHEN A ROW AND YOUR PLAN LINE DISAGREE, THE ROW IS TRUE.
 
 === THE TAP-OUT GATE ===
 Covers every mana you spend on your OWN turn: a Staff, an Elixir ACTIVATION, a Lightmine Field, a
@@ -35,7 +31,9 @@ THE GATE IS OPEN, whatever N reads, in four shapes and only four:
  (b) your life is 5 or less and the row gains life (Elixir activation, Revelation);
  (c) the cheapest counter in hand costs MORE than the row's own M;
  (d) the row is "Cast Staff of Nin" and NO Staff is on your battlefield line - the FIRST Staff is the
-     only card in this deck that ends a game. A SECOND Staff is NOT this shape.
+     only card in this deck that ends a game. A SECOND Staff is NOT this shape, and shape (d) is OFF
+     while a "CRACK-BACK NEXT TURN" line is printed and your life is 15 or less: answer that line
+     first with the sweeper, Path or Revelation row on the menu, and cast the Staff a turn later.
 With no counterspell in hand at all, the gate is open at any N. "Mana available:" means the number on
 that line, one exception: at "0 total (no untapped sources) | Already in pool: ... (N mana ALREADY
 produced and floating)", what you can spend IN THIS DECISION is N; mana kept open for a counterspell
@@ -56,21 +54,24 @@ upkeep included, with EVERY Staff.
   - <names>" is printed and a ping row offers one of those names, PING THE PUNISHER with every Staff,
   every window, until its row stops printing "SURVIVES", then back to the face. Your plan line's
   "ping their face" is a default and that line outranks it.
-- With NO punisher line printed, aim at a creature or planeswalker only when 1 damage finishes it
-  (toughness 1, or 1 loyalty counter); otherwise at the player.
+- With NO punisher line printed, the ping still leaves the face for a creature or planeswalker that
+  1 damage FINISHES (toughness 1, or 1 loyalty counter) and whose own text reads "{T}:", "Whenever
+  ... attacks" or "At the beginning of" - that body grows their board every turn and one ping ends
+  it for good. Any other body 1 damage finishes, and every tougher one: at the player.
 
 === EMRAKUL ===
 Costs {15}. Until "Cast Emrakul, the Aeons Torn" is a numbered row it is a blank card.
-- When the row IS printed, take it: only a cast you can pay for is printed, the extra turn is real,
-  and it outranks the tap-out gate.
-- THE ONE BOARD WHERE IT IS OFF: the prompt prints "LIFE-TO-DAMAGE CONVERTER on the battlefield:
-  theirs", or the row carries "{their converter:". Then the Emrakul row is not on your menu at any
-  life total: an edict makes them sacrifice it and their converter turns the 15 they gain into 15 off
-  you. Answer another row and let the Staff finish. IT FIRES ON LIFE THEY GAIN, never on yours: your
-  Revelation, Elixir and Fall of the Gavel's 5 are never converted against you.
-- With an Emrakul of yours out: attack in every attackers window offering it, block whenever the
-  block line does not read "your blocker dies", and answer "Cast nothing right now" to a sweeper row
-  whose tail reads "1 of yours" - that is your Emrakul.
+- When the row IS printed and NO Staff of Nin is on your battlefield line, take it: the extra turn is
+  real and it outranks the tap-out gate.
+- WITH ANY STAFF OF YOURS ON THE BOARD, EMRAKUL IS NOT YOUR ANSWER, at any mana and any life: the
+  Staffs already finish, the cast taps you out of every counter, and a cheap instant that makes you
+  sacrifice a creature pays its controller life equal to its toughness - 15, off one card whose own
+  text never says "life", with no printed line on your screen warning you first.
+- Same answer, no Staff needed, when the prompt prints "LIFE-TO-DAMAGE CONVERTER on the battlefield:
+  theirs" or the row carries "{their converter:": the 15 they gain comes back as 15 off you. That
+  converter FIRES ON LIFE THEY GAIN, never on yours - your Revelation, Elixir and Gavel are safe.
+- With an Emrakul of yours out: attack in every attackers window offering it, block unless the block
+  line reads "your blocker dies", and never take a sweeper row whose tail reads "1 of yours".
 
 === COUNTERSPELLS ===
 13: 4 Essence Scatter (creature spells only), 3 Dream Fracture, 3 Cancel, 3 Fall of the Gavel (gains
@@ -118,6 +119,11 @@ it against anything that returns from a graveyard. The opponent header prints TW
 the SECOND matters: "N are creatures, K of them without a restriction against attacking" (on the
 active player's board, "K of them able to attack right now"). Walls are already off K, a [tapped]
 creature is still counted, and the sweeper row repeats K.
+A LAND OF THEIRS THAT ANIMATES IS IN NO COUNT ON THIS SCREEN. The opponent header, every sweeper's K
+and Lightmine Field's N all count what is a creature RIGHT NOW, so a land that becomes a creature on
+their turn reads as nothing here, and no sweeper of yours answers it. The "CRACK-BACK NEXT TURN"
+paragraph names those permanents and the power they reach; that power is damage no row on this menu
+prevents, so subtract it from your life yourself before you spend a turn on anything else.
 - K IS 0: Supreme Verdict and Final Judgment are NOT castable plays this turn, in either main phase;
   "Cast nothing right now" and keep them. This outranks being ahead, being BEHIND, spare mana, a plan
   naming a wipe, the sweeper being your only cast row or your last card, and the phase.
@@ -247,14 +253,3 @@ BOTTOM IN THIS ORDER: Emrakul; then any "(copy 2 of 2 in your hand)" duplicate, 
 included; then a land beyond the fifth; then your most expensive spell; then the cheapest card that
 is neither a land nor an answer. Keep the LANDS and at least ONE answer; Glacial Fortress "enters
 tapped unless you control a Plains or an Island".
-
-=== SITUATIONS ===
-- "Your library: 13 cards", you are at 44 to their 12, two Staffs are out, and the menu offers a ping
-  and a "Life with Elixir of Immortality" row. Take the Elixir: the life is beside the point, the
-  ping can wait a window, and the shuffle is the whole game.
-- The X ask reads "X=7 is the largest value on this menu the library pays for" and two Staffs are on
-  your battlefield line. Announce X = 5.
-- Their life is 8, two Staffs are out, and a Revelation row is offered at max affordable X=12. "Cast
-  nothing right now": the Staffs need four more upkeeps and your library has to reach them.
-- The same rows have been offered four times this turn and the prompt says so: take the hold priority
-  row, and again when they come back.

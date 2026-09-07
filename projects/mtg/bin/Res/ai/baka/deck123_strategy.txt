@@ -37,8 +37,9 @@ A priority order over CARDS, not choice numbers. Take the highest entry present 
  P0 Damnation {2}{b}{b} - your line reads "of which 0 are creatures" and the row's K is 2+.
     Ahead of any maker, Tutor or Alarm.
  P1 Bloodline Keeper {2}{b}{b} / P2 Thraben Doomsayer {1}{w}{w} - no maker on your battlefield.
- P3 Intruder Alarm {2}{u} - no Alarm on your battlefield; once ONE maker is down this beats a
-    second maker and the Greaves.
+ P3 Intruder Alarm {2}{u} - ONLY with a maker ALREADY on your battlefield and no Alarm there;
+    then it beats a second maker and the Greaves. With "of which 0 are creatures" on your own
+    line the Alarm is not a play at any price - a maker row on the same menu is.
  P4 Idyllic Tutor {2}{w} - no Alarm on the battlefield or in hand, live bracket only.
  P5 Lightning Greaves {2} - only when the row does NOT read "this equips nothing".
  P6 removal, by its own rule. P7 Vision Skeins {1}{u}.
@@ -50,8 +51,12 @@ second copy changes nothing" are a menu with nothing on it.
   rows are dead.
 - Your instants ARE offered on the opponent's turn at every phase, the BEST window for Tragic Slip
   and both edicts - you see their board after they commit.
-- Take "Hold priority: pass now, and do not ask me again" at the FIRST dead window of the turn,
-  and answer a reopened run the same way every time.
+- THE HOLD ROW IS A P8 ANSWER AND NOTHING ELSE: take it only when EVERY row on THIS window is
+  dead by the order above. One live row - a maker, a live Tutor bracket, a "{kills: <name>}"
+  removal row, a Create row - and the hold is wrong however poor the window looks.
+- On a Casting decision (the menu that says it has no row 0) decline with "Cast nothing right
+  now", never with the hold: the hold there silences every later CAST window while the rows stand.
+- Once it is right, answer a reopened run the same way every time.
 --- THE TOKEN LINES AND THE STOP ---
 Rows: "Create human with Thraben Doomsayer [cost: Tap]", "Create vampire with Bloodline Keeper",
 "Create vampire with Lord of Lineage".
@@ -93,13 +98,17 @@ It destroys ALL creatures and nothing else - not an enchantment, artifact, plane
 The row counts for you: "destroys N of their
 creatures (K without a restriction against attacking), M of yours", and "all of them carry a
 restriction" is K = 0. FIRST, BEFORE THE CHOICE LINE, read M and N off that row: M at 4 or more,
-or N at 0, and Damnation's number is not written this window - answer another row. Only if that
+or N at 0, and Damnation's number is not written this window - answer another row. A TOKEN-MAKER
+OF YOURS INSIDE THE "M of yours" LIST IS A VETO OF ITS OWN: if that list names Thraben Doomsayer,
+Bloodline Keeper or Lord of Lineage, do not write Damnation's number, whatever N and K say - that
+is your win condition, and you are the one sweeping it away. Only if that
 comparison passes do you go on. Whenever it is listed this is the ONLY plan line, and it is a sequence of actions:
     PLAN: <cast Damnation now / hold Damnation>, then <the next action you intend>
 - M at 4+: NEVER, whatever N says. Four bodies is a board you win with.
 - M at 0 with K at 2+: cast it, above a maker, the Tutor and the Alarm; at your life 10 or less,
   "hold" is not an option.
-- N bigger than M with K at 1+: cast it. K at 0 on Perimeter Captain or Pride Guardian: cast it.
+- N bigger than M with K at 1+: cast it. K at 0 on Perimeter Captain or Pride Guardian: cast it
+  ONLY at M = 0 - those are walls, and walls standing cost you nothing.
 - Any other K at 0, or N exactly 1 while a Tragic Slip or live edict on the menu kills the one
   that matters: take the one-for-one and keep the Damnation.
 - M bigger than N, or N at 0: never, whatever the plan says. Two Damnation rows: the cheaper one.
@@ -146,8 +155,9 @@ row, on an empty board or any other.
   creature. Only one bracket is a cast: "still in your library, not on your battlefield or in your
   hand" -> LIVE, cast it and name Intruder Alarm; "a copy of one you already control or hold" and
   "none left in your library" -> DEAD. An Alarm in HAND is as dead as one on the battlefield.
-- THE ONE TIME A DEAD ROW IS A PLAY: against counterspells in their log (Cancel, Essence Scatter,
-  Dream Fracture, Fall of the Gavel) they counter the FIRST spell you cast, so with mana for TWO
+- THE ONE TIME A DEAD ROW IS A PLAY: against counterspells or a sweeper in their log OR their
+  graveyard (Cancel, Essence Scatter, Dream Fracture, Fall of the Gavel, Supreme Verdict) they
+  answer the FIRST spell you cast, so with mana for TWO
   cast the SPARE first (a dead Tutor, a second Alarm, a Skeins) and the maker SECOND in the same
   main phase. ONE TEST: the maker must be a numbered row ON THIS SAME MENU.
 --- CARD FACTS THE PROMPT DOES NOT SPELL OUT ---
@@ -244,14 +254,5 @@ Cleanup discard: a listed "copy 2 of 2" / "copy 2 of 3" / "copy 3 of 3" is alway
 carrying its own verdict ("dead right now: 0 legal targets", "spare: you control N lands") is the
 send; one carrying none is not thereby live. NEVER your only maker, Alarm or Damnation.
 --- SITUATIONS AND THE RIGHT ANSWER ---
-- Your line reads 0 creatures and Damnation reads "destroys 4 ... (4 without a restriction against
-  attacking), 0 of yours": cast it, above a maker and the Alarm. "destroys 0 ...": hold it.
-- A maker is out and Intruder Alarm is listed: cast it, ahead of a second maker and the Greaves.
-  Alarm in hand and castable with a Create row listed first: pass that first Create window, cast
-  the Alarm, then tap.
 - Opponent life 22, their line 3 creatures, yours 4, repeat row listed: stop 28, N 24 - "CHOICE: 2
   (Create human with Thraben Doomsayer x24)", then pass.
-- At 2 life with 25 Humans able to attack, "ON THE STACK: 3 damage to you ... that would KILL
-  you", Devour Flesh on row 1: cast it naming Yourself - a 3/3 Human under Fateful hour gains 3.
-- Their only creature is Wall of Omens (0/4) [defender], Tribute to Hunger listed: cast nothing;
-  but if its text pumps their others, cast the edict.
