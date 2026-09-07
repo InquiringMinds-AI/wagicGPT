@@ -437,8 +437,32 @@ static void w57gCollapseTargetIcons(vector<JQuadPtr>& quads, vector<MTGCardInsta
 }
 
 /* Ability */
+//#W71-BR (wave-70 known-bugs L6): the moment a stack object begins resolving is
+//the only place the engine can tell "this body left the battlefield earlier"
+//from "this effect is about to remove it itself". Two Tribute to Hunger copies
+//aimed at one Emrakul each paid its full toughness (`125v126` seq 120, opponent
+//10 -> 25 -> 40; `126v125` seq 130 -> 132) because the victim is chosen when the
+//granted ability goes on the stack and the life is paid off that stored pointer
+//at resolution, with nothing between them asking whether the sacrifice could
+//still happen. Stamped here, read in AADynamic::resolve; the nest is walked the
+//way every other ability walk in this codebase walks it.
+static void w71StampDynamicVictimGone(MTGAbility * a, GameObserver * obs, int depth)
+{
+    if (!a || depth > 5)
+        return;
+    (void) obs;
+    if (AADynamic * ad = dynamic_cast<AADynamic *>(a))
+        ad->resolvingFromStackAbility = true; //this one is resolving AS a stack object
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        w71StampDynamicVictimGone(na->ability, obs, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            w71StampDynamicVictimGone(ma->abilities[i], obs, depth + 1);
+}
+
 int StackAbility::resolve()
 {
+    w71StampDynamicVictimGone(ability, getObserver(), 0); //#W71-BR (L6)
     return (ability->resolve());
 }
 void StackAbility::Render()

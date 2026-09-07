@@ -1945,12 +1945,15 @@ static string sweeperSurvivorTail(const std::vector<std::string>& theirSurvivors
     return o.str();
 }
 
+static string animatableNotCountedTail(int n); //#W71-BR (L7)
+
 static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine,
                             bool liveScope = false,
                             const std::vector<std::string>& theirNames = std::vector<std::string>(),
                             const std::vector<std::string>& myNames = std::vector<std::string>(),
                             const std::vector<std::string>& theirSurvivors = std::vector<std::string>(),
-                            const std::vector<std::string>& mySurvivors = std::vector<std::string>())
+                            const std::vector<std::string>& mySurvivors = std::vector<std::string>(),
+                            int animatable = 0) //#W71-BR (L7)
 {
     std::ostringstream o;
     o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s") << " (";
@@ -1963,6 +1966,7 @@ static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttac
     o << "), " << mine << " of yours";
     o << sweeperRosterTail(theirNames, myNames); //#W60-O (B7)
     o << sweeperSurvivorTail(theirSurvivors, mySurvivors); //#W60-Q (R6)
+    o << animatableNotCountedTail(animatable); //#W71-BR (L7)
     return o.str();
 }
 
@@ -2056,9 +2060,81 @@ static string wipeSurvivorTail(int damage, const std::vector<WipeVictim>& hit)
     return o.str();
 }
 
+//#W71-BR (L7, deck125 HIGH-2 - the loss). A creature-land is in NO count on
+//this screen. `125v152` seq 35 printed "Opponent battlefield (10 permanents
+//listed, of which 0 are creatures ... and 10 are lands)" over a board whose
+//Lair of the Hydra had already dealt 8, every sweeper row read
+//`{right now: destroys 0 of their creatures}` and Lightmine Field read
+//`they control 0 creatures able to attack` - three numbers, all true of the
+//present tense, and a UW control deck whose whole guide is written around K and
+//N was structurally blind. The count is NOT folded into K (a land that has not
+//animated is not a creature and a sweeper does not kill it - folding it in
+//would be the false surface this fixes); it is stated BESIDE K, as what it is.
+//TRUE when a permanent is not a creature right now and its own script carries
+//an ACTIVATED `becomes(creature ...)` rung - the same script shape the
+//crack-back animate walk reads. Affordability is not claimed here: the
+//crack-back line owns the rung arithmetic, this owns the census.
+static bool scriptHasActivatedAnimate(const string& lowScript)
+{
+    size_t lp = 0;
+    while (lp <= lowScript.size())
+    {
+        const size_t nl = lowScript.find('\n', lp);
+        const string line = lowScript.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? lowScript.size() + 1 : nl + 1;
+        if (line.empty() || line[0] == '@')
+            continue;
+        const size_t bp = line.find("becomes(creature");
+        if (bp == string::npos)
+            continue;
+        const size_t colon = line.find(':');
+        if (colon != string::npos && colon < bp)
+            return true; //an activated animation
+    }
+    return false;
+}
+
+static bool permanentCanAnimate(MTGCardInstance * c)
+{
+    if (!c || c->isCreature())
+        return false;
+    string mt = c->magicText;
+    for (size_t i = 0; i < mt.size(); i++)
+        mt[i] = (char) tolower((unsigned char) mt[i]);
+    return scriptHasActivatedAnimate(mt);
+}
+
+//How many of a player's permanents answer that predicate.
+static int animatableCount(Player * p)
+{
+    if (!p || !p->game || !p->game->inPlay)
+        return 0;
+    int n = 0;
+    for (int i = 0; i < p->game->inPlay->nb_cards; i++)
+        if (permanentCanAnimate(p->game->inPlay->cards[i]))
+            n++;
+    return n;
+}
+
+//The tail a creature-count clause carries when the OTHER board holds bodies the
+//count cannot see. One wording for every surface that states such a count, so
+//the header, the sweeper row and the attack punisher cannot disagree. Pure.
+static string animatableNotCountedTail(int n)
+{
+    if (n <= 0)
+        return "";
+    std::ostringstream o;
+    o << " - " << n << (n == 1 ? " noncreature permanent of theirs can animate into a"
+                                 " creature and is not in that count"
+                               : " noncreature permanents of theirs can animate into"
+                                 " creatures and are not in that count");
+    return o.str();
+}
+
 //#W61-U (C10): the roster rides the clause the pilot reads.
 static string attackPunisherClause(int theirsAbleToAttack,
-                                   const std::vector<WipeVictim>& hit = std::vector<WipeVictim>())
+                                   const std::vector<WipeVictim>& hit = std::vector<WipeVictim>(),
+                                   int animatable = 0) //#W71-BR (L7)
 {
     std::ostringstream o;
     o << "they control " << theirsAbleToAttack << " creature" << (theirsAbleToAttack == 1 ? "" : "s")
@@ -2068,6 +2144,7 @@ static string attackPunisherClause(int theirsAbleToAttack,
     else
         o << "deals " << theirsAbleToAttack << " to each if all " << theirsAbleToAttack << " attack"
           << wipeSurvivorTail(theirsAbleToAttack, hit);
+    o << animatableNotCountedTail(animatable); //#W71-BR (L7)
     return o.str();
 }
 
@@ -2416,7 +2493,9 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
             ans->engines = eng.str();
         }
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames,
-                             theirSurvivors, mySurvivors); //#W60-Q (R6)
+                             theirSurvivors, mySurvivors, //#W60-Q (R6)
+                             animatableCount(card && card->controller()
+                                             ? card->controller()->opponent() : NULL)); //#W71-BR (L7)
     }
     //#W61-U (C10): the attack-punisher class deliberately takes NO part in the
     //menu ranking. What it removes is conditional on the opponent choosing to
@@ -2425,7 +2504,9 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
     //would be a true statement in the wrong scope. The roster above answers the
     //question this row is actually asked (does it stop the attack); `ans` stays
     //unset, so no marker is issued for it.
-    return attackPunisherClause(theirsAttack, theirAttackers); //#W61-U (C10)
+    return attackPunisherClause(theirsAttack, theirAttackers, //#W61-U (C10)
+                                animatableCount(card && card->controller()
+                                                ? card->controller()->opponent() : NULL)); //#W71-BR (L7)
 }
 
 string dynamicMagnitudes(MTGCardInstance * card, CastRowBoardAnswer * ans = NULL) //#W61-U (C10)
@@ -4491,6 +4572,56 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
                                   nowMay, chosen);
 }
 
+//#W71-BR (L8, deck162 HIGH). `{feeds:}`'s "draw converters in your hand: N" and
+//the `{reserve: ... STRANDS <card> this turn}` verdict are both taken from the
+//seat's hand, and `162v152` seq 21 computed both against a hand the seat's OWN
+//Teferi's Puzzle Box trigger - listed as stack object 2 in the SAME prompt -
+//was about to bottom whole; seq 22 then reads "no \"Underworld Dreams\" is in
+//your hand". Nothing is folded, because nothing about the replacing hand is
+//knowable: the honest fact is that every hand-derived count on this screen is
+//about to be void, and it is stated once, under the stack block that causes it.
+//The scan is over the SOURCE CARD's script (`bottomoflibrary`/`moveTo` over
+//`all(*|myhand)`) and the source's controller, since `myhand` is the ability
+//controller's hand. Returns the source's name, or "".
+static string scriptLower(const string & s); //#W71-BR (L8)
+static string stackHandReplacerFor(GameObserver * observer, Player * seat)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return "";
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return "";
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        MTGCardInstance * src = dynamic_cast<MTGCardInstance *>(it->source);
+        if (!src || src->controller() != seat)
+            continue;
+        const string mt = scriptLower(src->magicText);
+        if (mt.find("all(*|myhand)") == string::npos)
+            continue;
+        if (mt.find("bottomoflibrary") == string::npos && mt.find("moveto(") == string::npos)
+            continue;
+        return src->getDisplayName();
+    }
+    return "";
+}
+
+//The line it prints. Pure over the name, so the wording is pinned without a board.
+static string handAboutToBeReplacedLine(const string& sourceName)
+{
+    if (sourceName.empty())
+        return "";
+    return "EVERY COUNT TAKEN FROM YOUR HAND ON THIS SCREEN IS ABOUT TO BE VOID: the "
+           + sourceName + " ability above replaces your whole hand when it resolves,"
+             " so your hand size, the \"draw converters in your hand\" count, and any"
+             " verdict about holding or stranding a card you are looking at now stop"
+             " being true the moment it resolves - no card in your hand now is"
+             " guaranteed to be there afterwards.";
+}
+
 //How many cards the UNRESOLVED stack will hand `seat` before it empties.
 //#W63-AF (R8): non-static - `gptStackPendingDrawsFor` below is the suite's door
 //to it, so the fixture pins the SAME function the rows are priced off.
@@ -4730,9 +4861,13 @@ static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live)
 //precisely what makes it uncountable by eye, so state it. `lands` < 0 omits
 //the clause entirely and renders byte-identical to the pre-fix header, so
 //every existing window and its PARSETEST cases are untouched.
+//#W71-BR (L7): `animatable` < 0 omits the clause entirely and renders
+//byte-identical to the pre-fix header, so every window and pin that does not
+//pass it is untouched.
 static string battlefieldHeaderText(bool mine, int permanents, int creatures,
                                     int ableToAttack = -1, bool liveScope = true,
-                                    int attacking = 0, int lands = -1)
+                                    int attacking = 0, int lands = -1,
+                                    int animatable = -1)
 {
     std::ostringstream o;
     o << (mine ? "Your" : "Opponent") << " battlefield (" << permanents
@@ -4757,6 +4892,17 @@ static string battlefieldHeaderText(bool mine, int permanents, int creatures,
     if (lands >= 0)
         o << (creatureClause ? ", and " : " and ") << lands
           << (lands == 1 ? " is a land" : " are lands");
+    //#W71-BR (L7): the bodies no creature count on this screen can see. Stated
+    //as its own clause, never folded into the creature count - a land that has
+    //not animated is not a creature, and saying it is would be the second false
+    //surface. `125v152` seq 35: 0 creatures, 10 lands, and an 11/11 Lair of the
+    //Hydra that had already dealt 8.
+    if (animatable > 0)
+        o << "; " << animatable
+          << (animatable == 1
+                  ? " of those noncreature permanents can animate into a creature and is"
+                  : " of those noncreature permanents can animate into creatures and are")
+          << " in no creature count above";
     o << "): ";
     return o.str();
 }
@@ -6275,6 +6421,37 @@ static int clauseOccurrences(const string& row, const char * literal)
         at = row.find(literal, at + len);
     }
     return n;
+}
+
+//#W71-BR (L19, wave-70 LOW-1): the census above counts a LITERAL, and one
+//literal is not always one fact. `{paying this taps: ` names a tap GROUP, and a
+//single activation legitimately has two disjoint ones - the bodies convoked and
+//the source itself - so `152v162` printed a correct Katilda row and the F1
+//diagnostic cried defect 29 times over two games. What F1 exists to catch is the
+//merge shape: the SAME clause built twice. So the duplicate test for a
+//group-shaped literal is over the clause BODY (the text through its closing
+//brace), not the opening token: two identical bodies are still the merge
+//defect; two different bodies are two facts. Pure over a string, so both rungs
+//are pinned.
+static bool repeatedClauseBody(const string& row, const char * literal)
+{
+    if (!literal || !*literal)
+        return false;
+    const size_t len = strlen(literal);
+    std::vector<string> bodies;
+    size_t at = row.find(literal);
+    while (at != string::npos)
+    {
+        const size_t close = row.find('}', at + len);
+        bodies.push_back(row.substr(at, close == string::npos
+                                        ? string::npos : close + 1 - at));
+        at = row.find(literal, at + len);
+    }
+    for (size_t i = 0; i < bodies.size(); i++)
+        for (size_t j = i + 1; j < bodies.size(); j++)
+            if (bodies[i] == bodies[j])
+                return true;
+    return false;
 }
 
 //#W49-D11: a creature's own {T}-cost activation offered BEFORE attackers are
@@ -8387,6 +8564,28 @@ string graveyardZoneLine(bool mine, const vector<string>& entries)
     return o.str();
 }
 
+//#W71-BR (L14, deck146 MED-2 + L7's identity half). The cast menu promises that
+//"the activated abilities of your permanents (a manland animation among them)
+//are asked at their own windows", and the seat wrote animation plans at three
+//windows where the row could never appear (`146v126` s20, `146v125` s44/s45 -
+//4, 4 and 3 untapped sources against a 4-mana activation whose own source is
+//one of them). The rung ceiling that explains the shortfall
+//(animateRungCeilingClause) rides the OPTION ROW, i.e. it prints only once the
+//activation is already affordable - the model can never read it in the window
+//where it would change the plan. So the fact goes on the PERMANENT, where it is
+//readable at every window. Neutral about affordability: it states the rule, not
+//a rung, and is therefore true on either board. Pure over the two predicates.
+static string manlandBoardTag(bool canAnimate, bool tapsForMana)
+{
+    if (!canAnimate)
+        return "";
+    if (!tapsForMana)
+        return " [creature-land: it can animate into a creature at its own activation window]";
+    return " [creature-land: it can animate into a creature at its own activation window,"
+           " and its OWN mana is not counted toward that activation - tapping it for mana"
+           " leaves it tapped, and a tapped permanent can neither attack nor block]";
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
                        const char * copyScope = "your hand", bool effectText = false,
                        const std::set<string> * effectSkip = NULL,
@@ -8546,6 +8745,14 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //for either player's board.
             if (int selfDmg = ManaEngine::selfDamageOnTap(card))
                 out << " [tapping for mana deals " << selfDmg << " damage to its controller]";
+            //#W71-BR (L14): a creature-land says so ON the permanent, at every
+            //window - not only on the row it is already affordable at.
+            if (!card->isCreature())
+            {
+                const string mlow = scriptLower(card->magicText);
+                if (scriptHasActivatedAnimate(mlow))
+                    out << manlandBoardTag(true, mlow.find(":add") != string::npos);
+            }
             //the LIVE keyword set - granted/lost abilities the decklist
             //text cannot show (Bloodghast "can't block", taught flying...)
             if (card->isCreature())
@@ -12207,6 +12414,48 @@ static void drawStepExtrasScan(Player * me, Player * opp,
 //the pilot's own life would be a false surface; the engine's default (no player
 //token, or "controller") is the controller. `from` is where to start scanning -
 //an ability line starts at its own name(...), a spell line at 0.
+//#W71-BR (L16, deck130 MED - a FALSE verdict on a cast row). TRUE when a
+//script line's payload sits behind an ACTIVATION COST, so nothing on it happens
+//when the card is cast. The engine's own shape is `<cost>:<effect>`, and the
+//cost is the only thing that carries a top-level `{...}` group before that
+//colon (`{1}{S}:draw:1`, `aslongas(*|myhand) {2}{T}:draw:1`,
+//`this(counter{0/0.1.Level}>2) {T}:draw:1 controller`). Colons and braces
+//INSIDE (), [] or {} belong to a spec, not to the ability split, so the scan is
+//depth-aware: `this(variable{type:*:myhand}=0)` must not be read as the split.
+//A cast-time line has no top-level cost group before its first depth-0 colon
+//(`draw:1`, `life:x && draw:x`, `foreach(creature[attacking]):draw:1
+//controller`), and is left alone. Pure over the lowercased line.
+static bool lineIsActivatedCost(const string& low)
+{
+    int depth = 0;
+    bool sawCostGroup = false;
+    for (size_t i = 0; i < low.size(); i++)
+    {
+        const char c = low[i];
+        if (c == '(' || c == '[')
+            depth++;
+        else if (c == ')' || c == ']')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        else if (c == '{')
+        {
+            if (depth == 0)
+                sawCostGroup = true;
+            depth++;
+        }
+        else if (c == '}')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        else if (c == ':' && depth == 0)
+            return sawCostGroup;
+    }
+    return false;
+}
+
 static int lineControllerDrawCount(const string& low, size_t from)
 {
     int total = 0;
@@ -12338,6 +12587,16 @@ static int scriptSelfDrawCountUncached(const string& script)
             low[i] = (char) tolower((unsigned char) low[i]);
         if (low.find('@') != string::npos || low.find("may ") != string::npos
             || low.find("choice ") != string::npos || low.find("if(") != string::npos)
+            continue;
+        //#W71-BR (L16, deck130 MED): an ACTIVATED line is not a cast-time
+        //effect. Pyrite Spellbomb (`auto={1}{S}:draw:1`) drew nothing when it
+        //was cast, and `130v162` seq 17 rendered "[DRAW PRICE: this draws 1
+        //card ... you would be at 15]" on its CAST row - a false verdict on a
+        //row the model is instructed to believe. The count this tag prices is
+        //what CASTING does; a line whose payload sits behind a cost is priced
+        //by the ability-row emitter (scriptAbilityDrawCount) at the window
+        //where the cost is actually paid.
+        if (lineIsActivatedCost(low))
             continue;
         total += lineControllerDrawCount(low, 0);
     }
@@ -17893,6 +18152,25 @@ string logWindowLogHeader(bool windowed, int keptTurns)
 //consumePlan's other plan helpers, below.
 static string planMenuDiffClause(const string& absentName);
 
+//#W71-BR (L11, engine-seat MED-4; wave-70 class B, 7 of 2,119, and the shape
+//lane BL flagged untested in wave 66). The carried plan was served as
+//`YOUR PLAN (...): <sentence>` - byte for byte the LABEL shape the protocol
+//asks the model to write (`PLAN: <sentence>`), one line above the menu. Seven
+//replies copied the heading's words into the label slot and answered
+//`YOUR PLAN: Pass priority.` The parser is not the place to absorb that
+//(accepting a second label is prose-shaped tolerance, invariant 000); the
+//render is. So the heading stops being a label: the plan is QUOTED after a
+//verb, and the line no longer reads `<CAPS>: <text>`. The words "YOUR PLAN"
+//are kept exactly - three live deck guides key on that string - and nothing
+//else about the carry changes. Pure over its three inputs.
+static string carriedPlanHeaderText(const string& ageClause, const string& absentClause,
+                                    const string& plan)
+{
+    return string("\nYOUR PLAN (as you last stated it") + ageClause + absentClause
+           + ") reads \"" + plan + "\"\n";
+}
+
+
 string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     return assemblePrompt(tail, NULL);
@@ -18264,8 +18542,9 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         //not executed yet. #W70-BN (F10): `mPlanStepsDone` advances only on the
         //record of an EXECUTED decision, so it cannot change between two rebuilds
         //of the SAME window and never reaches the async slot key or the ask key.
-        u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << planAbsent
-          << "): " << gptcaveat::planStepsAfter(mCurrentPlan, (size_t) mPlanStepsDone) << "\n";
+        u << carriedPlanHeaderText(planAgeClause(), planAbsent,
+                                   gptcaveat::planStepsAfter(mCurrentPlan,
+                                                             (size_t) mPlanStepsDone));
         //#W50-Y D10 (ii): on a TARGET window, a carried plan whose named
         //target (a permanent on either battlefield, under a targeting verb)
         //matches no row gets the one-line note - deck130 G4's two self-hits
@@ -22332,11 +22611,19 @@ static string landDropThreatTag(const string& rawScript)
     return "";
 }
 
-static string crackBackFloorSources(Player * opp)
+//#W71-BR (L18, deck125 MED E-3): `sizeableOut` (optional) receives the damage
+//the floor clause NAMES A NUMBER FOR - the animators' best affordable rungs and
+//the pingers' per-activation damage - and `unsizedOut` whether anything listed
+//has no number at all (a pump trigger). The caller states the arithmetic; the
+//walk stays the one walk that produces the names.
+static string crackBackFloorSources(Player * opp, int * sizeableOut = NULL,
+                                    bool * unsizedOut = NULL)
 {
     if (!opp || !opp->game || !opp->game->inPlay)
         return "";
     string animators, pingers, pumps;
+    int sizeable = 0;      //#W71-BR (L18)
+    bool unsized = false;  //#W71-BR (L18)
     //#W61-V (R6): what their OPEN mana can pay for - the same engine call, the
     //same policy and the same integer the prompt's own "their open mana" line
     //three lines above is built from (#W56-B D10), so the clause and that line
@@ -22399,6 +22686,10 @@ static string crackBackFloorSources(Player * opp)
                     animators += ", ";
                 animators += crackBackAnimatorEntry(c->getDisplayName(), bestRungPower,
                                                     bestRungCost);
+                if (bestRungPower >= 0) //#W71-BR (L18)
+                    sizeable += bestRungPower;
+                else
+                    unsized = true;
             }
         }
         size_t lp = 0;
@@ -22436,6 +22727,7 @@ static string crackBackFloorSources(Player * opp)
                     if (!pingers.empty())
                         pingers += ", ";
                     pingers += pp.str();
+                    sizeable += flatDmg; //#W71-BR (L18)
                 }
             }
             else
@@ -22458,6 +22750,10 @@ static string crackBackFloorSources(Player * opp)
     }
     std::ostringstream o;
     int n = 0;
+    if (sizeableOut)
+        *sizeableOut = sizeable;
+    if (unsizedOut)
+        *unsizedOut = !pumps.empty() || unsized;
     if (!animators.empty())
         o << (n++ ? "; " : "") << "noncreature permanents of theirs that can animate and"
              " attack are not in that count - " << animators;
@@ -22487,7 +22783,9 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
                                     int exileReturnCount = 0, int exileReturnPower = 0,
                                     int evasiveAttackers = 0, int evasiveDamage = 0,
                                     bool haveBodies = false,
-                                    const string& floorSources = "")
+                                    const string& floorSources = "",
+                                    int floorExtra = 0,        //#W71-BR (L18)
+                                    bool floorUnsized = false) //#W71-BR (L18)
 {
     if (ableAttackers <= 0 || maxDamage <= 0)
         return "";
@@ -22507,6 +22805,27 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
           << " nothing you control can legally block";
     if (!floorSources.empty())
         o << " - and that number is a FLOOR, not a ceiling: " << floorSources;
+    //#W71-BR (L18, deck125 MED E-3, the game it lost). The head prints a life
+    //total and the FLOOR warning prints names, and a life total a reader is
+    //told is a floor is still the number they subtract: `125v152` seq 38 read
+    //"for up to 3 ... you would be at 9 ... FLOOR ... Lair of the Hydra (best
+    //rung their mana pays for: 9 power once animated)" and the reasoning
+    //produced "Total potential damage: 2 + 1 + 6 = 9. I would be at 3" against
+    //an actual 14. The names carry numbers the head never adds up, so the line
+    //adds them: one more subtraction, done by the engine that owns both halves.
+    //The result is NOT called a ceiling while anything listed has no number.
+    if (!floorSources.empty() && floorExtra > 0)
+    {
+        o << " - ADD THOSE UP: the numbers named there come to " << floorExtra
+          << " more damage, so the total to subtract from your life is "
+          << (maxDamage + floorExtra) << " and you would be at "
+          << (myLife - maxDamage - floorExtra);
+        if (myLife - maxDamage - floorExtra <= 0)
+            o << "; that would KILL you";
+        o << (floorUnsized ? ", and lower still - something listed above adds power this"
+                             " render cannot size"
+                           : ", which is every source on this screen counted once");
+    }
     o << crackBackExileReturnClause(exileReturnCount, exileReturnPower); //#W60-P (B9)
     return o.str();
 }
@@ -23904,6 +24223,11 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             const string pend = pendingStackDamageLine(stackDamageToMe, this->life);
             if (!pend.empty())
                 out << pend << "\n";
+            //#W71-BR (L8): the hand this screen's counts are taken from.
+            const string replaced = handAboutToBeReplacedLine(
+                stackHandReplacerFor(observer, this));
+            if (!replaced.empty())
+                out << replaced << "\n";
         }
     }
     //Honest mana line: the pool being empty between actions is normal (the
@@ -24248,7 +24572,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 ownEffectSkip.insert(nm);
         }
     out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures, myCanAttack,
-                                         activeSeat == this, myAttacking, myLands);
+                                         activeSeat == this, myAttacking, myLands,
+                                         animatableCount(this)); //#W71-BR (L7)
     //audit-L (A19): the one block the key variant renders differently.
     const size_t ownBlockStart = keyVariant ? (size_t) out.tellp() : 0;
     describeZoneCards(out, game->inPlay, true, "your hand", true, &ownEffectSkip);
@@ -24275,7 +24600,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
-                                             activeSeat == opp, oppAttacking, oppLands);
+                                             activeSeat == opp, oppAttacking, oppLands,
+                                             animatableCount(opp)); //#W71-BR (L7)
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
         //#W67-AY (I8): theirs only when it holds something - an empty opposing
@@ -24689,11 +25015,17 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //forms above - those require the opponent to be the active seat -
             //so this adds a line, replaces none.
             if (crackBackNextTurnDue(crackBackSeat, gp, nextTurnAttackers, nextTurnDamage))
+            {
+                int floorExtra = 0;          //#W71-BR (L18)
+                bool floorUnsized = false;   //#W71-BR (L18)
+                const string floorSrc = crackBackFloorSources(opp, &floorExtra, &floorUnsized);
                 out << "\n" << crackBackNextTurnLine(nextTurnAttackers, nextTurnDamage, life,
                                                      exileReturnCount, exileReturnPower,
                                                      nextTurnEvasive, nextTurnEvasiveDamage,
                                                      myCreatures > 0,
-                                                     crackBackFloorSources(opp)); //#W61-R (C3)
+                                                     floorSrc, //#W61-R (C3)
+                                                     floorExtra, floorUnsized); //#W71-BR (L18)
+            }
         }
         //#W68-BE (R7): the three exceptions MTGPlayerCards::drawFromLibrary itself
         //checks before it declares a loser - the drawing player's CANTLOSE or
@@ -25904,10 +26236,34 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //seen - so the row says that instead of the turn. This is not a blind cache:
 //holdStillStands re-checks the rendered rows, byte for byte, at every window,
 //and a single changed price re-opens the question.
+//#W71-BR (L17, deck123 MED-2): the tail is TRUE at the priority seam and false
+//in effect on a CASTING menu, where the row sits beside "Cast nothing right
+//now" and the two read as the same decline while one closes the turn's
+//remaining casting windows. deck123's own gameend counters:
+//`hold_windows_skipped_cast` 343 / 76 / 60 / 44 against
+//`hold_windows_skipped_priority` 30 / 0 / 21 / 19 - the skipped windows are
+//overwhelmingly CAST windows, and `123v146` seq 17 took the hold row over a
+//live Idyllic Tutor row. The row is NOT removed (a decline the pilot may want
+//is not the engine's to withhold, and the latch is what stops the identical-run
+//loops the row exists for): it says what it costs where it costs it. The HEAD
+//is shared by both spellings, so every consumer that identifies the row by its
+//head - holdRowIndexOf, isReservedHoldEcho - binds either.
+static const char * kHoldPriorityRowHead =
+    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    " until one of the rows above changes (any change re-opens this window;";
+
 static const char * kHoldPriorityRowText =
     "Hold priority: pass now, and do not ask me again - this turn or later -"
     " until one of the rows above changes (any change re-opens this window; you"
     " give up no cast)";
+
+//The same row on a CASTING menu, where "you give up no cast" is exactly the
+//claim that is false.
+static const char * kHoldPriorityRowTextCast =
+    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    " until one of the rows above changes (any change re-opens this window; on"
+    " THIS menu that means you also give up this turn's remaining CASTING"
+    " windows for as long as these rows stand)";
 
 //#W56-A (D1): the hold's board key is GONE. Wave 53-55 keyed the latch on
 //the situation block (phase line, hidden-zone counters and finally the life
@@ -26021,9 +26377,10 @@ static string holdRowBenefitClause()
                   " begins saying it kills you}");
 }
 
-static string holdRowLine()
+static string holdRowLine(bool castSeam = false) //#W71-BR (L17)
 {
-    return string(kHoldPriorityRowText) + holdRowBenefitClause();
+    return string(castSeam ? kHoldPriorityRowTextCast : kHoldPriorityRowText)
+           + holdRowBenefitClause();
 }
 
 //#W66-AS (deck123 MED): the casting menu HAS NO ROW 0 and the priority menu
@@ -26472,8 +26829,9 @@ static int holdRowIndexOf(const std::vector<string> * optionTexts)
     for (size_t o = 0; o < optionTexts->size(); o++)
         //#W55-A (D21): the row carries a benefit annotation, so its identity
         //is its own text as a HEAD, not the whole rendered string.
-        if ((*optionTexts)[o].compare(0, strlen(kHoldPriorityRowText),
-                                      kHoldPriorityRowText) == 0)
+        //#W71-BR (L17): the HEAD both spellings share.
+        if ((*optionTexts)[o].compare(0, strlen(kHoldPriorityRowHead),
+                                      kHoldPriorityRowHead) == 0)
             return (int) o;
     return -1;
 }
@@ -26830,11 +27188,18 @@ int AIPlayerGPT::codedChoiceOrdinal(const string& content, int choice, int optio
 //the legal one - the loop row stays exactly as it was, and a second row lets
 //the model name how many times it wants the engine to perform it.
 //
-//The floor is K >= 2 takes this turn (the same evidence the [repeat:] tag
-//keys on: a third offer of the same ability in the same turn is the earliest
-//point at which repetition is the salient fact), and the ceiling stated in the
-//row is real - N is clamped to it at parse.
-static const int kRepeatRowFloor = 2;
+//The floor is the SAME evidence the [repeat:] tag keys on - which is what this
+//comment always claimed and the number never was.
+//#W71-BR (L17, deck123 MED-3): `kRepeatActivationFloor` is 1, so the annotation
+//"[repeat: you control 5 creatures; activated this turn 1 times already. This
+//turn will not advance while you keep taking this option.]" printed on the
+//plain row at `123v130` seq 18 while the batch row this floor gates did not
+//exist until seq 23/24. The seat spent seq 18-22 - five windows, ~9 minutes of
+//wall clock - tapping one at a time under a note telling it the turn would not
+//advance, with no row that could end the loop. One threshold for one fact: the
+//window that says "you have done this before" is the window that offers the
+//batch. The ceiling stated in the row is real - N is clamped to it at parse.
+static const int kRepeatRowFloor = kRepeatActivationFloor;
 static const int kRepeatRowMax = 200;
 //How many consecutive windows a plan's option may be missing from the menu
 //before the plan is called finished, while something is still resolving on the
@@ -28941,7 +29306,9 @@ static string allCastRowsDeadNote(bool allDead, int castRows, int landPlaysLegal
          " activated abilities of your permanents (a manland animation among them),"
          " your attack and your planeswalker loyalty abilities are asked at their own"
          " windows and none of them is priced on this menu - a dead casting menu is not"
-         " a turn with nothing to do.";
+         " a turn with nothing to do. Those windows offer a row only where the cost can"
+         " actually be paid, so this sentence is not a promise that any particular"
+         " ability of yours is affordable this turn.";
     if (landPlaysLegal > 0)
         o << " Right now the land seam holds " << landPlaysLegal << " legal land play"
           << (landPlaysLegal == 1 ? "" : "s") << ".";
@@ -29599,6 +29966,12 @@ static string modalMirrorModeLabel(const string& script, const string& label)
     return "";
 }
 
+//#W71-BR (L15): the exact negative, named once so the composer can recognise
+//it and the pins can compare against the literal the render emits.
+static const char * const kModeNoLifeNoDrawTag =
+    " {this mode right now: it changes no life total and draws no cards - what"
+    " it does is in the row label and the card text}";
+
 //#W64-AG (F6, deck146 HIGH-1 - the decision that lost 146v152). Mode rows
 //reached the seat as the engine's bare `name(...)` label and NOTHING else. That
 //label is an OMISSION, not a summary: `name(Return creature and you draw)` drops
@@ -29636,6 +30009,9 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
     if (end == string::npos)
         end = low.size();
     string seg = low.substr(bgn, end - bgn);
+    //#W71-BR (L15): the pre-excision text, so the "no life, no draws" negative
+    //below cannot be claimed over a payload this function deliberately dropped.
+    const string rawSeg = seg;
     //#W64-AK (R6, wave-64 codex review finding 6): a granted ability is a
     //BLOCK, not a clause. `ability$! ... !$ opponent` hands its whole payload
     //to another player, and that payload may itself be several `&&` clauses -
@@ -29711,8 +30087,23 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
             parsed = true;
         }
     }
+    //#W71-BR (L15, deck162 MED): a mode row that prices NOTHING rendered BARE
+    //beside a sibling that carried a full price, and the seat filled the gap
+    //itself - `162v146` seq 21 read the unannotated "sacrifice cards" row as
+    //"Sacrificing cards costs life. I'd die." (Sandfall Cell sacrifices an
+    //artifact, a creature and a land; it costs no life). Trust doctrine: a
+    //silent omission is worse than a stated fact, because the model confabulates
+    //into the gap. What the script DOES imply here is the negative, and only
+    //when it is exact: the mode's own segment names no life and no draw at all.
+    //A segment carrying either token with a magnitude this tag will not read
+    //(non-numeric, implicit player) still returns nothing - claiming "no life"
+    //over a `life:x controller` would be the false surface this fix removes.
     if (!parsed)
-        return "";
+    {
+        if (rawSeg.find("life:") != string::npos || rawSeg.find("draw:") != string::npos)
+            return "";
+        return kModeNoLifeNoDrawTag;
+    }
     std::ostringstream o;
     o << " {this mode right now:";
     bool first = true;
@@ -29936,10 +30327,43 @@ static string modeRowAnnotations(const string& script, const string& optionLabel
 {
     if (script.empty() || optionLabel.empty())
         return "";
-    return tapUntapBranchTag(script, optionLabel,
-                             candidatesCanBlockTapped, candidatesDoNotUntap)
-           + modeEffectPriceTag(script, optionLabel, myLife, oppLife,
-                                theirDrawPunisherPerDraw);
+    const string tap = tapUntapBranchTag(script, optionLabel,
+                                        candidatesCanBlockTapped, candidatesDoNotUntap);
+    const string price = modeEffectPriceTag(script, optionLabel, myLife, oppLife,
+                                            theirDrawPunisherPerDraw);
+    //#W71-BR (L15): the "no life, no draws" negative exists to stop the model
+    //filling a BARE row with an invention. A row that already carries the
+    //tap/untap branch tag is not bare, so the negative is redundant there and
+    //is dropped - one fact per row, the wave-69 F1 rung.
+    if (!tap.empty() && price == kModeNoLifeNoDrawTag)
+        return tap;
+    return tap + price;
+}
+
+//#W71-BR (L15): every script a card carries - the `auto=` bucket plus every
+//zone bucket (`autohand=`, `autograveyard=`, `autocommandzone=`) - as one
+//newline-joined text. The label matches the mode annotations run are exact
+//`name(...)` finds, so a bucket that holds no modes contributes nothing.
+static string scriptAllZones(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    string all = c->magicText;
+    for (map<string, string>::const_iterator mi = c->magicTexts.begin();
+         mi != c->magicTexts.end(); ++mi)
+        all += (all.empty() ? "" : "\n") + mi->second;
+    return all;
+}
+
+//#W71-BR (L13): the clause. Pure over the subject name.
+static string modalResolutionOrderNote(const string& subject)
+{
+    if (subject.empty())
+        return "";
+    return " the GAME LOG above may already say " + subject + " resolved and went to a"
+           " graveyard - it did: the card leaves the stack as it resolves, and this"
+           " choice is part of that resolution, so the option you pick here still"
+           " happens.";
 }
 
 //#W65-AL (G1): the board counts the tap/untap tag reads, off the side a "TAPS
@@ -30947,7 +31371,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     //emitter, so no per-helper test could see it; the suite and every corpus
     //game run this build, so a re-introduction is loud instead of silent.
     {
-        static const char * kOnceOnly[] = { " {paying this taps: ", " {tapping ",
+        static const char * kOnceOnly[] = { " {tapping ",
                                             " {right now: ", " {crack-back cover: ",
                                             " {reserve: " };
         const string composed = out.str();
@@ -30955,6 +31379,11 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             if (clauseOccurrences(composed, kOnceOnly[oi]) > 1)
                 DebugTrace("W69-BJ F1: row states '" << kOnceOnly[oi]
                            << "' more than once: " << composed);
+        //#W71-BR (L19): the GROUP-shaped literal is duplicate-tested by body -
+        //two disjoint tap groups on one activation are two facts, not a merge.
+        if (repeatedClauseBody(composed, " {paying this taps: "))
+            DebugTrace("W69-BJ F1: row states '" << " {paying this taps: "
+                       << "' more than once: " << composed);
     }
 #endif
     return out.str();
@@ -37259,13 +37688,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (holdFirstDecline && declineRowIdx >= 0)
         {
             holdRow = declineRowIdx;
-            menu.insert(menu.begin() + declineRowIdx, holdRowLine());
+            menu.insert(menu.begin() + declineRowIdx, holdRowLine(true)); //#W71-BR (L17)
             declineRowIdx++;
         }
         else
         {
             holdRow = (int) menu.size();
-            menu.push_back(holdRowLine());
+            menu.push_back(holdRowLine(true)); //#W71-BR (L17)
         }
         //#W61-U (C14): the hold's own re-open rule for THIS menu, measured over
         //the rows the latch reads and BEFORE the latch consumes the window (a
@@ -39532,7 +39961,16 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //every menu that is not modal. Presentation only - req.optionTexts (the
     //staleness key), the option ORDER and the answer index are untouched.
     {
-        const string menuScript = ctx ? ctx->magicText : req.contextText;
+        //#W71-BR (L15, deck162 MED): the `auto=` bucket is not the whole card.
+        //A dungeon's rooms live in `autocommandzone=`, i.e. in the magicTexts
+        //map, so `162v146` seq 21 offered "1. lose 2 life / 2. sacrifice cards"
+        //for Tomb of Annihilation with NO annotation on either row while the
+        //same seat's seq 16 (Annihilation Rooms, an `auto=` card) priced the
+        //identical "lose 2 life" mode - the label matched nothing because the
+        //script the match ran over did not contain the modes. Same rail the
+        //cast-mode menu (`castModeMenu` above) and the ability-draw scan already
+        //use: every zone script the subject carries, joined.
+        const string menuScript = ctx ? scriptAllZones(ctx) : req.contextText;
         if (!menuScript.empty())
         {
             int canBlockTapped = 0, doNotUntap = 0;
@@ -39675,6 +40113,20 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     else
         decision = !ctxName.empty() ? ("Choose an option for " + ctxName + ":")
                                     : string("A choice is required - choose an option:");
+    //#W71-BR (L13, deck146 MED-1): the log narrates a modal spell as finished
+    //BEFORE its mode is asked. `146v130` seq 20's GAME LOG ends "You cast
+    //Silverquill Command / Your Silverquill Command resolved and went to your
+    //graveyard" and the very next thing the prompt asks is "Choose an option for
+    //Silverquill Command:" - the seat spent reasoning on the contradiction
+    //("the log says it already resolved? That's weird... it's a prompt
+    //artifact") before answering. Both statements are true of the ENGINE (the
+    //card moves to the graveyard as it resolves; the mode payload then arms off
+    //the stack, which is exactly why `ctx` is NULL here) and the pair reads as
+    //a contradiction to a reader who is instructed to believe the screen. So
+    //the ORDER is stated where the reader meets it. Scoped to the seam where it
+    //is true: a subject the game can no longer point at.
+    if (!ctx && !ctxName.empty())
+        decision += modalResolutionOrderNote(ctxName);
     //N-139a: a mutate placement menu overrides the generic header with a role header.
     if (mutatePlaceMenu)
         decision = mutateOverUnderHeader(ctxName);
@@ -59536,9 +59988,11 @@ static const char * kW50Y_r94 =
               "#W53-N D12a the singular age clause");
         CHECK(planAgeClauseText(14, 32) == ", 14 windows ago on turn 32",
               "#W53-N D12a 146v125 seq 163 -> 177: the docket's literal shape");
-        string block = string("YOUR PLAN (as you last stated it") + planAgeClauseText(45, 32) + "): nothing right now";
-        CHECK(block == "YOUR PLAN (as you last stated it, 45 windows ago on turn 32): nothing right now",
-              "#W53-N D12a the whole header line, at the repro's own age");
+        //#W71-BR (L11): the same line in the non-label shape.
+        string block = carriedPlanHeaderText(planAgeClauseText(45, 32), "", "nothing right now");
+        CHECK(block == "\nYOUR PLAN (as you last stated it, 45 windows ago on turn 32) reads"
+                       " \"nothing right now\"\n",
+              "#W53-N D12a / #W71-BR L11 the whole header line, at the repro's own age");
         // D12b: which coded line the engine latched
         {
             vector<string> menu;
@@ -60848,11 +61302,14 @@ static const char * kW50Y_r94 =
               "#W54-A D12b the docket's literal clause");
         CHECK(planMenuDiffClause("").empty(),
               "#W54-A D12b NEGATIVE nothing absent -> no clause");
-        string header = string("YOUR PLAN (as you last stated it") + planAgeClauseText(1, 10)
-                        + planMenuDiffClause("Master of the Feast") + "): cast Master of the Feast.";
-        CHECK(header == "YOUR PLAN (as you last stated it, 1 window ago on turn 10; "
-                        "\"Master of the Feast\" is no longer on your menu): cast Master of the Feast.",
-              "#W54-A D12b the whole header line, at the repro's own age");
+        //#W71-BR (L11): the same header line, in the non-label shape.
+        string header = carriedPlanHeaderText(planAgeClauseText(1, 10),
+                                              planMenuDiffClause("Master of the Feast"),
+                                              "cast Master of the Feast.");
+        CHECK(header == "\nYOUR PLAN (as you last stated it, 1 window ago on turn 10; "
+                        "\"Master of the Feast\" is no longer on your menu) reads \"cast Master"
+                        " of the Feast.\"\n",
+              "#W54-A D12b / #W71-BR L11 the whole header line, at the repro's own age");
         std::vector<string> mine;
         mine.push_back("Master of the Feast");
         mine.push_back("Gray Merchant of Asphodel");
@@ -63107,8 +63564,13 @@ static const char * kW50Y_r94 =
                       " activated abilities of your permanents (a manland animation among them),"
                       " your attack and your planeswalker loyalty abilities are asked at their own"
                       " windows and none of them is priced on this menu - a dead casting menu is not"
-                      " a turn with nothing to do.",
-              "#W57-C D12 the token states the fact AND that no window is removed");
+                      " a turn with nothing to do."
+                      //#W71-BR (L14): and the scope sentence is not a promise of affordability
+                      " Those windows offer a row only where the cost can actually be paid, so"
+                      " this sentence is not a promise that any particular ability of yours is"
+                      " affordable this turn.",
+              "#W57-C D12 / #W71-BR L14 the token states the fact, that no window is removed,"
+              " and that no window is promised affordable");
         //#W68-BD (deck146 MED-2). REPRO `146v125` s22/s24: a correct all-dead
         //casting menu on a turn where the seat also had an untapped manland and
         //a land drop, and cast nothing AND animated nothing. POSITIVE: the land
@@ -69129,10 +69591,18 @@ static const char * kW50Y_r94 =
         CHECK(modeEffectPriceTag(sq, "Return creature and opponent draws", 20, 1)
                   .find("they would be at 0; THIS WINS THE GAME") != string::npos,
               "#W64-AG F6 POSITIVE a mode that puts them at 0 says so, in the engine's own words");
-        // A mode with no life and no draw clause is left exactly as the engine wrote it,
-        // and its ability$! payload (whose actor is another player) is never priced.
-        CHECK(modeEffectPriceTag(sq, "Creature gains 3/3 and return creature", 1, 20).empty(),
-              "#W64-AG F6 MUST-NOT-MATCH a mode with no life or draw clause is annotated with nothing");
+        // A mode with no life and no draw clause names no MAGNITUDE, and its
+        // ability$! payload (whose actor is another player) is never priced.
+        //#W71-BR (L15): it is no longer SILENT - the model filled that gap with
+        //an invention (deck162 seq 21). The negative is what the script implies.
+        CHECK(modeEffectPriceTag(sq, "Creature gains 3/3 and return creature", 1, 20)
+                  == " {this mode right now: it changes no life total and draws no cards"
+                     " - what it does is in the row label and the card text}",
+              "#W64-AG F6 / #W71-BR L15 a mode with no life or draw clause states that,"
+              " and claims no magnitude");
+        CHECK(modeEffectPriceTag(sq, "Creature gains 3/3 and return creature", 1, 20)
+                  .find("you would be at") == string::npos,
+              "#W71-BR L15 MUST-NOT-MATCH the negative names no life total and no count");
         CHECK(modeEffectPriceTag(sq, "no such mode", 1, 20).empty()
               && modeEffectPriceTag(sq, "", 1, 20).empty()
               && modeEffectPriceTag("", "Return creature and you draw", 1, 20).empty(),
@@ -70799,17 +71269,28 @@ static const char * kW50Y_r94 =
         // ability$! block and are priced; the other three (rows 1, 4 and 7)
         // carry nothing but a grant and are left exactly as the engine wrote them.
         {
-            int priced = 0;
+            int priced = 0, negatives = 0;
             for (size_t i = 0; i < opts.size(); i++)
-                if (opts[i].find("{this mode right now:") != string::npos)
+            {
+                if (opts[i].find("{this mode right now: it changes no life total") != string::npos)
+                    negatives++;
+                else if (opts[i].find("{this mode right now:") != string::npos)
                     priced++;
+            }
             CHECK(priced == 6,
                   "#W65-AL G1 REPRO 6 of the 9 corpus rows carry a life/draw clause and are"
                   " priced; wave 64 rendered 0 of 23 mode rows on this card");
-            CHECK(opts[0] == engineRows[0] && opts[3] == engineRows[3]
-                      && opts[6] == engineRows[6],
-                  "#W65-AL G1 MUST-NOT-MATCH the three grant-only rows are untouched - a"
-                  " partial price stated as a total would be its own false surface");
+            //#W71-BR (L15): the other three carry the NEGATIVE, not silence. A
+            //partial price stated as a total would still be a false surface -
+            //none of these three names a magnitude or a life total.
+            CHECK(negatives == 3
+                      && opts[0] == engineRows[0] + string(" {this mode right now: it changes"
+                         " no life total and draws no cards - what it does is in the row label"
+                         " and the card text}")
+                      && opts[3].find("you would be at") == string::npos
+                      && opts[6].find("you LOSE") == string::npos,
+                  "#W65-AL G1 / #W71-BR L15 the three grant-only rows state the negative and"
+                  " claim no magnitude");
         }
         // MUST-NOT-MATCH: an opponent-facing cost is never billed to the seat.
         CHECK(opts[2].find("you LOSE") == string::npos
@@ -71928,8 +72409,12 @@ static const char * kW50Y_r94 =
               " own point alone was not fatal at 2 life, the pair is");
         // MUST-NOT-MATCH: the fold never invents a life clause where the mode
         // moves no life and draws the seat nothing.
-        CHECK(modeEffectPriceTag(sqFull, "Creature gains 3/3 and return creature", 18, 17, 3).empty(),
-              "#W66-AQ H9 MUST-NOT-MATCH a grant-only mode is still annotated with nothing");
+        CHECK(modeEffectPriceTag(sqFull, "Creature gains 3/3 and return creature", 18, 17, 3)
+                  .find("punisher") == string::npos
+              && modeEffectPriceTag(sqFull, "Creature gains 3/3 and return creature", 18, 17, 3)
+                  .find("you would be at") == string::npos,
+              "#W66-AQ H9 / #W71-BR L15 MUST-NOT-MATCH a grant-only mode invents no life"
+              " clause and no punisher fold");
         // ECHO SHAPE: one {this mode right now: ...} channel, opened once.
         CHECK(folded.find("{this mode right now:") == 1
                   && folded.find('}') == folded.size() - 1
@@ -75689,6 +76174,320 @@ static const char * kW50Y_r94 =
                       && gptcaveat::planStepCount("hold at 3.5 mana") == 1,
                   "#W70-BN F11 REGRESSION numerals are still never step boundaries");
         }
+    }
+
+
+    cout << "\n[#W71-BR] L7 a creature-land is stated BESIDE every creature count, never inside one\n";
+    {
+        //`125v152` seq 35/38: 0 creatures, 10 lands, and Lair of the Hydra
+        //(borderline.txt:64293-64312, the COMMA becomes(...) form) had already
+        //dealt 8 over two turns. Sweeper rows read `destroys 0`, Lightmine Field
+        //read `they control 0 creatures able to attack`.
+        const string lair = "{x}{g}{t}:becomes(creature hydra,1/1,green) ueot\n"
+                            "{t}:add{g}";
+        CHECK(scriptHasActivatedAnimate(lair),
+              "#W71-BR L7 REPRO the comma becomes(...) rung on an activated line is an animation");
+        CHECK(!scriptHasActivatedAnimate("{t}:add{g}")
+                  && !scriptHasActivatedAnimate("@each my upkeep:becomes(creature beast,3/3)")
+                  && !scriptHasActivatedAnimate("becomes(creature hydra,1/1,green) ueot"),
+              "#W71-BR L7 MUST-NOT-MATCH a plain land, a TRIGGERED animation and a"
+              " cast-time one are not activated animations");
+        const string h = battlefieldHeaderText(false, 10, 0, 0, false, 0, 10, 1);
+        CHECK(h == "Opponent battlefield (10 permanents listed, of which 0 are creatures,"
+                   " 0 of them without a restriction against attacking, and 10 are lands;"
+                   " 1 of those noncreature permanents can animate into a creature and is"
+                   " in no creature count above): ",
+              "#W71-BR L7 REPRO 125v152 seq 35's header now names the body it could not see");
+        CHECK(battlefieldHeaderText(false, 10, 0, 0, false, 0, 10, 0)
+                  == battlefieldHeaderText(false, 10, 0, 0, false, 0, 10)
+              && battlefieldHeaderText(false, 10, 0, 0, false, 0, 10, -1)
+                  == battlefieldHeaderText(false, 10, 0, 0, false, 0, 10),
+              "#W71-BR L7 MUST-NOT-MATCH with no animator the header is byte-identical to"
+              " the pre-fix line");
+        CHECK(h.find("of which 1 are creatures") == string::npos
+                  && h.find("of which 0 are creatures") != string::npos,
+              "#W71-BR L7 MUST-NOT-MATCH the animator is never folded INTO the creature count");
+        //The two row-level counts carry the same sentence, so the three surfaces
+        //cannot disagree about the same board.
+        CHECK(sweeperClause("destroys", 0, 0, 0, false, std::vector<std::string>(),
+                            std::vector<std::string>(), std::vector<std::string>(),
+                            std::vector<std::string>(), 1)
+                  == "destroys 0 of their creatures (0 without a restriction against"
+                     " attacking), 0 of yours - 1 noncreature permanent of theirs can"
+                     " animate into a creature and is not in that count",
+              "#W71-BR L7 REPRO the sweeper row says what its K does not cover");
+        CHECK(attackPunisherClause(0, std::vector<WipeVictim>(), 2)
+                  == "they control 0 creatures able to attack - deals 0 until they have an"
+                     " attacker - 2 noncreature permanents of theirs can animate into"
+                     " creatures and are not in that count",
+              "#W71-BR L7 REPRO Lightmine Field's N says what it does not cover");
+        CHECK(sweeperClause("destroys", 0, 0, 0) == sweeperClause("destroys", 0, 0, 0, false,
+                  std::vector<std::string>(), std::vector<std::string>(),
+                  std::vector<std::string>(), std::vector<std::string>(), 0)
+              && attackPunisherClause(3) == attackPunisherClause(3, std::vector<WipeVictim>(), 0),
+              "#W71-BR L7 MUST-NOT-MATCH with no animator both rows are byte-identical to"
+              " the pre-fix clause");
+        CHECK(animatableNotCountedTail(0).empty() && animatableNotCountedTail(-1).empty(),
+              "#W71-BR L7 MUST-NOT-MATCH no animator, no clause");
+        CHECK(stripNarrationDecoration("Cast Supreme Verdict {1}{w}{w}{u}")
+                  == "Cast Supreme Verdict {1}{w}{w}{u}",
+              "#W71-BR L7 ECHO the tail rides a {right now: ...} channel and leaves the"
+              " answer-matching name untouched");
+    }
+
+    cout << "\n[#W71-BR] L14 the creature-land carries its ceiling on the PERMANENT\n";
+    {
+        //`146v126` s20, `146v125` s44/s45: three animation plans written at
+        //windows where the row could not appear. The ceiling clause the row
+        //carries prints only once the activation is affordable.
+        const string t = manlandBoardTag(true, true);
+        CHECK(t == " [creature-land: it can animate into a creature at its own activation"
+                   " window, and its OWN mana is not counted toward that activation -"
+                   " tapping it for mana leaves it tapped, and a tapped permanent can"
+                   " neither attack nor block]",
+              "#W71-BR L14 REPRO Hive of the Eye Tyrant's ceiling, on the permanent");
+        CHECK(manlandBoardTag(true, false).find("OWN mana") == string::npos
+                  && manlandBoardTag(true, false).find("can animate") != string::npos,
+              "#W71-BR L14 a creature-land that is no mana source claims no exclusion");
+        CHECK(manlandBoardTag(false, true).empty() && manlandBoardTag(false, false).empty(),
+              "#W71-BR L14 MUST-NOT-MATCH a permanent that cannot animate carries nothing");
+        CHECK(t.find("affordable") == string::npos && t.find("right now") == string::npos,
+              "#W71-BR L14 MUST-NOT-MATCH the tag states the RULE, never a rung or a"
+              " present-tense affordability the board would have to back");
+        //The dead-menu scope sentence no longer promises a payable window.
+        CHECK(allCastRowsDeadNote(true, 3).find("not a promise that any particular ability"
+                                                " of yours is affordable this turn") != string::npos,
+              "#W71-BR L14 REPRO the cast menu's own promise is qualified where it was false");
+        CHECK(stripNarrationDecoration("Lair of the Hydra" + t) == "Lair of the Hydra",
+              "#W71-BR L14 ECHO the tag leaves no residue in the answer-matching name");
+    }
+
+    cout << "\n[#W71-BR] L17 the hold row prices what it costs ON A CASTING MENU\n";
+    {
+        //deck123 MED-2: `hold_windows_skipped_cast` 343/76/60/44 against
+        //`hold_windows_skipped_priority` 30/0/21/19, and `123v146` seq 17 took
+        //the hold row over a live Idyllic Tutor row.
+        const string cast = holdRowLine(true), prio = holdRowLine(false);
+        CHECK(cast.find("you also give up this turn's remaining CASTING windows for as"
+                        " long as these rows stand") != string::npos,
+              "#W71-BR L17 REPRO the casting menu's hold row says what it costs there");
+        CHECK(cast.find("you give up no cast") == string::npos,
+              "#W71-BR L17 MUST-NOT-MATCH the claim that is false on a casting menu is gone");
+        CHECK(prio == string(kHoldPriorityRowText) + holdRowBenefitClause()
+                  && prio.find("you give up no cast") != string::npos,
+              "#W71-BR L17 MUST-NOT-MATCH the priority seam's row is byte-identical to before");
+        //Both spellings are still THE hold row to every consumer that finds it.
+        {
+            std::vector<string> menuC, menuP;
+            menuC.push_back("Cast Idyllic Tutor {2}{w}");
+            menuC.push_back(cast);
+            menuP.push_back("Cast Idyllic Tutor {2}{w}");
+            menuP.push_back(prio);
+            CHECK(holdRowIndexOf(&menuC) == 1 && holdRowIndexOf(&menuP) == 1,
+                  "#W71-BR L17 both spellings are found as the hold row");
+            CHECK(isReservedHoldEcho(toLowerCopy(cast))
+                      && isReservedHoldEcho(toLowerCopy(prio))
+                      && isReservedHoldEcho("hold priority"),
+                  "#W71-BR L17 ECHO an echo of either spelling still binds the row");
+            CHECK(!isReservedHoldEcho("cast idyllic tutor"),
+                  "#W71-BR L17 MUST-NOT-MATCH an ordinary row echo is not the hold row");
+        }
+        //deck123 MED-3: the batch row now exists at the window the annotation
+        //first says the ability has been used this turn (123v130 seq 18).
+        CHECK(kRepeatRowFloor == kRepeatActivationFloor,
+              "#W71-BR L17 REPRO 123v130 seq 18: one threshold for one fact - the window"
+              " that says 'activated this turn N times already' is the window that offers"
+              " the batch row");
+    }
+
+    cout << "\n[#W71-BR] L8 a hand about to be replaced voids every count taken from it\n";
+    {
+        //`162v152` seq 21: the prompt listed the seat's own Teferi's Puzzle Box
+        //ability on the stack, a `draw converters in your hand: 1 - Underworld
+        //Dreams` count and a `{reserve: ... STRANDS Underworld Dreams this turn}`
+        //verdict; seq 22 says no Underworld Dreams is in hand.
+        const string l = handAboutToBeReplacedLine("Teferi's Puzzle Box");
+        CHECK(l.find("EVERY COUNT TAKEN FROM YOUR HAND ON THIS SCREEN IS ABOUT TO BE VOID") == 0
+                  && l.find("Teferi's Puzzle Box ability above replaces your whole hand") != string::npos
+                  && l.find("draw converters in your hand") != string::npos,
+              "#W71-BR L8 REPRO the line names the cause and the counts it voids");
+        CHECK(handAboutToBeReplacedLine("").empty(),
+              "#W71-BR L8 MUST-NOT-MATCH no replacer on the stack, no line");
+        CHECK(l.find("you would be at") == string::npos && l.find_first_of("0123456789") == string::npos,
+              "#W71-BR L8 MUST-NOT-MATCH the line claims no number about the hand it cannot see");
+        CHECK(stripNarrationDecoration(l) == l,
+              "#W71-BR L8 ECHO the line is a prompt statement, not a row - it carries no"
+              " bracket or brace an answer could echo");
+    }
+
+    cout << "\n[#W71-BR] L13 the mode ask states the order the log shows\n";
+    {
+        //`146v130` seq 20: "Your Silverquill Command resolved and went to your
+        //graveyard" immediately above "Choose an option for Silverquill Command:".
+        const string n = modalResolutionOrderNote("Silverquill Command");
+        CHECK(n.find("the GAME LOG above may already say Silverquill Command resolved") != string::npos
+                  && n.find("the option you pick here still happens") != string::npos,
+              "#W71-BR L13 REPRO the contradiction the seat reasoned about is answered");
+        CHECK(n.find("artifact") == string::npos && n.find("ignore") == string::npos,
+              "#W71-BR L13 MUST-NOT-MATCH the note never tells the reader to distrust the log");
+        CHECK(modalResolutionOrderNote("").empty(),
+              "#W71-BR L13 MUST-NOT-MATCH no subject, no note");
+        CHECK(("Choose an option for Silverquill Command:" + n).find(
+                  "Choose an option for Silverquill Command:") == 0,
+              "#W71-BR L13 ECHO the header the parser and the ask key read still leads the line");
+    }
+
+    cout << "\n[#W71-BR] L18 the crack-back FLOOR is added up where its parts carry numbers\n";
+    {
+        //`125v152` seq 38: floor 3, Lair of the Hydra's best affordable rung 9,
+        //the seat subtracted 9 from 12 and died to 14 the next turn.
+        const string floorSrc = "noncreature permanents of theirs that can animate and attack"
+                                " are not in that count - Lair of the Hydra (best rung their"
+                                " mana pays for: 9 power once animated, for {8}{g}; its own"
+                                " mana is NOT counted toward that cost - a permanent tapped"
+                                " for mana is tapped, and a tapped permanent cannot attack)";
+        const string line = crackBackNextTurnLine(2, 3, 12, 0, 0, 0, 0, false, floorSrc, 9, false);
+        CHECK(line.find("ADD THOSE UP: the numbers named there come to 9 more damage, so the"
+                        " total to subtract from your life is 12 and you would be at 0;"
+                        " that would KILL you") != string::npos,
+              "#W71-BR L18 REPRO 125v152 seq 38: the arithmetic the seat got wrong is done");
+        CHECK(line.find("that number is a FLOOR, not a ceiling") != string::npos,
+              "#W71-BR L18 the FLOOR warning is kept - the sum does not replace it");
+        CHECK(crackBackNextTurnLine(2, 3, 12, 0, 0, 0, 0, false, floorSrc, 9, true)
+                  .find("and lower still - something listed above adds power this render"
+                        " cannot size") != string::npos,
+              "#W71-BR L18 with an unsized pump trigger listed the sum is NOT called complete");
+        CHECK(crackBackNextTurnLine(2, 3, 12, 0, 0, 0, 0, false, floorSrc, 0, false)
+                  .find("ADD THOSE UP") == string::npos
+              && crackBackNextTurnLine(2, 3, 12).find("ADD THOSE UP") == string::npos
+              && crackBackNextTurnLine(2, 3, 12) == crackBackNextTurnLine(2, 3, 12, 0, 0, 0, 0,
+                                                                         false, "", 0, false),
+              "#W71-BR L18 MUST-NOT-MATCH nothing sizeable, nothing added, and the plain"
+              " line is byte-identical to the pre-fix one");
+        CHECK(crackBackNextTurnLine(2, 3, 30, 0, 0, 0, 0, false, floorSrc, 9, false)
+                  .find("KILL you") == string::npos,
+              "#W71-BR L18 MUST-NOT-MATCH the kill verdict follows the summed number, and"
+              " 30 life survives it");
+    }
+
+    cout << "\n[#W71-BR] L11 the carried plan is a QUOTATION, never a label\n";
+    {
+        //`125v146` seq 47/49, `125v123` seq 76/99, `125v162` seq 63/119: seven
+        //replies opened `YOUR PLAN: <sentence>` - the heading's own words in the
+        //label slot. The heading is what is fixed; the parser gains nothing.
+        const string h = carriedPlanHeaderText(planAgeClauseText(1, 10), "", "Pass priority.");
+        CHECK(h == "\nYOUR PLAN (as you last stated it, 1 window ago on turn 10) reads"
+                   " \"Pass priority.\"\n",
+              "#W71-BR L11 REPRO 125v146 seq 49's heading, in the shape that is not a label");
+        CHECK(h.find("YOUR PLAN:") == string::npos && h.find("PLAN:") == string::npos,
+              "#W71-BR L11 MUST-NOT-MATCH no `PLAN:` and no `YOUR PLAN:` anywhere in the heading");
+        CHECK(h.find("YOUR PLAN") != string::npos,
+              "#W71-BR L11 the words the live deck guides key on are unchanged");
+        //The heading no longer has the protocol's own line shape: label, colon,
+        //space, sentence. Proven over the composed line, not over an emitter.
+        {
+            const string line = h.substr(1, h.size() - 2);
+            const size_t colon = line.find(": ");
+            CHECK(colon == string::npos,
+                  "#W71-BR L11 the heading line contains no `<label>: <text>` split at all");
+        }
+        //A heading carrying the menu-diff clause keeps the same shape.
+        CHECK(carriedPlanHeaderText(planAgeClauseText(6, 39),
+                                    planMenuDiffClause("Katilda, Dawnhart Prime"),
+                                    "attack with Katilda.")
+                  .find("YOUR PLAN:") == string::npos,
+              "#W71-BR L11 MUST-NOT-MATCH the withdrawn-name variant is not label-shaped either");
+        //ECHO: what the model is served back is exactly the plan bytes, quoted -
+        //nothing is added inside the quotation for it to copy.
+        CHECK(h.find("\"Pass priority.\"") != string::npos,
+              "#W71-BR L11 ECHO the carried sentence is served verbatim, inside quotes");
+    }
+
+    cout << "\n[#W71-BR] L19 two DISJOINT tap groups on one row are two facts\n";
+    {
+        //`152v162` (24) and `152v126` (5): the Katilda row states two tap
+        //groups, one for the convoked bodies and one for the source, and the
+        //wave-69 F1 census called it a merge duplicate 29 times.
+        const string row =
+            "put 1/1 counters with Katilda, Dawnhart Prime [cost: {4}{g}{w}, Tap]"
+            " {paying this taps: Luminarch Aspirant, Intrepid Adversary - they cannot"
+            " attack this turn} {paying this taps: Katilda, Dawnhart Prime - it cannot"
+            " attack this turn}";
+        CHECK(clauseOccurrences(row, " {paying this taps: ") == 2
+                  && !repeatedClauseBody(row, " {paying this taps: "),
+              "#W71-BR L19 REPRO the legitimate row has two groups and is NOT a duplicate");
+        std::vector<std::string> taps;
+        std::vector<int> tapRestrictions;
+        taps.push_back("Llanowar Elves");
+        tapRestrictions.push_back(0);
+        const string one = paymentTapsClause(taps, tapRestrictions);
+        CHECK(repeatedClauseBody("Cast Overrun [cost: {2}{g}{g}]" + one + one,
+                                 " {paying this taps: "),
+              "#W71-BR L19 POSITIVE the wave-69 merge shape - the SAME clause twice - still fires");
+        CHECK(!repeatedClauseBody("Cast Overrun [cost: {2}{g}{g}]" + one,
+                                  " {paying this taps: ")
+                  && !repeatedClauseBody("Cast Overrun [cost: {2}{g}{g}]",
+                                         " {paying this taps: "),
+              "#W71-BR L19 MUST-NOT-MATCH one group, and no group at all, are not duplicates");
+        CHECK(stripNarrationDecoration(row).find("paying this taps") == string::npos,
+              "#W71-BR L19 ECHO the tap clauses leave no residue in the answer-matching name");
+    }
+
+    cout << "\n[#W71-BR] L16 the DRAW PRICE on a CAST row prices what CASTING draws\n";
+    {
+        //`130v162` seq 17: Pyrite Spellbomb (`auto={R}{S}:Damage:2 ...`,
+        //`auto={1}{S}:draw:1`) rendered "[DRAW PRICE: this draws 1 card ... you
+        //would be at 15]" on its cast row. Casting an artifact draws nothing.
+        const string spellbomb = "{R}{S}:Damage:2 target(anytarget)\n{1}{S}:draw:1";
+        CHECK(scriptSelfDrawCount(spellbomb) == 0,
+              "#W71-BR L16 REPRO 130v162 seq 17 casting Pyrite Spellbomb draws 0");
+        CHECK(scriptSelfDrawCount("draw:2 controller") == 2
+                  && scriptSelfDrawCount("life:1 controller && draw:1 controller") == 1,
+              "#W71-BR L16 POSITIVE a cast-time draw is still counted");
+        CHECK(scriptSelfDrawCount("aslongas(*|myhand) {2}{T}:draw:1 controller") == 0
+                  && scriptSelfDrawCount("this(variable{type:*:myhand}=0) {3}{T}:draw:3 controller") == 0
+                  && scriptSelfDrawCount("teach(creature) {4}:draw:1 controller") == 0,
+              "#W71-BR L16 MUST-NOT-MATCH a conditioned or granted ACTIVATION is not a cast");
+        CHECK(lineIsActivatedCost("foreach(creature[attacking]):draw:1 controller") == false
+                  && lineIsActivatedCost("draw:1") == false
+                  && lineIsActivatedCost("scry:3 scrycore delayed draw:revealedmana") == false,
+              "#W71-BR L16 MUST-NOT-MATCH a depth-0 colon with no cost group is cast-time");
+        CHECK(lineIsActivatedCost("{1}{s}:draw:1")
+                  && lineIsActivatedCost("this(counter{0/0.1.level}>2) {t}:draw:1 controller"),
+              "#W71-BR L16 POSITIVE a top-level cost group before the split is an activation");
+        CHECK(drawPriceRowTag(scriptSelfDrawCount(spellbomb), 1, "Underworld Dreams", 16).empty(),
+              "#W71-BR L16 ECHO with the count at 0 the bracket is not emitted at all");
+    }
+
+    cout << "\n[#W71-BR] L15 a mode row that prices nothing says so, and dungeon rooms are found\n";
+    {
+        //`162v146` seq 21: "Choose an option for Tomb of Annihilation: 1. lose 2
+        //life / 2. sacrifice cards" - both rows BARE, and the reasoning invented
+        //"Sacrificing cards costs life. I'd die." The modes live in the card's
+        //`autocommandzone=` bucket, which the seam's script never read.
+        const string sandfall =
+            "transforms((,newability[choice name(Lose 2 life) life:-2 controller],"
+            "newability[choice name(Sacrifice cards) name(Sacrifice cards) activate"
+            " castcard(copied alternative noevent named!:annihilation rooms:!)]))";
+        CHECK(modeEffectPriceTag(sandfall, "lose 2 life", 4, 14)
+                  .find("you LOSE 2 life - you would be at 2") != string::npos,
+              "#W71-BR L15 REPRO 162v146 seq 21 row 1 prices off the commandzone script");
+        CHECK(modeEffectPriceTag(sandfall, "sacrifice cards", 4, 14) == kModeNoLifeNoDrawTag,
+              "#W71-BR L15 REPRO row 2 states the negative instead of rendering bare");
+        CHECK(modeEffectPriceTag(sandfall, "sacrifice cards", 4, 14).find("life:") == string::npos
+                  && modeEffectPriceTag(sandfall, "sacrifice cards", 4, 14)
+                         .find("you would be at") == string::npos,
+              "#W71-BR L15 MUST-NOT-MATCH the negative names no magnitude and no life total");
+        CHECK(modeEffectPriceTag("choice name(Drain them) life:-x opponent", "drain them", 4, 14).empty(),
+              "#W71-BR L15 MUST-NOT-MATCH a non-numeric life clause is neither priced nor"
+              " declared free");
+        CHECK(modeEffectPriceTag("choice name(Gift) ability$!draw:1 controller!$ opponent",
+                                 "gift", 4, 14).empty(),
+              "#W71-BR L15 MUST-NOT-MATCH a granted payload this tag drops is never called"
+              " no-draw");
+        CHECK(stripNarrationDecoration("sacrifice cards" + string(kModeNoLifeNoDrawTag))
+                  == "sacrifice cards",
+              "#W71-BR L15 ECHO the negative leaves no residue in the answer-matching name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

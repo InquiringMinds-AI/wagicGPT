@@ -5600,6 +5600,10 @@ int amountsource;
 bool eachother;
 bool tosrc;
 MTGCardInstance * OriginalSrc;
+//#W71-BR (wave-70 L6): TRUE when this instance is resolving AS A STACK OBJECT
+//(a granted or triggered ability) rather than as one of a resolving spell's own
+//`auto=` lines - stamped by StackAbility::resolve. See AADynamic::resolve.
+bool resolvingFromStackAbility;
 MTGCardInstance * storedTarget;
 MTGAbility * storedAbility;
 MTGAbility * clonedStored;

@@ -1,0 +1,36 @@
+#W71-BR (L6). Tribute to Hunger, Oracle: "Target opponent sacrifices a creature
+#of their choice. You gain life equal to that creature's toughness."
+#(verified against Scryfall/Gatherer; mtg.txt:124073's text= and mana= match).
+#TWO copies against ONE creature: the opponent can only sacrifice it once, so
+#the second copy finds no creature and gains NOTHING. The corpus paid both
+#(125v126 seq 120, opp 10 -> 25 -> 40 off one Emrakul; 126v125 seq 130->132).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tribute to Hunger,Tribute to Hunger
+manapool:{4}{B}{B}
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Tribute to Hunger
+p2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tribute to Hunger,Tribute to Hunger
+life:22
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]
