@@ -42,3 +42,13 @@ Five EDIT verdicts staged in wave70/deck<N>/strategy.txt (146 19,927 B; 125 19,9
 
 ## P — PREDICTIONS (engine-seat §4)
 BK 1 PASS-with-exception (4 retry records at max_tokens 400), 2 PASS, 3/5 UNTESTED, 4 PASS; BL 1-5 PASS; BM 1 half, 2/4/5 FAIL (all zero — mechanisms dead), 3 PASS; BN 1-4 PASS, 5 UNTESTED. `plan_steps_done` absent from every record (BN's F10 advance was unmeasurable) → add it to the record (L10's sibling).
+
+## ADDENDUM — deck 152 and 126 seats (after the rerun; 21/21 games complete)
+- L3b HIGH (→ lane BQ, messaged) — `noop_row_zero_reask` false 2 of 2 on Tribute to Hunger's CONDITIONAL "…this does nothing" clause (126v125 seq 131/133; the same row accepted at 132 paid 15). Same family as L3.
+- L6 (→ lane BR, messaged) — second repro from the casting seat (126v125 seq 130→132, life 10→25→38); `mtg.txt:124073` verified byte-faithful to Oracle → engine resolution, not card script.
+- L20 HIGH (new; render salience) — `LOOP HALF PENDING` printed 158× in a game where the loop could never close, while a COMPLETED Sanguine Bond + Exquisite Blood pair gets no header at all (126: deck123 seq 21 shows only the converter line). Salience inverted.
+- L21 MED — reveal/search rows carry no legendary/duplicate annotation while cast rows do (152v162 seq 38 took a third Katilda holding one and controlling one); the reveal window never names the destination zone (`moveto(hand)`); the carried PLAN served at reveal windows is the stale combat plan (6 of 10 reveal windows answered with an attack plan) — the reveal seam should say what the window is for.
+- L22 MED — at a casting seam the crack-back header omits the "nothing you control can legally block" clause it prints elsewhere; the tap-you-out row is the only row with no crack-back cover arithmetic (126: deck146 seq 8).
+- S1 STRATEGY (reasoning-channel finding, deck152 HIGH-1) — the model twice threw away a guaranteed kill by adding blockable attackers to an already-lethal unblockable pair (152v126 seq 32, 41), quoting the render's correct answer and overriding it with a wrong rules derivation ("damage is simultaneous" vs blocking triggers resolving at declare-blockers). Guide edit installed (ATTACK TOTAL last-clause rule + blocking-trigger timing). This is the class the reasoning channel exists to expose: the render was right, the model's rules model was wrong.
+- Latency datum (152 seat): p50 97.0 s under -j 21 vs 28.6 s solo in the rerun (3.4×) — the corpus p50 is CONTENTION on the pilot, not reasoning cost.
+- Guides: deck152 (19,980 B) and deck126 (19,971 B) EDIT verdicts installed after verification.
