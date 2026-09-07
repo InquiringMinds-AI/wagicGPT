@@ -6426,3 +6426,25 @@ auto=@combat(attacking) source(this):target(creature|opponentbattlefield) moveto
 auto=@combat(attacking) source(this):name(Look top 5 cards) reveal:5 optionone name(Get a human) target(<upto:1>human|reveal) moveto(hand) optiononeend optiontwo name(put on bottom) target(*|reveal) bottomoflibrary and!( all(*|reveal) bottomoflibrary )! optiontwoend revealend
 text=Test-only (#W60-Q R2): two attack triggers from ONE source - a targeted pump and an interactive reveal. The pump's target chooser has the same tc->source as the reveal, which is exactly the shape a source-identity ownership test cannot tell apart.
 [/card]
+[card]
+id=2100000990
+name=BU Blockers Window Probe
+rarity=C
+mana={W}
+type=Instant
+target=creature[attacking]
+auto=destroy
+restriction=opponentblockersonly
+text=Test-only (#W72-BU M5): destroy target attacking creature. Castable ONLY during the OPPONENT's declare-blockers step, so it is cast if and only if this seat is given a response window after the opponent's blockers are declared.
+[/card]
+[card]
+id=2100000991
+name=BU End Step Window Probe
+rarity=C
+mana={W}
+type=Instant
+target=creature
+auto=destroy
+restriction=opponentendonly
+text=Test-only (#W72-BU M5): destroy target creature. Castable ONLY during the OPPONENT's end step, so it is cast if and only if this seat is given a response window in the opponent's end step.
+[/card]

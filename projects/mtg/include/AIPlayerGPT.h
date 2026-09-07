@@ -1366,6 +1366,28 @@ private:
     //and only while the screen it was chosen on is still the screen.
     int mHoldTurn;
     std::map<string, std::set<string> > mHoldRows;
+    //#W72-BU (M4): THE HOLD IS A WINDOW HOLD, NOT A SEAM HOLD. The row says
+    //"pass now, and do not ask me again - this turn or later - until one of the
+    //rows above changes"; that is a promise about being ASKED, and it named no
+    //seam. Honoured per seam it was false wherever both seams fire at one
+    //window: computeActions reaches FindCardToPlay (the "Casting decision" ask)
+    //and then selectAbility (the "Your legal actions" priority ask) inside the
+    //same tick, over the same board, and the two menus are disjoint by
+    //construction (chooseOrderedAction drops every hand cast as a dead end), so
+    //a hold taken on the first was answered again on the second. The wave-71
+    //corpus has 44 such pairs whose CURRENT SITUATION block is byte-identical,
+    //19 of them opened by a hold. These four remember the WINDOW the hold was
+    //taken at - turn, phase and the serialized board, all three - so the
+    //sibling seam of that one window is not asked. Nothing wider: any other
+    //turn, phase or board falls through to the per-seam row predicate exactly
+    //as before, and the cast seam's own "Cast nothing right now" row is NOT a
+    //window answer (it closes the casting question only, and the priority ask
+    //that follows it carries rows the model has not been shown).
+    string mHoldWindowSeam;
+    int mHoldWindowTurn;
+    int mHoldWindowPhase;
+    string mHoldWindowBoard;
+    int mSiblingWindowAsksSkipped; //gameend report field
     //#W68-BB (J5): the card the last payment receipt was written for, and the
     //step it was written in. A post-announcement decline consumes it and says
     //in the narration that the cast did NOT happen - the receipt alone reads as

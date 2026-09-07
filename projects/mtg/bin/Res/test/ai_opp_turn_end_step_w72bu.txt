@@ -1,0 +1,54 @@
+#NAME: The seat is offered a response window in the OPPONENT'S END STEP (#W72-BU M5)
+#DESC: See ai_opp_turn_after_blockers_w72bu.txt for the wave-71 evidence and the
+#DESC: probe-card technique.
+#DESC: PROBE CARD: "BU End Step Window Probe" ({W} instant, destroy target creature)
+#DESC: carries restriction{opponentendonly}, so it is castable in exactly ONE step
+#DESC: of the whole game - the opponent's end step. The Grizzly Bears attacks and
+#DESC: connects first (P2 is at 18 either way); what this fixture measures is only
+#DESC: whether the seat is ever ASKED in the opponent's end step. The assert is
+#DESC: taken one step later, in the opponent's cleanup.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:
+life:20
+[PLAYER2]
+inplay:Plains,Plains
+hand:BU End Step Window Probe
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+cleanup
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Plains,Plains
+tappedinplay:1
+graveyard:BU End Step Window Probe
+life:18
+[END]

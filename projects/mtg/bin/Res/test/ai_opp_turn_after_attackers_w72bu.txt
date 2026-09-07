@@ -1,0 +1,59 @@
+#NAME: The seat is offered its response window AFTER the opponent declares attackers (#W72-BU M5)
+#DESC: Wave-71 deck130 HIGH: the GPT seat received 4 opponent-turn windows in 353
+#DESC: decisions, ALL FOUR at the opponent's Main phase 1 - never after their
+#DESC: attackers were declared, never at their end step. Its only instant
+#DESC: (Starstorm) was therefore functionally a sorcery.
+#DESC: WITNESS: P2 (the seat under test) holds Kill Shot ({2}{W}, "destroy target
+#DESC: attacking creature") over three Plains. Kill Shot has NO legal target until
+#DESC: P1 declares attackers, so this fixture cannot be passed by any earlier
+#DESC: window: hasInstantResponse is false for P2 through P1's untap, upkeep, draw
+#DESC: and first main, and becomes true only once the Grizzly Bears is attacking.
+#DESC: The assert is taken at P1's end step - after combat - with the Bears in P1's
+#DESC: graveyard and P2's three Plains tapped.
+#DESC: PRE-FIX the Bears survive combat and Kill Shot stays in P2's hand with all
+#DESC: three Plains untapped.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:
+life:20
+[PLAYER2]
+inplay:Plains,Plains,Plains
+hand:Kill Shot
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Plains,Plains,Plains
+tappedinplay:3
+graveyard:Kill Shot
+life:20
+[END]

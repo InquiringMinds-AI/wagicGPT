@@ -1,0 +1,52 @@
+#NAME: The seat is offered a response window AFTER the opponent's blockers step is entered (#W72-BU M5)
+#DESC: See ai_opp_turn_after_attackers_w72bu.txt for the wave-71 evidence.
+#DESC: PROBE CARD: "BU Blockers Window Probe" ({W} instant, destroy target attacking
+#DESC: creature) carries restriction{opponentblockersonly}, so it is castable in
+#DESC: exactly ONE step of the whole game - the opponent's declare-blockers step.
+#DESC: If the seat is cast it, a response window existed there; if it is still in
+#DESC: hand at the opponent's end step, no window was ever offered in that step.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:
+life:20
+[PLAYER2]
+inplay:Plains,Plains
+hand:BU Blockers Window Probe
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Plains,Plains
+tappedinplay:1
+graveyard:BU Blockers Window Probe
+life:20
+[END]
