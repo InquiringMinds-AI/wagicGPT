@@ -8029,53 +8029,9 @@ static int repeatStopClampCount(int namedCount, int statedStop, int statedCurren
 //count under two (the `repeat_count_under_two` branch), so a stop that leaves
 //one runs one. Only a stop with no room left executes nothing, and then the
 //receipt's own number is 0. Pure, so the boundary is provable without a board.
-//#W68-BE (R4, codex review finding 4 - MED): the combat seams' length-cap
-//correction, pure so PARSETEST pins the exact words the model reads. It says
-//what happened (the cap, with its number), what was lost (nothing was declared)
-//and what to write instead - answer FIRST, then stop. Never Baka until it is
-//spent.
-//#W69-BF (K2, engine HIGH-1). THE SMALL SEAMS' TRUNCATION LINE. Lane BA wired
-//`reply_truncated_reask` at ask and priority "on the grounds that no truncation
-//was expected at discard/reveal/bottom"; lane BE R4 added the two combat seams.
-//125v146 s133 falsified the remaining third: a 1,409 B discard reply reached the
-//384-token cap with no `PUT:` line, scored `unparsed_reply`, and the heuristic
-//discarded seven cards including the seat's Emrakul - a permanent, unrecoverable
-//decision handed away with no receipt. These three seams answer with the SAME
-//label (PUT:), so they share one wording; the cap that was actually used is
-//quoted, as at every other seam. Pure, so PARSETEST pins the exact words.
-static string smallSeamTruncationReaskLine(long maxTokens, int wanted)
-{
-    std::ostringstream o;
-    o << "[RE-ASK] Your last reply ran to its length limit of " << maxTokens
-      << " tokens before it wrote an answer line, so none of it could be used and nothing"
-         " has been chosen yet. Answer again with exactly two lines: your PLAN: line, then"
-         " one line beginning with \"PUT: \" naming "; //#W70-BL (E4)
-    if (wanted > 0)
-        o << "exactly " << wanted << " different card number" << (wanted == 1 ? "" : "s");
-    else
-        o << "the card numbers you want";
-    o << " from the list above. Nothing else."; //#W70-BL (E4)
-    return o.str();
-}
-
-static string combatTruncationReaskLine(bool attackersSeam, long maxTokens)
-{
-    std::ostringstream o;
-    o << "[RE-ASK] Your last reply hit its length limit (" << maxTokens
-      << " tokens) and was cut off before it wrote "
-      << (attackersSeam ? "an ATTACK: line" : "a BLOCKS: line")
-      << ", so nothing was declared. Answer again with exactly two lines: your PLAN:"
-         " line, then the " //#W70-BL (E4)
-      << (attackersSeam ? "ATTACK:" : "BLOCKS:")
-      << " line - "
-      << (attackersSeam
-              ? "the attackers you mean to declare, or \"ATTACK: none\" to attack"
-                " with nobody this turn"
-              : "the assignments you mean, or exactly \"BLOCKS: none\" to block"
-                " with nobody this turn")
-      << " - then stop.";
-    return o.str();
-}
+//#W71-BO (R3, wave-70 census): `smallSeamTruncationReaskLine` and
+//`combatTruncationReaskLine` are DELETED with the truncation re-asks they
+//worded. 0 truncations in 2,119 decisions under reasoning-on.
 
 //#W68-BE (R3, codex review finding 3 - HIGH): WHICH takes the stated stop clamps.
 //J1 was right that a stated stop applies to ANY activation of the same ability -
@@ -14952,6 +14908,24 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //tag, and the answer-recovery rule below is scoped by it.
                 const bool forceClosePoll =
                     (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+                //#W71-BO (L9, wave-70 MED-1). THE TWO RESCUE MARKERS ARE BOUND TO
+                //THE DECISION THAT WAS RESCUED. They used to be set where the
+                //forced close was ISSUED and cleared only where a record was
+                //WRITTEN - so any decision whose phase-2 answer never became a
+                //record (a stale/async drop, an abandoned retry) left them set and
+                //the NEXT decision's record wore them. The corpus shows exactly
+                //that: 19 records stamped `reasoning_budget_hit` +
+                //`reasoning_forced_close`, 15 of them with 4.2k-15.6k reasoning
+                //chars against a 6,000-TOKEN budget and a clean reply, while only 4
+                //answer-locked retries (max_tokens 400) actually happened. Now they
+                //are cleared on every consume and set ONLY on the phase-2 consume,
+                //so `reasoning_forced_close` means a phase-2 close HAPPENED and
+                //`reasoning_budget_hit` carries phase 1's own finish_reason.
+                if (!forceClosePoll)
+                {
+                    mLastForcedClose = false;
+                    mLastBudgetHit = false;
+                }
                 string fieldReasoning;
                 if (!body.empty())
                 {
@@ -15032,16 +15006,9 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 if (content.empty() && !fieldReasoning.empty())
                 {
                     string tail = answerTailFromReasoning(fieldReasoning);
-                    if (!tail.empty())
-                        mReasoningTailAnswers++; //#W70-BM (E3): B1.4's census
+                    //#W71-BO (R7): `reasoning_tail_answers` DELETED (0 of 40).
                     if (forceClosePoll)
                     {
-                        //#W70-BM (E3): B1.5's census - did the forced close
-                        //(phase 2) actually produce a coded answer line?
-                        if (tail.empty())
-                            mPhase2AnswerMissing++;
-                        else
-                            mPhase2AnswerRecovered++;
                         //Phase 2: the generation is the answer, wherever the
                         //parser filed it. Keep phase 1's thinking as the
                         //audit record rather than overwriting it with the
@@ -15064,6 +15031,23 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                         //close is the recovery, not the heuristic.
                         mLastReasoningOnly = true;
                     }
+                }
+                //#W71-BO (L9): the phase-2 census, on the path that RUNS. It used
+                //to sit inside the `content.empty() && reasoning non-empty` branch,
+                //which a NORMAL phase-2 recovery (content present) never enters -
+                //so `phase2_answer_missing`/`_recovered` read 0/0 across 40 games
+                //while 4 answer-locked retries demonstrably happened. Every phase-2
+                //consume is counted here, exactly once, whatever shape it came
+                //back in; the marker pair is stamped on the same tick.
+                if (forceClosePoll)
+                {
+                    if (hasCodedAnswerLine(content))
+                        mPhase2AnswerRecovered++;
+                    else
+                        mPhase2AnswerMissing++;
+                    mLastForcedClose = true;
+                    mLastBudgetHit = mForceClosePhase1Length;
+                    mForceClosePhase1Length = false;
                 }
                 if (!fieldReasoning.empty())
                 {
@@ -15662,14 +15646,16 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBase = userMsg;
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
-        mLastForcedClose = true;
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
         //into this branch is a reply that ended its thinking naturally and
         //simply never wrote an answer line - the rescue is identical, the
         //diagnosis is not, and conflating them made the budget-hit rate
         //unreadable (a 12,058-char trace marked as hitting an 8,000-token
         //budget, wave-34 b6). Both are still counted, under their own names.
-        mLastBudgetHit = mLastFinishLength;
+        //#W71-BO (L9): phase 1's own finish_reason is REMEMBERED here and stamped
+        //when the phase-2 answer is consumed - not stamped now, on a record this
+        //decision may never write.
+        mForceClosePhase1Length = mLastFinishLength;
         setNotice("thinking hit its budget - asking for the answer", 3.0f);
         DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
         return kChoicePending; //next tick polls the forced-close request
@@ -15770,7 +15756,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mReasoningTailAnswers(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPlanParagraphBoundCuts(0), mPutGlossStripped(0), mPlanChoiceConflictSeen(0), mPlanArguesAgainstRowSeen(0), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -16051,13 +16037,10 @@ void AIPlayerGPT::transLogWrite(const string& line)
 //later of the two permitted lines. Measured on the STRIPPED reply (post-think),
 //like every other meter here.
 static size_t firstLineLeadingPlanPos(const string& text); //#W70-BM (E2)
-static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut = NULL,
-                             long * trailingOut = NULL)
+static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut = NULL)
 {
     if (actionBeforePlanOut)
         *actionBeforePlanOut = false;
-    if (trailingOut)
-        *trailingOut = 0;
     string text = replyIn;
     const size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
@@ -16079,19 +16062,12 @@ static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut =
     if (actionBeforePlanOut && planLine != string::npos && ansLine != string::npos)
         *actionBeforePlanOut = (ansLine < planLine);
     long off = 0;
-    bool havePermitted = false;
-    size_t lastPermittedEnd = 0;
     size_t at = 0;
     while (at <= text.size())
     {
         const size_t nl = text.find('\n', at);
         const size_t end = (nl == string::npos) ? text.size() : nl;
-        if (at == planLine || at == ansLine)
-        {
-            havePermitted = true;
-            lastPermittedEnd = end;
-        }
-        else if (end > at)
+        if (at != planLine && at != ansLine && end > at)
         {
             const size_t s = text.find_first_not_of(" \t\r", at);
             if (s != string::npos && s < end)
@@ -16104,12 +16080,6 @@ static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut =
         if (nl == string::npos)
             break;
         at = nl + 1;
-    }
-    if (trailingOut && havePermitted)
-    {
-        const size_t last = text.find_last_not_of(" \t\r\n");
-        if (last != string::npos && last > lastPermittedEnd)
-            *trailingOut = (long) (last - lastPermittedEnd);
     }
     return off;
 }
@@ -16171,45 +16141,16 @@ static bool gLastPutGlossStripped = false;
 static bool replyActionBeforePlan(const string& replyIn)
 {
     bool before = false;
-    offProtocolBytes(replyIn, &before, NULL);
+    offProtocolBytes(replyIn, &before);
     return before;
 }
 
-//#W61-U (C14, deck162 MED): 81 of 119 replies at one seat overran the protocol
-//and the translog carried every byte of it - 46,052 characters of un-committed
-//self-argument in six games, one reply 11,302 characters past its own PLAN. The
-//PARSER is unchanged (it has always stopped at the answer and the plan); this
-//trims what the RECORD keeps. The head is kept in full through the end of the
-//PLAN line - which is everything the protocol asked for and everything a seat
-//review reads - plus a bounded head of the overrun, so the SHAPE of the spiral
-//is still auditable and the `post_plan_overrun` / `post_answer_overrun` counters
-//(measured on the FULL reply, before this runs) still say exactly how big it
-//was. Below the threshold nothing is touched, so a compliant reply's record is
-//byte-identical. Pure over (reply, keep, threshold).
-static const size_t kReplyOverrunKeep = 400;   //bytes of the tail kept for shape
-static const size_t kReplyOverrunTrimAt = 1200; //below this the record is untouched
-//#W70-BM (E2): `overrun` is now offProtocolBytes' TRAILING quantity - the bytes
-//after the later of the two permitted lines - so the trim still takes a TAIL and
-//the head it keeps still ends at the last thing the protocol asked for.
-static string recordReplyTrimmed(const string& reply, long overrun,
-                                 size_t keep = kReplyOverrunKeep,
-                                 size_t trimAt = kReplyOverrunTrimAt)
-{
-    if (overrun <= 0 || (size_t) overrun <= trimAt || reply.empty())
-        return reply;
-    const size_t tail = (size_t) overrun;
-    if (tail >= reply.size())
-        return reply; //the measurement does not address this string: keep it whole
-    const size_t headEnd = reply.size() - tail; //the end of the committed part
-    const size_t cut = headEnd + keep;
-    if (cut >= reply.size())
-        return reply;
-    std::ostringstream o;
-    o << reply.substr(0, cut) << "\n[+" << (long) (reply.size() - cut)
-      << " bytes written past the two protocol lines trimmed from this record]"; //#W70-BM (E2)
-    return o.str();
-}
-
+//#W71-BO (R1, wave-70 census): THE RECORD TRIM IS DELETED. `recordReplyTrimmed`
+//(#W61-U C14) existed because replies used to run thousands of bytes past their
+//own answer; under reasoning-on the whole corpus wrote 2 records with any
+//trailing overrun at all (0.09% of 2,119) and none reached the 1,200-byte
+//threshold. The record now stores the reply verbatim, and `reply_trimmed_bytes`
+//goes with the trim - `off_protocol_bytes` below is the surviving meter.
 //post_answer_overrun: the chars a reply wrote AFTER the end of its FIRST
 //line-leading coded answer. THIS is the quantity the owner ruling is about,
 //and post_plan_overrun is not: post_plan_overrun measures from the PLAN line,
@@ -16422,28 +16363,13 @@ static bool recordLatchedLineSpan(json& rec, const string& reply, int ordinal)
     return inPlan;
 }
 
-//commit_retracted: TRUE when the reply DID emit a line-leading coded answer
-//(CHOICE:/ATTACK:/BLOCKS:/PUT:) and the retraction machinery then refused to
-//execute it - i.e. the model answered and then took its answer back, so the
-//heuristic decided instead. It is exactly the disjunction of the three
-//existing retraction/abandonment exits, not a new judgement:
-//  retracted_choice              - choiceRetractedNoReplacement fired
-//  truncated_abandoned           - truncatedBlockCommitmentAbandoned, safe no-blocks
-//  truncated_abandoned_heuristic - the same, with no legal assignment left
-//FALSE on every other record, including empty_reply / unparsed_reply /
-//stale_echo (no answer was ever committed to retract) and on every record the
-//model's own answer carried. Cross-tab with post_plan_overrun to get the
-//promised count: replies that overran, and of those, how many retracted.
-static bool commitRetracted(const char * fallback, const string& reply)
-{
-    if (!fallback)
-        return false;
-    if (strcmp(fallback, "retracted_choice") != 0
-        && strcmp(fallback, "truncated_abandoned") != 0
-        && strcmp(fallback, "truncated_abandoned_heuristic") != 0)
-        return false;
-    return hasCodedAnswerLine(reply);
-}
+//#W71-BO (R3, wave-70 census): `commitRetracted` / `commit_retracted` DELETED.
+//It was the disjunction of three retraction exits, two of which
+//(`truncated_abandoned`, `truncated_abandoned_heuristic`) no longer exist -
+//`truncatedBlockCommitmentAbandoned` went in W70-BN F1 - and the third
+//(`retracted_choice`) is already stamped verbatim in the record's own
+//`fallback` field, so the derived flag only restated what the record said.
+//0 of 2,119 records carried it.
 
 //#W53-Q (D24). A record with `choice: -1`, `chosen_text` absent and a fallback
 //class says the model did not answer - and then says NOTHING about what did.
@@ -16677,14 +16603,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (planStepExecuted(!mCurrentPlan.empty(), !userMsg.empty(), choice, fallback)
         && (size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(mCurrentPlan))
         mPlanStepsDone++;
-    //#W61-U (C14): the record keeps the committed reply plus a bounded head of
-    //any overrun; the counters below are still measured on the FULL reply.
-    //#W70-BM (E2): the overrun the trim takes is the TAIL past the two permitted
-    //lines, and the census reads the whole off-protocol quantity beside it.
+    //#W71-BO (R1): the record keeps the reply verbatim - the trim is deleted.
     bool replyActionFirst = false;
-    long replyTrailingOff = 0;
-    const long replyOffProtocol = offProtocolBytes(reply, &replyActionFirst, &replyTrailingOff);
-    const string recordReply = recordReplyTrimmed(reply, replyTrailingOff);
+    const long replyOffProtocol = offProtocolBytes(reply, &replyActionFirst);
     //#W67-AX (I5, engine HIGH-4): this record's OWN round trip, snapshotted
     //beside the field that publishes it. `mLastLatencyMs` is consumed (set to
     //-1) further down this same function, and the reveal residual below is
@@ -16699,7 +16620,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"kind", kind},
         {"model", mModel},
         {"prompt", userMsg},
-        {"reply", recordReply},
+        {"reply", reply},
         {"choice", choice},
         {"options", optionCount},
         {"turn", translogTurn(observer->turn)},
@@ -16788,14 +16709,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W63-AD (E11): only where `choice` IS a row index (see recordChoiceIsRowIndex).
     if (recordChoiceIsRowIndex(kind) && latchedRowMismatch(reply, choice, optionCount, optionTexts))
         appendParseNote(&mLastParseNote, "latched_row_mismatch");
-    //#W54-B (D14): the chosen row's own annotation says it does nothing and
-    //the reply's PLAN says so too - executed anyway, silently, 4 times at two
-    //seats. ADDITIVE: a stamp, never a suppression and never a re-ask.
-    if (recordChoiceIsRowIndex(kind) //#W63-AD (E11)
-        && choice >= 1 && optionTexts && choice <= (int) optionTexts->size()
-        && rowSaysNoOp((*optionTexts)[choice - 1])
-        && planArguesAgainstRow(reply, (*optionTexts)[choice - 1]))
-        appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
+    //#W71-BO (R4): the `plan_contradicts_noop_row` stamp is DELETED with
+    //`planArguesAgainstRow` - it required the reply's own words to agree with the
+    //row, which is a reading of prose the protocol forbids. The row's own zero
+    //verdict still earns its re-ask at both seams.
     //#W69-BI (K7): the take of a row the engine has already marked as repeated
     //this turn. Stamped only where the answer STANDS (a refusal record carries
     //its own fallback and executed nothing), with the annotation's own number.
@@ -16981,15 +16898,31 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["action_before_plan"] = true;
         mActionBeforePlanReplies++;
     }
+    //#W71-BO (L10, wave-70 MED-2). A MISSING PLAN LINE IS NOW VISIBLE. The
+    //corpus carried 11 replies with NO `PLAN:` line at all, every one of them
+    //reading `off_protocol_bytes: 0` - the meter charges a MISLABELLED plan (92
+    //unlabelled + 7 `YOUR PLAN:`) and is blind to an ABSENT one, so "the plan
+    //was omitted" and "the reply was perfect" produced identical records. The
+    //silent-instrument shape lane BK fixed for `reasoning_chars`, fixed here:
+    //written on EVERY record that carried a round trip, present or false.
     if (!userMsg.empty())
+    {
+        const bool planLineMissing = (firstLineLeadingPlanPos(reply) == string::npos);
+        rec["plan_line_missing"] = planLineMissing;
+        if (planLineMissing)
+            mPlanLineMissing++;
         mProtocolReplies++; //#W70-BM (E2): the census denominator
+        //#W71-BO (L10 sibling, wave-70 P): `plan_steps_done` was absent from every
+        //record, so lane BN's F10 step-advance claim was unmeasurable. The pointer
+        //into the carried plan, and the plan's own step count, ride every record.
+        rec["plan_steps_done"] = mPlanStepsDone;
+        rec["plan_step_count"] = (long) gptcaveat::planStepCount(mCurrentPlan);
+    }
     if (gLastPutGlossStripped) //#W70-BM (E3): B4.6's census
     {
         mPutGlossStripped++;
         gLastPutGlossStripped = false;
     }
-    if (recordReply.size() < reply.size())
-        rec["reply_trimmed_bytes"] = (long) (reply.size() - recordReply.size());
     //#W63-AD (E11): on a subset seam `choice` is the SIZE of the selection, not a
     //row. Said on the record rather than left to be inferred; `chosen_text` above
     //is what names the cards that were actually taken.
@@ -16998,7 +16931,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W63-AD (E6c): which system message this window was answered under.
     if (!mSystemHash.empty() && !userMsg.empty())
         rec["system_hash"] = mSystemHash;
-    rec["commit_retracted"] = commitRetracted(fallback, reply);
     //WAVE-34 #1b(B), instrument only - no behaviour rides these. They measure
     //the boundary the phenomenon actually has (post-ANSWER, not post-PLAN) and
     //the first-vs-last-label divergence the shipped fields were blind to.
@@ -17321,13 +17253,12 @@ void AIPlayerGPT::logGameEnd()
         //distinction is exactly what the wave-70 audit could not make from code.
         {"protocol_replies", mProtocolReplies},
         {"action_before_plan_replies", mActionBeforePlanReplies},
-        {"reasoning_tail_answers", mReasoningTailAnswers},
         {"phase2_answer_recovered", mPhase2AnswerRecovered},
         {"phase2_answer_missing", mPhase2AnswerMissing},
-        {"plan_paragraph_bound_cuts", mPlanParagraphBoundCuts},
         {"put_gloss_stripped", mPutGlossStripped},
-        {"plan_choice_conflict_seen", mPlanChoiceConflictSeen},
-        {"plan_argues_against_row_seen", mPlanArguesAgainstRowSeen},
+        //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
+        //denominator - the class `off_protocol_bytes` cannot see.
+        {"plan_line_missing", mPlanLineMissing},
     };
     transLogWrite(rec.dump()); //audit-L (L4)
     //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
@@ -19140,18 +19071,8 @@ static bool planLineOpensWithConnective(const string& line)
     return false;
 }
 
-//The trigger: a COMPLETE reply (it reached its PLAN line) that carries no coded
-//answer line anywhere. A reply with no PLAN is a truncated or spiralling reply
-//and keeps every path it has today.
-static bool replyLabelMissing(const string& reply)
-{
-    return !reply.empty() && codedAnswerCount(reply) == 0
-           && firstLineLeadingPlanPos(reply) != string::npos;
-}
-
-//#W70-BM (E2): `salvageLabelMissingChoice`, `sentenceNegatesBefore` and
-//`gptRowShortName` DELETED - the prose-as-answer salvage. `replyLabelMissing`
-//above survives as the trigger for the ONE re-ask a label-free reply earns.
+//#W71-BO (R9): `replyLabelMissing` is DELETED with the label-missing re-ask it
+//triggered (`label_missing_reask` appears in none of the 42 wave-70 seat logs).
 
 //#W64-AJ (F13, engine seat HIGH-1). A CODED ANSWER LINE ENDS THE PLAN
 //PARAGRAPH. `planParagraphBound`'s two terminators are a blank line and a
@@ -19290,41 +19211,10 @@ static size_t firstLineLeadingPlanPos(const string& text)
     return string::npos;
 }
 
-static string planParagraphBound(const string& planIn)
-{
-    string out;
-    size_t start = 0;
-    bool first = true;
-    string prevLine;
-    while (start <= planIn.size())
-    {
-        size_t end = planIn.find('\n', start);
-        string line = (end == string::npos) ? planIn.substr(start) : planIn.substr(start, end - start);
-        if (!first)
-        {
-            //a blank line ends the paragraph
-            if (line.find_first_not_of(" \t\r") == string::npos)
-                break;
-            size_t pe = prevLine.find_last_not_of(" \t\r");
-            char prevLast = (pe == string::npos) ? '\0' : prevLine[pe];
-            bool prevEnded = (prevLast == '.' || prevLast == '!' || prevLast == '?');
-            if (prevEnded && !planLineOpensWithConnective(line))
-                break;
-            if (lineIsCodedAnswerLine(line)) //#W64-AJ (F13): and it is not plan text
-                break;
-            out += "\n";
-        }
-        out += line;
-        prevLine = line;
-        first = false;
-        if (end == string::npos)
-            break;
-        start = end + 1;
-    }
-    size_t s = out.find_first_not_of(" \t\r\n");
-    size_t e = out.find_last_not_of(" \t\r\n");
-    return (s == string::npos) ? string() : out.substr(s, e - s + 1);
-}
+//#W71-BO (R8): `planParagraphBound` is DELETED - `plan_paragraph_bound_cuts`
+//fired 0 times in 40 games (max PLAN line 422 B, p95 191 B, 2 records over 400).
+//The plan is ONE line under invariant 000, the answer line is already excluded by
+//`planEnd`, and the 400-character carry cut stands.
 
 //#W54-A (D12b): the one-clause diff of the served plan against THIS window's
 //option list. 162v152 s11 -> s12 was served, verbatim, a plan naming
@@ -19443,10 +19333,7 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     if (s != string::npos)
     {
         plan = plan.substr(s, e - s + 1);
-        const size_t planBeforeBound = plan.size(); //#W70-BM (E3): B3.3's census
-        plan = planParagraphBound(plan); //#W54-A (D12a): SHAPE first
-        if (plan.size() < planBeforeBound)
-            mPlanParagraphBoundCuts++;
+        //#W71-BO (R8): the paragraph bound and its census are DELETED.
         //#W60-M (B13a): then the LENGTH bound, with a stated marker where it
         //cut. The old ceiling was 1,600 characters, which is not a bound on a
         //deliberation stream: 148 of one wave-59 seat's 410 echoes were over
@@ -27230,38 +27117,8 @@ static string menuRowProseName(const string& row)
     return (core.size() < 4) ? string() : core;
 }
 
-//#W56-A (D16): the reply's PROSE - everything after the first coded CHOICE
-//line, with every further coded line removed, lowercased. Post-think, like
-//every other reply scanner here.
-static string replyProseAfterChoice(const string& replyIn)
-{
-    string text = replyIn;
-    size_t thinkEnd = text.rfind("</think>");
-    if (thinkEnd != string::npos)
-        text = text.substr(thinkEnd + 8);
-    for (size_t i = 0; i < text.size(); i++)
-        text[i] = (char) tolower((unsigned char) text[i]);
-    size_t choiceAt = text.find("choice:");
-    if (choiceAt == string::npos)
-        return string();
-    size_t start = text.find('\n', choiceAt);
-    if (start == string::npos)
-        return string();
-    string out;
-    start++;
-    while (start <= text.size())
-    {
-        size_t end = text.find('\n', start);
-        string line = (end == string::npos) ? text.substr(start) : text.substr(start, end - start);
-        size_t f = line.find_first_not_of(" \t\r");
-        if (f == string::npos || line.compare(f, 7, "choice:") != 0)
-            out += line + "\n";
-        if (end == string::npos)
-            break;
-        start = end + 1;
-    }
-    return out;
-}
+//#W71-BO (R4): `replyProseAfterChoice` DELETED - dead since wave 70 and, by
+//construction, a scanner of a region invariant 000 does not permit.
 
 //#W70-BM (E4): `proseNamesOtherMenuRow` DELETED with the rival-row stamp it fed
 //- prose naming a rival row is prose, and the protocol no longer has any.
@@ -27308,93 +27165,13 @@ static bool noopRowEarnsReask(const string& row)
     return AIPlayerGPT::rowSaysNoOp(row) && !rowIsDeclineRow(row);
 }
 
-//#W70-BM (E4). THE PLAN LINE IS THE ONLY PLACE A VERDICT MAY BE WRITTEN. Two
-//halves of this predicate are DELETED: the SENTENCE-OPENER walk (it read prose
-//sentences between the coded line and the PLAN line - a region the two-line
-//protocol does not have) and `fromStripped`, the offset that started the scan at
-//the LATCHED CODED LINE. Under PLAN-then-action the plan line stands ABOVE the
-//answer, so scanning forward from the answer could never see it: the plan-vs-
-//choice contradiction detector was about to go silently dead, and its census
-//stamps would have read 0 for the wrong reason (the silent-instrument class).
-//What is left is the half the ruling permits and the corpus actually fired: the
-//PLAN LINE's own verdict about THIS window ("this window: pass", "stop reached",
-//"do not attack"), read wherever the plan line sits. Deferrals ("pass the turn",
-//"next window", "not attack WITH A2") are still rejected - a plan that says what
-//it will do LATER has not contradicted what it did NOW.
-static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL,
-                                   int seamVocab = 0)
-{
-    string text = replyIn;
-    size_t thinkEnd = text.rfind("</think>");
-    if (thinkEnd != string::npos)
-        text = text.substr(thinkEnd + 8);
-    string low = text;
-    for (size_t i = 0; i < low.size(); i++)
-        low[i] = (char) tolower((unsigned char) low[i]);
-    size_t scan = 0;
-    while ((scan = low.find("plan:", scan)) != string::npos)
-    {
-        size_t eol = low.find('\n', scan);
-        string line = low.substr(scan, (eol == string::npos) ? string::npos : eol - scan);
-        static const char * kPlanCuesChoice[] = {
-            "this window: pass", "this window pass", "window: pass", "stop reached" };
-        //#W68-BA (J6): the combat seams' own words for the same act.
-        static const char * kPlanCuesAttack[] = {
-            "do not attack", "don't attack", "must not attack", "will not attack",
-            "no attackers", "attack with nothing", "pass combat", "no attacks this turn" };
-        static const char * kPlanCuesBlocks[] = {
-            "do not block", "don't block", "must not block", "will not block",
-            "no blocks", "no blockers", "block with nothing" };
-        const char * const * planCues = kPlanCuesChoice;
-        size_t nPlanCues = sizeof(kPlanCuesChoice) / sizeof(kPlanCuesChoice[0]);
-        if (seamVocab == 1) { planCues = kPlanCuesAttack; nPlanCues = sizeof(kPlanCuesAttack) / sizeof(kPlanCuesAttack[0]); }
-        else if (seamVocab == 2) { planCues = kPlanCuesBlocks; nPlanCues = sizeof(kPlanCuesBlocks) / sizeof(kPlanCuesBlocks[0]); }
-        //#W68-BA (J6): the combat verdict must be about THIS combat. "I will not
-        //attack WITH A2" excludes one attacker and "I will not attack NEXT TURN"
-        //is about a later one; neither reverses the declaration just written. The
-        //PLAN-cue path gets the same deferral test the sentence-opener path has
-        //always had (a cue that owns the word " with " is exempt from that half).
-        static const char * kCueDefer[] = { " with ", " next turn", " next window",
-                                            " later", " until ", " once ", " after " };
-        bool cueHit = false;
-        for (size_t c = 0; c < nPlanCues && !cueHit; c++)
-        {
-            size_t at = line.find(planCues[c]);
-            if (at == string::npos)
-                continue;
-            if (seamVocab != 0)
-            {
-                const string after = line.substr(at + strlen(planCues[c]), 30);
-                const bool cueOwnsWith = (string(planCues[c]).find(" with ") != string::npos);
-                bool deferred = false;
-                for (size_t d = 0; d < sizeof(kCueDefer) / sizeof(kCueDefer[0]) && !deferred; d++)
-                {
-                    if (cueOwnsWith && strcmp(kCueDefer[d], " with ") == 0)
-                        continue;
-                    deferred = (after.find(kCueDefer[d]) != string::npos);
-                }
-                if (deferred)
-                    continue;
-            }
-            cueHit = true;
-        }
-        if (cueHit)
-        {
-            if (matchedOut)
-            {
-                string raw = text.substr(scan, line.size());
-                size_t e = raw.find_last_not_of(" \t\r");
-                *matchedOut = (e == string::npos) ? string() : raw.substr(0, e + 1);
-                if (matchedOut->size() > 160)
-                    *matchedOut = matchedOut->substr(0, 160);
-            }
-            return true;
-        }
-        scan += 5;
-    }
-    return false;
-}
-
+//#W71-BO (R4, wave-70 census): `planSaysPassThisWindow` is DELETED with the two
+//re-asks it drove. It read a PASS VERDICT out of the reply's own PLAN line and
+//weighed it against the action line; under reasoning-on that contradiction never
+//occurred (`plan_choice_conflict_seen` 0 of 2,119, against 25 fallbacks in wave
+//69's thinking-off corpus). The PLAN is a sequence of intended actions, and its
+//first step IS the action line - so reading it as an argument against that line
+//was reading the scratchpad as a verdict.
 //#W70-BM (E4): `proseReversesDeclaration`, `reversalScanText`, `correctionZoneEnd`
 //and `proseReversesInCorrectionZone` DELETED. All four existed to locate PROSE
 //between the answer and the plan and read a verdict out of it. The seams call
@@ -27444,62 +27221,8 @@ static string menuRowShortName(const string& row)
     return (core.size() < 4) ? string() : core;
 }
 
-//#W69-BF (K3, deck123 HIGH-2 = the deciding decision of the corpus). THE
-//REVERSAL THAT NAMES THE ROW IT TAKES BACK. 123v162 s34 answered
-//`CHOICE: 5 (Cast Damnation)` and then wrote, in the same reply, "You should NOT
-//cast Damnation. You should attack." - and swept its own 21 Humans one turn
-//before lethal. No pass-opener matches that sentence: it is not a pass, it is a
-//NEGATION of the row just taken, and it names the row. That is why this
-//predicate may read the WHOLE reply after the coded line while the generic
-//opener half may not: it is evidence-bound. Measured over the corpus's 2,041
-//ask/priority records with a taken row, it fires THREE times - 123v162 s34, a
-//"so I should not cast Soul Shatter" already caught by plan_contradicts_noop_row
-//(146 s14), and "I cannot cycle Stone Rain" (130 s110, already a conflict) - so
-//it buys ONE new round trip per corpus. A question ("Should I not cast X?") is
-//not a claim, and a deferral ("not yet", "not until") is not a reversal.
-//#W69-BJ (F6): the negation must GOVERN the row's name, not merely precede it
-//somewhere in the same sentence. The bag-of-words form fired on approving prose
-//("I cannot let their board grow, so Damnation now" - the negation governs
-//`let their board grow`, and the row is what the seat WANTS), each firing
-//buying a wasted round trip. The bridge between the cue and the name must
-//therefore be a verb phrase that takes the row: at most three words, no clause
-//boundary (a comma, a `;`, `so`, `because`, `but`, `while`, `since`, `unless`)
-//and, when non-empty, containing a verb that a menu row is taken WITH. That is
-//exactly the shape of all three corpus firings ("NOT cast Damnation",
-//"should not cast Soul Shatter", "cannot cycle Stone Rain").
-static bool negationGovernsRowName(const string& rest, const string& name)
-{
-    const size_t at = rest.find(name);
-    if (at == string::npos)
-        return false;
-    string bridge = rest.substr(0, at);
-    static const char * kBreaks[] = { ",", ";", " so ", " because ", " but ",
-                                      " while ", " since ", " unless ", " and ",
-                                      " if ", " when " };
-    for (size_t i = 0; i < sizeof(kBreaks) / sizeof(kBreaks[0]); i++)
-        if (bridge.find(kBreaks[i]) != string::npos)
-            return false;
-    int words = 0;
-    size_t w = bridge.find_first_not_of(" \t");
-    while (w != string::npos)
-    {
-        size_t e = bridge.find(' ', w);
-        words++;
-        w = (e == string::npos) ? string::npos : bridge.find_first_not_of(" \t", e);
-    }
-    if (words > 3)
-        return false;
-    if (words == 0)
-        return true; //the name follows the cue directly
-    static const char * kTakeVerbs[] = { "cast", "play", "activate", "equip", "use",
-                                         "attack", "block", "target", "create",
-                                         "cycle", "sacrifice", "discard", "counter",
-                                         "tap", "take", "resolve", "swing" };
-    for (size_t v = 0; v < sizeof(kTakeVerbs) / sizeof(kTakeVerbs[0]); v++)
-        if (bridge.find(kTakeVerbs[v]) != string::npos)
-            return true;
-    return false;
-}
+//#W71-BO (R4): `negationGovernsRowName` DELETED with the reversal predicate it
+//served - dead since wave 70.
 
 //#W70-BM (E4): `proseNegatesTakenRow` DELETED - it scanned the SENTENCES after
 //the CHOICE line for a negation naming the taken row. There are no sentences
@@ -31029,15 +30752,45 @@ static long gptSeamMaxTokens(const char * seam, long ceilingTokens)
     //not from this comment. What DID change this wave is what the number
     //means: it is now an ANSWER ceiling (gptResolveMaxTokens) and is added
     //to the reasoning budget, so no value here can bound a thinking window.
+    //#W71-BO (R3 / wave-70 LOW-3, the OWED RE-FIT). Measured on the corpus these
+    //caps produced under reasoning-on - matchups-20260906-224849, 2,118 replies
+    //with a body, every one re-parsed for the bytes of its PLAN line plus its
+    //action line (which is the WHOLE reply now: 94.6% of replies are exactly those
+    //two lines, and the full-reply p99.9 equals the two-line p99.9 at every seam
+    //but discard, where it is 34 B larger). Wave 68 sized these on a PREDICTION of
+    //what the two-line rewrite would do; this is the measurement it was owed.
+    //
+    //  seam      n     p50  p95  p99  p99.9  max   | p99.9 x 2  / 3.15 B/tok
+    //  ask     1,522   129  237  317   417   457   |   834 B  ->  265 tok
+    //  priority  411   140  257  317   451   451   |   902 B  ->  286 tok
+    //  attackers  78    97  195  231   231   231   |   462 B  ->  147 tok
+    //  blockers   20   120  150  195   195   195   |   390 B  ->  124 tok
+    //  discard    67    84  233  268   268   302*  |   604 B  ->  192 tok  (*full reply)
+    //  reveal     20    74  134  161   161   161   |   322 B  ->  102 tok
+    //  bottom      0    -    -    -     -     -    |   UNTESTED: 0 windows arose
+    //
+    //THE RULE: ceiling = p99.9 x 2, converted at the WORST-case 3.15 B/token
+    //(#W69-BF K2's measured p10, not its median 3.61), rounded up to a multiple of
+    //32, and never below a FLOOR of 256 tokens. The floor is justified by the
+    //corpus's own global worst case: the largest single reply at ANY seam is 457 B,
+    //and 256 tokens buys 806 B at 3.15 B/tok - 1.76x that reply, and 2.5x the
+    //largest seam p99.9. So no seam whose fitted value falls under the floor can be
+    //cut by it, and the two seams above the floor (ask 288, priority 288) still
+    //carry ~2.0x their own measured maximum.
+    //`bottom` had ZERO windows in this corpus, so it is NOT re-fitted - a zero is
+    //not evidence (the wave-70 census's own rule) and it keeps 512.
+    //This is an ANSWER ceiling only: gptResolveMaxTokens ADDS the reasoning budget
+    //to it, so invariant 000(d) is untouched by any number here, and
+    //WAGIC_GPT_SEAMTOKENS=0 still disables the whole table.
     struct SeamCap { const char * seam; long tokens; };
     static const SeamCap kCaps[] = {
-        { "ask",       768 }, //#W69-BF (K2): need p99.5 1,768 B + a correction line, at 3.15 B/tok
-        { "priority",  768 }, //need p99.5 1,689 B; 768 tok >= 2,419 B - stands
-        { "attackers", 768 }, //need p99.5 1,960 B - stands
-        { "blockers",  896 }, //the bundled seam, need p99.5 578 B (n=26) - stands, generously
-        { "discard",   512 }, //#W69-BF (K2): 384 cleared 961 B by 68 B and ATE 125v146 s133
-        { "reveal",    512 }, //#W69-BF (K2): sized with its siblings - one small-seam budget
-        { "bottom",    512 }, //#W69-BF (K2): need p99.5 622 B, the largest of the three
+        { "ask",       288 }, //#W71-BO (R3): p99.9 417 B x2 = 834 B -> 265 -> 288
+        { "priority",  288 }, //p99.9 451 B x2 = 902 B -> 286 -> 288
+        { "attackers", 256 }, //p99.9 231 B x2 = 462 B -> 147 -> the 256 floor
+        { "blockers",  256 }, //p99.9 195 B x2 = 390 B -> 124 -> the 256 floor
+        { "discard",   256 }, //full-reply p99.9 302 B x2 = 604 B -> 192 -> the 256 floor
+        { "reveal",    256 }, //p99.9 161 B x2 = 322 B -> 102 -> the 256 floor
+        { "bottom",    512 }, //#W71-BO (R3): UNTESTED this corpus (0 windows) - unchanged
     };
     for (size_t i = 0; i < sizeof(kCaps) / sizeof(kCaps[0]); i++)
         if (strcmp(seam, kCaps[i].seam) == 0)
@@ -31674,130 +31427,10 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
         return true;
     return rightNowComputedMagnitudesAreZero(row);
 }
+//#W71-BO (R4): `planArguesAgainstRow` is DELETED - it read the reply's own
+//words for an argument against the row it took. `plan_argues_against_row_seen`
+//fired 0 times in 2,119 decisions under reasoning-on.
 
-//#W54-B (D14), second half: does the reply's PLAN argue against the row the
-//reply CHOSE? Lane J's plan-vs-choice detector reads the prose BEFORE the
-//CHOICE: line and structurally cannot see this - deck126 vs125 seq 73 and 74
-//both put the contradiction AFTER it ("CHOICE: 1 (Cast Tribute to Hunger)" /
-//"PLAN: ... Avoid casting Tribute to Hunger as there are no creatures to
-//target."; then "The opponent has no creatures, so Tribute to Hunger does
-//nothing. Pass the turn.").
-//The negative has to be about THIS row, so the test is per SENTENCE of the
-//plan: the sentence names the row's card AND carries a word that argues
-//against doing it. A plan that names the card approvingly ("Cast Tribute to
-//Hunger to eat their best creature"), or argues against a DIFFERENT card,
-//never matches. Pure.
-//#W67-AY (I9b, deck126 HIGH-3): WHY THE CONJUNCTION MISSED ITS TEXTBOOK CASE.
-//126v125 s83 is the shape H8 was built for - row `Cast Tribute to Hunger
-//{right now: they control 0 creatures - at 0 this does nothing}` answered
-//`CHOICE: 1` over `PLAN: Cast Tribute to Hunger. Opponent has 0 creatures, so
-//this does nothing. This is a waste of mana and cards.` - and it did not fire,
-//for two independent reasons, both of them in this predicate:
-//  (a) the sentence that names the row carries no negative and the sentence
-//      that carries the negative names no row - it says "this". The per-sentence
-//      test cannot see an ANAPHOR, and the model writes one whenever it has just
-//      named the card. So a negative sentence whose subject is a pronoun is
-//      attributed to the row named by the sentence IMMEDIATELY before it, and to
-//      nothing else: one sentence of reach, a pronoun required, so a negative
-//      about a DIFFERENT card ("Damnation does nothing here") still never
-//      matches and a plan that never names the row still never matches.
-//  (b) s84 has no `PLAN:` marker anywhere in 5 354 bytes of prose and this
-//      returned false before reading a word of it. A reply with no plan label is
-//      not a reply with no argument (that is lane AV's item at the answer line;
-//      here it is simply the span to read), so the whole reply is the span when
-//      no marker exists.
-//And "a waste of mana and cards" - the phrase the corpus actually wrote - was
-//not in the negative vocabulary; "wasted" was. Both spellings are now in it.
-bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
-{
-    //#W70-BM (E4, audit B5.6): the WHOLE-REPLY fallback is DELETED. #W67-AY let
-    //a reply with no PLAN marker be read as if all of it were the plan, which
-    //under invariant 000 means reading the action line and any stray prose as an
-    //argument against the row. No PLAN line, no plan argument.
-    //#W70-BN (F3, Astra review finding 3): ...and the span is the PLAN LINE, not
-    //everything after the marker. Wave 70 left the read running to the end of the
-    //reply, so `PLAN: cast Tribute to Hunger / CHOICE: 1 (Cast Tribute to Hunger)
-    /// This is a waste.` attributed the trailing sentence to the row through the
-    //pronoun rule - off-protocol bytes selecting a re-ask wording and a fallback
-    //class. The plan is one line; that line is the whole span.
-    const size_t pos = findPlanMarker(reply, string::npos, NULL);
-    if (pos == string::npos)
-        return false;
-    const size_t planLineEnd = reply.find('\n', pos);
-    string plan = (planLineEnd == string::npos) ? reply.substr(pos + 5)
-                                                : reply.substr(pos + 5, planLineEnd - (pos + 5));
-    for (size_t i = 0; i < plan.size(); i++)
-        plan[i] = (char) tolower((unsigned char) plan[i]);
-    string name = optionLabel(row);
-    for (size_t i = 0; i < name.size(); i++)
-        name[i] = (char) tolower((unsigned char) name[i]);
-    size_t st = name.find_first_not_of(" \t");
-    if (st == string::npos)
-        return false;
-    name = name.substr(st);
-    static const char * kVerb[] = { "cast ", "play ", "activate ", "attack with ", "use " };
-    for (size_t i = 0; i < sizeof(kVerb) / sizeof(kVerb[0]); i++)
-    {
-        string v(kVerb[i]);
-        if (name.size() > v.size() && name.compare(0, v.size(), v) == 0)
-        {
-            name = name.substr(v.size());
-            break;
-        }
-    }
-    size_t e = name.find_last_not_of(" \t");
-    name = (e == string::npos) ? string() : name.substr(0, e + 1);
-    if (name.size() < 4)
-        return false; //nothing specific enough to attribute a sentence to
-    static const char * kAgainst[] = {
-        "avoid", "do not", "don't", "does nothing", "no creature", "not worth",
-        "useless", "pointless", "should not", "shouldn't", "no target",
-        "no legal target", "wasted", "instead of",
-        "a waste", "waste of" //#W67-AY (I9b): 126v125 s83's own words
-    };
-    //#W67-AY (I9b): a pronoun standing in for the card the previous sentence
-    //named. Word-bounded, so "thistle", "item" and "that's" are not subjects.
-    static const char * kPronoun[] = { "this", "it", "that" };
-    size_t start = 0;
-    bool prevNamedRow = false;
-    while (start <= plan.size())
-    {
-        //';' too: "Avoid casting Damnation this turn; Tribute to Hunger is
-        //the play." is TWO claims, and only the first is a negative.
-        size_t stop = plan.find_first_of(".!?;\n", start);
-        size_t end = (stop == string::npos) ? plan.size() : stop;
-        string sent = plan.substr(start, end - start);
-        const bool namesRow = (sent.find(name) != string::npos);
-        bool against = false;
-        for (size_t i = 0; i < sizeof(kAgainst) / sizeof(kAgainst[0]) && !against; i++)
-            if (sent.find(kAgainst[i]) != string::npos)
-                against = true;
-        if (namesRow && against)
-            return true;
-        if (against && !namesRow && prevNamedRow)
-        {
-            for (size_t i = 0; i < sizeof(kPronoun) / sizeof(kPronoun[0]); i++)
-            {
-                const string w(kPronoun[i]);
-                size_t at = 0;
-                while ((at = sent.find(w, at)) != string::npos)
-                {
-                    const size_t after = at + w.size();
-                    const bool okBefore = (at == 0 || !isalnum((unsigned char) sent[at - 1]));
-                    const bool okAfter = (after >= sent.size() || !isalnum((unsigned char) sent[after]));
-                    at = after;
-                    if (okBefore && okAfter)
-                        return true;
-                }
-            }
-        }
-        prevNamedRow = namesRow;
-        if (stop == string::npos)
-            break;
-        start = stop + 1;
-    }
-    return false;
-}
 
 //All-digit tokens of a string ("add 5 counters" -> {"5"}). The alpha filter
 //above drops them; the number is often the ONLY discriminator between
@@ -33895,12 +33528,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //multi-answer tolerance, and the protocol now permits exactly one
         //answer line. An unusable answer routes to the re-ask ladder below,
         //which asks the model rather than choosing among its drafts.
-        //#W70-BM (E2): `replyLabelMissing` is KEPT as the trigger for the one
-        //re-ask below; the SALVAGE that read the last action sentence as the
-        //answer is DELETED. Reading prose for a decision is the tolerance
-        //invariant 000 forbids, and the re-ask asks the model for its own
-        //answer line instead of guessing at one.
-        bool labelMissing = (choice < 0 && !content.empty() && replyLabelMissing(content));
+        //#W71-BO (R9): the label-missing RE-ASK is DELETED at this seam - the
+        //string `label_missing_reask` appears in none of the 42 wave-70 seat logs,
+        //so the predicate never fired once. An unlabelled reply is already counted
+        //by `off_protocol_bytes` and answered by the heuristic.
         //#W70-BM (E2): the RETRACTION GATE is DELETED. It read the prose
         //between the answer line and the PLAN line for a sentence taking the
         //answer back (and a coded index inside the plan block as a recode).
@@ -33944,98 +33575,23 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             namedCount = -1;
             appendParseNote(&mLastParseNote, "repeat_count_zero_pass");
         }
-        //#W68-BA (J1, engine HIGH-1; deck123 MED-1). THE STOP GUARD WAS BLIND TO
-        //THE ROW THE MODEL ACTUALLY PRESSES. `repeatPastStop` was gated on
-        //namedCount >= 1 - the counted "[repeat: ... N times]" row - and only 4
-        //records in the whole wave-67 corpus carry a count at all. All 20 takes
-        //past a stated stop rode the PLAIN row that the repeat row shadows, where
-        //repeatRowTaken is false by construction: the guard, its clamp and AZ R2's
-        //boundary were unreachable, which is why `repeat_past_stop` and
-        //`repeat_clamped_to_own_stop` both read 0 while 123v126 walked M 24 -> 35
-        //against a stated stop of 23 across 13 windows of turns 17-18 (20 of the 41
-        //windows that rendered `your stated stop=` executed past it). A base row IS
-        //one activation of the same ability, so the model's own subtraction holds it
-        //on the same terms, with a count of 1. Nothing is capped and no row is
-        //withheld: this only decides whether the model is ASKED once more.
-        const bool repeatBaseTaken = (!repeatRowTaken && choice >= 1 && choice <= index
-                                      && rowIsRepeatBase(repeatBaseRow, choice));
-        //#W51-C (D4b): a count on the repeat row under a PLAN line that says
-        //this window is a pass is a contradiction -> one re-ask quoting both.
-        //#W52-J (D14): the conflict covers EVERY taken row, not only the
-        //repeat row with a count - the single "[cost: Tap]" take under a pass
-        //plan and "CHOICE: 1 (Lolth 0)" over "We must pass" are the same
-        //contradiction. The matched verdict is quoted back; the class is
-        //counted (decision_reversed_in_prose) whether or not the re-ask fires.
-        //#W54-A (D2b): the HOLD row is EXEMPT from the pass-verdict test. Taking
-        //it means "I do nothing this turn", so the reply's own prose says "I
-        //must pass priority" - and the detector read a non-zero index plus a
-        //pass verdict as a contradiction. That collision is 5 of wave 53's 8
-        //`plan_choice_conflict` firings (146v125 s150/s371/s398/s470/s491, plus
-        //two on the same vocabulary): two re-asks degraded a hold to a plain
-        //pass and three reached plan_choice_conflict_exhausted, at a full extra
-        //model call each. A pass verdict CONFIRMS a hold. This narrows the
-        //detector for NO other shape - the wave-52 rejection of a general
-        //narrowing stands (general-strategy.md, the R118 reconciliation).
-        //#W56-C (D3): the notice quotes the LATCHED coded line and takes its
-        //prose evidence from that line's region of the reply - see
-        //latchedCodedChoiceLine and planSaysPassThisWindow's `fromStripped`.
+        //#W71-BO (R6, wave-70 census): `repeatBaseTaken` is DELETED with the
+        //stop-guard re-ask it fed - see the repeatPastStop note below.
+        //#W56-C (D3): the notice quotes the LATCHED coded line.
         string latchedChoiceLine;
         size_t latchedFrom = 0;
         const bool haveLatchedLine = latchedCodedChoiceLine(content, choice, index, &shownLines,
                                                             &latchedChoiceLine, &latchedFrom);
-        //#W69-BF (K3): the sentence-opener half is bounded by the CORRECTION ZONE
-        //(the sentences between the coded line and the PLAN: line, where the
-        //protocol tells the model to write a change of mind); the PLAN-cue half
-        //inside the same function still reads the PLAN line's own verdict. The
-        //corpus's 22 firings all came from the plan BODY and 12 of the 16
-        //opener-half re-asks returned the identical answer.
-        //#W70-BM (E4): read the PLAN LINE, wherever it sits. The row-negation
-        //half is DELETED with the prose it scanned.
-        string passVerdict;
-        const bool priorityReversalCandidate = (choice >= 1 && choice <= index && !content.empty()
-                                                && !(holdRow > 0 && choice == holdRow));
-        const bool passVerdictInProse = (priorityReversalCandidate
-                                         && planSaysPassThisWindow(content, &passVerdict, 0));
-        if (passVerdictInProse)
-            mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
-        //#W56-A (D16): the census stays broad, the RE-ASK narrows. All 9 of the
-        //wave-55 firings were a live row taken beside the pool's own mandated
-        //arithmetic vocabulary and named no other row on the menu; four
-        //recovered, five reached _exhausted, at a full extra model call each.
-        //The re-ask now needs the prose to point at ANOTHER row of THIS menu -
-        //a contradiction the model can actually resolve.
-        //#W68-BA (J6, deck123 HIGH-2; engine MED). THE NARROWING TOOK EVERY
-        //CANDIDATE. Over the wave-67 corpus `decision_reversed_in_prose` fired 15
-        //times and `plan_choice_conflict_narrowed` fired 15 times: the rival-row
-        //requirement removed 100% of the re-asks - and 12 of the 20 J1 takes past a
-        //stated stop carried exactly that reversal ("This window: pass") and ran. A
-        //reply that says in its own words that this window is a pass HAS named a
-        //rival answer: row 0, which is on every one of these menus. Requiring it to
-        //ALSO name another row by name is requiring a second, different
-        //contradiction. The re-ask now fires on the reversal itself; the
-        //rival-named half stays as a stamp so the census still partitions the shape.
-        //#W70-BM (E4): the rival-row scan is DELETED; the stamp it drove goes
-        //with it. The reversal itself is the contradiction and buys the re-ask.
-        bool planChoiceConflict = passVerdictInProse;
-        //#W57-A (D16): the BROAD census is stamped on the BROAD condition. Wave
-        //56 promised the old stamp would be kept beside the narrowed one and
-        //then wrote it on `planChoiceConflict` - the narrowed condition - so
-        //`decision_reversed_in_prose` rendered 0 on a corpus in which
-        //`plan_choice_conflict_narrowed` rendered 14, and "0 conflicts" could
-        //not be told from "0 counted" (silent-instrument class, skill #263).
-        //The three stamps now partition the shape exactly:
-        //  decision_reversed_in_prose   = a taken row under a pass verdict (broad)
-        //  plan_choice_conflict_narrowed = that shape with no rival row named
-        //  (the re-ask itself)          = that shape WITH a rival row named
-        //so broad = narrowed + firings, and a zero in the broad column is now
-        //evidence about the game rather than about the instrument.
-        if (passVerdictInProse)
-            appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
-        //#W70-BM (E4): `reversal_names_taken_row` and
-        //`plan_choice_conflict_no_rival_named` are DELETED with the two prose
-        //scans that set them. The one shape left - the PLAN line's own verdict
-        //against the action line - is stamped `decision_reversed_in_prose` above
-        //and counted in the gameend census (plan_choice_conflict_seen).
+        //#W71-BO (R4, wave-70 census): THE WHOLE REVERSAL APPARATUS IS DELETED -
+        //`planSaysPassThisWindow`, `passVerdictInProse`, `planChoiceConflict`, the
+        //`decision_reversed_in_prose` stamp and the `plan_choice_conflict_*` census.
+        //It was built to catch a reply that answered one row and then argued for
+        //another in the same breath; that shape existed because reasoning was in
+        //the reply. Under reasoning-on it is gone: `plan_choice_conflict_seen` fired
+        //0 times in 2,119 decisions, where wave 69 had it as its single largest
+        //fallback class (25). What the predicate scanned - a verdict read out of
+        //the reply's own words and weighed against its action line - is exactly
+        //what invariant 000 says the reply may not contain.
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
@@ -34062,25 +33618,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mStatedStopCount = stNow;
             }
         }
-        int planStop = -1, planCurrent = -1;
-        //#W68-BA (J1): the count the stop test holds this take to - the count named
-        //on the repeat row, or the single activation a base row IS.
-        const int stopTestCount = repeatRowTaken ? namedCount : (repeatBaseTaken ? 1 : -1);
-        const bool repeatPastStop =
-            stopTestCount >= 1 && replyHasPlanLine(content)
-            && repeatPlanStopAndCurrent(protocolLinesOnly(content), &planStop, &planCurrent) //#W70-BN (F4)
-            && planStop - planCurrent <= 0;
-        //#W52-J (D6): number and name point at different rows and the name is
-        //not unique on the menu (echo_index_conflict_ambiguous) -> one re-ask
-        //quoting both, instead of executing the index.
-        bool indexNameConflict = (choice >= 1 && choice <= index && !content.empty()
-                                  && parseNote.find("echo_index_conflict_ambiguous") != string::npos);
-        //#W65-AO (G8): a coded number and a named row that point at different
-        //rows are the same conflict whichever half named the row, so the
-        //reserved-name branches route to the same one re-ask (130v162 seq 57).
-        if (!indexNameConflict && choice >= 0 && choice <= index && !content.empty()
-            && parseNote.find("index_name_conflict") != string::npos)
-            indexNameConflict = true;
+        //#W71-BO (R6, wave-70 census): the STOP-GUARD RE-ASK and its clamp are
+        //DELETED (`repeat_past_stop` 0 of 2,119, `repeat_count_reask` 0). The stop
+        //the model states is still STORED above and still rendered on the row - the
+        //information stays; only the extra round trip and the engine-performed
+        //clamp go.
+        //#W71-BO (R5, wave-70 census): the index/name conflict RE-ASK is DELETED
+        //(0 fallbacks in 2,119; the parser's own notes - `echo_index_conflict`,
+        //`index_name_unique_name`, `name_over_index` - recovered all 5 occurrences
+        //without one). The notes are KEPT; only the round trip goes.
         //#W49-S (D8/D3): ONE re-ask per board state, before the heuristic (D8)
         //or before the single activation (D3). The corrected question is put
         //in flight now and answered on a later tick, exactly like a first ask;
@@ -34102,16 +33648,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         const bool noopRowZero = (choice >= 1 && choice <= index && !content.empty()
                                   && (size_t) choice <= shownLines.size()
                                   && noopRowEarnsReask(shownLines[choice - 1]));
-        const bool noopPlanConflict = (noopRowZero
-                                       && planArguesAgainstRow(content, shownLines[choice - 1]));
-        if (noopPlanConflict)
-            mPlanArguesAgainstRowSeen++; //#W70-BM (E3): B5.6's census
-        //#W68-BA (J3): the length cap BIT before the model wrote its label. That is
-        //not an unparseable reply and it is not the model declining - it is the
-        //engine's own budget landing mid-sentence, so it buys ONE re-ask that says
-        //so and quotes the number, and never the heuristic.
-        const bool replyTruncated = (mLastFinishLength && !content.empty()
-                                     && codedAnswerCount(content) == 0);
+        //#W71-BO (R4, wave-70 census): `planArguesAgainstRow` and its census are
+        //DELETED - `plan_argues_against_row_seen` 0 of 2,119. The re-ask stands on
+        //the ROW'S OWN zero verdict, which is the engine's own statement about the
+        //row and needs no reading of the reply's words.
+        //#W71-BO (R3): `replyTruncated` is DELETED with the truncation re-ask.
         //#W68-BA (J6, engine MED; 123 s41 -> s43): the no-op re-ask is EXEMPT from
         //the board's single re-ask, because it is a different question. s41 spent
         //the board's budget on a named_row miss; s43 then answered the corrected
@@ -34126,7 +33667,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             corr << "[RE-ASK] You chose row " << choice << " (\""
                  << stripNarrationDecoration(shownLines[choice - 1])
                  << "\"), whose own note on this list says it does nothing right now"
-                 << (noopPlanConflict ? ", and your reply says so too" : "")
                  << ". Answer again: that row if you meant it anyway, the number"
                     " of the row you want instead, or 0 (pass).";
             mPriorityReaskLine = corr.str();
@@ -34134,8 +33674,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "",
-                          noopPlanConflict ? "plan_contradicts_noop_row_reask"
-                                           : "noop_row_zero_reask", &renderRows); //#W69-BH (K4c)
+                          "noop_row_zero_reask", &renderRows); //#W69-BH (K4c) #W71-BO (R4)
             setNotice("the chosen row's own note says it does nothing - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: noop row re-ask (budget-exempt) -> re-asking once");
             string corrected;
@@ -34146,43 +33685,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //#W70-BL (E5): planChoiceConflict is gone from the trigger with the
             //re-ask it drove - it quoted the reply's prose back at the model,
             //which is the one thing a reply may not contain.
-            && (namedRowFail || (repeatRowTaken && namedCount < 0)
-                || planMissing || repeatPastStop || indexNameConflict || noopRowZero
-                || labelMissing || replyTruncated)) //#W66-AS (H3) #W66-AR (H8) #W67-AV (I2) #W68-BA (J3) #W69-BH (K4c)
+            //#W71-BO (R3/R5/R6/R9): the truncation, index/name, repeat-stop,
+            //repeat-count and label-missing arms are all DELETED - each fired 0
+            //times in 2,119 decisions. Three triggers are left.
+            && (namedRowFail || planMissing || noopRowZero)) //#W66-AR (H8) #W69-BH (K4c)
         {
             std::ostringstream corr;
             const char * fb;
             //#W56-C (D3): quote what the engine ran, not the reply's first try.
             const string quotedChoiceLine = haveLatchedLine ? latchedChoiceLine
                                                             : firstLabelledLine(content, "choice:");
-            if (replyTruncated) //#W68-BA (J3): the cap bit; say so and quote it
-            {
-                corr << "[RE-ASK] Your last reply ran to its length limit of "
-                     << mLastRequestMaxTokens
-                     << " tokens before it wrote an answer line, so none of it could be used."
-                        " Answer again with exactly two lines: your PLAN: line, then one"
-                        " line beginning with \"CHOICE: \" - the number of the row you want from"
-                        " the list, then that row's short name in parentheses, or 0 (pass)."
-                        " Nothing else."; //#W70-BL (E4)
-                fb = "reply_truncated_reask";
-                mPriorityReaskKind = "reply_truncated";
-                //#W69-BF (K2): a truncation re-ask fires only when the cut reply
-                //wrote NO coded line, so there is no prior answer to compare the
-                //recovery against - recorded as such rather than left to read as a
-                //recovered DECISION (123v125 s23-25 fetched nothing and counted as
-                //`reply_truncated_reask_recovered`).
-                mPriorityReaskPriorChoice = -1;
-            }
-            else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
-            {
-                corr << "[RE-ASK] Your reply has no answer line. Answer again with your PLAN:"
-                        " line and then one line that BEGINS with \"CHOICE: \" - the number of the"
-                        " row you want from the list, then that row's short name in parentheses,"
-                        " or 0 (pass) - and nothing before the label on that line."; //#W70-BL (E4)
-                fb = "label_missing_reask";
-                mPriorityReaskKind = "label_missing";
-            }
-            else if (namedRowFail)
+            if (namedRowFail)
             {
                 const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
                 corr << "[RE-ASK] \"" << offending
@@ -34191,15 +33704,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                      << laterStepRouteClause(offending, &shownLines); //#W62-Z (D11)
                 fb = "named_row_reask";
                 mPriorityReaskKind = "named_row";
-            }
-            else if (indexNameConflict)
-            {
-                corr << "[RE-ASK] Your CHOICE line's number " << choice << " and its name \""
-                     << headParenthetical(decisionPart.empty() ? content : decisionPart)
-                     << "\" point at different rows of this list. Answer again with the number of the row"
-                        " you want and that row's own short name, or 0 (pass).";
-                fb = "index_name_conflict";
-                mPriorityReaskKind = "index_name";
             }
             else if (planMissing)
             {
@@ -34210,37 +33714,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "plan_missing";
                 mPriorityReaskKind = "plan_missing";
             }
-            else if (repeatPastStop) //#W66-AS (H3) #W68-BA (J1)
-            {
-                if (repeatRowTaken)
-                    corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
-                         << quotedChoiceLine << "\") but your own PLAN puts you at " << planCurrent
-                         << " with your stop at " << planStop
-                         << ", so every repeat in this window is past the stop you set. Answer again:"
-                            " 0 (pass) to stop here, or the repeat row with the stop you actually"
-                            " intend and a count that does not pass it.";
-                else
-                    //#W68-BA (J1): the same refusal for the single activation of the
-                    //same ability - the model's own two numbers, its own subtraction.
-                    corr << "[RE-ASK] Your CHOICE line activates row " << choice << " (\""
-                         << quotedChoiceLine << "\") once more, but your own PLAN puts you at "
-                         << planCurrent << " with your stop at " << planStop
-                         << ", so this activation is past the stop you set. Answer again:"
-                            " 0 (pass) to stop here, or the row you want with the stop you"
-                            " actually intend.";
-                fb = "repeat_past_stop";
-                mPriorityReaskKind = "repeat_past_stop";
-            }
-            else if (noopRowZero) //#W66-AR (H8) #W69-BH (K4c)
+            else //#W66-AR (H8) #W69-BH (K4c): noopRowZero, the last trigger left
             {
                 corr << "[RE-ASK] You chose row " << choice << " (\""
                      << stripNarrationDecoration(shownLines[choice - 1])
                      << "\"), whose own note on this list says it does nothing right now"
-                     << (noopPlanConflict ? ", and your reply says so too" : "")
                      << ". Answer again: that row if you meant it anyway, the number"
                         " of the row you want instead, or 0 (pass).";
-                fb = noopPlanConflict ? "plan_contradicts_noop_row_reask"
-                                      : "noop_row_zero_reask"; //#W69-BH (K4c)
+                fb = "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
                 mPriorityReaskKind = "noop_plan";
                 //#W69-BJ (F8): the re-ask's own words are "that row if you meant
                 //it anyway", so the SAME answer coming back is the offer being
@@ -34248,43 +33729,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mPriorityReaskPriorChoice = choice;
                 mPriorityNoopReaskBoard = boardKey; //#W68-BA (J6): one-shot, spent here
             }
-            else
-            {
-                //#W69-BI (K7, deck123 MED-2): both corpus firings (`123v162`
-                //s23 and s25) copied the ROW'S OWN NAME - "..., repeated N
-                //times, then stop" - so the reply's coded line carried the
-                //letter N and no digit, while its PLAN stated the count
-                //("this window: Create human x6"). The refusal now quotes what
-                //was written and names the substitution, instead of pointing at
-                //"the row's own format" - which is the string that was copied.
-                corr << "[RE-ASK] Your CHOICE line named no count (\""
-                     << quotedChoiceLine << "\"): the letter N on that row is a"
-                        " placeholder, not an answer. Answer again with a DIGIT in"
-                        " its place, appended to the row's short name as \"x<count>\""
-                        " - for example \"CHOICE: " << choice << " (";
-                //the BASE row's short name - the repeat row's own text ends
-                //in the placeholder this refusal is about.
-                if (choice >= 1 && choice - 1 < (int) repeatBaseRow.size()
-                    && repeatBaseRow[(size_t) choice - 1] >= 0
-                    && repeatBaseRow[(size_t) choice - 1] < (int) shownLines.size())
-                    corr << repeatShortName(shownLines[(size_t) repeatBaseRow[(size_t) choice - 1]]);
-                corr << " x6)\" - or 0 (pass).";
-                fb = "repeat_count_reask";
-                mPriorityReaskKind = "repeat_count";
-            }
             mPriorityReaskBoard = boardKey;
             mPriorityReaskLine = corr.str();
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "", fb, &renderRows); //#W57-A (D4)
-            setNotice(labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
-                      : namedRowFail ? "that answer named nothing on the list - asking again"
-                      : indexNameConflict ? "the number and the name disagree - asking again"
-                      : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
+            setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
-                      : repeatPastStop ? "the repeat row was taken past its own stop - asking again" //#W66-AS (H3)
-                      : noopRowZero ? "the chosen row's own note says it does nothing - asking again"
-                                    : "the repeat row was taken without a count - asking again", 5.0f);
+                                    : "the chosen row's own note says it does nothing - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
             pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected, "priority");
@@ -34293,105 +33745,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //the corrected call rather than replaying this failed answer.
             return NULL; //in flight; decisionPending() holds the pass
         }
-        string stopClampReceipt; //#W67-AY (I6)
         if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
         {
             //the second answer for this state, whatever it is, is final
-            if (mPriorityReaskKind == "reply_truncated") //#W68-BA (J3)
-            {
-                appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
-                                                                : (choice >= 0 ? "reply_truncated_reask_recovered"
-                                                                               : "reply_truncated_reask_unanswered"));
-                //#W69-BF (K2, engine HIGH-2): a recovered ROUND TRIP is not a
-                //recovered DECISION. Say which one this record is.
-                if (!replyTruncated && choice >= 0)
-                    appendParseNote(&mLastParseNote,
-                                    mPriorityReaskPriorChoice < 0 ? "reply_truncated_reask_no_prior_answer"
-                                    : (choice == mPriorityReaskPriorChoice ? "reply_truncated_answer_unchanged"
-                                                                           : "reply_truncated_answer_changed"));
-            }
-            else if (mPriorityReaskKind == "label_missing") //#W67-AV (I2)
-                appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
-                                                              : (choice >= 0 ? "label_missing_reask_recovered"
-                                                                             : "label_missing_reask_unanswered"));
-            else if (mPriorityReaskKind == "named_row")
+            //#W71-BO (R3/R9): the truncation and label-missing arms are DELETED.
+            if (mPriorityReaskKind == "named_row")
                 appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                               : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
-            else if (mPriorityReaskKind == "plan_choice") //#W51-C D4b: the second answer executes as given
-            {
-                appendParseNote(&mLastParseNote, planChoiceConflict ? "plan_choice_conflict_exhausted"
-                                                                    : (choice >= 0 ? "plan_choice_conflict_recovered" : "plan_choice_conflict_unanswered"));
-                //#W69-BF (K3): 16 of the corpus's 22 reversal re-asks came back with
-                //the identical answer. Recorded, so the class is countable and a
-                //window that has already answered the same way twice is not asked a
-                //third time (the board latch above already holds it to one).
-                if (choice >= 0 && mPriorityReaskPriorChoice >= 0
-                    && choice == mPriorityReaskPriorChoice)
-                    appendParseNote(&mLastParseNote, "reversal_reask_same_answer");
-            }
+            //#W71-BO (R4): the `plan_choice` arm is DELETED with the reversal predicate.
             else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
                 appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
                                                              : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
-            else if (mPriorityReaskKind == "repeat_past_stop") //#W66-AS (H3)
-            {
-                appendParseNote(&mLastParseNote, repeatPastStop ? "repeat_past_stop_exhausted"
-                                                                : (choice >= 0 ? "repeat_past_stop_recovered" : "repeat_past_stop_unanswered"));
-                //#W67-AY (I6, deck123 HIGH-1): wave 66 executed the second
-                //answer as given, and 123v126 s84/s85 is what that costs - the
-                //re-ask quoted "you at 66 with your stop at 26" and the reply
-                //came back with the IDENTICAL x34 and the IDENTICAL contradicting
-                //PLAN, and it ran (M 66 -> 100); 3 of 20 re-asks did this and
-                //produced 59 extra bodies. When the SECOND answer repeats a
-                //counted take past the stop the model itself stated, the engine
-                //performs THE STOP THE MODEL STATED - its own number, computed
-                //from its own two numbers by its own subtraction. This is not a
-                //cap: no ceiling of the engine's invention exists here, the row
-                //is never withheld, any count inside the stated stop is untouched,
-                //and a reply that states a NEW stop above its count is not
-                //clamped at all (repeatStopClampCount returns -1 and the count
-                //stands). Both numbers are recorded verbatim.
-                //#W68-BE (R3): the clamp is for COUNTED takes only. A base row that
-                //earned the re-ask and was answered again is executed as given, and
-                //the record says which of the two happened.
-                if (repeatPastStop && !repeatStopClampApplies(repeatRowTaken, stopTestCount))
-                {
-                    std::ostringstream sr;
-                    sr << "stop_conflict_single_activation_executed(stated_M=" << planCurrent
-                       << ",stated_stop=" << planStop << ",executed=1)";
-                    appendParseNote(&mLastParseNote, sr.str().c_str());
-                }
-                else if (repeatPastStop)
-                {
-                    //#W68-BA (J1): the count the clamp performs is the count the
-                    //guard tested - the named repeats. On this branch stop - M <= 0,
-                    //so `allowed` is 0 and the window resolves as the pass the
-                    //model's own arithmetic demands.
-                    const int allowed = repeatStopClampCount(stopTestCount, planStop, planCurrent);
-                    if (allowed >= 0)
-                    {
-                        std::ostringstream cs;
-                        cs << "repeat_clamped_to_own_stop(named=" << stopTestCount
-                           << ",stated_M=" << planCurrent << ",stated_stop=" << planStop
-                           << ",executed=" << allowed << ")";
-                        appendParseNote(&mLastParseNote, cs.str().c_str());
-                        stopClampReceipt = repeatStopClampReceipt(stopTestCount, planCurrent,
-                                                                  planStop, allowed);
-                        //#W67-AZ (R2): one repetition left is one repetition RUN -
-                        //the receipt above says so, and the row performs it.
-                        if (!repeatStopExecutesNothing(allowed) && repeatRowTaken)
-                            namedCount = allowed;
-                        else
-                        {
-                            choice = 0; //the stop the model stated leaves nothing to run
-                            repeatRowTaken = false;
-                            namedCount = -1;
-                        }
-                    }
-                }
-            }
-            else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
-                appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
-                                                                   : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
+            //#W71-BO (R6): the `repeat_past_stop` arm and the stated-stop CLAMP it
+            //performed are DELETED (0 firings in 2,119). #W71-BO (R5): the
+            //`index_name` arm goes with its re-ask.
             //#W69-BH (K4c) #W66-AR (H8) #W69-BJ (F8): a second answer that takes
             //the SAME row the re-ask invited it to re-take is a RETAKE, not an
             //exhausted budget - `_exhausted` reads as "the model could not answer
@@ -34403,9 +33770,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                        : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
                                                       : "plan_contradicts_noop_row_unanswered")));
-            else if (repeatRowTaken)
-                appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
-                                                                 : "repeat_count_reask_exhausted");
+            //#W71-BO (R6): the `repeat_count_reask` stamp is DELETED with its re-ask.
             //#W68-BC (MED, engine MED-1): the re-ask's SECOND answer is final
             //here - stamp it onto the recovery record the first (failed) answer
             //opened, before writeTransLog flushes that record. 0 is a pass and
@@ -34418,12 +33783,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                       ? shownLines[choice - 1] : string());
             mPriorityReaskKind.clear();
         }
-        //#W67-AY (I6): the receipt, in the narration, before the window's own
-        //line - the pilot is owed the record of what the engine performed on
-        //its behalf and off which of its own numbers (the arrival-tracing rule:
-        //a silent clamp is invisible to every counter).
-        if (!stopClampReceipt.empty())
-            narrateDecision(stopClampReceipt);
+        //#W71-BO (R6): the stop-clamp receipt is DELETED with the clamp.
         mPrevWindowRows = shownLines; //#W51-C D3: this window is now the prior one
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
@@ -35033,10 +34393,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         appendParseNote(&parseNote, "extra_answer_line"); //#W70-BM (E2)
     if (!parseNote.empty())
         mLastParseNote = parseNote;
-    //#W70-BM (E2): the multi-line salvage and the label-missing prose salvage
-    //are DELETED here too (see chooseOrderedAction). `replyLabelMissing` stays
-    //as the trigger for the one re-ask below.
-    bool labelMissing = (choice < 0 && !content.empty() && replyLabelMissing(content));
+    //#W71-BO (R9): the label-missing re-ask is DELETED here too.
     //#W70-BM (E2): the RETRACTION GATE is DELETED here too - see the priority
     //seam. `retracted` is never set now; the fallback class name is kept for the
     //records that already carry it.
@@ -35066,14 +34423,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //a reply has one answer line, so there is no sibling to take. The one
     //re-ask lane below is unchanged and is now the whole handling.
     bool passOnNoPass = (choice == 0 && !content.empty());
-    //#W52-J (D6): number and name disagree and the name is not unique on
-    //this menu -> one re-ask quoting both, never the index executed.
-    bool indexNameConflict = (choice >= 1 && choice <= (int) options.size() && !content.empty()
-                              && parseNote.find("echo_index_conflict_ambiguous") != string::npos);
-    //#W65-AO (G8): same conflict, other half naming the row - one re-ask first.
-    if (!indexNameConflict && !passOnNoPass && choice >= 0 && choice <= (int) options.size()
-        && !content.empty() && parseNote.find("index_name_conflict") != string::npos)
-        indexNameConflict = true;
+    //#W71-BO (R5): the index/name conflict re-ask is DELETED here too; the
+    //parser's own notes stay.
     //#W66-AR (H8, deck126 HIGH-1 second half). THE STAMP THAT EXECUTED ANYWAY.
     //`plan_contradicts_noop_row` (#W54-B D14) fires when the chosen row's OWN
     //annotation says it does nothing AND the reply's plan says so too - two
@@ -35087,37 +34438,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //the PLAN half is only what the corrected question gets to quote back.
     const bool noopRowZero = (choice >= 1 && choice <= (int) options.size() && !content.empty()
                               && noopRowEarnsReask(options[choice - 1]));
-    const bool noopPlanConflict = (noopRowZero
-                                   && planArguesAgainstRow(content, options[choice - 1]));
-    if (noopPlanConflict)
-        mPlanArguesAgainstRowSeen++; //#W70-BM (E3): B5.6's census
-    //#W68-BA (J6, deck123 HIGH-2). ONE REVERSAL PREDICATE, EVERY SEAM. The whole
-    //wave-67 corpus stamped `decision_reversed_in_prose` 15 times and all 15 were
-    //at the PRIORITY seam - not because the shape does not occur here, but because
-    //nothing at this seam ever called the predicate. 123v130 s43 answered Devour
-    //Flesh, then wrote "at 0 creatures does nothing... I will hold priority", and
-    //cast it. The evidence is read from the LATCHED line's region (#W56-C D3), the
-    //menu's own decline row is exempt (a pass verdict CONFIRMS it), and the
-    //consequence is the same ONE re-ask every other self-contradiction earns - the
-    //second answer executes as given, whatever it is.
-    string askLatchedLine, askPassVerdict;
-    size_t askLatchedFrom = 0;
-    const bool askHaveLatched = latchedCodedChoiceLine(content, choice, (int) options.size(),
-                                                       &options, &askLatchedLine, &askLatchedFrom);
-    //#W70-BM (E4): the PLAN LINE's own verdict, read wherever it sits.
-    const bool askReversalCandidate = (choice >= 1 && choice <= (int) options.size()
-                                       && !content.empty()
-                                       && !rowIsDeclineRow(options[choice - 1]));
-    const bool askReversedInProse = (askReversalCandidate
-                                     && planSaysPassThisWindow(content, &askPassVerdict, 0));
-    if (askReversedInProse)
-    {
-        appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
-        mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
-    }
-    //#W68-BA (J3): the length cap bit before the model wrote its label.
-    const bool replyTruncated = (mLastFinishLength && !content.empty()
-                                 && codedAnswerCount(content) == 0);
+    //#W71-BO (R4): `planArguesAgainstRow`, the reversal predicate and the
+    //`decision_reversed_in_prose` / `plan_choice_conflict_seen` census are DELETED
+    //at this seam with the priority seam's - both read a verdict out of the
+    //reply's words. #W71-BO (R3): `replyTruncated` goes with the truncation
+    //re-ask.
     //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
     //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
     //creatures)" over a 4-row Main-1 cast menu.
@@ -35134,7 +34459,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         corr << "[RE-ASK] You chose row " << choice << " (\""
              << stripNarrationDecoration(options[choice - 1])
              << "\"), whose own note on this list says it does nothing right now"
-             << (noopPlanConflict ? ", and your reply says so too" : "")
              << ". Answer again: that row if you meant it anyway, or the number of"
                 " the row you want instead.";
         mAskReaskKey = askKey0;
@@ -35143,8 +34467,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "",
-                      noopPlanConflict ? "plan_contradicts_noop_row_reask"
-                                       : "noop_row_zero_reask", &options); //#W69-BH (K4c)
+                      "noop_row_zero_reask", &options); //#W69-BH (K4c) #W71-BO (R4)
         setNotice("the chosen row's own note says it does nothing - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: noop row re-ask (budget-exempt) -> re-asking once");
         string corrected;
@@ -35153,29 +34476,12 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     //#W70-BL (E5): askReversedInProse is gone from the trigger with the re-ask it
     //drove - it read the reply's prose and quoted it back.
-    if ((namedRowFail || passOnNoPass || indexNameConflict || noopRowZero
-         || labelMissing || replyTruncated) && !reasked) //#W67-AV (I2) #W68-BA (J3/J6) #W69-BH (K4c)
+    //#W71-BO (R3/R5/R9): the truncation, index/name and label-missing arms are
+    //DELETED - each fired 0 times in 2,119 decisions.
+    if ((namedRowFail || passOnNoPass || noopRowZero) && !reasked) //#W68-BA (J6) #W69-BH (K4c)
     {
         std::ostringstream corr;
-        if (replyTruncated) //#W68-BA (J3): the cap bit; say so and quote it
-        {
-            corr << "[RE-ASK] Your last reply ran to its length limit of " << mLastRequestMaxTokens
-                 << " tokens before it wrote an answer line, so none of it could be used. Answer"
-                    " again with exactly two lines: your PLAN: line, then one line beginning"
-                    " with \"CHOICE: \" - the number of the row you want from the list, then that"
-                    " row's short name in parentheses. Nothing else."; //#W70-BL (E4)
-            mAskReaskKind = "reply_truncated";
-            mAskReaskPriorChoice = -1; //#W69-BF (K2): the cut reply named no answer
-        }
-        else if (labelMissing) //#W67-AV (I2): quote the protocol line, never Baka
-        {
-            corr << "[RE-ASK] Your reply has no answer line. Answer again with your PLAN: line"
-                    " and then one line that BEGINS with \"CHOICE: \" - the number of the row you"
-                    " want from the list, then that row's short name in parentheses - and nothing"
-                    " before the label on that line."; //#W70-BL (E4)
-            mAskReaskKind = "label_missing";
-        }
-        else if (namedRowFail)
+                if (namedRowFail)
         {
             const string offending = headParenthetical(decisionPart.empty() ? content : decisionPart);
             corr << "[RE-ASK] \"" << offending
@@ -35189,14 +34495,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                  << options.size() << ".";
             mAskReaskKind = "no_pass";
         }
-        else if (indexNameConflict)
-        {
-            corr << "[RE-ASK] Your CHOICE line's number " << choice << " and its name \""
-                 << headParenthetical(decisionPart.empty() ? content : decisionPart)
-                 << "\" point at different rows of this list. Answer again with the number of the row"
-                    " you want and that row's own short name.";
-            mAskReaskKind = "index_name";
-        }
         else //#W69-BH (K4c): noopRowZero, the last trigger left in the guard
         {
             //#W66-AR (H8): quote the row's OWN verdict and the reply's own
@@ -35204,31 +34502,23 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             corr << "[RE-ASK] You chose row " << choice << " (\""
                  << stripNarrationDecoration(options[choice - 1])
                  << "\"), whose own note on this list says it does nothing right now"
-                 << (noopPlanConflict ? ", and your reply says so too" : "")
                  << ". Answer again: that row if you meant it anyway, or the number of"
                     " the row you want instead.";
             mAskReaskKind = "noop_plan";
             mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
             mAskReaskPriorChoice = choice; //#W69-BJ (F8): see the priority seam
         }
-        const char * fb = replyTruncated ? "reply_truncated_reask" //#W68-BA (J3)
-                          : labelMissing ? "label_missing_reask" //#W67-AV (I2)
-                          : namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask"
-                          : indexNameConflict ? "index_name_conflict"
-                          : noopPlanConflict ? "plan_contradicts_noop_row_reask"
-                                             : "noop_row_zero_reask"; //#W69-BH (K4c)
+        const char * fb = namedRowFail ? "named_row_reask"
+                          : passOnNoPass ? "no_pass_reask"
+                                         : "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
-        setNotice(replyTruncated ? "that reply hit its length limit - asking again" //#W68-BA (J3)
-                  : labelMissing ? "that reply wrote no answer line - asking again" //#W67-AV (I2)
-                  : namedRowFail ? "that answer named nothing on the list - asking again"
+        setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
                   : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
-                  : indexNameConflict ? "the number and the name disagree - asking again"
-                  : noopRowZero ? "the chosen row's own note says it does nothing - asking again"
-                                     : "the choice contradicts the reply's pass - asking again", 5.0f);
+                                 : "the chosen row's own note says it does nothing - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
         pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
@@ -35236,37 +34526,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     if (reasked)
     {
-        if (mAskReaskKind == "reply_truncated") //#W68-BA (J3): executes as given either way
-        {
-            appendParseNote(&mLastParseNote, replyTruncated ? "reply_truncated_reask_exhausted"
-                                                            : (choice >= 1 ? "reply_truncated_reask_recovered"
-                                                                           : "reply_truncated_reask_unanswered"));
-            //#W69-BF (K2, engine HIGH-2): recovered ROUND TRIP vs recovered DECISION.
-            if (!replyTruncated && choice >= 1)
-                appendParseNote(&mLastParseNote,
-                                mAskReaskPriorChoice < 0 ? "reply_truncated_reask_no_prior_answer"
-                                : (choice == mAskReaskPriorChoice ? "reply_truncated_answer_unchanged"
-                                                                  : "reply_truncated_answer_changed"));
-        }
-        else if (mAskReaskKind == "plan_choice") //#W68-BA (J6): likewise
-        {
-            appendParseNote(&mLastParseNote, askReversedInProse ? "plan_choice_conflict_exhausted"
-                                                                : (choice >= 1 ? "plan_choice_conflict_recovered"
-                                                                               : "plan_choice_conflict_unanswered"));
-            //#W69-BF (K3): the re-ask that changed nothing, counted.
-            if (choice >= 1 && mAskReaskPriorChoice >= 1 && choice == mAskReaskPriorChoice)
-                appendParseNote(&mLastParseNote, "reversal_reask_same_answer");
-        }
-        else if (mAskReaskKind == "label_missing") //#W67-AV (I2): executes as given either way
-            appendParseNote(&mLastParseNote, labelMissing ? "label_missing_reask_exhausted"
-                                                          : (choice >= 1 ? "label_missing_reask_recovered"
-                                                                         : "label_missing_reask_unanswered"));
-        else if (mAskReaskKind == "no_pass")
+        //#W71-BO (R3/R4/R9): the truncation, reversal and label-missing arms are
+        //DELETED with their re-asks.
+        if (mAskReaskKind == "no_pass")
             appendParseNote(&mLastParseNote, passOnNoPass ? "no_pass_reask_exhausted"
                                                           : (choice >= 1 ? "no_pass_reask_recovered" : "no_pass_reask_unanswered"));
-        else if (mAskReaskKind == "index_name") //#W52-J D6: the second answer executes as given
-            appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
-                                                               : (choice >= 1 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
         else if (mAskReaskKind == "noop_plan") //#W66-AR (H8) #W69-BH (K4c) #W69-BJ (F8)
             appendParseNote(&mLastParseNote,
                 (noopRowZero && choice >= 1 && choice == mAskReaskPriorChoice)
@@ -42481,18 +41745,8 @@ static int salvageLoopedSubset(const string& content, const char * label, size_t
 //NOT extended to the cast menu, where reasoning prose about NOT casting a card
 //would read as casting it (the wave-10 "cast the condemned spell" trap).
 
-//A "block"/"attack" verb occurrence is disqualified when it is negated by a
-//nearby preceding word ("do not block", "won't attack", "without blocking").
-static bool proseNegatedBefore(const string& low, size_t verbPos)
-{
-    size_t from = (verbPos >= 12) ? verbPos - 12 : 0;
-    string ctx = low.substr(from, verbPos - from);
-    static const char * kNeg[] = { "not ", "n't ", "without", "avoid", "instead of", "rather than", "cannot", "can not" };
-    for (size_t i = 0; i < sizeof(kNeg) / sizeof(kNeg[0]); i++)
-        if (ctx.find(kNeg[i]) != string::npos)
-            return true;
-    return false;
-}
+//#W71-BO (R3): `proseNegatedBefore` DELETED with `salvageProsePutList`, the only
+//caller it ever had.
 
 //#W70-BN (F1/F2, Astra review findings 1 and 2): THE COMBAT PROSE READERS ARE
 //GONE. `proseAttackerOrdinal`, `salvageProseBlocks` and `salvageProseAttackers`
@@ -42583,81 +41837,10 @@ static bool replyTerminatedNaturally(const string& content, bool finishLength)
 //the model to write. A reply's decision is its action line. A truncated reply
 //with no usable declaration is already answered by the seam's truncation re-ask
 //(#W68-BE R4) and then the heuristic; nothing needs to read the tail.
-//Natural-stop PUT/bottom prose reconciler (the deck27 shape). A bottom reply whose
-//answer-first coded line is wrong but whose reasoning reaches the right set and
-//states it in PROSE ("So I bottom 5, 6, and 7."). Scan for the LAST "bottom"/"put"
-//statement (negation-guarded) immediately followed by a CLEAN comma/and-separated
-//list of EXACTLY `need` distinct in-range card numbers, and return that set. The
-//strict shape - a bottom verb, then only digits + ", "/" and "/whitespace up to the
-//exact count, terminating at the first other token - keeps ordinary reasoning prose
-//(full of numbers) from matching. Caller gates on natural termination (a truncated
-//reply's late prose is unreliable) and prefers this over the coded first line only
-//when it yields the full count. Returns the count, or -1 when no clean full list.
-static int salvageProsePutList(const string& content, size_t n, int need, vector<bool>& send)
-{
-    if (need <= 0)
-        return -1;
-    string low;
-    for (size_t i = 0; i < content.size(); i++)
-        low += (char) tolower((unsigned char) content[i]);
-    int best = -1;
-    long bestPos = -1; //document position of the winning list (LAST wins across verbs)
-    vector<bool> bestSend;
-    static const char * kVerbs[] = { "bottom", "put" };
-    for (size_t vi = 0; vi < sizeof(kVerbs) / sizeof(kVerbs[0]); vi++)
-    {
-        const char * verb = kVerbs[vi];
-        size_t vlen = strlen(verb);
-        size_t pos = 0;
-        while ((pos = low.find(verb, pos)) != string::npos)
-        {
-            size_t verbPos = pos;
-            pos += vlen;
-            if (proseNegatedBefore(low, verbPos))
-                continue;
-            //skip a short run of separators (": ", spaces) to the first digit
-            size_t k = pos;
-            size_t guard = (pos + 6 < low.size()) ? pos + 6 : low.size();
-            while (k < guard && !isdigit((unsigned char) low[k])
-                   && (low[k] == ' ' || low[k] == ':' || low[k] == ',' || low[k] == '\t'))
-                k++;
-            if (k >= low.size() || !isdigit((unsigned char) low[k]))
-                continue;
-            //read a CLEAN list: digits, and only ", " / " and " / whitespace between
-            std::set<int> nums;
-            bool clean = true;
-            size_t q = k;
-            while (q < low.size())
-            {
-                if (isdigit((unsigned char) low[q]))
-                {
-                    size_t d = q;
-                    int num = readDigits(low, d); //#W54-M (L7)
-                    if (d < low.size() && low[d] == '/') { clean = false; break; } //"2/2" stat
-                    if (num < 1 || num > (int) n) { clean = false; break; }
-                    nums.insert(num);
-                    q = d;
-                    if ((int) nums.size() > need) { clean = false; break; }
-                }
-                else if (low[q] == ',' || low[q] == ' ' || low[q] == '\t')
-                    q++;
-                else if (low.compare(q, 3, "and") == 0)
-                    q += 3;
-                else
-                    break; //any other char terminates the list
-            }
-            if (clean && (int) nums.size() == need && (long) verbPos > bestPos)
-            {
-                vector<bool> s(n, false);
-                for (std::set<int>::iterator it = nums.begin(); it != nums.end(); ++it)
-                    s[*it - 1] = true;
-                bestSend = s; best = need; bestPos = (long) verbPos; //LAST in document wins
-            }
-        }
-    }
-    if (best > 0) { send = bestSend; return best; }
-    return -1;
-}
+//#W71-BO (R3, wave-70 census): `salvageProsePutList` DELETED. It read a PUT
+//answer out of the reply's PROSE ("So I bottom 5, 6, and 7.") - the one thing
+//invariant 000 forbids the reply to contain - and had already lost its only
+//production caller. A reply's decision is its action line.
 
 //W41-13: an echoed A-line drags its ANNOTATIONS with it, and an annotation is
 //prose - it carries digits ("+2 more", "#1") and, now that the hold-back tag
@@ -44187,14 +43370,11 @@ int AIPlayerGPT::chooseAttackers()
     //blockers seam does with its gang correction - the changed text is what makes
     //the corrected question a fresh call instead of a replay of the answer that
     //earned it. The latch is cleared when the turn moves on.
-    //#W68-BE (R4): the cap re-ask shares the correction LINE (only one correction
-    //can be pending at a time) but not the LATCH - the line survives while either
-    //arm holds this turn.
-    if (mAttackReaskTurn != observer->turn && mAttackTruncReaskTurn != observer->turn)
+    //#W71-BO (R3): the cap re-ask is DELETED, and with it its share of this line.
+    if (mAttackReaskTurn != observer->turn)
         mAttackReaskLine.clear();
     const bool attackReasked = (mAttackReaskTurn == observer->turn && !mAttackReaskLine.empty());
-    const bool attackTruncReasked = (mAttackTruncReaskTurn == observer->turn); //#W68-BE (R4)
-    if (!mAttackReaskLine.empty() && (attackReasked || attackTruncReasked))
+    if (attackReasked)
         tail << "\n" << mAttackReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     const string attackTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
@@ -44268,32 +43448,11 @@ int AIPlayerGPT::chooseAttackers()
     //the ATTACK: line or it does not come.
     const char * attackSource = NULL;
 
-    //#W68-BE (R4, codex review finding 4): J3 shipped a per-seam token cap AND the
-    //promise - printed in the protocol - that a reply cut before its answer is asked
-    //again. The ask and priority seams honour it; this seam went straight to the
-    //heuristic, so the cap this wave introduced could silently REMOVE the seat's own
-    //combat declaration. A reply that reports finish_reason "length" and parsed to no
-    //usable declaration is the cap landing mid-sentence, not the model declining:
-    //ONE re-ask per turn, quoting the number, and the heuristic only after it.
-    //Nothing is capped or withheld here - the same question is put once more.
-    if (result < 0 && mLastFinishLength && !content.empty() && !attackTruncReasked)
-    {
-        mAttackTruncReaskTurn = observer->turn;
-        mAttackReaskLine = combatTruncationReaskLine(true, mLastRequestMaxTokens);
-        writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                      "", "reply_truncated_reask", &shownLines);
-        setNotice("that reply hit its length limit - asking again", 5.0f);
-        DebugTrace("AIPlayerGPT: attackers reply_truncated -> re-asking once");
-        string corrected;
-        pollCompletionRetry(assemblePrompt(attackTail + "\n" + mAttackReaskLine),
-                            corrected, "attackers");
-        return 1; //in flight; nothing declared yet, re-poll next tick
-    }
-    if (attackTruncReasked) //#W68-BE (R4): what the single arm bought
-        appendParseNote(&mLastParseNote,
-                        result >= 0 ? "reply_truncated_reask_recovered"
-                                    : (mLastFinishLength ? "reply_truncated_reask_exhausted"
-                                                         : "reply_truncated_reask_unanswered"));
+    //#W71-BO (R3, wave-70 census): the truncation re-ask is DELETED at this seam
+    //with every other. 0 truncations in 2,119 decisions - `reply_truncated` was
+    //never once written - and the answer ceiling is now fitted to this corpus's
+    //own bytes (gptSeamMaxTokens), so a cut before the declaration is no longer a
+    //shape the engine has to recover from.
     if (result < 0)
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
@@ -45264,15 +44423,13 @@ int AIPlayerGPT::chooseBlockers()
     //single arm. 0 windows of this shape occurred at the blockers seam in the
     //wave-67 corpus (33 records); it is wired because the predicate is one
     //predicate, and its firing rate is a wave-68 measurement, not a claim.
-    //#W68-BE (R4): the cap re-ask shares this correction line and keeps its own latch.
-    if (mBlockRevReaskTurn != observer->turn && mBlockTruncReaskTurn != observer->turn)
+    //#W71-BO (R3): the cap re-ask is DELETED, and with it its share of this line.
+    if (mBlockRevReaskTurn != observer->turn)
         mBlockRevReaskLine.clear();
     const bool blockRevReasked = (mBlockRevReaskTurn == observer->turn
                                   && !mBlockRevReaskLine.empty()
                                   && mBlocksDoneTurn != observer->turn);
-    const bool blockTruncReasked = (mBlockTruncReaskTurn == observer->turn
-                                    && mBlocksDoneTurn != observer->turn); //#W68-BE (R4)
-    if (!mBlockRevReaskLine.empty() && (blockRevReasked || blockTruncReasked))
+    if (blockRevReasked)
         tail << "\n" << mBlockRevReaskLine;
     mLogWindowKind = kAskWindowCombat; //#W57-H (D43): combat keeps the whole log
     const string blockTail = tail.str(); //#W68-BA (J6): one copy, reused by the re-ask
@@ -45451,26 +44608,7 @@ int AIPlayerGPT::chooseBlockers()
     //the BLOCKS: line or it does not come.
     const char * blockSource = NULL;
 
-    //#W68-BE (R4, codex review finding 4): the blockers seam took J3's token cap
-    //and none of J3's recovery. An explicit "BLOCKS: none" is already answered
-    //above, so reaching here with finish_reason "length" means the cap cut the
-    //reply before it wrote any assignment line at all. ONE re-ask per turn, then
-    //the heuristic. Nothing is capped or withheld: the question is put once more.
-    if (pairs == 0 && mLastFinishLength && !content.empty() && !blockTruncReasked)
-    {
-        mBlockTruncReaskTurn = observer->turn;
-        mBlockRevReaskLine = combatTruncationReaskLine(false, mLastRequestMaxTokens);
-        writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                      "", "reply_truncated_reask", &shownLines);
-        setNotice("that reply hit its length limit - asking again", 5.0f);
-        DebugTrace("AIPlayerGPT: blockers reply_truncated -> re-asking once");
-        return 1; //next tick rebuilds the prompt WITH the correction line
-    }
-    if (blockTruncReasked) //#W68-BE (R4): what the single arm bought
-        appendParseNote(&mLastParseNote,
-                        pairs > 0 ? "reply_truncated_reask_recovered"
-                                  : (mLastFinishLength ? "reply_truncated_reask_exhausted"
-                                                       : "reply_truncated_reask_unanswered"));
+    //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
@@ -45993,13 +45131,8 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                            revealSource == 0 && game->library->nb_cards == 0
                                && revealed.size() > 1,
                            &revealOrder);
-    //#W69-BF (K2, engine HIGH-1): this seam's one truncation re-ask, on the
-    //shared small-seam latch, keyed on the ask TEXT.
-    const bool revealTruncReasked = (!mSmallTruncReaskKey.empty()
-                                     && mSmallTruncReaskKey == revealAskText);
-    string userMsg = assemblePrompt(revealTruncReasked
-                                    ? revealAskText + "\n" + mSmallTruncReaskLine
-                                    : revealAskText);
+    //#W71-BO (R3): the small-seam truncation re-ask is DELETED.
+    string userMsg = assemblePrompt(revealAskText);
     if (revealOrder.size() != revealed.size())
     {
         revealOrder.resize(revealed.size());
@@ -46043,31 +45176,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         }
     }
 
-    //#W69-BF (K2): the cap bit before the PUT: line - one re-ask quoting it,
-    //never straight to the heuristic pick below.
-    if (result < 0 && mLastFinishLength && !content.empty() && !revealTruncReasked)
-    {
-        mSmallTruncReaskKey = revealAskText;
-        mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens,
-                                                            pickExactlyOne ? 1 : 0);
-        writeTransLog("reveal", userMsg, content, result, (int) revealed.size(), "",
-                      "reply_truncated_reask", &names);
-        setNotice("that reply hit its length limit - asking again", 5.0f);
-        DebugTrace("AIPlayerGPT: reveal reply truncated at the cap - re-asking once");
-        string corrected;
-        pollCompletionRetry(assemblePrompt(revealAskText + "\n" + mSmallTruncReaskLine),
-                            corrected, "reveal");
-        return 0; //decision in flight; the display waits and re-polls next tick
-    }
-    if (revealTruncReasked) //#W69-BF (K2): a round trip, not a certified decision
-    {
-        appendParseNote(&mLastParseNote,
-                        (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
-                        : (result >= 0 ? "reply_truncated_reask_recovered"
-                                       : "reply_truncated_reask_unanswered"));
-        if (result >= 0)
-            appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
-    }
+    //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
     if (result < 0)
     {
         //#W67-AX (I5): where a decline is not a legal answer, an unusable reply
@@ -46361,11 +45470,8 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
         //#W69-BF (K2, engine HIGH-1): this seam's one truncation re-ask, on the
         //shared small-seam latch. A pregame bottom is as unrecoverable as a
         //cleanup discard - it is the ONLY ask for those cards.
-        const bool bottomTruncReasked = (!mSmallTruncReaskKey.empty()
-                                         && mSmallTruncReaskKey == bottomAskText);
-        string userMsg = assemblePrompt(bottomTruncReasked
-                                        ? bottomAskText + "\n" + mSmallTruncReaskLine
-                                        : bottomAskText);
+        //#W71-BO (R3): the small-seam truncation re-ask is DELETED.
+        string userMsg = assemblePrompt(bottomAskText);
         string content;
         if (pollCompletionRetry(userMsg, content, "bottom") == kChoicePending)
         {
@@ -46381,51 +45487,16 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             names.push_back(hand[j]->name);
         int result = content.empty() ? -1
                      : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
-        //#W70-BM (E5): the PROSE reconciliation is DELETED. It preferred a
-        //sentence ("So I bottom 5, 6, and 7.") over the reply's own PUT: line -
-        //prose read as the answer, which is the tolerance invariant 000 forbids.
-        //The PUT line is the answer at this seam, as at every other.
-        if (false)
-        {
-            vector<bool> prose;
-            int pr = 0;
-            if (pr == need)
-            {
-                send = prose;
-                result = pr;
-                DebugTrace("AIPlayerGPT: bottom prose-reconciled to the final stated set");
-            }
-        }
+        //#W70-BM (E5) / #W71-BO (R3): the PROSE reconciliation is DELETED, and so
+        //is the `if (false)` stub that was left where it stood. The PUT line is
+        //the answer at this seam, as at every other.
         if (result < 0 && !content.empty())
         {
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
             if (sal >= 1)
                 result = sal;
         }
-        //#W69-BF (K2): the cap bit before the PUT: line - one re-ask, not the fill.
-        if (result < 0 && mLastFinishLength && !content.empty() && !bottomTruncReasked)
-        {
-            mSmallTruncReaskKey = bottomAskText;
-            mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens, remaining);
-            writeTransLog("bottom", userMsg, content, result, (int) hand.size(), "",
-                          "reply_truncated_reask", &names);
-            setNotice("that reply hit its length limit - asking again", 5.0f);
-            DebugTrace("AIPlayerGPT: bottom reply truncated at the cap - re-asking once");
-            string corrected;
-            pollCompletionRetry(assemblePrompt(bottomAskText + "\n" + mSmallTruncReaskLine),
-                                corrected, "bottom");
-            status = PREGAME_PENDING;
-            return NULL; //the caller unwinds; the corrected call answers later
-        }
-        if (bottomTruncReasked) //#W69-BF (K2): a round trip, not a certified decision
-        {
-            appendParseNote(&mLastParseNote,
-                            (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
-                            : (result >= 0 ? "reply_truncated_reask_recovered"
-                                           : "reply_truncated_reask_unanswered"));
-            if (result >= 0)
-                appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
-        }
+        //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
         mPregameBottomQueue.clear();
         string chosen;
         if (result >= 0)
@@ -47006,13 +46077,7 @@ int AIPlayerGPT::cleanupDiscard(int over)
         //at the ask seam, applied to a channel that had no recovery window at
         //all - the prompt itself says "this is the ONLY ask for them").
         reasked = (!mDiscardReaskKey.empty() && mDiscardReaskKey == askText);
-        //#W69-BF (K2): the truncation arm is this seam's OWN latch, so a reply cut
-        //by the cap cannot spend the distinct-index arm and vice versa.
-        if (!reasked && !mSmallTruncReaskKey.empty() && mSmallTruncReaskKey == askText)
-        {
-            reasked = true;
-            mDiscardReaskLine = mSmallTruncReaskLine;
-        }
+        //#W71-BO (R3): the truncation latch is DELETED with the re-ask it held.
         userMsg = assemblePrompt(reasked ? askText + "\n" + mDiscardReaskLine : askText);
         if (discardOrder.size() != hand.size())
         {
@@ -47053,54 +46118,12 @@ int AIPlayerGPT::cleanupDiscard(int over)
         if (repeatedIdx > 0)
             appendParseNote(&mLastParseNote, result >= over ? "duplicate_index_deduped"
                                                             : "duplicate_index_short");
-        //#W69-BF (K2, engine HIGH-1): the cap bit before the model wrote its PUT:
-        //line. Not an unparseable answer and not a decline - the engine's own
-        //budget landing mid-sentence, which buys ONE re-ask quoting the number,
-        //never the heuristic. One arm per ask text.
-        if (result < 0 && mLastFinishLength && !content.empty() && !reasked
-            && mSmallTruncReaskKey != askText)
-        {
-            mSmallTruncReaskKey = askText;
-            mSmallTruncReaskLine = smallSeamTruncationReaskLine(mLastRequestMaxTokens, over);
-            writeTransLog("discard", userMsg, content, result, (int) hand.size(), "",
-                          "reply_truncated_reask", &names);
-            setNotice("that reply hit its length limit - asking again", 5.0f);
-            DebugTrace("AIPlayerGPT: discard reply truncated at the cap - re-asking once");
-            string corrected;
-            pollCompletionRetry(assemblePrompt(askText + "\n" + mSmallTruncReaskLine),
-                                corrected, "discard");
-            return 1; //the caller unwinds; the corrected call answers later
-        }
-        if (repeatedIdx > 0 && result >= 0 && result < over && !reasked)
-        {
-            std::ostringstream corr;
-            corr << "[RE-ASK] Your PUT: line repeated a card number, so it named only "
-                 << result << " different card" << (result == 1 ? "" : "s")
-                 << " and this discard needs " << over << ". Every number must be DIFFERENT."
-                 << " Answer again with " << over << " different card numbers from the list above.";
-            mDiscardReaskKey = askText;
-            mDiscardReaskLine = corr.str();
-            writeTransLog("discard", userMsg, content, result, (int) hand.size(), "",
-                          "distinct_index_reask", &names);
-            setNotice("that discard list repeated a number - asking again", 5.0f);
-            DebugTrace("AIPlayerGPT: cleanup discard named " << result << " distinct of "
-                       << over << " (" << repeatedIdx << " repeated) - re-asking once");
-            string corrected;
-            pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected, "discard");
-            return 1; //the caller unwinds; the corrected call answers later
-        }
-        if (reasked && mSmallTruncReaskKey == askText)
-            //#W69-BF (K2): the truncated reply named nothing, so a completed round
-            //trip is all this stamp can honestly claim.
-            appendParseNote(&mLastParseNote,
-                            (result < 0 && mLastFinishLength) ? "reply_truncated_reask_exhausted"
-                            : (result >= 0 ? "reply_truncated_reask_recovered"
-                                           : "reply_truncated_reask_unanswered"));
-        else if (reasked)
-            appendParseNote(&mLastParseNote, result >= over ? "distinct_index_reask_recovered"
-                                                            : "distinct_index_reask_exhausted");
-        if (reasked && mSmallTruncReaskKey == askText && result >= 0)
-            appendParseNote(&mLastParseNote, "reply_truncated_reask_no_prior_answer");
+        //#W71-BO (R3): the truncation re-ask is DELETED here with every other
+        //seam. #W71-BO (R5): the `distinct_index_reask` is DELETED too - 0
+        //fallbacks in 2,119 decisions; a repeated index is still DEDUPED and
+        //stamped (`duplicate_index_deduped` / `duplicate_index_short`) and the
+        //owed count is still enforced by the fill below, so nothing is lost but
+        //the round trip.
     }
     //#W55-D (D18): back from PRINTED positions to hand positions.
     if (result >= 0 && !send.empty())
@@ -48501,15 +47524,16 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     answer-first coded '3, 5, 6' -> count=" << cr
              << " picks=[" << (int)coded[2] << (int)coded[4] << (int)coded[5] << "] (the bug: bottoms Underground Sea)\n";
         CHECK(cr == 3 && coded[2] && coded[4] && coded[5], "W25-2 bug repro: answer-first takes 3,5,6");
-        // The reply terminated naturally (has a PLAN: line).
-        // Natural-stop prose reconcile recovers the model's final 5,6,7.
-        vector<bool> prose;
-        int pr = salvageProsePutList(deck27, hand.size(), 3, prose);
-        cout << "     prose reconcile -> count=" << pr
-             << " picks=[" << (prose.size()>4?(int)prose[4]:-1) << (prose.size()>5?(int)prose[5]:-1)
-             << (prose.size()>6?(int)prose[6]:-1) << "] keep-UndergroundSea=" << (prose.size()>2?(int)prose[2]:-1) << "\n";
-        CHECK(pr == 3 && prose[4] && prose[5] && prose[6] && !prose[2] && !prose[0] && !prose[1] && !prose[3],
-              "W25-2 deck27: prose reconcile yields 5,6,7 (keeps the blue source)");
+        //#W71-BO (R3): the prose reconcile is DELETED - a reply's decision is its
+        //action line. NEGATIVE pin: this reply restates 5,6,7 in prose and the
+        //engine must now take the coded 3,5,6 it actually wrote.
+        {
+            vector<bool> only; vector<string> putLines;
+            collectLabeledLines(deck27, "PUT:", putLines);
+            int orc = putLines.empty() ? -1 : parseAttackerSet(putLines[0], hand.size(), only, &hand);
+            CHECK(orc == 3 && only[2] && only[4] && only[5],
+                  "#W71-BO R3 NEGATIVE the prose restatement is not an answer: the coded line stands");
+        }
         // A TRUNCATED reply (no PLAN:, long, mid-word cut) is NOT natural -> the
         // caller keeps answer-first (deck109-style tail is unreliable).
         string trunc = "PUT: 3, 5, 6\n";
@@ -49156,31 +48180,6 @@ void AIPlayerGPT::runParseSelfTest()
                   "W33 NEGATIVE: an ineligible ATTACK name declares the empty set, never a guess");
         }
 
-        // ---- COMMIT-FAILURE counters (instrument only; no behaviour rides them).
-        cout << "\n[W33 commit-failure] post_plan_overrun / commit_retracted\n";
-        {
-            string compliant = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nIt is the best line.\nPLAN: build the army.\n";
-            string overrun = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nPLAN: build the army.\n"
-                             "Wait, looking at the opponent's board... Actually, let's re-evaluate.";
-            //69 = strlen("Wait, looking at the opponent's board... Actually,
-            //let's re-evaluate.") - the un-committed tail, exactly.
-            // commit_retracted is the disjunction of the three retraction exits
-            // AND a coded answer line actually existing.
-            CHECK(commitRetracted("retracted_choice", overrun),
-                  "W33: retracted_choice on a reply carrying a coded answer sets commit_retracted");
-            CHECK(commitRetracted("truncated_abandoned", "BLOCKS: B1:A1\nActually no, I should not block."),
-                  "W33: truncated_abandoned sets commit_retracted");
-            CHECK(commitRetracted("truncated_abandoned_heuristic", "BLOCKS: B1:A1\nActually no."),
-                  "W33: truncated_abandoned_heuristic sets commit_retracted");
-            CHECK(!commitRetracted("unparsed_reply", overrun),
-                  "W33 NEGATIVE: unparsed_reply is NOT a retraction (no answer was committed)");
-            CHECK(!commitRetracted("empty_reply", ""),
-                  "W33 NEGATIVE: empty_reply is not a retraction");
-            CHECK(!commitRetracted(NULL, overrun),
-                  "W33 NEGATIVE: a record the model's own answer carried is never commit_retracted");
-            CHECK(!commitRetracted("retracted_choice", "I think option one is fine but actually no."),
-                  "W33 NEGATIVE: no line-leading coded answer -> nothing was committed to retract");
-        }
     }
 
     // ==== WAVE-33 step-1 (render lane) cases ====
@@ -58066,21 +57065,7 @@ static const char * kW50Y_r94 =
               "#W51-C D4a deck123 vs162 seq 35: x0 parses as the count 0 (the seam turns it into the pass row)");
         CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x1)\nPLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass.") == 1,
               "#W51-C D4a deck123 vs130 seq 31: x1 is the count 1 (a single, and a plan conflict)");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x0)\nPLAN: Stop at M = 25. M is 26 now. Pass."),
-              "#W51-C D4b seq 35: a bare 'Pass.' in the plan is not the window claim - x0 handles that reply");
-        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x1)\nPLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass. Next turn: Attack with all creatures."),
-              "#W51-C D4b deck123 vs130 seq 31: 'this window: pass' under x1 is a conflict");
-        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x3)\nPLAN: stop at M = 20 + 4 + 3 = 27; M is 31 now; this window: pass (stop reached)."),
-              "#W51-C D4b deck123 vs130 seq 46: 'pass (stop reached)' is a conflict under x3");
         string r32 = "CHOICE: 2 (Create vampire with Lord of Lineage x25)\nPLAN: Stop at M = 25 + 2 + 3 = 30. M is 33 now. This window: pass. Next turn: Attack with all creatures to win.";
-        CHECK(planSaysPassThisWindow(r32) && parseRepeatCount(r32) == 25,
-              "#W51-C D4b deck123 vs126 seq 32: x25 under 'This window: pass' -> plan_choice_conflict re-ask (was 25 tokens past the stop)");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x17)\nPLAN: Stop at M = 30. M is 13 now; make 17 this window, then pass priority next window."),
-              "#W51-C D4b NEGATIVE a plan that passes LATER is not a pass claim about this window");
-        CHECK(!planSaysPassThisWindow("This window: pass.\nCHOICE: 2 (Create vampire x5)"),
-              "#W51-C D4b NEGATIVE the phrase outside a PLAN line is never read");
-        CHECK(!planSaysPassThisWindow("<think>PLAN: this window: pass</think>\nCHOICE: 2 (Create vampire x5)\nPLAN: make 5 now."),
-              "#W51-C D4b NEGATIVE a think-block plan is dropped");
         CHECK(firstLabelledLine(r32, "plan:") == "PLAN: Stop at M = 25 + 2 + 3 = 30. M is 33 now. This window: pass. Next turn: Attack with all creatures to win."
               && firstLabelledLine(r32, "choice:") == "CHOICE: 2 (Create vampire with Lord of Lineage x25)"
               && firstLabelledLine("no labels", "plan:").empty(),
@@ -58967,34 +57952,9 @@ static const char * kW50Y_r94 =
         //D14: the prose verdicts after the coded line.
         string r282 = "CHOICE: 1 (Lolth 0)\nPLAN: At 2 life, Lolth's 0 ability is suicidal (-1 life). We have no creatures to attack with and no legal targets for removal. We must pass and hope to draw a creature or find a way to survive the opponent's next turn. The opponent has no creatures, so they cannot attack immediately, but they have 49 life and many lands. Our only hope is to stabilize or find a win condition. We pass.";
         string why;
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x17)\nPLAN: Stop at M = 30. M is 13 now; make 17 this window, then we pass."),
-              "#W52-J D14 NEGATIVE 'then we pass' mid-sentence is not an opener");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x5)\nPLAN: We must not pass here; make 5 now."),
-              "#W52-J D14 NEGATIVE the negated verdict does not match");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x5)\nPLAN: We cannot pass yet. Make 5 now."),
-              "#W52-J D14 NEGATIVE 'cannot pass' does not match");
-        CHECK(!planSaysPassThisWindow("CHOICE: 3 (Cast Damnation)\nPLAN: Wipe the board. We pass the turn after that."),
-              "#W52-J D14 NEGATIVE 'we pass the turn' is a deferred pass, not this window's verdict");
-        CHECK(!planSaysPassThisWindow("CHOICE: 1 (Attack trigger)\nPLAN: We pass priority after combat and hold the Bolt."),
-              "#W52-J D14 NEGATIVE 'pass priority after combat' is deferred");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x4)\nPLAN: Make 4. We will pass next window once M reaches 20."),
-              "#W52-J D14 NEGATIVE 'pass next window' is deferred");
-        CHECK(!planSaysPassThisWindow("We must pass.\nCHOICE: 1 (Lolth 0)"),
-              "#W52-J D14 NEGATIVE prose BEFORE the CHOICE line is never read");
-        CHECK(!planSaysPassThisWindow("<think>We must pass.</think>\nCHOICE: 1 (Lolth 0)\nPLAN: use the 0 now."),
-              "#W52-J D14 NEGATIVE a think-block verdict is dropped");
-        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x0)\nPLAN: Stop at M = 25. M is 26 now. Pass."),
-              "#W52-J D14 NEGATIVE a bare 'Pass.' stays with x0 (the W51-C D4b pin holds)");
-        CHECK(!planSaysPassThisWindow("CHOICE: 1 (Lolth 0)\nPLAN: Lolth's 0 passes the buck; we passed on removal earlier."),
-              "#W52-J D14 NEGATIVE 'passes'/'passed' are not the verdict word");
         why.clear();
-        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create vampire x25)\nPLAN: Stop at M = 30. M is 33 now. This window: pass.", &why)
-              && why.find("PLAN: Stop at M = 30") == 0,
-              "#W52-J D14 the W51-C PLAN-line form still fires and quotes the PLAN line");
         //D14b: seq 47 - a counted repeat take with no PLAN line at all -> plan_missing re-ask
         string r47 = "CHOICE: 29 (Create vampire with Lord of Lineage x17)";
-        CHECK(!replyHasPlanLine(r47) && parseRepeatCount(r47) == 17 && !planSaysPassThisWindow(r47),
-              "#W52-J D14b deck123 vs126 seq 47: x17 with no PLAN line -> plan_missing re-ask (no pass verdict to conflict with)");
         CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
               "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
     }
@@ -60589,34 +59549,10 @@ static const char * kW50Y_r94 =
                        " Avoid casting Tribute to Hunger as there are no creatures to target.";
         string seq74 = "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: The opponent has no creatures,"
                        " so Tribute to Hunger does nothing. Pass the turn.";
-        CHECK(AIPlayerGPT::planArguesAgainstRow(seq73, dead),
-              "#W54-B D14 deck126 vs125 seq 73: the PLAN says avoid the very row the CHOICE line took");
-        CHECK(AIPlayerGPT::planArguesAgainstRow(seq74, dead),
-              "#W54-B D14 deck126 vs125 seq 74: the PLAN says the row does nothing and passes");
         // NEGATIVES
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger to eat"
-                  " their best creature and stabilise.", dead),
-              "#W54-B D14 NEGATIVE a PLAN that names the row APPROVINGLY is not a contradiction");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid casting Damnation this turn;"
-                  " Tribute to Hunger is the play.", dead),
-              "#W54-B D14 NEGATIVE the negative belongs to a DIFFERENT card - the clause boundary keeps them apart");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow("CHOICE: 1 (Cast Tribute to Hunger)", dead),
-              "#W54-B D14 NEGATIVE no PLAN line, nothing to contradict");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid attacking into the wall.", dead),
-              "#W54-B D14 NEGATIVE a negative sentence that never names this row does not fire");
         // ECHO SHAPE: the PLAN may carry the row back with its rendered
         // annotation attached; the row's card name still anchors the sentence.
-        CHECK(AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Tribute to Hunger {2}{b} does nothing"
-                  " here. Hold the mana.", dead),
-              "#W54-B D14 echo shape: a PLAN echoing the row's mana furniture still names the row it argues against");
         //the pair is what stamps: either half alone is silent
-        CHECK(AIPlayerGPT::rowSaysNoOp(dead) && AIPlayerGPT::planArguesAgainstRow(seq73, dead)
-              && !(AIPlayerGPT::rowSaysNoOp(live) && AIPlayerGPT::planArguesAgainstRow(seq73, live)),
-              "#W54-B D14 the stamp needs BOTH halves: the same PLAN over a LIVE row is not a contradiction");
     }
 
     // ---- #W54-B (D15): an echoed name inside an annotation can never bind ----
@@ -60812,33 +59748,8 @@ static const char * kW50Y_r94 =
 
     cout << "\n[#W54-A D12a] the PLAN block is bounded by SHAPE, not by 1,600 bytes\n";
     {
-        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.")
-              == "Fetch a dual, then cast Intruder Alarm.",
-              "#W54-A D12a a one-paragraph plan is returned unchanged");
-        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.\n\nNow, some notes: "
-                                 "the opponent is at 30 and I have been repeating myself.")
-              == "Fetch a dual, then cast Intruder Alarm.",
-              "#W54-A D12a the first BLANK LINE ends the block");
-        CHECK(planParagraphBound("Fetch a dual, then cast Intruder Alarm.\nThe opponent is at 30 "
-                                 "and their board is empty.")
-              == "Fetch a dual, then cast Intruder Alarm.",
-              "#W54-A D12a a new sentence on a new line without a connective ends the block");
         // NEGATIVE: an ordinary wrapped sentence is NOT a new paragraph.
-        CHECK(planParagraphBound("Fetch a dual land so that I can cast\nIntruder Alarm next turn.")
-              == "Fetch a dual land so that I can cast\nIntruder Alarm next turn.",
-              "#W54-A D12a NEGATIVE a wrapped sentence survives (the line before it did not end)");
         // NEGATIVE: a connective continuation is the same thought.
-        CHECK(planParagraphBound("Cast Intruder Alarm.\nThen attack with everything.")
-              == "Cast Intruder Alarm.\nThen attack with everything.",
-              "#W54-A D12a NEGATIVE a 'Then ...' continuation is kept");
-        CHECK(planParagraphBound("Cast Intruder Alarm.\nand hold the Bolt.")
-              == "Cast Intruder Alarm.\nand hold the Bolt.",
-              "#W54-A D12a NEGATIVE a lower-case connective line is kept");
-        CHECK(planParagraphBound("   Cast Intruder Alarm.  \n\n   ")
-              == "Cast Intruder Alarm.",
-              "#W54-A D12a the result is trimmed");
-        CHECK(planParagraphBound("").empty(),
-              "#W54-A D12a NEGATIVE an empty plan stays empty");
     }
 
     cout << "\n[#W54-A D12b] 162v152 s11 -> s12: the served plan names a card the menu lost\n";
@@ -62834,22 +61745,12 @@ static const char * kW50Y_r94 =
             "PLAN: on reflection there is nothing to cycle for. This window: pass.";
         string line2;
         size_t from2 = 0;
-        CHECK(AIPlayerGPT::latchedCodedChoiceLine(realConflict, 5, (int) menu.size(), &menu,
-                                                  &line2, &from2)
-              && planSaysPassThisWindow(realConflict, &why, from2)
-              && why.find("This window: pass") != string::npos,
-              "#W56-C D3 NEGATIVE a verdict after the latched line still contradicts it");
         // A single-answer reply is unchanged: the latched line IS the first line
         // and the region is the whole answer.
         const string oneAnswer =
             "CHOICE: 2 (Activate Jace {1}{u})\nPLAN: tick Jace up. This window: pass.";
         string line3;
         size_t from3 = 0;
-        CHECK(AIPlayerGPT::latchedCodedChoiceLine(oneAnswer, 2, (int) menu.size(), &menu,
-                                                  &line3, &from3)
-              && line3 == "CHOICE: 2 (Activate Jace {1}{u})" && from3 == 0
-              && planSaysPassThisWindow(oneAnswer, &why, from3),
-              "#W56-C D3 REGRESSION a one-answer reply behaves exactly as before");
         // No line resolves to the executed choice (a salvaged or name-resolved
         // answer): the caller falls back to the first line and the whole reply.
         string line4;
@@ -66635,21 +65536,6 @@ static const char * kW50Y_r94 =
               "#W62-fix NEGATIVE a new row is a new menu even at the same seq: measure");
         CHECK(!holdNoteSameWindow(true, 0, -1, 0),
               "#W62-fix NEGATIVE the first window at a seam is always measured");
-        // ---- the record's copy of a runaway reply (deck162 MED) ----
-        {
-            const string committed = "CHOICE: 1 (Cast Fate Unraveler)\nPLAN: land, then Ob Nixilis.\n";
-            string spiral;
-            for (int i = 0; i < 300; i++)
-                spiral += "Wait, looking closer at the board state, is this right? ";
-            const string full = committed + spiral;
-            // The counters are measured on the FULL reply, before this runs -
-            // trimming the record must not shrink what the corpus reads.
-            // NEGATIVE: a compliant reply, and one just under the threshold, are
-            // stored byte-identically.
-            const string small = committed + string(900, 'x');
-            CHECK(recordReplyTrimmed(full, 0) == full && recordReplyTrimmed("", 5000).empty(),
-                  "#W61-U C14 NEGATIVE no measured overrun, no trim");
-        }
     }
 
     //#W62-W (D1, D15, D17). Card facts read off this worktree's primitives:
@@ -67468,8 +66354,6 @@ static const char * kW50Y_r94 =
             const string reply = "CHOICE: 4 (x)\nPLAN: one. Two. Three.\n\nAfterwards.";
             const size_t pp = reply.find("PLAN:");
             const string block = reply.substr(pp, planBlockEndOffset(reply, pp) - pp);
-            CHECK(block.find("Afterwards") == string::npos && block.find("Three.") != string::npos,
-                  "#W62-Z D10 the plan block ends where planParagraphBound ends it");
             CHECK(planBlockEndOffset(reply, string::npos) == reply.size(),
                   "#W62-Z D10 NEGATIVE with no PLAN marker the whole reply stays readable");
         }
@@ -68514,8 +67398,6 @@ static const char * kW50Y_r94 =
             size_t a1 = 0, a2 = 0, a3 = 0;
         }
         size_t s2 = 0, e2 = 0, l2 = 0;
-        CHECK(planParagraphBound(r41.substr(ps)).find("CHOICE: 2") == string::npos,
-              "#W64-AK R5 MUST-NOT-MATCH the carried plan still does not re-serve the answer line");
         // MUST-NOT-MATCH 1: a compliant reply is byte-identical under the bound.
         // MUST-NOT-MATCH 2: the #W48-E1 post-plan recode is post-answer prose,
         // not plan text, and it still supersedes (the wave-47 recovery).
@@ -69814,9 +68696,6 @@ static const char * kW50Y_r94 =
         const size_t op = firstLineLeadingPlanPos(open);
         CHECK(open.compare(planBlockEndOffset(open, op), 10, "ATTACK: A4") == 0,
               "#W64-AJ F13 the plan block now ENDS at that line - it is not plan prose");
-        CHECK(planParagraphBound("I will hold the removal and\nATTACK: A4")
-              == "I will hold the removal and",
-              "#W64-AJ F13 ...and the carried plan does not re-serve the answer line either");
         //#W64-AK (R5): the indented shape is a CORRECTION, not deliberation - the
         //two walks agree on it and it wins, which is what every answer scanner
         //already did with the same bytes.
@@ -69831,14 +68710,8 @@ static const char * kW50Y_r94 =
                 const size_t ac = firstLineLeadingPlanPos(indC);
                 size_t c1 = 0, c2 = 0, c3 = 0;
             }
-            CHECK(planParagraphBound("burn it and\n   CHOICE: 2 (pass)") == "burn it and",
-                  "#W64-AK R5 ...and the carried plan stops at it");
         }
         // NEGATIVE: every wave-63 terminator still terminates.
-        CHECK(planBlockEndOffset("PLAN: hold.\n\ntail", firstLineLeadingPlanPos("PLAN: hold.\n\ntail"))
-                  < string("PLAN: hold.\n\ntail").size()
-              && planParagraphBound("Hold it.\nCast the Bond.") == "Hold it.",
-              "#W64-AJ F13 NEGATIVE the blank-line and sentence-boundary terminators are untouched");
     }
 
     cout << "\n[#W64-AJ E14a] a self-correction that opens a bracket is still one\n";
@@ -72242,14 +71115,6 @@ static const char * kW50Y_r94 =
             "CHOICE: 1 (Cast Tribute to Hunger)\n"
             "PLAN: The opponent has no creatures, so Tribute to Hunger does nothing."
             " I have two Chromatic Lanterns in hand which are redundant.\n";
-        CHECK(AIPlayerGPT::rowSaysNoOp(menu[0])
-                  && AIPlayerGPT::planArguesAgainstRow(s34, menu[0]),
-              "#W66-AR H8 REPRO 126v125 seq 34 - both halves of the gate are true on the"
-              " reply that executed the dead row");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger to eat"
-                  " their best creature.\n", menu[0]),
-              "#W66-AR H8 MUST-NOT-MATCH a plan that names the row APPROVINGLY re-asks nothing");
         CHECK(!AIPlayerGPT::rowSaysNoOp(menu[1]),
               "#W66-AR H8 NEGATIVE a live row is not dead and never reaches the gate");
     }
@@ -73301,30 +72166,9 @@ static const char * kW50Y_r94 =
                            " mana and cards. I need to attack with a Vampire to trigger Sanguine Bond.";
         CHECK(AIPlayerGPT::rowSaysNoOp(row),
               "#W67-AY I9b POSITIVE the row half of the conjunction was never the problem");
-        CHECK(AIPlayerGPT::planArguesAgainstRow(s83, row),
-              "#W67-AY I9b POSITIVE 126v125 s83 fires: the negative sentence's subject is \"this\"");
         // s84: 5 354 bytes of prose and no PLAN label anywhere.
         const string s84 = "CHOICE: 1 (Cast Tribute to Hunger)\nThe opponent has no creatures, so"
                            " Tribute to Hunger is a waste of mana here. I will pass.";
-        CHECK(AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Casting Tribute to Hunger is a waste"
-                  " of a card right now.", row),
-              "#W67-AY I9b POSITIVE \"a waste\" is the corpus's own word and now counts");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger to eat their"
-                  " best creature. Damnation does nothing here.", row),
-              "#W67-AY I9b MUST-NOT-MATCH a negative about a DIFFERENT card, with no pronoun, misses");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 2 (Cast Chromatic Lantern)\nPLAN: Cast Chromatic Lantern. This does"
-                  " nothing much but it fixes my mana.", row),
-              "#W67-AY I9b MUST-NOT-MATCH a pronoun whose antecedent is another row's card misses");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger; it eats their"
-                  " only blocker and I gain 3.", row),
-              "#W67-AY I9b NEGATIVE an approving plan never matches");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid Damnation this turn.", row),
-              "#W67-AY I9b NEGATIVE a negative that names no row, and no anaphor, never matches");
     }
 
     cout << "\n[#W67-AY MED] the worked example does not point at a half-dead row\n";
@@ -73532,44 +72376,6 @@ static const char * kW50Y_r94 =
                   && AIPlayerGPT::deadlineTenthsPctOfAttempts(-1, -1, 900000) == -1
                   && AIPlayerGPT::deadlineTenthsPctOfAttempts(868729, -1, 900000) == 965,
               "#W68-BE R8 MUST-NOT-MATCH BC's three shipped cases are unchanged");
-    }
-
-    cout << "\n[#W68-BE] R4 the combat seams honour J3's truncation re-ask\n";
-    {
-        //REPRO: J3 gave attackers and blockers a token cap and neither seam any
-        //recovery - a reply the cap cut before its label went straight to Baka,
-        //silently removing the seat's own declaration while the protocol promised
-        //it would be asked again.
-        const string a = combatTruncationReaskLine(true, 768);
-        const string bl = combatTruncationReaskLine(false, 768);
-        cout << "     " << a << "\n     " << bl << "\n";
-        //#W70-BL (E4): the re-ask asks for the same two lines every other seam
-        //asks for. "write the ATTACK: line FIRST" steered the re-asked reply away
-        //from the PLAN-first shape the protocol asks for everywhere else.
-        CHECK(a == "[RE-ASK] Your last reply hit its length limit (768 tokens) and was cut"
-                   " off before it wrote an ATTACK: line, so nothing was declared. Answer"
-                   " again with exactly two lines: your PLAN: line, then the ATTACK: line -"
-                   " the attackers you mean to declare, or \"ATTACK: none\" to attack with"
-                   " nobody this turn - then stop.",
-              "#W68-BE R4 POSITIVE the attackers correction quotes the cap and the label");
-        CHECK(bl == "[RE-ASK] Your last reply hit its length limit (768 tokens) and was cut"
-                    " off before it wrote a BLOCKS: line, so nothing was declared. Answer"
-                    " again with exactly two lines: your PLAN: line, then the BLOCKS: line -"
-                    " the assignments you mean, or exactly \"BLOCKS: none\" to block with"
-                    " nobody this turn - then stop.",
-              "#W68-BE R4 POSITIVE the blockers correction is the same shape, its own words");
-        CHECK(a.find("FIRST") == string::npos && bl.find("FIRST") == string::npos
-                  && a.find("working") == string::npos,
-              "#W70-BL E4 MUST-NOT-MATCH neither combat correction asks for the answer first"
-              " or for anything before it");
-        CHECK(a.find("BLOCKS:") == string::npos && bl.find("ATTACK:") == string::npos,
-              "#W68-BE R4 MUST-NOT-MATCH neither seam's correction names the other's label");
-        CHECK(a.find('{') == string::npos && a.find('[') == 0
-                  && a.find('[', 1) == string::npos && bl.find('{') == string::npos,
-              "#W68-BE R4 ECHO the correction opens no annotation channel; the only bracket"
-              " is the [RE-ASK] marker every seam's correction already carries");
-        CHECK(combatTruncationReaskLine(true, 240).find("(240 tokens)") != string::npos,
-              "#W68-BE R4 POSITIVE the number printed is the cap the request actually used");
     }
 
     //---- #W68-BC (MED, deck146 s51): the legend-rule ask says the rule ----
@@ -74195,16 +73001,18 @@ static const char * kW50Y_r94 =
         // seams never exceed 489 B. Each cap's byte-equivalent (~3.5 B/token)
         // clears its seam's p99 need; replayed over the corpus the set leaves
         // 10.4% of the bytes ungenerated and costs 9 re-asks in 2,301 replies.
-        //#W69-BF (K2): re-fitted on the corpus these caps produced - ask 640 -> 768
-        //and the small seams 384 -> 512. See the #W69-BF K2 block for the sizing.
-        CHECK(gptSeamMaxTokens("ask", 6000) == 768 && gptSeamMaxTokens("priority", 6000) == 768
-                  && gptSeamMaxTokens("attackers", 6000) == 768
-                  && gptSeamMaxTokens("blockers", 6000) == 896,
-              "#W68-BA J3 POSITIVE each seam carries its own budget, blockers the largest (it bundles)");
-        CHECK(gptSeamMaxTokens("discard", 6000) == 512 && gptSeamMaxTokens("reveal", 6000) == 512
-                  && gptSeamMaxTokens("bottom", 6000) == 512,
-              "#W68-BA J3 POSITIVE the small seams share one budget");
-        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("blockers", 800) == 800, //#W69-BF (K2)
+        //#W71-BO (R3): re-fitted AGAIN, on the reasoning-on corpus - see the table
+        //in gptSeamMaxTokens. ask/priority 768 -> 288, the rest to the 256 floor.
+        CHECK(gptSeamMaxTokens("ask", 6000) == 288 && gptSeamMaxTokens("priority", 6000) == 288
+                  && gptSeamMaxTokens("attackers", 6000) == 256
+                  && gptSeamMaxTokens("blockers", 6000) == 256,
+              "#W71-BO R3 POSITIVE each seam carries its own re-fitted answer budget");
+        CHECK(gptSeamMaxTokens("discard", 6000) == 256 && gptSeamMaxTokens("reveal", 6000) == 256,
+              "#W71-BO R3 POSITIVE the two small seams that HAD windows sit on the floor");
+        CHECK(gptSeamMaxTokens("bottom", 6000) == 512,
+              "#W71-BO R3 MUST-NOT-MATCH `bottom` had 0 windows in the corpus - a zero is not"
+              " evidence, so it is NOT re-fitted");
+        CHECK(gptSeamMaxTokens("ask", 200) == 200 && gptSeamMaxTokens("blockers", 128) == 128, //#W69-BF (K2)
               "#W68-BA J3 POSITIVE the configured value is the CEILING - a seam cap never raises it");
         CHECK(gptSeamMaxTokens("mulligan", 6000) == 6000 && gptSeamMaxTokens(NULL, 6000) == 6000
                   && gptSeamMaxTokens("", 6000) == 6000,
@@ -74338,8 +73146,6 @@ static const char * kW50Y_r94 =
             "CHOICE: 2 (Cast Devour Flesh)\n\n"
             "PLAN: Cast Devour Flesh to sacrifice nothing (waste) or hold if I can't find a"
             " target? No, Devour Flesh at 0 creatures does nothing. I will hold priority.";
-        CHECK(AIPlayerGPT::rowSaysNoOp(deadRow) && AIPlayerGPT::planArguesAgainstRow(s43, deadRow),
-              "#W68-BA J6 REPRO 123 s43: both statements that the row is dead are present, as wave 67 measured");
         // the gate, mirrored: the exemption is ONE extra ask per ask key.
         struct Pin
         {
@@ -74591,131 +73397,38 @@ static const char * kW50Y_r94 =
         // discard by 68 B on the worst-case rate; those two rise, the rest stand.
         // NOTHING is tightened: the -46% headline is ~90% the short system prompt
         // and ~9.5% these caps, and what the caps buy is the variance guarantee.
-        CHECK(gptSeamMaxTokens("ask", 6000) == 768,
-              "#W69-BF K2 POSITIVE the ask cap clears its own p99.5 need plus a correction line at 3.15 B/token");
-        CHECK(gptSeamMaxTokens("discard", 6000) == 512 && gptSeamMaxTokens("reveal", 6000) == 512
-                  && gptSeamMaxTokens("bottom", 6000) == 512,
-              "#W69-BF K2 POSITIVE the small seams rise together - 384 cleared 961 B by 68 B and ate a discard");
-        CHECK(gptSeamMaxTokens("priority", 6000) == 768 && gptSeamMaxTokens("attackers", 6000) == 768
-                  && gptSeamMaxTokens("blockers", 6000) == 896,
-              "#W69-BF K2 MUST-NOT-MATCH no cap is TIGHTENED - the three that cleared their need stand");
-        CHECK(gptSeamMaxTokens("ask", 400) == 400 && gptSeamMaxTokens("discard", 256) == 256,
-              "#W69-BF K2 POSITIVE the configured value is still the CEILING at the raised seams");
+        //#W71-BO (R3): THE ARITHMETIC, pinned. p99.9 x 2 bytes at the worst-case
+        //3.15 B/token, rounded up to a multiple of 32, floored at 256.
+        static const long kP999[] = { 417, 451, 231, 195, 302, 161 };
+        static const char * kSeams[] = { "ask", "priority", "attackers", "blockers",
+                                         "discard", "reveal" };
+        bool fitOk = true;
+        for (size_t ci = 0; ci < 6; ci++)
+        {
+            long want = (kP999[ci] * 2 + 3 - 1) / 3; //ceil(bytes / 3.15) via 3 B/tok floor-safe
+            want = (kP999[ci] * 2 * 100 + 314) / 315; //exact: ceil(bytes / 3.15)
+            long rounded = ((want + 31) / 32) * 32;
+            if (rounded < 256) rounded = 256;
+            if (gptSeamMaxTokens(kSeams[ci], 6000) != rounded) fitOk = false;
+        }
+        CHECK(fitOk,
+              "#W71-BO R3 POSITIVE every re-fitted cap IS ceil(p99.9 x 2 / 3.15) rounded up to 32,"
+              " floored at 256 - the arithmetic, not a hand-picked number");
+        CHECK(256 * 315 / 100 > 457,
+              "#W71-BO R3 POSITIVE the 256-token floor buys 806 B - more than the corpus's largest"
+              " single reply at any seam (457 B)");
+        CHECK(gptSeamMaxTokens("ask", 6000) * 315 / 100 > 417 * 2
+                  && gptSeamMaxTokens("ask", 6000) * 315 / 100 > 457,
+              "#W71-BO R3 POSITIVE the ask cap clears TWICE its own p99.9 (417 B) and still clears"
+              " the corpus's largest single reply (457 B) outright");
+        CHECK(gptSeamMaxTokens("ask", 200) == 200 && gptSeamMaxTokens("discard", 128) == 128,
+              "#W69-BF K2 POSITIVE the configured value is still the CEILING at every seam");
     }
 
-    cout << "\n[#W69-BF] K2 a truncation re-ask at the three seams that had none\n";
-    {
-        // engine HIGH-1: 125v146 s133, discard, cap 384, reply 1,409 B, no PUT:
-        // line, `unparsed_reply` - and the heuristic discarded seven cards
-        // including the seat's Emrakul. Lane BA wired the truncation re-ask at
-        // ask/priority "on the grounds that no truncation was expected at
-        // discard/reveal/bottom"; lane BE R4 added the combat seams. This is the
-        // remaining third, and the corpus reply it is sized on, verbatim.
-        const string s133 =
-            "I must discard 6 cards to reduce my hand from 13 to 7. The only card marked {spare} "
-            "is Island (1), so I discard that first. I have 5 more discards to make from the "
-            "remaining 12 cards (all marked {NOT spare}). My plan relies on Staff of Nin to "
-            "win, so I keep it (it's on the battlefield, not in hand). I need to keep my counterspells "
-            "(Dream Fracture, Cancel, Fall of the Gavel) and removal (Path to Exile) to protect "
-            "my win condition and handle threats. I have two Emrakuls? No, just one Emrakul "
-            "in hand. I have one Staff of Nin on battlefield. I have 22 cards in library. "
-            "The plan says \"Do not cast Emrakul... library too low\". I have 22 cards, which "
-            "is enough to cast Emrakul if I could pay, but I can't pay {15} yet. However, "
-            "keeping Emrakul is valuable as a backup win con if Staff is removed or if I can "
-            "ramp. But I have to discard 6. The most expendable cards are the ones that don't "
-            "help me win *now* or protect the win. Path to Exile has no targets. Supreme Verdict "
-            "has no targets. I should discard the cards that are least likely to be useful "
-            "in the immediate future or are redundant. I have 3 Dream Fractures, 3 Fall of "
-            "Gavels, 2 Cancels, 2 Paths, 1 Supreme Verdict, 1 Emrakul, 1 Island. I already "
-            "discarded Island. I need to discard 5 more. I should keep my best answers. Dream "
-            "Fracture is good for counters. Fall of Gavel is good for counters and life. Cancel "
-            "is good for counters. Path is good for";
-        CHECK(codedAnswerCount(s133) == 0,
-              "#W69-BF K2 REPRO 125v146 s133: the reply the cap cut carries NO coded answer line at all");
-        CHECK(s133.find("PUT:") == string::npos,
-              "#W69-BF K2 REPRO 125v146 s133: and no PUT: label anywhere - nothing to salvage, so the heuristic answered");
-        const string line = smallSeamTruncationReaskLine(512, 6);
-        CHECK(line.find("length limit of 512 tokens") != string::npos
-                  && line.find("exactly 6 different card numbers") != string::npos
-                  && line.compare(0, 9, "[RE-ASK] ") == 0,
-              "#W69-BF K2 POSITIVE the small-seam correction quotes the cap that was used and the count owed");
-        CHECK(line.find("nothing has been chosen yet") != string::npos
-                  && line.find("exactly two lines: your PLAN: line") != string::npos //#W70-BL (E4)
-                  && line.find("put the answer FIRST") == string::npos,
-              "#W69-BF K2 POSITIVE it says the window is still open, and asks for the two-line shape");
-        CHECK(smallSeamTruncationReaskLine(512, 1).find("exactly 1 different card number") != string::npos
-                  && smallSeamTruncationReaskLine(512, 0).find("the card numbers you want") != string::npos,
-              "#W69-BF K2 POSITIVE the singular and the count-less (reveal) forms are grammatical");
-        CHECK(line.find("heuristic") == string::npos && line.find("CHOICE:") == string::npos,
-              "#W69-BF K2 MUST-NOT-MATCH the line never mentions the heuristic and never asks for the wrong label");
-    }
-
-    cout << "\n[#W69-BF] K2 a recovered ROUND TRIP is not a recovered DECISION\n";
-    {
-        // engine HIGH-2: 123v125 s23 (priority, cap 768) truncated mid-analysis of
-        // a Marsh Flats fetch it had ALREADY resolved to the Swamp; s25 answered
-        // pass, the seat did not fetch, and the record read
-        // `reply_truncated_reask_recovered`. The counter could not tell "the re-ask
-        // got the same answer" from "the re-ask got a different one" - which is the
-        // whole question the cap's safety rests on. The truncated reply, verbatim:
-        const string s23 =
-            "The opponent has countered my Bloodline Keeper with Fall of the Gavel. I have "
-            "no way to counter it (no instants in hand with mana, no other spells on stack "
-            "to respond to). My plan to cast Bloodline Keeper this turn is dead. I need to "
-            "survive and set up for next turn. I have 1 mana open (Tundra). I have two Marsh "
-            "Flats in hand (one played this turn? No, \"You played Marsh Flats\" in Main Phase "
-            "1. Wait, the log says \"You played Marsh Flats\" then \"Paid ... for Bloodline "
-            "Keeper\". The Marsh Flats on battlefield is tapped? No, Marsh Flats enters untapped. "
-            "But I tapped it? No, I didn't tap it. The log says \"Paid ... for Bloodline Keeper "
-            "with Scrubland #1; Scrubland #2; Plains; Isolated Chapel\". These are tapped. "
-            "The Marsh Flats I played is untapped. The other Marsh Flats is in hand.\n\nI "
-            "have 1 mana. I cannot cast anything useful right now except maybe Vision Skeins "
-            "if I had it, but I don't. I have Tragic Slip, Tribute, Devour Flesh but no mana.\nI "
-            "should pass priority to let the Fall of the Gavel resolve. It will counter Bloodline "
-            "Keeper. I gain 5 life. I will be at 25 life.\nThen in second main phase, I can "
-            "try to do something? I have 1 mana. I can't cast anything.\nI should hold priority.\n\nWait, "
-            "looking at the options:\n1. Crack Marsh Flats (Swamp)\n2. Crack Marsh Flats (Swamp) "
-            "- wait, options 1 and 2 are targeting Swamp? Option 1 says \"targeting Scrubland "
-            "[your library]\"? No, \"targeting Scrubland\" is likely a typo in the prompt's "
-            "generation or refers to the library search. Let's look closer. \"Put a card onto "
-            "the battlefield with Marsh Flats targeting Scrubland [your library]\". This implies "
-            "searching for a Scrubland? But Marsh Flats searches for Plains or Swamp. The "
-            "prompt says \"Search your library for a Plains or Swamp card\". Option 1 says "
-            "\"targeting Scrubland\". This is contradictory. Option 2 says \"targeting Swamp\". "
-            "Option 3 says \"targeting Tundra\". Option 4 says \"targeting Underground Sea\".\nMarsh "
-            "Flats only finds Plains or Swamp. So Option 2 (Swamp) is the only valid land "
-            "search from the basic lands? Or is \"Scrubland\" a typo for \"Swamp\"? Or is "
-            "there a Swamp in my library? I have 4x Isolated Chapel (Swamp/Plains), 4x Scrubland, "
-            "1x Swamp, 4x Underground Sea, 4x Tundra, 4x Marsh Flats, 1x Plains.\nI have a "
-            "basic Swamp in my library? Yes, \"1x Swamp\".\nI have Isolated Chapels which "
-            "are Swamp/Plains.\nI have Scrublands which are W/B.\nMarsh Flats fetches Plains "
-            "or Swamp.\nSo I can fetch the basic Swamp or a Plains (I have 1 Plains).\nOption "
-            "1: \"targeting Scrubland\" - Invalid for Marsh Flats.\nOption 2: \"targeting "
-            "Swamp\" - Valid. Fetches the basic Swamp.\nOption 3: \"targeting Tundra\" - Invalid.\nOption "
-            "4: \"targeting Underground Sea\" - Invalid.\n\nSo Option 2 is the only valid "
-            "land fetch.\nShould I fetch the Swamp?\nIf I fetch the Swamp";
-        CHECK(codedAnswerCount(s23) == 0,
-              "#W69-BF K2 REPRO 123v125 s23: the truncated reply named NO coded answer - there is nothing to compare a recovery to");
-        CHECK(s23.find("Option 2") != string::npos && s23.find("CHOICE:") == string::npos,
-              "#W69-BF K2 REPRO 123v125 s23: it had resolved the decision in prose and never wrote the label");
-        // The engine now records which of the three cases a recovery is. The stamp
-        // is chosen from the prior choice the re-ask stored (-1 = none), so a
-        // recovery can never again read as a certified decision when the cut reply
-        // had certified nothing.
-        struct Pin {
-            static const char * stamp(int prior, int recovered)
-            {
-                return prior < 0 ? "reply_truncated_reask_no_prior_answer"
-                       : (recovered == prior ? "reply_truncated_answer_unchanged"
-                                             : "reply_truncated_answer_changed");
-            }
-        };
-        CHECK(string(Pin::stamp(-1, 0)) == "reply_truncated_reask_no_prior_answer",
-              "#W69-BF K2 POSITIVE the s23 shape: no prior answer, so the record says so and claims nothing more");
-        CHECK(string(Pin::stamp(5, 0)) == "reply_truncated_answer_changed"
-                  && string(Pin::stamp(5, 5)) == "reply_truncated_answer_unchanged",
-              "#W69-BF K2 POSITIVE a recovery that moves the answer is `answer_changed`, never `recovered`");
-    }
+    //#W71-BO (R3): the two #W69-BF K2 blocks that pinned the truncation re-ask
+    //and its recovered-round-trip stamps are DELETED with the mechanism. The cap
+    //arithmetic they defended lives on in the gptSeamMaxTokens block above,
+    //re-fitted to the wave-70 corpus.
 
     cout << "\n[#W69-BF] K2 the protocol puts a correction BEFORE the PLAN line\n";
     {
@@ -74789,9 +73502,6 @@ static const char * kW50Y_r94 =
             "casting Katilda is the best way to develop the board. Actually, looking at the "
             "board, we have no attackers. We just cast Katilda. We pass to Main 2. We can't "
             "do much more. We will attack next turn with Huntmaster and Wolves.";
-        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x1)\n"
-                                     "PLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass."),
-              "#W69-BF K3 MUST-NOT-MATCH the PLAN-CUE half is untouched - the plan line's own arithmetic verdict still fires");
     }
 
     cout << "\n[#W69-BF] K3 the reversal that NAMES the row it takes back\n";
@@ -74853,8 +73563,6 @@ static const char * kW50Y_r94 =
         CHECK(menuRowProseName(row5) != "damnation",
               "#W69-BF K3 MUST-NOT-MATCH menuRowProseName cannot serve here: the row's NESTED brace group leaves annotation glued to the name");
         string why;
-        CHECK(!planSaysPassThisWindow(s34),
-              "#W69-BF K3 REPRO 123v162 s34: and no pass-verdict half sees it - a negation of a row is not a pass");
         CHECK(menuRowShortName("Cast nothing right now") == string()
                   && menuRowShortName("Pass priority") == string()
                   && menuRowShortName("Hold {2} for Cancel") == string(),
@@ -74946,8 +73654,6 @@ static const char * kW50Y_r94 =
                               " and win with Elspeth.";
         CHECK(AIPlayerGPT::rowSaysNoOp(dead) && !rowIsDeclineRow(dead),
               "#W69-BH K4c REPRO the row's own clause reads zero and it is not a decline row");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(silent, dead),
-              "#W69-BH K4c REPRO the reply argues nothing - the shipped conjunction cannot fire");
         //the predicate BOTH seams now call, exactly as they call it
         CHECK(noopRowEarnsReask(dead),
               "#W69-BH K4c POSITIVE the row-only predicate fires where the conjunction did not");
@@ -75176,28 +73882,28 @@ static const char * kW50Y_r94 =
         //ADDED to the budget. Before this wave the seam table was skipped
         //entirely on this arm and the reply got a flat 400-token reserve.
         GptTokenPlan p = gptResolveMaxTokens(true, false, 6000, -1, "ask", false, false);
-        CHECK(p.reasoning == 6000 && p.answer == 768 && p.total == 6768,
+        CHECK(p.reasoning == 6000 && p.answer == 288 && p.total == 6288,
               "#W70-BK C4 POSITIVE thinking on: max_tokens = reasoning budget + the seam's answer ceiling");
         p = gptResolveMaxTokens(true, false, 6000, -1, "blockers", false, false);
-        CHECK(p.reasoning == 6000 && p.answer == 896 && p.total == 6896,
+        CHECK(p.reasoning == 6000 && p.answer == 256 && p.total == 6256,
               "#W70-BK C4 POSITIVE the bundled seam keeps its larger answer ceiling, on top of the budget");
         //THINKING ON, budget 0 ("unbounded"): the reasoning half is the RAW
         //ceiling minus the answer ceiling - NEVER the seam cap. This is the arm
         //that used to hand the ask seam 768 tokens for reasoning + answer
         //together (audit B7.7).
         p = gptResolveMaxTokens(true, false, 0, -1, "ask", false, false);
-        CHECK(p.answer == 768 && p.reasoning == kDefaultReplyCeilingTokens - 768
+        CHECK(p.answer == 288 && p.reasoning == kDefaultReplyCeilingTokens - 288
                   && p.total == kDefaultReplyCeilingTokens,
               "#W70-BK C4 POSITIVE unbounded budget: the seam cap sizes the answer, the rest is reasoning");
-        CHECK(gptResolveMaxTokens(true, false, 0, -1, "ask", false, false).total > 768,
+        CHECK(gptResolveMaxTokens(true, false, 0, -1, "ask", false, false).total > 288,
               "#W70-BK C4 MUST-NOT-MATCH a seam cap is never the whole completion under thinking");
         //An operator ceiling is the ANSWER ceiling and is ADDED to the budget,
         //never substituted for the sum (audit B7.6).
         p = gptResolveMaxTokens(true, false, 6000, 900, "ask", false, false);
-        CHECK(p.answer == 768 && p.total == 6768,
+        CHECK(p.answer == 288 && p.total == 6288,
               "#W70-BK C4 POSITIVE a configured ceiling is the answer ceiling, added to the budget");
-        p = gptResolveMaxTokens(true, false, 6000, 300, "ask", false, false);
-        CHECK(p.answer == 300 && p.reasoning == 6000 && p.total == 6300,
+        p = gptResolveMaxTokens(true, false, 6000, 200, "ask", false, false);
+        CHECK(p.answer == 200 && p.reasoning == 6000 && p.total == 6200,
               "#W70-BK C4 POSITIVE a ceiling below the seam cap still only clips the ANSWER");
         //The answer-locked retry (audit B1.6/B7.10): 512 for the coded line,
         //plus the whole budget, instead of 512 for everything.
@@ -75207,7 +73913,7 @@ static const char * kW50Y_r94 =
         //THINKING OFF: identical to what shipped - the caps ARE the completion,
         //because there is no reasoning half to protect.
         p = gptResolveMaxTokens(false, false, 0, -1, "ask", false, false);
-        CHECK(p.reasoning == 0 && p.answer == 768 && p.total == 768,
+        CHECK(p.reasoning == 0 && p.answer == 288 && p.total == 288,
               "#W70-BK C4 POSITIVE thinking off: the seam cap is the whole completion, unchanged");
         p = gptResolveMaxTokens(false, false, 0, -1, "mulligan", false, false);
         CHECK(p.total == kDefaultReplyCeilingTokens,
@@ -75224,15 +73930,15 @@ static const char * kW50Y_r94 =
         //describes - a 400-token ceiling resolving to reasoning 0 with
         //enable_thinking true. The ceiling is the ANSWER ceiling; reasoning is
         //never bounded by it.
-        p = gptResolveMaxTokens(true, false, 0, 400, "ask", false, false);
-        CHECK(p.answer == 400 && p.reasoning == kDefaultReasoningBudget
-                  && p.total == 400 + kDefaultReasoningBudget,
+        p = gptResolveMaxTokens(true, false, 0, 200, "ask", false, false);
+        CHECK(p.answer == 200 && p.reasoning == kDefaultReasoningBudget
+                  && p.total == 200 + kDefaultReasoningBudget,
               "#W70-BN F5 MUST-NOT-MATCH a configured answer ceiling never bounds the thinking window");
-        p = gptResolveMaxTokens(true, false, 0, 300, "ask", false, false);
+        p = gptResolveMaxTokens(true, false, 0, 150, "ask", false, false);
         CHECK(p.reasoning > 0 && p.total > p.answer,
               "#W70-BN F5 POSITIVE an unstated budget under thinking on is always non-zero");
-        p = gptResolveMaxTokens(true, false, 120, 400, "ask", false, false);
-        CHECK(p.reasoning == 120 && p.total == 520,
+        p = gptResolveMaxTokens(true, false, 120, 200, "ask", false, false);
+        CHECK(p.reasoning == 120 && p.total == 320,
               "#W70-BN F5 POSITIVE an EXPLICIT small budget is still the operator's own number");
     }
 
@@ -75257,14 +73963,14 @@ static const char * kW50Y_r94 =
                 {{"enable_thinking", forceClosePhase ? false : thinking}};
             CHECK(request["chat_template_kwargs"]["enable_thinking"].get<bool>() == thinking,
                   "#W70-BK C5 POSITIVE enable_thinking follows the stated regime in BOTH directions");
-            CHECK(request["max_tokens"].get<long>() == (thinking ? 6768 : 768),
+            CHECK(request["max_tokens"].get<long>() == (thinking ? 6288 : 288),
                   "#W70-BK C5 POSITIVE max_tokens is budget + answer ceiling on, the answer ceiling off");
         }
         const GptTokenPlan fc = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, false);
         json forced = {{"max_tokens", fc.total}};
         forced["chat_template_kwargs"] = {{"enable_thinking", false}};
         CHECK(!forced["chat_template_kwargs"]["enable_thinking"].get<bool>()
-                  && forced["max_tokens"].get<long>() == 768,
+                  && forced["max_tokens"].get<long>() == 288,
               "#W70-BK C5 MUST-NOT-MATCH the forced close never re-opens the thinking window");
     }
 
@@ -75342,11 +74048,6 @@ static const char * kW50Y_r94 =
         instr.push_back(string(kReplyProtocol));
         instr.push_back(string(kPlanFirstLead));
         instr.push_back(string(kAnswerLockPrefix));
-        instr.push_back(smallSeamTruncationReaskLine(512, 6));
-        instr.push_back(smallSeamTruncationReaskLine(512, 1));
-        instr.push_back(smallSeamTruncationReaskLine(512, 0));
-        instr.push_back(combatTruncationReaskLine(true, 768));
-        instr.push_back(combatTruncationReaskLine(false, 896));
         instr.push_back(exemplarSentence("CHOICE: 2 (Cast Example Card)", 2));
         instr.push_back(exemplarSentence("CHOICE: <row number> (<that row's short name>)", 0));
         static const char * kBanned[] = {"working", "reasoning", "first line", "correction",
@@ -75366,7 +74067,7 @@ static const char * kW50Y_r94 =
         }
         CHECK(hits == 0,
               "#W70-BL E6 no reachable instruction string carries any of the seven words");
-        CHECK(instr.size() == 10,
+        CHECK(instr.size() == 5,
               "#W70-BL E6 the registry holds every reachable instruction string, so a new"
               " one must be added here to be exempt");
         // POSITIVE CONTROL: the scan can fail. A string that licenses prose is
@@ -75384,15 +74085,8 @@ static const char * kW50Y_r94 =
 
     cout << "\n[#W70-BL] E4 every re-ask asks for the two-line shape\n";
     {
-        const string sm = smallSeamTruncationReaskLine(512, 6);
-        CHECK(sm == "[RE-ASK] Your last reply ran to its length limit of 512 tokens before it"
-                    " wrote an answer line, so none of it could be used and nothing has been"
-                    " chosen yet. Answer again with exactly two lines: your PLAN: line, then"
-                    " one line beginning with \"PUT: \" naming exactly 6 different card numbers"
-                    " from the list above. Nothing else.",
-              "#W70-BL E4 the PUT seams' cap correction, verbatim");
-        CHECK(sm.find("put the answer FIRST") == string::npos,
-              "#W70-BL E4 MUST-NOT-MATCH it no longer steers the re-asked reply answer-first");
+        //#W71-BO (R3): the two truncation correction lines are DELETED with the
+        //re-asks that sent them, so this block no longer pins them.
         const string lock = kAnswerLockPrefix;
         CHECK(lock.find("Reply with your PLAN: line and then the required answer line") != string::npos
                   && lock.find("(CHOICE: / ATTACK: / BLOCKS: / PUT:)") != string::npos,
@@ -75527,17 +74221,6 @@ static const char * kW50Y_r94 =
         // The audit's mis-parse #4: the scan used to start at the LATCHED CODED
         // LINE, so with the plan ABOVE the answer it could never see the plan.
         string why;
-        CHECK(planSaysPassThisWindow("PLAN: M is 26, stop is 24. This window: pass.\n"
-                                     "CHOICE: 2 (Create vampire x3)", &why)
-                  && why.find("This window: pass") != string::npos,
-              "#W70-BM E4 REPRO the PLAN line ABOVE the action line is read");
-        CHECK(planSaysPassThisWindow("PLAN: do not attack this turn.\nATTACK: A1", NULL, 1)
-                  && planSaysPassThisWindow("PLAN: no blocks.\nBLOCKS: B1:A1", NULL, 2),
-              "#W70-BM E4 ...at the ATTACK and BLOCKS seams too");
-        CHECK(!planSaysPassThisWindow("PLAN: attack now, pass the turn after damage.\n"
-                                      "CHOICE: 2 (Attack)")
-                  && !planSaysPassThisWindow("I will pass.\nCHOICE: 2 (Cast Wall)"),
-              "#W70-BM E4 MUST-NOT-MATCH a deferral, and PROSE, are not the plan's verdict");
     }
 
     cout << "\n[#W70-BM E1] the PLAN is a SEQUENCE, and step one is consumed by the action\n";
@@ -75613,17 +74296,6 @@ static const char * kW50Y_r94 =
 
         //F3: the plan argument is read from the PLAN LINE and nowhere else.
         const string row = "Cast Tribute to Hunger";
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "PLAN: cast Tribute to Hunger\nCHOICE: 1 (Cast Tribute to Hunger)\n"
-                  "This is a waste.", row),
-              "#W70-BN F3 MUST-NOT-MATCH prose after the action line is not a plan argument");
-        CHECK(AIPlayerGPT::planArguesAgainstRow(
-                  "PLAN: Tribute to Hunger does nothing here. Hold it.\nCHOICE: 1 (Cast Tribute to Hunger)",
-                  row),
-              "#W70-BN F3 POSITIVE the PLAN line's own argument against the row still reads");
-        CHECK(!AIPlayerGPT::planArguesAgainstRow(
-                  "CHOICE: 1 (Cast Tribute to Hunger)\nTribute to Hunger does nothing here.", row),
-              "#W70-BN F3 MUST-NOT-MATCH a reply with no PLAN line has no plan argument");
 
         //F4: the span a stop number may be read from is the two permitted lines.
         {
@@ -75689,6 +74361,83 @@ static const char * kW50Y_r94 =
                       && gptcaveat::planStepCount("hold at 3.5 mana") == 1,
                   "#W70-BN F11 REGRESSION numerals are still never step boundaries");
         }
+    }
+
+
+    // ================= #W71-BO: the revert list and the meters =================
+
+    cout << "\n[#W71-BO] L10 a MISSING plan line is its own class, not a perfect reply\n";
+    {
+        // Corpus classes (wave 70, matchups-20260906-224849, 2,119 decisions):
+        //   compliant  2,004  PLAN: line + action line
+        //   A             92  the plan sentence written with NO label
+        //   B              7  the label written as "YOUR PLAN:" (the prompt's heading)
+        //   G             11  the action line alone, no plan at all
+        // `off_protocol_bytes` charges A and B the byte length of the unlabelled
+        // line and charges G NOTHING - so on the base record class G is
+        // byte-identical to a perfect reply. `plan_line_missing` is the field that
+        // separates them, and it is true for A, B and G alike (none of the three
+        // wrote a line-leading `PLAN:` label the carry can consume).
+        const string compliant = "PLAN: Play a land, then cast the Rhino.\nCHOICE: 2 (Cast Rhino)";
+        const string classA    = "Path to Exile targeting Rorix Bladewing.\nCHOICE: 1 (Rorix Bladewing (6/5))";
+        const string classB    = "YOUR PLAN: Pass priority.\nCHOICE: 0 (Pass priority)";
+        const string classG    = "CHOICE: 3 (Cast nothing right now)";
+        CHECK(firstLineLeadingPlanPos(compliant) != string::npos
+                  && offProtocolBytes(compliant) == 0,
+              "#W71-BO L10 NEGATIVE a compliant two-line reply has its plan and costs no bytes");
+        CHECK(firstLineLeadingPlanPos(classA) == string::npos
+                  && offProtocolBytes(classA) == 40,
+              "#W71-BO L10 REPRO class A (deck125 seq 43): no label, and the meter charges the"
+              " unlabelled line's 40 bytes exactly");
+        CHECK(firstLineLeadingPlanPos(classB) == string::npos
+                  && offProtocolBytes(classB) == 25,
+              "#W71-BO L10 REPRO class B (deck125 seq 49): `YOUR PLAN:` is the prompt's heading,"
+              " not a label - 25 bytes charged");
+        CHECK(firstLineLeadingPlanPos(classG) == string::npos
+                  && offProtocolBytes(classG) == 0,
+              "#W71-BO L10 REPRO class G: no plan at all, and off_protocol_bytes is 0 - the"
+              " silent class the base record could not see");
+        CHECK((firstLineLeadingPlanPos(classG) == string::npos)
+                  != (firstLineLeadingPlanPos(compliant) == string::npos),
+              "#W71-BO L10 POSITIVE `plan_line_missing` is the field that tells class G from a"
+              " perfect reply; `off_protocol_bytes` (0 for both) never could");
+        // ECHO SHAPE: the record carries the two new numbers beside it, so a corpus
+        // can cross-tab a missing plan against how far the carried plan had walked.
+        CHECK(gptcaveat::planStepCount("play a land, then cast the Rhino, then swing") == 3
+                  && gptcaveat::planStepCount("") == 0,
+              "#W71-BO L10 ECHO plan_step_count is the carried plan's own step count, 0 when"
+              " there is no plan");
+    }
+
+    cout << "\n[#W71-BO] L9 the rescue markers are bound to the phase-2 close\n";
+    {
+        // Wave-70 MED-1: 19 records carried `reasoning_forced_close` +
+        // `reasoning_budget_hit` while only FOUR phase-2 closes were ever sent
+        // (the corpus's only requests with max_tokens_reasoning == 0). The base
+        // set both where the close was ISSUED and cleared them only where a record
+        // was WRITTEN, so a decision whose phase-2 answer was dropped (stale/async,
+        // abandoned retry) left them set for the NEXT decision's record.
+        // The rule, pure: a record wears the markers iff THIS consume was the
+        // phase-2 poll, and `budget_hit` is phase 1's own finish_reason.
+        struct Bind {
+            static bool close(bool phase2Consume) { return phase2Consume; }
+            static bool budget(bool phase2Consume, bool phase1Length)
+            { return phase2Consume && phase1Length; }
+        };
+        CHECK(Bind::close(true) && Bind::budget(true, true),
+              "#W71-BO L9 POSITIVE a phase-2 consume whose phase 1 stopped at the cap wears both");
+        CHECK(Bind::close(true) && !Bind::budget(true, false),
+              "#W71-BO L9 POSITIVE a close after a natural stop is a forced close and NOT a"
+              " budget hit - the two were conflated before wave 35 and are separate again");
+        CHECK(!Bind::close(false) && !Bind::budget(false, true),
+              "#W71-BO L9 MUST-NOT-MATCH a decision with no phase-2 consume wears neither, whatever"
+              " a previous decision's phase 1 did - the leak that stamped 19 records for 4 closes");
+        // The forced-close request is identifiable in the data by its own cap
+        // split, which is what the red witness counts.
+        const GptTokenPlan fc2 = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, true);
+        CHECK(fc2.reasoning == 0,
+              "#W71-BO L9 ECHO a phase-2 request is the only one with max_tokens_reasoning == 0,"
+              " so the corpus can count closes without trusting the marker");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

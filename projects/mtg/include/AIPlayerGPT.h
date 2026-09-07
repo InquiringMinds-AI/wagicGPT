@@ -717,8 +717,7 @@ private:
     //quotes the cap. The ask and priority seams had it; these two delegated
     //straight to the heuristic instead. Separate from the reversal latch so
     //neither failure can spend the other's single arm.
-    int mAttackTruncReaskTurn;
-    int mBlockTruncReaskTurn;
+    //#W71-BO (R3): the two combat truncation latches are DELETED with their re-ask.
 
     //Parse-shape signature for the NEXT translog record (parseChoice noteOut,
     //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
@@ -1264,8 +1263,7 @@ private:
     //seams (BE R4) and left these three to the heuristic; 125v146 s133 is the
     //cost - a 1,409 B discard reply cut at the cap with no coded label, and the
     //heuristic discarded seven cards including the seat's Emrakul.
-    string mSmallTruncReaskKey;
-    string mSmallTruncReaskLine;
+    //#W71-BO (R3): the small-seam truncation latch is DELETED with its re-ask.
     //#W69-BF (K2, engine HIGH-2): the coded answer the TRUNCATED reply had
     //already named when a re-ask was bought, or -1 when it named none. The
     //recovery compares against it, so `..._recovered` can no longer mean a
@@ -1584,7 +1582,6 @@ public:
     //qualifier. PUBLIC so PARSETEST pins it without a board.
     static bool verdictReadsZero(const string& verdictClause);
 private:
-    static bool planArguesAgainstRow(const string& reply, const string& row);
     //#W54-F (D7b): an engine-answered decision (no prompt, no reply, nothing
     //executed) has no class of its own and so was invisible to the recovery
     //contract above. Pure, pinned in PARSETEST.
@@ -1665,13 +1662,16 @@ private:
     int mProtocolReplies;          //replies that carried a body (the denominator)
     int mActionBeforePlanReplies;  //...that wrote the action line above the plan
     int mPlanStepsDone;            //steps of the carried plan already executed
-    int mReasoningTailAnswers;     //B1.4: the answer came from the reasoning tail
+    //#W71-BO (R7/R8/R4): `mReasoningTailAnswers`, `mPlanParagraphBoundCuts`,
+    //`mPlanChoiceConflictSeen` and `mPlanArguesAgainstRowSeen` are DELETED - each
+    //read 0 across 40 games and the mechanisms they counted are gone.
+    int mPlanLineMissing;          //#W71-BO (L10): replies with NO PLAN: line
     int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
     int mPhase2AnswerMissing;      //B1.5: ...and did not
-    int mPlanParagraphBoundCuts;   //B3.3: the paragraph bound shortened a plan
     int mPutGlossStripped;         //B4.6: a PUT line carried a trailing gloss
-    int mPlanChoiceConflictSeen;   //B5.1: the PLAN line contradicted the action
-    int mPlanArguesAgainstRowSeen; //B5.6: the PLAN argued against the taken row
+    //#W71-BO (L9): phase 1's finish_reason, carried to the phase-2 record so
+    //`reasoning_budget_hit` is stamped on the decision that actually hit the cap.
+    bool mForceClosePhase1Length;
     //#W55-E (D5a): reveal-driver stall figures for the record being written.
     int mRevealStallTicks;
     long mRevealStallSecs;
