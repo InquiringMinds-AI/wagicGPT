@@ -968,23 +968,9 @@ private:
                            std::string * noteOut = NULL,
                            bool passRowOffered = false);
 
-    //Salvage a decode-time repeat-loop reply: when the normal parse fails,
-    //scan the raw reply for the LAST well-formed "CHOICE: N (name)" line
-    //(one the model stated before spiraling) and re-parse it through the
-    //same echo/staleness checks. Returns the 1-based choice or -1. Never
-    //bypasses stale_echo protection (a stale line re-parses to -1 here too).
-    //#W50-Y D9: `minChoice` = 1 skips coded 0 lines - on an ask with no pass
-    //row a "CHOICE: 0 (pass)" sibling is not an offered choice.
-    //#W50-Y D7: rejection lines (see choiceLineIsRejection) are never taken;
-    //the last CLEAN line wins, else the last non-rejection line.
-    static int salvageLoopedChoice(const string& content, int optionCount,
-                                   const std::vector<string> * optionTexts = NULL,
-                                   int minChoice = 0);
-    //#W49-S (D2): the FIRST well-formed line-leading CHOICE line's parse (-1
-    //when none parses) - the seams compare it with what executed so
-    //answer_replaced states whether the EXECUTED answer differs from the
-    //first coded one, not merely whether the reply's first and last coded
-    //lines differ as strings.
+    //#W70-BM (E2): `salvageLoopedChoice` DELETED - it walked every coded line of
+    //a reply and kept the last clean one, a rule that only exists when a reply
+    //may carry several answers. The protocol permits one.
     static int firstCodedChoice(const string& content, int optionCount,
                                 const std::vector<string> * optionTexts = NULL);
 
@@ -995,16 +981,10 @@ private:
     //parenthetical names a row that is NOT on the menu at that index (or any
     //index) - the earlier, offered answer is kept and the function returns
     //false; the caller records `named_row_not_offered` as a parse note.
-    //#W62-Z (D9): the LAST combat directive the model re-states in prose after
-    //its coded answer line and before its PLAN: line, or "" when there is none.
-    static string restatedCombatDirective(const string& content, const char * label,
-                                          const std::vector<string> * rosterA = NULL,
-                                          const std::vector<string> * rosterB = NULL);
-    static bool choiceRetractedNoReplacement(const string& content, int optionCount,
-                                             const std::vector<string> * optionTexts = NULL,
-                                             int * replacement = NULL,
-                                             bool * namedRowNotOffered = NULL,
-                                             bool * planProseRecodeOut = NULL); //#W62-Z (D10)
+    //#W70-BM (E2): `restatedCombatDirective` and `choiceRetractedNoReplacement`
+    //DELETED - both read PROSE for a verdict (a restated declaration, a
+    //retraction sentence), which invariant 000 no longer permits the model to
+    //write and no parser may go on rewarding.
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;
@@ -1674,6 +1654,20 @@ private:
     int mBlockerForecastMulti;     //...with two or more candidates
     int mBlockerForecastGang;      //...carrying a GANG BLOCK verdict
     int mBlockerForecastCollapsed; //...printed in the collapsed (>4) form
+    //#W70-BM (E2/E3). THE REPLY-SHAPE AND VERIFY CENSUS. Invariant 000 makes the
+    //reply two labelled lines; these say what the model ACTUALLY wrote and how
+    //often each mechanism the wave-70 audit left standing (its VERIFY rows) fired,
+    //so the probe corpus decides them from counts instead of from code reading.
+    int mProtocolReplies;          //replies that carried a body (the denominator)
+    int mActionBeforePlanReplies;  //...that wrote the action line above the plan
+    int mPlanStepsDone;            //steps of the carried plan already executed
+    int mReasoningTailAnswers;     //B1.4: the answer came from the reasoning tail
+    int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
+    int mPhase2AnswerMissing;      //B1.5: ...and did not
+    int mPlanParagraphBoundCuts;   //B3.3: the paragraph bound shortened a plan
+    int mPutGlossStripped;         //B4.6: a PUT line carried a trailing gloss
+    int mPlanChoiceConflictSeen;   //B5.1: the PLAN line contradicted the action
+    int mPlanArguesAgainstRowSeen; //B5.6: the PLAN argued against the taken row
     //#W55-E (D5a): reveal-driver stall figures for the record being written.
     int mRevealStallTicks;
     long mRevealStallSecs;
