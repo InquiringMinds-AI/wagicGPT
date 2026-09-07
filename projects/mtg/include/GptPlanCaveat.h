@@ -721,186 +721,14 @@ inline std::string planScratchpadCut(const std::string& plan)
     return plan;
 }
 
-//#W66-AR (H2b). THE RETRACTION HEADER, ONE DEFINITION. #W65-AO's
-//gptAnswerCorrectionCue is a SUBSTRING test over the correcting line or the one
-//directly above it. 123v126 seq 36 wrote "Correction: ... M (41) is already
-//above stop (33)" TWO non-blank lines above its `CHOICE: 0 (pass)` and the
-//adjacency window could not see it: 30 activations ran on the retracted line.
-//A wider window cannot stay a substring test - "no correction is needed"
-//anywhere in a paragraph would arm it - so the wider window reads only an
-//ANNOUNCED header: the cue at the START of the line (markdown decoration
-//tolerated) and immediately closed by ':', ',', '.' or the end of the line.
-//That is exactly the form both corpus retractions took ("Correction:",
-//"Re-evaluating:") and it excludes ordinary prose that merely contains the
-//word. Deliberation vocabulary ("wait", "hmm", "however", "let me re-read") is
-//NOT here, for the same reason #W65-AO kept it out of the substring set.
-//Lives in this header because two consumers need the SAME set: the answer
-//selector in AIPlayerGPT.cpp and the plan-carry truncation note below, which
-//has to say when the bytes it dropped contained a retraction.
-inline bool correctionHeaderCue(const std::string& line)
-{
-    static const char * kHeads[] = {
-        "correction", "corrections", "corrected", "re-evaluating", "reevaluating",
-        "re-evaluation", "revised", "revising", "revision", "on reflection",
-        "on second thought", "actually", "scratch that", "disregard the above",
-        //#W67-AV (I3, deck123 HIGH-2). ONE MEASURED TOKEN. Counted over the
-        //three-line window this function is read in, across every later coded
-        //line in the wave-66 corpus: "wait" 14, "actually" 9, "however" 3,
-        //"correction" 1, "correct plan" 1. The last is 123v126 seq 114 - `CHOICE:
-        //3 (Cast Damnation)`, "Correct Plan: Cast nothing right now.", `CHOICE: 6`
-        //- and the unheard announcement cast the Damnation over the seat's own 102
-        //creatures and decided the game. "wait" is the most frequent and stays
-        //OUT: 130v146 seq 24 answers `CHOICE: 0 (pass)` at an UPKEEP window,
-        //rambles "Wait,, Lay Waste targets a land..." and writes `CHOICE: 1 (Cast
-        //Hammer of Bogardan)`, a main-phase intent - admitting it turns a right
-        //answer into a wrong one. Deliberation vocabulary is still not an
-        //announcement (#W66-AR); this adds the one announced HEADER the corpus
-        //wrote that the set did not name.
-        "correct plan", "corrected plan",
-        "final answer"
-    };
-    std::string lc = toLower(line);
-    size_t s = 0;
-    while (s < lc.size() && (lc[s] == ' ' || lc[s] == '\t' || lc[s] == '*'
-                             || lc[s] == '#' || lc[s] == '-' || lc[s] == '>'))
-        s++;
-    for (size_t k = 0; k < sizeof(kHeads) / sizeof(kHeads[0]); k++)
-    {
-        const size_t n = std::strlen(kHeads[k]);
-        if (lc.compare(s, n, kHeads[k]) != 0)
-            continue;
-        const size_t e = s + n;
-        if (e >= lc.size())
-            return true; //the whole line IS the header
-        const char c = lc[e];
-        if (c == ':' || c == ',' || c == '.' || c == '!' || c == '\r')
-            return true;
-        //"Correction -" / "Correction (2)" read as announcements too; a bare
-        //space does NOT ("actually I could also block" is deliberation).
-        if ((c == ' ' || c == '\t') && e + 1 < lc.size()
-            && (lc[e + 1] == '-' || lc[e + 1] == ':'))
-            return true;
-    }
-    return false;
-}
-
-//#W67-AV (I1, engine HIGH-1; deck130/126/125/123/162 HIGH-1). THE HEADING WORD
-//BEFORE THE LABEL. #W66-AR named the protocol's three sections REASONING /
-//ANSWER / PLAN, and the model transcribed two of them as literal line-leading
-//labels: 50 of the wave-66 corpus's 83 `unparsed_reply` records had written the
-//answer in the exact label syntax behind one of them - 46 of those behind the
-//single token `ANSWER:` - and every label scanner in the engine skips only
-//" \t*#->`" before it compares, so `ANSWER: CHOICE: 3 (Cast nothing right now)`
-//was prose and no answer was found. The worst is 126v162 seq 10, `ANSWER: PUT:
-//44` at a reveal: the reveal was refused and an Idyllic Tutor was voided.
-//The set is CLOSED and it is the measured one: the wave-66 corpus writes exactly
-//five distinct heading tokens before a label (`ANSWER:` 51, `So ` 4,
-//`CORRECTION:` 1, `The answer is ` 1, `Therefore,` 1); this set matches 53 of
-//those 56 lines - see the exclusion note on kHeadsPhrase/kHeadsClosed - and
-//nothing else in the corpus. The prefixes it must NOT eat are in the same
-//corpus and are all rejected by it: `PLAN: Turn 10 ...`, `REASONING: I have
-//Sorin ... CHOICE: 1 is better than CHOICE: 3.`, `4. Attack: I have no
-//Vampires.`, `However, the Branch B rule says "..."`, `But wait, ...`.
-//Two rails make this safe to call from every seam: the skip happens ONLY when a
-//real answer label with a payload follows it (so no reply that parses today
-//stops parsing), and `PLAN` and `REASONING` are deliberately not heads - a plan
-//line and a reasoning line are not answers at any seam.
-//`s` is the offset the caller has already advanced past markdown decoration;
-//`end` bounds the line. Returns the offset the label compare should use.
-inline size_t answerHeadingSkip(const std::string& text, size_t s, size_t end)
-{
-    if (s >= end || end > text.size())
-        return s;
-    //Two forms, because a bare connective is NOT safe as a head. `kHeadsPhrase`
-    //NAMES the answer, so a space may follow it ("The answer is CHOICE: 2");
-    //`kHeadsClosed` must be closed by ':' or ',' ("ANSWER:", "CORRECTION:").
-    //DELIBERATELY EXCLUDED: "So", "Therefore", "Thus". The corpus writes them
-    //before a label 5 times, but a bare connective before a label is the shape
-    //three shipped rules already own and pin - #W48-E1's post-plan prose recode
-    //("So, CHOICE: 0 (pass)."), `restatedCombatDirective`'s clean restatement
-    //("So ATTACK: A1, A2, A3.") and its MUST-NOT-MATCH ("So BLOCKS: whatever
-    //keeps me alive longest.", prose that is not a declaration). Admitting the
-    //connective here would promote that prose to a line-leading answer at every
-    //seam, ahead of the cleanliness tests those rules exist to apply. The 2
-    //decisions it leaves behind (`So PUT: 1, 8.` at the discard seam, 125v130
-    //s258/s194) are caught by #W67-AV I2's re-ask instead of by Baka.
-    static const char * kHeadsPhrase[] = {
-        "the answer line is", "the answer is", "my answer is", "my choice is",
-        "the chosen row is"
-    };
-    static const char * kHeadsClosed[] = {
-        "the answer line", "final answer", "my answer", "the answer", "answer",
-        "correction", "corrections", "corrected", "correct plan",
-        "revised answer", "revised", "conclusion", "decision"
-        //NOT bare "final": `Final: BLOCKS: B1:A2.` is the shape #W62-AA R2 pins
-        //as a post-answer RESTATEMENT read by restatedCombatDirective's clean
-        //test, and the corpus never writes it as a heading. "final answer" is
-        //above, where the corpus's own vocabulary puts it.
-    };
-    static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
-    const size_t nPhrase = sizeof(kHeadsPhrase) / sizeof(kHeadsPhrase[0]);
-    const size_t nClosed = sizeof(kHeadsClosed) / sizeof(kHeadsClosed[0]);
-    for (size_t k = 0; k < nPhrase + nClosed; k++)
-    {
-        const bool phrase = (k < nPhrase);
-        const char * head = phrase ? kHeadsPhrase[k] : kHeadsClosed[k - nPhrase];
-        const size_t n = std::strlen(head);
-        if (end - s < n)
-            continue;
-        bool m = true;
-        for (size_t i = 0; i < n && m; i++)
-            m = ((char) std::tolower((unsigned char) text[s + i]) == head[i]);
-        if (!m)
-            continue;
-        size_t e = s + n;
-        if (e < end && (text[e] == ':' || text[e] == ','))
-            e++;
-        else if (phrase && e < end && (text[e] == ' ' || text[e] == '\t'))
-            ; //an answer-naming phrase may be closed by a space
-        else
-            continue;
-        while (e < end && (text[e] == ' ' || text[e] == '\t'))
-            e++;
-        if (e <= s || e >= end)
-            continue;
-        for (size_t li = 0; li < sizeof(kLabels) / sizeof(kLabels[0]); li++)
-        {
-            const size_t ln = std::strlen(kLabels[li]);
-            if (end - e < ln)
-                continue;
-            bool lm = true;
-            for (size_t i = 0; i < ln && lm; i++)
-                lm = ((char) std::tolower((unsigned char) text[e + i]) == kLabels[li][i]);
-            if (!lm)
-                continue;
-            size_t pp = e + ln;
-            while (pp < end && (text[pp] == ' ' || text[pp] == '\t'))
-                pp++;
-            if (pp < end)
-                return e; //a real label with a payload follows the heading
-        }
-    }
-    return s;
-}
-
-//#W66-AR (H2b/MED): does this text contain an ANNOUNCED retraction on a line of
-//its own? Used on the bytes the plan carry is about to DROP.
-inline bool textHasCorrectionHeader(const std::string& text)
-{
-    size_t at = 0;
-    while (at <= text.size())
-    {
-        const size_t nl = text.find('\n', at);
-        const std::string line = text.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
-        if (correctionHeaderCue(line))
-            return true;
-        if (nl == std::string::npos)
-            break;
-        at = nl + 1;
-    }
-    return false;
-}
-
+//#W70-BM (E1): `correctionHeaderCue`, `answerHeadingSkip` and
+//`textHasCorrectionHeader` were DELETED here. All three existed only to
+//tolerate in-band reasoning in the reply - an announced retraction written
+//between two answer lines, and a heading word ("ANSWER:", "CORRECTION:")
+//standing before the label. Under invariant 000 the reply is a PLAN line and
+//an action line and nothing else, so a heading before the label and a second
+//answer line are both protocol VIOLATIONS, not shapes to salvage: tolerating
+//them is what teaches the model to write them.
 inline const char * planTruncationMarker()
 {
     return " [...the rest of your plan was not carried - restate it if you still mean it]";
@@ -915,17 +743,14 @@ inline const char * planTruncationMarker()
 // cut, which is the one fact that tells the model its PLAN line was a
 // deliberation stream rather than a plan. Pure over (kept, original) so the
 // composed shape is provable; a plan the bound did not touch is byte-identical.
-//#W66-AR (MED, deck126): `droppedCorrection` says the dropped bytes contained an
-//ANNOUNCED retraction (correctionHeaderCue). The cut keeps the FIRST sentences
-//and the model's corrections live at the END of a deliberating PLAN line, so on
-//29 of 183 deck126 windows the carry served the premise and dropped the sentence
-//that withdrew it - a true fragment in a false scope, which the trust doctrine
-//treats as a lie. Nothing is added to what is carried (the bound is the owner's
-//400 characters); what is added is the ONE fact the model needs to know the
-//fragment is not the whole answer. Default false, so every shipped note and
-//every shipped pin is byte-identical.
+//#W70-BM (E1): the correction clause is DELETED with correctionHeaderCue - a
+//retraction inside a PLAN line is in-band reasoning, which the protocol no
+//longer permits and this note must no longer describe as normal. What replaces
+//it is the fact a SEQUENCE has: how many later STEPS the cut dropped. A plan is
+//"swing all, trick after blockers, Rhino in main 2" - dropping step 3 silently
+//is the failure this number exists to make impossible.
 inline std::string planTruncationNote(size_t keptChars, size_t originalChars,
-                                      bool droppedCorrection = false)
+                                      size_t droppedSteps = 0)
 {
     // The wave-60 literal is kept verbatim as the head - deck guides and the
     // shipped PARSETEST pins read it - and the measured size rides after it.
@@ -935,8 +760,9 @@ inline std::string planTruncationNote(size_t keptChars, size_t originalChars,
     if (originalChars > keptChars)
         o << ": " << (originalChars - keptChars) << " further characters, of "
           << originalChars << " you wrote";
-    if (droppedCorrection)
-        o << ", and what was dropped included a line correcting what you see above";
+    if (droppedSteps > 0)
+        o << ", and " << droppedSteps << (droppedSteps == 1 ? " later step" : " later steps")
+          << " of the sequence";
     o << " - restate it in a sentence or two if you still mean it]";
     return o.str();
 }
@@ -1005,9 +831,8 @@ inline std::string planCarryBound(const std::string& plan, size_t maxChars)
     if (out.empty())
         return plan; // nothing survived the cut: carry the plan as it stands
     //#W65-AP (R7): the note counts what the protocol counts - characters.
-    //#W66-AR (MED): and says whether the bytes it dropped announced a retraction.
-    return out + planTruncationNote(utf8Length(out), utf8Length(plan),
-                                    textHasCorrectionHeader(plan.substr(out.size()))); //#W62-Z (D16)
+    //#W70-BM (E1): the retraction clause is gone with its predicate.
+    return out + planTruncationNote(utf8Length(out), utf8Length(plan)); //#W62-Z (D16)
 }
 
 // #W60-Q (R8). THE COMPOSED PATH. planCarryBound's marker ends in ']', and the
@@ -1037,20 +862,132 @@ inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
         const std::string head = " [...the rest of your plan was not carried";
         const size_t m = out.rfind(head);
         const std::string kept = (m == std::string::npos) ? out : out.substr(0, m);
-        //#W66-AR (MED): the drop is measured against the plan the model WROTE, so
-        //the retraction test reads the same span the number above counts.
-        return kept + planTruncationNote(utf8Length(kept), utf8Length(plan),
-                                         textHasCorrectionHeader(plan.substr(kept.size()))); //#W65-AP (R7)
+        return kept + planTruncationNote(utf8Length(kept), utf8Length(plan)); //#W65-AP (R7)
     }
     if (core.size() < plan.size())
-        return core + planTruncationNote(utf8Length(core), utf8Length(plan),
-                                         textHasCorrectionHeader(plan.substr(core.size()))); //#W65-AP (R7)
+        return core + planTruncationNote(utf8Length(core), utf8Length(plan)); //#W65-AP (R7)
     char last = out.empty() ? '.' : out[out.size() - 1];
     if (last != '.' && last != '!' && last != '?')
     {
         size_t dot = out.find_last_of(".!?");
         if (dot != std::string::npos && dot > out.size() / 2)
             out = out.substr(0, dot + 1);
+    }
+    return out;
+}
+
+//#W70-BM (E1). THE PLAN IS A SEQUENCE OF STEPS (invariant 000(e)): "swing all,
+//use the combat trick after blockers are declared, then play the creature in
+//second main". Three facts follow from that and none of them held before:
+//  (1) a BYTE bound may cut inside step 2 and delete step 3 without saying so.
+//      The carry is bounded by STEPS here, with a byte ceiling raised to a
+//      sequence-sized number and cut only AT a step boundary, so the model is
+//      never served half a step and never silently loses a later one.
+//  (2) the action line is STEP ONE, so when the action executes step one is
+//      CONSUMED - the next window is served the REMAINDER (planStepsAfter).
+//  (3) the steps must be found without changing a byte of the plan: these
+//      helpers return OFFSETS into the plan, so every join is the original text.
+//A step ends at ';' ',' '.' '!' '?' or a newline that is followed by whitespace
+//or the end of the string - so "1,000" and "3.5" do not split a step - and the
+//last step needs no terminator. Pure over one string.
+inline std::vector<size_t> planStepEnds(const std::string& plan)
+{
+    std::vector<size_t> ends;
+    for (size_t i = 0; i < plan.size(); i++)
+    {
+        const char c = plan[i];
+        if (c != ';' && c != ',' && c != '.' && c != '!' && c != '?' && c != '\n')
+            continue;
+        if (c != '\n' && i + 1 < plan.size()
+            && !std::isspace((unsigned char) plan[i + 1]))
+            continue; //"1,000" / "3.5": not a step boundary
+        const size_t st = plan.find_first_not_of(" \t\r\n;,.!?");
+        if (st == std::string::npos || i < st)
+            continue; //nothing but punctuation so far
+        ends.push_back(i + 1);
+    }
+    if (ends.empty() || ends.back() < plan.size())
+    {
+        const size_t last = plan.find_last_not_of(" \t\r\n");
+        if (last != std::string::npos && (ends.empty() || ends.back() <= last))
+            ends.push_back(last + 1);
+    }
+    return ends;
+}
+
+inline size_t planStepCount(const std::string& plan)
+{
+    return planStepEnds(plan).size();
+}
+
+//The plan from step `done` (0-based) onward, trimmed. `done` is CLAMPED to the
+//last step: a fully-executed plan still carries its final step rather than
+//vanishing, because a blank carry is indistinguishable from "no plan yet" and
+//the model would be asked for a plan it already gave.
+inline std::string planStepsAfter(const std::string& plan, size_t done)
+{
+    if (done == 0)
+        return plan;
+    const std::vector<size_t> ends = planStepEnds(plan);
+    if (ends.size() <= 1)
+        return plan;
+    if (done > ends.size() - 1)
+        done = ends.size() - 1;
+    size_t at = ends[done - 1];
+    while (at < plan.size() && (std::isspace((unsigned char) plan[at])
+                                || plan[at] == ';' || plan[at] == ','))
+        at++;
+    if (at >= plan.size())
+        return plan;
+    return plan.substr(at);
+}
+
+//The carry bound, denominated in STEPS with a byte ceiling that only ever cuts
+//AT a step end. Returns the plan untouched when it fits both; otherwise the
+//kept steps plus a note that says how many characters AND how many steps the
+//cut dropped.
+inline std::string planStepBound(const std::string& plan, size_t maxSteps, size_t hardChars)
+{
+    const std::vector<size_t> ends = planStepEnds(plan);
+    if (ends.empty())
+        return plan;
+    if (ends.size() <= maxSteps && utf8Length(plan) <= hardChars)
+        return plan;
+    size_t keepEnd = 0, kept = 0;
+    for (size_t i = 0; i < ends.size() && i < maxSteps; i++)
+    {
+        if (utf8Length(plan.substr(0, ends[i])) > hardChars && kept > 0)
+            break;
+        keepEnd = ends[i];
+        kept = i + 1;
+    }
+    if (kept == 0 || keepEnd >= plan.size())
+        return plan;
+    std::string out = plan.substr(0, keepEnd);
+    const size_t e = out.find_last_not_of(" \t\r\n");
+    out = (e == std::string::npos) ? std::string() : out.substr(0, e + 1);
+    if (out.empty())
+        return plan;
+    return out + planTruncationNote(utf8Length(out), utf8Length(plan), ends.size() - kept);
+}
+
+//#W70-BM (E1): the composed carry for a SEQUENCE - the scratchpad cut first (it
+//chooses the text), then the step bound (it bounds THAT text). Same order and
+//same single-marker discipline as planCarryCompose, which stays for the callers
+//that bound a paragraph rather than a sequence.
+inline std::string planCarryComposeSteps(const std::string& plan, size_t maxSteps,
+                                         size_t hardChars)
+{
+    const std::string core = planScratchpadCut(plan);
+    std::string out = planStepBound(core, maxSteps, hardChars);
+    if (core.size() < plan.size())
+    {
+        const std::string head = " [...the rest of your plan was not carried";
+        const size_t m = out.rfind(head);
+        const std::string keptText = (m == std::string::npos) ? out : out.substr(0, m);
+        const size_t coreSteps = planStepCount(core), keptSteps = planStepCount(keptText);
+        return keptText + planTruncationNote(utf8Length(keptText), utf8Length(plan),
+                                             (coreSteps > keptSteps) ? coreSteps - keptSteps : 0);
     }
     return out;
 }

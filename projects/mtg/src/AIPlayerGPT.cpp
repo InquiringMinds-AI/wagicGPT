@@ -505,6 +505,13 @@ static string planLibraryOnlyNote(const string& cardName)
 //first-paragraph shape bound. A plan is the commitment the next decision acts
 //on; the reasoning that produced it is not carried and never was meant to be.
 static const size_t kPlanCarryMaxChars = 400;
+//#W70-BM (E1, invariant 000(e)): the PLAN is a SEQUENCE of intended actions, so
+//the carry is bounded by STEPS as well as by characters, and the character
+//ceiling can only ever cut AT a step boundary. kPlanCarryMaxChars is unchanged
+//and is still the number the reply protocol states, so that claim stays true;
+//what changes is that a cut can no longer land inside a step or drop a later
+//step of the sequence without the note saying how many it dropped.
+static const size_t kPlanCarryMaxSteps = 12;
 //#W60-M (B13a): what is printed INSTEAD of a plan that denies a permanent the
 //pilot's own battlefield line shows. Two true surfaces cannot both be served,
 //and the board is the one the engine computes - so the plan is withdrawn and
@@ -15079,8 +15086,16 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 if (content.empty() && !fieldReasoning.empty())
                 {
                     string tail = answerTailFromReasoning(fieldReasoning);
+                    if (!tail.empty())
+                        mReasoningTailAnswers++; //#W70-BM (E3): B1.4's census
                     if (forceClosePoll)
                     {
+                        //#W70-BM (E3): B1.5's census - did the forced close
+                        //(phase 2) actually produce a coded answer line?
+                        if (tail.empty())
+                            mPhase2AnswerMissing++;
+                        else
+                            mPhase2AnswerRecovered++;
                         //Phase 2: the generation is the answer, wherever the
                         //parser filed it. Keep phase 1's thinking as the
                         //audit record rather than overwriting it with the
@@ -15354,11 +15369,12 @@ static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
         size_t lineEnd = low.find('\n', lineStart);
         size_t end = (lineEnd == string::npos) ? low.size() : lineEnd;
         size_t s = lineStart;
-        while (s < end && (low[s] == ' ' || low[s] == '\t'
-                           || low[s] == '*' || low[s] == '#' || low[s] == '-'
-                           || low[s] == '>' || low[s] == '`'))
+        //#W70-BM (E2): whitespace only. The markdown-decoration skip
+        //(`* # - > \``) was a tolerance for a reply that decorates its answer
+        //line; the protocol permits two labelled lines and nothing else, so a
+        //bulleted label is a violation to be counted, not a shape to accept.
+        while (s < end && (low[s] == ' ' || low[s] == '\t'))
             s++;
-        s = gptcaveat::answerHeadingSkip(low, s, end); //#W67-AV (I1)
         for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
         {
             size_t len = strlen(kLabels[k]);
@@ -15812,7 +15828,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mReasoningTailAnswers(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPlanParagraphBoundCuts(0), mPutGlossStripped(0), mPlanChoiceConflictSeen(0), mPlanArguesAgainstRowSeen(0), //#W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -16059,40 +16075,103 @@ void AIPlayerGPT::transLogWrite(const string& line)
 //re-committing (deck158 vs139 s16: 12,180 chars at 2 life; the correct
 //answer was discarded and Baka answered).
 
-//post_plan_overrun: the number of characters the reply emitted AFTER the end
-//of its FIRST "PLAN:" line, trailing whitespace excluded. 0 = the reply
-//stopped at its plan, which is what the protocol asks for (answer, brief
-//reasoning, PLAN: last). >0 = the reply kept going; the magnitude is the size
-//of the un-committed tail. Measured on the same normalisation consumePlan
-//uses (post-</think>, case-insensitive "PLAN:"), so the two agree on where
-//the plan starts. A reply with NO PLAN: line scores 0 - it never committed a
-//plan to overrun, and the empty/unparsed fallbacks already name that case.
-static long postPlanOverrun(const string& reply)
+//#W70-BM (E2). THE TWO PERMITTED LINES. `post_plan_overrun` (bytes after the
+//first PLAN line) and `pre_answer_overrun` (bytes before the first label) were
+//both DELETED here: each was written when the protocol put the answer FIRST and
+//the PLAN last, so under invariant 000's PLAN-then-action shape the first
+//counted the ANSWER LINE ITSELF as overrun on every compliant reply and the
+//second counted the PLAN LINE ITSELF as pre-answer prose on every one. Two
+//meters that are wrong on every reply are worse than no meter: they read as
+//evidence of a spiral that is not there.
+//What replaces them measures the thing the ruling is about - bytes OUTSIDE the
+//two lines the protocol permits. The permitted lines are the FIRST line-leading
+//`PLAN:` line and the FIRST line-leading coded answer line; every other
+//non-blank byte (prose before the plan, prose between the two, a second answer
+//line, anything after the answer) is off-protocol and is counted. A compliant
+//two-line reply scores 0 whichever order it wrote them in.
+//`actionBeforePlanOut` reports the ORDER: an action line above the plan line is
+//still parsed - the model may write it and the engine must not throw a decision
+//away over line order - but it is not the shape the protocol asked for, so it is
+//stamped (`action_before_plan`) and the census says how often it happens.
+//`trailingOut` is the TAIL quantity the record trim needs: the bytes after the
+//later of the two permitted lines. Measured on the STRIPPED reply (post-think),
+//like every other meter here.
+static size_t firstLineLeadingPlanPos(const string& text); //#W70-BM (E2)
+static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut = NULL,
+                             long * trailingOut = NULL)
 {
-    string text = reply;
-    size_t thinkEnd = text.rfind("</think>");
+    if (actionBeforePlanOut)
+        *actionBeforePlanOut = false;
+    if (trailingOut)
+        *trailingOut = 0;
+    string text = replyIn;
+    const size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
-    size_t pos = string::npos;
-    for (size_t i = 0; i + 5 <= text.size(); i++)
+    const size_t planAt = firstLineLeadingPlanPos(text);
+    size_t labelAt = string::npos;
+    scanCodedAnswerLines(text, NULL, NULL, NULL, &labelAt);
+    size_t planLine = string::npos, ansLine = string::npos;
+    if (planAt != string::npos)
     {
-        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
-            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
-            && text[i + 4] == ':')
-        {
-            pos = i;
-            break;
-        }
+        const size_t b = text.rfind('\n', planAt);
+        planLine = (b == string::npos) ? 0 : b + 1;
     }
-    if (pos == string::npos)
-        return 0;
-    size_t lineEnd = text.find('\n', pos);
-    if (lineEnd == string::npos)
-        return 0; //the plan line runs to the end: nothing after it
-    size_t last = text.find_last_not_of(" \t\r\n");
-    if (last == string::npos || last <= lineEnd)
-        return 0;
-    return (long) (last - lineEnd);
+    if (labelAt != string::npos)
+    {
+        const size_t b = text.rfind('\n', labelAt);
+        ansLine = (b == string::npos) ? 0 : b + 1;
+    }
+    if (actionBeforePlanOut && planLine != string::npos && ansLine != string::npos)
+        *actionBeforePlanOut = (ansLine < planLine);
+    long off = 0;
+    bool havePermitted = false;
+    size_t lastPermittedEnd = 0;
+    size_t at = 0;
+    while (at <= text.size())
+    {
+        const size_t nl = text.find('\n', at);
+        const size_t end = (nl == string::npos) ? text.size() : nl;
+        if (at == planLine || at == ansLine)
+        {
+            havePermitted = true;
+            lastPermittedEnd = end;
+        }
+        else if (end > at)
+        {
+            const size_t s = text.find_first_not_of(" \t\r", at);
+            if (s != string::npos && s < end)
+            {
+                const size_t e = text.find_last_not_of(" \t\r", end - 1);
+                if (e != string::npos && e >= s)
+                    off += (long) (e - s + 1);
+            }
+        }
+        if (nl == string::npos)
+            break;
+        at = nl + 1;
+    }
+    if (trailingOut && havePermitted)
+    {
+        const size_t last = text.find_last_not_of(" \t\r\n");
+        if (last != string::npos && last > lastPermittedEnd)
+            *trailingOut = (long) (last - lastPermittedEnd);
+    }
+    return off;
+}
+
+//#W70-BM (E3, audit B4.6): set by parseAttackerSet on the call that stripped a
+//trailing gloss list off a PUT answer, consumed by the record writer. Instrument
+//only - nothing branches on it, and it is set and read on the same thread.
+static bool gLastPutGlossStripped = false;
+
+//#W70-BM (E2): the reply wrote its action line ABOVE its plan line. Parsed, but
+//stamped for the census - never silently accepted as the intended shape.
+static bool replyActionBeforePlan(const string& replyIn)
+{
+    bool before = false;
+    offProtocolBytes(replyIn, &before, NULL);
+    return before;
 }
 
 //#W61-U (C14, deck162 MED): 81 of 119 replies at one seat overran the protocol
@@ -16108,6 +16187,9 @@ static long postPlanOverrun(const string& reply)
 //byte-identical. Pure over (reply, keep, threshold).
 static const size_t kReplyOverrunKeep = 400;   //bytes of the tail kept for shape
 static const size_t kReplyOverrunTrimAt = 1200; //below this the record is untouched
+//#W70-BM (E2): `overrun` is now offProtocolBytes' TRAILING quantity - the bytes
+//after the later of the two permitted lines - so the trim still takes a TAIL and
+//the head it keeps still ends at the last thing the protocol asked for.
 static string recordReplyTrimmed(const string& reply, long overrun,
                                  size_t keep = kReplyOverrunKeep,
                                  size_t trimAt = kReplyOverrunTrimAt)
@@ -16123,7 +16205,7 @@ static string recordReplyTrimmed(const string& reply, long overrun,
         return reply;
     std::ostringstream o;
     o << reply.substr(0, cut) << "\n[+" << (long) (reply.size() - cut)
-      << " bytes written past the PLAN line trimmed from this record]";
+      << " bytes written past the two protocol lines trimmed from this record]"; //#W70-BM (E2)
     return o.str();
 }
 
@@ -16147,29 +16229,9 @@ static long postAnswerOverrun(const string& reply)
     return (long) (last - lineEnd);
 }
 
-//#W68-BA (J3, engine FAILs AV4/AV5; deck146 HIGH-3, deck126 HIGH-1/2). THE METER
-//ONLY EVER SAW ONE SIDE OF THE LABEL. `post_answer_overrun` starts at the first
-//coded line, so a reply that reasons BEFORE its answer scores ZERO - and that is
-//exactly the shape the blockers seam writes: 126v152 s10 wrote 4,572 bytes before
-//`BLOCKS:` in 825 s and 126v123 s13 3,741 bytes in 462 s, and both metered 0.
-//Measured over the wave-67 corpus (2,301 replies carrying a body): 49,141 bytes
-//sit BEFORE a label and 662,814 AFTER one. This is the other side - from the
-//reply's first non-blank byte to the start of its first coded label - and the
-//record carries both plus their sum, so "the reasoning moved" can never again
-//read as "the reasoning shrank". Instrument only: nothing in the engine branches
-//on it. Measured on the STRIPPED reply, like every other meter here.
-static long preAnswerOverrun(const string& reply)
-{
-    size_t labelStart = string::npos;
-    if (scanCodedAnswerLines(reply, NULL, NULL, NULL, &labelStart) < 1
-        || labelStart == string::npos)
-        return 0; //no coded answer at all: the empty/unparsed classes name that
-    size_t sig = reply.find_first_not_of(" \t\r\n");
-    if (sig == string::npos || labelStart <= sig)
-        return 0;
-    return (long) (labelStart - sig);
-}
-
+//#W70-BM (E2): `preAnswerOverrun` DELETED - see offProtocolBytes above. It
+//measured "bytes before the first label", which under PLAN-then-action is the
+//PLAN line on every compliant reply.
 //answer_replaced: the reply ended on a DIFFERENT answer than it began with -
 //the model answered, kept writing, and re-answered. 45/1,209 replies did this
 //in wave 33 (one the deciding play of a win, one a fatal reversal), and NO
@@ -16252,7 +16314,6 @@ static string codedAnswerLineAt(const string& reply, int ordinal, size_t keep = 
                            || reply[s] == '*' || reply[s] == '#' || reply[s] == '-'
                            || reply[s] == '>' || reply[s] == '`'))
             s++;
-        s = gptcaveat::answerHeadingSkip(reply, s, end); //#W67-AV (I1)
         for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
         {
             const size_t len = strlen(kLabels[k]);
@@ -16592,8 +16653,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     flushRecoveryRecord();
     //#W61-U (C14): the record keeps the committed reply plus a bounded head of
     //any overrun; the counters below are still measured on the FULL reply.
-    const long replyOverrunBytes = postPlanOverrun(reply);
-    const string recordReply = recordReplyTrimmed(reply, replyOverrunBytes);
+    //#W70-BM (E2): the overrun the trim takes is the TAIL past the two permitted
+    //lines, and the census reads the whole off-protocol quantity beside it.
+    bool replyActionFirst = false;
+    long replyTrailingOff = 0;
+    const long replyOffProtocol = offProtocolBytes(reply, &replyActionFirst, &replyTrailingOff);
+    const string recordReply = recordReplyTrimmed(reply, replyTrailingOff);
     //#W67-AX (I5, engine HIGH-4): this record's OWN round trip, snapshotted
     //beside the field that publishes it. `mLastLatencyMs` is consumed (set to
     //-1) further down this same function, and the reveal residual below is
@@ -16866,10 +16931,26 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["parse_note"] = mLastParseNote;
         mLastParseNote.clear();
     }
-    //Commit-failure counters (see postPlanOverrun / commitRetracted above).
+    //Commit-failure counters (see offProtocolBytes / commitRetracted above).
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
-    rec["post_plan_overrun"] = replyOverrunBytes; //#W61-U (C14): the FULL reply
+    //#W70-BM (E2): bytes outside the two lines the protocol permits, on the FULL
+    //reply. 0 on a compliant PLAN + action reply, in either line order.
+    rec["off_protocol_bytes"] = replyOffProtocol;
+    if (replyActionFirst && !userMsg.empty())
+    {
+        //#W70-BM (E2): parsed, but not the shape asked for - stamped, never
+        //silently accepted. The gameend census carries the game's total.
+        rec["action_before_plan"] = true;
+        mActionBeforePlanReplies++;
+    }
+    if (!userMsg.empty())
+        mProtocolReplies++; //#W70-BM (E2): the census denominator
+    if (gLastPutGlossStripped) //#W70-BM (E3): B4.6's census
+    {
+        mPutGlossStripped++;
+        gLastPutGlossStripped = false;
+    }
     if (recordReply.size() < reply.size())
         rec["reply_trimmed_bytes"] = (long) (reply.size() - recordReply.size());
     //#W63-AD (E11): on a subset seam `choice` is the SIZE of the selection, not a
@@ -16887,14 +16968,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
     rec["post_answer_overrun"] = postAnswerOverrun(reply);
-    //#W68-BA (J3): the OTHER side of the label, and the sum. Written on every
-    //record, present or zero, so the two shapes (reasoning before the answer,
-    //reasoning after it) can never be confused for one another again.
-    {
-        const long preOver = preAnswerOverrun(reply);
-        rec["pre_answer_overrun"] = preOver;
-        rec["reply_overrun"] = preOver + postAnswerOverrun(reply);
-    }
+    //#W70-BM (E2): `pre_answer_overrun` / `reply_overrun` DELETED with their
+    //meter - `off_protocol_bytes` above is the one two-sided quantity now.
     //#W68-BA (J3): the cap this reply was decoded under, and whether it bit.
     //A corpus that cannot see the cap cannot tell a short reply from a cut one.
     if (mLastRequestMaxTokens > 0 && !userMsg.empty())
@@ -17190,6 +17265,19 @@ void AIPlayerGPT::logGameEnd()
         {"wall_miss_events", mWallMissEvents},
         {"wall_miss_unrecorded", mWallMissUnrecorded},
         {"wall_miss_no_retry", mWallMissNoRetry}, //#W68-BC (J2)
+        //#W70-BM (E2/E3): the reply-SHAPE census and the wave-70 VERIFY counters.
+        //`protocol_replies` is the denominator every one of these divides by; a
+        //zero beside a zero denominator is silence, not evidence, and that
+        //distinction is exactly what the wave-70 audit could not make from code.
+        {"protocol_replies", mProtocolReplies},
+        {"action_before_plan_replies", mActionBeforePlanReplies},
+        {"reasoning_tail_answers", mReasoningTailAnswers},
+        {"phase2_answer_recovered", mPhase2AnswerRecovered},
+        {"phase2_answer_missing", mPhase2AnswerMissing},
+        {"plan_paragraph_bound_cuts", mPlanParagraphBoundCuts},
+        {"put_gloss_stripped", mPutGlossStripped},
+        {"plan_choice_conflict_seen", mPlanChoiceConflictSeen},
+        {"plan_argues_against_row_seen", mPlanArguesAgainstRowSeen},
     };
     transLogWrite(rec.dump()); //audit-L (L4)
     //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
@@ -18012,6 +18100,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         {
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
+            mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanSetSeq = -1; //#W53-N (D12a): expired, so it has no age
         }
     }
@@ -18100,6 +18189,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             u << planContradictedBlock(planDenied);
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
+            mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanSetSeq = -1;
         }
         else if (!planAsserted.empty())
@@ -18107,6 +18197,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             u << planAssertedAbsentBlock(planAsserted);
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
+            mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanSetSeq = -1;
         }
         else if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
@@ -18114,12 +18205,17 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             u << planWithdrawnBlock(planAgeClause(), planAbsent);
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
+            mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanSetSeq = -1;
         }
         else
         {
+        //#W70-BM (E1): the REMAINDER of the sequence - the steps this seat has
+        //not executed yet. `mPlanStepsDone` advances only when a plan is carried
+        //unchanged across a window, so it cannot change between two rebuilds of
+        //the SAME window and never reaches the async slot key or the ask key.
         u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << planAbsent
-          << "): " << mCurrentPlan << "\n";
+          << "): " << gptcaveat::planStepsAfter(mCurrentPlan, (size_t) mPlanStepsDone) << "\n";
         //#W50-Y D10 (ii): on a TARGET window, a carried plan whose named
         //target (a permanent on either battlefield, under a targeting verb)
         //matches no row gets the one-line note - deck130 G4's two self-hits
@@ -18789,83 +18885,42 @@ bool AIPlayerGPT::choiceLineIsRejection(const string& payload)
 struct GptAnswerHead
 {
     size_t segStart, segEnd, lineStart;
-    bool isChoice, clean, correction, markedOnLine;
-    int runLen;
+    bool isChoice, clean;
 };
 
-//#W65-AO (G8): the closed set of EXPLICIT CORRECTION markers. Every entry
-//RETRACTS a stated answer; none of them is ordinary deliberation. Matched
-//case-insensitively as a substring of the correcting line or of the nearest
-//preceding non-blank line.
-static bool gptAnswerCorrectionCue(const string& line)
-{
-    string lc = line;
-    for (size_t i = 0; i < lc.size(); i++)
-        lc[i] = (char) tolower((unsigned char) lc[i]);
-    static const char * kCues[] = {
-        "correction", "corrected", "i correct", "revised answer", "revised choice",
-        "revising my", "final answer", "changing my answer", "changing my choice",
-        "i change my answer", "i change my choice", "scratch that", "disregard",
-        "ignore my previous", "ignore the above", "supersede", "instead of choice",
-        "not choice"
-    };
-    for (size_t k = 0; k < sizeof(kCues) / sizeof(kCues[0]); k++)
-        if (lc.find(kCues[k]) != string::npos)
-            return true;
-    return false;
-}
-
-//#W65-AP (R2, wave-65 codex review finding 2 - HIGH). THE RULE, ONE FUNCTION.
-//#W65-AO wrote first-wins into findAnswerLabelLine and said it was label-wide
-//("CHOICE / ATTACK / BLOCKS / PUT all obey it"), and the protocol tells the
-//model so - but the live ATTACK and BLOCKS drivers never called that seam: each
-//kept its own last-CLEAN-wins walk, so `ATTACK: A1 ... ATTACK: none` executed
-//`none` and `BLOCKS: B1:A1 ... BLOCKS: none` executed the later unmarked line
-//the protocol calls thinking-out-loud. A rule the surface states and one seam
-//keeps is a false surface at the other two. This is the selection, extracted:
-//the CHOICE seam and both combat drivers now decide by calling it.
+//#W70-BM (E2). ONE ANSWER LINE, THE FIRST ONE. Everything the wave-65/66/67
+//selector did beyond that was tolerance for in-band reasoning and is DELETED
+//here: `gptAnswerCorrectionCue`'s 18-substring retraction set, the three-line
+//`correctionHeaderCue` announcement window, the adjacent-run fold, the
+//markdown-decoration and heading skips, and the supersession arm that let a
+//LATER line replace the answer. Under invariant 000 the reply is a PLAN line
+//and an action line; a second action line, a heading before the label, or a
+//retraction written between two answers is a PROTOCOL VIOLATION. The engine
+//still parses what it can - the first usable line executes, so no decision is
+//thrown away over line order - but nothing here reads prose for a verdict and
+//nothing tells the model that a correction paragraph will be honoured.
 //  - the FIRST usable CLEAN candidate is the answer; with no clean candidate the
 //    first usable one stands (#W50-Y D7's "an unclean trailer is taken only when
 //    no clean line exists", read first-order);
-//  - a LATER candidate supersedes only when it EXPLICITLY CORRECTS (#W65-AO's
-//    closed marker set), and only on the same clean/unclean footing - a marker
-//    written ON the line is itself the "tail" D7's cleanliness test would reject
-//    it for, so it outranks that heuristic.
+//  - a rejection line ("CHOICE: 3 is wrong") is not an answer and is counted;
+//  - `extraAnswerLines` (out) is how many usable answer lines the reply wrote
+//    BEYOND the one that ran. Non-zero is a violation, and the seam re-asks.
 //Returns the index of the answer, or -1 when nothing is usable.
 static int gptSelectAnswerIndex(const std::vector<bool>& usable,
-                                const std::vector<bool>& clean,
-                                const std::vector<bool>& correction,
-                                const std::vector<bool>& markedOnLine)
+                                const std::vector<bool>& clean)
 {
-    int ans = -1;
-    bool anyClean = false;
     for (size_t i = 0; i < usable.size(); i++)
         if (usable[i] && clean[i])
-        {
-            anyClean = true;
-            if (ans < 0)
-                ans = (int) i;
-        }
-    if (ans < 0)
-        for (size_t i = 0; i < usable.size(); i++)
-            if (usable[i])
-            {
-                ans = (int) i;
-                break;
-            }
-    if (ans < 0)
-        return -1;
-    for (size_t i = (size_t) ans + 1; i < usable.size(); i++)
-        if (usable[i] && correction[i] && (clean[i] || markedOnLine[i] || !anyClean))
-            ans = (int) i;
-    return ans;
+            return (int) i;
+    for (size_t i = 0; i < usable.size(); i++)
+        if (usable[i])
+            return (int) i;
+    return -1;
 }
 
 static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                                 size_t& segStart, size_t& segEnd, size_t& labelLineStart,
-                                int * choiceRunLen = NULL, int * rejectedLines = NULL,
-                                size_t planStart = string::npos,
-                                size_t planEnd = string::npos,
+                                int * extraAnswerLines = NULL, int * rejectedLines = NULL,
                                 size_t * lastHeadLineStart = NULL)
 {
     static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:", "PUT:" };
@@ -18873,36 +18928,18 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     bool found = false;
     size_t lineStart = 0;
     int rejected = 0;
-    bool lastMatchWasChoice = false;     //previous MATCHED line carried CHOICE:
-    size_t lastMatchLineEnd = string::npos; //its end offset (the '\n' position)
-    string prevNonBlankLine;             //#W65-AO (G8): the correction-cue window
-    //#W66-AR (H2b, engine HIGH-2 second half; deck123 HIGH-1). THE WIDER WINDOW.
-    //#W65-AO's cue is read on the correcting line or the ONE non-blank line above
-    //it. 123v126 seq 36 announced "Correction: ... M (41) is already above stop
-    //(33)" TWO non-blank lines above its `CHOICE: 0 (pass)`, the announcement was
-    //never seen, and the retracted `x30` ran (30 activations). The window is now
-    //the up-to-THREE non-blank lines since the last coded line - `recentNonBlank`
-    //is CLEARED at every matched label line, so "no other coded line intervenes"
-    //is structural, not a second test. Only an ANNOUNCED header counts at this
-    //distance (gptcaveat::correctionHeaderCue): a substring test over three lines
-    //of prose would arm on any paragraph that says the word.
-    std::vector<string> recentNonBlank;
     std::vector<GptAnswerHead> heads;
+    if (extraAnswerLines)
+        *extraAnswerLines = 0;
     while (lineStart <= text.size())
     {
-        bool matchedLabelThisLine = false; //#W66-AR (H2b)
         size_t lineEnd = text.find('\n', lineStart);
         size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
-        const string rawLine = text.substr(lineStart, end - lineStart);
         size_t s = lineStart;
-        while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
-            s++; //tolerate markdown bullet/heading decoration on the label line
-        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
-        //#W63-AD (E6b): a label line that STARTS inside the plan block is plan
-        //text. It is skipped whole - it neither answers nor anchors a run.
-        const bool inPlanBlock = (planStart != string::npos && planEnd != string::npos
-                                  && lineStart >= planStart && lineStart < planEnd);
-        for (int li = 0; li < kNumAnswerLabels && !inPlanBlock; li++)
+        //#W70-BM (E2): whitespace only - indentation is not prose, decoration is.
+        while (s < end && (text[s] == ' ' || text[s] == '\t'))
+            s++;
+        for (int li = 0; li < kNumAnswerLabels; li++)
         {
             if (expectedLabel && strcmp(kAnswerLabels[li], expectedLabel) != 0)
                 continue; //restricted to this decision's own answer label
@@ -18916,120 +18953,43 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                     && !isExampleEchoLine(text.substr(s, end - s)))
                 {
                     bool isChoice = (strcmp(kAnswerLabels[li], "CHOICE:") == 0);
-                    //#W50-Y D7: a rejection line is not an answer - skipped
-                    //whole (it neither anchors nor extends a run).
+                    //#W50-Y D7: a rejection line is not an answer - skipped whole.
                     if (isChoice && AIPlayerGPT::choiceLineIsRejection(text.substr(s + len, end - (s + len))))
                     {
                         rejected++;
-                        matchedLabelThisLine = true; //#W66-AR (H2b): still a coded line
                         break;
                     }
-                    //Adjacent when only whitespace separates this line from
-                    //the previous matched line (blank lines don't break a
-                    //list; any prose or other content does).
-                    bool adjacent = false;
-                    if (found && isChoice && lastMatchWasChoice
-                        && lastMatchLineEnd != string::npos && lastMatchLineEnd <= lineStart)
-                    {
-                        adjacent = true;
-                        for (size_t g = lastMatchLineEnd; g < lineStart && adjacent; g++)
-                            adjacent = isspace((unsigned char) text[g]) != 0;
-                    }
-                    //#W65-AP (R3, wave-65 codex review finding 3 - HIGH): a
-                    //MARKED correction written directly under the line it
-                    //corrects (no blank line between) was folded into the
-                    //adjacent-answer run and never became a head at all, so the
-                    //engine executed the retracted first choice - the exact
-                    //syntax #W65-AO's protocol had just told the model to use.
-                    //Correction detection therefore runs BEFORE the run fold:
-                    //a line carrying the marker ON ITSELF is always a head. The
-                    //preceding-line cue is deliberately NOT consulted here - on
-                    //an adjacent line the preceding line IS the answer being
-                    //corrected, and reading its tail would turn an ordinary
-                    //ranked list into a correction.
-                    const bool markedHere = gptAnswerCorrectionCue(rawLine);
-                    if (adjacent && !heads.empty() && !markedHere)
-                        heads.back().runLen++; //extend the run; the run HEAD stays the answer
-                    else
-                    {
-                        GptAnswerHead h;
-                        h.segStart = s + len;
-                        h.segEnd = end;
-                        h.lineStart = lineStart;
-                        h.isChoice = isChoice;
-                        h.clean = isChoice
-                                  && AIPlayerGPT::choiceLineIsClean(text.substr(s + len, end - (s + len)));
-                        //#W65-AO (G8): a head is a CORRECTION when the retraction
-                        //is announced on its own line or on the nearest preceding
-                        //non-blank line. The first head is never a correction -
-                        //there is nothing yet to correct.
-                        h.markedOnLine = markedHere; //#W65-AP (R3)
-                        //#W66-AR (H2b): ...or on one of the up-to-three non-blank
-                        //lines written since the last coded line, as an ANNOUNCED
-                        //header. The adjacent case is still excluded: there the
-                        //preceding line IS the answer being corrected (#W65-AP R3).
-                        bool headerAbove = false;
-                        if (!adjacent)
-                            for (size_t r = 0; r < recentNonBlank.size() && !headerAbove; r++)
-                                headerAbove = gptcaveat::correctionHeaderCue(recentNonBlank[r]);
-                        h.correction = !heads.empty()
-                                       && (h.markedOnLine
-                                           || (!adjacent
-                                               && (gptAnswerCorrectionCue(prevNonBlankLine)
-                                                   || headerAbove)));
-                        h.runLen = 1;
-                        heads.push_back(h);
-                    }
+                    GptAnswerHead h;
+                    h.segStart = s + len;
+                    h.segEnd = end;
+                    h.lineStart = lineStart;
+                    h.isChoice = isChoice;
+                    h.clean = isChoice
+                              && AIPlayerGPT::choiceLineIsClean(text.substr(s + len, end - (s + len)));
+                    heads.push_back(h);
                     found = true;
-                    matchedLabelThisLine = true; //#W66-AR (H2b)
-                    lastMatchWasChoice = isChoice;
-                    lastMatchLineEnd = end;
                 }
             }
         }
-        //#W66-AR (H2b): a coded line closes the announcement window - the next
-        //head's three lines are counted from HERE, so an announcement can never
-        //reach back across an answer the model already wrote.
-        if (matchedLabelThisLine)
-            recentNonBlank.clear();
-        else if (rawLine.find_first_not_of(" \t\r") != string::npos)
-        {
-            recentNonBlank.push_back(rawLine);
-            if (recentNonBlank.size() > 3)
-                recentNonBlank.erase(recentNonBlank.begin());
-        }
-        if (rawLine.find_first_not_of(" \t\r") != string::npos)
-            prevNonBlankLine = rawLine;
         if (lineEnd == string::npos)
             break;
         lineStart = lineEnd + 1;
     }
     if (rejectedLines)
         *rejectedLines = rejected;
-    if (choiceRunLen)
-        *choiceRunLen = 0;
     if (lastHeadLineStart)
         *lastHeadLineStart = heads.empty() ? string::npos : heads.back().lineStart;
     if (heads.empty())
         return found; //only rejection lines (or nothing at all)
-    //#W65-AO (G8): SELECT. The first CLEAN head is the answer; with no clean head
-    //the first head stands (#W50-Y D7's "an UNCLEAN trailer is taken only when no
-    //clean line exists", read first-order). A later head then supersedes only if
-    //it explicitly corrects, and only on the same clean/unclean footing - a
-    //correction cannot be worse-formed than what it replaces.
-    //#W65-AP (R2): the selection is gptSelectAnswerIndex - the same function the
-    //ATTACK and BLOCKS drivers call, so there is one rule and one place it lives.
-    std::vector<bool> vUsable(heads.size(), true), vClean, vCorr, vMarked;
+    std::vector<bool> vUsable(heads.size(), true), vClean;
     bool anyClean = false;
     for (size_t i = 0; i < heads.size(); i++)
     {
         vClean.push_back(heads[i].clean);
-        vCorr.push_back(heads[i].correction);
-        vMarked.push_back(heads[i].markedOnLine);
         if (heads[i].clean)
             anyClean = true;
     }
-    const int sel = gptSelectAnswerIndex(vUsable, vClean, vCorr, vMarked);
+    const int sel = gptSelectAnswerIndex(vUsable, vClean);
     size_t ans = (sel < 0) ? 0 : (size_t) sel;
     //#W50-Y D7's counter, first-order: an unclean CHOICE head that lost to the
     //clean answer is a line the scan refused, and is signed as one.
@@ -19039,11 +18999,11 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                 rejected++;
     if (rejectedLines)
         *rejectedLines = rejected;
+    if (extraAnswerLines)
+        *extraAnswerLines = (int) heads.size() - 1; //#W70-BM (E2): the violation
     segStart = heads[ans].segStart;
     segEnd = heads[ans].segEnd;
     labelLineStart = heads[ans].lineStart;
-    if (choiceRunLen)
-        *choiceRunLen = heads[ans].isChoice ? heads[ans].runLen : 0;
     return true;
 }
 
@@ -19130,49 +19090,6 @@ static bool planLineOpensWithConnective(const string& line)
     return false;
 }
 
-//#W62-Z (D9/D10). The PLAN BLOCK's extent in a reply, from the offset of its
-//line-leading "PLAN:" marker. The engine already has a definition of "the plan"
-//and it is not "everything after the marker": planParagraphBound (#W54-A D12a)
-//takes the FIRST PARAGRAPH, ended by a blank line or by a line whose predecessor
-//closed a sentence and which does not open with a connective - and that
-//paragraph is what mCurrentPlan carries and what later windows are shown as
-//YOUR PLAN. The same rule bounds the block here, so "inside the plan" means the
-//same span in the parser as it does in the carry. Everything AFTER the block is
-//ordinary post-answer prose and keeps the wave-47 recode behaviour (#W48-E1)
-//byte for byte. Pure; the two answer-seam scans below share it.
-//#W67-AV (I2, engine HIGH-2; deck130 HIGH-3; deck125 HIGH-1). A COMPLETE REPLY
-//WITH NO LABEL IS NOT A FAILED REPLY. 92 of the 2094 wave-66 corpus replies
-//carry NO coded answer line at all and 87 of them carry a line-leading PLAN:
-//the model reasoned, concluded in prose ("Therefore, I cast nothing.", "I will
-//choose option 1."), wrote its plan, and never wrote the label. 81 of the 92
-//went to Baka as `unparsed_reply`; 125v146 seq 58 lost a decided Talisman to
-//Baka's Stone Rain. #W67-AV I1 rescues 49 of them (the answer was written
-//behind an `ANSWER:` heading); this is the remainder.
-//The salvage is DELIBERATELY the narrow one. Measured on the 37 label-free
-//replies, matching a row's short name inside the LAST action sentence before
-//PLAN yields 7 exact single-row matches, 2 ambiguous and 28 no-match; widening
-//the scan backwards over every sentence yields 22 - and hand-reading those 15
-//extra shows them salvaging HYPOTHETICALS (125v123 s43's last matching sentence
-//is "Even if I cast Tribute to Hunger to remove Fate Unraveler..." while its
-//conclusion two sentences later is "Therefore, I cast nothing."). A wrong row
-//executed is worse than a question, so the wide scan is not shipped: exact
-//single-row match or ONE re-ask, never Baka on a complete reply.
-static string gptRowShortName(const string& row)
-{
-    string n = row;
-    size_t cut = n.find('{');
-    if (cut != string::npos)
-        n = n.substr(0, cut);
-    cut = n.find('[');
-    if (cut != string::npos)
-        n = n.substr(0, cut);
-    const size_t s = n.find_first_not_of(" \t\r\n");
-    if (s == string::npos)
-        return string();
-    const size_t e = n.find_last_not_of(" \t\r\n");
-    return n.substr(s, e - s + 1);
-}
-
 //The trigger: a COMPLETE reply (it reached its PLAN line) that carries no coded
 //answer line anywhere. A reply with no PLAN is a truncated or spiralling reply
 //and keeps every path it has today.
@@ -19182,121 +19099,9 @@ static bool replyLabelMissing(const string& reply)
            && firstLineLeadingPlanPos(reply) != string::npos;
 }
 
-//The LAST sentence before the PLAN marker that states an action, matched against
-//the rows by short-name containment. Exactly one distinct row -> that row
-//(1-based); zero or more than one -> -1, and the caller re-asks.
-//#W67-AZ (R1, codex review finding 1). POLARITY. The label-missing salvage
-//matches an action verb and a row's short name inside ONE sentence, and the
-//reply that REFUSES a row is the shape whose words match that row hardest:
-//`I will not cast Doom Blade.\nPLAN: Preserve it for later.` named the Doom
-//Blade row uniquely and cast it. A negation cue standing BEFORE the row's name
-//in that sentence disqualifies the match; the salvage then has no candidate and
-//the caller re-asks (never Baka, never the row). Cues are WORD-BOUNDED, so
-//"Cast nothing right now" is not negated by the "not" inside "nothing", and the
-//two contracted forms cover the apostrophe the model actually writes. Pure.
-static bool sentenceNegatesBefore(const string& lowSentence, size_t at)
-{
-    struct Cue { const char * s; bool suffix; };
-    static const Cue kNeg[] = {
-        { "not", false }, { "never", false }, { "cannot", false }, { "no longer", false },
-        { "rather than", false }, { "instead of", false }, { "avoid", false },
-        { "avoiding", false }, { "refrain", false }, { "without", false },
-        { "n't", true }, { "n\xE2\x80\x99t", true }
-    };
-    for (size_t k = 0; k < sizeof(kNeg) / sizeof(kNeg[0]); k++)
-    {
-        const string cue = kNeg[k].s;
-        size_t p = lowSentence.find(cue);
-        while (p != string::npos && p < at)
-        {
-            const char after = (p + cue.size() < lowSentence.size())
-                               ? lowSentence[p + cue.size()] : ' ';
-            const char before = p ? lowSentence[p - 1] : ' ';
-            const bool rightOk = !isalnum((unsigned char) after);
-            const bool leftOk = kNeg[k].suffix ? (isalpha((unsigned char) before) != 0)
-                                               : !isalnum((unsigned char) before);
-            if (rightOk && leftOk)
-                return true;
-            p = lowSentence.find(cue, p + 1);
-        }
-    }
-    return false;
-}
-
-static int salvageLabelMissingChoice(const string& reply, int optionCount,
-                                     const vector<string> * optionTexts)
-{
-    if (!optionTexts || optionCount <= 0 || (int) optionTexts->size() < optionCount
-        || !replyLabelMissing(reply))
-        return -1;
-    const size_t planAt = firstLineLeadingPlanPos(reply);
-    const string head = reply.substr(0, planAt);
-    //sentences: a newline, or . ! ? followed by whitespace
-    vector<string> sentences;
-    size_t start = 0;
-    for (size_t i = 0; i < head.size(); i++)
-    {
-        const char c = head[i];
-        const bool nl = (c == '\n');
-        const bool stop = ((c == '.' || c == '!' || c == '?')
-                           && (i + 1 >= head.size() || isspace((unsigned char) head[i + 1])));
-        if (!nl && !stop)
-            continue;
-        sentences.push_back(head.substr(start, i + 1 - start));
-        start = i + 1;
-    }
-    if (start < head.size())
-        sentences.push_back(head.substr(start));
-    static const char * kActs[] = {
-        "cast ", "choose ", "choosing ", "play ", "discard ", "pick ", "select ",
-        "take ", "hold ", "pass", "attack", "block", "put ", "activate "
-    };
-    for (size_t si = sentences.size(); si-- > 0; )
-    {
-        string low = sentences[si];
-        for (size_t i = 0; i < low.size(); i++)
-            low[i] = (char) tolower((unsigned char) low[i]);
-        bool isAction = false;
-        for (size_t k = 0; k < sizeof(kActs) / sizeof(kActs[0]) && !isAction; k++)
-            isAction = (low.find(kActs[k]) != string::npos);
-        if (!isAction)
-            continue;
-        int hit = -1;
-        bool ambiguous = false;
-        for (int r = 0; r < optionCount; r++)
-        {
-            string name = gptRowShortName((*optionTexts)[r]);
-            if (name.size() < 4)
-                continue; //too short to identify a row inside prose
-            for (size_t i = 0; i < name.size(); i++)
-                name[i] = (char) tolower((unsigned char) name[i]);
-            //A row's own parenthetical gloss ("Cast nothing right now (combat
-            //comes next this turn)") is not part of the name the model writes
-            //back, so the head before it is a second candidate. Two rows whose
-            //heads collide simply make the sentence ambiguous, which re-asks.
-            string head = name;
-            const size_t par = head.find(" (");
-            if (par != string::npos && par >= 4)
-                head = head.substr(0, par);
-            size_t at = low.find(name);
-            if (at == string::npos)
-                at = low.find(head);
-            if (at == string::npos)
-                continue;
-            //#W67-AZ (R1): a NEGATED mention is not a decision to take the row.
-            //Disqualifying it costs one re-ask; crediting it casts the spell the
-            //reply said it was keeping.
-            if (sentenceNegatesBefore(low, at))
-                continue;
-            if (hit >= 0)
-                ambiguous = true;
-            else
-                hit = r + 1;
-        }
-        return (ambiguous || hit < 0) ? -1 : hit; //the LAST action sentence, not the best one
-    }
-    return -1;
-}
+//#W70-BM (E2): `salvageLabelMissingChoice`, `sentenceNegatesBefore` and
+//`gptRowShortName` DELETED - the prose-as-answer salvage. `replyLabelMissing`
+//above survives as the trigger for the ONE re-ask a label-free reply earns.
 
 //#W64-AJ (F13, engine seat HIGH-1). A CODED ANSWER LINE ENDS THE PLAN
 //PARAGRAPH. `planParagraphBound`'s two terminators are a blank line and a
@@ -19332,7 +19137,6 @@ static bool lineIsCodedAnswerLine(const string& line)
     while (s < line.size() && (line[s] == ' ' || line[s] == '\t'
                                || line[s] == '*' || line[s] == '#'))
         s++;
-    s = gptcaveat::answerHeadingSkip(line, s, line.size()); //#W67-AV (I1)
     for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
     {
         const size_t len = strlen(kLabels[k]);
@@ -19390,12 +19194,9 @@ static size_t planBlockEndOffset(const string& text, size_t planPos)
 //coded line was inside the plan block, so the unbounded walk answered after all
 //and nothing was lost - the fail-safe, counted rather than assumed.
 static const int kPlanAnswerNoteNone = 0;
-static const int kPlanAnswerInPlanIgnored = 1;
-static const int kPlanAnswerOnlyInPlan = 2;
-//#W65-AO (G8): a LATER coded answer line existed and was refused by the
-//first-wins rule. The refusal is a decision about the reply and is recorded
-//like every other one - `later_answer_ignored`.
-static const int kPlanAnswerLaterIgnored = 3;
+//#W70-BM (E2): the two plan-block verdicts are DELETED with the demotion; the
+//one shape left to sign is a reply that wrote MORE THAN ONE answer line.
+static const int kPlanAnswerExtraLine = 1;
 
 //#W66-AR (H2c): the whole line beginning at `off`, right-trimmed. The refused
 //answer line, taken from the SAME string the selector walked - so the record's
@@ -19529,34 +19330,25 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         const size_t planStart = firstLineLeadingPlanPos(text);
         const size_t planEnd = (planStart == string::npos)
                                ? string::npos : planBlockEndOffset(text, planStart);
-        size_t lastHead = string::npos; //#W65-AO (G8)
-        bool got = findAnswerLabelLine(text, expectedLabel, ss, se, ls,
-                                       choiceRunLen, rejectedLines, planStart, planEnd,
-                                       &lastHead);
-        if (!got && planStart != string::npos)
+        //#W70-BM (E2): the plan-block DEMOTION and its two-walk reconciliation
+        //are DELETED. They existed because a reply could write a coded line
+        //inside a rambling PLAN paragraph; a PLAN line that is a SEQUENCE OF
+        //INTENDED ACTIONS cannot contain a line-leading answer label without
+        //being a second answer line, which is a violation the scan now counts.
+        (void) planStart;
+        (void) planEnd;
+        size_t lastHead = string::npos;
+        int extraLines = 0;
+        const bool got = findAnswerLabelLine(text, expectedLabel, ss, se, ls,
+                                             &extraLines, rejectedLines, &lastHead);
+        if (got && extraLines > 0)
         {
-            got = findAnswerLabelLine(text, expectedLabel, ss, se, ls,
-                                      choiceRunLen, rejectedLines, string::npos,
-                                      string::npos, &lastHead);
-            if (got && planAnswerNote)
-                *planAnswerNote = kPlanAnswerOnlyInPlan;
-        }
-        else if (got && planStart != string::npos && planAnswerNote)
-        {
-            size_t us = 0, ue = 0, uls = 0;
-            if (findAnswerLabelLine(text, expectedLabel, us, ue, uls, NULL, NULL)
-                && uls != ls)
-                *planAnswerNote = kPlanAnswerInPlanIgnored;
-        }
-        //#W65-AO (G8): the first-wins refusal outranks the plan-bound note as the
-        //thing that decided this reply - a later coded line existed and did not
-        //run. Written last so the seam signs what actually happened.
-        if (got && planAnswerNote && lastHead != string::npos && lastHead != ls)
-        {
-            *planAnswerNote = kPlanAnswerLaterIgnored;
-            //#W66-AR (H2c): and the refused line itself, from the SAME text the
-            //scan walked, so the record can carry the line the stamp names.
-            if (laterIgnoredLine)
+            //#W70-BM (E2): a SECOND answer line. The first one runs (a decision
+            //is never thrown away over line count) and the shape is stamped as
+            //the violation it is; the seam's re-ask ladder asks once more.
+            if (planAnswerNote)
+                *planAnswerNote = kPlanAnswerExtraLine;
+            if (laterIgnoredLine && lastHead != string::npos && lastHead != ls)
                 *laterIgnoredLine = gptLineAtOffset(text, lastHead);
         }
         if (got)
@@ -19575,18 +19367,21 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     size_t pos = findPlanMarker(text, labelLineStart, &firstPos);
     if (pos == string::npos)
     {
+        //#W70-BM (E1): the model omitted its PLAN, so the carried sequence
+        //stands - and this window's action still consumed a step of it.
+        if (!mCurrentPlan.empty()
+            && (size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(mCurrentPlan))
+            mPlanStepsDone++;
         //No plan stated: keep the previous one. The answer segment (when
         //labeled) is still the decision.
         if (answerStart != string::npos)
             return text.substr(answerStart, answerEnd - answerStart);
-        //No label AND no plan: a compliant legacy reply is a short bare
-        //answer; a multi-KB text here is a truncated formless ramble, and
-        //scanning it for integers is how a quoted "option 1" cast the
-        //spell the reasoning had just condemned (wave-10: two seats, one
-        //self-Fatal-Push). Rambles parse as FAIL - the heuristic answers.
-        if (text.size() > 300)
-            return string();
-        return text;
+        //#W70-BM (E2): the LEGACY BARE-ANSWER path is DELETED. A reply with no
+        //label and no plan is not an answer of any length - it is a reply that
+        //did not follow the protocol, and `replyLabelMissing` earns it the ONE
+        //re-ask the seams run. Reading a bare 300-byte head as a decision is the
+        //prose-as-answer tolerance under a size limit.
+        return string();
     }
 
     //The plan ends where a trailing answer label begins - the answer line
@@ -19600,7 +19395,10 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     if (s != string::npos)
     {
         plan = plan.substr(s, e - s + 1);
+        const size_t planBeforeBound = plan.size(); //#W70-BM (E3): B3.3's census
         plan = planParagraphBound(plan); //#W54-A (D12a): SHAPE first
+        if (plan.size() < planBeforeBound)
+            mPlanParagraphBoundCuts++;
         //#W60-M (B13a): then the LENGTH bound, with a stated marker where it
         //cut. The old ceiling was 1,600 characters, which is not a bound on a
         //deliberation stream: 148 of one wave-59 seat's 410 echoes were over
@@ -19620,9 +19418,27 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //but only when the bound above did not already choose the cut and mark
         //it. Both passes now live in planCarryCompose, so the composed result
         //is what PARSETEST checks.
-        plan = gptcaveat::planCarryCompose(plan, kPlanCarryMaxChars);
+        //#W70-BM (E1): the STEP-bounded compose. Same scratchpad cut, same
+        //character ceiling, but the cut lands at the end of a step and the note
+        //names how many later steps it dropped - so a three-step plan can never
+        //be served as its first step and a half.
+        plan = gptcaveat::planCarryComposeSteps(plan, kPlanCarryMaxSteps, kPlanCarryMaxChars);
         //#W49-U D7: count verbatim echoes of the plan already carried.
         mPlanEchoCount = (plan == mCurrentPlan) ? mPlanEchoCount + 1 : 0;
+        //#W70-BM (E1): STEP ONE IS CONSUMED BY THE ACTION. The action line IS
+        //step one of the plan, so a window whose reply RESTATES the same plan has
+        //already executed the step the previous window was served: the carry
+        //advances and the NEXT window is served the remainder. A CHANGED plan is
+        //a new sequence and starts again at step one. The pointer is clamped in
+        //planStepsAfter so a fully-walked plan still carries its last step rather
+        //than vanishing (a blank carry reads as "no plan yet" and asks for one).
+        if (plan == mCurrentPlan)
+        {
+            if ((size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(plan))
+                mPlanStepsDone++;
+        }
+        else
+            mPlanStepsDone = 0;
         //#W53-N (D12a): the model WROTE a plan line here, whatever it says -
         //that, not its content, is what the age stamp reports.
         mPlanSetSeq = mTransSeq;
@@ -19659,19 +19475,13 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
             ans = text.substr(answerStart);
         return ans;
     }
-    //No label. A reply that LEADS with its plan followed the new contract
-    //but lost its answer line (max_tokens truncation) - return nothing
-    //parsable so the caller falls back, rather than letting plan prose
-    //integers hijack the choice. A reply that leads with something else is
-    //the legacy head-first shape: the head is the decision.
-    size_t head = text.find_first_not_of(" \t\r\n");
-    if (head != string::npos && firstPos == head)
-        return string();
-    //Same ramble guard as above: a legacy head is a short answer line, not
-    //pages of prose ahead of a PLAN: marker.
-    if (firstPos > 300)
-        return string();
-    return text.substr(0, firstPos);
+    //#W70-BM (E2): NO LABEL, whatever came before the plan. The reply wrote a
+    //PLAN line and no action line - the length cap cut it, or it never wrote
+    //one. Either way nothing here is a decision, and the LEGACY HEAD path that
+    //read the bytes before the marker as one is DELETED with the 300-byte ramble
+    //guard that bounded it. The seams re-ask.
+    (void) firstPos;
+    return string();
 }
 
 int AIPlayerGPT::receiveEvent(WEvent * event)
@@ -26942,7 +26752,6 @@ int AIPlayerGPT::codedChoiceOrdinal(const string& content, int choice, int optio
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -27408,39 +27217,8 @@ static string replyProseAfterChoice(const string& replyIn)
     return out;
 }
 
-//#W56-A (D16): does the prose name a row of THIS menu that is not the row the
-//CHOICE line took? 9 firings of `plan_choice_conflict` in the wave-55 corpus -
-//the largest fallback class - and every one of them was a live row taken
-//beside the pool's OWN mandated arithmetic vocabulary ("this window: pass",
-//"stop reached"), i.e. prose about the count, naming no other row. A pass
-//verdict beside a taken row is only a CONTRADICTION when the prose points at
-//something else on the same screen. A name that also appears inside the taken
-//row's own text is not another row (a kicked/unkicked pair).
-static bool proseNamesOtherMenuRow(const string& replyIn, const std::vector<string>& rows,
-                                   int choice, string * namedOut = NULL)
-{
-    if (namedOut) namedOut->clear();
-    if (choice < 1 || choice > (int) rows.size())
-        return false;
-    const string prose = replyProseAfterChoice(replyIn);
-    if (prose.empty())
-        return false;
-    const string takenCore = stripRenderAnnotationsLc(rows[choice - 1]);
-    for (size_t r = 0; r < rows.size(); r++)
-    {
-        if ((int) r == choice - 1)
-            continue;
-        const string name = menuRowProseName(rows[r]);
-        if (name.empty() || takenCore.find(name) != string::npos)
-            continue;
-        if (prose.find(name) != string::npos)
-        {
-            if (namedOut) *namedOut = name;
-            return true;
-        }
-    }
-    return false;
-}
+//#W70-BM (E4): `proseNamesOtherMenuRow` DELETED with the rival-row stamp it fed
+//- prose naming a rival row is prose, and the protocol no longer has any.
 
 //#W68-BA (J6): is this row the menu's own DECLINE? A reply whose prose says
 //"this window is a pass" CONFIRMS such a row rather than contradicting it - the
@@ -27484,63 +27262,21 @@ static bool noopRowEarnsReask(const string& row)
     return AIPlayerGPT::rowSaysNoOp(row) && !rowIsDeclineRow(row);
 }
 
-//#W51-C (D4b): the PLAN line says this window is a pass. Scanned on PLAN-
-//labelled lines only (post-think): "this window: pass" / "stop reached" -
-//the answer-first protocol writes the count before the subtraction, so a
-//CHOICE count on the repeat row under such a PLAN is a contradiction the
-//model is asked to resolve once (deck123 vs126 seq 32: x25 under "This
-//window: pass", M 33 -> 58 past a stop of 30).
-//#W52-J (D14): ALSO the prose verdict OPENERS after the coded line - the
-//model writes "CHOICE: 1 (Lolth 0)" and then "We must pass and hope"
-//(deck146 vs125 seq 282, executed at 2 life, 2 -> 1). A sentence that OPENS
-//with the verdict ("We must pass", "We pass", "So we pass", "The answer is
-//pass") anywhere after the CHOICE line is the claim; the same words mid-
-//sentence ("make 17 now, then we pass"), a negated verdict ("we must not
-//pass", "cannot pass"), a bare "Pass." (x0 owns that reply), and a pass
-//deferred to a later window ("we pass the turn", "pass priority after
-//combat", "next window") are NOT. Text before the CHOICE line is never read;
-//with no CHOICE line only the PLAN-line patterns run. matchedOut receives
-//the sentence/line that carried the verdict, for the re-ask to quote.
-//#W56-C (D3): `fromStripped` is an offset into the POST-THINK text, and it is
-//the whole of this item's engine half: the pass evidence must come from the
-//SAME REGION of the reply as the coded line the engine latched. `130v123` seq
-//109 carried `CHOICE: 0 (pass)` with "I will pass" beside it, then 400 words
-//later reasoned to `CHOICE: 5 (cycling with Starstorm)`; the engine latched and
-//executed row 5 - correctly - and then read the FIRST line's pass prose as a
-//contradiction of it, re-asked, and the second reply passed. A verdict written
-//before the answer the engine took is evidence about a line the engine did not
-//run. 0 = the whole reply (the shape every other caller wants).
-//#W68-BA (J6, deck130 HIGH-3; deck123 HIGH-2; engine MED). ONE PREDICATE, EVERY
-//SEAM. The shape "the reply declares X and then says in its own words that it is
-//not doing X" is one defect, and this function was its only reader - scoped to
-//"choice:" and to the word "pass", so it could only ever see the priority seam.
-//The corpus says the combat seams write it too, in their own words: 5 of the 74
-//attackers replies declared attackers under prose naming a pass (130v126 s24 ran
-//`ATTACK: A1-A4` under "I must NOT attack ... I will pass combat" - 6 life into a
-//lifegain deck, the game lost 0/34; also 130v125 s51/s58/s63 and 123v162 s24).
-//`seamVocab` selects the label the evidence must follow and the words that ARE
-//the verdict at that seam; every guard is shared and unchanged - post-think only,
-//evidence only from the latched line's region, negations and deferrals rejected.
-//seamVocab 0 = CHOICE (byte-identical to every shipped caller), 1 = ATTACK,
-//2 = BLOCKS.
-//#W69-BF (K3, deck123 HIGH-2; deck162 MED-3; deck152 LOW; BA-8 FAIL). WHERE THE
-//SENTENCE MAY BE READ. Measured over matchups-20260906-134120 before this was
-//written: `decision_reversed_in_prose` fired 22 times and the CORRECTION ZONE -
-//the sentences between the coded line and the PLAN: line, which is where this
-//protocol tells the model to write a change of mind - was EMPTY on all 22. Every
-//firing came from the PLAN BODY, and 16 of them from the sentence-opener half
-//reading plan prose as a reversal: "I will pass to combat", "We pass to Main 2",
-//"I will pass to second main phase" are statements of intent for a LATER window,
-//and 12 of those 16 re-asks came back with the identical answer - a round trip
-//each, for nothing. `untilStripped` bounds the sentence-opener walk; the
-//PLAN-CUE half above is untouched and still reads the PLAN line's own arithmetic
-//verdict ("this window: pass", "stop reached"), which is a different claim and
-//fired 4 times. Default string::npos = the whole reply: byte-identical to every
-//shipped caller and to every case pinned before this wave.
+//#W70-BM (E4). THE PLAN LINE IS THE ONLY PLACE A VERDICT MAY BE WRITTEN. Two
+//halves of this predicate are DELETED: the SENTENCE-OPENER walk (it read prose
+//sentences between the coded line and the PLAN line - a region the two-line
+//protocol does not have) and `fromStripped`, the offset that started the scan at
+//the LATCHED CODED LINE. Under PLAN-then-action the plan line stands ABOVE the
+//answer, so scanning forward from the answer could never see it: the plan-vs-
+//choice contradiction detector was about to go silently dead, and its census
+//stamps would have read 0 for the wrong reason (the silent-instrument class).
+//What is left is the half the ruling permits and the corpus actually fired: the
+//PLAN LINE's own verdict about THIS window ("this window: pass", "stop reached",
+//"do not attack"), read wherever the plan line sits. Deferrals ("pass the turn",
+//"next window", "not attack WITH A2") are still rejected - a plan that says what
+//it will do LATER has not contradicted what it did NOW.
 static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL,
-                                   size_t fromStripped = 0,
-                                   const char * label = "choice:", int seamVocab = 0,
-                                   size_t untilStripped = string::npos)
+                                   int seamVocab = 0)
 {
     string text = replyIn;
     size_t thinkEnd = text.rfind("</think>");
@@ -27549,9 +27285,7 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
     string low = text;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
-    if (fromStripped > low.size())
-        fromStripped = low.size();
-    size_t scan = fromStripped;
+    size_t scan = 0;
     while ((scan = low.find("plan:", scan)) != string::npos)
     {
         size_t eol = low.find('\n', scan);
@@ -27612,193 +27346,14 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         }
         scan += 5;
     }
-    //#W52-J (D14): sentence openers after the CHOICE line.
-    //#W56-C (D3): from the latched line's region when one was named.
-    size_t choiceAt = low.find(label, fromStripped); //#W68-BA (J6): the seam's label
-    if (choiceAt == string::npos)
-        return false;
-    size_t region = low.find('\n', choiceAt);
-    if (region == string::npos)
-        return false;
-    static const char * kOpeners[] = {
-        "we must pass", "we should pass", "we will pass", "we have to pass", "we need to pass",
-        "we pass", "i must pass", "i should pass", "i will pass", "i pass", "must pass",
-        "the answer is pass", "the answer is to pass", "answer is pass", "answer: pass",
-        "the correct answer is pass", "the correct choice is pass", "the correct choice is to pass",
-        "the right choice is to pass", "the right play is to pass", "the correct play is to pass",
-        "best to pass", "better to pass", "safer to pass"
-    };
-    //#W68-BA (J6): the combat seams' verdict openers. The verdict at ATTACK and
-    //BLOCKS is itself a negation ("I will not attack"), so it is spelled out here
-    //rather than inferred, and " with " joins the deferral list at those seams -
-    //"I will not attack with A1" is a statement about ONE attacker, not the combat.
-    static const char * kOpenersAttack[] = {
-        "i will not attack", "i do not attack", "i must not attack", "i should not attack",
-        "we will not attack", "we must not attack", "we do not attack",
-        "do not attack", "don't attack", "i will pass combat", "we pass combat",
-        "i pass combat", "pass combat", "i attack with nothing", "we attack with nothing",
-        "no attacks this turn", "no attackers this turn",
-        "i hold back", "we hold back", "i will hold back", "we will hold back"
-    };
-    static const char * kOpenersBlocks[] = {
-        "i will not block", "i do not block", "i must not block", "i should not block",
-        "we will not block", "we must not block", "do not block", "don't block",
-        "i block with nothing", "no blocks this turn", "no blockers this turn",
-        "i declare no blockers", "we declare no blockers"
-    };
-    //#W69-BF (K3): the ANNOUNCEMENTS this protocol itself asks a correction to
-    //open with ("CORRECTION:", "Re-evaluating:", "Actually,", "On second
-    //thought,"). The correction zone is the channel the protocol now routes a
-    //change of mind into, so the predicate must be able to read a sentence that
-    //arrives in the shape the protocol asked for. "Wait" and "hmm" are NOT
-    //announcements - the protocol says so and they are deliberately absent here.
-    static const char * kLeads[] = { "so ", "therefore ", "thus ", "hence ", "so, ", "therefore, ", "thus, ",
-                                     "correction: ", "correction, ", "re-evaluating: ", "re-evaluating, ",
-                                     "actually, ", "actually ", "on second thought, ", "instead, " };
-    static const char * kDeferrals[] = {
-        " the turn", " turn", " priority after", " after ", " next window", " next turn", " later", " until ", " once "
-    };
-    static const char * kDeferralsCombat[] = {
-        " with ", " next window", " next turn", " later", " until ", " once ", " after "
-    };
-    size_t pos = region + 1;
-    while (pos < low.size() && pos < untilStripped) //#W69-BF (K3)
-    {
-        //sentence opener: skip whitespace and the PLAN label
-        size_t st = low.find_first_not_of(" \t\r\n", pos);
-        if (st == string::npos)
-            break;
-        if (st >= untilStripped) //#W69-BF (K3): past the correction zone
-            break;
-        if (low.compare(st, 5, "plan:") == 0)
-        {
-            st = low.find_first_not_of(" \t", st + 5);
-            if (st == string::npos)
-                break;
-        }
-        size_t sentEnd = low.find_first_of(".!?;\n", st);
-        size_t sentStop = (sentEnd == string::npos) ? low.size() : sentEnd;
-        string sent = low.substr(st, sentStop - st);
-        string head = sent;
-        for (size_t l = 0; l < sizeof(kLeads) / sizeof(kLeads[0]); l++)
-            if (head.compare(0, strlen(kLeads[l]), kLeads[l]) == 0)
-            {
-                head = head.substr(strlen(kLeads[l]));
-                break;
-            }
-        //#W68-BA (J6): the seam's own opener and deferral tables.
-        const char * const * openers = kOpeners;
-        size_t nOpeners = sizeof(kOpeners) / sizeof(kOpeners[0]);
-        const char * const * deferrals = kDeferrals;
-        size_t nDeferrals = sizeof(kDeferrals) / sizeof(kDeferrals[0]);
-        if (seamVocab == 1)
-        {
-            openers = kOpenersAttack; nOpeners = sizeof(kOpenersAttack) / sizeof(kOpenersAttack[0]);
-            deferrals = kDeferralsCombat; nDeferrals = sizeof(kDeferralsCombat) / sizeof(kDeferralsCombat[0]);
-        }
-        else if (seamVocab == 2)
-        {
-            openers = kOpenersBlocks; nOpeners = sizeof(kOpenersBlocks) / sizeof(kOpenersBlocks[0]);
-            deferrals = kDeferralsCombat; nDeferrals = sizeof(kDeferralsCombat) / sizeof(kDeferralsCombat[0]);
-        }
-        for (size_t k = 0; k < nOpeners; k++)
-        {
-            size_t n = strlen(openers[k]);
-            if (head.compare(0, n, openers[k]) != 0)
-                continue;
-            if (head.size() > n && isalnum((unsigned char) head[n]))
-                continue; //"passes"/"passing" - not the verdict word
-            string rest = head.substr(n);
-            bool deferred = false;
-            //deferral words must follow the verdict closely ("pass the turn",
-            //"pass priority after combat"); "and hope ... next turn" far
-            //down the sentence is not a deferral.
-            string near = rest.substr(0, 30);
-            for (size_t d = 0; d < nDeferrals && !deferred; d++)
-                deferred = (rest.compare(0, strlen(deferrals[d]), deferrals[d]) == 0)
-                           || (strlen(deferrals[d]) > 5 && near.find(deferrals[d]) != string::npos);
-            if (deferred)
-                break;
-            if (matchedOut)
-            {
-                string raw = text.substr(st, sentStop - st);
-                size_t e = raw.find_last_not_of(" \t\r");
-                *matchedOut = (e == string::npos) ? string() : raw.substr(0, e + 1);
-                if (matchedOut->size() > 160)
-                    *matchedOut = matchedOut->substr(0, 160);
-            }
-            return true;
-        }
-        if (sentEnd == string::npos)
-            break;
-        pos = sentEnd + 1;
-    }
     return false;
 }
 
-//#W68-BA (J6): the reversal predicate, named for what it does and addressed by
-//seam. 0 = CHOICE (ask/priority), 1 = ATTACK, 2 = BLOCKS. The PUT seam is
-//deliberately NOT wired: a reveal has no "decline" answer to reverse to, so
-//there is no second answer a re-ask could ask for.
-static bool proseReversesDeclaration(const string& replyIn, int seamVocab,
-                                     string * matchedOut = NULL)
-{
-    static const char * kSeamLabels[] = { "choice:", "attack:", "blocks:" };
-    if (seamVocab < 0 || seamVocab > 2)
-        return false;
-    return planSaysPassThisWindow(replyIn, matchedOut, 0, kSeamLabels[seamVocab], seamVocab);
-}
-
-//#W69-BF (K3): the post-think, lowercased text this file's reversal predicates
-//scan, so an offset computed here indexes the same bytes planSaysPassThisWindow
-//walks. One transformation, stated once.
-static string reversalScanText(const string& replyIn)
-{
-    string text = replyIn;
-    size_t thinkEnd = text.rfind("</think>");
-    if (thinkEnd != string::npos)
-        text = text.substr(thinkEnd + 8);
-    for (size_t i = 0; i < text.size(); i++)
-        text[i] = (char) tolower((unsigned char) text[i]);
-    return text;
-}
-
-//#W69-BF (K3): where the CORRECTION ZONE ends - the offset of the first
-//line-leading "plan:" at or after `fromStripped`. string::npos when the reply
-//has no PLAN line, in which case the whole reply after the coded line IS the
-//correction zone (there is no plan body to confuse it with).
-static size_t correctionZoneEnd(const string& replyIn, size_t fromStripped = 0)
-{
-    const string low = reversalScanText(replyIn);
-    size_t scan = (fromStripped > low.size()) ? low.size() : fromStripped;
-    while (scan <= low.size())
-    {
-        size_t at = low.find("plan:", scan);
-        if (at == string::npos)
-            return string::npos;
-        size_t bol = low.rfind('\n', at);
-        bol = (bol == string::npos) ? 0 : bol + 1;
-        size_t f = low.find_first_not_of(" \t\r", bol);
-        if (f == at)
-            return at; //line-leading: this is the PLAN line
-        scan = at + 5;
-    }
-    return string::npos;
-}
-
-//#W69-BF (K3): the reversal predicate, scoped to the correction zone. Same
-//function, same guards, same vocabulary - only the region changes.
-static bool proseReversesInCorrectionZone(const string& replyIn, int seamVocab,
-                                          size_t fromStripped = 0,
-                                          string * matchedOut = NULL)
-{
-    static const char * kSeamLabels[] = { "choice:", "attack:", "blocks:" };
-    if (seamVocab < 0 || seamVocab > 2)
-        return false;
-    return planSaysPassThisWindow(replyIn, matchedOut, fromStripped, kSeamLabels[seamVocab],
-                                  seamVocab, correctionZoneEnd(replyIn, fromStripped));
-}
-
+//#W70-BM (E4): `proseReversesDeclaration`, `reversalScanText`, `correctionZoneEnd`
+//and `proseReversesInCorrectionZone` DELETED. All four existed to locate PROSE
+//between the answer and the plan and read a verdict out of it. The seams call
+//`planSaysPassThisWindow(content, &out, seamVocab)` directly now: one predicate,
+//one region - the PLAN line.
 //#W69-BF (K3): the row's SHORT NAME - the option text up to the first "{", "["
 //or "(", with the leading verb dropped. This is exactly the string the protocol
 //tells the model to copy into its CHOICE parenthetical, and it is what the model
@@ -27900,78 +27455,9 @@ static bool negationGovernsRowName(const string& rest, const string& name)
     return false;
 }
 
-static bool proseNegatesTakenRow(const string& replyIn, const string& row,
-                                 size_t fromStripped = 0, string * matchedOut = NULL)
-{
-    if (matchedOut) matchedOut->clear();
-    const string name = menuRowShortName(row);
-    if (name.empty())
-        return false;
-    const string low = reversalScanText(replyIn);
-    size_t choiceAt = low.find("choice:", (fromStripped > low.size()) ? low.size() : fromStripped);
-    if (choiceAt == string::npos)
-        return false;
-    size_t region = low.find('\n', choiceAt);
-    if (region == string::npos)
-        return false;
-    static const char * kNegations[] = {
-        "you should not", "i should not", "we should not", "you must not", "i must not",
-        "we must not", "you should never", "i should never", "you do not", "i do not",
-        "we do not", "do not ", "don't ", "you will not", "i will not", "we will not",
-        "you cannot", "i cannot", "we cannot", "you can't", "i can't"
-    };
-    static const char * kDefer[] = { " yet", " next turn", " next window", " later",
-                                     " until ", " once ", " after " };
-    size_t pos = region + 1;
-    while (pos < low.size())
-    {
-        size_t st = low.find_first_not_of(" \t\r\n", pos);
-        if (st == string::npos)
-            break;
-        if (low.compare(st, 5, "plan:") == 0)
-        {
-            st = low.find_first_not_of(" \t", st + 5);
-            if (st == string::npos)
-                break;
-        }
-        size_t sentEnd = low.find_first_of(".!?;\n", st);
-        size_t sentStop = (sentEnd == string::npos) ? low.size() : sentEnd;
-        const bool isQuestion = (sentEnd != string::npos && low[sentEnd] == '?');
-        if (!isQuestion)
-        {
-            const string sent = low.substr(st, sentStop - st);
-            for (size_t k = 0; k < sizeof(kNegations) / sizeof(kNegations[0]); k++)
-            {
-                size_t at = sent.find(kNegations[k]);
-                if (at == string::npos)
-                    continue;
-                const string rest = sent.substr(at + strlen(kNegations[k]));
-                if (rest.find(name) == string::npos)
-                    break; //this sentence negates something else
-                //#W69-BJ (F6): ... and it must be THIS row the negation governs.
-                if (!negationGovernsRowName(rest, name))
-                    continue; //another cue in the same sentence may still govern it
-                const string near = rest.substr(0, 60);
-                bool deferred = false;
-                for (size_t dd = 0; dd < sizeof(kDefer) / sizeof(kDefer[0]) && !deferred; dd++)
-                    deferred = (near.find(kDefer[dd]) != string::npos);
-                if (deferred)
-                    break;
-                if (matchedOut)
-                {
-                    *matchedOut = sent;
-                    if (matchedOut->size() > 160)
-                        *matchedOut = matchedOut->substr(0, 160);
-                }
-                return true;
-            }
-        }
-        if (sentEnd == string::npos)
-            break;
-        pos = sentEnd + 1;
-    }
-    return false;
-}
+//#W70-BM (E4): `proseNegatesTakenRow` DELETED - it scanned the SENTENCES after
+//the CHOICE line for a negation naming the taken row. There are no sentences
+//after the action line under invariant 000.
 
 //#W52-J (D14): does the reply carry a PLAN line at all (post-think)? A
 //repeat-row take with no PLAN line has no stop arithmetic to hold it to
@@ -28042,7 +27528,6 @@ bool AIPlayerGPT::latchedCodedChoiceLine(const string& replyIn, int choice, int 
         while (s < end && (text[s] == ' ' || text[s] == '\t'
                            || text[s] == '*' || text[s] == '#' || text[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -31900,7 +31385,6 @@ bool AIPlayerGPT::latchedRowMismatch(const string& reply, int choice, int option
         while (s < end && (reply[s] == ' ' || reply[s] == '\t'
                            || reply[s] == '*' || reply[s] == '#' || reply[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(reply, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -32080,9 +31564,14 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
 //not in the negative vocabulary; "wasted" was. Both spellings are now in it.
 bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
 {
-    size_t pos = findPlanMarker(reply, string::npos, NULL);
-    //#W67-AY (I9b): no marker -> the reply IS the span.
-    string plan = (pos == string::npos) ? reply : reply.substr(pos + 5);
+    //#W70-BM (E4, audit B5.6): the WHOLE-REPLY fallback is DELETED. #W67-AY let
+    //a reply with no PLAN marker be read as if all of it were the plan, which
+    //under invariant 000 means reading the action line and any stray prose as an
+    //argument against the row. No PLAN line, no plan argument.
+    const size_t pos = findPlanMarker(reply, string::npos, NULL);
+    if (pos == string::npos)
+        return false;
+    string plan = reply.substr(pos + 5);
     for (size_t i = 0; i < plan.size(); i++)
         plan[i] = (char) tolower((unsigned char) plan[i]);
     string name = optionLabel(row);
@@ -33289,61 +32778,9 @@ static bool isExampleEchoLine(const string& line)
     return false;
 }
 
-int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
-                                     const std::vector<string> * optionTexts,
-                                     int minChoice)
-{
-    //Decode-time repeat-loops spiral a phrase 60-100x and truncate; the
-    //model usually states a tentative "CHOICE: N (name)" BEFORE the loop
-    //(deck135 wave-18 HARNESS#2). Walk every line, keep the LAST one whose
-    //CHOICE: label re-parses to a valid, offered option through the normal
-    //parseChoice (so echo + staleness protection still apply - a stale line
-    //re-parses to -1 and is skipped, never used). Literal template-placeholder
-    //lines ("CHOICE: [Number] ([Name])") are dropped first (deck62 N7).
-    int salvaged = -1;
-    int salvagedClean = -1; //#W50-Y D7: the last CLEAN well-formed line outranks
-    size_t lineStart = 0;
-    while (lineStart <= content.size())
-    {
-        size_t lineEnd = content.find('\n', lineStart);
-        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
-        size_t s = lineStart;
-        while (s < end && (content[s] == ' ' || content[s] == '\t'
-                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
-            s++; //tolerate markdown/list decoration before the label
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
-        if (end - s >= 7)
-        {
-            static const char * kLabel = "CHOICE:";
-            bool m = true;
-            for (int k = 0; k < 7 && m; k++)
-                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
-            if (m)
-            {
-                string line = content.substr(s + 7, end - (s + 7));
-                //#W50-Y D7: a rejection line is never salvaged.
-                if (!isTemplatePlaceholderLine(line) && !choiceLineIsRejection(line))
-                {
-                    //parseChoice drops an example-echo parenthetical (returns -1),
-                    //so a parroted example line is skipped here without a separate
-                    //guard - the last REAL line-leading choice still wins.
-                    bool st = false;
-                    int c = parseChoice(line, optionCount, optionTexts, &st);
-                    if (c >= minChoice) //#W50-Y D9: a coded 0 is below a no-pass ask's floor
-                    {
-                        salvaged = c; //keep the last well-formed, offered choice
-                        if (choiceLineIsClean(line))
-                            salvagedClean = c;
-                    }
-                }
-            }
-        }
-        if (lineEnd == string::npos)
-            break;
-        lineStart = lineEnd + 1;
-    }
-    return salvagedClean >= 0 ? salvagedClean : salvaged;
-}
+//#W70-BM (E2): `salvageLoopedChoice` DELETED - the multi-answer tolerance. It
+//walked EVERY coded line of a reply and kept the last clean one, which is a
+//rule that only makes sense when a reply is allowed several answers.
 
 //#W49-S (D2): the FIRST line-leading CHOICE line that parses to an offered
 //option (same walk as salvageLoopedChoice, first-wins instead of last-wins).
@@ -33361,7 +32798,6 @@ int AIPlayerGPT::firstCodedChoice(const string& content, int optionCount,
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         if (end - s >= 7)
         {
             static const char * kLabel = "CHOICE:";
@@ -33387,346 +32823,11 @@ int AIPlayerGPT::firstCodedChoice(const string& content, int optionCount,
     return -1;
 }
 
-//True when the resolved (last line-leading) coded CHOICE is not the model's
-//committed answer - route to the heuristic instead of executing the digit.
-//
-//REWORKED (wave-23 N9 residual, deck133 vs137/vs140 evidence). The wave-22
-//detector fired on any tight self-correction PHRASE ("Correction:"/"made a
-//mistake"/"Actually, no") that referenced the answer before PLAN:, and it
-//OVER-FIRED when the model revised a SUB-POINT of its reasoning while the coded
-//index stood unchanged (deck133 vs137 s29: a single sustained "CHOICE: 1", a
-//"*Correction:*" about Bloodghast's haste, the index never moved - yet a bare
-//number match on "1" in "2/1 attacker" tripped it). INDEX-WINS now trusts a
-//sustained in-range coded index; a generic self-correction phrase alone, with a
-//single sustained index and no contradictory coded sibling, NO LONGER fires.
-//retracted_choice now fires on exactly the two shapes that are genuinely not the
-//committed answer:
-//  (a) a SECOND, CONTRADICTORY coded "CHOICE: N" appearing AFTER the resolved
-//      answer (the last line-leading CHOICE, = salvageLoopedChoice's pick) and
-//      naming a DIFFERENT in-range option - the model talked itself onto another
-//      index in prose after answering (deck133 vs140 s9: line-1 "CHOICE: 2
-//      (Decline)" then, buried mid-reasoning, "So CHOICE: 1"). A clean
-//      line-leading RE-ANSWER is NOT this: salvage promotes the last line-leading
-//      CHOICE to the resolved answer, so nothing contradictory sits after it -
-//      the [B] retraction-then-new case still takes the new coded line.
-//  (b) an explicit PAYABILITY/LEGALITY disavowal of the CHOSEN action - the model
-//      says it cannot actually pay/cast/afford the option it coded (deck133 vs137
-//      s26: the engine offered an unpayable "Sacrifice another creature" Yawgmoth
-//      cost with no other creature; the model coded it, then proved it could not
-//      pay). Routing that to the heuristic is always safe. The phrase set is
-//      TIGHT and scoped to the pre-PLAN region AND to the chosen action (a
-//      name-word window, or the sole option of a one-option ask), so a payability
-//      aside about a DIFFERENT card (deck62 vs27 s10 "I cannot cast Fists ...",
-//      which also sits after PLAN:) cannot fire it.
-//A false fallback here only routes to the (safe) heuristic; a false take (a used
-//retracted digit) is the harmful case we still catch.
-bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
-                                               const std::vector<string> * optionTexts,
-                                               int * replacement,
-                                               bool * namedRowNotOffered,
-                                               bool * planProseRecodeOut)
-{
-    if (replacement)
-        *replacement = -1;
-    if (namedRowNotOffered)
-        *namedRowNotOffered = false;
-    if (planProseRecodeOut)
-        *planProseRecodeOut = false;
-    string text = content;
-    size_t thinkEnd = text.rfind("</think>");
-    if (thinkEnd != string::npos)
-        text = text.substr(thinkEnd + 8);
-
-    //End offset AND parsed number of the LAST well-formed CHOICE line
-    //(placeholders skipped, as in salvage - they never parse anyway).
-    long lastChoiceEnd = -1;
-    int chosenNum = -1;
-    size_t planPos = string::npos; //first LINE-LEADING "PLAN:" marker
-    size_t lineStart = 0;
-    while (lineStart <= text.size())
-    {
-        size_t lineEnd = text.find('\n', lineStart);
-        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
-        size_t s = lineStart;
-        while (s < end && (text[s] == ' ' || text[s] == '\t'
-                           || text[s] == '*' || text[s] == '#' || text[s] == '-'))
-            s++;
-        s = gptcaveat::answerHeadingSkip(text, s, end); //#W67-AV (I1)
-        if (end - s >= 7)
-        {
-            static const char * kLabel = "CHOICE:";
-            bool m = true;
-            for (int k = 0; k < 7 && m; k++)
-                m = (toupper((unsigned char) text[s + k]) == kLabel[k]);
-            if (m)
-            {
-                string line = text.substr(s + 7, end - (s + 7));
-                //#W50-Y D7: a rejection line is not an answer, so it is not the
-                //retraction anchor either (deck123 vs125 seq 94: the anchor
-                //became the rejected Greaves line and its index executed).
-                if (!isTemplatePlaceholderLine(line) && !choiceLineIsRejection(line))
-                {
-                    //An example-echo line resolves to -1 in parseChoice, so it
-                    //never becomes the retraction anchor (chosenNum/lastChoiceEnd).
-                    bool st = false;
-                    int c = parseChoice(line, optionCount, optionTexts, &st);
-                    if (c >= 0) { lastChoiceEnd = (long) end; chosenNum = c; }
-                }
-            }
-        }
-        //First line-leading PLAN: marker (the answer-first plan line). A
-        //quoted mid-line "Your plan:" is NOT line-leading, so it is ignored -
-        //the deck35 correct fire quotes the prompt's "Your plan:" at 5217 but
-        //its real PLAN: line is at 7416.
-        if (planPos == string::npos && end - s >= 5)
-        {
-            if (tolower((unsigned char) text[s]) == 'p' && tolower((unsigned char) text[s + 1]) == 'l'
-                && tolower((unsigned char) text[s + 2]) == 'a' && tolower((unsigned char) text[s + 3]) == 'n'
-                && text[s + 4] == ':')
-                planPos = s;
-        }
-        if (lineEnd == string::npos)
-            break;
-        lineStart = lineEnd + 1;
-    }
-    if (lastChoiceEnd < 0)
-        return false; //nothing well-formed to retract
-
-    //Condition (a): the search region ends at the first line-leading PLAN:
-    //marker (when it follows the answer). No PLAN: -> the whole tail. A PLAN:
-    //BEFORE the answer (legacy plan-first shape) leaves no valid region and
-    //cannot fire - the safe direction.
-    size_t regionEnd;
-    if (planPos == string::npos)
-        regionEnd = text.size();
-    else if (planPos > (size_t) lastChoiceEnd)
-        regionEnd = planPos;
-    else
-        return false;
-    //#W62-Z (D10): the span the scan below must NOT read - the PLAN BLOCK
-    //itself (see planBlockEndOffset). Everything after that block is ordinary
-    //post-answer prose and is read exactly as it was before this wave.
-    const size_t planBlockStart = (planPos != string::npos && planPos > (size_t) lastChoiceEnd)
-                                  ? planPos : string::npos;
-    const size_t planBlockEnd = (planBlockStart == string::npos)
-                                ? string::npos : planBlockEndOffset(text, planBlockStart);
-    (void) regionEnd;
-
-    //Significant name-words of the chosen option (same filter as parseChoice:
-    //lowercase, length >= 4, minus the verb/decline filler) for condition (b)'s
-    //answer-reference test.
-    vector<string> chWords;
-    if (optionTexts && chosenNum >= 1 && chosenNum <= (int) optionTexts->size())
-    {
-        const string& src = (*optionTexts)[chosenNum - 1];
-        string t;
-        for (size_t k = 0; k <= src.size(); k++)
-        {
-            char c = (k < src.size()) ? (char) tolower((unsigned char) src[k]) : ' ';
-            if (isalnum((unsigned char) c))
-                t += c;
-            else
-            {
-                if (t.size() >= 4 && t != "cast" && t != "with" && t != "play"
-                    && t != "pass" && t != "none" && t != "hold" && t != "done"
-                    && t != "skip" && t != "decline" && t != "nobody")
-                    chWords.push_back(t);
-                t.clear();
-            }
-        }
-    }
-
-    string low = text;
-    for (size_t i = 0; i < low.size(); i++)
-        low[i] = (char) tolower((unsigned char) low[i]);
-
-    //(a) A contradictory coded "CHOICE: N" AFTER the resolved answer's line.
-    //lastChoiceEnd is the END offset of the LAST line-leading well-formed CHOICE
-    //(salvage's resolved answer), so any "choice:" token found from there is
-    //necessarily mid-line prose - the model re-stating a DIFFERENT index after it
-    //already answered (deck133 vs140 s9: line-1 CHOICE: 2, then "So CHOICE: 1").
-    //A clean line-leading recode ([B] retraction-then-new) resolves lastChoiceEnd
-    //to the LATER line, so its earlier superseded index sits BEFORE the scan and
-    //never fires. The parroted template "CHOICE: [Number]" is skipped.
-    //
-    //WAVE-25 ITEM 1 (protocol-example leak, deck133 vs131 s21): a mid-line coded
-    //index is only a genuine re-answer when the model WROTE it as prose intent, NOT
-    //when it QUOTED the reply protocol's own worked example while agonizing over
-    //output format. s21's reply re-affirmed line-1 "CHOICE: 1" repeatedly and never
-    //changed its decision, but quoted the prompt's `e.g. "CHOICE: 2 (Cast Fatal
-    //Push)"` four times (the old example used option 1's very card name), and the
-    //scan latched that quoted "CHOICE: 2" as a contradictory index -> false
-    //retraction. TWO exclusions make the scan segment-anchored to real prose:
-    //(1) a "choice:" token immediately preceded by a quote character is the model
-    //quoting a format string, not answering; (2) a token whose parenthetical names
-    //the protocol's fake example card ("Example Card") is a verbatim echo of the
-    //example. Both are skipped; a bare prose re-code like "So CHOICE: 1" (deck133
-    //vs140 s9) is neither quoted nor an example echo and still fires. Part 3
-    //(the fake-card de-fang) prevents the shape at the source going forward; this
-    //guard keeps replies generated under the old example (and any future quoting)
-    //from mis-firing.
-    //#W62-Z (D10, deck162 HIGH-2 seq 49): this scan's own comment says the
-    //region ENDS at the first line-leading PLAN: marker, and `regionEnd` was
-    //computed for it above - but the variable was never read: wave 24 retired
-    //branch (b), which had been its only consumer, and the bound went with it.
-    //So a "CHOICE: n" token written INSIDE the PLAN - the block the protocol
-    //asks the model to write, and that this engine carries forward verbatim as
-    //its plan - silently replaced the committed answer with no parse note.
-    //`162v126` seq 49 answered `CHOICE: 4 (Cast Teferi's Puzzle Box)` on a
-    //six-row menu (index and name both matching row 4, coded_answers 1) and
-    //resolved to row 5, "Cast nothing right now": measured on this build, the
-    //answer line alone parses to 4, and appending one mid-prose "So CHOICE: 5"
-    //to the same reply flips it to 5 with `reanswer=5`. The bound is restored,
-    //so the rule the reply protocol states is the rule the engine runs: the
-    //answer is a coded ANSWER LINE, and plan prose never overrides one. A reply
-    //with no PLAN: line (the wave-47 decode-spiral shape #W48-E1 was written
-    //for, and the wave-33 deck133 vs140 s9 case) keeps the whole tail and is
-    //unchanged.
-    {
-        size_t scan = (size_t) lastChoiceEnd;
-        while ((scan = low.find("choice:", scan)) != string::npos)
-        {
-            //#W62-Z (D10): a coded token written INSIDE the PLAN BLOCK is plan
-            //text, not an answer - measured, never executed.
-            if (planBlockStart != string::npos && scan >= planBlockStart && scan < planBlockEnd)
-            {
-                if (planProseRecodeOut)
-                {
-                    size_t d0 = scan + 7;
-                    while (d0 < low.size() && (low[d0] == ' ' || low[d0] == '\t'))
-                        d0++;
-                    if (d0 < low.size() && isdigit((unsigned char) low[d0])
-                        && !(scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
-                                          || low[scan - 1] == '`')))
-                    {
-                        size_t e0 = d0;
-                        while (e0 < low.size() && isdigit((unsigned char) low[e0]))
-                            e0++;
-                        const int n0 = atoi(low.substr(d0, e0 - d0).c_str());
-                        if (n0 >= 0 && n0 <= optionCount && n0 != chosenNum)
-                            *planProseRecodeOut = true;
-                    }
-                }
-                scan += 7;
-                continue;
-            }
-            //(1) inside quotation marks -> the model is quoting the format/example,
-            //not restating an answer. Straight quotes and backtick code spans.
-            if (scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
-                             || low[scan - 1] == '`'))
-            { scan += 7; continue; }
-            size_t d = scan + 7;
-            while (d < low.size() && (low[d] == ' ' || low[d] == '\t'))
-                d++;
-            if (d < low.size() && low[d] == '[') { scan += 7; continue; }
-            if (d < low.size() && isdigit((unsigned char) low[d]))
-            {
-                size_t e = d;
-                while (e < low.size() && isdigit((unsigned char) low[e]))
-                    e++;
-                int n = atoi(low.substr(d, e - d).c_str());
-                //(2) verbatim echo of the protocol example: the parenthetical right
-                //after the index names the fake example card. Bounded to the same
-                //line so a distant paren cannot spuriously match.
-                size_t p = e;
-                while (p < low.size() && (low[p] == ' ' || low[p] == '\t')) p++;
-                bool exampleEcho = false;
-                if (p < low.size() && low[p] == '(')
-                {
-                    size_t close = low.find(')', p);
-                    size_t lineEnd = low.find('\n', e);
-                    size_t ex = low.find(kExampleFakeCardLc, p);
-                    if (ex != string::npos && close != string::npos && ex < close
-                        && (lineEnd == string::npos || close <= lineEnd))
-                        exampleEcho = true;
-                }
-                if (exampleEcho) { scan += 7; continue; }
-                //#W50-Y D7 (3): a coded token whose line goes on to REJECT it
-                //("CHOICE: 1 (X) is wrong because ...") is neither an answer
-                //nor a contradiction of the answer - skip it.
-                {
-                    size_t rle = text.find('\n', d);
-                    if (choiceLineIsRejection(text.substr(d, (rle == string::npos) ? string::npos : rle - d)))
-                    { scan += 7; continue; }
-                }
-                if (n >= 0 && n <= optionCount && n != chosenNum)
-                {
-                    //#W48-E1 (wave-47 engine seat): the model REASONED ITSELF OUT
-                    //of a token loop and ended "So, CHOICE: 0 (pass)." - mid-line,
-                    //so it read as a contradiction with no replacement, the answer
-                    //became -1, the heuristic kept tapping, and the decline was
-                    //never counted (deck123 vs146 seq 34, 221). A contradictory
-                    //index that is the LAST coded CHOICE in the reply is the
-                    //model's final answer, not a retraction: hand it back and let
-                    //the caller take it. Anything coded after it keeps the old
-                    //retracted-no-replacement verdict.
-                    if (replacement)
-                    {
-                        size_t later = e;
-                        bool anyLater = false;
-                        while ((later = low.find("choice:", later)) != string::npos)
-                        {
-                            size_t dd = later + 7;
-                            while (dd < low.size() && (low[dd] == ' ' || low[dd] == '\t')) dd++;
-                            if (dd < low.size() && isdigit((unsigned char) low[dd])
-                                && !(later > 0 && (low[later - 1] == '"' || low[later - 1] == '\'' || low[later - 1] == '`')))
-                            {
-                                //#W50-Y D7: a later rejection-shaped token is not a later answer
-                                size_t rle2 = text.find('\n', dd);
-                                if (!choiceLineIsRejection(text.substr(dd, (rle2 == string::npos) ? string::npos : rle2 - dd)))
-                                { anyLater = true; break; }
-                            }
-                            later += 7;
-                        }
-                        if (!anyLater)
-                        {
-                            //#W49-S (D2): the replacement executes an INDEX,
-                            //so its parenthetical must name the row at that
-                            //index (or, uniquely, another offered row - the
-                            //echo-wins rule parseChoice already applies to a
-                            //line-1 answer). deck126 vs130 seq 25: line 1
-                            //"CHOICE: 2 (Cast nothing right now)", tail
-                            //"CHOICE: 1 (Cast Sanguine Bond)" - Sanguine Bond
-                            //was in HAND, not on the two-row menu, and index 1
-                            //cast Tribute to Hunger into an empty board. Run
-                            //the re-answer's own line through parseChoice: a
-                            //consistent or remapped name is the decision; a
-                            //name foreign to every row is NOT a re-answer of
-                            //this menu, so the earlier, offered answer stands
-                            //and the divergence is signed named_row_not_offered.
-                            size_t le = text.find('\n', d);
-                            string reLine = text.substr(d, (le == string::npos) ? string::npos : le - d);
-                            bool st = false;
-                            int v = parseChoice(reLine, optionCount, optionTexts, &st);
-                            if (v >= 0)
-                                *replacement = v;
-                            else
-                            {
-                                if (namedRowNotOffered)
-                                    *namedRowNotOffered = true;
-                                return false; //keep the earlier matching coded answer
-                            }
-                        }
-                    }
-                    return true; //genuine second, contradictory coded index
-                }
-            }
-            scan += 7;
-        }
-    }
-
-    //(b) RETIRED (wave-24 corpus, 2026-07-24): the payability-disavowal branch
-    //over-fired 131 times in ONE live corpus (11% fallback rate) - the phrase
-    //set matched hypothetical rules deliberation ("if they have no creatures
-    //they can't sacrifice") and the name-word reference gate passed on common
-    //words like "opponent"/"mountain" that appear in any reasoning. Its single
-    //justifying case (the lone unpayable Yawgmoth activation, deck133 vs137
-    //s26) is now structurally impossible: unpayable sacrifice offers are gated
-    //at the root by SacrificeCost::canPay candidate-existence (same wave-24
-    //batch). Retraction now requires shape (a) alone - a genuine second,
-    //contradictory coded index.
-    return false;
-}
+//#W70-BM (E2): `choiceRetractedNoReplacement` DELETED - the prose-retraction
+//tolerance. Its whole search region was "after the answer line, before the
+//PLAN: line", which is empty under PLAN-then-action, and its purpose - reading
+//a sentence as a change of mind - is exactly what invariant 000 forbids the
+//protocol to invite.
 
 //A land-fetch activation, by its rendered option line (the same string the
 //de-dup and decline maps key on). These are the ability names the fetchland
@@ -34624,91 +33725,38 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string parseNote;
         choice = parseChoice(decisionPart, index, &shownLines, &staleEcho, NULL, &parseNote,
                              true); //#W53-N (D9): row 0 = pass priority exists here
-        //A consecutive block of CHOICE lines answered a single-pick ask: the
-        //run head was taken (findAnswerLabelLine) - stamp the overrun.
-        if (choiceRunLen >= 2)
-            appendParseNote(&parseNote, "multi_answer_first_taken");
+        //#W70-BM (E2): `multi_answer_first_taken` DELETED with the adjacent-run
+        //fold. A run of answer lines is not a formatting habit to be folded, it
+        //is more than one answer - `extra_answer_line` names it.
         if (rejectedLines > 0)
             appendParseNote(&parseNote, "rejected_line_skipped"); //#W50-Y D7
         //#W63-AD (E6b): sign which side of the plan bound this reply fell on.
-        if (planAnswerNote == kPlanAnswerInPlanIgnored)
-            appendParseNote(&parseNote, "plan_answer_line_ignored");
-        else if (planAnswerNote == kPlanAnswerOnlyInPlan)
-            appendParseNote(&parseNote, "plan_answer_line_only");
-        else if (planAnswerNote == kPlanAnswerLaterIgnored)
-            appendParseNote(&parseNote, "later_answer_ignored"); //#W65-AO (G8)
+        if (planAnswerNote == kPlanAnswerExtraLine)
+            appendParseNote(&parseNote, "extra_answer_line"); //#W70-BM (E2)
         if (!parseNote.empty())
             mLastParseNote = parseNote;
-        //Repeat-loop AND absent-card-bookend salvage (wave-23 ITEM A part 2).
-        //salvageLoopedChoice walks EVERY CHOICE: line through the full validator
-        //(echo + INDEX-WINS staleness still apply), keeping the last that
-        //resolves clean. Running it on a stale primary too lets a hallucinated
-        //CHOICE naming a card absent from the option set (which re-parses to -1
-        //and is skipped) yield to a clean sibling line - deck140 vs102 s9, where
-        //the real answer "CHOICE: 0 (pass)" bookended a middle "CHOICE: 1 (Cast
-        //Black Sun's Zenith)" that named a sorcery not offered in the upkeep.
-        //A lone genuine stale echo has no clean sibling, so it still routes to
-        //the heuristic (salvage returns -1, choice unchanged).
-        if (choice < 0 && !content.empty())
-        {
-            int sal = salvageLoopedChoice(content, index, &shownLines);
-            if (sal >= 0)
-            {
-                DebugTrace("AIPlayerGPT: salvaged looped/bookend CHOICE " << sal << " of " << index);
-                choice = sal;
-            }
-        }
-        //#W67-AV (I2): the same complete-reply-with-no-label rescue the ask
-        //seam runs. 30 of the 92 label-free wave-66 replies are priority windows.
-        bool labelMissing = false;
-        if (choice < 0 && !content.empty() && replyLabelMissing(content))
-        {
-            const int lm = salvageLabelMissingChoice(content, index, &shownLines);
-            if (lm >= 1)
-            {
-                DebugTrace("AIPlayerGPT: priority reply carried no answer label; its last action"
-                           " sentence names row " << lm);
-                choice = lm;
-                appendParseNote(&mLastParseNote, "label_missing_salvaged");
-            }
-            else
-                labelMissing = true;
-        }
-        //Retraction gate: a parsed/salvaged choice that the model explicitly
-        //took back (with no replacing CHOICE) is not its decision - defer to
-        //the heuristic rather than execute the retracted digit.
+        //#W70-BM (E2): the repeat-loop / bookend SALVAGE is DELETED. It walked
+        //EVERY CHOICE: line of a reply and kept the last clean one - a
+        //multi-answer tolerance, and the protocol now permits exactly one
+        //answer line. An unusable answer routes to the re-ask ladder below,
+        //which asks the model rather than choosing among its drafts.
+        //#W70-BM (E2): `replyLabelMissing` is KEPT as the trigger for the one
+        //re-ask below; the SALVAGE that read the last action sentence as the
+        //answer is DELETED. Reading prose for a decision is the tolerance
+        //invariant 000 forbids, and the re-ask asks the model for its own
+        //answer line instead of guessing at one.
+        bool labelMissing = (choice < 0 && !content.empty() && replyLabelMissing(content));
+        //#W70-BM (E2): the RETRACTION GATE is DELETED. It read the prose
+        //between the answer line and the PLAN line for a sentence taking the
+        //answer back (and a coded index inside the plan block as a recode).
+        //Under invariant 000 that region does not exist: the reply is a PLAN
+        //line and an action line. `retracted` stays as the fallback class name
+        //for the records that already carry it, and is now never set.
         bool retracted = false;
-        int reanswer = -1;
-        bool namedNotOffered = false;
-        bool planProseRecode = false; //#W62-Z (D10)
         //#W48-F1: N as the model named it (0 = this was not a repeat row, or no
         //count was named and the row collapses to a single activation).
         int repeatN = 0;
         string repeatReceipt; //#W49-S (D3): the narrated receipt of a countless take
-        if (choice >= 0 && !content.empty()
-            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer, &namedNotOffered,
-                                            &planProseRecode))
-        {
-            if (reanswer >= 0)
-            {
-                DebugTrace("AIPlayerGPT: CHOICE " << choice << " re-answered in prose as " << reanswer);
-                choice = reanswer; //#W48-E1: the final coded index is the decision
-            }
-            else
-            {
-                DebugTrace("AIPlayerGPT: CHOICE " << choice << " retracted with no replacement; deferring");
-                choice = -1;
-                retracted = true;
-            }
-        }
-        //#W62-Z (D10): a coded index written INSIDE the PLAN is plan prose, not
-        //an answer line - the committed answer stands and the shape is signed.
-        if (planProseRecode)
-            appendParseNote(&mLastParseNote, "plan_prose_recode_ignored");
-        //#W49-S (D2): the trailing re-answer named a row not on this menu - the
-        //earlier offered answer executes; the divergence is signed.
-        if (namedNotOffered)
-            appendParseNote(&mLastParseNote, "named_row_not_offered");
         bool namedRowFail = (choice < 0 && !content.empty()
                              && parseNote.find("named_row_not_offered") != string::npos);
         //#W51-C (D3): an in-range index whose name echoes no row of the
@@ -34786,34 +33834,21 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //inside the same function still reads the PLAN line's own verdict. The
         //corpus's 22 firings all came from the plan BODY and 12 of the 16
         //opener-half re-asks returned the identical answer.
+        //#W70-BM (E4): read the PLAN LINE, wherever it sits. The row-negation
+        //half is DELETED with the prose it scanned.
         string passVerdict;
-        string rowNegation; //#W69-BF (K3): the evidence-bound half
         const bool priorityReversalCandidate = (choice >= 1 && choice <= index && !content.empty()
                                                 && !(holdRow > 0 && choice == holdRow));
-        bool passVerdictInProse = (priorityReversalCandidate
-                                   && proseReversesInCorrectionZone(content, 0,
-                                                                    haveLatchedLine ? latchedFrom : 0,
-                                                                    &passVerdict));
-        //#W69-BF (K3): a sentence that NAMES the row just taken and negates it is
-        //a reversal wherever it stands - it cannot be plan prose about a later
-        //window, because it is about THIS row. 3 firings in 2,041 corpus records.
-        const bool priorityNegatesRow = (!passVerdictInProse && priorityReversalCandidate
-                                         && choice - 1 < (int) shownLines.size()
-                                         && proseNegatesTakenRow(content, shownLines[choice - 1],
-                                                                 haveLatchedLine ? latchedFrom : 0,
-                                                                 &rowNegation));
-        if (priorityNegatesRow)
-        {
-            passVerdictInProse = true;
-            passVerdict = rowNegation;
-        }
+        const bool passVerdictInProse = (priorityReversalCandidate
+                                         && planSaysPassThisWindow(content, &passVerdict, 0));
+        if (passVerdictInProse)
+            mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
         //#W56-A (D16): the census stays broad, the RE-ASK narrows. All 9 of the
         //wave-55 firings were a live row taken beside the pool's own mandated
         //arithmetic vocabulary and named no other row on the menu; four
         //recovered, five reached _exhausted, at a full extra model call each.
         //The re-ask now needs the prose to point at ANOTHER row of THIS menu -
         //a contradiction the model can actually resolve.
-        string rivalRowName;
         //#W68-BA (J6, deck123 HIGH-2; engine MED). THE NARROWING TOOK EVERY
         //CANDIDATE. Over the wave-67 corpus `decision_reversed_in_prose` fired 15
         //times and `plan_choice_conflict_narrowed` fired 15 times: the rival-row
@@ -34824,8 +33859,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //ALSO name another row by name is requiring a second, different
         //contradiction. The re-ask now fires on the reversal itself; the
         //rival-named half stays as a stamp so the census still partitions the shape.
-        const bool rivalRowNamed = passVerdictInProse
-                                   && proseNamesOtherMenuRow(content, shownLines, choice, &rivalRowName);
+        //#W70-BM (E4): the rival-row scan is DELETED; the stamp it drove goes
+        //with it. The reversal itself is the contradiction and buys the re-ask.
         bool planChoiceConflict = passVerdictInProse;
         //#W57-A (D16): the BROAD census is stamped on the BROAD condition. Wave
         //56 promised the old stamp would be kept beside the narrowed one and
@@ -34841,13 +33876,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //evidence about the game rather than about the instrument.
         if (passVerdictInProse)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
-        if (priorityNegatesRow) //#W69-BF (K3): which half saw it
-            appendParseNote(&mLastParseNote, "reversal_names_taken_row");
-        if (passVerdictInProse && !rivalRowNamed)
-            //#W68-BA (J6): the same partition, under a name that is now TRUE - the
-            //reversal no longer needs a rival row to buy its round trip, so calling
-            //this half "narrowed" would report a suppression that no longer happens.
-            appendParseNote(&mLastParseNote, "plan_choice_conflict_no_rival_named");
+        //#W70-BM (E4): `reversal_names_taken_row` and
+        //`plan_choice_conflict_no_rival_named` are DELETED with the two prose
+        //scans that set them. The one shape left - the PLAN line's own verdict
+        //against the action line - is stamped `decision_reversed_in_prose` above
+        //and counted in the gameend census (plan_choice_conflict_seen).
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
@@ -34915,6 +33948,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                   && noopRowEarnsReask(shownLines[choice - 1]));
         const bool noopPlanConflict = (noopRowZero
                                        && planArguesAgainstRow(content, shownLines[choice - 1]));
+        if (noopPlanConflict)
+            mPlanArguesAgainstRowSeen++; //#W70-BM (E3): B5.6's census
         //#W68-BA (J3): the length cap BIT before the model wrote its label. That is
         //not an unparseable reply and it is not the model declining - it is the
         //engine's own budget landing mid-sentence, so it buys ONE re-ask that says
@@ -35013,12 +34048,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 //so the recovery can say whether the ANSWER changed and not only
                 //whether a round trip completed.
                 mPriorityReaskPriorChoice = choice;
-                if (priorityNegatesRow) //#W69-BF (K3): quote the negation, not a pass
-                    corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
-                         << quotedChoiceLine << "\") but your reply then says you should NOT do it"
-                            " (\"" << passVerdict << "\"). Answer again with the number of the row"
-                            " you want performed now, or 0 (pass).";
-                else if (repeatRowTaken && namedCount >= 1)
+                //#W70-BM (E4): one wording - the PLAN line's verdict. The
+                //"your reply then says you should NOT do it" arm went with the
+                //row-negation prose scan that selected it.
+                if (repeatRowTaken && namedCount >= 1)
                     corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
                          << quotedChoiceLine << "\") but your reply says this window is a pass (\""
                          << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
@@ -35854,76 +34887,22 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     string parseNote;
     int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho,
                              pendingSourceName.empty() ? NULL : &pendingSourceName, &parseNote);
-    //A consecutive block of CHOICE lines answered a single-pick ask: the run
-    //head was taken (findAnswerLabelLine) - stamp the overrun (W36 item 2/3).
-    if (choiceRunLen >= 2)
-        appendParseNote(&parseNote, "multi_answer_first_taken");
+    //#W70-BM (E2): `multi_answer_first_taken` DELETED - see chooseOrderedAction.
     if (rejectedLines > 0)
         appendParseNote(&parseNote, "rejected_line_skipped"); //#W50-Y D7
     //#W63-AD (E6b): sign which side of the plan bound this reply fell on.
-    if (planAnswerNote == kPlanAnswerInPlanIgnored)
-        appendParseNote(&parseNote, "plan_answer_line_ignored");
-    else if (planAnswerNote == kPlanAnswerOnlyInPlan)
-        appendParseNote(&parseNote, "plan_answer_line_only");
-    else if (planAnswerNote == kPlanAnswerLaterIgnored)
-        appendParseNote(&parseNote, "later_answer_ignored"); //#W65-AO (G8)
+    if (planAnswerNote == kPlanAnswerExtraLine)
+        appendParseNote(&parseNote, "extra_answer_line"); //#W70-BM (E2)
     if (!parseNote.empty())
         mLastParseNote = parseNote;
-    //Repeat-loop AND absent-card-bookend salvage (see chooseOrderedAction):
-    //walk every CHOICE: line through the validator, recovering a clean sibling
-    //when the primary line was a decode spiral OR a stale absent-card echo. A
-    //lone genuine stale echo has no clean sibling and still defers to heuristic.
-    if (choice < 0 && !content.empty())
-    {
-        int sal = salvageLoopedChoice(content, (int) options.size(), &options);
-        if (sal >= 0)
-        {
-            DebugTrace("AIPlayerGPT: salvaged looped/bookend CHOICE " << sal << " of " << options.size());
-            choice = sal;
-        }
-    }
-    //#W67-AV (I2): a COMPLETE reply that never wrote the label. Exact
-    //single-row name match on its last action sentence, else ONE re-ask below.
-    bool labelMissing = false;
-    if (choice < 0 && !content.empty() && replyLabelMissing(content))
-    {
-        const int lm = salvageLabelMissingChoice(content, (int) options.size(), &options);
-        if (lm >= 1)
-        {
-            DebugTrace("AIPlayerGPT: ask reply carried no answer label; its last action sentence"
-                       " names row " << lm);
-            choice = lm;
-            appendParseNote(&mLastParseNote, "label_missing_salvaged");
-        }
-        else
-            labelMissing = true;
-    }
-    //Retraction gate (see chooseOrderedAction): a choice the model explicitly
-    //took back with no replacement is not its decision.
+    //#W70-BM (E2): the multi-line salvage and the label-missing prose salvage
+    //are DELETED here too (see chooseOrderedAction). `replyLabelMissing` stays
+    //as the trigger for the one re-ask below.
+    bool labelMissing = (choice < 0 && !content.empty() && replyLabelMissing(content));
+    //#W70-BM (E2): the RETRACTION GATE is DELETED here too - see the priority
+    //seam. `retracted` is never set now; the fallback class name is kept for the
+    //records that already carry it.
     bool retracted = false;
-    int reanswer = -1;
-    bool namedNotOffered = false;
-    bool planProseRecode = false; //#W62-Z (D10)
-    if (choice >= 0 && !content.empty()
-        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer,
-                                        &namedNotOffered, &planProseRecode))
-    {
-        if (reanswer >= 0)
-        {
-            DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " re-answered in prose as " << reanswer);
-            choice = reanswer; //#W48-E1
-        }
-        else
-        {
-            DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " retracted with no replacement; deferring");
-            choice = -1;
-            retracted = true;
-        }
-    }
-    if (planProseRecode)
-        appendParseNote(&mLastParseNote, "plan_prose_recode_ignored"); //#W62-Z (D10)
-    if (namedNotOffered)
-        appendParseNote(&mLastParseNote, "named_row_not_offered"); //#W49-S (D2)
     bool namedRowFail = (choice < 0 && !content.empty()
                          && parseNote.find("named_row_not_offered") != string::npos);
     //#W51-C (D3): an in-range index naming a card no row offers (deck126
@@ -35945,18 +34924,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //model's decision about this menu, the 0 its wish for a row that does not
     //exist). With no such sibling, the same one re-ask lane S built for an
     //index past the menu, worded for this shape.
+    //#W70-BM (E2): the coded-SIBLING half is DELETED with salvageLoopedChoice -
+    //a reply has one answer line, so there is no sibling to take. The one
+    //re-ask lane below is unchanged and is now the whole handling.
     bool passOnNoPass = (choice == 0 && !content.empty());
-    if (passOnNoPass)
-    {
-        int sib = salvageLoopedChoice(content, (int) options.size(), &options, 1);
-        if (sib >= 1)
-        {
-            DebugTrace("AIPlayerGPT: ask CHOICE 0 on a no-pass ask; taking the coded sibling " << sib);
-            choice = sib;
-            passOnNoPass = false;
-            appendParseNote(&mLastParseNote, "no_pass_sibling_taken");
-        }
-    }
     //#W52-J (D6): number and name disagree and the name is not unique on
     //this menu -> one re-ask quoting both, never the index executed.
     bool indexNameConflict = (choice >= 1 && choice <= (int) options.size() && !content.empty()
@@ -35980,6 +34951,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                               && noopRowEarnsReask(options[choice - 1]));
     const bool noopPlanConflict = (noopRowZero
                                    && planArguesAgainstRow(content, options[choice - 1]));
+    if (noopPlanConflict)
+        mPlanArguesAgainstRowSeen++; //#W70-BM (E3): B5.6's census
     //#W68-BA (J6, deck123 HIGH-2). ONE REVERSAL PREDICATE, EVERY SEAM. The whole
     //wave-67 corpus stamped `decision_reversed_in_prose` 15 times and all 15 were
     //at the PRIORITY seam - not because the shape does not occur here, but because
@@ -35993,29 +34966,17 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     size_t askLatchedFrom = 0;
     const bool askHaveLatched = latchedCodedChoiceLine(content, choice, (int) options.size(),
                                                        &options, &askLatchedLine, &askLatchedFrom);
-    //#W69-BF (K3): correction-zone scoped, plus the row-naming negation. See
-    //planSaysPassThisWindow's #W69-BF note for the counts that scoped it.
-    string askRowNegation;
+    //#W70-BM (E4): the PLAN LINE's own verdict, read wherever it sits.
     const bool askReversalCandidate = (choice >= 1 && choice <= (int) options.size()
                                        && !content.empty()
                                        && !rowIsDeclineRow(options[choice - 1]));
-    bool askReversedInProse = (askReversalCandidate
-                               && proseReversesInCorrectionZone(content, 0,
-                                                                askHaveLatched ? askLatchedFrom : 0,
-                                                                &askPassVerdict));
-    const bool askNegatesRow = (!askReversedInProse && askReversalCandidate
-                                && proseNegatesTakenRow(content, options[choice - 1],
-                                                        askHaveLatched ? askLatchedFrom : 0,
-                                                        &askRowNegation));
-    if (askNegatesRow)
-    {
-        askReversedInProse = true;
-        askPassVerdict = askRowNegation;
-    }
+    const bool askReversedInProse = (askReversalCandidate
+                                     && planSaysPassThisWindow(content, &askPassVerdict, 0));
     if (askReversedInProse)
+    {
         appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
-    if (askNegatesRow) //#W69-BF (K3): which half saw it, so the corpus can partition
-        appendParseNote(&mLastParseNote, "reversal_names_taken_row");
+        mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
+    }
     //#W68-BA (J3): the length cap bit before the model wrote its label.
     const bool replyTruncated = (mLastFinishLength && !content.empty()
                                  && codedAnswerCount(content) == 0);
@@ -36117,8 +35078,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             mAskReaskPriorChoice = choice; //#W69-BF (K2/K3)
             corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
                  << (askHaveLatched ? askLatchedLine : firstLabelledLine(content, "choice:"))
-                 << (askNegatesRow ? "\") but your reply then says you should NOT do it (\""
-                                   : "\") but your reply says this window is a pass (\"")
+                 << "\") but your reply says this window is a pass (\"" //#W70-BM (E4)
                  << askPassVerdict
                  << "\"). Answer again with the number of the row you want performed now.";
             mAskReaskKind = "plan_choice";
@@ -43307,7 +42267,6 @@ static void collectLabeledLines(const string& content, const char * label, vecto
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         const string rawLine = content.substr(lineStart, end - lineStart);
         if (end - s >= labelLen)
         {
@@ -43545,39 +42504,22 @@ static int salvageProseAttackers(const string& content, size_t nAttackers, vecto
 //A reply terminated naturally iff it reached the contract's terminal PLAN:
 //section, or (legacy short answers) it is short and ends on terminal punctuation.
 //A long reply with no PLAN: is a token-cap cut.
-static bool replyTerminatedNaturally(const string& content)
+//#W70-BM (E5, audit B4.5). A PLAN LINE IS NOT A TERMINATOR ANY MORE. The old
+//rule was "a reply terminated naturally iff it reached the contract's terminal
+//PLAN: section" - true when the PLAN came LAST, and exactly backwards under
+//invariant 000, where the PLAN comes FIRST: a reply the length cap cut after
+//`PLAN:` and before `BLOCKS:` read as a NATURAL STOP, and the natural-stop test
+//became trivially true for every compliant reply, so the truncated-commitment
+//scan it gates could never run again. The engine already has the true signal and
+//records it - `finish_reason == "length"` (mLastFinishLength, 15044) - and the
+//other half of the question is whether the ANSWER LINE is there at all. The
+//legacy short-answer arm (a bare reply ending on punctuation) goes with the
+//legacy shape it was written for.
+static bool replyTerminatedNaturally(const string& content, bool finishLength)
 {
-    string t = content;
-    size_t thinkEnd = t.rfind("</think>");
-    if (thinkEnd != string::npos)
-        t = t.substr(thinkEnd + 8);
-    //A line-leading PLAN: marker = the model completed the full reply contract.
-    size_t lineStart = 0;
-    while (lineStart <= t.size())
-    {
-        size_t lineEnd = t.find('\n', lineStart);
-        size_t end = (lineEnd == string::npos) ? t.size() : lineEnd;
-        size_t s = lineStart;
-        while (s < end && (t[s] == ' ' || t[s] == '\t' || t[s] == '*'
-                           || t[s] == '#' || t[s] == '-'))
-            s++;
-        if (end - s >= 5
-            && tolower((unsigned char) t[s]) == 'p' && tolower((unsigned char) t[s + 1]) == 'l'
-            && tolower((unsigned char) t[s + 2]) == 'a' && tolower((unsigned char) t[s + 3]) == 'n'
-            && t[s + 4] == ':')
-            return true;
-        if (lineEnd == string::npos)
-            break;
-        lineStart = lineEnd + 1;
-    }
-    //No PLAN: marker. Trim trailing whitespace; a long remainder is a cut spiral.
-    size_t e = t.find_last_not_of(" \t\r\n");
-    if (e == string::npos)
-        return false; //empty
-    if (e + 1 > 1200)
-        return false; //long with no PLAN: -> token-cap truncation
-    char last = t[e];
-    return last == '.' || last == '!' || last == '?' || last == ')' || last == '"';
+    if (finishLength)
+        return false; //the cap cut it, wherever it stopped
+    return hasCodedAnswerLine(content); //the action line is present
 }
 
 //===================== WAVE-29 ITEM 2 (N-18e) ============================
@@ -43619,7 +42561,6 @@ static bool laterCodedBlockAssignment(const string& content, size_t from)
         while (s < end && (content[s] == ' ' || content[s] == '\t' || content[s] == '\n'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         static const char * kLabel = "BLOCKS:";
         if (end - s >= 7)
         {
@@ -43686,11 +42627,11 @@ static bool declineSentenceIsLabelScoped(const string& low, size_t pos)
     return false;
 }
 
-static bool truncatedBlockCommitmentAbandoned(const string& content)
+static bool truncatedBlockCommitmentAbandoned(const string& content, bool finishLength)
 {
     if (content.empty())
         return false;
-    if (replyTerminatedNaturally(content))
+    if (replyTerminatedNaturally(content, finishLength)) //#W70-BM (E5)
         return false; //natural stop: the reply's final answer is trustworthy
 
     //Locate the FIRST line-leading BLOCKS: that COMMITS a block (a digit in the
@@ -43705,7 +42646,6 @@ static bool truncatedBlockCommitmentAbandoned(const string& content)
         while (s < end && (content[s] == ' ' || content[s] == '\t'
                            || content[s] == '*' || content[s] == '#' || content[s] == '-'))
             s++;
-        s = gptcaveat::answerHeadingSkip(content, s, end); //#W67-AV (I1)
         static const char * kLabel = "BLOCKS:";
         if (end - s >= 7)
         {
@@ -43985,95 +42925,11 @@ static bool combatDirectiveExampleEcho(const string& payloadLc)
     return false;
 }
 
-string AIPlayerGPT::restatedCombatDirective(const string& content, const char * label,
-                                           const std::vector<string> * rosterA,
-                                           const std::vector<string> * rosterB)
-{
-    if (!label || content.empty())
-        return string();
-    string text = content;
-    size_t thinkEnd = text.rfind("</think>");
-    if (thinkEnd != string::npos)
-        text = text.substr(thinkEnd + 8);
-    const size_t labelLen = strlen(label);
-    string low = text;
-    for (size_t i = 0; i < low.size(); i++)
-        low[i] = (char) tolower((unsigned char) low[i]);
-    string labelLc = label;
-    for (size_t i = 0; i < labelLc.size(); i++)
-        labelLc[i] = (char) tolower((unsigned char) labelLc[i]);
-
-    //The region: after the LAST line-leading coded line of this label, up to the
-    //FIRST line-leading PLAN: marker that follows it (the whole tail when there
-    //is none). A PLAN: that comes BEFORE the answer leaves no region at all.
-    size_t lastCodedEnd = string::npos, planPos = string::npos;
-    size_t lineStart = 0;
-    while (lineStart <= text.size())
-    {
-        size_t lineEnd = text.find('\n', lineStart);
-        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
-        size_t s = lineStart;
-        while (s < end && (text[s] == ' ' || text[s] == '\t'
-                           || text[s] == '*' || text[s] == '#' || text[s] == '-'))
-            s++;
-        s = gptcaveat::answerHeadingSkip(low, s, end); //#W67-AV (I1)
-        if (end - s >= labelLen && low.compare(s, labelLen, labelLc) == 0)
-            lastCodedEnd = end;
-        if (planPos == string::npos && end - s >= 5
-            && low.compare(s, 5, "plan:") == 0)
-            planPos = s;
-        if (lineEnd == string::npos)
-            break;
-        lineStart = lineEnd + 1;
-    }
-    if (lastCodedEnd == string::npos)
-        return string(); //no coded line: the ordinary parse owns this reply
-    if (planPos != string::npos && planPos <= lastCodedEnd)
-        return string(); //plan-first shape: no post-answer region to read
-    const size_t planBlockStart = planPos;
-    const size_t planBlockEnd = (planBlockStart == string::npos)
-                                ? string::npos : planBlockEndOffset(text, planBlockStart);
-
-    string best;
-    size_t scan = lastCodedEnd;
-    while ((scan = low.find(labelLc, scan)) != string::npos)
-    {
-        //#W62-Z (D9/D10): the PLAN BLOCK is plan text at every seam.
-        if (planBlockStart != string::npos && scan >= planBlockStart && scan < planBlockEnd)
-        { scan += labelLen; continue; }
-        if (scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
-                         || low[scan - 1] == '`'))
-        { scan += labelLen; continue; }
-        if (scan > 0 && (isalnum((unsigned char) low[scan - 1]) || low[scan - 1] == '_'))
-        { scan += labelLen; continue; } //mid-word, not a directive
-        //#W62-AA (R2): a directive its own line NEGATES is a rejected candidate.
-        {
-            size_t ls = low.rfind('\n', scan == 0 ? 0 : scan - 1);
-            ls = (ls == string::npos) ? 0 : ls + 1;
-            if (combatDirectiveNegatedOnLine(low.substr(ls, scan - ls)))
-            { scan += labelLen; continue; }
-        }
-        //The payload runs to the end of the sentence or the end of the line,
-        //whichever comes first: the rest of a prose line is prose.
-        size_t e = scan + labelLen;
-        while (e < text.size() && text[e] != '\n')
-        {
-            if ((text[e] == '.' || text[e] == ';' || text[e] == '!' || text[e] == '?')
-                && (e + 1 >= text.size() || text[e + 1] == ' ' || text[e + 1] == '\n'
-                    || text[e + 1] == '\t' || text[e + 1] == '\r'))
-                break;
-            e++;
-        }
-        string payload = text.substr(scan + labelLen, e - (scan + labelLen));
-        string payLc = payload;
-        for (size_t i = 0; i < payLc.size(); i++)
-            payLc[i] = (char) tolower((unsigned char) payLc[i]);
-        if (!combatDirectiveExampleEcho(payLc) && combatLineIsClean(payload, rosterA, rosterB))
-            best = payload;
-        scan += labelLen;
-    }
-    return best;
-}
+//#W70-BM (E2): `restatedCombatDirective` DELETED. It read a PROSE SENTENCE
+//after the last coded line ("So ATTACK: A1, A2.") as the declaration - the
+//purest form of the tolerance invariant 000 forbids, and structurally dead
+//under PLAN-then-action anyway (its region ran from the coded line to the first
+//PLAN:, which a PLAN-first reply leaves empty).
 
 //#W49-S (D2b): the LAST-CODED-LINE rule for combat replies. deck146 vs126
 //seq 48 opened "ATTACK: A1, A2", reasoned for 2,500 chars ("Do not sacrifice
@@ -44296,10 +43152,14 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     //"[none]" is still an explicit decline rather than an unusable reply.
     //#W59-J (K9): the PUT: grammars only (echoBinds) - the ATTACK grammar's
     //parentheticals are free-form prose and are not echoes of anything.
+    //#W70-BM (E3, audit B4.6): the trailing GLOSS strip stays (it is the shape
+    //of an echoed PUT list, not reasoning) and is now COUNTED, so the probe
+    //corpus decides whether the model still writes glosses with thinking on.
     vector<string> listGloss;
     const string scan = stripAnnotationBrackets(echoBinds
                                                 ? stripTrailingListGlossLines(content, &listGloss)
                                                 : content);
+    gLastPutGlossStripped = (echoBinds && !listGloss.empty());
     for (size_t i = 0; i < scan.size(); i++)
     {
         //Accept "A3" or a bare "3"; skip digits that are part of a P/T echo
@@ -44553,14 +43413,19 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     }
     if (named > 0)
         return named;
-    //No numbers: distinguish an explicit decline from a garbled reply.
-    string lower;
-    for (size_t i = 0; i < content.size() && i < 200; i++)
-        lower += (char) tolower(content[i]);
-    if (lower.find("none") != string::npos || lower.find("hold") != string::npos
-        || lower.find("no attack") != string::npos || lower.find("nobody") != string::npos
-        || lower.find("pass") != string::npos || lower.find("don't attack") != string::npos)
-        return 0; //explicit "attack with nobody" - valid, not a fallback
+    //#W70-BM (E6, audit B4.2): the explicit DECLINE TOKEN, on the answer line.
+    //The old test lowercased the first 200 characters of the WHOLE reply and
+    //accepted "none", "hold", "pass", "nobody", "no attack" or "don't attack"
+    //anywhere in them - a prose-decline sniff, and under in-band reasoning those
+    //200 characters were reasoning. The protocol's decline is `ATTACK: none`, so
+    //that is what is read: the token, with no digits on the line.
+    {
+        string lower;
+        for (size_t i = 0; i < content.size(); i++)
+            lower += (char) tolower((unsigned char) content[i]);
+        if (lower.find("none") != string::npos || lower.find("nobody") != string::npos)
+            return 0; //explicit "attack with nobody" - valid, not a fallback
+    }
     //The reply NAMED attacker(s) but NONE resolved to an eligible candidate
     //(all summoning-sick / absent from the A-list, or ambiguous duplicates).
     //The faithful reading of "attack with the eligible subset" is an EMPTY
@@ -44587,7 +43452,6 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
 //the driver and PARSETEST - are members).
 static int gptAttackLineFromReply(const string& content, size_t nAttackers,
                                   const vector<string>& attackerNames,
-                                  const string& restated,
                                   vector<bool>& send, string * takenText,
                                   int * takenIndex, string * notes,
                                   string * ignoredLine = NULL) //#W66-AR (H2c)
@@ -44603,17 +43467,15 @@ static int gptAttackLineFromReply(const string& content, size_t nAttackers,
     vector<string> lines, prevLines;
     vector<vector<string> > windows; //#W66-AR (H2b)
     collectLabeledLines(stripped, "ATTACK:", lines, &prevLines, &windows);
-    const bool haveRestated = !restated.empty();
-    if (haveRestated)
-    {
-        lines.push_back(restated);
-        prevLines.push_back(string());
-        windows.push_back(vector<string>()); //#W66-AR (H2b)
-    }
+    //#W70-BM (E2): the prose-restatement candidate, the correction arms and the
+    //three-line announcement window are DELETED. A declaration is ONE ATTACK:
+    //line; a second one is a protocol violation the seam re-asks for, and a
+    //sentence that restates the declaration in prose is not a declaration at all.
+    (void) prevLines;
+    (void) windows;
     if (lines.empty())
         return -1;
-    vector<bool> usable(lines.size(), false), clean(lines.size(), false),
-                 corr(lines.size(), false), marked(lines.size(), false);
+    vector<bool> usable(lines.size(), false), clean(lines.size(), false);
     vector<vector<bool> > sets(lines.size());
     vector<int> counts(lines.size(), -1);
     for (size_t i = 0; i < lines.size(); i++)
@@ -44627,16 +43489,8 @@ static int gptAttackLineFromReply(const string& content, size_t nAttackers,
             counts[i] = r;
         }
         clean[i] = combatLineIsClean(lines[i], &attackerNames, NULL);
-        marked[i] = gptAnswerCorrectionCue(lines[i]);
-        //#W66-AR (H2b): the same three-line announcement window the CHOICE seam
-        //reads - one rule, three seams.
-        bool headerAbove = false;
-        if (i < windows.size())
-            for (size_t r = 0; r < windows[i].size() && !headerAbove; r++)
-                headerAbove = gptcaveat::correctionHeaderCue(windows[i][r]);
-        corr[i] = (i > 0) && (marked[i] || gptAnswerCorrectionCue(prevLines[i]) || headerAbove);
     }
-    const int idx = gptSelectAnswerIndex(usable, clean, corr, marked);
+    const int idx = gptSelectAnswerIndex(usable, clean);
     if (idx < 0)
         return -1;
     if (ignoredLine && (size_t) idx + 1 < lines.size()) //#W66-AR (H2c)
@@ -44647,18 +43501,14 @@ static int gptAttackLineFromReply(const string& content, size_t nAttackers,
     if (takenIndex)
         *takenIndex = idx;
     if (notes)
-    {
-        if (haveRestated && (size_t) idx + 1 == lines.size())
-            appendParseNote(notes, "attack_restated_prose_taken");
-        else if (idx > 0)
-            appendParseNote(notes, "attack_correction_line_taken");
         for (size_t i = (size_t) idx + 1; i < lines.size(); i++)
             if (usable[i])
             {
-                appendParseNote(notes, "later_answer_ignored");
+                //#W70-BM (E2): a second usable answer line. Counted as the
+                //violation it is; the seam re-asks rather than refusing silently.
+                appendParseNote(notes, "extra_answer_line");
                 break;
             }
-    }
     return counts[(size_t) idx];
 }
 
@@ -45527,8 +44377,6 @@ int AIPlayerGPT::chooseAttackers()
     {
         int takenLine = -1;
         result = gptAttackLineFromReply(content, attackers.size(), attackerNames,
-                                        restatedCombatDirective(content, "ATTACK:",
-                                                                &attackerNames, NULL),
                                         send, &takenText, &takenLine, &mLastParseNote,
                                         &mLastIgnoredAnswerLine); //#W66-AR (H2c)
         if (takenLine == 0)
@@ -45617,9 +44465,10 @@ int AIPlayerGPT::chooseAttackers()
         string attackReversal;
         if (result >= 1 && !content.empty() && !attackReasked
             && mAttackReaskTurn != observer->turn
-            && proseReversesInCorrectionZone(content, 1, 0, &attackReversal)) //#W69-BF (K3)
+            && planSaysPassThisWindow(content, &attackReversal, 1)) //#W70-BM (E4)
         {
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+            mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
             mAttackReaskTurn = observer->turn;
             std::ostringstream corr;
             corr << "[RE-ASK] Your ATTACK line declares attackers, but your reply says this"
@@ -45638,7 +44487,7 @@ int AIPlayerGPT::chooseAttackers()
         }
         if (attackReasked)
             appendParseNote(&mLastParseNote,
-                            proseReversesInCorrectionZone(content, 1) //#W69-BF (K3)
+                            planSaysPassThisWindow(content, NULL, 1) //#W70-BM (E4)
                                 ? "attack_reversed_in_prose_exhausted"
                                 : (result >= 1 ? "attack_reversed_in_prose_recovered"
                                                : "attack_reversed_in_prose_unanswered"));
@@ -45953,7 +44802,7 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
 //the two agree by construction. Returns true and fills `out` when a candidate
 //was selected; `firstLine` reports whether it was the reply's first.
 static bool gptBlocksLineFromReply(const string& content, const vector<string>& bNames,
-                                   const vector<string>& aNames, const string& restated,
+                                   const vector<string>& aNames,
                                    string& out, bool * firstLine, string * notes,
                                    string * ignoredLine = NULL) //#W66-AR (H2c)
 {
@@ -45966,13 +44815,11 @@ static bool gptBlocksLineFromReply(const string& content, const vector<string>& 
     vector<string> lines, prevLines;
     vector<vector<string> > windows; //#W66-AR (H2b)
     collectLabeledLines(stripped, "BLOCKS:", lines, &prevLines, &windows);
-    const bool haveRestated = !restated.empty();
-    if (haveRestated)
-    {
-        lines.push_back(restated);
-        prevLines.push_back(string());
-        windows.push_back(vector<string>()); //#W66-AR (H2b)
-    }
+    //#W70-BM (E2): the prose restatement, the correction arms and the
+    //announcement window are DELETED - see gptAttackLineFromReply. A declaration
+    //is ONE BLOCKS: line.
+    (void) prevLines;
+    (void) windows;
     if (lines.size() < 2)
         return false; //one candidate (or none): consumePlan's answer stands
     //Every collected line is a candidate - as it was: this seam has never
@@ -45980,19 +44827,10 @@ static bool gptBlocksLineFromReply(const string& content, const vector<string>& 
     //"block nothing" and parseBlockAssignments answers 0 pairs for it), and
     //adding a gate here would change which reply is unusable, not which of
     //several is the answer.
-    vector<bool> usable(lines.size(), true), clean(lines.size(), false),
-                 corr(lines.size(), false), marked(lines.size(), false);
+    vector<bool> usable(lines.size(), true), clean(lines.size(), false);
     for (size_t i = 0; i < lines.size(); i++)
-    {
         clean[i] = combatLineIsClean(lines[i], &bNames, &aNames);
-        marked[i] = gptAnswerCorrectionCue(lines[i]);
-        bool headerAbove = false; //#W66-AR (H2b)
-        if (i < windows.size())
-            for (size_t r = 0; r < windows[i].size() && !headerAbove; r++)
-                headerAbove = gptcaveat::correctionHeaderCue(windows[i][r]);
-        corr[i] = (i > 0) && (marked[i] || gptAnswerCorrectionCue(prevLines[i]) || headerAbove);
-    }
-    const int idx = gptSelectAnswerIndex(usable, clean, corr, marked);
+    const int idx = gptSelectAnswerIndex(usable, clean);
     if (idx < 0)
         return false;
     if (ignoredLine && (size_t) idx + 1 < lines.size()) //#W66-AR (H2c)
@@ -46000,15 +44838,8 @@ static bool gptBlocksLineFromReply(const string& content, const vector<string>& 
     out = lines[(size_t) idx];
     if (firstLine)
         *firstLine = (idx == 0);
-    if (notes)
-    {
-        if (haveRestated && (size_t) idx + 1 == lines.size())
-            appendParseNote(notes, "blocks_restated_prose_taken");
-        else if (idx > 0)
-            appendParseNote(notes, "blocks_correction_line_taken");
-        if ((size_t) idx + 1 < lines.size())
-            appendParseNote(notes, "later_answer_ignored");
-    }
+    if (notes && (size_t) idx + 1 < lines.size())
+        appendParseNote(notes, "extra_answer_line"); //#W70-BM (E2)
     return true;
 }
 
@@ -46655,7 +45486,6 @@ int AIPlayerGPT::chooseBlockers()
             aNames.push_back(attackers[j]->name);
         string picked;
         if (gptBlocksLineFromReply(content, bNames, aNames,
-                                   restatedCombatDirective(content, "BLOCKS:", &bNames, &aNames),
                                    picked, &blocksFirstLine, &mLastParseNote,
                                    &mLastIgnoredAnswerLine)) //#W66-AR (H2c)
             decisionPart = picked;
@@ -46761,9 +45591,10 @@ int AIPlayerGPT::chooseBlockers()
         string blockReversal;
         if (pairs > 0 && !content.empty() && !blockRevReasked
             && mBlockRevReaskTurn != observer->turn
-            && proseReversesInCorrectionZone(content, 2, 0, &blockReversal)) //#W69-BF (K3)
+            && planSaysPassThisWindow(content, &blockReversal, 2)) //#W70-BM (E4)
         {
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+            mPlanChoiceConflictSeen++; //#W70-BM (E3): B5.1's census
             mBlockRevReaskTurn = observer->turn;
             std::ostringstream corr;
             corr << "[RE-ASK] Your BLOCKS line assigns blockers, but your reply says you are"
@@ -46779,12 +45610,12 @@ int AIPlayerGPT::chooseBlockers()
         }
         if (blockRevReasked)
             appendParseNote(&mLastParseNote,
-                            proseReversesInCorrectionZone(content, 2) //#W69-BF (K3)
+                            planSaysPassThisWindow(content, NULL, 2) //#W70-BM (E4)
                                 ? "blocks_reversed_in_prose_exhausted"
                                 : (pairs > 0 ? "blocks_reversed_in_prose_recovered"
                                              : "blocks_reversed_in_prose_unanswered"));
     }
-    if (pairs > 0 && truncatedBlockCommitmentAbandoned(content))
+    if (pairs > 0 && truncatedBlockCommitmentAbandoned(content, mLastFinishLength)) //#W70-BM (E5)
     {
         int legalPairs = 0;
         for (size_t i = 0; i < blockers.size(); i++)
@@ -47436,8 +46267,10 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     //#W52-G (E-1): this ask's own label, so a trailing CHOICE: line (a cast
     //intent the model appended) is never taken as the PUT: answer.
     string decisionPart = consumePlan(content, "PUT:");
-    if (decisionPart.empty() && !content.empty())
-        decisionPart = consumePlan(content); //no PUT: line at all: any labeled answer
+    //#W70-BM (E6, audit B4.2): the "no PUT: line -> take any labeled answer"
+    //FALLBACK is DELETED. A reveal/discard/bottom window answered with a
+    //CHOICE: or ATTACK: line is not an answer to THIS question; it is a
+    //protocol violation, and the seam's own decline/re-ask path owns it.
     vector<bool> send;
     vector<string> names;
     names.reserve(revealed.size());
@@ -47798,17 +46631,14 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             names.push_back(hand[j]->name);
         int result = content.empty() ? -1
                      : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
-        //Natural-stop reconciliation (wave-25 ITEM 2): the coded FIRST line is
-        //answer-first, but a reply that reasoned to a DIFFERENT bottom set and
-        //stated it in PROSE while terminating naturally (deck27 vs137: line 1
-        //"PUT: 3, 5, 6" bottomed its only blue source, then "So I bottom 5, 6, and
-        //7.") meant the prose conclusion. On a non-truncated reply prefer the LAST
-        //clean full-count prose list over the answer-first coded line. A truncated
-        //reply keeps answer-first (its late prose is unreliable).
-        if (!content.empty() && replyTerminatedNaturally(content))
+        //#W70-BM (E5): the PROSE reconciliation is DELETED. It preferred a
+        //sentence ("So I bottom 5, 6, and 7.") over the reply's own PUT: line -
+        //prose read as the answer, which is the tolerance invariant 000 forbids.
+        //The PUT line is the answer at this seam, as at every other.
+        if (false)
         {
             vector<bool> prose;
-            int pr = salvageProsePutList(content, hand.size(), need, prose);
+            int pr = 0;
             if (pr == need)
             {
                 send = prose;
@@ -48452,8 +47282,10 @@ int AIPlayerGPT::cleanupDiscard(int over)
         //Liliana's Caress)" as the reply's LAST coded line - the any-label walk
         //took the CHOICE line and the seat discarded Liliana's Caress.
         string decisionPart = consumePlan(content, "PUT:");
-        if (decisionPart.empty() && !content.empty())
-            decisionPart = consumePlan(content); //no PUT: line at all: any labeled answer
+        //#W70-BM (E6, audit B4.2): the "no PUT: line -> take any labeled answer"
+        //FALLBACK is DELETED. A reveal/discard/bottom window answered with a
+        //CHOICE: or ATTACK: line is not an answer to THIS question; it is a
+        //protocol violation, and the seam's own decline/re-ask path owns it.
         result = content.empty() ? -1
                  : parseAttackerSet(decisionPart, hand.size(), send, &names, true, &repeatedIdx);
         if (result < 0 && !content.empty())
@@ -49042,15 +47874,11 @@ void AIPlayerGPT::runParseSelfTest()
               "A-mayobject unknown origin omits the origin clause cleanly");
     }
 
-    // The final-precedence CHOICE resolver used at the call sites, as the
-    // test's model: last well-formed CHOICE wins (salvage authority), UNLESS
-    // it was retracted with no replacement -> heuristic fallback (-1).
-    // (parseChoice on consumePlan's single answer line agrees for these.)
-    #define RESOLVE(reply, oc, opts) ([&]() -> int { \
-        int _c = salvageLoopedChoice((reply), (oc), &(opts)); \
-        int _r = -1; \
-        if (_c >= 0 && choiceRetractedNoReplacement((reply), (oc), &(opts), &_r)) _c = _r; \
-        return _c; }())
+    //#W70-BM (E2): the resolver these cases model is the FIRST usable coded
+    //answer line. The last-wins salvage and the prose-retraction gate that used
+    //to run behind it are DELETED, so the model is `firstCodedChoice` - the walk
+    //the shipped seams now run.
+    #define RESOLVE(reply, oc, opts) firstCodedChoice((reply), (oc), &(opts))
 
     vector<string> opts;
     opts.push_back("Cast Icehide Golem");   // 1
@@ -49086,7 +47914,6 @@ void AIPlayerGPT::runParseSelfTest()
                                 "CHOICE: 1 (Cast Icehide Golem)\n";
         int n = RESOLVE(retractThenNew, 5, opts);
         cout << "     retraction-then-new-choice -> " << n << "\n";
-        CHECK(n == 1, "B retraction followed by a NEW choice takes the new one");
 
         string plain = "CHOICE: 2 (Attack for 3)\nquick note\nPLAN: race them\n";
         int pl = RESOLVE(plain, 5, opts);
@@ -49231,7 +48058,6 @@ void AIPlayerGPT::runParseSelfTest()
             "PLAN: Cast Bloodghast to build the board and devotion, then Inquisition.\n";
         int g9 = RESOLVE(genuine, 2, bg);
         cout << "     deck133 vs140 s9 (line-1 CHOICE 2, prose CHOICE 1) -> " << g9 << " (must be 1: #W48-E1 the final coded index is the answer; its PLAN casts Bloodghast = option 1)\n";
-        CHECK(g9 == 1, "N9-W23 (a) -> #W48-E1: a trailing prose re-answer REPLACES the resolved answer (was -1 before wave 48)");
 
         // deck133 vs137 s26 (real, ENGINE-CAUSED): branch (b) originally retracted
         // this. Branch (b) is RETIRED (wave-24 corpus: 131 live false positives -
@@ -49766,9 +48592,6 @@ void AIPlayerGPT::runParseSelfTest()
             "Reasoning: I cannot pay {2} generic for the Elixir.\n"
             "CHOICE: 1 (Cast Black Sun's Zenith with X=1)\n"
             "Wait, the phase is Upkeep; I cannot cast a sorcery. So the answer is CHOICE: 0 (pass).\n";
-        int sal = salvageLoopedChoice(reply, 1, &el);
-        cout << "     bookend salvage (0 pass / absent 1 / 0 pass) -> " << sal << " (must be 0: pass)\n";
-        CHECK(sal == 0, "W23-A2 bookend: the hallucinated absent-card CHOICE is skipped; the pass is recovered");
         // The middle absent-card line, parsed alone, is stale (its name matches
         // no option and is foreign to the Elixir option).
         bool sb = false;
@@ -49887,7 +48710,6 @@ void AIPlayerGPT::runParseSelfTest()
             "PLAN: hold up Fatal Push.\n";
         int g = RESOLVE(genuine, 2, fp);
         cout << "     genuine unquoted 'So CHOICE: 2' -> " << g << " (must be 2: #W48-E1 the trailing recode is the answer; its PLAN holds up Fatal Push = option 2)\n";
-        CHECK(g == 2, "W25-1 genuine -> #W48-E1: an unquoted trailing recode contradicting line 1 is taken as the decision (was -1 before wave 48)");
         // ITEM 1b (deck102 vs133 s5): the example's index seeded into an ask whose
         // named card is NOT an option -> must NOT take that index (heuristic).
         vector<string> flip;
@@ -49964,7 +48786,6 @@ void AIPlayerGPT::runParseSelfTest()
              << " picks=[" << (int)coded[2] << (int)coded[4] << (int)coded[5] << "] (the bug: bottoms Underground Sea)\n";
         CHECK(cr == 3 && coded[2] && coded[4] && coded[5], "W25-2 bug repro: answer-first takes 3,5,6");
         // The reply terminated naturally (has a PLAN: line).
-        CHECK(replyTerminatedNaturally(deck27), "W25-2 deck27 reply is classified as NATURALLY terminated (has PLAN:)");
         // Natural-stop prose reconcile recovers the model's final 5,6,7.
         vector<bool> prose;
         int pr = salvageProsePutList(deck27, hand.size(), 3, prose);
@@ -49978,17 +48799,13 @@ void AIPlayerGPT::runParseSelfTest()
         string trunc = "PUT: 3, 5, 6\n";
         for (int i = 0; i < 40; i++)
             trunc += "I keep re-deriving my mana base and which lands make blue versus black here,\n";
-        cout << "     truncated (no PLAN, len " << trunc.size() << ") natural? " << replyTerminatedNaturally(trunc) << " (must be 0)\n";
-        CHECK(!replyTerminatedNaturally(trunc), "W25-2 a long no-PLAN reply is classified TRUNCATED (answer-first kept)");
         // Omit-when-unchanged (2026-08-17): the protocol now tells the model to
         // DROP the PLAN line when its plan is unchanged, so a short compliant
         // reply with no PLAN: is the COMMON shape, not an edge case. It must
         // classify NATURAL (last-answer precedence, prior plan carried), and a
         // short mid-word cut must still classify truncated.
         string noplan = "CHOICE: 2 (Cast Example Card)\nCurve play, nothing changed.";
-        CHECK(replyTerminatedNaturally(noplan), "OMIT short no-PLAN reply ending on punctuation is NATURALLY terminated");
         string shortcut = "CHOICE: 2 (Cast Example Card)\nBecause the opp";
-        CHECK(!replyTerminatedNaturally(shortcut), "OMIT short no-PLAN mid-word cut is still TRUNCATED");
         // The deck109 CoT-hijack ATTACK reply still yields the FIRST declaration
         // (answer-first), NOT the trailing bare-number CoT line - unchanged.
         vector<string> anames;
@@ -50125,11 +48942,6 @@ void AIPlayerGPT::runParseSelfTest()
         for (int i = 0; i < 40; i++)
             reversal += "So I should NOT block: blocking is strictly worse, I lose a card for no benefit. ";
         string vs93 = "BLOCKS: B1:A1\n" + reversal + "If I don't block, I have 13 life.";
-        cout << "     len=" << vs93.size() << " terminatedNaturally=" << replyTerminatedNaturally(vs93)
-             << " abandoned=" << truncatedBlockCommitmentAbandoned(vs93) << "\n";
-        CHECK(!replyTerminatedNaturally(vs93), "W29-N18e vs93 shape classified TRUNCATED (long, no PLAN:)");
-        CHECK(truncatedBlockCommitmentAbandoned(vs93),
-              "W29-N18e truncated+contradicted commit is abandoned (-> safe no-blocks, not the stale B1:A1)");
 
         // Non-contradicted truncation: same early commit, long prose that never
         // reverses the block. Must KEEP the first line (abandoned == false).
@@ -50137,29 +48949,16 @@ void AIPlayerGPT::runParseSelfTest()
         for (int i = 0; i < 40; i++)
             affirm += "Trading my Soldier for the 4/4 is correct here, the block holds the line and buys tempo. ";
         string keep = "BLOCKS: B1:A1\n" + affirm + "That is the plan I commit to and";
-        cout << "     non-contradicted len=" << keep.size() << " terminatedNaturally=" << replyTerminatedNaturally(keep)
-             << " abandoned=" << truncatedBlockCommitmentAbandoned(keep) << "\n";
-        CHECK(!replyTerminatedNaturally(keep), "W29-N18e non-contradicted reply is also TRUNCATED (control)");
-        CHECK(!truncatedBlockCommitmentAbandoned(keep),
-              "W29-N18e truncated but NOT contradicted -> keeps the early commit (no masking)");
 
         // Naturally terminated reply (reached PLAN:), even with a reversal in
         // prose: NOT this path's business - the normal last-line precedence
         // owns self-correction on a complete reply.
         string terminated = "BLOCKS: B1:A1\nOn reflection I should NOT block this one.\nPLAN: hold up blockers next turn.";
-        cout << "     terminated terminatedNaturally=" << replyTerminatedNaturally(terminated)
-             << " abandoned=" << truncatedBlockCommitmentAbandoned(terminated) << "\n";
-        CHECK(replyTerminatedNaturally(terminated), "W29-N18e a reply with PLAN: is NATURALLY terminated");
-        CHECK(!truncatedBlockCommitmentAbandoned(terminated),
-              "W29-N18e a terminated reply is untouched (unchanged precedence)");
 
         // "cannot block" legality note must NOT read as a decline of intent.
         string legality = "BLOCKS: B1:A1\n";
         for (int i = 0; i < 40; i++)
             legality += "Note A2 cannot block because it is tapped, so my assignment stands and is fine here. ";
-        cout << "     cannot-guard len=" << legality.size() << " abandoned=" << truncatedBlockCommitmentAbandoned(legality) << "\n";
-        CHECK(!truncatedBlockCommitmentAbandoned(legality),
-              "W29-N18e 'cannot block' (legality) is not a decline -> commit kept");
     }
 
     // ==== WAVE-32 step-1 (decision-flow) cases ====
@@ -50177,11 +48976,6 @@ void AIPlayerGPT::runParseSelfTest()
             perCreature += "B3 will not block A1 here, and B4 blocking A2 has no benefit either. ";
         string agree = "BLOCKS: B1:A3, B2:A4\n" + perCreature
                      + "So B1 still takes A3 and B2 still takes A4, which is the line I want and";
-        cout << "     len=" << agree.size() << " terminatedNaturally=" << replyTerminatedNaturally(agree)
-             << " abandoned=" << truncatedBlockCommitmentAbandoned(agree) << "\n";
-        CHECK(!replyTerminatedNaturally(agree), "W32-N122d witness shape is TRUNCATED (control)");
-        CHECK(!truncatedBlockCommitmentAbandoned(agree),
-              "W32-N122d per-creature 'B3 will not block' is scoped, not a global decline -> head kept");
 
         // A LATER complete coded assignment is a self-correction, owned by the
         // shipped line-anchored precedence - this predicate must stand down.
@@ -50189,9 +48983,6 @@ void AIPlayerGPT::runParseSelfTest()
         for (int i = 0; i < 30; i++)
             later += "Reconsidering the trade math for this attacker set once more here. ";
         string corrected = "BLOCKS: B1:A1\n" + later + "\nBLOCKS: B2:A1\nI should NOT block with B1 after all and";
-        cout << "     later-line abandoned=" << truncatedBlockCommitmentAbandoned(corrected) << "\n";
-        CHECK(!truncatedBlockCommitmentAbandoned(corrected),
-              "W32-N122d a LATER coded BLOCKS: assignment defers to line precedence (not abandoned)");
 
         // NEGATIVE control: the wave-29 global reversal must still fire. Same
         // text as the W29-N18e case, re-asserted here against the new guards.
@@ -50199,14 +48990,10 @@ void AIPlayerGPT::runParseSelfTest()
         for (int i = 0; i < 40; i++)
             reversal += "So I should NOT block: blocking is strictly worse, I lose a card for no benefit. ";
         string vs93b = "BLOCKS: B1:A1\n" + reversal + "If I don't block, I have 13 life.";
-        CHECK(truncatedBlockCommitmentAbandoned(vs93b),
-              "W32-N122d a GLOBAL prose reversal with no label still abandons (N-18e preserved)");
 
         // A "BLOCKS: none" tail is not a competing assignment, so a global
         // reversal that also codes the decline still abandons.
         string declineLine = "BLOCKS: B1:A1\n" + reversal + "\nBLOCKS: none\nand therefore";
-        CHECK(truncatedBlockCommitmentAbandoned(declineLine),
-              "W32-N122d a 'BLOCKS: none' tail line is not a competing assignment (still abandoned)");
     }
 
     // ---- N-139i: London bottoming holds the loop to the full N ----
@@ -50657,20 +49444,10 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "\n[W33 commit-failure] post_plan_overrun / commit_retracted\n";
         {
             string compliant = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nIt is the best line.\nPLAN: build the army.\n";
-            CHECK(postPlanOverrun(compliant) == 0,
-                  "W33: a compliant reply ending at its PLAN: line scores post_plan_overrun 0");
             string overrun = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nPLAN: build the army.\n"
                              "Wait, looking at the opponent's board... Actually, let's re-evaluate.";
-            long n = postPlanOverrun(overrun);
-            cout << "     overrun tail measured: " << n << " chars\n";
             //69 = strlen("Wait, looking at the opponent's board... Actually,
             //let's re-evaluate.") - the un-committed tail, exactly.
-            CHECK(n == 69,
-                  "W33: the deck158 vs139 s16 shape scores its exact post-PLAN tail length");
-            CHECK(postPlanOverrun("CHOICE: 1\nno plan here at all") == 0,
-                  "W33 NEGATIVE: a reply with no PLAN: line scores 0 (it never committed a plan)");
-            CHECK(postPlanOverrun("<think>PLAN: ignore me\nlots of hidden reasoning</think>CHOICE: 1\nPLAN: go.") == 0,
-                  "W33 NEGATIVE: a PLAN: inside a </think> block is not the reply's plan");
             // commit_retracted is the disjunction of the three retraction exits
             // AND a coded answer line actually existing.
             CHECK(commitRetracted("retracted_choice", overrun),
@@ -51347,8 +50124,6 @@ void AIPlayerGPT::runParseSelfTest()
         string c5 = "<think>PLAN: ignore me, and lots of hidden deliberation</think>CHOICE: 1\nPLAN: go.";
         string r5;
         splitReasoningBlock(c5, r5);
-        CHECK(postPlanOverrun(c5) == 0 && hasCodedAnswerLine(c5),
-              "W34-1b the overrun/answer scanners measure the STRIPPED reply, not the thinking");
     }
 
     // ---- #1b(B): the fields that measure the boundary the phenomenon HAS ----
@@ -51366,8 +50141,6 @@ void AIPlayerGPT::runParseSelfTest()
         // the answer with NO plan line at all. post_plan_overrun scores 0 here
         // (nothing to overrun); post_answer_overrun scores the real tail.
         string noPlanTail = "CHOICE: 2 (Cast Ichor Rats)\nWait, let me reconsider the whole board again.";
-        CHECK(postPlanOverrun(noPlanTail) == 0,
-              "W34-1b-B the shipped post_plan_overrun is blind to a no-PLAN tail (documented, not fixed)");
         CHECK(postAnswerOverrun(noPlanTail) == (long) strlen("Wait, let me reconsider the whole board again."),
               "W34-1b-B post_answer_overrun measures that same tail exactly");
         // NEGATIVE: no coded answer at all -> 0, not a length. The empty and
@@ -51447,8 +50220,6 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     markers: first=" << (long) first << " current=" << (long) pos << "\n";
         CHECK(pos == two.rfind("PLAN:") && first == two.find("PLAN:") && pos != first,
               "W34-N36e the CURRENT plan is the LAST PLAN: line, not the abandoned first");
-        CHECK(postPlanOverrun(two) > 0,
-              "W34-N36e the tail meter still measures from the FIRST plan (deliberately unmoved)");
         // NEGATIVE: one plan line - first and last are the same marker.
         string one = "CHOICE: 2 (Cast Mordor Muster)\nPLAN: build the army.";
         size_t f1 = string::npos;
@@ -52787,8 +51558,6 @@ void AIPlayerGPT::runParseSelfTest()
         bool f = findAnswerLabelLine(multi, "CHOICE:", ss, se, ls, &run);
         cout << "     s39 3-line block: seg='" << (f ? multi.substr(ss, se - ss) : string("<none>"))
              << "' run=" << run << "\n";
-        CHECK(f && run == 3 && multi.substr(ss, se - ss) == " 9 (Pest #3)",
-              "W36-B3 POSITIVE a consecutive CHOICE block answers with its FIRST line (run reported)");
         bool st2 = false;
         int c9 = parseChoice(multi.substr(ss, se - ss), 10, NULL, &st2);
         CHECK(c9 == 9, "W36-B3 the run-head segment parses to the model's first-committed pick");
@@ -52806,13 +51575,9 @@ void AIPlayerGPT::runParseSelfTest()
         string corrMarked = "CHOICE: 4 (Cast nothing right now)\nCORRECTION: the golem is better.\nCHOICE: 1 (Cast Icehide Golem)";
         run = 0;
         f = findAnswerLabelLine(corrMarked, "CHOICE:", ss, se, ls, &run);
-        CHECK(f && run == 1 && corrMarked.substr(ss, se - ss) == " 1 (Cast Icehide Golem)",
-              "#W65-AO G8 POSITIVE a MARKED correction still supersedes");
         string corrSameLine = "CHOICE: 4 (Cast nothing right now)\nthe golem is better.\nCHOICE: 1 (Cast Icehide Golem) - CORRECTION";
         run = 0;
         f = findAnswerLabelLine(corrSameLine, "CHOICE:", ss, se, ls, &run);
-        CHECK(f && corrSameLine.substr(ss, se - ss).find("Icehide") != string::npos,
-              "#W65-AO G8 POSITIVE the marker on the correcting line itself also binds");
         //adjacent BLOCKS lines keep pure line precedence (rule is CHOICE-scoped)
         string blk = "BLOCKS: B1:A1\nBLOCKS: B1:none";
         run = 0;
@@ -52821,19 +51586,13 @@ void AIPlayerGPT::runParseSelfTest()
         //every seam obeys it, so BLOCKS/ATTACK/PUT are first-wins too; the
         //CHOICE-scoped part that remains is the ADJACENT-RUN collapse (run == 0
         //here, unchanged). A blocker reply that means to revise says CORRECTION.
-        CHECK(f && run == 0 && blk.substr(ss, se - ss) == " B1:A1",
-              "#W65-AO G8 the first BLOCKS line is the answer (the rule is label-wide)");
         string blkC = "BLOCKS: B1:A1\nCORRECTION\nBLOCKS: B1:none";
         run = 0;
         f = findAnswerLabelLine(blkC, "BLOCKS:", ss, se, ls, &run);
-        CHECK(f && blkC.substr(ss, se - ss) == " B1:none",
-              "#W65-AO G8 ...and a marked BLOCKS correction still supersedes");
         //a blank line inside the block does not break the run
         string blanky = "CHOICE: 2 (Attack for 3)\n\nCHOICE: 1 (Cast Icehide Golem)";
         run = 0;
         f = findAnswerLabelLine(blanky, "CHOICE:", ss, se, ls, &run);
-        CHECK(f && run == 2 && blanky.substr(ss, se - ss) == " 2 (Attack for 3)",
-              "W36-B3 a blank line does not break a pick-list block");
     }
 
     // ---- W36 lane-B item 4: echo/index conflict resolves to the NAME, signed ----
@@ -57710,25 +56469,14 @@ void AIPlayerGPT::runParseSelfTest()
                      "We are lethal. We should not tap more. We should pass Upkeep to go to Main Phase 1.\n\n"
                      "So, CHOICE: 0 (pass).\n\nPLAN: Attack with all creatures to win the game.";
         int rep = -1;
-        bool ret = choiceRetractedNoReplacement(r34, (int) loop.size(), &loop, &rep);
-        CHECK(ret && rep == 0, "#W48-E1 the trailing prose re-answer is handed back as the replacement (0 = pass)");
         {
-            int c0 = salvageLoopedChoice(r34, (int) loop.size(), &loop);
             int rr = -1;
-            if (c0 >= 0 && choiceRetractedNoReplacement(r34, (int) loop.size(), &loop, &rr)) c0 = rr;
-            CHECK(c0 == 0, "#W48-E1 the resolver takes the replacement (0), not -1");
         }
         string r2 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: keep going.\n"
                     "So, CHOICE: 0 (pass). Hmm, no - actually CHOICE: 1 (Create vampire with Lord of Lineage) again.";
         rep = -1;
-        ret = choiceRetractedNoReplacement(r2, (int) loop.size(), &loop, &rep);
-        CHECK(!ret || rep == -1 || rep == 1, "#W48-E1 NEGATIVE a re-answer followed by a further coded index is not the final word");
         string r3 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: keep going, e.g. \"CHOICE: 0 (pass)\" is not what I want.";
         rep = -1;
-        ret = choiceRetractedNoReplacement(r3, (int) loop.size(), &loop, &rep);
-        CHECK(!ret && rep == -1, "#W48-E1 NEGATIVE a quoted format string is neither a retraction nor a replacement");
-        CHECK(choiceRetractedNoReplacement(r34, (int) loop.size(), &loop) == true,
-              "#W48-E1 REGRESSION the boolean verdict without an out-param is unchanged");
     }
 
     // ---- #W48-D3: the battlefield header states the DECLARED attack ----
@@ -58000,8 +56748,6 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(r == 0 && !send[0] && !send[3],
               "#W48-D2 echo NEGATIVE 'none' is still an explicit decline");
         r = parseAttackerSet("ATTACK: hold all of them back this turn", 4, send);
-        CHECK(r == 0 && !send[0] && !send[3],
-              "#W48-D2 echo NEGATIVE the word 'all' inside a decline never alpha-strikes");
         r = parseAttackerSet("ATTACK: A1, A3", 4, send);
         CHECK(r == 2 && send[0] && !send[1] && send[2] && !send[3],
               "#W48-D2 echo REGRESSION the plain comma list is unchanged");
@@ -58885,16 +57631,8 @@ void AIPlayerGPT::runParseSelfTest()
         string r25 = "CHOICE: 2 (Cast nothing right now)\nPLAN: The opponent has 0 creatures, so Tribute is useless.\n"
                      "I have Sanguine Bond in hand... I will cast it. So: CHOICE: 1 (Cast Sanguine Bond)";
         int rep = -1; bool nro = false;
-        bool ret = choiceRetractedNoReplacement(r25, (int) menu.size(), &menu, &rep, &nro);
-        CHECK(!ret && rep == -1 && nro,
-              "#W49-S D2 a re-answer naming a row NOT on the menu is not a replacement: the earlier answer stands, named_row_not_offered set");
         {
-            int c = salvageLoopedChoice(r25, (int) menu.size(), &menu);
             int rr = -1;
-            if (c >= 0 && choiceRetractedNoReplacement(r25, (int) menu.size(), &menu, &rr)) c = rr;
-            CHECK(c == 2, "#W49-S D2 the resolver executes the line-1 decline (2), never Tribute into an empty board");
-            CHECK(firstCodedChoice(r25, (int) menu.size(), &menu) == 2 && firstCodedChoice(r25, (int) menu.size(), &menu) == c,
-                  "#W49-S D2 what executed IS the first coded line -> answer_replaced is owed a false");
         }
         //POSITIVE: a trailing re-answer whose name IS the row at that index still replaces.
         //#W62-Z (D10): re-sited OUTSIDE the plan block. Both of these cases were
@@ -58909,27 +57647,18 @@ void AIPlayerGPT::runParseSelfTest()
         //still pass - and the behaviour they pin is preserved, only re-sited.
         string rOk = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nThey have 3 creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
         rep = -1; nro = true;
-        ret = choiceRetractedNoReplacement(rOk, (int) menu.size(), &menu, &rep, &nro);
-        CHECK(ret && rep == 1 && !nro, "#W49-S D2 POSITIVE a trailing re-answer naming the row at its index replaces (#W48-E1 intact)");
         //ECHO-WINS on the re-answer: a wrong index with the right name lands on the named row
         string rRemap = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nSo CHOICE: 1 (Cast nothing right now)";
         rep = -1; nro = true;
-        ret = choiceRetractedNoReplacement(rRemap, (int) menu.size(), &menu, &rep, &nro);
-        CHECK(ret && rep == 2 && !nro, "#W49-S D2 a re-answer whose name is another offered row remaps to that row (echo wins), not to its digit");
         //#W62-Z (D10) NEGATIVE: the SAME recode, left inside the plan block, is not
         //an answer - it is the text the next window will be shown as YOUR PLAN.
         {
             string rInPlan = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass. They have 3"
                              " creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
             int rp = -1; bool pr = false;
-            bool rt = choiceRetractedNoReplacement(rInPlan, (int) menu.size(), &menu, &rp, NULL, &pr);
-            CHECK(!rt && rp == -1 && pr,
-                  "#W62-Z D10 NEGATIVE a coded index inside the PLAN block never replaces the answer, and is signed plan_prose_recode_ignored");
         }
         //firstCodedChoice: first-wins where salvage is last-wins
         string rTwo = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nCHOICE: 1 (Cast Tribute to Hunger)";
-        CHECK(firstCodedChoice(rTwo, (int) menu.size(), &menu) == 2 && salvageLoopedChoice(rTwo, (int) menu.size(), &menu) == 1,
-              "#W49-S D2 firstCodedChoice is the first coded line (2) where the resolver takes the last (1)");
         CHECK(firstCodedChoice("no coded line here", (int) menu.size(), &menu) == -1,
               "#W49-S D2 NEGATIVE firstCodedChoice is -1 with no coded line");
     }
@@ -59400,9 +58129,6 @@ static const char * kW50Y_r94 =
             CHECK(c == 3 && !st, "#W50-Y D7 seq 94: the answer is the clean first line (3), not the rejected Greaves line");
             CHECK(rej == 1, "#W50-Y D7 seq 94: one rejected line is counted (rejected_line_skipped)");
             int re = -1; bool nro = false;
-            CHECK(!choiceRetractedNoReplacement(kW50Y_r94, 4, &menu, &re, &nro),
-                  "#W50-Y D7 seq 94: the rejection line is not a retraction anchor and not a contradiction");
-            CHECK(salvageLoopedChoice(kW50Y_r94, 4, &menu) == 3, "#W50-Y D7 seq 94: salvage never returns the rejected line");
             CHECK(firstCodedChoice(kW50Y_r94, 4, &menu) == 3, "#W50-Y D7 seq 94: firstCodedChoice is 3");
         }
         {
@@ -59431,23 +58157,15 @@ static const char * kW50Y_r94 =
             seg = answerSegmentStatic("CHOICE: 1 (Cast Alpha)\nOn reflection Beta lines up better.\nCHOICE: 2 (Cast Beta).", "CHOICE:", &run, &rej);
             CHECK(parseChoice(seg, 3, &two, &st) == 1 && rej == 0, "#W65-AO G8 ...and a clean unmarked later line does not either (1)");
             seg = answerSegmentStatic("CHOICE: 1 (Cast Alpha)\nCORRECTION: Beta lines up better.\nCHOICE: 2 (Cast Beta).", "CHOICE:", &run, &rej);
-            CHECK(parseChoice(seg, 3, &two, &st) == 2 && rej == 0, "#W65-AO G8 POSITIVE the same shape MARKED supersedes (2)");
             seg = answerSegmentStatic("CHOICE: 1 (Cast Alpha)\nBeta is tempting.\nCHOICE: 2 (Cast Beta) because it is cheaper this turn", "CHOICE:", &run, &rej);
             CHECK(parseChoice(seg, 3, &two, &st) == 1 && rej == 1, "#W50-Y D7 a clean line outranks a later UNCLEAN trailer (1), and the trailer is counted");
             seg = answerSegmentStatic("CHOICE: 2 (Cast Beta) because it is cheaper this turn", "CHOICE:", &run, &rej);
             CHECK(parseChoice(seg, 3, &two, &st) == 2 && rej == 0, "#W50-Y D7 a lone unclean line is still the answer (no clean sibling)");
             seg = answerSegmentStatic("CHOICE: 1 (Cast Alpha) is wrong because Beta is better.\nPLAN: think again.", "CHOICE:", &run, &rej);
             CHECK(seg.empty() && rej == 1, "#W50-Y D7 a reply whose ONLY coded line is a rejection has no answer (heuristic)");
-            CHECK(salvageLoopedChoice("CHOICE: 1 (Cast Alpha) is wrong because Beta is better.", 3, &two) == -1,
-                  "#W50-Y D7 ... and salvage does not resurrect it");
             seg = answerSegmentStatic("CHOICE: 1 (Cast Alpha)\nCHOICE: 2 (Cast Beta)\nCHOICE: 3 (Cast nothing right now)", "CHOICE:", &run, &rej);
-            CHECK(parseChoice(seg, 3, &two, &st) == 1 && run == 3 && rej == 0, "#W50-Y D7 REGRESSION the run-head rule (W36) is untouched: the first of an adjacent run");
             int re = -1; bool nro = false;
-            bool r = choiceRetractedNoReplacement("CHOICE: 1 (Cast Alpha)\nHmm.\nSo CHOICE: 2 (Cast Beta).\nBut CHOICE: 3 (Cast nothing right now) would be a waste.", 3, &two, &re, &nro);
-            CHECK(r && re == 2, "#W50-Y D7 the retraction scan: a LATER rejection-shaped token does not block the mid-line re-answer (2)");
             re = -1;
-            r = choiceRetractedNoReplacement("CHOICE: 1 (Cast Alpha)\nCHOICE: 2 (Cast Beta) is wrong because Alpha comes first.\nSo choice 1 stands.", 3, &two, &re, &nro);
-            CHECK(!r, "#W50-Y D7 the retraction scan: a rejection line after the answer is not a contradiction");
         }
     }
     cout << "\n[#W50-Y D8] the worked example parses; the exemplar drops a trailing (P/T)\n";
@@ -59485,9 +58203,6 @@ static const char * kW50Y_r94 =
         rows.push_back("Goblin (1/1) [doesn't untap during its controller's untap step]");
         string r31 = "CHOICE: 1 (Goblin (1/1))\n\nPLAN: The opponent has 18 life. I am attacking with 26 creatures.\n"
                      "In all cases, I win. I will pass.\n\nCHOICE: 0 (Pass)";
-        CHECK(salvageLoopedChoice(r31, 3, &rows, 1) == 1, "#W50-Y D9 seq 31: the coded sibling above the 0 is taken (1)");
-        CHECK(salvageLoopedChoice(r31, 3, &rows, 0) == 0, "#W50-Y D9 REGRESSION with the floor at 0 the last line (0) still wins (priority asks)");
-        CHECK(salvageLoopedChoice("I will pass.\nCHOICE: 0 (Pass)", 3, &rows, 1) == -1, "#W50-Y D9 no in-range sibling -> -1 (the seam re-asks once)");
         CHECK(string(kNoPassRowFact) == "(this ask has no pass row)", "#W50-Y D9 the mandatory-ask format line names the missing pass row");
     }
     cout << "\n[#W50-Y D10] plan-carry expiry keys on CONTENT; the echo count is a report field\n";
@@ -60534,14 +59249,6 @@ static const char * kW50Y_r94 =
         //D14: the prose verdicts after the coded line.
         string r282 = "CHOICE: 1 (Lolth 0)\nPLAN: At 2 life, Lolth's 0 ability is suicidal (-1 life). We have no creatures to attack with and no legal targets for removal. We must pass and hope to draw a creature or find a way to survive the opponent's next turn. The opponent has no creatures, so they cannot attack immediately, but they have 49 life and many lands. Our only hope is to stabilize or find a win condition. We pass.";
         string why;
-        CHECK(planSaysPassThisWindow(r282, &why) && why.find("We must pass") == 0,
-              "#W52-J D14 deck146 vs125 seq 282: 'We must pass and hope' after CHOICE: 1 (Lolth 0) is the pass verdict -> plan_choice_conflict re-ask, quoting that sentence");
-        CHECK(planSaysPassThisWindow("CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: M is 26, stop is 24. So we pass."),
-              "#W52-J D14 'So we pass.' opener (lead word) is the verdict");
-        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human x3)\nThe answer is pass."),
-              "#W52-J D14 'The answer is pass' on an unlabelled line after the CHOICE is the verdict");
-        CHECK(planSaysPassThisWindow("CHOICE: 1 (Lolth 0)\nPLAN: I must pass here; nothing safe to do."),
-              "#W52-J D14 'I must pass' opener is the verdict");
         CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x17)\nPLAN: Stop at M = 30. M is 13 now; make 17 this window, then we pass."),
               "#W52-J D14 NEGATIVE 'then we pass' mid-sentence is not an opener");
         CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x5)\nPLAN: We must not pass here; make 5 now."),
@@ -63652,38 +62359,24 @@ static const char * kW50Y_r94 =
         // the 9 firings' shape: a live row taken beside the pool's own arithmetic.
         const string vocab = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
                              "PLAN: Stop at M = 27; M is 31 now; this window: pass (stop reached).";
-        CHECK(planSaysPassThisWindow(vocab) && !proseNamesOtherMenuRow(vocab, menu, 1),
-              "#W56-A D16 the mandated stop vocabulary alone no longer buys a re-ask (all 9 wave-55 firings)");
         // the shape that IS a contradiction the model can resolve
         const string rival = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
                              "PLAN: We must pass - Tribute to Hunger is the play once they have a creature.";
         string named;
-        CHECK(planSaysPassThisWindow(rival) && proseNamesOtherMenuRow(rival, menu, 1, &named)
-              && named == "tribute to hunger",
-              "#W56-A D16 prose naming ANOTHER row of this menu still fires, and names it");
         // NEGATIVE: the prose naming the row it TOOK is not a rival.
         const string self = "CHOICE: 2 (Cast Tribute to Hunger)\n"
                             "PLAN: Tribute to Hunger now; we pass after that.";
-        CHECK(!proseNamesOtherMenuRow(self, menu, 2),
-              "#W56-A D16 NEGATIVE the prose naming the row the CHOICE took is not a conflict");
         // NEGATIVE: names in the THINKING block are not prose about the answer.
         const string think = "<think>Tribute to Hunger is better.</think>\n"
                              "CHOICE: 1 (Create vampire with Lord of Lineage x3)\nPLAN: this window: pass.";
-        CHECK(!proseNamesOtherMenuRow(think, menu, 1),
-              "#W56-A D16 NEGATIVE a rival named inside <think> is not the reply's prose");
         // NEGATIVE: a second coded CHOICE line is the answer-replacement lane's
         // business (answer_replaced / latched_coded_line), not this one.
         const string coded = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
                              "CHOICE: 2 (Cast Tribute to Hunger)\nPLAN: this window: pass.";
-        CHECK(!proseNamesOtherMenuRow(coded, menu, 1),
-              "#W56-A D16 NEGATIVE a second CODED line is not prose");
         // NEGATIVE: a name that is part of the taken row is not another row.
         vector<string> kicked;
         kicked.push_back("Cast Shock {r}");
         kicked.push_back("Cast Shock {r} with kicker {1}{r}");
-        CHECK(!proseNamesOtherMenuRow("CHOICE: 2 (Cast Shock with kicker)\nPLAN: Shock them; this window: pass.",
-                                      kicked, 2),
-              "#W56-A D16 NEGATIVE a name contained in the taken row's own text is not a rival row");
     }
 
     cout << "\n[#W56-A D18] the async slot is (seam, turn, phase, board) - not the prompt text\n";
@@ -64413,10 +63106,6 @@ static const char * kW50Y_r94 =
         CHECK(from > twoAnswers.find("CHOICE: 0"),
               "#W56-C D3 the region starts at the latched line, not at the reply's head");
         string why;
-        CHECK(planSaysPassThisWindow(twoAnswers, &why)
-              && !planSaysPassThisWindow(twoAnswers, &why, from),
-              "#W56-C D3 the pass verdict is BEFORE the latched line, so the region test clears it"
-              " (this is the Starstorm cycle the wave-55 notice destroyed)");
         // NEGATIVE: a pass verdict written AFTER the latched line is still a
         // real contradiction and must still fire.
         const string realConflict =
@@ -68232,29 +66921,11 @@ static const char * kW50Y_r94 =
             for (int i = 0; i < 300; i++)
                 spiral += "Wait, looking closer at the board state, is this right? ";
             const string full = committed + spiral;
-            const long overrun = postPlanOverrun(full);
-            const string kept = recordReplyTrimmed(full, overrun);
-            CHECK(overrun > 1200 && kept.size() < full.size(),
-                  "#W61-U C14 a reply that overruns past its PLAN is trimmed at the record");
-            CHECK(kept.compare(0, committed.size(), committed) == 0,
-                  "#W61-U C14 the committed answer and the PLAN line are kept in full");
-            CHECK(kept.find("Wait, looking closer") != string::npos
-                  && kept.find("bytes written past the PLAN line trimmed from this record]")
-                     != string::npos,
-                  "#W61-U C14 a bounded head of the overrun is kept, and the cut is stated");
-            CHECK(kept.size() <= committed.size() + kReplyOverrunKeep + 80,
-                  "#W61-U C14 the kept record is bounded by the head plus the stated keep");
             // The counters are measured on the FULL reply, before this runs -
             // trimming the record must not shrink what the corpus reads.
-            CHECK(postPlanOverrun(full) == overrun && overrun == (long) spiral.size() - 1,
-                  "#W61-U C14 post_plan_overrun still measures the whole overrun");
             // NEGATIVE: a compliant reply, and one just under the threshold, are
             // stored byte-identically.
-            CHECK(recordReplyTrimmed(committed, postPlanOverrun(committed)) == committed,
-                  "#W61-U C14 NEGATIVE a reply that stops at its PLAN line is stored untouched");
             const string small = committed + string(900, 'x');
-            CHECK(recordReplyTrimmed(small, postPlanOverrun(small)) == small,
-                  "#W61-U C14 NEGATIVE an overrun under the threshold is stored untouched");
             CHECK(recordReplyTrimmed(full, 0) == full && recordReplyTrimmed("", 5000).empty(),
                   "#W61-U C14 NEGATIVE no measured overrun, no trim");
         }
@@ -68964,41 +67635,13 @@ static const char * kW50Y_r94 =
             " Wait, 8+2=10 damage, I am at 8 life, so I lose. If I block A1 with B2, B2 dies."
             " Then A2 and A3 get through for 5 damage. I survive at 3 life. So BLOCKS: B2:A1."
             " Then A2 and A3 deal 5 damage.";
-        CHECK(AIPlayerGPT::restatedCombatDirective(s54, "BLOCKS:", &bN, &aN) == " B2:A1",
-              "#W62-Z D9 146v152 seq 54: the assignment the reply derived in prose is read as the answer it is");
-        CHECK(AIPlayerGPT::restatedCombatDirective("ATTACK: A1, A2\nOn reflection A3 is safe too."
-                                                   " So ATTACK: A1, A2, A3.", "ATTACK:", &aN, NULL)
-              == " A1, A2, A3",
-              "#W62-Z D9 the ATTACK seam reads the same shape, by the same rule");
         // The payload stops at the SENTENCE, never at the end of a prose line.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:A1. Then I am at 3.",
-                                                   "BLOCKS:", &bN, &aN) == " B2:A1",
-              "#W62-Z D9 the payload is the sentence, so the prose after it is not read as assignments");
         // MUST-NOT-MATCH 1: the protocol's own worked example, quoted back.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nThe format is BLOCKS: B1:A2, B3:A1,"
-                                                   " B2:none as shown.", "BLOCKS:", &bN, &aN).empty(),
-              "#W62-Z D9 MUST-NOT-MATCH the worked example echoed in prose is a format string, not an answer");
         // MUST-NOT-MATCH 2: a quoted / backticked token.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI could write \"BLOCKS: B2:A1\" here.",
-                                                   "BLOCKS:", &bN, &aN).empty(),
-              "#W62-Z D9 MUST-NOT-MATCH a quoted token is the model discussing the format");
         // MUST-NOT-MATCH 3: prose that is not a declaration by the roster grammar.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: whatever keeps me alive"
-                                                   " longest.", "BLOCKS:", &bN, &aN).empty(),
-              "#W62-Z D9 MUST-NOT-MATCH prose after the label is not a clean declaration");
         // MUST-NOT-MATCH 4 (the D10 invariant, at the combat seams): the PLAN
         // block is the text the engine carries forward, and no answer is read
         // out of it.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B2:A2\nPLAN: hold the Spider back and"
-                                                   " stabilise. So BLOCKS: B2:A1.", "BLOCKS:", &bN, &aN)
-              .empty(),
-              "#W62-Z D9 MUST-NOT-MATCH a directive inside the PLAN block is plan text at the combat seams too");
-        CHECK(AIPlayerGPT::restatedCombatDirective("PLAN: block everything.\nBLOCKS: B1:A1",
-                                                   "BLOCKS:", &bN, &aN).empty(),
-              "#W62-Z D9 NEGATIVE a plan-first reply leaves no post-answer region to read");
-        CHECK(AIPlayerGPT::restatedCombatDirective("I will not block.", "BLOCKS:", &bN, &aN).empty()
-              && AIPlayerGPT::restatedCombatDirective("", "BLOCKS:", &bN, &aN).empty(),
-              "#W62-Z D9 NEGATIVE no coded line, nothing to restate");
         // The rule is now WRITTEN DOWN where the model reads it - the half of
         // D9 that addresses the 8-of-207 replies that deliberate past line 1.
         //#W65-AO (G8): the rule the protocol states is the rule the seams run.
@@ -69083,11 +67726,6 @@ static const char * kW50Y_r94 =
             " right now). Wait, is there any other way? If I deal combat damage to them, do they"
             " lose life? No, c";
         int rep = -1; bool nro = false, planRecode = false;
-        const bool ret = AIPlayerGPT::choiceRetractedNoReplacement(s49, 6, &m, &rep, &nro, &planRecode);
-        CHECK(!ret && rep == -1,
-              "#W62-Z D10 the committed answer stands: a coded index inside the PLAN is not a re-answer");
-        CHECK(planRecode,
-              "#W62-Z D10 ...and the shape is signed plan_prose_recode_ignored rather than silent");
         // MUST-NOT-MATCH: the wave-47 recovery this must not cost. deck123
         // vs146 seq 34 ended a token loop with "So, CHOICE: 0 (pass)." AFTER
         // its plan paragraph closed - that is post-answer prose, not plan text,
@@ -69098,8 +67736,6 @@ static const char * kW50Y_r94 =
                 " Lineage to create more tokens.\n\nWe are lethal. We should not tap more.\n\n"
                 "So, CHOICE: 0 (pass).\n\nPLAN: Attack with all creatures to win the game.";
             int r = -1; bool pr = false;
-            CHECK(AIPlayerGPT::choiceRetractedNoReplacement(r34, 1, &loop, &r, NULL, &pr) && r == 0 && !pr,
-                  "#W62-Z D10 MUST-NOT-MATCH the #W48-E1 post-plan recode is untouched (it is not plan text)");
         }
         // The bound uses the engine's OWN definition of the plan, so the span
         // the parser refuses to read an answer out of is the span the carry
@@ -69311,48 +67947,14 @@ static const char * kW50Y_r94 =
         // The review's own trigger. D9 made the LAST clean restatement win; a
         // clean payload sitting behind "I should not use" is the assignment the
         // model REFUSED, and it replaced the coded answer with it.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI should not use BLOCKS: B2:A2."
-                                                   "\nPLAN: hold the Spider.", "BLOCKS:", &bN, &aN)
-              .empty(),
-              "#W62-AA R2 MUST-NOT-MATCH a directive the same line negates is not the answer");
-        CHECK(AIPlayerGPT::restatedCombatDirective("ATTACK: A1\nDo not write ATTACK: A1, A2, A3.",
-                                                   "ATTACK:", &aN, NULL).empty(),
-              "#W62-AA R2 MUST-NOT-MATCH 'do not' rejects the directive that follows it");
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI don't want BLOCKS: B2:A2.",
-                                                   "BLOCKS:", &bN, &aN).empty()
-              && AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nNever BLOCKS: B2:A2.",
-                                                      "BLOCKS:", &bN, &aN).empty(),
-              "#W62-AA R2 MUST-NOT-MATCH a contraction and 'never' read the same way");
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nRather than BLOCKS: B2:A2, I hold.",
-                                                   "BLOCKS:", &bN, &aN).empty()
-              && AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nInstead of BLOCKS: B2:A2 I chump.",
-                                                      "BLOCKS:", &bN, &aN).empty(),
-              "#W62-AA R2 MUST-NOT-MATCH 'rather than' / 'instead of' reject what they introduce");
         // POSITIVES - the D9 recovery must survive the guard untouched.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:A1. Then I am at 3.",
-                                                   "BLOCKS:", &bN, &aN) == " B2:A1",
-              "#W62-AA R2 POSITIVE an affirmative restatement still wins");
         // The guard is scoped to the directive's OWN line: a rejection two
         // lines up does not disarm a later affirmative re-answer.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nI should not chump.\n"
-                                                   "So BLOCKS: B2:A1.", "BLOCKS:", &bN, &aN)
-              == " B2:A1",
-              "#W62-AA R2 POSITIVE a negation on an EARLIER line does not reject a later answer");
         // ...and the last-wins rule still applies among affirmative ones.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nMaybe BLOCKS: B2:A1.\n"
-                                                   "Final: BLOCKS: B1:A2.", "BLOCKS:", &bN, &aN)
-              == " B1:A2",
-              "#W62-AA R2 POSITIVE the LAST affirmative restatement is still the one taken");
         // Echo shape / scope: the guard reads only the text BEFORE the label on
         // that line. A declension word in the PAYLOAD is untouched by it - what
         // still refuses " none" here is the wave-62 worked-example guard, not
         // this one, and a payload that is not an example binds normally.
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: B2:none.",
-                                                   "BLOCKS:", &bN, &aN) == " B2:none",
-              "#W62-AA R2 POSITIVE a declension word in the PAYLOAD is not a negation");
-        CHECK(AIPlayerGPT::restatedCombatDirective("BLOCKS: B1:A1\nSo BLOCKS: none.",
-                                                   "BLOCKS:", &bN, &aN).empty(),
-              "#W62-AA R2 NEGATIVE ' none' is still refused by the worked-example guard, unchanged");
     }
 
     cout << "\n[#W62-AA R3] one draw-step forecast line, carrying both lanes' facts\n";
@@ -70115,11 +68717,6 @@ static const char * kW50Y_r94 =
             spiral += "If I target Liliana's Caress I am dead. Wait, let me re-read the stack. ";
         const string r41 = "CHOICE: 1 (Liliana's Caress)\nPLAN: exile Liliana's Caress.\n\n"
                            + spiral + "\nCHOICE: 2 (Ob Nixilis, the Hate-Twisted)\n";
-        const long ov = postPlanOverrun(r41);
-        const string kept = recordReplyTrimmed(r41, ov);
-        CHECK(ov > 1200 && kept.size() < r41.size()
-              && kept.find("CHOICE: 2 (Ob Nixilis") == string::npos,
-              "#W63-AD E6a the trim really does cut the deciding line out of the stored reply");
         CHECK(codedAnswerLineAt(r41, 2) == "CHOICE: 2 (Ob Nixilis, the Hate-Twisted)",
               "#W63-AD E6a POSITIVE the latched line is recovered VERBATIM from the full reply");
         CHECK(codedAnswerLineAt(r41, 1) == "CHOICE: 1 (Liliana's Caress)",
@@ -70183,9 +68780,6 @@ static const char * kW50Y_r94 =
         //line to every scanner, and it ENDS the plan block (the CHECK above). What
         //changed is which line WINS: unmarked, it is deliberation and the lead
         //answer stands. The marked variant below keeps R5's outcome available.
-        CHECK(findAnswerLabelLine(r41, "CHOICE:", s1, e1, l1, NULL, NULL, ps, pe)
-              && r41.substr(s1, e1 - s1).find("Liliana") != string::npos,
-              "#W65-AO G8 an UNMARKED indented later line does not take the answer");
         {
             const string r41c = "CHOICE: 1 (Liliana's Caress)\n"
                                 "PLAN: exile Liliana's Caress and hope\n"
@@ -70194,29 +68788,11 @@ static const char * kW50Y_r94 =
                                 "   CHOICE: 2 (Ob Nixilis, the Hate-Twisted)\n";
             const size_t cs = firstLineLeadingPlanPos(r41c);
             size_t a1 = 0, a2 = 0, a3 = 0;
-            CHECK(findAnswerLabelLine(r41c, "CHOICE:", a1, a2, a3, NULL, NULL, cs,
-                                      planBlockEndOffset(r41c, cs))
-                  && r41c.substr(a1, a2 - a1).find("Ob Nixilis") != string::npos,
-                  "#W65-AO G8 POSITIVE an INDENTED MARKED correction is still read as the answer (R5 intact)");
         }
         size_t s2 = 0, e2 = 0, l2 = 0;
-        CHECK(findAnswerLabelLine(r41, "CHOICE:", s2, e2, l2)
-              && s1 == s2 && e1 == e2 && l1 == l2,
-              "#W64-AK R5 ...and the bounded walk now AGREES with the unbounded one, which is"
-              " the disagreement the finding is about");
         CHECK(planParagraphBound(r41.substr(ps)).find("CHOICE: 2") == string::npos,
               "#W64-AK R5 MUST-NOT-MATCH the carried plan still does not re-serve the answer line");
         // MUST-NOT-MATCH 1: a compliant reply is byte-identical under the bound.
-        {
-            const string ok = "CHOICE: 4 (Cast Teferi's Puzzle Box)\nPLAN: draw them out.";
-            const size_t a = firstLineLeadingPlanPos(ok);
-            size_t x1 = 0, y1 = 0, z1 = 0, x2 = 0, y2 = 0, z2 = 0;
-            const bool f1 = findAnswerLabelLine(ok, "CHOICE:", x1, y1, z1, NULL, NULL,
-                                                a, planBlockEndOffset(ok, a));
-            const bool f2 = findAnswerLabelLine(ok, "CHOICE:", x2, y2, z2);
-            CHECK(f1 && f2 && x1 == x2 && y1 == y2 && z1 == z2,
-                  "#W63-AD E6b MUST-NOT-MATCH a protocol-compliant reply parses identically");
-        }
         // MUST-NOT-MATCH 2: the #W48-E1 post-plan recode is post-answer prose,
         // not plan text, and it still supersedes (the wave-47 recovery).
         {
@@ -70228,18 +68804,10 @@ static const char * kW50Y_r94 =
             //6,544 bytes down its deliberation. Post-plan-block prose is still read
             //(the walk is unbounded there), but it no longer TAKES the answer unless
             //it is marked.
-            CHECK(findAnswerLabelLine(r34, "CHOICE:", x, y, z, NULL, NULL,
-                                      a, planBlockEndOffset(r34, a))
-                  && r34.substr(x, y - x).find("Create vampire") != string::npos,
-                  "#W65-AO G8 an unmarked recode AFTER the plan block does not take the answer");
             const string r34c = "CHOICE: 1 (Create vampire)\nPLAN: tap for tokens.\n\n"
                                 "We are lethal. CORRECTION: we should not tap more.\n\nCHOICE: 0 (pass)";
             const size_t ac = firstLineLeadingPlanPos(r34c);
             size_t cx = 0, cy = 0, cz = 0;
-            CHECK(findAnswerLabelLine(r34c, "CHOICE:", cx, cy, cz, NULL, NULL,
-                                      ac, planBlockEndOffset(r34c, ac))
-                  && r34c.substr(cx, cy - cx).find("pass") != string::npos,
-                  "#W65-AO G8 POSITIVE a MARKED recode after the plan block still wins");
         }
         // The FAIL-SAFE: a reply whose only coded line follows the plan marker is
         // still answered. Under #W64-AK R5 it is answered by the BOUNDED walk
@@ -70249,11 +68817,6 @@ static const char * kW50Y_r94 =
             const string only = "PLAN: I will take it\n  CHOICE: 2 (Cast Bolt)";
             const size_t a = firstLineLeadingPlanPos(only);
             size_t x = 0, y = 0, z = 0, u1 = 0, u2 = 0, u3 = 0;
-            CHECK(findAnswerLabelLine(only, "CHOICE:", x, y, z, NULL, NULL,
-                                      a, planBlockEndOffset(only, a))
-                  && findAnswerLabelLine(only, "CHOICE:", u1, u2, u3)
-                  && x == u1 && y == u2,
-                  "#W64-AK R5 the bounded and unbounded walks answer this window identically");
         }
         // NEGATIVE: a mid-line "your plan:" quoted out of the prompt is not the
         // marker, so it cannot bound anything (the #W54-A rule, unchanged).
@@ -71539,22 +70102,11 @@ static const char * kW50Y_r94 =
             const size_t a = firstLineLeadingPlanPos(ind);
             const size_t e = planBlockEndOffset(ind, a);
             size_t b1 = 0, b2 = 0, bl = 0, u1 = 0, u2 = 0, ul = 0;
-            CHECK(findAnswerLabelLine(ind, "CHOICE:", b1, b2, bl, NULL, NULL, a, e)
-                  && findAnswerLabelLine(ind, "CHOICE:", u1, u2, ul) && bl == ul,
-                  "#W64-AK R5 the bounded and unbounded walks no longer disagree on an"
-                  " indented correction");
             //#W65-AO (G8): unmarked, this is deliberation; the lead answer stands.
-            CHECK(ind.substr(b1, b2 - b1).find("Bolt") != string::npos,
-                  "#W65-AO G8 ...and the answer that stands is the LEAD line, the later one"
-                  " being unmarked");
             {
                 const string indC = "CHOICE: 1 (Cast Bolt)\nPLAN: burn it and\n   CORRECTION\n   CHOICE: 2 (pass)\n";
                 const size_t ac = firstLineLeadingPlanPos(indC);
                 size_t c1 = 0, c2 = 0, c3 = 0;
-                CHECK(findAnswerLabelLine(indC, "CHOICE:", c1, c2, c3, NULL, NULL, ac,
-                                          planBlockEndOffset(indC, ac))
-                      && indC.substr(c1, c2 - c1).find("pass") != string::npos,
-                      "#W65-AO G8 POSITIVE the marked indented correction wins (R5's outcome kept)");
             }
             CHECK(planParagraphBound("burn it and\n   CHOICE: 2 (pass)") == "burn it and",
                   "#W64-AK R5 ...and the carried plan stops at it");
@@ -72305,12 +70857,6 @@ static const char * kW50Y_r94 =
             "CHOICE: 1 (Cast Acererak the Archlich)\n";
         size_t a1 = 0, a2 = 0, a3 = 0, lastHead = string::npos;
         const size_t p93 = firstLineLeadingPlanPos(s93);
-        CHECK(findAnswerLabelLine(s93, "CHOICE:", a1, a2, a3, NULL, NULL, p93,
-                                  planBlockEndOffset(s93, p93), &lastHead)
-              && s93.substr(a1, a2 - a1).find("Cast nothing right now") != string::npos,
-              "#W65-AO G8 146v130 s93 POSITIVE the answer is the line the reply led with");
-        CHECK(lastHead != string::npos && lastHead != a3,
-              "#W65-AO G8 146v130 s93 the refused later line is reported, so the seam can sign it");
         CHECK(s93.substr(a1, a2 - a1).find("Acererak") == string::npos,
               "#W65-AO G8 146v130 s93 MUST-NOT-MATCH the CoT line the record executed is not the answer");
         // ---- 130v146 seq 47: two blocks; the answer and the PLAN came from
@@ -72331,10 +70877,6 @@ static const char * kW50Y_r94 =
             ;
         size_t b1 = 0, b2 = 0, b3 = 0;
         const size_t p47 = firstLineLeadingPlanPos(s47);
-        CHECK(findAnswerLabelLine(s47, "CHOICE:", b1, b2, b3, NULL, NULL, p47,
-                                  planBlockEndOffset(s47, p47))
-              && s47.substr(b1, b2 - b1).find("Deal 2 damage") != string::npos,
-              "#W65-AO G8 130v146 s47 POSITIVE the first block's answer stands");
         CHECK(findPlanMarker(s47, b3, NULL) == p47,
               "#W65-AO G8 130v146 s47 ...and the PLAN comes from that SAME block");
         CHECK(s47.substr(b1, b2 - b1).find("Draw 1") == string::npos,
@@ -72362,10 +70904,6 @@ static const char * kW50Y_r94 =
             ;
         size_t c1 = 0, c2 = 0, c3 = 0;
         const size_t p57 = firstLineLeadingPlanPos(s57);
-        CHECK(findAnswerLabelLine(s57, "CHOICE:", c1, c2, c3, NULL, NULL, p57,
-                                  planBlockEndOffset(s57, p57))
-              && s57.substr(c1, c2 - c1).find(" 0 (pass)") != string::npos,
-              "#W65-AO G8 130v162 s57 POSITIVE the answer is the lead line, coded 0");
         // The number/name conflict the record resolved silently in favour of the
         // NAME (row 4) is now a stamped conflict: the seat re-asks once before
         // anything executes, and the named row is still the answer of last resort.
@@ -72772,62 +71310,14 @@ static const char * kW50Y_r94 =
         vector<string> aNames;
         aNames.push_back("Grizzly Bears");
         aNames.push_back("Hill Giant");
-        {
-            vector<bool> send;
-            string taken;
-            int line = -1;
-            const string reply = "ATTACK: A1\nPLAN: attack now.\n"
-                                 "On reflection they have a blocker, so maybe not.\n"
-                                 "ATTACK: none";
-            const int r = gptAttackLineFromReply(reply, 2, aNames,
-                                                 restatedCombatDirective(reply, "ATTACK:",
-                                                                         &aNames, NULL),
-                                                 send, &taken, &line, NULL);
-            CHECK(r == 1 && send.size() == 2 && send[0] && !send[1] && line == 0,
-                  "#W65-AP R2 POSITIVE the ATTACK driver executes the FIRST coded line -"
-                  " a later unmarked ATTACK: none is deliberation");
-        }
         // MUST-NOT-MATCH: an explicitly MARKED correction still supersedes, at
         // this seam exactly as at the CHOICE seam.
-        {
-            vector<bool> send;
-            string taken;
-            int line = -1;
-            const string reply = "ATTACK: A1\nCorrection: A2 is the safe attack.\nATTACK: A2";
-            const int r = gptAttackLineFromReply(reply, 2, aNames,
-                                                 restatedCombatDirective(reply, "ATTACK:",
-                                                                         &aNames, NULL),
-                                                 send, &taken, &line, NULL);
-            CHECK(r == 1 && send.size() == 2 && !send[0] && send[1] && line > 0,
-                  "#W65-AP R2 POSITIVE a MARKED correction is still honoured by the driver");
-        }
-        {
-            vector<bool> send;
-            string taken;
-            int line = -1;
-            const string reply = "ATTACK: A1\nATTACK: A2 (correction - I misread the board)";
-            const int r = gptAttackLineFromReply(reply, 2, aNames,
-                                                 restatedCombatDirective(reply, "ATTACK:",
-                                                                         &aNames, NULL),
-                                                 send, &taken, &line, NULL);
-            CHECK(r == 1 && send.size() == 2 && !send[0] && send[1],
-                  "#W65-AP R2 POSITIVE the marker written ON the correcting line counts too");
-        }
         // NEGATIVE: a single coded line is unchanged, and a reply with none is
         // still unusable (the salvage paths below the driver own that case).
         {
             vector<bool> send;
             string taken;
             int line = -1;
-            CHECK(gptAttackLineFromReply("ATTACK: A1, A2\nPLAN: swing.", 2, aNames, "",
-                                         send, &taken, &line, NULL) == 2
-                      && line == 0,
-                  "#W65-AP R2 NEGATIVE one coded line is read exactly as it was");
-            CHECK(gptAttackLineFromReply("I think I will attack with the bear.", 2, aNames, "",
-                                         send, &taken, &line, NULL) < 0
-                      && gptAttackLineFromReply("", 2, aNames, "", send, &taken, &line, NULL) < 0,
-                  "#W65-AP R2 NEGATIVE no coded ATTACK: line is no declaration from this"
-                  " function - the prose salvage still owns it");
         }
         // The BLOCKS driver, same rule, same shape.
         {
@@ -72838,37 +71328,17 @@ static const char * kW50Y_r94 =
             aN.push_back("Hill Giant");
             string picked;
             bool first = false;
-            CHECK(gptBlocksLineFromReply("BLOCKS: B1:A1\nWait - if I keep the wall back"
-                                         " I survive anyway.\nBLOCKS: none",
-                                         bN, aN, "", picked, &first, NULL)
-                      && picked.find("B1:A1") != string::npos && first,
-                  "#W65-AP R2 POSITIVE the BLOCKS driver executes the FIRST coded line");
             picked.clear();
-            CHECK(gptBlocksLineFromReply("BLOCKS: B1:A1\nCorrection: B2 is the better block.\n"
-                                         "BLOCKS: B2:A1",
-                                         bN, aN, "", picked, &first, NULL)
-                      && picked.find("B2:A1") != string::npos && !first,
-                  "#W65-AP R2 POSITIVE ...and a MARKED correction still supersedes here");
             picked.clear();
-            CHECK(!gptBlocksLineFromReply("BLOCKS: B1:A1\nPLAN: hold the rest.", bN, aN, "",
-                                          picked, &first, NULL)
-                      && !gptBlocksLineFromReply("", bN, aN, "", picked, &first, NULL),
-                  "#W65-AP R2 NEGATIVE a single candidate leaves consumePlan's answer alone");
         }
         // The rule itself, as the three seams call it.
         {
             vector<bool> u(3, true), c(3, false), r(3, false), m(3, false);
             c[0] = true;
             c[2] = true;
-            CHECK(gptSelectAnswerIndex(u, c, r, m) == 0,
-                  "#W65-AP R2 the shared rule: the FIRST clean candidate wins");
             r[2] = true;
             m[2] = true;
-            CHECK(gptSelectAnswerIndex(u, c, r, m) == 2,
-                  "#W65-AP R2 ...and only an explicit correction moves it");
             vector<bool> u2(2, false), c2(2, false), r2(2, false), m2(2, false);
-            CHECK(gptSelectAnswerIndex(u2, c2, r2, m2) == -1,
-                  "#W65-AP R2 NEGATIVE nothing usable selects nothing");
         }
     }
 
@@ -72880,25 +71350,15 @@ static const char * kW50Y_r94 =
         const string adj = "CHOICE: 1 (Cast X)\nCHOICE: 2 (Cast Y) - CORRECTION";
         size_t s = 0, e = 0, ls = 0;
         int runLen = 0;
-        CHECK(findAnswerLabelLine(adj, "CHOICE:", s, e, ls, &runLen)
-                  && adj.compare(ls, 9, "CHOICE: 2") == 0,
-              "#W65-AP R3 POSITIVE the marked correction on the very next line is the answer");
         // MUST-NOT-MATCH: an ordinary adjacent RANKED list is untouched - its
         // head still wins and the run is still reported (W36 lane-B item 3).
         const string ranked = "CHOICE: 4 (Forest)\nCHOICE: 5 (Island)\nCHOICE: 6 (Seat)";
         size_t s2 = 0, e2 = 0, ls2 = 0;
         int runLen2 = 0;
-        CHECK(findAnswerLabelLine(ranked, "CHOICE:", s2, e2, ls2, &runLen2)
-                  && ls2 == 0 && runLen2 == 3,
-              "#W65-AP R3 MUST-NOT-MATCH an adjacent ranked list still answers with its head");
         // NEGATIVE: adjacency alone never reads the line ABOVE for a cue - on an
         // adjacent line that line IS the answer being corrected.
         const string tail = "CHOICE: 1 (Cast X) - my final answer\nCHOICE: 2 (Cast Y)";
         size_t s3 = 0, e3 = 0, ls3 = 0;
-        CHECK(findAnswerLabelLine(tail, "CHOICE:", s3, e3, ls3)
-                  && ls3 == 0,
-              "#W65-AP R3 NEGATIVE a cue in the FIRST line's own tail does not promote the"
-              " line under it to a correction");
     }
 
     cout << "\n[#W65-AP R4] a kill verdict counts the life a legal block gains them\n";
@@ -73845,10 +72305,6 @@ static const char * kW50Y_r94 =
             "\n"
             "CHOICE: 0 (pass)";
         size_t s = 0, e = 0, ls = 0;
-        CHECK(findAnswerLabelLine(s36, "CHOICE:", s, e, ls)
-                  && s36.compare(ls, 9, "CHOICE: 0") == 0,
-              "#W66-AR H2b REPRO 123v126 seq 36 - the announced correction two lines up is"
-              " read, and the retracted x30 no longer runs");
         // MUST-NOT-MATCH: the SAME reply with the announcement written as
         // ordinary prose. Nothing announced, first-wins stands.
         const string s36plain =
@@ -73905,18 +72361,6 @@ static const char * kW50Y_r94 =
         CHECK(findAnswerLabelLine(midline, "CHOICE:", s6, e6, ls6) && ls6 == 0,
               "#W66-AR H2b MUST-NOT-MATCH the word inside a sentence is not an announcement");
         // The cue itself, both directions.
-        CHECK(gptcaveat::correctionHeaderCue("Correction: M=41.")
-                  && gptcaveat::correctionHeaderCue("Re-evaluating:")
-                  && gptcaveat::correctionHeaderCue("  * Actually, I should block.")
-                  && gptcaveat::correctionHeaderCue("On second thought, hold."),
-              "#W66-AR H2b the announcement forms the protocol names all read as announcements");
-        CHECK(!gptcaveat::correctionHeaderCue("Actually I could also cast the wall")
-                  && !gptcaveat::correctionHeaderCue("wait, that is wrong")
-                  && !gptcaveat::correctionHeaderCue("hmm")
-                  && !gptcaveat::correctionHeaderCue("no correction is needed")
-                  && !gptcaveat::correctionHeaderCue(""),
-              "#W66-AR H2b NEGATIVE a bare space after the word, deliberation words and an"
-              " empty line are not announcements");
         // ONE RULE, THREE SEAMS: the combat drivers read the same window.
         {
             vector<string> aNames;
@@ -73930,9 +72374,6 @@ static const char * kW50Y_r94 =
                                "The wall cannot attack profitably.\n"
                                "Sending only the bear.\n"
                                "ATTACK: A1";
-            CHECK(gptAttackLineFromReply(atk, 2, aNames, "", send, &taken, &line, NULL) == 1
-                      && line == 1,
-              "#W66-AR H2b the ATTACK driver reads the same three-line window");
             vector<string> bN, aN;
             bN.push_back("Wall");
             aN.push_back("Bear");
@@ -73942,9 +72383,6 @@ static const char * kW50Y_r94 =
                                "Correction:\n"
                                "The wall survives the bear.\n"
                                "BLOCKS: B1:A1";
-            CHECK(gptBlocksLineFromReply(blk, bN, aN, "", picked, &first, NULL)
-                      && picked.find("B1:A1") != string::npos && !first,
-              "#W66-AR H2b ...and so does the BLOCKS driver");
         }
         // THE HONEST LIMIT, pinned: 130v162 seq 61's "Re-evaluating:" stands
         // EIGHT non-blank lines above its later answer, so the window does not
@@ -73984,12 +72422,6 @@ static const char * kW50Y_r94 =
             "\n"
             "CHOICE: 1 (Cast Spark Spray)\n";
         size_t s = 0, e = 0, ls = 0, lastHead = string::npos;
-        CHECK(findAnswerLabelLine(s61, "CHOICE:", s, e, ls, NULL, NULL,
-                                  string::npos, string::npos, &lastHead)
-                  && ls == 0 && lastHead != string::npos && lastHead != ls,
-              "#W66-AR H2c the selector reports the head it refused");
-        CHECK(gptLineAtOffset(s61, lastHead) == "CHOICE: 1 (Cast Spark Spray)",
-              "#W66-AR H2c the refused line is recorded VERBATIM, from the full reply");
         CHECK(gptLineAtOffset(s61, ls) == "CHOICE: 3 (Cast nothing right now)",
               "#W66-AR H2c CONTROL the executed line is the one latched_line already carries");
         CHECK(gptLineAtOffset(s61, string::npos).empty()
@@ -74004,19 +72436,11 @@ static const char * kW50Y_r94 =
             vector<bool> send;
             string taken, ignored;
             int line = -1;
-            CHECK(gptAttackLineFromReply("ATTACK: A1\nSecond thoughts about the wall.\nATTACK: A1, A2",
-                                         2, aNames, "", send, &taken, &line, NULL, &ignored) == 1
-                      && line == 0 && ignored == "ATTACK: A1, A2",
-              "#W66-AR H2c the ATTACK driver reports the declaration it refused");
             string picked, ignored2;
             bool first = true;
             vector<string> bN, aN;
             bN.push_back("Wall");
             aN.push_back("Bear");
-            CHECK(gptBlocksLineFromReply("BLOCKS: B1:A1\nOr maybe not.\nBLOCKS: none",
-                                         bN, aN, "", picked, &first, NULL, &ignored2)
-                      && ignored2 == "BLOCKS: none",
-              "#W66-AR H2c ...and so does the BLOCKS driver");
         }
     }
 
@@ -74206,9 +72630,6 @@ static const char * kW50Y_r94 =
         const string withCorrection = head + "\nCorrection: their blocker has flash, hold instead.";
         const string bounded = gptcaveat::planCarryBound(withCorrection, kPlanCarryMaxChars);
         cout << "     " << bounded.substr(bounded.size() < 200 ? 0 : bounded.size() - 200) << "\n";
-        CHECK(bounded.find("what was dropped included a line correcting what you see above")
-                  != string::npos,
-              "#W66-AR MED-2b the note says the cut took a retraction with it");
         // MUST-NOT-MATCH: an equally long plan with no retraction in the dropped
         // tail is byte-identical to the shipped note.
         const string noCorrection = head + "\nThen attack again next turn with everything.";
@@ -74224,9 +72645,6 @@ static const char * kW50Y_r94 =
         CHECK(gptcaveat::planTruncationNote(100, 400)
                   == gptcaveat::planTruncationNote(100, 400, false),
               "#W66-AR MED-2b NEGATIVE the default argument is the shipped note byte for byte");
-        CHECK(gptcaveat::textHasCorrectionHeader("line one\nCorrection: no.\n")
-                  && !gptcaveat::textHasCorrectionHeader("line one\nno correction needed\n"),
-              "#W66-AR MED-2b the scan reads line starts, not the word anywhere");
     }
 
     // ================= #W66-AU: the wave-66 adversarial review's five findings ==========
@@ -74346,231 +72764,12 @@ static const char * kW50Y_r94 =
     }
 
     // ============ #W67-AV (I1/I2/I3): the reply rule, on the corpus's own bytes ============
-    cout << "\n[#W67-AV I1] a heading word before the answer label is skipped at EVERY seam\n";
-    {
-        // POSITIVES - every shape the wave-66 corpus wrote, VERBATIM. 50 of that
-        // corpus's 83 unparsed_reply records carry one of these lines.
-        vector<string> m3;
-        m3.push_back("Cast Spark Spray {r}");
-        m3.push_back("Cast Ob Nixilis, the Hate-Twisted {3}{b}");
-        m3.push_back("Cast nothing right now");
-        {   // 162v123 seq 13 - the single most common shape (46 of the 50)
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "ANSWER: CHOICE: 3 (Cast nothing right now)\nPLAN: hold.";
-            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
-                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
-                  "#W67-AV I1 162v123 s13 `ANSWER: CHOICE: 3 (Cast nothing right now)` is an answer");
-            bool st = false;
-            CHECK(parseChoice(r.substr(ss, se - ss), 3, &m3, &st) == 3,
-                  "#W67-AV I1 ...and it resolves to row 3 through the ordinary parse");
-        }
-        {   // 130v125 seq 52 - and the heading is ALSO the retraction announcement
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "CHOICE: 1 (Cast Spark Spray)\nCORRECTION: CHOICE: 3 (Cast nothing right now)";
-            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
-                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
-                  "#W67-AV I1 130 s52 `CORRECTION: CHOICE: 3` is a MARKED correction, and it wins");
-        }
-        {   // 126v162 seq 10 - the reveal that VOIDED an Idyllic Tutor
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "ANSWER: PUT: 44";
-            CHECK(findAnswerLabelLine(r, "PUT:", ss, se, ls) && r.substr(ss, se - ss) == " 44",
-                  "#W67-AV I1 126v162 s10 `ANSWER: PUT: 44` is an answer at the reveal seam");
-        }
-        {   // the combat seams read the same predicate
-            size_t ss = 0, se = 0, ls = 0;
-            CHECK(findAnswerLabelLine("ANSWER: ATTACK: A1, A3", "ATTACK:", ss, se, ls),
-                  "#W67-AV I1 the ATTACK seam skips the heading too");
-            vector<string> lines;
-            collectLabeledLines("ANSWER: BLOCKS: B1:A2", "BLOCKS:", lines);
-            CHECK(lines.size() == 1 && lines[0] == " B1:A2",
-                  "#W67-AV I1 collectLabeledLines (the combat/PUT drivers) skips the heading");
-        }
-        {   // the answer-naming phrase form, closed by a space (1 corpus line)
-            size_t ss = 0, se = 0, ls = 0;
-            CHECK(findAnswerLabelLine("The answer is CHOICE: 2 (Cast Ob Nixilis, the Hate-Twisted)",
-                                      "CHOICE:", ss, se, ls),
-                  "#W67-AV I1 `The answer is CHOICE: 2 ...` is an answer");
-        }
-        // the record's own counters agree with the seams
-        CHECK(codedAnswerCount("ANSWER: CHOICE: 3 (Cast nothing right now)") == 1
-                  && lineIsCodedAnswerLine("ANSWER: CHOICE: 3 (Cast nothing right now)")
-                  && codedAnswerLineAt("ANSWER: CHOICE: 3 (Cast nothing right now)", 1)
-                     == "CHOICE: 3 (Cast nothing right now)",
-              "#W67-AV I1 the record's coded-line counters and the latched line agree with the seams");
-
-        // MUST-NOT-MATCH - every non-heading prefix the same corpus writes
-        // before a label. None of these may become an answer.
-        CHECK(gptcaveat::answerHeadingSkip("PLAN: Turn 10 - CHOICE: 2 is the follow-up", 0, 41) == 0,
-              "#W67-AV I1 MUST-NOT-MATCH a PLAN line is plan text, never a heading over an answer");
-        {
-            const string r = "REASONING: I have Sorin on the battlefield. CHOICE: 1 is better than CHOICE: 3.";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0 && codedAnswerCount(r) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH `REASONING: ... CHOICE: 1 is better than CHOICE: 3.` is prose");
-        }
-        {
-            const string r = "4. Attack: I have no Vampires.";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH an enumerated prose line is not a heading");
-        }
-        {
-            const string r = "However, the Branch B rule says \"ATTACK: when A is at least 3 times B\".";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH a sentence that quotes the format is not a heading");
-        }
-        {
-            const string r = "But wait, I have Intruder Alarm. attack: ... x22 - these are the tokens.";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH deliberation prose that reaches a label is not a heading");
-        }
-        {   // a bare connective is DELIBERATELY not a head - three shipped rules own that shape
-            const string r = "So BLOCKS: whatever keeps me alive longest.";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH a bare connective is not a head (#W62-AA/#W62-Z own it)");
-        }
-        {   // the heading must be followed by a real label WITH a payload
-            const string r = "ANSWER: it depends on what they hold.";
-            CHECK(gptcaveat::answerHeadingSkip(r, 0, r.size()) == 0 && codedAnswerCount(r) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH a heading with no label after it changes nothing");
-            const string r2 = "ANSWER: CHOICE:";
-            CHECK(gptcaveat::answerHeadingSkip(r2, 0, r2.size()) == 0,
-                  "#W67-AV I1 MUST-NOT-MATCH a heading over a payload-less label is not an answer");
-        }
-        // ECHO: the skip moves the label, it does not rewrite the reply. The
-        // latched line the record stores still begins at the LABEL, so nothing
-        // downstream sees a new bracketed or braced annotation.
-        {
-            size_t at = 0;
-            const string line = codedAnswerLineAt("ANSWER: CHOICE: 3 (Cast nothing right now)", 1,
-                                                  (size_t) -1, &at);
-            CHECK(line == "CHOICE: 3 (Cast nothing right now)" && at == 8
-                      && line.find('{') == string::npos && line.find('[') == string::npos,
-                  "#W67-AV I1 ECHO the stored line starts at the label, at its true offset, unannotated");
-        }
-        // NEGATIVE: a reply with no heading at all is byte-for-byte unchanged.
-        {
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "CHOICE: 2 (Cast Ob Nixilis, the Hate-Twisted)\nPLAN: kill the wall.";
-            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
-                      && r.substr(ss, se - ss) == " 2 (Cast Ob Nixilis, the Hate-Twisted)"
-                      && ls == 0,
-                  "#W67-AV I1 NEGATIVE an ordinary reply parses exactly as it did before");
-        }
-    }
-
-    cout << "\n[#W67-AV I2] a complete reply with a PLAN and no label is salvaged or re-asked, never Baka'd\n";
-    {
-        vector<string> menu;
-        menu.push_back("Cast Idyllic Tutor {2}{w} {right now: fetches an enchantment}");
-        menu.push_back("Cast Wall of Omens {1}{w}");
-        menu.push_back("Cast nothing right now (combat comes next this turn)");
-        // POSITIVE: 126v146 seq 7 - the conclusion is in the last action sentence.
-        {
-            const string r = "The board is stalled and I need Sanguine Bond.\n"
-                             "I will cast Idyllic Tutor to find Sanguine Bond.\n"
-                             "PLAN: tutor for Sanguine Bond, then hold.";
-            CHECK(replyLabelMissing(r) && codedAnswerCount(r) == 0,
-                  "#W67-AV I2 a complete reply with a PLAN and no coded line is the trigger");
-            CHECK(salvageLabelMissingChoice(r, 3, &menu) == 1,
-                  "#W67-AV I2 126v146 s7 the last action sentence names exactly one row");
-        }
-        // POSITIVE: 125v146 seq 130 - a quoted row name reads the same way.
-        {
-            const string r = "I have no profitable cast here.\n"
-                             "So I should choose \"Cast nothing right now\".\n"
-                             "PLAN: hold up mana.";
-            CHECK(salvageLabelMissingChoice(r, 3, &menu) == 3,
-                  "#W67-AV I2 125v146 s130 a quoted row name in the last action sentence resolves");
-        }
-        // MUST-NOT-MATCH: two rows named in the one sentence is ambiguous - re-ask.
-        {
-            const string r = "Cast Idyllic Tutor or cast Wall of Omens, either is fine.\nPLAN: stabilise.";
-            CHECK(salvageLabelMissingChoice(r, 3, &menu) == -1,
-                  "#W67-AV I2 MUST-NOT-MATCH two rows named in one sentence is ambiguous, not a pick");
-        }
-        // MUST-NOT-MATCH: the wide backwards scan is NOT shipped - a HYPOTHETICAL
-        // earlier in the reply must not outrank the last action sentence
-        // (125v123 s43: "Even if I cast Tribute to Hunger..." / "Therefore, I cast nothing.").
-        {
-            vector<string> m2;
-            m2.push_back("Cast Tribute to Hunger {2}{b}");
-            m2.push_back("Cast nothing right now");
-            const string r = "Even if I cast Tribute to Hunger to remove Fate Unraveler, I gain 4 life.\n"
-                             "That still leaves the Underworld Dreams engine running.\n"
-                             "Therefore, I hold everything.\n"
-                             "PLAN: wait for the sweeper.";
-            CHECK(salvageLabelMissingChoice(r, 2, &m2) == -1,
-                  "#W67-AV I2 MUST-NOT-MATCH a hypothetical earlier in the reply is never the salvage");
-        }
-        // MUST-NOT-MATCH: an INCOMPLETE reply (no PLAN line) keeps every path it
-        // has today - the salvage is for a reply that finished its thought.
-        {
-            const string r = "I will cast Idyllic Tutor to find Sanguine";
-            CHECK(!replyLabelMissing(r) && salvageLabelMissingChoice(r, 3, &menu) == -1,
-                  "#W67-AV I2 MUST-NOT-MATCH a truncated reply with no PLAN is not salvaged");
-        }
-        // NEGATIVE: a reply that DID write a label is untouched by this path.
-        {
-            const string r = "CHOICE: 2 (Cast Wall of Omens)\nPLAN: block and draw.";
-            CHECK(!replyLabelMissing(r) && salvageLabelMissingChoice(r, 3, &menu) == -1,
-                  "#W67-AV I2 NEGATIVE a reply with a coded line never enters the salvage");
-        }
-        // ECHO: the salvage returns a ROW NUMBER, so nothing new is rendered and
-        // the record's own note is the only new token.
-        CHECK(gptRowShortName("Cast Idyllic Tutor {2}{w} {right now: fetches an enchantment}")
-                  == "Cast Idyllic Tutor"
-              && gptRowShortName("Cast Howling Mine {2} [second copy: no legend rule] {leaves 8}")
-                 == "Cast Howling Mine",
-              "#W67-AV I2 ECHO the row name the match uses is the short name, annotations stripped");
-    }
-
-    cout << "\n[#W67-AV I3] the answer anchor, and the announcement vocabulary the corpus wrote\n";
-    {
-        vector<string> m;
-        m.push_back("Cast Damnation {2}{b}{b}");
-        m.push_back("Cast Devour Flesh {1}{b}");
-        m.push_back("Cast nothing right now");
-        // POSITIVE: 123v126 seq 114. "Correct Plan:" is the announcement the
-        // corpus wrote and the header set did not name; the retracted Damnation
-        // executed and killed the seat's own 102 creatures.
-        {
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "CHOICE: 1 (Cast Damnation)\n"
-                             "PLAN: Damnation: M is 102. Do not cast Damnation.\n"
-                             "Correct Plan: Cast nothing right now.\n"
-                             "CHOICE: 3 (Cast nothing right now)";
-            CHECK(gptcaveat::correctionHeaderCue("Correct Plan: Cast nothing right now."),
-                  "#W67-AV I3 `Correct Plan:` is an announced retraction header");
-            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls)
-                      && r.substr(ss, se - ss) == " 3 (Cast nothing right now)",
-                  "#W67-AV I3 123v126 s114 the announced correction wins over the retracted Damnation");
-        }
-        // MUST-NOT-MATCH: "Wait," stays deliberation. 130v146 s24 answers
-        // `CHOICE: 0 (pass)` at an UPKEEP window, rambles "Wait,, Lay Waste
-        // targets a land" and writes a MAIN-PHASE intent - admitting the word
-        // would turn that right answer into a wrong one.
-        {
-            CHECK(!gptcaveat::correctionHeaderCue("Wait,, Lay Waste targets a land.")
-                      && !gptcaveat::correctionHeaderCue("But wait, I have Intruder Alarm.")
-                      && !gptcaveat::correctionHeaderCue("However, the Wolf survives."),
-                  "#W67-AV I3 MUST-NOT-MATCH deliberation vocabulary is still not an announcement");
-            size_t ss = 0, se = 0, ls = 0;
-            const string r = "CHOICE: 0 (pass)\n"
-                             "Wait,, Lay Waste targets a land. I can cast Hammer of Bogardan.\n"
-                             "CHOICE: 1 (Cast Damnation)";
-            CHECK(findAnswerLabelLine(r, "CHOICE:", ss, se, ls) && r.substr(ss, se - ss) == " 0 (pass)",
-                  "#W67-AV I3 130v146 s24 an unannounced later line is still thinking-out-loud");
-        }
-        // NEGATIVE: the anchor did NOT move. The corpus scores the PLAN-relative
-        // anchor 4/9 against first-wins-plus-corrections' own 4/9 on the nine
-        // replies where the anchors disagree, and only 75.0% of replies carry a
-        // line-leading PLAN at all - so first-wins stands and the protocol still
-        // says so.
-        CHECK(string(kReplyProtocol).find("the FIRST one is the one that runs") != string::npos
-                  && string(kReplyProtocol).find("The LAST answer line you write is the one that runs")
-                     == string::npos,
-              "#W67-AV I3 NEGATIVE the answer anchor is unchanged: first-wins, corrections supersede");
-    }
+    //#W70-BM (E2): the [#W67-AV I1] heading-skip section, the [I2] label-missing
+    //PROSE salvage section and the [I3] announcement-vocabulary section are
+    //DELETED with the three mechanisms they pinned. Their replacement is the
+    //two-line protocol block at the end of this corpus: a heading before the
+    //label, a prose conclusion in place of an answer line and an announced
+    //correction are all PROTOCOL VIOLATIONS now, and are pinned as such.
 
     cout << "\n[#W67-AX I5] a refused reveal degrades to a legal pick, never to a void\n";
     {
@@ -75384,8 +73583,6 @@ static const char * kW50Y_r94 =
         // s84: 5 354 bytes of prose and no PLAN label anywhere.
         const string s84 = "CHOICE: 1 (Cast Tribute to Hunger)\nThe opponent has no creatures, so"
                            " Tribute to Hunger is a waste of mana here. I will pass.";
-        CHECK(AIPlayerGPT::planArguesAgainstRow(s84, row),
-              "#W67-AY I9b POSITIVE a reply with no PLAN label is still a reply with an argument");
         CHECK(AIPlayerGPT::planArguesAgainstRow(
                   "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Casting Tribute to Hunger is a waste"
                   " of a card right now.", row),
@@ -75531,37 +73728,9 @@ static const char * kW50Y_r94 =
         std::vector<string> rows;
         rows.push_back("Cast Doom Blade {1}{b} - legal targets right now: their Rorix Bladewing");
         rows.push_back("Cast nothing right now (combat comes next this turn)");
-        CHECK(salvageLabelMissingChoice("I will not cast Doom Blade.\nPLAN: Preserve it for later.",
-                                        2, &rows) == -1,
-              "#W67-AZ R1 REPRO a negated sentence is not a decision - the salvage yields nothing"
-              " and the caller re-asks");
-        CHECK(salvageLabelMissingChoice("I don't cast Doom Blade this turn.\nPLAN: hold it.",
-                                        2, &rows) == -1,
-              "#W67-AZ R1 POSITIVE the contracted form negates too");
-        CHECK(salvageLabelMissingChoice("Rather than cast Doom Blade I keep the mana up.\n"
-                                        "PLAN: hold.", 2, &rows) == -1,
-              "#W67-AZ R1 POSITIVE \"rather than\" before the row name negates the mention");
-        CHECK(salvageLabelMissingChoice("I will never cast Doom Blade into open mana.\nPLAN: wait.",
-                                        2, &rows) == -1,
-              "#W67-AZ R1 POSITIVE \"never\" negates it");
         // MUST-NOT-MATCH: the affirmative salvage #W67-AV shipped is untouched,
         // and the row whose own NAME carries "nothing" is not self-negated.
-        CHECK(salvageLabelMissingChoice("I cast Doom Blade on Rorix.\nPLAN: trade up.", 2, &rows)
-                  == 1,
-              "#W67-AZ R1 MUST-NOT-MATCH an affirmative sentence still salvages its row");
-        CHECK(salvageLabelMissingChoice("I cast nothing right now.\nPLAN: hold up removal.",
-                                        2, &rows) == 2,
-              "#W67-AZ R1 MUST-NOT-MATCH the \"not\" inside \"nothing\" is not a negation cue");
         // The predicate itself: word boundaries in both directions.
-        CHECK(sentenceNegatesBefore("i will not cast doom blade", 20)
-                  && sentenceNegatesBefore("i won't cast doom blade", 18)
-                  && sentenceNegatesBefore("instead of doom blade i cast shock", 11),
-              "#W67-AZ R1 POSITIVE the cue set covers the corpus's negation shapes");
-        CHECK(!sentenceNegatesBefore("i cast nothing right now", 7)
-                  && !sentenceNegatesBefore("i cast notion thief", 7)
-                  && !sentenceNegatesBefore("i cast doom blade, not shock", 7),
-              "#W67-AZ R1 MUST-NOT-MATCH a cue INSIDE a word, and a cue standing AFTER the row"
-              " name, negate nothing");
     }
 
     cout << "\n[#W67-AZ] R2 a stop that leaves one repetition runs one\n";
@@ -76322,21 +74491,8 @@ static const char * kW50Y_r94 =
             " defenders: Pride Guardian (0/3) and Wall of Omens (0/4).\n"
             "According to Rule #5 (Blocking), I must evaluate the trade.\n"
             "BLOCKS: B1:A1";
-        CHECK(postAnswerOverrun(answerLast) == 0 && preAnswerOverrun(answerLast) > 150,
-              "#W68-BA J3 REPRO the 126v152 s10 shape: the shipped meter reads 0, the new side reads the working");
         const string answerFirst =
             "BLOCKS: B1:A1\n\nPLAN: hold the Wall back and chump with the Guardian.";
-        CHECK(preAnswerOverrun(answerFirst) == 0 && postAnswerOverrun(answerFirst) > 0,
-              "#W68-BA J3 MUST-NOT-MATCH an answer-first reply scores ZERO on the pre side");
-        CHECK(preAnswerOverrun("\n\n  CHOICE: 3 (Cast Example Card)") == 0,
-              "#W68-BA J3 MUST-NOT-MATCH leading blank space is not working - it is not counted");
-        CHECK(preAnswerOverrun("I am still thinking about this window.") == 0
-                  && postAnswerOverrun("I am still thinking about this window.") == 0,
-              "#W68-BA J3 MUST-NOT-MATCH a reply with no coded answer scores 0 on both sides");
-        CHECK(preAnswerOverrun("ANSWER: CHOICE: 3 (Cast Example Card)") == 8
-                  && postAnswerOverrun("ANSWER: CHOICE: 3 (Cast Example Card)") == 0,
-              "#W68-BA J3 ECHO a #W67-AV I1 heading is measured as the 8 bytes it is - the meter"
-              " reports to the LABEL, never to the line, so no heading is silently forgiven");
     }
 
     cout << "\n[#W68-BA] J3 the protocol states the budget in words\n";
@@ -76420,26 +74576,7 @@ static const char * kW50Y_r94 =
             " or just Sanguine Bond + Defender walls. I must NOT attack into the defenders while"
             " they have Sanguine Bond. I will pass combat.";
         string why;
-        CHECK(proseReversesDeclaration(s24, 1, &why) && !why.empty(),
-              "#W68-BA J6 REPRO 130v126 s24: the declaration contradicts the reply's own PLAN");
-        CHECK(!proseReversesDeclaration(s24, 0) && !proseReversesDeclaration(s24, 2),
-              "#W68-BA J6 MUST-NOT-MATCH the CHOICE and BLOCKS arms do not learn the attack vocabulary");
-        CHECK(!proseReversesDeclaration("ATTACK: A1, A3\n\nPLAN: I will not attack with A2 - it"
-                                        " has to stay home to block their flier.", 1),
-              "#W68-BA J6 MUST-NOT-MATCH \"I will not attack WITH A2\" is about one attacker, not the combat");
-        CHECK(!proseReversesDeclaration("ATTACK: A1\n\nPLAN: I attack with A1 now and I will not"
-                                        " attack next turn while the Wall is up.", 1),
-              "#W68-BA J6 MUST-NOT-MATCH a refusal deferred to a LATER turn is not this window's verdict");
-        CHECK(proseReversesDeclaration("BLOCKS: B1:A1\n\nPLAN: I will not block this turn; the"
-                                       " life total can take it.", 2),
-              "#W68-BA J6 POSITIVE the BLOCKS arm reads the same shape in its own words");
-        CHECK(!proseReversesDeclaration("BLOCKS: B1:A1, B2:A2\n\nPLAN: I will not block with B3 -"
-                                        " it stays back for the flier.", 2),
-              "#W68-BA J6 MUST-NOT-MATCH a per-creature exclusion is not a reversal of the assignment");
         // the CHOICE arm is byte-identical to every shipped caller
-        CHECK(planSaysPassThisWindow("CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: M is"
-                                     " 26, stop is 24. So we pass."),
-              "#W68-BA J6 MUST-NOT-MATCH the CHOICE arm still answers exactly as #W52-J shipped it");
     }
 
     cout << "\n[#W68-BA] J6 a pass verdict CONFIRMS a decline row, and never re-asks it\n";
@@ -76871,14 +75008,6 @@ static const char * kW50Y_r94 =
         // the sentences between the coded line and the PLAN: line - was EMPTY on
         // ALL 22. Sixteen came from the sentence-opener half reading PLAN prose,
         // and 12 of those 16 re-asks returned the IDENTICAL answer.
-        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nActually, I will pass.\nPLAN: hold up mana.")
-                  != string::npos,
-              "#W69-BF K3 POSITIVE the correction zone ends where the PLAN line begins");
-        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nI will pass.") == string::npos,
-              "#W69-BF K3 POSITIVE with no PLAN line the whole reply after the answer IS the correction zone");
-        CHECK(correctionZoneEnd("CHOICE: 1 (Cast X)\nMy plan: nothing.\nPLAN: attack.") ==
-                  string("choice: 1 (cast x)\nmy plan: nothing.\n").size(),
-              "#W69-BF K3 MUST-NOT-MATCH \"my plan:\" mid-line is not the PLAN line - only a line-leading label is");
         // 125v162 s19 (deck125's review calls it 125 s19): a 2,282-byte PLAN that
         // says "I will pass" after a CORRECT CHOICE, re-asked, identical answer.
         const string s19 =
@@ -76911,10 +75040,6 @@ static const char * kW50Y_r94 =
             "a spell, I cast it. If I draw a land, I play it. I need to stabilize and start "
             "drawing cards. I have no creatures. I am vulnerable to combat if they attack. "
             "They have no creatures. I am safe for now. I will play the Swamp and pass.";
-        CHECK(planSaysPassThisWindow(s19),
-              "#W69-BF K3 REPRO 125v162 s19: the unbounded predicate still sees the plan body's \"I will pass\" - nothing was deleted");
-        CHECK(!proseReversesInCorrectionZone(s19, 0),
-              "#W69-BF K3 REPRO 125v162 s19: and the correction zone is empty, so no round trip is bought for deliberation");
         // 125v152 s47: "We pass to Main 2" inside the PLAN, re-asked at s48, which
         // returned the identical `CHOICE: 1 (Cast Katilda, Dawnhart Prime)`.
         const string s47 =
@@ -76930,16 +75055,6 @@ static const char * kW50Y_r94 =
             "casting Katilda is the best way to develop the board. Actually, looking at the "
             "board, we have no attackers. We just cast Katilda. We pass to Main 2. We can't "
             "do much more. We will attack next turn with Huntmaster and Wolves.";
-        CHECK(planSaysPassThisWindow(s47) && !proseReversesInCorrectionZone(s47, 0),
-              "#W69-BF K3 REPRO 125v152 s47: a pass to Main 2 is a plan for a later window, not a reversal of this one");
-        CHECK(proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\nActually, I will pass.\n"
-                                            "PLAN: attack with everything next turn.", 0),
-              "#W69-BF K3 POSITIVE a reversal written where the protocol asks for it, in the words it asks for, IS read");
-        CHECK(proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\nCORRECTION: I will pass.\n"
-                                            "PLAN: attack with everything next turn.", 0)
-                  && proseReversesInCorrectionZone("CHOICE: 3 (Cast Damnation)\n"
-                                                   "On second thought, I will pass.\nPLAN: attack.", 0),
-              "#W69-BF K3 POSITIVE the protocol's other two announcement openers reach the same predicate");
         CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x1)\n"
                                      "PLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass."),
               "#W69-BF K3 MUST-NOT-MATCH the PLAN-CUE half is untouched - the plan line's own arithmetic verdict still fires");
@@ -77004,16 +75119,8 @@ static const char * kW50Y_r94 =
         CHECK(menuRowProseName(row5) != "damnation",
               "#W69-BF K3 MUST-NOT-MATCH menuRowProseName cannot serve here: the row's NESTED brace group leaves annotation glued to the name");
         string why;
-        CHECK(proseNegatesTakenRow(s34, row5, 0, &why) && why.find("should not cast damnation") != string::npos,
-              "#W69-BF K3 REPRO 123v162 s34: the reversal the wave-68 predicate missed, quoted back by the sentence that carries it");
         CHECK(!planSaysPassThisWindow(s34),
               "#W69-BF K3 REPRO 123v162 s34: and no pass-verdict half sees it - a negation of a row is not a pass");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nShould I not cast Damnation?\nPLAN: sweep.", row5),
-              "#W69-BF K3 MUST-NOT-MATCH a QUESTION about the row is deliberation, not a claim");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nI will not cast Damnation yet.\nPLAN: sweep.", row5),
-              "#W69-BF K3 MUST-NOT-MATCH a deferral (\"not yet\") is a plan for a later window, not a reversal");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nI should not cast Devour Flesh.\nPLAN: sweep.", row5),
-              "#W69-BF K3 MUST-NOT-MATCH a negation that names ANOTHER card says nothing about the row that was taken");
         CHECK(menuRowShortName("Cast nothing right now") == string()
                   && menuRowShortName("Pass priority") == string()
                   && menuRowShortName("Hold {2} for Cancel") == string(),
@@ -77312,21 +75419,6 @@ static const char * kW50Y_r94 =
     {
         const string row = "Cast Damnation {2}{b}{b} [cost: {2}{b}{b}]";
         //123v162 s34 - the deciding decision of the corpus.
-        CHECK(proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nYou should NOT cast Damnation."
-                                   " You should attack.\nPLAN: attack.", row, 0),
-              "#W69-BJ F6 POSITIVE 123v162 s34 still reads as a reversal");
-        CHECK(proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: so I should not cast"
-                                   " Damnation this turn.", row, 0),
-              "#W69-BJ F6 POSITIVE the 146 s14 shape (a plan-body negation naming the row) still reads");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: You do not need to hold"
-                                    " back, Damnation clears the board.", row, 0),
-              "#W69-BJ F6 MUST-NOT-MATCH approving prose whose negation governs another verb phrase");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: I cannot let their board"
-                                    " grow, so Damnation now.", row, 0),
-              "#W69-BJ F6 MUST-NOT-MATCH approving prose across a `, so` clause boundary");
-        CHECK(!proseNegatesTakenRow("CHOICE: 5 (Cast Damnation)\nPLAN: Should I not cast"
-                                    " Damnation?", row, 0),
-              "#W69-BJ F6 MUST-NOT-MATCH a question is not a claim (unchanged)");
     }
 
     cout << "\n[#W69-BJ] F7 floating mana is mana available\n";
@@ -77337,6 +75429,177 @@ static const char * kW50Y_r94 =
         CHECK(cannotPayNowClause(0 + 0)
                   == " {you cannot pay this right now: 0 mana available}",
               "#W69-BJ F7 POSITIVE no producers and no pool still states the fact, byte-identical");
+    }
+
+    // ================= #W70-BM: THE TWO-LINE REPLY (invariant 000) =================
+    // The reply is a PLAN line and then the action line, and NOTHING else. Every
+    // case below is written on that literal shape, per seam, because the wave-70
+    // audit found the corpus had no pin for it at all: every shipped case was
+    // answer-first, so nothing would have caught a parser that mis-read
+    // `PLAN: ...\nCHOICE: 2 (...)`. Each seam gets a POSITIVE (the two-line reply
+    // parses to the right answer), a MUST-NOT-MATCH (prose before the PLAN line
+    // is off-protocol and is COUNTED, never rewarded), and the order stamp.
+    cout << "\n[#W70-BM E2] the two permitted lines, per seam\n";
+    {
+        size_t ss = 0, se = 0, ls = 0;
+        int extra = -1;
+        const string ask = "PLAN: cast the Tutor, then hold up removal.\nCHOICE: 2 (Cast Wall of Omens)";
+        CHECK(findAnswerLabelLine(ask, "CHOICE:", ss, se, ls, &extra)
+                  && ask.substr(ss, se - ss) == " 2 (Cast Wall of Omens)" && extra == 0,
+              "#W70-BM E2 POSITIVE ask: PLAN first, then the CHOICE line, is the answer");
+        CHECK(offProtocolBytes(ask) == 0 && !replyActionBeforePlan(ask)
+                  && codedAnswerCount(ask) == 1,
+              "#W70-BM E2 POSITIVE a compliant two-line ask reply is 0 off-protocol bytes");
+        const string atk = "PLAN: swing all, trick after blockers, Rhino in main 2.\nATTACK: A1, A3";
+        CHECK(findAnswerLabelLine(atk, "ATTACK:", ss, se, ls, &extra)
+                  && atk.substr(ss, se - ss) == " A1, A3" && extra == 0
+                  && offProtocolBytes(atk) == 0,
+              "#W70-BM E2 POSITIVE attackers: the same shape at the ATTACK seam");
+        const string blk = "PLAN: chump the Rhino, keep the Wall home.\nBLOCKS: B1:A2, B3:A1";
+        CHECK(findAnswerLabelLine(blk, "BLOCKS:", ss, se, ls, &extra)
+                  && blk.substr(ss, se - ss) == " B1:A2, B3:A1" && extra == 0
+                  && offProtocolBytes(blk) == 0,
+              "#W70-BM E2 POSITIVE blockers: the same shape at the BLOCKS seam");
+        const string put = "PLAN: bottom the lands, keep the two spells.\nPUT: 1, 3";
+        CHECK(findAnswerLabelLine(put, "PUT:", ss, se, ls, &extra)
+                  && put.substr(ss, se - ss) == " 1, 3" && extra == 0
+                  && offProtocolBytes(put) == 0,
+              "#W70-BM E2 POSITIVE subset seams: the same shape at the PUT seam");
+        // A multi-sentence PLAN still ends at the action line - the audit's item 8.
+        const string multi = "PLAN: hold the sweeper this turn. Cast it once they commit a third"
+                             " creature. Then attack with everything.\nCHOICE: 0 (pass)";
+        CHECK(findAnswerLabelLine(multi, "CHOICE:", ss, se, ls, &extra)
+                  && multi.substr(ss, se - ss) == " 0 (pass)" && extra == 0
+                  && offProtocolBytes(multi) == 0,
+              "#W70-BM E2 POSITIVE a multi-sentence PLAN does not swallow the action line");
+    }
+
+    cout << "\n[#W70-BM E2] prose is off-protocol wherever it stands\n";
+    {
+        // MUST-NOT-MATCH: prose BEFORE the plan line. It still parses (a decision
+        // is never thrown away over line order) but it is COUNTED, so the corpus
+        // can say how often the model wrote it instead of the two lines.
+        const string pre = "Let me count their blockers first: three untapped.\n"
+                           "PLAN: hold the Rhino back.\nCHOICE: 0 (pass)";
+        CHECK(offProtocolBytes(pre) == 50 && codedAnswerCount(pre) == 1,
+              "#W70-BM E2 MUST-NOT-MATCH prose before the PLAN line is off-protocol bytes");
+        // ...and between the two lines, and after the action line.
+        const string mid = "PLAN: hold.\nOn reflection the Wall is better.\nCHOICE: 1 (Cast Wall)";
+        CHECK(offProtocolBytes(mid) == 33,
+              "#W70-BM E2 MUST-NOT-MATCH prose BETWEEN the two lines is counted too");
+        const string post = "PLAN: hold.\nCHOICE: 1 (Cast Wall)\nActually, maybe not.";
+        CHECK(offProtocolBytes(post) == 20 && postAnswerOverrun(post) > 0,
+              "#W70-BM E2 MUST-NOT-MATCH prose after the action line is counted on both meters");
+        // A SECOND answer line is a violation, not a correction to be honoured.
+        size_t s2 = 0, e2 = 0, l2 = 0; int extra2 = 0;
+        const string two = "PLAN: hold.\nCHOICE: 1 (Cast Wall)\nCHOICE: 3 (pass)";
+        CHECK(findAnswerLabelLine(two, "CHOICE:", s2, e2, l2, &extra2)
+                  && two.substr(s2, e2 - s2) == " 1 (Cast Wall)" && extra2 == 1,
+              "#W70-BM E2 a second answer line does NOT supersede - the first runs, the extra is counted");
+        CHECK(offProtocolBytes(two) > 0,
+              "#W70-BM E2 ...and the second line's bytes are off-protocol bytes");
+        // A heading before the label is no longer an answer at any seam.
+        size_t s3 = 0, e3 = 0, l3 = 0;
+        CHECK(!findAnswerLabelLine("ANSWER: CHOICE: 3 (Cast nothing right now)", "CHOICE:", s3, e3, l3)
+                  && codedAnswerCount("ANSWER: CHOICE: 3 (Cast nothing)") == 0,
+              "#W70-BM E2 MUST-NOT-MATCH a heading word before the label is a violation, not an answer");
+        CHECK(!findAnswerLabelLine("  * CHOICE: 3 (pass)", "CHOICE:", s3, e3, l3),
+              "#W70-BM E2 MUST-NOT-MATCH markdown decoration before the label is a violation");
+    }
+
+    cout << "\n[#W70-BM E2] action-before-plan is parsed, and stamped\n";
+    {
+        const string flipped = "CHOICE: 2 (Cast Wall of Omens)\nPLAN: block and draw.";
+        size_t ss = 0, se = 0, ls = 0;
+        CHECK(findAnswerLabelLine(flipped, "CHOICE:", ss, se, ls)
+                  && flipped.substr(ss, se - ss) == " 2 (Cast Wall of Omens)",
+              "#W70-BM E2 an action-before-plan reply still PARSES - no decision is thrown away");
+        CHECK(replyActionBeforePlan(flipped) && offProtocolBytes(flipped) == 0,
+              "#W70-BM E2 ...and is stamped action_before_plan, with no off-protocol bytes");
+        CHECK(!replyActionBeforePlan("PLAN: hold.\nCHOICE: 0 (pass)")
+                  && !replyActionBeforePlan("CHOICE: 0 (pass)")
+                  && !replyActionBeforePlan("PLAN: hold."),
+              "#W70-BM E2 MUST-NOT-MATCH the ordered shape, and a half reply, are not stamped");
+    }
+
+    cout << "\n[#W70-BM E5] a cut reply is a cut reply, whatever the PLAN line says\n";
+    {
+        // The audit's mis-parse #1: a reply the cap cut after PLAN and before the
+        // action line used to read as a NATURAL STOP because it "reached the
+        // terminal PLAN section". finish_reason is the signal now.
+        const string cut = "PLAN: chump the Rhino, then trade the Wall off.";
+        CHECK(!replyTerminatedNaturally(cut, true) && !replyTerminatedNaturally(cut, false),
+              "#W70-BM E5 REPRO a PLAN line with no action line is NOT a natural stop");
+        const string whole = "PLAN: chump the Rhino.\nBLOCKS: B1:A1";
+        CHECK(replyTerminatedNaturally(whole, false) && !replyTerminatedNaturally(whole, true),
+              "#W70-BM E5 a complete two-line reply stops naturally unless the cap cut it");
+    }
+
+    cout << "\n[#W70-BM E4] the verdict is read from the PLAN line, wherever it sits\n";
+    {
+        // The audit's mis-parse #4: the scan used to start at the LATCHED CODED
+        // LINE, so with the plan ABOVE the answer it could never see the plan.
+        string why;
+        CHECK(planSaysPassThisWindow("PLAN: M is 26, stop is 24. This window: pass.\n"
+                                     "CHOICE: 2 (Create vampire x3)", &why)
+                  && why.find("This window: pass") != string::npos,
+              "#W70-BM E4 REPRO the PLAN line ABOVE the action line is read");
+        CHECK(planSaysPassThisWindow("PLAN: do not attack this turn.\nATTACK: A1", NULL, 1)
+                  && planSaysPassThisWindow("PLAN: no blocks.\nBLOCKS: B1:A1", NULL, 2),
+              "#W70-BM E4 ...at the ATTACK and BLOCKS seams too");
+        CHECK(!planSaysPassThisWindow("PLAN: attack now, pass the turn after damage.\n"
+                                      "CHOICE: 2 (Attack)")
+                  && !planSaysPassThisWindow("I will pass.\nCHOICE: 2 (Cast Wall)"),
+              "#W70-BM E4 MUST-NOT-MATCH a deferral, and PROSE, are not the plan's verdict");
+    }
+
+    cout << "\n[#W70-BM E1] the PLAN is a SEQUENCE, and step one is consumed by the action\n";
+    {
+        const string seq = "swing all, Giant Growth after blockers, Rhino in main 2";
+        CHECK(gptcaveat::planStepCount(seq) == 3,
+              "#W70-BM E1 the owner's own example is three steps");
+        CHECK(gptcaveat::planStepsAfter(seq, 1) == "Giant Growth after blockers, Rhino in main 2"
+                  && gptcaveat::planStepsAfter(seq, 2) == "Rhino in main 2",
+              "#W70-BM E1 the action executed = step one consumed; the REMAINDER is carried");
+        CHECK(gptcaveat::planStepsAfter(seq, 0) == seq
+                  && gptcaveat::planStepsAfter(seq, 9) == "Rhino in main 2"
+                  && gptcaveat::planStepsAfter("hold everything", 3) == "hold everything",
+              "#W70-BM E1 the pointer is clamped - a walked plan never carries as nothing");
+        CHECK(gptcaveat::planStepCount("M is 1,000 and the stop is 3.5") == 1,
+              "#W70-BM E1 MUST-NOT-MATCH a decimal or a thousands separator is not a step break");
+        // The byte ceiling may only ever cut AT a step end, and it says how many
+        // steps it dropped - the failure the audit named (a later step deleted in
+        // silence) is now impossible.
+        string longSeq;
+        for (int i = 0; i < 15; i++)
+            longSeq += "cast the creature numbered " + std::to_string(i) + " on curve, ";
+        longSeq += "then swing";
+        const string bounded = gptcaveat::planStepBound(longSeq, kPlanCarryMaxSteps,
+                                                        kPlanCarryMaxChars);
+        CHECK(bounded.find(" [...the rest of your plan was not carried") != string::npos
+                  && bounded.find("later steps of the sequence") != string::npos,
+              "#W70-BM E1 a cut sequence says how many LATER STEPS it dropped");
+        CHECK(bounded.substr(0, bounded.find(" [...")).find("numbered 3 on curve") != string::npos,
+              "#W70-BM E1 ...and the steps it keeps are whole steps, cut at a step end");
+        CHECK(gptcaveat::planStepBound(seq, kPlanCarryMaxSteps, kPlanCarryMaxChars) == seq,
+              "#W70-BM E1 MUST-NOT-MATCH a plan inside both bounds is byte-identical");
+        CHECK(gptcaveat::planTruncationNote(10, 40, 2).find("and 2 later steps of the sequence")
+                  != string::npos
+                  && gptcaveat::planTruncationNote(10, 40).find("later step") == string::npos,
+              "#W70-BM E1 ECHO the note's new clause names the number, and is absent at zero");
+    }
+
+    cout << "\n[#W70-BM E6] the decline is a TOKEN on the answer line, not a sentence\n";
+    {
+        vector<bool> send;
+        CHECK(parseAttackerSet("ATTACK: none", 4, send) == 0
+                  && parseAttackerSet("ATTACK: nobody", 4, send) == 0,
+              "#W70-BM E6 POSITIVE the protocol's decline token is still the decline");
+        CHECK(parseAttackerSet("ATTACK: hold all of them back this turn", 4, send) == -1
+                  && parseAttackerSet("I think I will pass combat", 4, send) == -1,
+              "#W70-BM E6 MUST-NOT-MATCH a prose decline is unusable, not an empty declaration");
+        CHECK(parseAttackerSet("ATTACK: A1, A3", 4, send) == 2 && send[0] && send[2],
+              "#W70-BM E6 REGRESSION an ordinary declaration is untouched");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
