@@ -1459,6 +1459,16 @@ private:
     int mReserveDeclineTurn;
     int mReserveDeclinePhase;
     int mReserveDeclineWindows; //gameend report field
+    //#W72-BV (M9, deck162 MED): the TURN-scoped half of the same decline. The
+    //latch above is step-scoped and board-keyed and cannot survive an upkeep ->
+    //draw step (the draw itself moves the hand and library counts, so the board
+    //key differs by construction and the window is re-asked, correctly). What
+    //the seat still owes the model at that next window is the fact that it has
+    //already answered this question once this turn. Prompt-only, so it never
+    //enters the ask key; suppresses nothing.
+    string mReserveDeclineSpanKey;
+    int mReserveDeclineSpanTurn;
+    int mReserveDeclineNoted; //gameend report field
     int mEngineRevealFloorPicks; //#W67-AZ (R7): gameend report field
 public:
     void noteEngineRevealFloor(const string& card); //#W67-AZ (R7)

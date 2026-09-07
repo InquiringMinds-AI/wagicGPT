@@ -4494,6 +4494,19 @@ int GenericChooseTypeColorName::resolve()
         for (int k = 0; k < 9; k++){
             MTGGameZone * zone = zones[k];
             for (int j = zone->nb_cards - 1; j >= 0; --j){
+                //#W72-BV (M7, wave-71 deck146 HIGH-1): a TOKEN's name is not a
+                //card name. CR 201.3 lets a "choose a card name" effect name only
+                //a card, and a token that is not a copy of a card has no card
+                //name to choose - so a token name on this menu is not a legal
+                //answer, it is an answer that can never do anything. `146v130`
+                //seq 30 named "Goblin" with Silverquill Silencer off a Siege-Gang
+                //Commander token while the opponent's deck holds no card of that
+                //name, and the Silencer's `@movedto(*[chosenname]|opponentstack)`
+                //trigger could never fire again. Removing it removes an ILLEGAL
+                //option, which is what enforcing legality means; every real card
+                //name in every zone is still offered.
+                if (zone->cards[j] && zone->cards[j]->isToken)
+                    continue;
                 if ((!ANonBasicLand || (!zone->cards[j]->hasType(Subtypes::TYPE_BASIC) && !zone->cards[j]->hasType(Subtypes::TYPE_LAND))) && (!ANonLand || !zone->cards[j]->hasType(Subtypes::TYPE_LAND))){
                      bool added = false;
                      for (int i = names.size() - 1; i >= 0; --i)
