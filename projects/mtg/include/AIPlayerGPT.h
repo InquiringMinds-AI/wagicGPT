@@ -889,6 +889,21 @@ private:
     std::set<size_t> mStuckCastLines; //#W54-M (L6): std::hash of the line - equality is all that is tested
     int mStuckCastTurn;
 
+    //#W71-BQ (L5, wave-70 deck130 HIGH): the cast the model has ALREADY
+    //committed to at this turn's casting ask. A card with an alternative hand
+    //path (cycling, channel, an MDFC face) arms a second "Choose an option for
+    //<card>:" menu after the cast is answered, and that menu's rows read as a
+    //fresh offer: 7 confirmed reversals in one seat (deck126 seq 35 -> 36 -
+    //`CHOICE: 1 (Cast Starstorm)` then `CHOICE: 2 (cycling)`, against its own
+    //PLAN), 21 modal cycling menus and only 4 answered "Cast Card Normally".
+    //Every row stays offered - taking the alternative is legal, and the
+    //standing rule forbids removing or auto-answering a legal option - so the
+    //carry is a HEADER FACT: the second half of a cast already answered. Turn
+    //stamped so a menu armed on the same card in a later turn, or on the
+    //heuristic's own pick, never inherits a claim about what the model said.
+    string mCommittedCastName;
+    int mCommittedCastTurn;
+
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
     //one JSONL record per consumed decision - prompt-tuning raw material
     //and, accumulated, training data for a small shippable policy model.

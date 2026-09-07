@@ -1391,3 +1391,4 @@ legend_rule_pick_dies2_w68be.txt
 w69bg_reveal_parked_library_no_deckout.txt
 ai_mdfc_decline_sticky_w71bp.txt
 ai_mdfc_decline_livelock_w71bp.txt
+ai_instant_own_end_step_w71bq.txt
