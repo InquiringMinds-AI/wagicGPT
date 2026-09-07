@@ -1166,6 +1166,11 @@ private:
     int mOppLifeTurnNo[3];
     int mOppLifeSamples;
     int mOppLifeLastTurn;
+    //#W72-BW (M11): the same samples, read as a RISE - the opponent's life now
+    //minus the oldest sample, and the turns between. Returns false (and leaves
+    //both outputs 0) unless there are at least two samples spanning at least one
+    //turn and the life went UP; the row clause it feeds is silent on false.
+    bool oppLifeRise(int& gain, int& turns) const;
     //W43-R2 (owner report: "damage is receiving 2 entries, which may be
     //confusing to the model, and is also unnecessarily verbose"). Damage::
     //resolve raises WEventLife(fromDamage) and then the WEventDamage for the
@@ -1797,6 +1802,14 @@ class GameObserver;
 class Player;
 class MTGCardInstance;
 int gptStackPendingDrawsFor(GameObserver * observer, Player * seat, MTGCardInstance * exclude);
+
+//#W72-BW (M3): external door onto the hand-replacement scan (`stackHandReplacerFor`),
+//for the same reason and by the same construction. Returns the display name of the
+//unresolved stack object whose own PAYLOAD empties `seat`'s hand, or "" for none.
+//The suite's `asserthandreplacer` stages a host card's triggered abilities in front
+//of it one at a time: no live trigger is needed, and the two halves of a card that
+//carries both (Teferi's Puzzle Box) are told apart by which one is staged.
+std::string gptStackHandReplacerFor(GameObserver * observer, Player * seat);
 
 #endif //WITH_GPT_AI
 

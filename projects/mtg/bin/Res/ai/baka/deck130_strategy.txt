@@ -245,7 +245,7 @@ Siege-Gang and sacrifice Goblins at their face while the mana lasts; with no Com
 floor is returning Hammer and pointing 3 at their face, and when "Opponent life trend" shows them
 gaining 3 or more a turn that return is not a clock - spend the turn deploying instead.
 Write that, and take the row that does it.
-When the last menu row begins "Hold priority: pass now, and do not ask me again ...", take THAT row
+When the last menu row begins "Hold priority - pass now, and do not ask me again ...", take THAT row
 at the FIRST such ask of the turn - "Cast nothing right now" answers one window, the hold row all
 of them.
 

@@ -1682,6 +1682,77 @@ int TestSuiteAI::Act(float)
         }
         return 1;
     }
+    else if (action.find("asserthandreplacer ") == 0)
+    {
+        //#W72-BW (M3, wave-71 engine-seat HIGH-3 / lane-BS F7's own weakest
+        //evidence): the "EVERY COUNT TAKEN FROM YOUR HAND ON THIS SCREEN IS
+        //ABOUT TO BE VOID" line is produced by `stackHandReplacerFor`, which
+        //walks an UNRESOLVED stack object's own payload for a chooser over
+        //THIS seat's hand. It had no test of any kind and came back FAIL on
+        //its first live shape (123v162 seq 43-45: the opponent's Teferi's
+        //Puzzle Box trigger on the stack in this seat's draw step, no line).
+        //Staging, not waiting: the host card's registered triggered abilities
+        //are pushed onto the stack ONE AT A TIME - exactly the object
+        //`MTGAbility::fireAbility` pushes - the scan is asked, and the object
+        //is retired unresolved (RESOLVED_NOK), so nothing is drawn or bottomed.
+        //Teferi's Puzzle Box carries BOTH halves (`all(*|myhand)` for its
+        //controller's draw step, `all(*|opponenthand)` for the other player's),
+        //so for either seat EXACTLY ONE of its two triggers empties that seat's
+        //hand whichever side the Box is on. That count is the assertion:
+        //  0 = the payload walk never reaches the chooser (the live FAIL),
+        //  2 = the whole SCRIPT is being read instead of the payload,
+        //  1 = the payload, read relative to the source, as it must be.
+        //Syntax: asserthandreplacer <expected count> <in-play host card name>
+        string rest = action.substr(19);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.substr(0, sp).c_str());
+        string cardName = (sp == string::npos) ? string() : rest.substr(sp + 1);
+        //the harness lowercases every command line, so match that way
+        for (size_t li = 0; li < cardName.size(); li++)
+            cardName[li] = (char) tolower((unsigned char) cardName[li]);
+        ActionStack * st = observer->mLayers->stackLayer();
+        ActionLayer * al = observer->mLayers->actionLayer();
+        int got = 0;
+        int staged = 0;
+        if (st && al)
+        {
+            for (size_t ai = 0; ai < al->mObjects.size(); ai++)
+            {
+                GenericTriggeredAbility * gta =
+                    dynamic_cast<GenericTriggeredAbility *>(al->mObjects[ai]);
+                if (!gta || !gta->source)
+                    continue;
+                string cn = gta->source->getName();
+                for (size_t li = 0; li < cn.size(); li++)
+                    cn[li] = (char) tolower((unsigned char) cn[li]);
+                if (cn != cardName)
+                    continue;
+                staged++;
+                size_t before = st->mObjects.size();
+                st->addAbility(gta);
+                if (!gptStackHandReplacerFor(observer, this).empty())
+                    got++;
+                for (size_t i = before; i < st->mObjects.size(); i++)
+                    ((Interruptible *) st->mObjects[i])->state = RESOLVED_NOK;
+            }
+        }
+        if (!staged)
+        {
+            std::cerr << "TESTSUITE asserthandreplacer: no in-play card named \""
+                      << cardName << "\" with a triggered ability ["
+                      << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else if (got != expect)
+        {
+            std::cerr << "TESTSUITE asserthandreplacer: staged " << staged
+                      << " trigger(s) from \"" << cardName << "\", expected "
+                      << expect << " of them to name this seat's hand, got "
+                      << got << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
     else if (action.find("assertxrows ") == 0)
     {
         //#W63-AF (R1, wave-63 codex review finding 1): with an X ANNOUNCEMENT

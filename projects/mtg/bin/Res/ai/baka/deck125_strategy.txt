@@ -205,7 +205,7 @@ above the cheapest counter in hand, unless gate shape (a), (b) or (c) applies.
 
 === YOUR WINDOWS, AND THE HOLD ROW ===
 A window with nothing under "ON THE STACK" has one right answer: decline it.
-THE LAST ROW OF EVERY MENU is "Hold priority: pass now, and do not ask me again ...". When the prompt
+THE LAST ROW OF EVERY MENU is "Hold priority - pass now, and do not ask me again ...". When the prompt
 carries "[you declined this exact list N times already this turn]", THAT ROW IS THE ANSWER and "Cast
 nothing right now" is the wrong one - take it at the FIRST such window, and again when the same rows
 come back. Only it stops the next identical ask.
