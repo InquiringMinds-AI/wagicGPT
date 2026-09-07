@@ -6719,6 +6719,7 @@ ActivatedAbility(observer, id, card, _cost, 0),type(type),effect(effect),who(who
     target = _target;
     sourceamount = 0;
     targetamount = 0;
+    resolvingFromStackAbility = false; //#W71-BR (L6)
     eachother = false;
     tosrc = false;
     menu = "";
@@ -6731,6 +6732,42 @@ int AADynamic::resolve()
 {
     Damageable * _target = (Damageable *) target;
     Damageable * secondaryTarget = NULL;
+    //#W71-BR (wave-70 known-bugs L6, deck125 HIGH-1 / deck126 HIGH-2). Tribute
+    //to Hunger's Oracle (verified against Gatherer/Scryfall; mtg.txt:124073's
+    //`text=` and `mana=` are byte-faithful to it) is "Target opponent sacrifices
+    //a creature of their choice. You gain life equal to that creature's
+    //toughness." The life is the PRICE OF A SACRIFICE THAT HAPPENED. The engine
+    //picks the victim when the granted ability goes on the stack and pays the
+    //life off that stored pointer when it resolves, so two copies aimed at ONE
+    //creature each paid its full toughness while it died once: `125v126` seq 120
+    //(opponent 10 -> 25 -> 40 off one Emrakul, and ~15 further turns of game),
+    //`126v125` seq 130->132 (10 -> 25 -> 38). Scoped as narrowly as the evidence
+    //allows: only the `mytgt toughnesslifegain` family (Tribute to Hunger,
+    //Devour Flesh), where the life is definitionally the toughness of a body
+    //that left the battlefield BY this effect. If that body is no longer on a
+    //battlefield when this resolves, no sacrifice can be made from it and no
+    //life is owed. Every other dynamicability - and this same one on a target
+    //still in play, which is the ordinary single-copy case - is untouched.
+    //The test is NOT a bare "is the body in play now". Condemn is
+    //`auto=bottomoflibrary` + `auto=dynamicability<!mytgt toughnesslifegain
+    //targetcontroller!>`: the SPELL removes the body itself on its first line
+    //and pays for it on its second, which is rules-correct and pinned by seven
+    //fixtures - a bare in-play test kills all seven. What separates the two is
+    //WHO is resolving: a spell running its own `auto=` lines removed the body
+    //in this same resolution, while a GRANTED or TRIGGERED ability arriving as
+    //its own stack object was put there earlier and can find the body already
+    //gone (Tribute copy 2, whose sacrifice therefore never happens). So the
+    //guard is scoped to the stack-object path, which StackAbility::resolve
+    //stamps, and every spell-resolution path is untouched.
+    if (resolvingFromStackAbility
+        && effect == DYNAMIC_ABILITY_EFFECT_LIFEGAIN
+        && type == DYNAMIC_ABILITY_TYPE_TOUGHNESS
+        && amountsource == DYNAMIC_MYTGT_AMOUNT)
+    {
+        MTGCardInstance * victim = dynamic_cast<MTGCardInstance *>(_target);
+        if (victim && game && !victim->isInPlay(game))
+            return 0;
+    }
     if(amountsource == 2)
         source = (MTGCardInstance * )_target;
     switch(who)
