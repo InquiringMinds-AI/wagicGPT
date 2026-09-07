@@ -25,6 +25,12 @@ unix:DEFINES += WITH_GPT_AI
 # initializer that comment-stripping actually removes, so trailing tag
 # comments stay legal. Runs before every link of the dev build.
 unix:QMAKE_PRE_LINK += python3 $$PWD/tools/check-ctor-init.py $$PWD/src
+#W70-BL (E6): no string this seat SHOWS the model may license prose in the reply,
+# ask for the answer before the PLAN line, or make the PLAN conditional (owner
+# ruling: the reply is a PLAN line then the action line, nothing else). Waves
+# 66-69 each re-added one of those because their corpora ran with thinking off;
+# this makes the next one loud at link time instead of one corpus later.
+unix:QMAKE_PRE_LINK += && python3 $$PWD/tools/check-reply-instructions.py $$PWD/src
 # audit-W54 O2: the reply-parser self-test corpus compiles in only here (desktop)
 unix:DEFINES += WAGIC_GPT_PARSETEST_BUILD
 unix:INCLUDEPATH += include/thirdparty

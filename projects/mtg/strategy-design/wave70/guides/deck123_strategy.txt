@@ -1,0 +1,258 @@
+INTRUDERS OF THRABEN - WBU TOKEN COMBO
+
+THE DECK. Intruder Alarm beside Thraben Doomsayer or Bloodline Keeper, tapped for a token again
+and again: any creature entering untaps all creatures, so the tap comes straight back and one
+maker builds an army in one window. Removal buys the turns; the tokens end the game.
+
+ORDER OF OPERATIONS. 1. Land, first, every turn. 2. A token-maker (Keeper before Doomsayer).
+3. Intruder Alarm once one maker is down, ahead of a SECOND maker and of Lightning Greaves.
+4. Tap makers to the stop, preferably on the OPPONENT'S turn. 5. Attack with everything except one
+untapped maker. Two things reorder it: 0 creatures of yours against 2+ of their attackers (sweeper
+first), and lethal already on the board (attack, do not build).
+
+--- ANSWER FORMAT ---
+- "CHOICE:" is bare, on its own line; "ANSWER: CHOICE: 0 (pass)" is not read as an answer at all
+  and the built-in AI plays the window. PLAN line, then CHOICE line; nothing else.
+- A CHOICE names a NUMBERED ROW ON THIS WINDOW; a printed row is payable now, and a card with no
+  "Cast" row is not castable now, whatever your plan says.
+- EVERY GATE IN THIS GUIDE IS APPLIED BEFORE YOU WRITE. A row's own numbers - "M of yours", "they
+  control N creatures", "at 0 this does nothing", "this equips nothing" - decide whether that row's
+  NUMBER may be written at all. The row your CHOICE line names is what runs.
+- Your carried PLAN is older text; where it and a "{right now:}" clause disagree, the clause wins.
+--- LAND DROP AND MARSH FLATS ---
+- Any "Play <land>" line listed: take one, every turn, before anything.
+- The drop is NOT spent by a spell or a Flats crack; "Land drop: NOT yet used this turn" outranks
+  your own memory.
+- Prefer a land entering UNTAPPED (Sea, Tundra, Scrubland, Plains, Swamp) when it makes a spell
+  castable this turn; Arcane Sanctum always enters tapped, Isolated Chapel unless you control a
+  Plains or Swamp.
+- Marsh Flats makes NO mana until cracked: crack it the FIRST window listed, either turn; that is
+  not your land drop.
+- WHICH FETCH: take the row tagged "(you cannot make {W} right now)", and among several the one
+  supplying the pip your hand needs TWICE. Sea = {U}{B}, Tundra = {W}{U}, Scrubland = {W}{B}.
+- No such tag: still a DUAL, never a basic - "adds {W} or {B}" beats "adds {B}". A colour printed
+  at 0 comes first; {U} is scarce (10 of 24 lands).
+--- WHAT TO CAST WHEN SEVERAL ARE LISTED ---
+A priority order over CARDS, not choice numbers. Take the highest entry present on this menu.
+ P0 Damnation {2}{b}{b} - your line reads "of which 0 are creatures" and the row's K is 2+.
+    Ahead of any maker, Tutor or Alarm.
+ P1 Bloodline Keeper {2}{b}{b} / P2 Thraben Doomsayer {1}{w}{w} - no maker on your battlefield.
+ P3 Intruder Alarm {2}{u} - no Alarm on your battlefield; once ONE maker is down this beats a
+    second maker and the Greaves.
+ P4 Idyllic Tutor {2}{w} - no Alarm on the battlefield or in hand, live bracket only.
+ P5 Lightning Greaves {2} - only when the row does NOT read "this equips nothing".
+ P6 removal, by its own rule. P7 Vision Skeins {1}{u}.
+ P8 "Cast nothing right now" - correct when nothing above is on the menu.
+P8 IS NOT INACTION: rows reading "destroys 0 of their creatures", "at 0 this does nothing" or "a
+second copy changes nothing" are a menu with nothing on it.
+--- HOLDS AND PASSES ---
+- "0. Pass priority" is always available, and is the answer whenever the stop is reached or all
+  rows are dead.
+- Your instants ARE offered on the opponent's turn at every phase, the BEST window for Tragic Slip
+  and both edicts - you see their board after they commit.
+- Take "Hold priority: pass now, and do not ask me again" at the FIRST dead window of the turn,
+  and answer a reopened run the same way every time.
+--- THE TOKEN LINES AND THE STOP ---
+Rows: "Create human with Thraben Doomsayer [cost: Tap]", "Create vampire with Bloodline Keeper",
+"Create vampire with Lord of Lineage".
+POWER CANNOT MEASURE THIS LOOP: new tokens are summoning sick, so the "not summoning sick" power
+number does not move. M = the "of which" number on YOUR battlefield line
+("activated this turn N times" is NOT M); L = "Opponent life:"; C = the "of which" number on
+THEIRS.
+- THE STOP IS L + C + 3. Below it, take the line every time it returns; at or past it, "CHOICE: 0
+  (pass)" whatever else is listed. Against a lifegain board add their last gain to the stop a
+  second time, and read L again in the ATTACK window.
+- TAKE THE REPEAT ROW ("repeated N times, then stop") ONCE, with N = (L + C + 3) - M, in its own
+  format: CHOICE: 2 (Create human with Thraben Doomsayer x17). A take with no number is re-asked
+  and the window spent; the next window is a pass. N of 0 or less is a pass - not "x1", not "x0".
+- Carry the four numbers INSIDE a sequence of actions, every blank filled from the screen, never
+  the bracket text itself:
+    PLAN: this window <x<N> or pass>, then <the next action you intend>, then <the one after>;
+    stop <L+C+3>, M is <M> now, their life <L>, their creatures <C>
+  The first step names the action the CHOICE line names; a Damnation menu takes its own plan line.
+- Recompute the stop from THIS window's row every time; if your numbers disagree, the arithmetic
+  is right.
+- "[RE-ASK] ... your own PLAN puts you at <M> with your stop at <S>" -> "CHOICE: 0 (pass)": not
+  the same count, not a smaller count, not a new stop invented to fit it.
+- THE STOP ALSO GOVERNS THE PLAIN "[cost: Tap]" CREATE ROW, which prints no stop clause. Once M is
+  at or past the stop, EVERY Create row is a pass.
+
+--- TIMING THE CHAIN ---
+- Tokens made now cannot attack until your next turn. FIRE ON THE OPPONENT'S TURN, where the lines
+  are also offered: a token made there blocks that turn, swings on your next, and dodges part of a
+  sweeper. Fire on your own turn only when your attackers are ALREADY out.
+- Your OWN upkeep is the worst window against a log showing Damnation, Supreme Verdict or
+  Starstorm: pass there.
+- Nothing untaps in your untap step while the Alarm is out, so "Your creatures that can attack:"
+  holds what you made on THEIR turn and have not spent, never what you made this turn.
+- ALARM IN HAND AND CASTABLE THIS TURN: the maker WAITS UNTAPPED until it resolves, or it sits
+  tapped all their turn. Land, Alarm, then tap; with no castable Alarm, tap freely.
+- BUT THE ROW DOES NOT WAIT WITH IT: pass a Create row TWICE in one turn and it is retired for the
+  turn, Alarm or no Alarm. On an Alarm turn the FIRST Create window may be passed, the SECOND not.
+--- DAMNATION ---
+It destroys ALL creatures and nothing else - not an enchantment, artifact, planeswalker or land.
+The row counts for you: "destroys N of their
+creatures (K without a restriction against attacking), M of yours", and "all of them carry a
+restriction" is K = 0. FIRST, BEFORE THE CHOICE LINE, read M and N off that row: M at 4 or more,
+or N at 0, and Damnation's number is not written this window - answer another row. Only if that
+comparison passes do you go on. Whenever it is listed this is the ONLY plan line:
+    PLAN: Damnation: N <theirs>, K <able to attack>, M <mine>; <cast / hold>
+- M at 4+: NEVER, whatever N says. Four bodies is a board you win with.
+- M at 0 with K at 2+: cast it, above a maker, the Tutor and the Alarm; at your life 10 or less,
+  "hold" is not an option.
+- N bigger than M with K at 1+: cast it. K at 0 on Perimeter Captain or Pride Guardian: cast it.
+- Any other K at 0, or N exactly 1 while a Tragic Slip or live edict on the menu kills the one
+  that matters: take the one-for-one and keep the Damnation.
+- M bigger than N, or N at 0: never, whatever the plan says. Two Damnation rows: the cheaper one.
+--- TRAGIC SLIP ---
+-1/-1 kills toughness 1 only; with Morbid live, -13/-13 kills anything. THE DECISION IS AT THE
+CAST ROW - the target ask has NO pass row, so the card is spent on one of the names listed.
+- "a creature died this turn, so Morbid applies": cast it; take the biggest power.
+- "kills 0 of the 3 legal targets at -1/-1": cast nothing; it costs {B} and kills something later.
+  "{kills: <name>}": cast it.
+- On the target ask take the row ending "- DIES"; "- SURVIVES" means the card is wasted.
+
+--- THE TWO EDICTS ---
+You NEVER pick the victim; the only choice is whether to cast. Read N off the row: "they control N
+creatures - <name> is sacrificed" at N = 1, "they choose which one" at 2+, "at 0 this does
+nothing" at 0. N not exactly 1: no edict. A creature on the stack is not on the battlefield and
+does not change N.
+- Tribute to Hunger {2}{b}: they sacrifice, YOU gain its toughness in life. At N = 1 it is the
+  cast, ahead of a Slip on a toughness-2 creature.
+- Devour Flesh {1}{b}: the player you NAME sacrifices AND gains the life; use it at the opponent
+  only when Tribute is not listed and N is exactly 1.
+- Decline an edict on an N = 1 body printing "[defender]" or power 0 - unless its text gives their
+  board mana, counters or +X/+X, which makes it their engine.
+- Never cast an edict when their life is at or below the life it gives them.
+- "LIFE-TO-DAMAGE CONVERTER ... theirs - Sanguine Bond" on screen: an edict at the opponent swings
+  both ways. Cast nothing.
+- NAMING "Yourself" IS A LIFE GAIN, and here a big one: you sacrifice one of your own creatures,
+  your choice, and gain its toughness - under Fateful hour your 1/1 Humans are 3/3. Take it
+  whenever the LIFE, not their board, is killing you; give up a token, never a maker.
+--- "THAT WOULD KILL YOU" AT A PRIORITY WINDOW ---
+"ON THE STACK: N damage to you - you would be at X; that would KILL YOU" is the ONLY fact in that
+window: it resolves in the step you are standing in, so do not plan around a main phase you will
+not reach. Take the row that moves the number - gain the life (Devour Flesh naming Yourself) or
+kill the source. A hold is NEVER the answer here.
+--- LIGHTNING GREAVES ---
+Equip costs {0} and is re-offered every window: take it ONCE per Greaves, on Bloodline Keeper if
+out, else Thraben Doomsayer; "{attached: Lightning Greaves #1}" is the done-signal. Later
+re-offers: a "[cost: Tap]" Create line if listed, else pass; equip again only when that creature
+died or a new unequipped maker arrived. "this equips nothing" is a decline even as the only cast
+row, on an empty board or any other.
+--- INTRUDER ALARM AND IDYLLIC TUTOR ---
+- One copy does the whole job; "[second copy: ... changes nothing]" is LEGAL, not USEFUL. On an
+  empty battlefield the Alarm does NOTHING. It is symmetric - it untaps THEIR creatures too.
+- Idyllic Tutor finds an ENCHANTMENT, and the only one here is Intruder Alarm - it CANNOT find a
+  creature. Only one bracket is a cast: "still in your library, not on your battlefield or in your
+  hand" -> LIVE, cast it and name Intruder Alarm; "a copy of one you already control or hold" and
+  "none left in your library" -> DEAD. An Alarm in HAND is as dead as one on the battlefield.
+- THE ONE TIME A DEAD ROW IS A PLAY: against counterspells in their log (Cancel, Essence Scatter,
+  Dream Fracture, Fall of the Gavel) they counter the FIRST spell you cast, so with mana for TWO
+  cast the SPARE first (a dead Tutor, a second Alarm, a Skeins) and the maker SECOND in the same
+  main phase. ONE TEST: the maker must be a numbered row ON THIS SAME MENU.
+--- CARD FACTS THE PROMPT DOES NOT SPELL OUT ---
+- Thraben Doomsayer {1}{w}{w} (2/2), "{T}: put a 1/1 white Human token". FATEFUL HOUR: at YOUR
+  life 5 or less every OTHER creature you control gets +2/+2, printed as the result - "Human #1
+  (5/5) (printed 1/1)". Add those numbers before answering "ATTACK: none": that sum is LETHAL or
+  it is nothing.
+- Bloodline Keeper {2}{b}{b} (3/3) flying, "{T}: put a 2/2 black flying Vampire token" - your best
+  creature. Take "Transform:backside with Bloodline Keeper [cost: {b}]" whenever listed: it
+  becomes Lord of Lineage, a 5/5 giving every OTHER Vampire +2/+2 and still making a token on the
+  same tap. It needs {B} and five Vampires, and the Alarm untaps CREATURES, not lands, so leave a
+  black source untapped - off four lands the Keeper taps you out.
+- Vision Skeins {1}{u} - EACH player draws two. Your dig, not your default: cast it only with no
+  maker and no castable Alarm this window, and count "Your hand (N cards)" first - at 6 or more it
+  ends in a Cleanup discard. Never cast it against a card that draws them extra cards or punishes
+  drawing (Howling Mine, Underworld Dreams).
+--- ATTACKING - FIVE CHECKS IN ORDER ---
+Stop at the first check that answers; CHECK 2 only trims the list.
+CHECK 0 - CRACK-BACK. What you send is TAPPED and cannot block on their turn. "CRACK-BACK NEXT
+TURN: ... you would be at X or lower" - READ X. At 0 or below: "ATTACK: none", unless your
+sendable power is at or above their PRINTED life. No CRACK-BACK line: the check is free.
+CHECK 1 - LIFEGAIN AND WALLS, by the names on their line; Sanguine Bond and Exquisite Blood are
+enchantments you cannot remove, so waiting them out is not a plan.
+ A - only PERIMETER CAPTAIN or PRIDE GUARDIAN: "ATTACK: none" until removal takes the last of
+  them off that line.
+ B2 - BOTH SANGUINE BOND AND EXQUISITE BLOOD ("their life LOOP is in play"): one point they gain
+  chains to your zero before your damage. "ATTACK: none" while any untapped creature of theirs can
+  BLOCK what you send - the gate is BLOCK LEGALITY, not their count. When "[no creature they
+  control can block this attacker]" covers EVERY attacker and the total says lethal, send them all.
+ B - exactly ONE of those two: A = the LENGTH of "Your creatures that can attack:", B = their
+  UNTAPPED creatures. Attack at A of 3 x B + 3 or more; below that, "ATTACK: none" and make tokens.
+ Lethal overrides all three - power at or above their printed life, send it all - here and in B2
+ only. Attacker tags cannot see life: "(neither dies)" counts deaths.
+CHECK 2 - GANG BLOCKS. "(you kill it, your attacker lives)" prices ONE blocker; a "GANG BLOCK: ...
+enough to kill this attacker" clause prices what happens. With that clause, or 2+ "untapped
+creatures that could block this one": a TOKEN goes anyway, a CARD stays home (any maker, or
+anything wearing the Greaves).
+CHECK 3 - THE COUNT. ONE BLOCKER BLOCKS EXACTLY ONE ATTACKER, so a 5/5 flier blocks ONE of yours
+and the rest connect - but outnumbering protects no individual creature; THEY pick the matchups.
+"ATTACK: none" on the count alone only when their untapped count is EQUAL TO OR HIGHER THAN what
+you send and no tag reads "you kill it, your blocker lives".
+CHECK 4 - SEND EVERYTHING on "Your creatures that can attack:"; that list already dropped what
+cannot legally attack.
+ - KEEP ONE UNTAPPED MAKER HOME, every attack, while the Alarm is out: a tapped creature untaps
+   only when a creature ENTERS, which only an untapped maker causes. Or fire the chain to its stop
+   in your main phase FIRST.
+ - With no maker out, what you send stays tapped until one arrives: send it when the attack
+   advances your clock, but do not plan a block with it.
+ - Never send a LONE maker, or your only creature, into "(both die)" or "(your attacker dies)":
+   that is "ATTACK: none".
+--- BLOCKING ---
+"INCOMING THIS COMBAT: ... D unblocked damage - you would be at X; this KILLS you" prints on EVERY
+window of their combat, so an instant or a token line in their upkeep is priced against it first.
+"this KILLS you" ALSO SAYS WHETHER BLOCKING SAVES YOU: "you would be at N AT BEST (no assignment
+of your blockers does better)". THAT N IS THE VERDICT, never your own arithmetic: at 1 or more,
+blocking SURVIVES - block by the LETHAL rule and spend every blocker. Only when that clause is
+absent, or its N is 0 or lower, is "BLOCKS: none" right.
+ STEP -1 - ON THE LOOP BOARD (both Sanguine Bond and Exquisite Blood on THEIR side) a block that
+  gains them life is LETHAL, and the header's best case does not price the loop. Block only
+  attackers whose rows carry no life-gain clause; if all do, "BLOCKS: none".
+ STEP 0 - A "B" ROW IS A BLOCKER, and its "may block A1, A2" list is the legality list. At LETHAL
+  your BLOCKS line is "BLOCKS: B1:A<largest deals N>". "(you kill it, your blocker lives)" is a
+  free kill unless STEP -1 says otherwise.
+ STEP 0b - THE HEADER'S NAMED ASSIGNMENT IS A LIFE-MAXIMISER, NOT ADVICE. Take it ONLY when the
+  header also says "LETHAL"; on "NOT lethal", ignore the name and go to STEP 1.
+ STEP 1 - Spend a TOKEN (Human, Vampire - no mana cost on the row) before any CARD; makers block
+  LAST, after every token.
+ LETHAL RULE - at LETHAL, or unblocked damage of your life minus 4 or more, ASSIGN TO THE BIGGEST
+  ATTACKERS FIRST AND SPEND EVERY BLOCKER: sort the "deals N" numbers and work down, makers
+  included.
+ MENACE - "[menace]" is not blocked by one creature at all: two blockers on it, or none.
+ OTHERWISE makers do NOT block: "(your blocker dies, attacker lives)" or "(both die)" on a
+  Doomsayer or Keeper is declined while "you would be at N" is above 5.
+--- MULLIGAN AND BOTTOMING ---
+Read "(keeping N)" first: each look is a fresh seven shaved by one more card at the SAME land
+odds, so a mulligan buys a look, never a fix. Colour never ships a hand.
+- At (keeping 5) or lower: ONE land in front of you is a KEEP. Only ZERO lands, or all lands, ships.
+- On the untouched seven or at (keeping 6), use "counted by the engine: N lands, M spells" - read
+  that number, never recount. TWO OR MORE LANDS AND A SPELL: keep, full stop, even under "would
+  not cover any spell in it" - that coverage line decides ONE-land hands only. ONE LAND: "would
+  cover the cost of: <card>" keeps, "would not cover any spell in it" ships. ZERO LANDS or ALL
+  lands: ship. SIX OR MORE LANDS with one spell: keep.
+- BOTTOMING: read "You will be left with an N-card hand" and BUILD the best N in this order,
+  bottoming the leftovers - 1. lands covering the cheapest spell you keep (at N of 3, two lands
+  and one spell; at N of 5 or 6, three or four lands and the spells they cover, up to FOUR mana);
+  2. a token-maker; 3. Idyllic Tutor or Vision Skeins; 4. removal; 5. Intruder Alarm LAST.
+- A LAND THAT MAKES MANA IS NEVER THE BOTTOM while a card outside that order is in hand: Lightning
+  Greaves is the leftover and goes under. Marsh Flats makes no mana, so a hand whose only other
+  land is a Flats is one-source.
+--- DISCARD AND SACRIFICE ASKS ---
+A forced sacrifice ask (annihilator, or an edict naming you): give up a land, then a spare copy,
+then a token; never the Alarm, your only maker or Damnation.
+Cleanup discard: a listed "copy 2 of 2" / "copy 2 of 3" / "copy 3 of 3" is always the discard. A row
+carrying its own verdict ("dead right now: 0 legal targets", "spare: you control N lands") is the
+send; one carrying none is not thereby live. NEVER your only maker, Alarm or Damnation.
+--- SITUATIONS AND THE RIGHT ANSWER ---
+- Your line reads 0 creatures and Damnation reads "destroys 4 ... (4 without a restriction against
+  attacking), 0 of yours": cast it, above a maker and the Alarm. "destroys 0 ...": hold it.
+- A maker is out and Intruder Alarm is listed: cast it, ahead of a second maker and the Greaves.
+  Alarm in hand and castable with a Create row listed first: pass that first Create window, cast
+  the Alarm, then tap.
+- Opponent life 22, their line 3 creatures, yours 4, repeat row listed: stop 28, N 24 - "CHOICE: 2
+  (Create human with Thraben Doomsayer x24)", then pass.
+- At 2 life with 25 Humans able to attack, "ON THE STACK: 3 damage to you ... that would KILL
+  you", Devour Flesh on row 1: cast it naming Yourself - a 3/3 Human under Fateful hour gains 3.
+- Their only creature is Wall of Omens (0/4) [defender], Tribute to Hunger listed: cast nothing;
+  but if its text pumps their others, cast the edict.
