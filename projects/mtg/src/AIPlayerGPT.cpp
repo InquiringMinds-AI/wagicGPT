@@ -16116,7 +16116,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -17681,6 +17681,11 @@ void AIPlayerGPT::logGameEnd()
         {"declined_face_latches", mDeclinedFaceLatches},
         {"hold_windows_skipped_priority", mHoldWindowsSkippedPriority},
         {"hold_windows_skipped_cast", mHoldWindowsSkippedCast},
+        //#W72-BU (M4): of those, the ones closed because the OTHER seam of the
+        //same window had already been held. This is the double-ask the wave-71
+        //corpus measured (44 same-board cast/priority pairs, 19 hold-opened);
+        //a rise here is model calls saved, not windows removed.
+        {"sibling_window_asks_skipped", mSiblingWindowAsksSkipped},
         //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
         //per-decision `async_drops` field is consumed with its record, so this
         //is the only place a reader can take the game's number from.
@@ -26978,6 +26983,25 @@ string AIPlayerGPT::crackBackVerdictNow()
     return crackBackVerdictKey(atk, dmg, life);
 }
 
+//#W72-BU (M4): ONE WINDOW, ONE ASK. Pure over the hold's recorded window and
+//the window now being opened. True only for the OTHER seam of the SAME window:
+//the same turn, the same phase and a byte-identical serialized board. A held
+//seam re-asking itself is not this rule's business - the per-seam row predicate
+//below owns that and is unchanged - and any move of turn, phase or board falls
+//through to it. `heldSeam` empty means no hold has been taken at all.
+static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int heldPhase,
+                                const string& heldBoard, const char * nowSeam,
+                                int nowTurn, int nowPhase, const string& nowBoard)
+{
+    if (heldSeam.empty() || !nowSeam || !nowSeam[0])
+        return false;
+    if (heldSeam == nowSeam)
+        return false; //the same seam: the rows predicate decides, as before
+    if (heldTurn != nowTurn || heldPhase != nowPhase)
+        return false;
+    return heldBoard == nowBoard;
+}
+
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
 //took the HOLD row this turn, at this seam, and the board it took it on is
 //still the board in front of it with no row it has not already seen. Every
@@ -26990,6 +27014,28 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //the turn only while the model is being offered, byte for byte, the screen
     //it already answered. mHoldTurn is kept as the turn it was TAKEN on (the
     //stderr line and takeHold read it); it is no longer a gate.
+    //#W72-BU (M4): the sibling seam of the window the hold was taken at. Checked
+    //BEFORE the per-seam lookup, because this is exactly the case that lookup
+    //calls "held elsewhere, never at this seam" and then pays for a second model
+    //call over the same board. serializeGameState() only reads the game (the
+    //cast and priority seams both key on it already), so this costs one string.
+    if (gptHoldCoversSiblingWindow(mHoldWindowSeam, mHoldWindowTurn, mHoldWindowPhase,
+                                   mHoldWindowBoard, seam, observer->turn,
+                                   observer->getCurrentGamePhase(), serializeGameState()))
+    {
+        mSiblingWindowAsksSkipped++;
+        mHoldWindowsSkipped++;
+        if (strcmp(seam, "cast") == 0)
+            mHoldWindowsSkippedCast++;
+        else
+            mHoldWindowsSkippedPriority++;
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the model held this window at the "
+                   << mHoldWindowSeam << " seam - not asking the " << seam
+                   << " seam over the same board (turn " << observer->turn
+                   << ", phase " << observer->getCurrentGamePhase() << "; "
+                   << mSiblingWindowAsksSkipped << " sibling asks skipped this game)");
+        return true;
+    }
     std::map<string, std::set<string> >::iterator it = mHoldRows.find(seam);
     if (it == mHoldRows.end())
         return false; //held elsewhere, never at this seam: this question is owed
@@ -27049,6 +27095,11 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
 void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 {
     mHoldTurn = observer->turn;
+    //#W72-BU (M4): and the WINDOW it was taken at, for the sibling seam.
+    mHoldWindowSeam = seam ? seam : "";
+    mHoldWindowTurn = observer->turn;
+    mHoldWindowPhase = observer->getCurrentGamePhase();
+    mHoldWindowBoard = serializeGameState();
     //#W61-U (C14): the seam's set is REPLACED, not added to. With the turn
     //boundary no longer clearing it (holdHonoured), a union would let a second
     //hold widen the set of rows the first one was taken over - which is exactly
@@ -76518,6 +76569,60 @@ static const char * kW50Y_r94 =
             CHECK(!AIPlayerGPT::askReplayRefuseScoped("", one, 64),
                   "#W72-BT M22 NEGATIVE an empty key is never a replay run");
         }
+    }
+
+    cout << "\n[#W72-BU] M4 one window, one ask - the hold is a WINDOW hold\n";
+    {
+        //The wave-71 corpus (matchups-20260907-085638) has 44 cast/priority pairs
+        //at one (turn, phase) whose CURRENT SITUATION block is byte-identical -
+        //two model calls over one board - and 19 of them were opened by the model
+        //taking the HOLD row on the casting menu. The hold row's own text is
+        //"pass now, and do not ask me again - this turn or later - until one of
+        //the rows above changes": it names no seam, so honouring it at the cast
+        //seam and then putting the priority question anyway made the row a false
+        //surface as well as a wasted call. `130v125` seq 24 (ask, Upkeep, turn 14,
+        //"Cast Starstorm ...") -> seq 25 (priority, Upkeep, turn 14, cycling rows)
+        //is the shape.
+        const string board = "life 20/20 | hand 3 | battlefield 4";
+        const string other = "life 20/18 | hand 3 | battlefield 4";
+        CHECK(gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
+                                         "priority", 14, MTG_PHASE_UPKEEP, board),
+              "#W72-BU M4 POSITIVE a hold taken at the cast seam closes the priority ask"
+              " of the SAME window");
+        CHECK(gptHoldCoversSiblingWindow("priority", 14, MTG_PHASE_UPKEEP, board,
+                                         "cast", 14, MTG_PHASE_UPKEEP, board),
+              "#W72-BU M4 POSITIVE and the rule is symmetric - a priority hold closes the"
+              " casting ask of the same window");
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
+                                          "cast", 14, MTG_PHASE_UPKEEP, board),
+              "#W72-BU M4 MUST-NOT-MATCH the SAME seam is still decided by its own rows -"
+              " this rule never touches the per-seam latch");
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
+                                          "priority", 14, MTG_PHASE_UPKEEP, other),
+              "#W72-BU M4 MUST-NOT-MATCH the board moved: a different window, and it is"
+              " owed its own ask");
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
+                                          "priority", 14, MTG_PHASE_FIRSTMAIN, board),
+              "#W72-BU M4 MUST-NOT-MATCH a later phase is a later window even on an"
+              " unchanged board");
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
+                                          "priority", 15, MTG_PHASE_UPKEEP, board),
+              "#W72-BU M4 MUST-NOT-MATCH next turn's window is not this one");
+        CHECK(!gptHoldCoversSiblingWindow("", -1, -1, "", "priority", 14,
+                                          MTG_PHASE_UPKEEP, board),
+              "#W72-BU M4 MUST-NOT-MATCH no hold has been taken at all - every window is"
+              " asked, which is the default this rule never widens");
+        //The rule keys on a HOLD only. "Cast nothing right now" answers the
+        //casting question and nothing else: the priority menu that follows it
+        //carries rows chooseOrderedAction builds and the cast menu cannot
+        //(cycling, activations), so collapsing it would remove legal options.
+        CHECK(declineRowText(holdRowLine(true)) && declineRowText(holdRowLine(false)),
+              "#W72-BU M4 ECHO both hold rows are still the decline rows they were - no"
+              " row text moved with this change");
+        CHECK(castDeclineRow(false) == "Cast nothing right now"
+              && castDeclineRow(true) == "Cast nothing right now (combat comes next this turn)",
+              "#W72-BU M4 MUST-NOT-MATCH the plain cast decline is untouched: it closes the"
+              " casting question only and the priority ask still follows it");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
