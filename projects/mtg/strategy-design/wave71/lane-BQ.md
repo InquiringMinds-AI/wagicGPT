@@ -3,13 +3,13 @@
 Base `77d82bbe6`. Worktree `worktrees/lanes/w71-BQ`, branch `w71-lane-BQ`.
 All four items CONFIRMED. Gates: suite 1279 + 68 AI, **0 failed, 0 timed out**
 (`WAGIC_TESTSUITE_THREADS=1`, detached unit `w71-BQ-suite`, log
-`~/.gatelogs/w71-BQ-suite.log`); PARSETEST **5302 → 5319 passed, 0 failed**
-(+17 checks, exactly this lane's additions). Both link-time guards print OK.
+`~/.gatelogs/w71-BQ-suite.log`); PARSETEST **5302 → 5323 passed, 0 failed**
+(+21 checks, exactly this lane's additions). Both link-time guards print OK.
 Base binary kept at `~/.gatelogs/w71-BQ-base-wagic` for the counterfactuals below.
 
 ---
 
-## L3 — `rowSaysNoOp` reads a Morbid qualifier as a verdict — CONFIRMED
+## L3 — `rowSaysNoOp` reads a qualifier, a quote or a conditional as a verdict — CONFIRMED
 
 **Repro (read-only, corpus `matchups-20260906-224849`).**
 `1788752940-ai_baka_deck123-...-vs-ai_baka_deck152.jsonl` seq 13, rendered row:
@@ -22,36 +22,63 @@ Reply `CHOICE: 1 (Cast Tragic Slip)` → `fallback: noop_row_zero_reask`,
 `chosen_text: <refused: noop_row_zero_reask>`. Same shape seq 11 and
 `...vs-ai_baka_deck146.jsonl` seq 4.
 
+**Second repro (coordinator evidence, same defect family, other phrase cue).**
+`1788752968-ai_baka_deck126-0x556e0f994e80-vs-ai_baka_deck125.jsonl` seq **131** and
+**133** refused (`noop_row_zero_reask`) this row, while seq **132** — the IDENTICAL
+row — was accepted and paid the 15 life:
+
+```
+Cast Tribute to Hunger {2}{b} {right now: they control 1 creature - Emrakul, the Aeons Torn
+  (17/15) [...] is sacrificed, you gain 15 - but an effect already on the stack is aimed at
+  that same creature; if it is gone when this resolves they control 0 creatures and this does
+  nothing} {leaves 13 of your 16 untapped mana sources untapped}
+```
+The `does nothing` is `edictOnlyVictimOnStackClause`'s CONDITIONAL tail — a statement
+about a board that does not exist yet — sitting in a verdict whose own operative
+scope names a 17/15 being sacrificed for 15 life. 2 of 2 fires false in that seat.
+
 **Root cause (one line).** `AIPlayerGPT::rowSaysNoOp` lowercased the WHOLE row and
-returned true on the substring `does not apply`, whose only emitter
-(`morbidMagnitudeClause`) puts it INSIDE the parenthetical qualifier of a real
-magnitude — a statement about WHICH of two magnitudes applies — while the row's
-own `{kills: ...}` clause, the engine's live verdict, was never consulted.
+returned true on the substring `does not apply` / `does nothing` wherever it stood —
+inside the Morbid parenthetical of a real magnitude, inside a quoted card text, or
+inside a conditional tail — while the row's own victim-list clause, the engine's live
+verdict, was never consulted.
 
 **Fix.** Two pure predicates in front of the phrase test:
-* `rowNamesALiveKill` — a `{kills: <non-empty>}` clause defeats any no-op read.
-  The zero forms carry different tags (`{kills 0 of the N ...}`, `{kills nothing: ...}`)
-  and an `- INDESTRUCTIBLE, destroy does nothing: <names>` note inside the tag is
-  about the bodies the list does NOT name, so it cannot cancel the list.
+* `rowNamesALiveKill` — a non-empty victim tag defeats any no-op read. The
+  openers are the ones `removalVictimTag` and the magnitude emitter can produce
+  (`spellRemovalVerb` returns only `kills` or `removes`), each with its split
+  THEIRS/YOURS form: `{kills: `, `{removes: `, `{kills whichever you target: `,
+  `{removes whichever you target: `. The zero forms carry different tags
+  (`{kills 0 of the N ...}`, `{kills nothing: ...}`) and an
+  `- INDESTRUCTIBLE, destroy does nothing: <names>` note inside the tag is about
+  the bodies the list does NOT name, so it cannot cancel the list.
 * `noOpPhraseIsAVerdict` — `does nothing` / `does not apply` count only at
   parenthesis depth 0 and outside double quotes, so a Morbid qualifier and a
-  quoted `{card text: "..."}` blob are no longer verdicts. Same unit rule
-  `verdictScopeOperative` / `verdictReadsZero` already apply one layer down;
-  `rowSaysNoOp` is still the single zero-predicate and nothing else changed.
+  quoted `{card text: "..."}` blob are no longer verdicts.
+* `phraseScopeIsConditional` — and the phrase's own scope, back to the nearest
+  `;` or brace (the units `verdictReadsZero` already splits on), must not open a
+  hypothetical (`if `, `unless `, `would `). A conditional states no verdict about
+  now. A conditional that comes AFTER a real zero verdict in the same clause does
+  not rescue the row — the earlier occurrence still fires (pinned).
+
+`rowSaysNoOp` is still the single zero-predicate and nothing else changed.
 
 **RED on base.** `strategy-design/wave71/lane-BQ-noop-row-red.py` replays the base
 predicate and the fixed one over every rendered cast row in the corpus:
-**2,914 cast rows scanned, 41 verdict changes, every one base=TRUE → fixed=FALSE**,
-every one a Tragic Slip row (6 distinct rendered shapes). Pins:
-4 negatives (the seq-13 row; the Morbid clause alone; a quoted card text;
-a kills-list carrying an indestructible note), 3 positives/regressions
-(`{right now: does nothing this turn}`, the Tribute and Devour Flesh scope forms,
-the computed-magnitude grammar), 1 echo (the row binds `CHOICE: 1 (Cast Tragic Slip)`
+**2,914 cast rows scanned, 45 verdict changes, every one base=TRUE → fixed=FALSE**
+— 41 Tragic Slip rows (6 distinct rendered shapes) and 4 Tribute to Hunger rows
+carrying the conditional tail. Pins: 7 negatives (the deck123 seq-13 row; the Morbid
+clause alone; a quoted card text; a kills-list carrying an indestructible note; the
+deck126 seq-131 conditional row; the `{removes: }` verb; the split THEIRS/YOURS tag),
+4 positives/regressions (`{right now: does nothing this turn}`, the Tribute and
+Devour Flesh scope forms, a conditional AFTER a real zero verdict, the
+computed-magnitude grammar), 1 echo (the row binds `CHOICE: 1 (Cast Tragic Slip)`
 unchanged — no annotation was added or removed).
 
-**Prediction (next corpus).** `noop_row_zero_reask` fires 0 times on a row carrying
-`{kills: <name>}`; the Tragic Slip re-ask wording ("says it does nothing") does not
-appear against a printed kill.
+**Prediction (next corpus).** `noop_row_zero_reask` fires 0 times on a row carrying a
+non-empty victim tag or a conditional-only "does nothing"; the re-ask wording ("says it
+does nothing") does not appear against a printed kill; and no row is refused in one
+window and accepted unchanged in the next (the deck126 131/132/133 signature).
 
 ---
 
@@ -186,14 +213,18 @@ string does not exist.
    prediction is a rate claim on 21 base events — a single next-corpus sample cannot
    separate a moderate effect from noise. Treat both as hypotheses until the seat
    review reads them.
-2. **L3's blast radius is wider than the 3 seat fires.** 41 rendered rows change
-   verdict, but only 6 were ever taken by the model. **35 of the 41 are
+2. **L3's blast radius is wider than the 5 seat fires.** 45 rendered rows change
+   verdict, but only 8 were ever taken by the model (3 Tragic Slip, 2 Tribute). **35 of them are
    `{kills 0 of the N CREATURE targets at -1/-1}` rows** — rows that are saved by the
    parenthetical rule rather than by the kill list, and which the base guard was
    re-asking for the wrong reason. They are no longer re-asked, and the engine has
    no correct zero-verdict for "a -1/-1 that kills nobody" (it is not a no-op — the
    creature still shrinks). If a wave wants those windows re-asked, that needs a
-   real verdict, not the Morbid phrase.
+   real verdict, not the Morbid phrase. The conditional rule is also a WORD test
+   (`if `/`unless `/`would `): a future emitter that opens a hypothetical with
+   different words would slip past it, and one that legitimately states a present
+   verdict in a clause containing the word "if" would be silenced by it. Neither
+   shape exists in the current emitters (checked).
 3. **L4 is the only behaviour change to the shared heuristic path.** The suite is
    green single-threaded and the new fixture discriminates the exact window, but the
    suite has no coverage of upkeep/end-step casting for most cards, and the change

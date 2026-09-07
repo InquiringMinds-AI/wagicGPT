@@ -31689,16 +31689,62 @@ static bool rightNowComputedMagnitudesAreZero(const string& row)
 //is a note about the bodies it does NOT name, not about the ones it does.
 static bool rowNamesALiveKill(const string& row)
 {
-    const string open = "{kills: ";
-    for (size_t p = row.find(open); p != string::npos; p = row.find(open, p + 1))
+    //The victim-tag openers `removalVictimTag` and the magnitude emitter can
+    //produce (`spellRemovalVerb` returns only "kills" or "removes"), each with
+    //its split THEIRS/YOURS form. Every other `{word: ...}` tag is left alone.
+    static const char * kVictimTag[] = {
+        "{kills: ", "{removes: ",
+        "{kills whichever you target: ", "{removes whichever you target: "
+    };
+    for (size_t t = 0; t < sizeof(kVictimTag) / sizeof(kVictimTag[0]); t++)
     {
-        const size_t payload = p + open.size();
-        const size_t close = row.find('}', payload);
-        if (close == string::npos)
-            continue;
-        const size_t first = row.find_first_not_of(" \t", payload);
-        if (first != string::npos && first < close)
-            return true;
+        const string open(kVictimTag[t]);
+        for (size_t p = row.find(open); p != string::npos; p = row.find(open, p + 1))
+        {
+            const size_t payload = p + open.size();
+            const size_t close = row.find('}', payload);
+            if (close == string::npos)
+                continue;
+            const size_t first = row.find_first_not_of(" \t", payload);
+            if (first != string::npos && first < close)
+                return true;
+        }
+    }
+    return false;
+}
+
+//#W71-BQ (L3, second half - the deck126 evidence): a no-op phrase inside a
+//CONDITIONAL is a statement about a board that does not exist yet.
+//`edictOnlyVictimOnStackClause` appends "...; if it is gone when this resolves
+//they control 0 creatures and this does nothing" to a verdict whose own
+//operative scope names a 17/15 being sacrificed for 15 life - and the guard
+//refused that row twice (deck126 vs125 seq 131 and 133) while the IDENTICAL row
+//was accepted at seq 132 and paid the 15. The scope a phrase belongs to runs
+//back to the nearest `;` or brace, exactly as `verdictReadsZero` splits scopes;
+//a scope that opens a hypothetical states no verdict about now.
+static bool phraseScopeIsConditional(const string& low, size_t hit)
+{
+    size_t start = 0;
+    for (size_t i = hit; i > 0; i--)
+    {
+        const char c = low[i - 1];
+        if (c == ';' || c == '{' || c == '}')
+        {
+            start = i;
+            break;
+        }
+    }
+    static const char * kIf[] = { "if ", "unless ", "would " };
+    for (size_t k = 0; k < sizeof(kIf) / sizeof(kIf[0]); k++)
+    {
+        const string w(kIf[k]);
+        for (size_t i = start; i + w.size() <= hit; i++)
+        {
+            if (low.compare(i, w.size(), w) != 0)
+                continue;
+            if (i == start || low[i - 1] == ' ' || low[i - 1] == '(' || low[i - 1] == '-')
+                return true;
+        }
     }
     return false;
 }
@@ -31738,7 +31784,8 @@ static bool noOpPhraseIsAVerdict(const string& low, const char * phrase)
                 depth--;
             continue;
         }
-        if (!depth && i + n <= low.size() && low.compare(i, n, phrase) == 0)
+        if (!depth && i + n <= low.size() && low.compare(i, n, phrase) == 0
+            && !phraseScopeIsConditional(low, i))
             return true;
     }
     return false;
@@ -75845,6 +75892,30 @@ static const char * kW50Y_r94 =
                   "Cast Damnation {2}{b}{b} {kills: Grizzly Bears - INDESTRUCTIBLE, destroy"
                   " does nothing: Darksteel Colossus}"),
               "#W71-BQ L3 NEGATIVE a note about the bodies a kill list does NOT name cannot kill the list");
+        //The deck126 half of the same defect family: a CONDITIONAL "this does
+        //nothing" inside a verdict whose own operative scope names a kill.
+        //`1788752968-ai_baka_deck126-0x556e0f994e80-vs-ai_baka_deck125.jsonl`
+        //seq 131 and 133 (refused), seq 132 (the IDENTICAL row, accepted, paid 15).
+        const string tributeLive =
+            "Cast Tribute to Hunger {2}{b} {right now: they control 1 creature - Emrakul, the"
+            " Aeons Torn (17/15) [flying, can't be countered, protection from colored spells]"
+            " is sacrificed, you gain 15 - but an effect already on the stack is aimed at that"
+            " same creature; if it is gone when this resolves they control 0 creatures and this"
+            " does nothing} {leaves 13 of your 16 untapped mana sources untapped}";
+        CHECK(!AIPlayerGPT::rowSaysNoOp(tributeLive),
+              "#W71-BQ L3 NEGATIVE deck126 seq 131/133: a conditional 'this does nothing' is about a"
+              " board that does not exist yet, and the row's own scope names a 17/15 sacrificed");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Path to Exile {w} {removes: Emrakul, the Aeons Torn}"),
+              "#W71-BQ L3 NEGATIVE the other victim-tag verb spellRemovalVerb emits is a live verdict too");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Doom Blade {1}{b} {kills whichever you target: THEIRS - Rorix; YOURS -"
+                  " Bears - INDESTRUCTIBLE, destroy does nothing: Colossus}"),
+              "#W71-BQ L3 NEGATIVE the split THEIRS/YOURS victim tag is a named kill as well");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tribute to Hunger {2}{b} {right now: they control 0"
+                                       " creatures - at 0 this does nothing; if they gain one"
+                                       " before this resolves it eats that one instead}"),
+              "#W71-BQ L3 POSITIVE a conditional AFTER a real zero verdict does not rescue the row");
         //POSITIVES: every phrasing that IS the renderer's own conclusion still reads as one.
         CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tragic Slip {b} {right now: does nothing this turn}"),
               "#W71-BQ L3 POSITIVE the same card's own zero verdict still reads as a no-op");

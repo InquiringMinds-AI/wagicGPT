@@ -6,7 +6,7 @@ The base predicate (77d82bbe6, AIPlayerGPT.cpp `rowSaysNoOp`) is:
     lowercase the WHOLE row; true if it contains "does nothing" or
     "does not apply"; else the computed-magnitude grammar.
 
-"does not apply" has exactly one emitter - `morbidMagnitudeClause`, INSIDE the
+Two phrase cues, two emitter families. "does not apply" has exactly one emitter - `morbidMagnitudeClause`, INSIDE the
 parenthetical qualifier of a real magnitude: "-1/-1 (no creature has died this
 turn, so Morbid does NOT apply)". So every Tragic Slip row cast outside Morbid
 matched, including rows whose own `{kills: ...}` clause named the bodies the
@@ -56,6 +56,16 @@ def base_no_op(row):
     return ('does nothing' in low) or ('does not apply' in low) or computed_zero(row)
 
 
+def scope_is_conditional(low, hit):
+    start = 0
+    for i in range(hit, 0, -1):
+        if low[i - 1] in ';{}':
+            start = i
+            break
+    seg = low[start:hit]
+    return bool(re.search(r'(^|[ (\-])(if|unless|would) ', seg))
+
+
 def phrase_is_verdict(low, phrase):
     depth, quoted, i = 0, False, 0
     while i < len(low):
@@ -68,14 +78,14 @@ def phrase_is_verdict(low, phrase):
             depth += 1
         elif c == ')':
             depth = max(0, depth - 1)
-        elif depth == 0 and low.startswith(phrase, i):
+        elif depth == 0 and low.startswith(phrase, i) and not scope_is_conditional(low, i):
             return True
         i += 1
     return False
 
 
 def names_a_live_kill(row):
-    for m in re.finditer(r'\{kills: ', row):
+    for m in re.finditer(r'\{(?:kills|removes)(?: whichever you target)?: ', row):
         close = row.find('}', m.end())
         if close < 0:
             continue
