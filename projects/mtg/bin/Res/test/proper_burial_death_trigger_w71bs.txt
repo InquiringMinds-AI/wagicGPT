@@ -1,0 +1,44 @@
+#NAME: A death trigger's lifegain survives the victim being in the graveyard (#W71-BS F1)
+#DESC: Astra review finding 1 (HIGH). Wave-71 lane BR stamped every AADynamic that
+#DESC: resolves as a STACK OBJECT so Tribute to Hunger's second copy could not pay
+#DESC: for a sacrifice that never happened. Proper Burial (Oracle, verified against
+#DESC: mtg.wtf/DIS: "Whenever a creature you control dies, you gain life equal to
+#DESC: that creature's toughness") is scripted with the SAME primitive family -
+#DESC: `dynamicability<!mytgt toughnesslifegain targetcontroller!>` (mtg.txt:89137) -
+#DESC: and its triggered ability also arrives as its own stack object, with the
+#DESC: victim in the graveyard BY DEFINITION. The stamp therefore returned 0 and
+#DESC: the required life was never granted. Grim Feast (mtg.txt:50348) and Death
+#DESC: Watch (mtg.txt:27072) are the same shape.
+#DESC: WITNESS: P1 controls Proper Burial and Grizzly Bears (2 toughness) and casts
+#DESC: its own Doom Blade on the Bears. Rules-correct: the Bears die and P1 gains 2
+#DESC: (life 22). PRE-FIX (586a3f69c) P1 stays at 20 - the trigger paid nothing.
+#DESC: FIX: the stamp is armed only for the EDICT shape, where the sacrifice is the
+#DESC: same stack object's own effect (an AASacrificeCard in the resolving nest).
+#DESC: A death trigger has no sacrifice in its payload and is never stamped.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Proper Burial,Grizzly Bears
+hand:Doom Blade
+manapool:{1}{B}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Doom Blade
+Grizzly Bears
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Proper Burial
+graveyard:Doom Blade,Grizzly Bears
+life:22
+[PLAYER2]
+life:20
+[END]

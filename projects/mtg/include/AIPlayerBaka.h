@@ -258,11 +258,29 @@ class AIPlayerBaka: public AIPlayer{
     //candidates, so both the heuristic seat and the model seat stop re-proposing
     //a card the deciding seat just refused. Cleared on the turn boundary: a land
     //drop is a once-per-turn window, and the refusal is scoped to it.
-    std::vector<MTGCardInstance *> mDeclinedFaceCards;
+    //#W71-BS (F3, Astra review finding 3): NOT the turn - the WINDOW. A turn-long
+    //latch is a legal land drop removed for the rest of the turn, which the wave's
+    //own ruling forbids: a decline in main 1 is an answer about the board it was
+    //given on, and after combat or a spell moves that board the same card may be
+    //exactly the play. Each latch therefore carries the serialized board
+    //fingerprint it was given in (declineWindowProbe) and is consulted only while
+    //that fingerprint still holds. The livelock it was built for is untouched: in
+    //a livelock, by definition, nothing moves, so the fingerprint is identical
+    //every tick and the refusal stands.
+    struct DeclinedFace
+    {
+        MTGCardInstance * card;
+        std::string window;
+    };
+    std::vector<DeclinedFace> mDeclinedFaceCards;
     int mDeclinedFaceTurn = -1;
     int mDeclinedFaceLatches = 0; //observable count (translog / fixtures)
     void latchDeclinedFace(MTGCardInstance * card);
     bool faceDeclinedThisTurn(MTGCardInstance * card);
+    //The window key: turn, phase and both seats' zone counts and life. Excludes the
+    //menu name (the menu is open when the decline is given and closed when the
+    //proposer asks again) and the stack, so the fingerprint is about the BOARD.
+    std::string declineWindowProbe();
     //#W64-AK (R2): how many times the floor has actually FORCED a pass - which
     //it now does only when LegalActionsOracle::hasAnyLegalAction says nothing
     //legal remains, so a nonzero count is a livelock breaker firing on an empty

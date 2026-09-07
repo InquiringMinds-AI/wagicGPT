@@ -1,0 +1,63 @@
+#NAME: A declined face menu is re-offered once the board moves (#W71-BS F3)
+#DESC: Astra review finding 3 (HIGH). Lane BP's decline latch is scoped to the
+#DESC: TURN and is armed by ANY declined hand-card menu, so one local refusal
+#DESC: removed a legal land drop for the rest of the turn - a decline in main 1
+#DESC: erased the card even after combat or a spell made its other face the play.
+#DESC: That is a cap on a legal option, which the wave's own ruling forbids.
+#DESC: FIX: the latch is scoped to the WINDOW (the serialized board fingerprint the
+#DESC: decline was given in) and armed only for a LAND-DROP face menu. The livelock
+#DESC: it was built for is unchanged - in a livelock nothing moves, so the
+#DESC: fingerprint is identical and the latch holds - but the moment the board or
+#DESC: the phase moves, the card is proposed again and the seat may take it.
+#DESC: WITNESS: P1 holds Branchloft Pathway and Raging Goblin with a Mountain
+#DESC: untapped, and the decline arm is unbounded. PRE-FIX the pathway is latched
+#DESC: for the whole turn, so exactly ONE decline is ever applied (RED here:
+#DESC: "assertdeclinesapplied: expected 3, got 1" on 586a3f69c). POST-FIX it is
+#DESC: proposed again in every window whose board differs from the declined one -
+#DESC: three of them in this game: main 1 before the Goblin, main 1 after it (the
+#DESC: board moved), and main 2 (the phase moved). The land is never taken away.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+aideclineface Branchloft Pathway
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+assertdeclinesapplied 3
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mountain,Raging Goblin
+hand:Branchloft Pathway
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:19
+[END]

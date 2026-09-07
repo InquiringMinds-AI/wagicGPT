@@ -408,6 +408,20 @@ private:
     static bool askReplayRefuse(const std::string & key, std::string & lastKey,
                                 int & run, int maxRun);
     //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
+    //#W71-BS (F5): the answer floor the CURRENT seam's legal answer needs, and the
+    //seam it was computed for. buildRequestBody applies it only when the two agree,
+    //so a blockers floor can never widen an ask. Set by setAnswerFloorForSeam at
+    //each declaration seam, immediately before its poll.
+    long mAnswerFloorTokens = 0;
+    std::string mAnswerFloorSeam;
+    void setAnswerFloorForSeam(const char * seam, long items, long bytesPerItem);
+    //#W71-BS (F5): the one length-truncation re-ask a declaration seam may buy -
+    //the SAME question with a bigger allowance, no added text.
+    std::string mCeilingReaskDoneBase;
+    int mCeilingReasks = 0;
+    //#W71-BS (F4): where a replay record goes - a sidecar beside the translog, so
+    //re-serving an answer never advances the file the harness watchdog times.
+    std::string askReplaySidecarPath() const;
     void logAskReplay(const char * why, const std::string & decision, int choice,
                       int optionCount, int fromSeq, int run);
     //#W66-AQ (H1): draws already RESOLVED inside the current draw step, per
