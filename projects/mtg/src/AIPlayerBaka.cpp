@@ -3763,12 +3763,36 @@ int AIPlayerBaka::computeActions()
     //rows; Tribute to Hunger never offered at a resolved Emrakul). Own-spell
     //windows (INTERRUPTMYSPELLS) keep the old abilities-only path.
     Player * topController = (action && action->source) ? action->source->controller() : NULL;
-    if (observer->isInterrupting == this
-        && this == currentP 
+    //#W71-BQ (L4, wave-70 deck130 HIGH): the OWN-TURN instant-speed windows.
+    //This function has two reach branches, and the "standard actions" one below
+    //answers every non-main phase of the seat's own turn with selectAbility()
+    //alone - an activations menu. So an instant in hand was castable only in a
+    //RESPONSE window (this branch) or in a main phase: on its own turn, at its
+    //own upkeep, after blockers, at combat damage or in its end step, the seat
+    //could not cast it and - for the GPT seat - FindCardToPlay (the cast ask)
+    //was never even reached. Measured at deck130: an instant the prompt printed
+    //`[castable now]` got NO cast row at 23 of 23 `priority`-kind windows while
+    //all 25 "Casting decision" asks offered one, and the seat lost holding two
+    //Starstorms. The windows admitted here are exactly the phases the standard
+    //branch already answers with selectAbility() on an empty stack - nothing
+    //new is asked, and this branch falls back to selectAbility() itself when no
+    //castable card is found, so a window with no instant is unchanged. The
+    //ATTACKERS step is deliberately NOT included: it currently asks nothing
+    //after the engine-issued declaration, and adding a window there would be a
+    //new ask rather than a missing cast.
+    const int phaseNow = observer->getCurrentGamePhase();
+    const bool ownInstantSpeedWindow =
+        observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0
+        && (phaseNow == MTG_PHASE_UPKEEP
+            || phaseNow == MTG_PHASE_COMBATBLOCKERS
+            || phaseNow == MTG_PHASE_COMBATDAMAGE
+            || phaseNow == MTG_PHASE_ENDOFTURN);
+    if (this == currentP
         //and i am the currentlyActivePlayer
-        && topController != this)
-        //am im not interupting my own spell/ability (a NextGamePhase or an
-        //empty stack has no controller and is a response window too).
+        && ((observer->isInterrupting == this && topController != this)
+            //am im not interupting my own spell/ability (a NextGamePhase or an
+            //empty stack has no controller and is a response window too).
+            || ownInstantSpeedWindow))
     {
         bool ipotential = false;
         if(p->game->hand->hasType("instant") || p->game->hand->hasAbility(Constants::FLASH) || p->game->hand->hasAbility(Constants::ASFLASH) ||

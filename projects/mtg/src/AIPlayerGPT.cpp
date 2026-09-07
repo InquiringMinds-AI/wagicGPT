@@ -342,6 +342,21 @@ const char * kNoPassRowFact = "(this ask has no pass row)";
 //#W62-Y (D5): the other face - a menu whose LAST row IS a decline the caller
 //appended. Same channel, same shape, so the guides' key still finds it.
 const char * kDeclineRowFact = "(the LAST row of this menu declines: it is a real answer, not a fallback)";
+//#W71-BQ (L12, wave-70 engine-seat MED-5): a reveal window can arm inside a
+//COMBAT step of the seat's own turn, and the board header then reads
+//"Phase: Blockers | It is your turn." one screen above the reveal list.
+//152v123 seq 25 answered that reveal `BLOCKS: Sigarda, Champion of Light blocks
+//Vampire.` in the PLAN slot and then `PUT: 1` - the parser latched the right
+//line, but the seat had written a combat declaration into a window where no
+//combat declaration exists (1 of 20 reveal records). The reveal is the ONLY
+//seam whose window routinely sits inside a step named after a different
+//decision, so it states its own scope. Restriction-first, and true in every
+//phase: this window declares no attack and no block, and PUT: is the only
+//answer label it reads. Nothing about the reply FORM is added or relaxed - the
+//two-line protocol and the PUT: instruction below are untouched.
+const char * kRevealWindowScopeFact =
+    "This window decides only where the cards listed above go: no attack and no block is being "
+    "declared in it, and PUT: is the only answer label it reads.\n";
 
 //#W64-AH (F2, deck125 HIGH-2): the two facts above are claims about THIS menu,
 //and wave 62 left the choice between them to a flag only the CHOOSE_MENU family
@@ -15770,7 +15785,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mReasoningTailAnswers(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPlanParagraphBoundCuts(0), mPutGlossStripped(0), mPlanChoiceConflictSeen(0), mPlanArguesAgainstRowSeen(0), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mReasoningTailAnswers(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPlanParagraphBoundCuts(0), mPutGlossStripped(0), mPlanChoiceConflictSeen(0), mPlanArguesAgainstRowSeen(0), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -31664,13 +31679,86 @@ static bool rightNowComputedMagnitudesAreZero(const string& row)
 //#W58-A (D3), preserving #W54-B (D14): an explicit renderer conclusion and
 //the Morbid status remain semantic no-op facts; computed verdicts use the
 //number grammar above. A real magnitude must never match. Pure.
+//#W71-BQ (L3, wave-70 deck123 HIGH-1): the two halves of the fix, both pure.
+//(a) A NAMED KILL is a live verdict. `{kills: Elite Spellbinder, Intrepid
+//Adversary}` is the engine's own conclusion that this row removes those bodies;
+//no phrase anywhere else on the row can outrank it. The zero-count forms carry
+//a DIFFERENT tag (`{kills 0 of the 2 CREATURE targets at ...}`, `{kills
+//nothing: ...}`), so only the `{kills: ` opener with a non-empty payload
+//counts, and `- INDESTRUCTIBLE, destroy does nothing: <names>` INSIDE that tag
+//is a note about the bodies it does NOT name, not about the ones it does.
+static bool rowNamesALiveKill(const string& row)
+{
+    const string open = "{kills: ";
+    for (size_t p = row.find(open); p != string::npos; p = row.find(open, p + 1))
+    {
+        const size_t payload = p + open.size();
+        const size_t close = row.find('}', payload);
+        if (close == string::npos)
+            continue;
+        const size_t first = row.find_first_not_of(" \t", payload);
+        if (first != string::npos && first < close)
+            return true;
+    }
+    return false;
+}
+
+//(b) A phrase is a VERDICT only where the renderer states one: at the top level
+//of the row. "does not apply" is emitted in exactly one place - inside the
+//Morbid qualifier of a real magnitude, `{right now: -1/-1 (no creature has died
+//this turn, so Morbid does NOT apply)}` - which says WHICH of two magnitudes
+//applies, never that the row does nothing; and a quoted `{card text: "..."}`
+//blob is the card's printed words, not the engine's conclusion about this
+//board. So the cue counts only at parenthesis depth 0 and outside double
+//quotes. This is the same unit rule `verdictScopeOperative`/`verdictReadsZero`
+//already apply one layer down; `rowSaysNoOp` is still the single zero-predicate.
+static bool noOpPhraseIsAVerdict(const string& low, const char * phrase)
+{
+    const size_t n = strlen(phrase);
+    int depth = 0;
+    bool quoted = false;
+    for (size_t i = 0; i < low.size(); i++)
+    {
+        const char c = low[i];
+        if (c == '"')
+        {
+            quoted = !quoted;
+            continue;
+        }
+        if (quoted)
+            continue;
+        if (c == '(')
+        {
+            depth++;
+            continue;
+        }
+        if (c == ')')
+        {
+            if (depth > 0)
+                depth--;
+            continue;
+        }
+        if (!depth && i + n <= low.size() && low.compare(i, n, phrase) == 0)
+            return true;
+    }
+    return false;
+}
+
 bool AIPlayerGPT::rowSaysNoOp(const string& row)
 {
+    //#W71-BQ (L3): 3 of 3 seat fires were false at deck123 - every non-Morbid
+    //Tragic Slip cast row matched on the Morbid clause's "does NOT apply" while
+    //the same row printed `{kills: Elite Spellbinder, Intrepid Adversary}`, and
+    //at 152 seq 13 -> 14 the re-ask's "says it does nothing" wording talked the
+    //model out of two printed kills. A row the engine says kills something is
+    //not a row that does nothing.
+    if (rowNamesALiveKill(row))
+        return false;
     string low = row;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
-    if (low.find("does nothing") != string::npos
-        || low.find("does not apply") != string::npos)
+    if (noOpPhraseIsAVerdict(low, "does nothing")
+        || noOpPhraseIsAVerdict(low, "does not apply"))
         return true;
     return rightNowComputedMagnitudesAreZero(row);
 }
@@ -37378,6 +37466,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //the menu, and a suppression key that drifted with it would never
             //match the next tick's rebuild.
             mLastCastLine = (pick >= 0 && pick < (int) opts.size()) ? opts[pick] : menu[pick];
+            //#W71-BQ (L5): the model has now COMMITTED to casting this card.
+            //Recorded on the card the engine validated (not the row text), so
+            //the cast-mode menu one window later can say whose answer it is
+            //completing. Stamped with the turn - see the header.
+            mCommittedCastName = validated->getDisplayName();
+            mCommittedCastTurn = observer->turn;
             return validated;
         }
 
@@ -38536,6 +38630,31 @@ static string castModeCastPriceTag(const string& castCost, const string& castCla
     return o.str();
 }
 
+//#W71-BQ (L5, wave-70 deck130 HIGH): the header fact that makes the cast-mode
+//menu the SECOND HALF of a decision instead of a fresh choice between two uses
+//of the card. 7 confirmed reversals in one seat - `Cast Starstorm` answered at
+//the casting ask, then the `cycling` row taken at "Choose an option for
+//Starstorm:", discarding the card the same reply's PLAN said to cast (deck126
+//seq 35 -> 36; also deck125 4->5, 37->38, 41->42, 47->48, deck146 23->24,
+//deck126 4->5). 21 modal cycling menus, 4 answered "Cast Card Normally".
+//Nothing is removed and nothing is answered: taking the alternative is legal
+//and stays offered in its own place. Pure over the four facts, so the gate is
+//provable without a game: the menu must BE a cast-mode menu (the engine's own
+//"Cast Card Normally" label), it must be about the card the model committed to,
+//and the commitment must be THIS turn - a menu armed by the heuristic's own
+//pick, or by the same card a turn later, carries no claim about what the model
+//said.
+static string castModeCommitmentNote(bool castModeMenu, const string& ctxName,
+                                     const string& committedName, bool sameTurn)
+{
+    if (!castModeMenu || !sameTurn || committedName.empty() || ctxName != committedName)
+        return "";
+    return " (you answered \"Cast " + committedName + "\" at the previous window -"
+           " this menu completes THAT cast, it is not a new offer: the \"Cast Card"
+           " Normally\" row casts it, and every other row abandons the cast you"
+           " just chose)";
+}
+
 //And the symmetric tag on the CAST row: the alternatives it spends. `draws` is
 //the card count the alternative's own script draws (0 prints nothing about
 //drawing rather than the false "draws 0" - a cycling-less alternative such as
@@ -39690,6 +39809,16 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //any counter ...". State the per-counter partial-pay semantics here too;
     //detection runs on the clean engine labels (req.optionTexts), and the
     //note is header-only (options and the staleness key untouched).
+    //#W71-BQ (L5, wave-70 deck130 HIGH): this menu is the SECOND HALF of a cast
+    //the model already answered. Nothing is withheld and nothing is answered for
+    //it - every row stays exactly where it was, in the order the engine built -
+    //but the header stops reading as a fresh offer between two equal uses of the
+    //card. Gated on the engine's own "Cast Card Normally" label, on the menu's
+    //own subject name, and on the turn the commitment was made, so a menu armed
+    //by the heuristic's pick or in a later turn carries no claim about what the
+    //model said.
+    decision += castModeCommitmentNote(castModeMenu, ctxName, mCommittedCastName,
+                                       mCommittedCastTurn == observer->turn);
     decision += payRepeatModeNote(req.optionTexts);
     //#W62-Y (D7, deck152 HIGH-3): the header's semantics, now with the row's own
     //NUMBER. Read off the card's own script (payRepeatPerCounterCost) and the
@@ -45898,6 +46027,7 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         if (outOrder)
             *outOrder = revealOrder;
     }
+    tail << kRevealWindowScopeFact; //#W71-BQ (L12)
     if (pickExactlyOne)
         tail << kPlanFirstLead //#W70-BL (E2)
              << "on a line of its own PUT: followed by the ONE card number you"
@@ -75688,6 +75818,85 @@ static const char * kW50Y_r94 =
             CHECK(gptcaveat::planStepCount("draw 1,000 cards") == 1
                       && gptcaveat::planStepCount("hold at 3.5 mana") == 1,
                   "#W70-BN F11 REGRESSION numerals are still never step boundaries");
+        }
+    }
+
+
+    // ---- #W71-BQ: wave-70 L3 (rowSaysNoOp), L5 (cast-mode carry), L12 (reveal scope) ----
+    cout << "\n[#W71-BQ] the decision-seam defects of wave 70\n";
+    {
+        //L3. The corpus row, byte for byte from
+        //`1788752940-ai_baka_deck123-0x55875fed49a0-vs-ai_baka_deck152.jsonl` seq 13.
+        const string slipLive =
+            "Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn, so Morbid"
+            " does NOT apply)} {leaves 2 of your 3 untapped mana sources untapped}"
+            " {kills: Elite Spellbinder, Intrepid Adversary}";
+        CHECK(!AIPlayerGPT::rowSaysNoOp(slipLive),
+              "#W71-BQ L3 NEGATIVE the deck123 seq-13 row names two kills and is not a no-op");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn,"
+                  " so Morbid does NOT apply)}"),
+              "#W71-BQ L3 NEGATIVE the Morbid qualifier alone is a WHICH-magnitude fact, never a verdict");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Bolt {r} {card text: \"this does nothing unless a creature died\"}"
+                  " {right now: deals 3}"),
+              "#W71-BQ L3 NEGATIVE a quoted card text is the card's words, not the engine's verdict");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Damnation {2}{b}{b} {kills: Grizzly Bears - INDESTRUCTIBLE, destroy"
+                  " does nothing: Darksteel Colossus}"),
+              "#W71-BQ L3 NEGATIVE a note about the bodies a kill list does NOT name cannot kill the list");
+        //POSITIVES: every phrasing that IS the renderer's own conclusion still reads as one.
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tragic Slip {b} {right now: does nothing this turn}"),
+              "#W71-BQ L3 POSITIVE the same card's own zero verdict still reads as a no-op");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tribute to Hunger {2}{b} {right now: they control"
+                                       " 0 creatures - at 0 this does nothing}")
+                  && AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 1"
+                                              " creature - Rorix is sacrificed; YOU control 0"
+                                              " creatures - targeting yourself does nothing}"),
+              "#W71-BQ L3 REGRESSION a top-level 'does nothing', in any scope of the verdict, still fires");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 0}")
+                  && !AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 3}"),
+              "#W71-BQ L3 REGRESSION the computed-magnitude grammar is untouched");
+        //ECHO shape: the row is unchanged, so the answer still binds to it.
+        {
+            vector<string> menu;
+            menu.push_back(slipLive);
+            bool stale = false; string src;
+            CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Cast Tragic Slip)", 1, &menu, &stale, &src) == 1
+                      && !stale,
+                  "#W71-BQ L3 ECHO the row's short name still binds - no annotation was added or removed");
+        }
+
+        //L5. The cast-mode menu's committed-cast header fact.
+        const string note = castModeCommitmentNote(true, "Starstorm", "Starstorm", true);
+        CHECK(note.find("you answered \"Cast Starstorm\"") != string::npos
+                  && note.find("completes THAT cast") != string::npos
+                  && note.find("every other row abandons") != string::npos,
+              "#W71-BQ L5 POSITIVE the modal names the cast it is the second half of");
+        CHECK(!note.empty() && note[0] == ' ' && note.find('\n') == string::npos
+                  && note.find("CHOICE:") == string::npos && note.find("PLAN:") == string::npos,
+              "#W71-BQ L5 ECHO the fact is header text on one line - it can be neither a row nor a label");
+        CHECK(castModeCommitmentNote(false, "Starstorm", "Starstorm", true).empty(),
+              "#W71-BQ L5 MUST-NOT-MATCH a menu with no 'Cast Card Normally' row is not a cast-mode menu");
+        CHECK(castModeCommitmentNote(true, "Lay Waste", "Starstorm", true).empty(),
+              "#W71-BQ L5 MUST-NOT-MATCH a modal about a DIFFERENT card carries no commitment");
+        CHECK(castModeCommitmentNote(true, "Starstorm", "Starstorm", false).empty(),
+              "#W71-BQ L5 MUST-NOT-MATCH a commitment from an earlier turn is not this window's");
+        CHECK(castModeCommitmentNote(true, "Starstorm", "", true).empty(),
+              "#W71-BQ L5 MUST-NOT-MATCH the heuristic's own pick made no answer to complete");
+
+        //L12. The reveal window's own scope.
+        {
+            const string scope(kRevealWindowScopeFact);
+            CHECK(scope.find("PUT: is the only answer label it reads") != string::npos
+                      && scope.find("no attack and no block is being declared") != string::npos,
+                  "#W71-BQ L12 POSITIVE the reveal states the scope 152v123 seq 25 answered BLOCKS: into");
+            CHECK(scope.find("BLOCKS:") == string::npos && scope.find("ATTACK:") == string::npos
+                      && scope.find("CHOICE:") == string::npos && scope.find("PLAN:") == string::npos,
+                  "#W71-BQ L12 MUST-NOT-MATCH the scope line names no OTHER label - it cannot cue one");
+            CHECK(!scope.empty() && scope[scope.size() - 1] == '\n'
+                      && scope.find("write") == string::npos && scope.find("Write") == string::npos,
+                  "#W71-BQ L12 ECHO one line of window scope, saying nothing about the reply FORM");
         }
     }
 

@@ -1,0 +1,69 @@
+#NAME: An instant in hand is castable in the seat OWN instant-speed windows (#W71-BQ L4)
+#DESC: Wave-70 deck130 HIGH: an instant printed [castable now] got NO cast row at
+#DESC: 23 of 23 `priority`-kind windows (Starstorm, 1788752934-...deck130...-vs-
+#DESC: deck123 seq 17, own turn UPKEEP), while all 25 "Casting decision" asks did
+#DESC: offer one. The seat lost that game holding two Starstorms.
+#DESC: MECHANISM: AIPlayerBaka::computeActions has TWO reach branches. The
+#DESC: response-window branch (W52-I) runs FindCardToPlay(mana, "") and casts an
+#DESC: instant; the "standard actions" branch runs on the seat's OWN turn with an
+#DESC: empty stack and, for every phase that is not a main phase, calls
+#DESC: selectAbility() ONLY - an abilities-and-activations menu. So on its own
+#DESC: turn the seat could never cast an instant outside a main phase, and the
+#DESC: GPT seat's FindCardToPlay override (the cast ask) was never even reached.
+#DESC: FIX: the own-turn instant-speed windows (upkeep, blockers, combat damage,
+#DESC: end step, stack empty) enter the SAME branch as a response window, which
+#DESC: still falls back to selectAbility() when no castable card is found.
+#DESC: WITNESS: P1 (AI) starts in its END STEP holding Lightning Bolt over three
+#DESC: Mountains; P2 has a Grizzly Bears and no lands. PRE-FIX (w71-BQ base
+#DESC: 77d82bbe6) the end step offers abilities only, the Bolt is still in hand at
+#DESC: P2's main phase and P2's Bears is alive. POST-FIX the Bolt is cast in the
+#DESC: end step. The assert is taken on P2's turn, after P1's last main phase has
+#DESC: already gone by, so a main-phase cast cannot produce it.
+FORCEABILITY
+AICALLS 120
+[INIT]
+upkeep
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain
+hand:Lightning Bolt
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain
+hand:Mind Stone
+graveyard:Lightning Bolt
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+graveyard:Grizzly Bears
+life:20
+[END]
