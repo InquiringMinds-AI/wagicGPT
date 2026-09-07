@@ -332,6 +332,16 @@ const char * kPriorityAgainFact =
 //activated-ability rows, naming a card from the cast menu it had just
 //declined. Restriction-first, and only stated where it is true (a cast ask
 //was actually put to the model this turn, in this phase).
+//#W72-BX (F3): may this window say the phase's casting decision is already
+//answered? Only when the stamp dates THIS turn and phase AND no casting
+//decision is open right now - the second casting menu of a phase, and the cast
+//seam's own re-ask, are open decisions whatever the stamp says. Pure over the
+//two facts, so both faces are provable.
+static bool w72CastAnsweredFactApplies(bool stampMatchesThisWindow, int castDecisionsOpen)
+{
+    return stampMatchesThisWindow && castDecisionsOpen == 0;
+}
+
 const char * kCastAnsweredFact =
     "You have already answered this phase's Casting decision (a card you did not cast there is "
     "not re-offered below). The rows below are the OTHER actions available now.\n";
@@ -2222,6 +2232,45 @@ static int animatableCount(Player * p)
         if (permanentCanAnimate(p->game->inPlay->cards[i]))
             n++;
     return n;
+}
+
+//#W72-BX (F8, Astra review finding 8 - MED): what THIS seat could still put in
+//front of an attacker before blockers are declared, though it controls no
+//creature right now - an untapped noncreature permanent with an activated
+//`becomes(creature ...)` rung (Mutavault, Lair of the Hydra) and an
+//instant-speed creature maker in hand. Names only, at most three, and no
+//affordability claim: the sentence it feeds says "unless you first make a
+//blocker", which is a fact about the board, not a prediction.
+static string w72BlockerMakers(Player * p)
+{
+    if (!p || !p->game)
+        return "";
+    std::vector<string> names;
+    if (p->game->inPlay)
+        for (int i = 0; i < p->game->inPlay->nb_cards && names.size() < 3; i++)
+        {
+            MTGCardInstance * c = p->game->inPlay->cards[i];
+            if (c && !c->isTapped() && permanentCanAnimate(c))
+                names.push_back(c->getDisplayName());
+        }
+    if (p->game->hand)
+        for (int i = 0; i < p->game->hand->nb_cards && names.size() < 3; i++)
+        {
+            MTGCardInstance * c = p->game->hand->cards[i];
+            if (!c)
+                continue;
+            if (!(c->hasType(Subtypes::TYPE_INSTANT) || c->has(Constants::FLASH)))
+                continue;
+            string low = c->magicText;
+            for (size_t k = 0; k < low.size(); k++)
+                low[k] = (char) tolower((unsigned char) low[k]);
+            if (low.find("token(") != string::npos && low.find("creature") != string::npos)
+                names.push_back(c->getDisplayName());
+        }
+    string out;
+    for (size_t i = 0; i < names.size(); i++)
+        out += (i ? ", " : "") + names[i];
+    return out;
 }
 
 //The tail a creature-count clause carries when the OTHER board holds bodies the
@@ -8339,7 +8388,11 @@ bool optionRowMentions(const string& optionText, const string& name)
 //#W67-AY (I6): MOVED UP from the repeat-row block, unchanged, so the plan
 //scanner is declared before consumePlan persists what it reads. Same TU, same
 //static linkage, byte-identical body.
-static int repeatPlanScanNumber(const string& plan, const char * label)
+//#W72-BX (F2): the same scan, reporting WHERE the number it returned was found
+//(`atOut` = the index of the label occurrence), so an ownership test can read
+//the words in front of it. `repeatPlanScanNumber` below is the unchanged
+//wrapper every existing caller keeps using.
+static int repeatPlanScanNumberAt(const string& plan, const char * label, size_t * atOut)
 {
     string low;
     for (size_t i = 0; i < plan.size(); i++)
@@ -8348,6 +8401,7 @@ static int repeatPlanScanNumber(const string& plan, const char * label)
     size_t at = 0;
     while ((at = low.find(label, at)) != string::npos)
     {
+        const size_t labelAt = at; //#W72-BX (F2)
         const size_t after = at + n;
         const bool boundedBefore = (at == 0 || !isalnum((unsigned char) low[at - 1]));
         const bool boundedAfter = (after >= low.size() || !isalnum((unsigned char) low[after]));
@@ -8368,10 +8422,16 @@ static int repeatPlanScanNumber(const string& plan, const char * label)
             int v = 0;
             while (d < low.size() && isdigit((unsigned char) low[d]) && v < 1000000)
                 v = v * 10 + (low[d++] - '0');
+            if (atOut) *atOut = labelAt; //#W72-BX (F2)
             return v;
         }
     }
     return -1;
+}
+
+static int repeatPlanScanNumber(const string& plan, const char * label)
+{
+    return repeatPlanScanNumberAt(plan, label, NULL);
 }
 
 //The pilot's own stop, and the count it says it is at. Both or nothing: a
@@ -8383,6 +8443,39 @@ static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * cu
     if (stopOut) *stopOut = s;
     if (currentOut) *currentOut = m;
     return s >= 0 && m >= 0;
+}
+
+//#W72-BX (F2, Astra review finding 2 - HIGH). WHOSE STOP IS IT? The scanner
+//takes the first "stop=<n>" in the plan line whoever it belongs to, so
+//`PLAN: Their stop=29; their M=29; develop my board` populated the seat's own
+//stated stop and could then silence the seat's own windows. A stop the reply
+//attributes to the OPPONENT is not an answer this seat gave. Pure over the plan
+//text: the words immediately before the label decide.
+static bool repeatPlanStopIsOwn(const string& plan)
+{
+    size_t at = string::npos;
+    if (repeatPlanScanNumberAt(plan, "stop", &at) < 0 || at == string::npos)
+        return false;
+    string before;
+    for (size_t i = 0; i < at; i++)
+        before += (char) tolower((unsigned char) plan[i]);
+    //the last two words in front of the label are enough for every attribution
+    //the corpus writes ("their stop", "opponent's stop", "his stop").
+    static const char * kTheirs[] = { "their ", "theirs ", "opponent's ", "opponents ",
+                                      "opponent ", "his ", "her ", "its " };
+    size_t tail = before.size();
+    while (tail > 0 && (before[tail - 1] == ' ' || before[tail - 1] == '='
+                        || before[tail - 1] == ':'))
+        tail--;
+    //walk back over one word (the possessive) and test it
+    size_t wordEnd = tail;
+    while (tail > 0 && before[tail - 1] != ' ' && before[tail - 1] != ',' && before[tail - 1] != ';')
+        tail--;
+    const string word = before.substr(tail, wordEnd - tail) + " ";
+    for (size_t i = 0; i < sizeof(kTheirs) / sizeof(kTheirs[0]); i++)
+        if (word == kTheirs[i])
+            return false;
+    return true;
 }
 
 //#W67-AY (I6, deck123 HIGH-1): what the model's OWN stated stop leaves this
@@ -16303,6 +16396,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 {
     mStatedStop = -1;      //#W67-AY (I6): nothing stated yet
     mStatedStopCount = -1;
+    mStatedStopTurn = -1;  //#W72-BX (F2)
+    mCastDecisionOpen = 0; //#W72-BX (F3)
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     for (int i = 0; i < 3; i++) //#W57-E (D15)
     {
@@ -20048,10 +20143,16 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //said about its own stop until it says another.
         {
             int stStop = -1, stNow = -1;
-            if (repeatPlanStopAndCurrent(plan, &stStop, &stNow))
+            if (repeatPlanStopAndCurrent(plan, &stStop, &stNow) && repeatPlanStopIsOwn(plan))
             {
                 mStatedStop = stStop;
                 mStatedStopCount = stNow;
+                //#W72-BX (F2): the stop carries its OWN date. `mPlanSetTurn` is
+                //stamped by EVERY plan line, so a plan that states no stop at all
+                //re-dated a stop from an earlier turn and let it collapse this
+                //turn's windows. Set here and nowhere else: only a stop parsed
+                //out of THIS reply's PLAN line is a stop stated this turn.
+                mStatedStopTurn = observer ? observer->turn : -1;
             }
         }        mPlanSetTurn = observer ? observer->turn : 0;
         mCurrentPlan = plan;
@@ -21564,9 +21665,19 @@ string loopNonChainingClause(const string& converter, const string& mirror, bool
 //states the closure and the two entry points into the chain, which is what a
 //decision at a closed loop turns on, and nothing about what to do with it.
 //Pure over the two names and the side.
-string closedLoopHeaderText(const string& converter, const string& mirror, bool theirs)
+//#W72-BX (F9, Astra review finding 9 - MED): `loopCanOperate` is the same
+//question `lifeLoopProvenWin` asks of the board - can the chain actually run
+//(no CANTCHANGELIFE / CANTLIFELOSE / CANTLOSE on the victim, no NOLIFEGAIN /
+//NOLIFEGAINOPPONENT stopping the gain that restarts it). Two script-shaped
+//halves on a battlefield are not a chain: with Erebos (`nolifegainopponent`)
+//opposite Sanguine Bond + Exquisite Blood, this header called every life
+//payment fatal while nothing could chain at all. The header is SILENT when the
+//loop cannot operate - the same rule the loop-half warning already keeps -
+//rather than stating a consequence the board forbids.
+string closedLoopHeaderText(const string& converter, const string& mirror, bool theirs,
+                            bool loopCanOperate)
 {
-    if (converter.empty() || mirror.empty())
+    if (converter.empty() || mirror.empty() || !loopCanOperate)
         return "";
     std::ostringstream o;
     o << "LOOP COMPLETE: BOTH halves of a life LOOP (" << converter << " + " << mirror
@@ -21880,7 +21991,8 @@ static string loopPendingSituationLine(Player * me, Player * opp,
         //to `continue` - the state that decides the game announced itself with
         //nothing. It gets the header now.
         if (!conv.empty() && !mir.empty())
-            return closedLoopHeaderText(conv, mir, side == 0);
+            return closedLoopHeaderText(conv, mir, side == 0,
+                                        lifeLoopProvenWin(pl)); //#W72-BX (F9)
         const bool wantMirror = mir.empty();
         string found, where;
         bool halfCanReturn = true; //#W67-AY (I8)
@@ -23094,7 +23206,8 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
                                     bool haveBodies = false,
                                     const string& floorSources = "",
                                     int floorExtra = 0,        //#W71-BR (L18)
-                                    bool floorUnsized = false) //#W71-BR (L18)
+                                    bool floorUnsized = false, //#W71-BR (L18)
+                                    const string& blockerMakers = "") //#W72-BX (F8)
 {
     if (ableAttackers <= 0 || maxDamage <= 0)
         return "";
@@ -23120,6 +23233,17 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
     //anywhere saying the total was unblockable in full - and silence is the one
     //thing the trust doctrine forbids, because the model confabulates a defence
     //into the gap. The fact is read off the same flag the split is gated on.
+    //#W72-BX (F8, Astra review finding 8 - MED): "every point is unblocked" is a
+    //claim about NEXT turn's combat made from THIS turn's creature count, and an
+    //untapped creature-land (Mutavault, Lair of the Hydra) or an instant-speed
+    //creature maker turns it false before blockers are declared. Where the seat
+    //holds one, the sentence states the same fact CONDITIONALLY and names what
+    //would change it; where it holds none, the categorical sentence stands
+    //unchanged.
+    else if (!haveBodies && !blockerMakers.empty())
+        o << " - you control NO creature right now, so nothing on your battlefield"
+             " blocks any of it as the board stands - unless you first make a"
+             " blocker: " << blockerMakers;
     else if (!haveBodies)
         o << " - you control NO creature, so every point of that is unblocked:"
              " nothing on your battlefield can stop any of it";
@@ -24747,8 +24871,15 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         //same `instantSpeedOnly` switch FindCardToPlay passes.
         //#W72-BT (M13): this phase's Casting decision was already put to the
         //model and answered - the same test kCastAnsweredFact is printed on.
-        const bool castingDecisionAnswered =
-            (mCastAskTurn == observer->turn && mCastAskPhase == phase);
+        //#W72-BX (F3, Astra review finding 3 - MED): a phase stamp is not proof
+        //that no cast is open. A second casting menu inside the SAME phase (one
+        //spell cast and resolved, mana and another legal spell left) is an OPEN
+        //casting decision, and so is the re-ask of the casting menu itself; both
+        //were told their own window had already been answered. The stamp now
+        //dates a CLOSED decision only, and a casting decision that is open right
+        //now overrides it.
+        const bool castingDecisionAnswered = w72CastAnsweredFactApplies(
+            mCastAskTurn == observer->turn && mCastAskPhase == phase, mCastDecisionOpen);
         const bool sorcerySpeedOk = (observer->currentPlayer == this)
             && (phase == (int) MTG_PHASE_FIRSTMAIN || phase == (int) MTG_PHASE_SECONDMAIN)
             && stackEmpty;
@@ -25393,7 +25524,9 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                                      nextTurnEvasive, nextTurnEvasiveDamage,
                                                      myCreatures > 0,
                                                      floorSrc, //#W61-R (C3)
-                                                     floorExtra, floorUnsized); //#W71-BR (L18)
+                                                     floorExtra, floorUnsized, //#W71-BR (L18)
+                                                     myCreatures > 0 ? string()
+                                                                     : w72BlockerMakers(this));
             }
         }
         //#W68-BE (R7): the three exceptions MTGPlayerCards::drawFromLibrary itself
@@ -27323,15 +27456,103 @@ string AIPlayerGPT::crackBackVerdictNow()
     return crackBackVerdictKey(atk, dmg, life);
 }
 
+//#W72-BX (F1, Astra review finding 1 - HIGH): a row that DECLINES rather than
+//acts. The two seams word their declines differently by construction (the cast
+//seam's "Cast nothing right now", the priority seam's row 0 "Pass priority"),
+//and the hold row itself has three spellings, so a cross-seam row comparison
+//that counted them would answer "different menu" for every window. They are not
+//legal PLAYS: dropping them from the comparison compares what the model can
+//actually DO at the two seams, which is the question the sibling rule asks.
+//Pure over the row text.
+static bool w72RowIsDeclineOrHold(const string& row)
+{
+    static const char * kDeclines[] = {
+        "Hold priority", "Pass priority", "Cast nothing right now", "Cast nothing",
+        "Decline", "Do nothing", "Done", "Hold "
+    };
+    for (size_t i = 0; i < sizeof(kDeclines) / sizeof(kDeclines[0]); i++)
+        if (row.compare(0, strlen(kDeclines[i]), kDeclines[i]) == 0)
+            return true;
+    return false;
+}
+
+//#W72-BX (F7, Astra review finding 7 - MED): does this land's own script make
+//MANA? The engine's three spellings in `auto=` lines are `Add{...}` (Ancient
+//Tomb), `out{...}` (Reflecting Pool's conditional producers) and the basic-land
+//route, which carries no script at all and is passed in as the flag below.
+//Pure over the script text, so both faces are provable without a board.
+static bool w72ScriptProducesMana(const string& script)
+{
+    string s;
+    for (size_t i = 0; i < script.size(); i++)
+        if (!isspace((unsigned char) script[i]))
+            s += (char) tolower((unsigned char) script[i]);
+    return s.find("add{") != string::npos || s.find("add(") != string::npos
+           || s.find("out{") != string::npos;
+}
+
+//#W72-BX (F7): the land drop counts as a mana SOURCE only if the land it would
+//play can make mana. `basicManaSubtype` is the basic-land route (a Basic Land,
+//or any land carrying a Plains/Island/Swamp/Mountain/Forest subtype - a dual
+//taps for mana with no script of its own). Dark Depths, a fetchland and Maze of
+//Ith answer false here, and the reserve warning they were erasing stands.
+static bool w72LandDropIsManaSource(bool basicManaSubtype, const string& script)
+{
+    return basicManaSubtype || w72ScriptProducesMana(script);
+}
+
+//#W72-BX (F6): the engine index a name-menu answer commits to. A model answer
+//is an index into the DISPLAYED order and is permuted back; a heuristic answer
+//and the out-of-range clamp are already engine indices and are returned
+//untouched. Pure over (pick, whose index space, the permutation).
+static int w72NameMenuEngineIndex(int pick, bool pickIsDisplayIndex,
+                                  const std::vector<size_t>& nameOrder)
+{
+    if (!pickIsDisplayIndex || nameOrder.empty() || pick < 0
+        || pick >= (int) nameOrder.size())
+        return pick;
+    return (int) nameOrder[pick];
+}
+
+//#W72-BX (F1): did the menu the hold was taken on SHOW every row the sibling
+//window is about to offer? Every acting row of the new menu must already be in
+//the held menu's recorded row set; declines and hold rows are not acting rows
+//(above). An empty acting set is a menu that offers nothing new and is covered.
+//Pure over the two row sets.
+static bool w72HeldMenuShowedEveryRow(const std::set<string>& heldRowKeys,
+                                      const std::vector<string>& nowRowKeys)
+{
+    for (size_t i = 0; i < nowRowKeys.size(); i++)
+    {
+        if (w72RowIsDeclineOrHold(nowRowKeys[i]))
+            continue;
+        if (heldRowKeys.find(nowRowKeys[i]) == heldRowKeys.end())
+            return false; //a legal row the model has not been shown: ask
+    }
+    return true;
+}
+
 //#W72-BU (M4): ONE WINDOW, ONE ASK. Pure over the hold's recorded window and
 //the window now being opened. True only for the OTHER seam of the SAME window:
 //the same turn, the same phase and a byte-identical serialized board. A held
 //seam re-asking itself is not this rule's business - the per-seam row predicate
 //below owns that and is unchanged - and any move of turn, phase or board falls
 //through to it. `heldSeam` empty means no hold has been taken at all.
+//#W72-BX (F1, Astra review finding 1 - HIGH). AN UNCHANGED BOARD IS NOT THE
+//SAME QUESTION. The wave-72 rule checked the board and the window and never
+//asked whether the held menu had CONTAINED the sibling's rows: a hold taken over
+//the casting rows at upkeep then closed a priority window carrying cycling and
+//activated abilities the cast menu never printed, and the hold row's own text
+//prices "the rows above" - the rows it was taken over. That is removal of legal
+//options by a latch, which the doctrine forbids. The row sets now decide: the
+//collapse stands only where the sibling offers nothing the held menu did not
+//already show.
 static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int heldPhase,
-                                const string& heldBoard, const char * nowSeam,
-                                int nowTurn, int nowPhase, const string& nowBoard)
+                                const string& heldBoard,
+                                const std::set<string>& heldRowKeys,
+                                const char * nowSeam,
+                                int nowTurn, int nowPhase, const string& nowBoard,
+                                const std::vector<string>& nowRowKeys)
 {
     if (heldSeam.empty() || !nowSeam || !nowSeam[0])
         return false;
@@ -27339,7 +27560,9 @@ static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int
         return false; //the same seam: the rows predicate decides, as before
     if (heldTurn != nowTurn || heldPhase != nowPhase)
         return false;
-    return heldBoard == nowBoard;
+    if (heldBoard != nowBoard)
+        return false;
+    return w72HeldMenuShowedEveryRow(heldRowKeys, nowRowKeys); //#W72-BX (F1)
 }
 
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
@@ -27359,9 +27582,21 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //calls "held elsewhere, never at this seam" and then pays for a second model
     //call over the same board. serializeGameState() only reads the game (the
     //cast and priority seams both key on it already), so this costs one string.
+    //#W72-BX (F1): with the rows of BOTH menus - the set the hold was recorded
+    //over, and the keys of the rows this window is about to print.
+    std::set<string> heldRowKeys;
+    {
+        std::map<string, std::set<string> >::iterator hit = mHoldRows.find(mHoldWindowSeam);
+        if (hit != mHoldRows.end())
+            heldRowKeys = hit->second;
+    }
+    std::vector<string> nowRowKeys;
+    for (size_t nr = 0; nr < rows.size(); nr++)
+        nowRowKeys.push_back(holdKeyRow(rows[nr]));
     if (gptHoldCoversSiblingWindow(mHoldWindowSeam, mHoldWindowTurn, mHoldWindowPhase,
-                                   mHoldWindowBoard, seam, observer->turn,
-                                   observer->getCurrentGamePhase(), serializeGameState()))
+                                   mHoldWindowBoard, heldRowKeys, seam, observer->turn,
+                                   observer->getCurrentGamePhase(), serializeGameState(),
+                                   nowRowKeys))
     {
         mSiblingWindowAsksSkipped++;
         mHoldWindowsSkipped++;
@@ -27427,6 +27662,18 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                << " seam (the model's own hold row, turn " << observer->turn << "; "
                << mHoldWindowsSkipped << " windows held this game)");
     return true;
+}
+
+//#W72-BX (F3): this phase's casting decision is now CLOSED - the model (or the
+//heuristic on its behalf) answered it. One place, called from every exit of the
+//casting seam that ends the window, so the stamp and the fact it licenses
+//("you have already answered this phase's Casting decision") cannot disagree.
+void AIPlayerGPT::markCastDecisionAnswered()
+{
+    if (!observer)
+        return;
+    mCastAskTurn = observer->turn;
+    mCastAskPhase = observer->getCurrentGamePhase();
 }
 
 //#W53-N (D2): record the hold. A hold taken at a second seam on the same
@@ -30912,10 +31159,16 @@ string chooseANameHeaderText(const string& sourceName, const string& cardText)
          " in a public zone right now; an unmarked row names a card that is not"
          " visible in any public zone."
          //#W72-BV (M7): and what those two numbers are worth to a CAST trigger.
-         " A copy that is already in a public zone has been played: it can never"
-         " be cast again, so a {visible now: ...} count is evidence the name is"
-         " SPENT. The rows are ordered by {copies not yet in a public zone: ...},"
-         " highest first - that is the count of copies that can still be cast.";
+         //#W72-BX (F5, Astra review finding 5 - MED): the wave-72 sentence called
+         //a public copy SPENT and said it can never be cast again. A graveyard is
+         //a public zone and cards are cast out of it (Hammer of Bogardan returns
+         //itself; flashback, cast-from-exile and ordinary bounce say the same),
+         //so that read as a rule where it was only a location. The tag says WHERE
+         //the public copies are; it claims nothing about whether they are done.
+         " The {visible now: ...} tag says WHERE those copies are - a copy in a"
+         " graveyard or in exile can still be cast or returned if a card says so."
+         " The rows are ordered by {copies not yet in a public zone: ...},"
+         " highest first - the copies that are not visible anywhere yet.";
     return o.str();
 }
 
@@ -30983,7 +31236,11 @@ string namedCardRemainingTag(int theirNotPublic, int myNotPublic)
     }
     if (myNotPublic > 0)
         o << (first ? " " : ", ") << myNotPublic << " of yours";
-    o << " - only a copy that is not already public can still be cast}";
+    //#W72-BX (F5): the count, without the exclusivity claim wave 72 attached to
+    //it - a public copy in a graveyard or exile can still be cast where a card
+    //allows it, so "only a copy that is not already public can still be cast" is
+    //false on this engine's own graveyard/exile cast enumeration.
+    o << " - copies not visible in any public zone}";
     return o.str();
 }
 
@@ -34817,8 +35074,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //earlier turn can never silence a later one; (c) it collapses only while the
     //count stays at or past the stop - the moment the board moves back under it,
     //repeatRowStopClause prints room again and the window re-opens.
+    //#W72-BX (F2): the STOP's own date, not the last plan line's. mPlanSetTurn
+    //is stamped by every reply that writes a PLAN, so a plan that states no stop
+    //re-dated a stop from an earlier turn and let it silence this turn's windows.
     if (observer && w72StopReachedWindowCollapses(everyBaseRowIsStopReached, anyStopReachedRow,
-                                                 carriedStop, mPlanSetTurn, observer->turn))
+                                                 carriedStop, mStatedStopTurn, observer->turn))
     {
         mStopReachedWindowsSkipped++;
         DebugTrace("AIPlayerGPT[ph" << phase << "]: every live row is a repeat family already at"
@@ -35058,7 +35318,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
              << kPriorityAgainFact;
     //#W49-S (D8): the casting question of this phase was already put to the
     //model - say so, where it is true.
-    if (mCastAskTurn == observer->turn && mCastAskPhase == phase)
+    if (w72CastAnsweredFactApplies(mCastAskTurn == observer->turn && mCastAskPhase == phase,
+                                   mCastDecisionOpen)) //#W72-BX (F3)
     {
         const string sofar = tail.str(); //#W54-M (L5): one copy, not three
         tail << (sofar.empty() || sofar[sofar.size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
@@ -35265,10 +35526,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             //#W70-BN (F4): the two permitted lines are the whole span.
             int stStop = -1, stNow = -1;
-            if (repeatPlanStopAndCurrent(protocolLinesOnly(content), &stStop, &stNow))
+            const string protOnly = protocolLinesOnly(content);
+            if (repeatPlanStopAndCurrent(protOnly, &stStop, &stNow)
+                && repeatPlanStopIsOwn(protOnly)) //#W72-BX (F2)
             {
                 mStatedStop = stStop;
                 mStatedStopCount = stNow;
+                mStatedStopTurn = observer ? observer->turn : -1; //#W72-BX (F2)
             }
         }
         //#W71-BO (R6, wave-70 census): the STOP-GUARD RE-ASK and its clamp are
@@ -37536,13 +37800,27 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         //`tap(noevent)` idiom and is deliberately unqualified,
                         //so a card it mis-reads UNDER-counts the remainder and
                         //can only make this clause smaller.
+                        //#W72-BX (F7): and only for a land that MAKES mana - the
+                        //wave-72 walk counted any land not entering tapped, so an
+                        //unused Dark Depths (or a fetchland, or Maze of Ith)
+                        //erased a true reserve warning by contributing a source
+                        //that produces nothing.
                         int landDropSources = 0;
                         {
                             std::vector<LegalActionsOracle::Cast> lp =
                                 LegalActionsOracle::legalLandPlays(this);
                             for (size_t li = 0; li < lp.size() && !landDropSources; li++)
-                                if (lp[li].card && !castBodyEntersTapped(lp[li].card))
+                            {
+                                MTGCardInstance * lc = lp[li].card;
+                                if (!lc || castBodyEntersTapped(lc))
+                                    continue;
+                                const bool basicMana = lc->hasType(Subtypes::TYPE_BASIC)
+                                    || lc->hasSubtype("Plains") || lc->hasSubtype("Island")
+                                    || lc->hasSubtype("Swamp") || lc->hasSubtype("Mountain")
+                                    || lc->hasSubtype("Forest");
+                                if (w72LandDropIsManaSource(basicMana, scriptAllZones(lc)))
                                     landDropSources = 1;
+                            }
                         }
                         o << sorceryReserveClause(left, sorc->getDisplayName(),
                                                   sorc->getManaCost()->toString(), sorcNeed,
@@ -38170,6 +38448,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //rejected line now costs exactly ONE record.
     const int kMaxCastReasks = 2; //3 asks per window, worst case
     string rejectedSoFar;
+    //#W72-BX (F3): this seat's casting decision is OPEN from here until the loop
+    //returns, however it returns. RAII so no exit path can leave it set.
+    struct CastOpenGuard
+    {
+        int * flag;
+        CastOpenGuard(int * f) : flag(f) { if (flag) (*flag)++; }
+        ~CastOpenGuard() { if (flag && *flag > 0) (*flag)--; }
+    } castOpenGuard(&mCastDecisionOpen);
     for (int attempt = 0; ; attempt++)
     {
         vector<string> menu(opts);
@@ -38340,13 +38626,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             return NULL; //no cast this tick; the answer is consumed on a later poll
         //#W49-S (D8): the priority ask after this can say so.
         //#W72-BT (M13): set AFTER the window is answered, not before it is put.
-        //The hand line now reads this same pair (kHandCastableAnswered), and a
-        //re-ask of the cast menu itself (attempt > 0) re-renders the situation
-        //with no prefill - stamping it beforehand made the CASTING window's own
-        //prompt say the casting decision was already answered. Both consumers
-        //want "answered", and this is where that becomes true.
-        mCastAskTurn = observer->turn;
-        mCastAskPhase = observer->getCurrentGamePhase();
+        //#W72-BX (F3): and after VALIDATION, at the exits that actually close the
+        //decision - a pick the engine then rejects re-renders this same window
+        //with `attempt > 0`, and the stamp made that re-ask say the casting
+        //decision had already been answered. `markCastDecisionAnswered` is called
+        //on every closing exit below (decline, hold, a validated cast, and the
+        //heuristic paths) and on none of the re-ask iterations.
         if (pick < 0) //model deferred or endpoint failed: heuristic decides
         {
             //#W67-AX (I7, engine MED-1): say what the heuristic did with the
@@ -38359,6 +38644,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     if (candidates[ci] == heur) { heurRow = (int) ci + 1; break; }
             noteHeuristicExecuted("cast", heurRow,
                                   heur ? ("cast " + heur->name) : string("cast nothing"));
+            markCastDecisionAnswered(); //#W72-BX (F3)
             return heur;
         }
         //#W60-M (B13c): count a decline only when the MODEL was shown this
@@ -38384,6 +38670,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 mReserveDeclineSpanTurn = observer->turn;
                 mReserveDeclineSpanKey = castSetKey;
             }
+            markCastDecisionAnswered(); //#W72-BX (F3)
             return NULL;
         }
         //#W53-N (D2): the model closed this turn's casting question itself.
@@ -38392,6 +38679,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             takeHold("cast", menu);
             if (!mAskAnswerReserved)
                 mListDeclineCount[listKeyHash(listKey)]++;
+            markCastDecisionAnswered(); //#W72-BX (F3)
             return NULL;
         }
 
@@ -38421,6 +38709,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //completing. Stamped with the turn - see the header.
             mCommittedCastName = validated->getDisplayName();
             mCommittedCastTurn = observer->turn;
+            markCastDecisionAnswered(); //#W72-BX (F3)
             return validated;
         }
 
@@ -38460,6 +38749,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (lastChance)
         {
             noticeFallback("that cast could not be completed - the heuristic decides", 5.0f);
+            markCastDecisionAnswered(); //#W72-BX (F3)
             return AIPlayerBaka::FindCardToPlay(pMana, type);
         }
         setNotice("that cast could not be completed - asking again", 5.0f);
@@ -40016,13 +40306,26 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                             true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
+        //#W72-BX (F6, Astra review finding 6 - MED): WHOSE INDEX SPACE IS THIS?
+        //The model answers over the DISPLAYED rows and must be permuted back; the
+        //heuristic (`AIPlayerBaka::selectMenuOption`) and the clamp already answer
+        //in the ENGINE's own index space, and permuting them a second time
+        //committed a different name than the fallback chose (engine names [A, B]
+        //displayed as [B, A], endpoint down: the heuristic picked A and the
+        //engine was handed B). Only the model's answer is permuted.
+        bool pickIsDisplayIndex = true;
         if (pick < 0)
-            pick = AIPlayerBaka::selectMenuOption(); //heuristic: same index space
+        {
+            pick = AIPlayerBaka::selectMenuOption(); //heuristic: ENGINE index space
+            pickIsDisplayIndex = false;
+        }
         if (pick < 0 || pick >= (int) req.optionTexts.size())
+        {
             pick = 0;
+            pickIsDisplayIndex = false;
+        }
         //#W72-BV (M7): map the DISPLAYED row back to the engine's own index.
-        if (!nameOrder.empty() && pick < (int) nameOrder.size())
-            pick = (int) nameOrder[pick];
+        pick = w72NameMenuEngineIndex(pick, pickIsDisplayIndex, nameOrder); //#W72-BX (F6)
         act.choice = pick;
         return 0;
     }
@@ -77337,33 +77640,56 @@ static const char * kW50Y_r94 =
         //is the shape.
         const string board = "life 20/20 | hand 3 | battlefield 4";
         const string other = "life 20/18 | hand 3 | battlefield 4";
-        CHECK(gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
-                                         "priority", 14, MTG_PHASE_UPKEEP, board),
+        //#W72-BX (F1): the pin now carries BOTH option sets. The held menu's
+        //recorded rows and the rows the sibling window is about to print decide;
+        //an unchanged board alone never does.
+        std::set<string> heldCast;
+        heldCast.insert("Cast Starstorm {x}{r}{r}");
+        heldCast.insert("Cast nothing right now");
+        heldCast.insert("Hold priority - pass now");
+        std::vector<string> nowSame;
+        nowSame.push_back("Cast Starstorm {x}{r}{r}");
+        nowSame.push_back("Pass priority (take no action this window)");
+        std::vector<string> nowCycling(nowSame);
+        nowCycling.push_back("Cycle Starstorm {2}");
+        CHECK(gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                         "priority", 14, MTG_PHASE_UPKEEP, board, nowSame),
               "#W72-BU M4 POSITIVE a hold taken at the cast seam closes the priority ask"
-              " of the SAME window");
-        CHECK(gptHoldCoversSiblingWindow("priority", 14, MTG_PHASE_UPKEEP, board,
-                                         "cast", 14, MTG_PHASE_UPKEEP, board),
+              " of the SAME window when that window offers nothing it did not show");
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                          "priority", 14, MTG_PHASE_UPKEEP, board, nowCycling),
+              "#W72-BX F1 REPRO the priority window carries a CYCLING row the held casting"
+              " menu never showed - the model is asked, not silenced");
+        CHECK(gptHoldCoversSiblingWindow("priority", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                         "cast", 14, MTG_PHASE_UPKEEP, board, nowSame),
               "#W72-BU M4 POSITIVE and the rule is symmetric - a priority hold closes the"
               " casting ask of the same window");
-        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
-                                          "cast", 14, MTG_PHASE_UPKEEP, board),
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                          "cast", 14, MTG_PHASE_UPKEEP, board, nowSame),
               "#W72-BU M4 MUST-NOT-MATCH the SAME seam is still decided by its own rows -"
               " this rule never touches the per-seam latch");
-        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
-                                          "priority", 14, MTG_PHASE_UPKEEP, other),
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                          "priority", 14, MTG_PHASE_UPKEEP, other, nowSame),
               "#W72-BU M4 MUST-NOT-MATCH the board moved: a different window, and it is"
               " owed its own ask");
-        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
-                                          "priority", 14, MTG_PHASE_FIRSTMAIN, board),
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                          "priority", 14, MTG_PHASE_FIRSTMAIN, board, nowSame),
               "#W72-BU M4 MUST-NOT-MATCH a later phase is a later window even on an"
               " unchanged board");
-        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board,
-                                          "priority", 15, MTG_PHASE_UPKEEP, board),
+        CHECK(!gptHoldCoversSiblingWindow("cast", 14, MTG_PHASE_UPKEEP, board, heldCast,
+                                          "priority", 15, MTG_PHASE_UPKEEP, board, nowSame),
               "#W72-BU M4 MUST-NOT-MATCH next turn's window is not this one");
-        CHECK(!gptHoldCoversSiblingWindow("", -1, -1, "", "priority", 14,
-                                          MTG_PHASE_UPKEEP, board),
+        CHECK(!gptHoldCoversSiblingWindow("", -1, -1, "", heldCast, "priority", 14,
+                                          MTG_PHASE_UPKEEP, board, nowSame),
               "#W72-BU M4 MUST-NOT-MATCH no hold has been taken at all - every window is"
               " asked, which is the default this rule never widens");
+        CHECK(w72RowIsDeclineOrHold("Pass priority (take no action this window)")
+                  && w72RowIsDeclineOrHold("Cast nothing right now (combat comes next this turn)")
+                  && w72RowIsDeclineOrHold("Hold priority - pass now, and do not ask me again"),
+              "#W72-BX F1 the two seams' declines and the hold row are not acting rows");
+        CHECK(!w72RowIsDeclineOrHold("Cast Starstorm {x}{r}{r}")
+                  && !w72RowIsDeclineOrHold("Cycle Starstorm {2}"),
+              "#W72-BX F1 MUST-NOT-MATCH a real play is never read as a decline");
         //The rule keys on a HOLD only. "Cast nothing right now" answers the
         //casting question and nothing else: the priority menu that follows it
         //carries rows chooseOrderedAction builds and the cast menu cannot
@@ -77411,25 +77737,35 @@ static const char * kW50Y_r94 =
         //`146v130` seq 30 named a TOKEN ("Goblin"); `146v126` seq 17 took the
         //visible-first row while four live Tributes sat unmarked at row 8.
         const string tag = namedCardRemainingTag(4, 0);
-        CHECK(tag == " {copies not yet in a public zone: 4 of theirs - only a copy that is not"
-                     " already public can still be cast}",
+        //#W72-BX (F5): the count stays; the "can never be cast again" claim goes.
+        CHECK(tag == " {copies not yet in a public zone: 4 of theirs - copies not visible in"
+                     " any public zone}",
               "#W72-BV M7 REPRO the deciding number is rendered");
+        CHECK(tag.find("can still be cast") == string::npos
+                  && tag.find("only a copy") == string::npos,
+              "#W72-BX F5 MUST-NOT-MATCH the tag no longer claims a public copy is spent -"
+              " Hammer of Bogardan returns itself from a graveyard, and flashback,"
+              " cast-from-exile and bounce say the same");
         CHECK(namedCardRemainingTag(0, 0).empty(),
               "#W72-BV M7 MUST-NOT-MATCH every copy public: no claim");
         CHECK(namedCardRemainingTag(2, 1).find("2 of theirs, 1 of yours") != string::npos,
               "#W72-BV M7 both seats are counted where both have copies");
         const string h = chooseANameHeaderText("Silverquill Silencer", "");
-        CHECK(h.find("a {visible now: ...} count is evidence the name is SPENT") != string::npos
-                  && h.find("ordered by {copies not yet in a public zone: ...}, highest first")
-                     != string::npos,
+        CHECK(h.find("ordered by {copies not yet in a public zone: ...}, highest first")
+                  != string::npos
+                  && h.find("a copy in a graveyard or in exile can still be cast or returned"
+                            " if a card says so") != string::npos,
               "#W72-BV M7 the header says what the two counts are worth and how the list is"
               " ordered - the wave-55 sentence endorsed the ordering it now explains");
+        CHECK(h.find("SPENT") == string::npos && h.find("never") == string::npos,
+              "#W72-BX F5 REPRO the header no longer declares a public copy permanently"
+              " uncastable");
         CHECK(stripNarrationDecoration("Sanguine Bond" + namedCardVisibilityTag(1, 0, 0, 0)
                                        + namedCardRemainingTag(3, 0)) == "Sanguine Bond",
               "#W72-BV M7 ECHO neither tag reaches the narrated choice");
         CHECK(AIPlayerGPT::parseChoice("CHOICE: 1 (Sanguine Bond {copies not yet in a public"
-                                       " zone: 3 of theirs - only a copy that is not already"
-                                       " public can still be cast})", 4, NULL, NULL) == 1,
+                                       " zone: 3 of theirs - copies not visible in any public"
+                                       " zone})", 4, NULL, NULL) == 1,
               "#W72-BV M7 ECHO a reply echoing the new tag still binds its row");
     }
 
@@ -77669,19 +78005,19 @@ static const char * kW50Y_r94 =
     {
         //wave-70 deck126 HIGH-3: 158 renders of the DEAD state in one game and no
         //header at all for the state that wins it (deck123 seq 21).
-        const string mine = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", false);
+        const string mine = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", false, true);
         CHECK(mine == "LOOP COMPLETE: BOTH halves of a life LOOP (Sanguine Bond + Exquisite"
                       " Blood) are on YOUR battlefield right now. Any life THEY lose, and any"
                       " life YOU gain, chains until they are at 0 - so any one point of"
                       " either, from any source, ends the game in your favour.",
               "#W72-BW M19 REPRO the completed pair finally has a header");
-        const string theirs = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true);
+        const string theirs = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true, true);
         CHECK(theirs.find("on THEIR battlefield") != string::npos
                   && theirs.find("Any life YOU lose") != string::npos
                   && theirs.find("fatal rather than expensive") != string::npos,
               "#W72-BW M19 the other side's header names the other entry into the chain");
-        CHECK(closedLoopHeaderText("", "Exquisite Blood", false).empty()
-                  && closedLoopHeaderText("Sanguine Bond", "", false).empty(),
+        CHECK(closedLoopHeaderText("", "Exquisite Blood", false, true).empty()
+                  && closedLoopHeaderText("Sanguine Bond", "", false, true).empty(),
               "#W72-BW M19 NEGATIVE half a pair is not a complete pair");
         CHECK(mine.compare(0, 14, "LOOP COMPLETE:") == 0
                   && mine.find("LOOP HALF PENDING") == string::npos,
@@ -77796,6 +78132,109 @@ static const char * kW50Y_r94 =
                   + namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24))
                   == "Cast Bloodline Keeper {2}{b}{b}",
               "#W72-BW M23a ECHO the whole tag stays out of the history line");
+    }
+
+    cout << "\n[#W72-BX] the Astra step-one review - the nine findings\n";
+    {
+        // F2: the stop carries its OWN date, and its own OWNER.
+        CHECK(!w72StopReachedWindowCollapses(true, true, 29, -1, 12),
+              "#W72-BX F2 REPRO turn 12's reply states a PLAN with no stop: the stop from"
+              " turn 11 has no date of its own this turn and cannot collapse the window");
+        CHECK(w72StopReachedWindowCollapses(true, true, 29, 12, 12),
+              "#W72-BX F2 POSITIVE a stop restated THIS turn still collapses the window whose"
+              " answer it already gave");
+        CHECK(repeatPlanStopIsOwn("PLAN: L=15, C=2, stop=20; M=68 now; this window: x33"),
+              "#W72-BX F2 the seat's own stop is its own");
+        CHECK(!repeatPlanStopIsOwn("PLAN: Their stop=29; their M=29; develop my board")
+                  && !repeatPlanStopIsOwn("PLAN: opponent's stop=29, M=29"),
+              "#W72-BX F2 REPRO a stop the reply attributes to the OPPONENT is not an answer"
+              " this seat gave - it never dates the seat's own stop");
+        int f2s = -1, f2m = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: Their stop=29; their M=29", &f2s, &f2m)
+                  && f2s == 29,
+              "#W72-BX F2 the SCANNER is unchanged - the ownership test is a separate gate,"
+              " so no existing reader of the two numbers moves");
+
+        // F3: an OPEN casting decision is not an answered one.
+        CHECK(!w72CastAnsweredFactApplies(true, 1),
+              "#W72-BX F3 REPRO a second casting menu inside the same phase (and the cast"
+              " seam's own re-ask) is an OPEN decision - the stamp does not make it answered");
+        CHECK(w72CastAnsweredFactApplies(true, 0),
+              "#W72-BX F3 POSITIVE a closed decision, and no other open, still says so");
+        CHECK(!w72CastAnsweredFactApplies(false, 0),
+              "#W72-BX F3 MUST-NOT-MATCH no stamp for this turn and phase, no claim");
+        CHECK(handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}").find("[castable now]")
+                  != string::npos,
+              "#W72-BX F3 the open tag is the one an open decision prints");
+        CHECK(string(kCastAnsweredFact).find("already answered") != string::npos,
+              "#W72-BX F3 the fact whose scope the flag now bounds");
+
+        // F4: CR 201.4 - a token copy of a real card keeps its card name.
+        CHECK(w72TokenNameChoosable(true, true),
+              "#W72-BX F4 REPRO a token COPY of Grizzly Bears names a card, and the name stays"
+              " on the menu (CR 201.4)");
+        CHECK(!w72TokenNameChoosable(true, false),
+              "#W72-BX F4 a bare Goblin token names no card - still the illegal answer wave 72"
+              " removed");
+        CHECK(w72TokenNameChoosable(false, false) && w72TokenNameChoosable(false, true),
+              "#W72-BX F4 MUST-NOT-MATCH a nontoken card's name is never filtered");
+
+        // F6: the name-menu fallback is already in engine index space.
+        {
+            std::vector<size_t> order;
+            order.push_back(1);
+            order.push_back(0); //engine [A, B] displayed as [B, A]
+            CHECK(w72NameMenuEngineIndex(0, true, order) == 1,
+                  "#W72-BX F6 a MODEL answer over the displayed rows is permuted back");
+            CHECK(w72NameMenuEngineIndex(0, false, order) == 0,
+                  "#W72-BX F6 REPRO with the endpoint down the heuristic picks engine index 0"
+                  " (A) - permuting it again committed B");
+            std::vector<size_t> none;
+            CHECK(w72NameMenuEngineIndex(1, true, none) == 1
+                      && w72NameMenuEngineIndex(3, true, order) == 3,
+                  "#W72-BX F6 MUST-NOT-MATCH no permutation, or an index outside it, is left"
+                  " alone");
+        }
+
+        // F7: a land that makes no mana is not a mana source.
+        CHECK(!w72LandDropIsManaSource(false,
+                  "auto=counter(0/0,10,Ice)\nauto={3}:counter(0/0,-1,Ice) all(this)"),
+              "#W72-BX F7 REPRO Dark Depths' own script produces no mana, so the unused land"
+              " drop does not erase the STRANDS verdict");
+        CHECK(w72LandDropIsManaSource(true, ""),
+              "#W72-BX F7 a basic land (and any land with a basic subtype) taps for mana with"
+              " no script of its own");
+        CHECK(w72LandDropIsManaSource(false, "auto={T}:Add{2} and!( damage:2 controller )!")
+                  && w72LandDropIsManaSource(false, "auto=this(variable{plandg}>0) {t}:out{G}"),
+              "#W72-BX F7 Ancient Tomb's Add and Reflecting Pool's out are both mana");
+
+        // F8: an animatable land makes the categorical claim conditional.
+        {
+            const string cond = crackBackNextTurnLine(2, 6, 11, 0, 0, 0, 0, false, "", 0, false,
+                                                      "Mutavault");
+            CHECK(cond.find("unless you first make a blocker: Mutavault") != string::npos
+                      && cond.find("every point of that is unblocked") == string::npos,
+                  "#W72-BX F8 REPRO an untapped Mutavault can block next turn's attacker, so"
+                  " the categorical claim becomes the conditional one and names it");
+            CHECK(crackBackNextTurnLine(2, 6, 11, 0, 0, 0, 0, false)
+                      .find("every point of that is unblocked") != string::npos,
+                  "#W72-BX F8 MUST-NOT-MATCH with nothing that can make a blocker the wave-72"
+                  " sentence stands byte for byte");
+            CHECK(crackBackNextTurnLine(2, 6, 11, 0, 0, 0, 0, true, "", 0, false, "Mutavault")
+                      .find("unless you first make a blocker") == string::npos,
+                  "#W72-BX F8 MUST-NOT-MATCH a seat that already HAS bodies is told neither");
+        }
+
+        // F9: LOOP COMPLETE is silent when the chain cannot run.
+        CHECK(closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true, false).empty(),
+              "#W72-BX F9 REPRO with Erebos (nolifegainopponent) on the board the chain cannot"
+              " restart - the header claims no fatality it cannot support");
+        CHECK(!closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true, true).empty(),
+              "#W72-BX F9 POSITIVE an operable loop still announces itself");
+        CHECK(lifeLoopWinnable(true, true, true)
+                  && !lifeLoopWinnable(true, true, false)
+                  && !lifeLoopWinnable(true, false, true),
+              "#W72-BX F9 the header consults the SAME predicate the loop-half warning does");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
