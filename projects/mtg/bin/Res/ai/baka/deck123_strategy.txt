@@ -12,16 +12,12 @@ first), and lethal already on the board (attack, do not build).
 
 --- ANSWER FORMAT ---
 - "CHOICE:" is bare, on its own line; "ANSWER: CHOICE: 0 (pass)" is not read as an answer at all
-  and the built-in AI plays the window. Reasoning, CHOICE line, PLAN.
+  and the built-in AI plays the window. PLAN line, then CHOICE line; nothing else.
 - A CHOICE names a NUMBERED ROW ON THIS WINDOW; a printed row is payable now, and a card with no
   "Cast" row is not castable now, whatever your plan says.
-- THE FIRST CHOICE LINE RUNS AND PROSE NEVER TAKES IT BACK. Only a line STARTING "Correction:",
-  "Re-evaluating:", "Actually," or "On reflection" plus a SECOND full CHOICE line replaces it -
-  both halves or nothing. "Wait," and "Correct Plan:" do not count.
-- EVERY GATE IN THIS GUIDE IS READ BEFORE THE CHOICE LINE, NEVER AFTER IT. A row's own numbers -
-  "M of yours", "they control N creatures", "at 0 this does nothing", "this equips nothing" - decide
-  whether that row's NUMBER may be written at all. A refusal you write after the CHOICE line, or in
-  the PLAN, does not run; the row you already named does.
+- EVERY GATE IN THIS GUIDE IS APPLIED BEFORE YOU WRITE. A row's own numbers - "M of yours", "they
+  control N creatures", "at 0 this does nothing", "this equips nothing" - decide whether that row's
+  NUMBER may be written at all. The row your CHOICE line names is what runs.
 - Your carried PLAN is older text; where it and a "{right now:}" clause disagree, the clause wins.
 --- LAND DROP AND MARSH FLATS ---
 - Any "Play <land>" line listed: take one, every turn, before anything.
@@ -69,8 +65,9 @@ THEIRS.
 - TAKE THE REPEAT ROW ("repeated N times, then stop") ONCE, with N = (L + C + 3) - M, in its own
   format: CHOICE: 2 (Create human with Thraben Doomsayer x17). A take with no number is re-asked
   and the window spent; the next window is a pass. N of 0 or less is a pass - not "x1", not "x0".
-- The stop is a STEP, not a ledger. One PLAN line, actions only, blanks filled from the screen:
-    PLAN: this window <x<N> or pass>, then <next action>, then make humans until M reaches <L+C+3>, then pass
+- The stop is a STEP of the sequence, not a ledger under it. One PLAN line, actions only, every
+  blank filled from the screen, never the bracket text itself:
+    PLAN: this window <x<N> or pass>, then <the next action you intend>, then keep making humans until M reaches <L+C+3>, then pass
   The first step names the action the CHOICE line names; a Damnation menu takes its own plan line.
 - Recompute the stop from THIS window's row every time; if your numbers disagree, the arithmetic
   is right.
@@ -97,8 +94,8 @@ The row counts for you: "destroys N of their
 creatures (K without a restriction against attacking), M of yours", and "all of them carry a
 restriction" is K = 0. FIRST, BEFORE THE CHOICE LINE, read M and N off that row: M at 4 or more,
 or N at 0, and Damnation's number is not written this window - answer another row. Only if that
-comparison passes do you go on. Whenever it is listed this is the ONLY plan line, a sequence of actions:
-    PLAN: <cast Damnation now / hold Damnation>, then <next action>
+comparison passes do you go on. Whenever it is listed this is the ONLY plan line, and it is a sequence of actions:
+    PLAN: <cast Damnation now / hold Damnation>, then <the next action you intend>
 - M at 4+: NEVER, whatever N says. Four bodies is a board you win with.
 - M at 0 with K at 2+: cast it, above a maker, the Tutor and the Alarm; at your life 10 or less,
   "hold" is not an option.
@@ -212,7 +209,7 @@ absent, or its N is 0 or lower, is "BLOCKS: none" right.
   gains them life is LETHAL, and the header's best case does not price the loop. Block only
   attackers whose rows carry no life-gain clause; if all do, "BLOCKS: none".
  STEP 0 - A "B" ROW IS A BLOCKER, and its "may block A1, A2" list is the legality list. At LETHAL
-  your FIRST line is "BLOCKS: B1:A<largest deals N>". "(you kill it, your blocker lives)" is a
+  your BLOCKS line is "BLOCKS: B1:A<largest deals N>". "(you kill it, your blocker lives)" is a
   free kill unless STEP -1 says otherwise.
  STEP 0b - THE HEADER'S NAMED ASSIGNMENT IS A LIFE-MAXIMISER, NOT ADVICE. Take it ONLY when the
   header also says "LETHAL"; on "NOT lethal", ignore the name and go to STEP 1.

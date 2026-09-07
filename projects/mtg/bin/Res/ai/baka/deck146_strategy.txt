@@ -83,8 +83,8 @@ unless you reveal a Plains or Swamp; Hive enters TAPPED once you control two or 
   at N}" is above the total power on their line. NEVER AT 3 LIFE OR LESS.
 - HIVE OF THE EYE TYRANT: {3}{B} - FOUR mana - for a 3/3 menace attacker until end of turn. Before
   answering "becomes beholder" run these in order, stopping at the first that fires.
-  CHECK 0 - Add the power of every untapped creature of yours that could attack, plus 3, and write
-    that sum and their printed life into your reply. At or above their life -> ANIMATE and swing,
+  CHECK 0 - Add the power of every untapped creature of yours that could attack, plus 3, and weigh
+    that sum against their printed life. At or above their life -> ANIMATE and swing,
     whatever the phase.
   CHECK 0b - Their line reads "of which 0 are creatures" and your line shows 0 able to attack ->
     ANIMATE at any phase (your only clock), unless the row is tagged [this land is TAPPED] or that

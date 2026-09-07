@@ -12,10 +12,10 @@ answers back into your library. Your mana is 26 lands and nothing else.
    in hand - a first Staff, an Elixir, a Path/sweeper/Lightmine Field the board calls for, a
    Revelation the three stops below allow.
 4. End your turn with {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture.
-Your plan line, when asked for one, is this sentence and nothing else:
-   "Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that
-   counter's cost; take an Elixir row before any ping while my library reads 16 or less; ping their
-   face every turn unless a DRAW PUNISHERS line is printed, and then ping the punisher; never cast
+Your plan line is this sequence of actions and nothing else:
+   "Hold the counter in my hand payable, then Staff of Nin from a row whose leaves N covers that
+   counter's cost, then an Elixir row before any ping while my library reads 16 or less, then ping
+   their face each turn - the punisher instead whenever a DRAW PUNISHERS line is printed; no
    Emrakul while a converter of theirs is printed."
 Never append a per-card verdict to it: it is echoed atop every later window and outlives the board
 that made it. WHEN A ROW AND YOUR PLAN LINE DISAGREE, THE ROW IS TRUE.

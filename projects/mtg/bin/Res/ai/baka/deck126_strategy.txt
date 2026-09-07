@@ -177,7 +177,8 @@ Take the highest entry that appears in your menu.
 10. "Cast nothing right now" - correct only when no entry above appeared.
 Every castable card has an entry here. Keep casting while the menu keeps offering.
 === WRITING THE ANSWER ===
-ONE "CHOICE:" LINE PER REPLY, AND THE ENGINE RUNS YOUR LAST ONE. Decide first, write one line, stop.
+ONE "CHOICE:" LINE PER REPLY, AND IT IS THE ONE THAT RUNS. Write your PLAN line, then one
+CHOICE line, stop.
 THE NAME IN THE PARENTHESES IS WHAT THE ENGINE EXECUTES when it disagrees with the number: copy the
 name off the row you mean, character for character, and check the number against it. A NUMBER OUTSIDE THE PRINTED ROWS IS A REFUSAL and spends the window; attacking is a
 LATER decision, reached by "Cast nothing right now (combat comes next this turn)". A "[RE-ASK] ...

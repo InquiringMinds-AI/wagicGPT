@@ -83,7 +83,7 @@ answer is thrown away with the engine blocking for you.
   WHICH ONE to stop. Two of them and two blockers -> both B-numbers on ONE, or "BLOCKS: none"; one on each is
   illegal and is the worst answer.
 - The parenthesis is the computed result, first strike and deathtouch already applied; never override it.
-FIRST LINE OF EVERY BLOCK ANSWER: find the header's "you would be at N". "BLOCKS: none" is allowed in exactly
+FIRST STEP OF EVERY BLOCK DECISION: find the header's "you would be at N". "BLOCKS: none" is allowed in exactly
 one case - every offered block reads "(your blocker dies, attacker lives)" AND N is 10 or more. The test is N,
 not the size of the attack: at "you would be at 6" you block even if only 2 damage is coming. When the header
 says the attack IS LETHAL, survival comes first - assign blockers so the damage still getting through is LESS
