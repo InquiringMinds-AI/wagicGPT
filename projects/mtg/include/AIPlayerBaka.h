@@ -91,6 +91,10 @@ typedef std::map<OrderedAIAction, int, CmpAbilities> RankingContainer;
 struct AttackerDamaged;
 
 class AIPlayerBaka: public AIPlayer{
+public:
+    //#W72-BT (M14): the GPT seat counts own-turn instant-speed windows the
+    //W71-BQ L4 arm left without issuing a cast ask. No-op for the heuristic.
+    virtual void noteOwnTurnWindowSkipped() {}
  protected:
     virtual int orderBlockers();
     //Permute atk->blockers so autoaffectDamage's lethal-first walk kills

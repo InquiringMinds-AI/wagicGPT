@@ -16116,7 +16116,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -16311,6 +16311,30 @@ bool AIPlayerGPT::askReplayRefuse(const std::string & key, std::string & lastKey
         run = 1;
         return false;
     }
+    run++;
+    if (run < maxRun)
+        return false;
+    run = 0;
+    return true;
+}
+
+//#W72-BT (M22, wave-71 engine-seat MED-2): the same predicate, PER WINDOW.
+//The single-slot version above is reset by ANY other key - including a window
+//the model really answered in between - so the wave-71 sidecar shows an
+//18-replay run of one byte-identical casting window whose counter restarted at
+//1 halfway through (`...deck123-0x5629c69e3090`, turn 36, seqs 363-383). A
+//livelock that alternates between two windows can never reach the cap that way,
+//which is the one thing the cap exists for. One counter per state+question:
+//interleaving cannot reset a run, and the map is dropped with the ask cache at
+//the turn boundary (the keys embed the turn header, so they are dead anyway)
+//and erased for a window the moment that window is really answered. Fires and
+//re-arms exactly as the single-slot form does. Pure and static.
+bool AIPlayerGPT::askReplayRefuseScoped(const std::string & key,
+                                        std::map<std::string, int> & runs, int maxRun)
+{
+    if (key.empty())
+        return false;
+    int & run = runs[key];
     run++;
     if (run < maxRun)
         return false;
@@ -17641,6 +17665,9 @@ void AIPlayerGPT::logGameEnd()
         //#W53-N (D2): windows the model's own HOLD row closed. Not a window
         //removed - a window the model answered once and did not want re-put.
         {"hold_windows_skipped", mHoldWindowsSkipped},
+        //#W72-BT (M10 / M14): the two window classes that never reached the model.
+        {"stop_reached_windows_skipped", mStopReachedWindowsSkipped},
+        {"own_turn_windows_skipped", mOwnTurnWindowsSkipped},
         //#W69-BI (K7, engine MED-5): the same total by suppression class.
         //#W71-BP (L1/L2, engine-seat HIGH-0/HIGH-1): the livelock instrumentation.
         //A hung seat used to be INVISIBLE here - the wave-70 hang's seat log simply
@@ -24038,7 +24065,11 @@ enum HandCastVerdict
     kHandNeedsColours,   //enough sources by count, the payment still does not assemble
     kHandSorcerySpeed,   //timing, not resources
     kHandNoLegalTarget,  //CR 601.2c: a mandatory target with none on the board
-    kHandRestricted      //a play restriction forbids the cast
+    kHandRestricted,     //a play restriction forbids the cast
+    //#W72-BT (M13, wave-71 deck146 MED-4): castable this turn, but this window
+    //is not where it is offered - the phase's Casting decision was already put
+    //to the model and answered.
+    kHandCastableAnswered
 };
 //#W67-AW (M2, deck130 MED-4): the bracket stated two conditions and never said
 //which one failed. `130v125` s52 read `Talisman of Impulse {2} [artifact] [no
@@ -24073,6 +24104,21 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
     {
     case kHandCastableNow:
         return " [castable now]";
+    //#W72-BT (M13, deck146 MED-4; `146v125` seq 150). `Lolth, Spider Queen
+    //{3}{b}{b} [planeswalker] [castable now]` printed over a legal-action list
+    //that held only a loyalty ability, an animation and Hold; 27 of that seat's
+    //47 casting-already-answered windows carried the stamp. The truthful
+    //explanation was in the header (kCastAnsweredFact), but the model reasoned
+    //to "this is a contradiction or a specific UI quirk" before it found it -
+    //two statements in one prompt, and the one ON THE CARD won. RESTRICTION
+    //FIRST, per the annotation-wording rule: the first thing the tag says is
+    //that this window does not offer it. Nothing is withheld and the card's
+    //castability this turn is still stated - deleting the fact would invite the
+    //confabulation the trust doctrine warns about.
+    case kHandCastableAnswered:
+        return " [no cast row now: you already answered this phase's Casting decision, so"
+               " this window does not offer it - it is otherwise castable and its own"
+               " casting window this turn has passed]";
     case kHandNeedsMana:
         o << " [cannot pay now: needs " << need << " mana, you have " << have << "]";
         return o.str();
@@ -24456,6 +24502,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         //CR 307.1 / 601.3a as the oracle applies it: a sorcery-speed card has a
         //cast row only in your own main phase with an empty stack. This is the
         //same `instantSpeedOnly` switch FindCardToPlay passes.
+        //#W72-BT (M13): this phase's Casting decision was already put to the
+        //model and answered - the same test kCastAnsweredFact is printed on.
+        const bool castingDecisionAnswered =
+            (mCastAskTurn == observer->turn && mCastAskPhase == phase);
         const bool sorcerySpeedOk = (observer->currentPlayer == this)
             && (phase == (int) MTG_PHASE_FIRSTMAIN || phase == (int) MTG_PHASE_SECONDMAIN)
             && stackEmpty;
@@ -24520,7 +24570,10 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //The oracle's own gate ORDER, so the reason named is the FIRST one
             //that actually stops the cast.
             if (castableNow.find(nm) != castableNow.end())
-                verdict = kHandCastableNow;
+                //#W72-BT (M13): the same fact kCastAnsweredFact states, on the
+                //card the model reads it off. One condition, one source.
+                verdict = castingDecisionAnswered ? kHandCastableAnswered
+                                                  : kHandCastableNow;
             else if (!sorcerySpeedOk && !hc->hasType(Subtypes::TYPE_INSTANT)
                      && !hc->has(Constants::FLASH) && !hc->has(Constants::ASFLASH))
                 verdict = kHandSorcerySpeed;
@@ -27383,6 +27436,26 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
 //window (the engine's own creature count, and the stop the pilot last stated in
 //its carried PLAN); neither is a running total of asks, so two rebuilds of one
 //window render the same bytes - the wave-61 livelock rule, kept.
+//#W72-BT (M10): the collapse's whole guard, as one pure predicate so PARSETEST
+//can walk its truth table without a board. Every clause is a fact about what the
+//MODEL was shown and what it wrote (the same discipline repeatAskAnswerStands
+//keeps): the rows it is looking at are all a repeat family; the engine's own
+//count has reached the stop on at least one of them; a stop was actually stated;
+//and it was stated on THIS turn - a stop persisted from an earlier turn is
+//history, never a standing answer for a later one. Every doubt resolves to
+//asking, which is the wave-71 behaviour and costs a round trip.
+static bool w72StopReachedWindowCollapses(bool everyBaseRowIsStopReached, bool anyStopReachedRow,
+                                          int carriedStop, int planTurn, int nowTurn)
+{
+    if (!everyBaseRowIsStopReached || !anyStopReachedRow)
+        return false;
+    if (carriedStop < 0)
+        return false;
+    if (planTurn < 0 || nowTurn < 0 || planTurn != nowTurn)
+        return false;
+    return true;
+}
+
 static string repeatRowStopClause(int creatureCount, int statedStop)
 {
     if (creatureCount < 0 || statedStop < 0)
@@ -32261,6 +32334,131 @@ static bool w71EveryBranchIsANoOp(const string& low)
     return anyOperative;
 }
 
+//#W72-BT (M2, wave-71 engine-seat HIGH-2 + deck125 A-1). A PERMANENT'S ZERO CAN
+//BE PROSPECTIVE, AND A PROSPECTIVE ZERO IS NOT A NO-OP. 3 of the corpus's 4
+//fallbacks were this shape: `Cast Lightmine Field {right now: they control 0
+//creatures able to attack - deals 0 until they have an attacker ...}` (125v152
+//seq 32, 125v123 seq 7) and `Cast Lightning Greaves {right now: you control 0
+//creatures - this equips nothing}` (123v152 seq 10). Both rows put a PERMANENT
+//on the battlefield, where it waits for the condition its own verdict says is
+//not met yet; the model's PLAN was the set-up line and the re-ask argued it out
+//of it. The magnitude scanner reads only the operative core before the first
+//" - ", so what it actually read in both cases was the PRECONDITION ("they/you
+//control 0 ..."), never an effect of the row.
+//
+//So the rescue asks for BOTH halves of that shape, and nothing else:
+//  (a) every digit-bearing segment of the operative core is a SUBJECT-LED BOARD
+//      COUNT ("they control 0 ...", "you control 0 ...") - a fact about the
+//      board, not a magnitude this row produces. `Cast Supreme Verdict {right
+//      now: destroys 0 of their creatures (0 without ...), 0 of yours - ...}`
+//      fails here on both segments and stays the genuine no-op it is (125v152
+//      seq 64, the one TRUE fire of the four); and
+//  (b) a later segment carries a PROSPECTIVE cue - "until", "when", "whenever",
+//      or the equipment renderer's "equips nothing" - i.e. the row's own text
+//      says the zero is about a condition that has not happened YET.
+//A row with an unqualified zero EFFECT ("deals 0", "destroys 0") is untouched by
+//this, and so is every row that reaches the phrase path above. The miss
+//direction is deliberately the seat's own answer standing: the harm measured is
+//a FALSE refusal (a spent round trip that talked the pilot off its own plan),
+//never a missed one - a row taken is a legal row the model chose.
+//Pure over the rendered clause, so every face is pinned without a game.
+static bool w72CoreZerosAreBoardCounts(const string& core)
+{
+    //Parentheticals qualify a magnitude, they do not state one (the
+    //`verdictScopeOperative` rule); their digits are not this test's business.
+    string flat;
+    int depth = 0;
+    for (size_t i = 0; i < core.size(); i++)
+    {
+        const char c = core[i];
+        if (c == '(')
+            depth++;
+        else if (c == ')')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        else if (!depth)
+            flat += c;
+    }
+    bool sawADigit = false;
+    size_t seg = 0;
+    while (seg <= flat.size())
+    {
+        size_t next = flat.find(',', seg);
+        if (next == string::npos)
+            next = flat.size();
+        string piece = flat.substr(seg, next - seg);
+        bool hasDigit = false;
+        for (size_t i = 0; i < piece.size(); i++)
+            if (isdigit((unsigned char) piece[i]))
+                hasDigit = true;
+        if (hasDigit)
+        {
+            sawADigit = true;
+            size_t a = piece.find_first_not_of(" \t");
+            if (a == string::npos)
+                return false;
+            const string head = piece.substr(a);
+            if (head.compare(0, 5, "they ") != 0 && head.compare(0, 4, "you ") != 0)
+                return false; //an effect magnitude, not a board count
+        }
+        seg = next + 1;
+    }
+    return sawADigit;
+}
+
+static bool w72ProspectiveZeroOnAPermanent(const string& row)
+{
+    const string clause = rowVerdictClause(row);
+    if (clause.empty())
+        return false;
+    string low = clause;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    const size_t colon = low.find(':');
+    if (colon == string::npos)
+        return false;
+    string body = low.substr(colon + 1, low.size() - colon - 2); //drop the closing brace
+    const size_t split = body.find(" - ");
+    if (split == string::npos)
+        return false; //no explanatory tail: nothing states a prospect
+    const string core = body.substr(0, split);
+    const string tail = body.substr(split + 3);
+    if (!w72CoreZerosAreBoardCounts(core))
+        return false;
+    static const char * kProspect[] = { " until ", "when ", "whenever ", "equips nothing" };
+    for (size_t k = 0; k < sizeof(kProspect) / sizeof(kProspect[0]); k++)
+        if (tail.find(kProspect[k]) != string::npos)
+            return true;
+    return false;
+}
+
+//#W72-BT (M2, deck125 A-1). THE RE-ASK NAMES THE VERDICT IT REFUSED. The
+//refusal re-served the identical prompt with one added sentence that said only
+//"its own note on this list says it does nothing right now" - the note itself
+//was stripped out of the quoted row by stripNarrationDecoration, so the model
+//was told a conclusion and never shown the words it was drawn from. It
+//re-derived the same choice: 2 of 3 re-asks came back with a wrong answer
+//(1 identical and ACCEPTED, 1 a different wrong row), 1 recovered. The row's own
+//`{right now: ...}` clause is the engine's statement about the row, so the
+//re-ask quotes it. Still ONE labelled line, still no prose read from the reply
+//and no new answer shape - invariant 000 is untouched.
+static string noopReaskLine(int choice, const string& renderedRow)
+{
+    std::ostringstream corr;
+    corr << "[RE-ASK] You chose row " << choice << " (\""
+         << stripNarrationDecoration(renderedRow) << "\")";
+    const string verdict = rowVerdictClause(renderedRow);
+    if (!verdict.empty())
+        corr << ", whose own verdict on this list reads zero: " << verdict;
+    else
+        corr << ", whose own note on this list says it does nothing right now";
+    corr << ". Answer again: that row if you meant it anyway, or the number of"
+            " the row you want instead.";
+    return corr.str();
+}
+
 bool AIPlayerGPT::rowSaysNoOp(const string& row)
 {
     //#W71-BQ (L3): 3 of 3 seat fires were false at deck123 - every non-Morbid
@@ -32277,7 +32475,11 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
     if (noOpPhraseIsAVerdict(low, "does nothing")
         || noOpPhraseIsAVerdict(low, "does not apply"))
         return w71EveryBranchIsANoOp(low);
-    return rightNowComputedMagnitudesAreZero(row);
+    //#W72-BT (M2): a computed zero that is a PRECONDITION plus a prospective
+    //cue is a permanent waiting for its condition, not a row that does nothing.
+    if (rightNowComputedMagnitudesAreZero(row))
+        return !w72ProspectiveZeroOnAPermanent(row);
+    return false;
 }
 //#W71-BO (R4): `planArguesAgainstRow` is DELETED - it read the reply's own
 //words for an argument against the row it took. `plan_argues_against_row_seen`
@@ -34013,12 +34215,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     int carriedStop = mStatedStop;
     if (carriedStop < 0)
         repeatPlanStopAndCurrent(mCurrentPlan, &carriedStop, NULL);
+    //#W72-BT (M10, deck123 HIGH-1): does every base row on this menu belong to a
+    //repeat family whose OWN rendered verdict says the stop is reached? Answered
+    //from the same two numbers the row prints - the engine's live creature count
+    //and the stop the model stated - so the collapse below and the clause the
+    //model reads can never disagree.
+    bool everyBaseRowIsStopReached = (baseIndex > 0);
+    bool anyStopReachedRow = false;
     for (int rb = 0; rb < baseIndex; rb++)
     {
         if (isManaOnlyAction(shown[rb]->ability))
             continue; //a mana window is auto-passed below; a repeat there buys nothing
         if (!repeatRowEligible(asActivatedForCount(shown[rb]->ability)))
+        {
+            everyBaseRowIsStopReached = false; //#W72-BT (M10): a live row of another kind
             continue;
+        }
         int creatureCount = -1; //#W50-Z (D11)
         if (makesCreatureToken(shown[rb]->ability))
         {
@@ -34026,6 +34238,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (rsrc && rsrc->controller())
                 creatureCount = creatureCountOnBattlefield(rsrc->controller());
         }
+        if (creatureCount >= 0 && carriedStop >= 0 && creatureCount >= carriedStop)
+            anyStopReachedRow = true; //#W72-BT (M10)
+        else
+            everyBaseRowIsStopReached = false;
         string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1, creatureCount)
                        + repeatRowStopClause(creatureCount, carriedStop); //#W66-AS (H3)
         index++;
@@ -34037,6 +34253,38 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         renderRows.push_back(rline);
         repeatBaseRow.push_back(rb);
         tail << index << ". " << rline << "\n";
+    }
+
+    //#W72-BT (M10, wave-71 deck123 HIGH-1). THE ANSWER IS ALREADY GIVEN.
+    //`123v152` seqs 28-38: eleven consecutive priority windows on ONE turn
+    //(opponent's main 1 -> combat -> attackers -> blockers x4 -> combat damage ->
+    //combat ends -> main 2 x2), every one carrying the same two Thraben Doomsayer
+    //rows over `{right now: M=29, your stated stop=29, so this window would add to
+    //a count ALREADY AT OR PAST your own stop}`, every one answered `CHOICE: 0
+    //(pass)` - 1,287 s of wall clock and 11 model calls to advance nothing. Two
+    //re-serve caches missed it: the ask cache is not on this seam, and the
+    //repeat-ask reserve refuses a held choice of 0 (`heldChoice < 1`), which a
+    //pass always is.
+    //This is NOT a removal and NOT an auto-answer of an open question. It is the
+    //same collapse the mana-only window already gets: the model stated the stop,
+    //the engine's own count has reached it, and the ONLY live rows left are that
+    //repeat family - so the window's answer is the one the model already wrote.
+    //Three guards keep it to that: (a) EVERY base row must be a stop-reached
+    //repeat family or a mana-only row - one live row of any other kind (a cast, a
+    //different activation) and the window is asked as usual; (b) the stop must
+    //come from a plan the model stated ON THIS TURN, so a stop persisted from an
+    //earlier turn can never silence a later one; (c) it collapses only while the
+    //count stays at or past the stop - the moment the board moves back under it,
+    //repeatRowStopClause prints room again and the window re-opens.
+    if (observer && w72StopReachedWindowCollapses(everyBaseRowIsStopReached, anyStopReachedRow,
+                                                 carriedStop, mPlanSetTurn, observer->turn))
+    {
+        mStopReachedWindowsSkipped++;
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: every live row is a repeat family already at"
+                   " the model's own stated stop (" << carriedStop << "); passing without a model"
+                   " call (skipped " << mStopReachedWindowsSkipped << " this game)");
+        mLastChoice = 0;
+        return NULL;
     }
 
     //#W53-N (D2, second half) + #W55-A (D2a/D19): how many times THIS EXACT
@@ -34515,13 +34763,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             && mPriorityNoopReaskBoard != boardKey && choice >= 1 && choice <= index)
         {
             mPriorityNoopReaskBoard = boardKey;
-            std::ostringstream corr;
-            corr << "[RE-ASK] You chose row " << choice << " (\""
-                 << stripNarrationDecoration(shownLines[choice - 1])
-                 << "\"), whose own note on this list says it does nothing right now"
-                 << ". Answer again: that row if you meant it anyway, the number"
-                    " of the row you want instead, or 0 (pass).";
-            mPriorityReaskLine = corr.str();
+            //#W72-BT (M2): the verdict, named. The " or 0 (pass)" tail is the
+            //priority seam's own third answer and stays.
+            mPriorityReaskLine = noopReaskLine(choice, shownLines[choice - 1])
+                                 + " (0 passes.)";
             mPriorityReaskKind = "noop_plan";
             if (!parseNote.empty())
                 mLastParseNote = parseNote;
@@ -34568,11 +34813,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             }
             else //#W66-AR (H8) #W69-BH (K4c): noopRowZero, the last trigger left
             {
-                corr << "[RE-ASK] You chose row " << choice << " (\""
-                     << stripNarrationDecoration(shownLines[choice - 1])
-                     << "\"), whose own note on this list says it does nothing right now"
-                     << ". Answer again: that row if you meant it anyway, the number"
-                        " of the row you want instead, or 0 (pass).";
+                corr << noopReaskLine(choice, shownLines[choice - 1]) //#W72-BT (M2)
+                     << " (0 passes.)";
                 fb = "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
                 mPriorityReaskKind = "noop_plan";
                 //#W69-BJ (F8): the re-ask's own words are "that row if you meant
@@ -35069,6 +35311,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mAskCacheSeq.clear(); //#W71-BP (L2): the provenance map is the cache's shadow
         mAskReplayKey.clear();
         mAskReplayRun = 0;
+        mAskReplayRuns.clear(); //#W72-BT (M22): the per-window runs die with the keys
         mAskCacheTurn = observer->turn;
     }
     //"Only one valid action": no decision to make, no model call.
@@ -35204,7 +35447,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         //no error in it.
         std::map<string, int>::iterator cs = mAskCacheSeq.find(askKey);
         const int fromSeq = (cs == mAskCacheSeq.end()) ? -1 : cs->second;
-        if (askReplayRefuse(askKey, mAskReplayKey, mAskReplayRun, kAskReplayRefuseMax))
+        if (askReplayRefuseScoped(askKey, mAskReplayRuns, kAskReplayRefuseMax)) //#W72-BT (M22)
         {
             mAskReplaysRefused++;
             logAskReplay("cache_replay_refused", decision, cached->second,
@@ -35232,7 +35475,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
             mAskReplaysReserved++;
             logAskReplay("cache_replay", decision, cached->second, (int) options.size(),
-                         fromSeq, mAskReplayRun);
+                         fromSeq, mAskReplayRuns[askKey]); //#W72-BT (M22): this window's own run
             return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
         }
     }
@@ -35354,14 +35597,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         && choice >= 1 && choice <= (int) options.size())
     {
         mAskNoopReaskKey = askKey0;
-        std::ostringstream corr;
-        corr << "[RE-ASK] You chose row " << choice << " (\""
-             << stripNarrationDecoration(options[choice - 1])
-             << "\"), whose own note on this list says it does nothing right now"
-             << ". Answer again: that row if you meant it anyway, or the number of"
-                " the row you want instead.";
+        const string corrLine = noopReaskLine(choice, options[choice - 1]); //#W72-BT (M2)
         mAskReaskKey = askKey0;
-        mAskReaskLine = corr.str();
+        mAskReaskLine = corrLine;
         mAskReaskKind = "noop_plan";
         if (!parseNote.empty())
             mLastParseNote = parseNote;
@@ -35398,11 +35636,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             //#W66-AR (H8): quote the row's OWN verdict and the reply's own
             //sentence, so the contradiction the model must resolve is visible.
-            corr << "[RE-ASK] You chose row " << choice << " (\""
-                 << stripNarrationDecoration(options[choice - 1])
-                 << "\"), whose own note on this list says it does nothing right now"
-                 << ". Answer again: that row if you meant it anyway, or the number of"
-                    " the row you want instead.";
+            corr << noopReaskLine(choice, options[choice - 1]); //#W72-BT (M2)
             mAskReaskKind = "noop_plan";
             mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
             mAskReaskPriorChoice = choice; //#W69-BJ (F8): see the priority seam
@@ -35476,6 +35710,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     mAskCacheSeq[askKey] = mTransSeq; //#W71-BP (L2): where a later replay was served FROM
     mAskReplayKey.clear(); //a real model answer ends any replay run
     mAskReplayRun = 0;
+    //#W72-BT (M22): ...but only for THIS window. Wiping every window's run is
+    //what let an interleaved answer hide an 18-deep replay loop.
+    mAskReplayRuns.erase(askKey);
     //#W59-J (K10): latch the answer for a re-ask of this exact window. Only a
     //VALID choice: a fallback is not an answer and is never re-served.
     if (callerChoice >= 1 && callerChoice <= (int) optionsIn.size())
@@ -37494,13 +37731,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                  " is still open: decide again over what remains.";
 
         //no narration: a cast narrates itself as zone events, "nothing" is a non-action
-        mCastAskTurn = observer->turn; //#W49-S (D8): the priority ask after this can say so
-        mCastAskPhase = observer->getCurrentGamePhase();
         if (attempt == 0)
             mAskSituationPrefill = boardNow; //#W54-M (A19): the situation this call already rendered
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
+        //#W49-S (D8): the priority ask after this can say so.
+        //#W72-BT (M13): set AFTER the window is answered, not before it is put.
+        //The hand line now reads this same pair (kHandCastableAnswered), and a
+        //re-ask of the cast menu itself (attempt > 0) re-renders the situation
+        //with no prefill - stamping it beforehand made the CASTING window's own
+        //prompt say the casting decision was already answered. Both consumers
+        //want "answered", and this is where that becomes true.
+        mCastAskTurn = observer->turn;
+        mCastAskPhase = observer->getCurrentGamePhase();
         if (pick < 0) //model deferred or endpoint failed: heuristic decides
         {
             //#W67-AX (I7, engine MED-1): say what the heuristic did with the
@@ -60497,8 +60741,9 @@ static const char * kW50Y_r94 =
             "Cast Divination {2}{u} {right now: draws 0}",
             "Cast Healing Salve {w} {right now: prevents 0}",
             "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours}",
-            "Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours}",
-            "Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker}"
+            "Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours}"
+            //#W72-BT (M2): the Lightmine Field row MOVED OUT of this positive
+            //list - see the M2 block below. Its zero is prospective.
         };
         static const char * liveRows[] = {
             "Cast Gray Merchant {3}{b}{b} {right now: drains 2}",
@@ -60507,8 +60752,7 @@ static const char * kW50Y_r94 =
             "Cast Divination {2}{u} {right now: draws 2}",
             "Cast Healing Salve {w} {right now: prevents 2}",
             "Cast Damnation {2}{b}{b} {right now: destroys 2 of their creatures (2 without a restriction against attacking), 0 of yours}",
-            "Cast Final Judgment {4}{w}{w} {right now: exiles 2 of their creatures (2 without a restriction against attacking), 0 of yours}",
-            "Cast Lightmine Field {2}{w}{w} {right now: they control 2 creatures able to attack - deals 2 to each if all 2 attack}"
+            "Cast Final Judgment {4}{w}{w} {right now: exiles 2 of their creatures (2 without a restriction against attacking), 0 of yours}"
         };
         for (size_t i = 0; i < sizeof(zeroRows) / sizeof(zeroRows[0]); i++)
         {
@@ -76095,6 +76339,185 @@ static const char * kW50Y_r94 =
                                        " creatures - at 0 this does nothing; if they gain one"
                                        " before this resolves it eats that one instead}"),
               "#W71-BS F9 REGRESSION a CONDITIONAL sibling branch never rescues a dead row");
+    }
+
+    // ---- #W72-BT: wave-71 M2 (prospective zero + the re-ask), M10 (the reached
+    // stop), M13 (castable-now scope) and M22 (the per-window replay run) ----
+    cout << "\n[#W72-BT] the no-op class, the reached stop, the castable-now scope and the replay run\n";
+    {
+        // M2 NEGATIVE: the two rows that ate 3 of the corpus's 4 fallbacks.
+        const string lightmine =
+            "Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack -"
+            " deals 0 until they have an attacker - 1 noncreature permanent of theirs can animate"
+            " into a creature and is not in that count} {leaves 4 of your 8 untapped mana sources"
+            " untapped} {card text: \"Whenever one or more creatures attack, Lightmine Field deals"
+            " damage to each of those creatures equal to the number of attacking creatures.\"}";
+        const string greaves =
+            "Cast Lightning Greaves {2} {right now: you control 0 creatures - this equips nothing}"
+            " {leaves 3 of your 5 untapped mana sources untapped}";
+        CHECK(!AIPlayerGPT::rowSaysNoOp(lightmine),
+              "#W72-BT M2 NEGATIVE 125v152 seq 32: a permanent whose zero is a precondition plus"
+              " an 'until' is not a no-op");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(greaves),
+              "#W72-BT M2 NEGATIVE 123v152 seq 10: 'you control 0 creatures - this equips nothing'"
+              " is an equipment waiting for a body");
+        // M2 POSITIVE: the one TRUE fire of the four keeps firing.
+        CHECK(AIPlayerGPT::rowSaysNoOp(
+                  "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures"
+                  " (0 without a restriction against attacking), 0 of yours - 1 noncreature"
+                  " permanent of theirs can animate into a creature and is not in that count}"),
+              "#W72-BT M2 POSITIVE 125v152 seq 64: a one-shot sweeper into an empty board still"
+              " reads zero - its core states an EFFECT, not a board count");
+        CHECK(AIPlayerGPT::rowSaysNoOp(
+                  "Cast Lightmine Field {2}{w}{w} {right now: deals 0 to each attacker - they"
+                  " control 3 creatures}"),
+              "#W72-BT M2 POSITIVE an unqualified zero EFFECT in the core is a no-op whatever"
+              " follows the dash");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Lightmine Field {2}{w}{w} {right now: they control 2 creatures able to"
+                  " attack - deals 2 to each if all 2 attack}"),
+              "#W72-BT M2 REGRESSION the same card with a live magnitude was never a no-op");
+        CHECK(AIPlayerGPT::rowSaysNoOp(
+                  "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures}")
+              && AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 0}"),
+              "#W72-BT M2 REGRESSION the single-segment computed-zero grammar is untouched");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(
+                  "Cast Tribute to Hunger {2}{b} {right now: they control 1 creature - Rorix is"
+                  " sacrificed} {kills: Rorix Bladewing}"),
+              "#W72-BT M2 REGRESSION a named kill still outranks everything (W71-BQ L3)");
+        // The rescue needs BOTH halves: a board-count core AND a prospective cue.
+        CHECK(AIPlayerGPT::rowSaysNoOp(
+                  "Cast Rally {1}{w} {right now: you control 0 creatures - it pumps nothing}"),
+              "#W72-BT M2 MUST-NOT-MATCH a board-count core with no prospective cue is still a"
+              " no-op - the rescue is not 'any zero on a precondition'");
+        // ...and the header folds over the same predicate, so it cannot claim it either.
+        {
+            vector<string> menu;
+            menu.push_back(lightmine);
+            CHECK(!AIPlayerGPT::verdictReadsZero(rowVerdictClause(lightmine)),
+                  "#W72-BT M2 the NO LIVE CAST ROW header folds over rowSaysNoOp, so it stops"
+                  " claiming the Lightmine window too (292 windows carried the claim)");
+            CHECK(AIPlayerGPT::verdictReadsZero(rowVerdictClause(
+                      "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures}")),
+                  "#W72-BT M2 REGRESSION the header still folds a genuine all-dead menu");
+        }
+        // M2 second half: the re-ask NAMES the verdict it refused.
+        {
+            const string line = noopReaskLine(1, lightmine);
+            CHECK(line.find("[RE-ASK] You chose row 1 (\"Cast Lightmine Field {2}{w}{w}\")") == 0,
+                  "#W72-BT M2 the re-ask still opens by naming the row it refused");
+            CHECK(line.find("whose own verdict on this list reads zero: {right now: they control 0"
+                            " creatures able to attack") != string::npos,
+                  "#W72-BT M2 ...and now QUOTES that row's own verdict (deck125 A-1: the refused"
+                  " prompt never said why, and 2 of 3 re-asks came back wrong)");
+            CHECK(line.find('\n') == string::npos,
+                  "#W72-BT M2 ECHO the re-ask is ONE labelled line - invariant 000 licenses no"
+                  " prose and reads nothing outside the two reply lines");
+            CHECK(noopReaskLine(2, "Cast Bear {1}{g}").find("says it does nothing right now")
+                      != string::npos,
+                  "#W72-BT M2 MUST-NOT-MATCH a row with no {right now:} clause keeps the old"
+                  " wording rather than quoting an empty verdict");
+        }
+    }
+    {
+        // M10: the reached-stop clause is the collapse's own condition, read off
+        // the row the model reads. 123v152 seqs 28-38 rendered exactly this.
+        CHECK(repeatRowStopClause(29, 29).find("ALREADY AT OR PAST your own stop") != string::npos,
+              "#W72-BT M10 POSITIVE M=29 against a stated stop of 29 is the reached-stop verdict"
+              " the eleven collapsed windows carried");
+        CHECK(repeatRowStopClause(30, 29).find("ALREADY AT OR PAST") != string::npos,
+              "#W72-BT M10 POSITIVE past the stop reads the same");
+        CHECK(repeatRowStopClause(28, 29).find("ALREADY AT OR PAST") == string::npos
+              && repeatRowStopClause(28, 29).find("1 to add before it reaches") != string::npos,
+              "#W72-BT M10 NEGATIVE one short of the stop still has room - that window is asked");
+        CHECK(repeatRowStopClause(29, -1).empty() && repeatRowStopClause(-1, 29).empty(),
+              "#W72-BT M10 NEGATIVE no stated stop and no creature count: nothing is collapsed"
+              " (the guard is carriedStop >= 0 && creatureCount >= 0)");
+        // ...and the guard itself, face by face.
+        CHECK(w72StopReachedWindowCollapses(true, true, 29, 11, 11),
+              "#W72-BT M10 POSITIVE 123v152 turn 11: every live row is a repeat family at a stop"
+              " stated this turn - the window's answer is already given");
+        CHECK(!w72StopReachedWindowCollapses(false, true, 29, 11, 11),
+              "#W72-BT M10 NEGATIVE one live row of any other kind (a cast, another activation)"
+              " and the window is asked - this removes no legal option");
+        CHECK(!w72StopReachedWindowCollapses(true, false, 29, 11, 11),
+              "#W72-BT M10 NEGATIVE a repeat family still short of its stop is asked");
+        CHECK(!w72StopReachedWindowCollapses(true, true, -1, 11, 11),
+              "#W72-BT M10 NEGATIVE no stop was ever stated: nothing to stand on");
+        CHECK(!w72StopReachedWindowCollapses(true, true, 29, 9, 11)
+              && !w72StopReachedWindowCollapses(true, true, 29, -1, 11)
+              && !w72StopReachedWindowCollapses(true, true, 29, 11, -1),
+              "#W72-BT M10 NEGATIVE a stop stated on an EARLIER turn is history, not a standing"
+              " answer - a persisted stop can never silence a later turn");
+    }
+    {
+        // M13: the hand tag at a window whose casting decision is already answered.
+        const string open = handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}");
+        const string answered = handCastabilityTag(kHandCastableAnswered, 3, 5, "{2}{b}");
+        CHECK(open == " [castable now]",
+              "#W72-BT M13 REGRESSION an OPEN casting decision still stamps [castable now]");
+        CHECK(answered.find("castable now") == string::npos,
+              "#W72-BT M13 POSITIVE 146v125 seq 150: the already-answered window no longer stamps"
+              " [castable now] on a card it does not offer (27 of 47 windows did)");
+        CHECK(answered.find(" [no cast row now:") == 0,
+              "#W72-BT M13 the tag is RESTRICTION FIRST - the first thing it says is that this"
+              " window does not offer it");
+        CHECK(answered.find("already answered this phase's Casting decision") != string::npos
+              && answered.find("otherwise castable") != string::npos,
+              "#W72-BT M13 ...and it still states the reason and the card's real castability -"
+              " a silent omission is what the model confabulates into");
+        CHECK(answered.find("cannot pay") == string::npos,
+              "#W72-BT M13 MUST-NOT-MATCH the answered tag never claims an affordability failure");
+    }
+    {
+        // M22: the replay run, per window.
+        std::map<std::string, int> runs;
+        const std::string a = "boardA|Casting decision";
+        const std::string b = "boardB|Choose an option";
+        int fires = 0, firstAt = -1;
+        for (int i = 0; i < 200; i++)
+            if (AIPlayerGPT::askReplayRefuseScoped(a, runs, 64))
+            {
+                if (firstAt < 0)
+                    firstAt = i;
+                fires++;
+            }
+        CHECK(firstAt == 63 && fires == 3,
+              "#W72-BT M22 POSITIVE the 64th identical replay of a window is refused, and the"
+              " counter re-arms (parity with the single-slot form)");
+        {
+            std::map<std::string, int> two;
+            bool fired = false;
+            for (int i = 0; i < 128; i++)
+                fired = AIPlayerGPT::askReplayRefuseScoped(i % 2 ? a : b, two, 64) || fired;
+            CHECK(fired,
+                  "#W72-BT M22 POSITIVE two INTERLEAVED windows each reach their own cap - the"
+                  " single-slot counter reset on every alternation and could never fire");
+        }
+        {
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 128; i++)
+                fired = AIPlayerGPT::askReplayRefuse(i % 2 ? a : b, last, run, 64) || fired;
+            CHECK(!fired,
+                  "#W72-BT M22 the wave-71 shape, stated: the single-slot predicate never fires"
+                  " on the same 128 interleaved replays (engine-seat MED-2, sidecar turn 36:"
+                  " an 18-deep run whose replay_run restarted at 1 midway)");
+        }
+        {
+            std::map<std::string, int> one;
+            for (int i = 0; i < 30; i++)
+                AIPlayerGPT::askReplayRefuseScoped(a, one, 64);
+            CHECK(one[a] == 30,
+                  "#W72-BT M22 a window's run is its own count, not a shared slot");
+            one.erase(a); //what a real model answer for THAT window does
+            CHECK(AIPlayerGPT::askReplayRefuseScoped(a, one, 64) == false && one[a] == 1,
+                  "#W72-BT M22 NEGATIVE a real answer for a window resets THAT window's run to"
+                  " zero - and only that window's");
+            CHECK(!AIPlayerGPT::askReplayRefuseScoped("", one, 64),
+                  "#W72-BT M22 NEGATIVE an empty key is never a replay run");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
