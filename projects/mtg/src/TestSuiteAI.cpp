@@ -355,6 +355,36 @@ int TestSuiteAI::Act(float)
         mAssertPhaseArmed = true;
     bool atAssertPhase = mAssertPhaseArmed && observer->getCurrentGamePhase() == suite->endState.phase;
 
+    //#W71-BP (L1, engine-seat HIGH-0): the armed face DECLINE, applied before the
+    //heuristic gets the tick - the order the live path has (the model seam answers
+    //the menu, then computeActions sees no menu and proposes again). Driven through
+    //DecisionManager exactly as AIPlayerGPT::chooseMenuAction drives it, so what a
+    //fixture reproduces is the seam's own behaviour and not a suite shortcut.
+    if (playMode == MODE_AI && !suite->mAiDeclineFace.empty()
+        && (suite->mAiDeclineBudget == 0 || suite->mAiDeclineApplied < suite->mAiDeclineBudget))
+    {
+        ActionLayer * dal = observer->mLayers->actionLayer();
+        if (dal->menuObject && dal->abilitiesMenu && dal->abilitiesMenu->mObjects.size())
+        {
+            DecisionRequest req;
+            if (DecisionManager::buildMenuChoice(this, req)
+                && req.contextCard
+                //the pump lowercases every command; compare in that space (the
+                //engine's own getLCName, the same key getCard() matches on)
+                && req.contextCard->getLCName() == suite->mAiDeclineFace)
+            {
+                DecisionAction dact;
+                dact.choice = -1; //the model's "Decline - do nothing" row
+                DecisionManager::applyMenuChoice(req, dact);
+                suite->mAiDeclineApplied++;
+                DebugTrace("TESTSUITE aideclineface: declined menu for '"
+                           << suite->mAiDeclineFace << "' (" << suite->mAiDeclineApplied
+                           << " so far) [" << suite->filename << "]");
+                return 1;
+            }
+        }
+    }
+
     if (playMode == MODE_AI && suite->aiMaxCalls && !atAssertPhase)
     {
         //Per-instance, not function-local static: the static was shared by
@@ -432,6 +462,8 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                              || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                              || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
+                             || action.compare(0, 14, "aideclineface ") == 0 //#W71-BP
+                             || action.compare(0, 22, "assertdeclinesapplied ") == 0 //#W71-BP
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -495,7 +527,13 @@ int TestSuiteAI::Act(float)
             && action.compare(0, 12, "assertxrows ") != 0
             && action.compare(0, 19, "assertpendingdraws ") != 0 //#W63-AF (R1/R8)
             //#W69-BG (K1): the draw driver is not a menu answer.
-            && action.compare(0, 9, "drawcard ") != 0)
+            && action.compare(0, 9, "drawcard ") != 0
+            //#W71-BP: the decline ARM is not a menu answer - it must reach its own
+            //handler, which arms a standing decline the AI seat applies on its own
+            //ticks. Pre-answering it with the suite default would answer ONE menu
+            //and disarm nothing, which is not the shape under test.
+            && action.compare(0, 14, "aideclineface ") != 0
+            && action.compare(0, 22, "assertdeclinesapplied ") != 0)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -517,6 +555,8 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                 || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                 || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
+                || action.compare(0, 14, "aideclineface ") == 0 //#W71-BP
+                || action.compare(0, 22, "assertdeclinesapplied ") == 0 //#W71-BP
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -1196,6 +1236,56 @@ int TestSuiteAI::Act(float)
         DebugTrace("TESTSUITE aideclareattack " << aName << (wName.size() ? " > " : "") << wName
                    << ": attacker=" << atk->isAttacker()
                    << " target=" << (void *) atk->isAttacking << " [" << suite->filename << "]");
+    }
+    else if (action.compare(0, 14, "aideclineface ") == 0)
+    {
+        //#W71-BP (L1, engine-seat HIGH-0). ARM the answer that hangs the engine:
+        //this card's own face/mode menu is answered with its DECLINE row, through
+        //the same DecisionManager::applyMenuChoice(choice = -1) path AIPlayerGPT's
+        //menu seam uses when the model picks "Decline - do nothing". Nothing else
+        //can produce that answer in a suite: selectMenuOption always takes a real
+        //row, and the model seam needs a live endpoint. The arm is standing, not a
+        //one-shot, because the DEFECT is what the seat does after the decline - it
+        //re-proposes the same card and re-opens the same menu, for ever.
+        //Syntax: aideclineface <card name>[ <budget>]   (budget 0/absent = for ever)
+        string arg = action.substr(14);
+        while (arg.size() && arg[0] == ' ') arg.erase(0, 1);
+        int budget = 0;
+        size_t sp = arg.rfind(' ');
+        if (sp != string::npos && arg.size() > sp + 1
+            && arg.find_first_not_of("0123456789", sp + 1) == string::npos)
+        {
+            budget = atoi(arg.substr(sp + 1).c_str());
+            arg = arg.substr(0, sp);
+        }
+        while (arg.size() && arg[arg.size() - 1] == ' ') arg.erase(arg.size() - 1);
+        if (arg.empty())
+        {
+            std::cerr << "TESTSUITE aideclineface: no card named (state unchanged) ["
+                      << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        suite->mAiDeclineFace = arg;
+        suite->mAiDeclineBudget = budget;
+        suite->mAiDeclineApplied = 0;
+        DebugTrace("TESTSUITE aideclineface '" << arg << "' budget=" << budget
+                   << " [" << suite->filename << "]");
+        return 1;
+    }
+    else if (action.compare(0, 22, "assertdeclinesapplied ") == 0)
+    {
+        //#W71-BP: how many declines the arm above actually made. On the base binary
+        //the seat re-proposes for ever, so the count is the whole budget; with the
+        //latch it is exactly ONE - the seat stops proposing the card it was refused.
+        const int want = atoi(action.substr(22).c_str());
+        if (suite->mAiDeclineApplied != want)
+        {
+            std::cerr << "TESTSUITE assertdeclinesapplied: expected " << want << ", got "
+                      << suite->mAiDeclineApplied << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
     }
     else if (action.compare(0, 10, "aipending ") == 0)
     {
@@ -2991,7 +3081,8 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
       currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
       mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
-      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), testsuite(testsuite)
+      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), mAiDeclineBudget(0),
+      mAiDeclineApplied(0), testsuite(testsuite)
 {
 }
 
@@ -2999,7 +3090,8 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
       currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0),
       mAiPendingSeat(NULL), mAiPendingTicks(0), mAiPendingInFlight(false),
-      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), testsuite(testsuite)
+      mAiPendingInteractive(false), mAiPendingDeadlineMs(0), mAiDeclineBudget(0),
+      mAiDeclineApplied(0), testsuite(testsuite)
 {
     filename = _filename;
     observer = new GameObserver();

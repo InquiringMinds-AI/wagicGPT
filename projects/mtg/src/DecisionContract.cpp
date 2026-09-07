@@ -7,6 +7,7 @@
 #include "GameObserver.h"
 #include "MTGAbility.h"
 #include "MTGRules.h" //#W64-AI (F4): MTGPlaneswalkerAttackRule
+#include "AIPlayerBaka.h" //#W71-BP (L1 a): the declined-face latch
 #include "Player.h"
 #include "TargetChooser.h"
 
@@ -616,6 +617,25 @@ void DecisionManager::applyMenuChoice(const DecisionRequest & req, const Decisio
     //decline: the last menu item is the cancel when cancellable; on a
     //can't-cancel menu the same key clicks the last real option (the
     //engine's own convention - an answer must always land)
+    //
+    //#W71-BP (L1 a). THE DECLINE IS AN ANSWER AND MUST BE REMEMBERED. Cancelling
+    //this menu leaves the game byte-identical: the card is still in hand, the land
+    //drop is still unused, and the heuristic that proposed the card re-proposes it
+    //on the next tick, re-arming this same menu, whose answer the ask cache then
+    //replays with no request and no record - forever (wave-70 game 152v126: one
+    //visible decline, 2,584,190 iterations, 3,641 s, the game lost to the harness
+    //kill). This is the single choke point every declining consumer passes through
+    //- the model seam, the heuristic and the suite driver alike - so the latch
+    //lives here rather than in any one of them. Scope: a card being proposed FROM
+    //HAND. A declined `may` trigger on a battlefield permanent is a different
+    //shape (the trigger leaves the stack either way) and is untouched.
+    if (req.contextCard && req.player && req.player->game
+        && req.player->game->hand->hasCard(req.contextCard))
+    {
+        AIPlayerBaka * baka = dynamic_cast<AIPlayerBaka *>(req.player);
+        if (baka)
+            baka->latchDeclinedFace(req.contextCard);
+    }
     object->doReactTo((int) object->abilitiesMenu->mObjects.size() - 1);
 }
 

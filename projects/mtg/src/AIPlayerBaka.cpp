@@ -3117,6 +3117,91 @@ int AIPlayerBaka::selectMenuOption()
 //"commander" = commander cards; a single type = that type; a
 //comma-separated list = a whole priority ladder in one call (earlier
 //types dominate, converted cost breaks ties within a type).
+//#W71-BP (L1 a). Declining a card's face menu is an ANSWER, not a no-op: the
+//click is cancelled and the card stays in hand, but nothing records that the
+//seat refused it, so the proposer offers the same card again on the next tick.
+//These two calls are the record. They are deliberately per-TURN and per-CARD:
+//the window a land drop lives in is the turn, and a refusal of one card says
+//nothing about any other.
+//#W71-BP (L1 b): the no-progress predicate. Pure, so the fixture-free half of
+//its evidence is a PARSETEST case; the fingerprint it consumes is built by
+//menuPassProbe below. Firing re-arms the run, so a stall that outlives one
+//forced pass is named on every subsequent cycle instead of falling silent.
+bool AIPlayerBaka::menuPassNoProgress(const std::string & probe, std::string & lastProbe,
+                                      int & run, int maxRun)
+{
+    if (probe.empty() || probe != lastProbe)
+    {
+        lastProbe = probe;
+        run = 0;
+        return false;
+    }
+    run++;
+    if (run < maxRun)
+        return false;
+    run = 0;
+    return true;
+}
+
+//The cheapest fingerprint that MOVES whenever anything this seat could act on
+//moves: the phase ring, both life totals, every zone count on both sides, the
+//stack depth and the armed menu's own name. It is not a serialization and does
+//not need to be - a livelock is byte-identical in all of them, and any real
+//progress changes at least one.
+std::string AIPlayerBaka::menuPassProbe()
+{
+    if (!observer)
+        return std::string();
+    std::ostringstream o;
+    o << observer->turn << ':' << observer->getCurrentGamePhase();
+    for (int i = 0; i < 2; i++)
+    {
+        Player * p = observer->players[i];
+        if (!p)
+            continue;
+        o << '|' << p->life << ',' << p->game->hand->nb_cards << ',' << p->game->inPlay->nb_cards
+          << ',' << p->game->graveyard->nb_cards << ',' << p->game->library->nb_cards;
+    }
+    ActionLayer * al = observer->mLayers ? observer->mLayers->actionLayer() : NULL;
+    o << '|' << (observer->mLayers ? (int) observer->mLayers->stackLayer()->mObjects.size() : -1)
+      << '|' << (al ? al->menuObjectName : std::string());
+    return o.str();
+}
+
+void AIPlayerBaka::latchDeclinedFace(MTGCardInstance * card)
+{
+    if (!card || !observer)
+        return;
+    if (mDeclinedFaceTurn != observer->turn)
+    {
+        mDeclinedFaceCards.clear();
+        mDeclinedFaceTurn = observer->turn;
+    }
+    for (size_t i = 0; i < mDeclinedFaceCards.size(); i++)
+        if (mDeclinedFaceCards[i] == card)
+            return;
+    mDeclinedFaceCards.push_back(card);
+    mDeclinedFaceLatches++;
+    DebugTrace("AIPlayerBaka: latched declined face menu for " << card->getName()
+               << " (turn " << observer->turn << ", " << mDeclinedFaceLatches << " this game)");
+}
+
+bool AIPlayerBaka::faceDeclinedThisTurn(MTGCardInstance * card)
+{
+    if (!card || !observer)
+        return false;
+    if (mDeclinedFaceTurn != observer->turn)
+    {
+        mDeclinedFaceCards.clear();
+        mDeclinedFaceTurn = observer->turn;
+        return false;
+    }
+    for (size_t i = 0; i < mDeclinedFaceCards.size(); i++)
+        if (mDeclinedFaceCards[i] == card)
+            return true;
+    return false;
+}
+
 MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * type)
 {
     int maxCost = -1;
@@ -3172,6 +3257,9 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
     vector<LegalActionsOracle::Cast> candidates;
     if (wantSpells)
         candidates = LegalActionsOracle::legalCasts(this, policy, pMana, instantWindow);
+    //#W71-BP (L1 a): where the LAND candidates begin, so the declined-face latch
+    //below can be scoped to the land drop exactly as the ledger scopes it.
+    size_t firstLandIdx = candidates.size();
     if (wantLands)
     {
         vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
@@ -3189,6 +3277,18 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
 
         if (aiForcedCandidate && card != aiForcedCandidate)
             continue;
+        //#W71-BP (L1 a): this seat DECLINED this card's own face/mode menu during
+        //this turn's land drop. Re-proposing it re-opens the identical menu, whose
+        //answer is cached, which changes nothing - the wave-70 livelock exactly.
+        //Skipping it is the `held the land drop` shape: nothing is removed from the
+        //seat (the land drop is still available for every other land, and the card
+        //returns next turn), the refusal is simply not overridden by the proposer.
+        if (ci >= firstLandIdx && faceDeclinedThisTurn(card))
+        {
+            DebugTrace("AIPlayerBaka: land drop skips " << card->getName()
+                       << " - its face menu was declined this turn");
+            continue;
+        }
         if (commanderOnly && !card->isCommander)
             continue;
 
@@ -5566,6 +5666,19 @@ int AIPlayerBaka::Act(float dt)
         //livelock breaker nobody can see fire is a livelock breaker nobody can
         //adjudicate.
         const bool menuAnswered = menuOpenBefore && menuLayer && !menuLayer->menuObject;
+        //#W71-BP (L1 b): evaluated ONCE per tick, before the arms, so the branch that
+        //fires and the reason recorded for it are the same evaluation (the W66-AR
+        //unsequenced-argument lesson). Only ticks that are already AT the floor
+        //advance the stall run - a menu being answered productively must not.
+        bool stalled = false;
+        if (menuAnswered && mMenuPassHold >= kMenuPassHoldMax)
+            stalled = menuPassNoProgress(menuPassProbe(), mMenuPassProbe, mMenuPassProbeRun,
+                                         kMenuPassNoProgressMax);
+        else if (!menuAnswered)
+        {
+            mMenuPassProbe.clear();
+            mMenuPassProbeRun = 0;
+        }
         if (!menuAnswered)
             mMenuPassHold = 0;
         else if (mMenuPassHold < kMenuPassHoldMax)
@@ -5575,7 +5688,14 @@ int AIPlayerBaka::Act(float dt)
                        << mMenuPassHold << "/" << kMenuPassHoldMax << ")");
             return 0;
         }
-        else if (LegalActionsOracle::hasAnyLegalAction(this))
+        //#W71-BP (L1 b): ...and this tick is not the Nth identical tick of a stall.
+        //The legal-action arm was written to keep a window the seat still wants; a
+        //livelock is the case where the seat has been offered that same legal action,
+        //with the same board and the same menu, for kMenuPassNoProgressMax consecutive
+        //ticks and has declined it every time. Passing then removes nothing it was
+        //going to use, and it is the ONLY shape that can break a cached-answer loop -
+        //every other link in that loop is byte-identical by construction.
+        else if (LegalActionsOracle::hasAnyLegalAction(this) && !stalled)
         {
             mMenuPassHold++;
             DebugTrace("AIPLAYER: menu pass floor reached at " << mMenuPassHold
@@ -5585,8 +5705,19 @@ int AIPlayerBaka::Act(float dt)
         else
         {
             mMenuPassForced++;
+            //#W71-BP (L1 b): say WHICH arm fired. The two are different findings - an
+            //empty seat closing its window is routine, a stall being broken is a bug
+            //report - and a breaker nobody can tell apart from routine is a breaker
+            //nobody can adjudicate (the W64-AK argument, applied to its own successor).
+            const bool noProgress = stalled;
+            if (noProgress)
+                mMenuPassNoProgress++;
             DebugTrace("AIPLAYER: menu pass floor fired at " << mMenuPassHold
-                       << " with no legal action left (forced pass #" << mMenuPassForced << ")");
+                       << (noProgress ? " on NO PROGRESS (a legal action remains and has been"
+                                        " refused every tick of the stall)"
+                                      : " with no legal action left")
+                       << " (forced pass #" << mMenuPassForced << ", no-progress "
+                       << mMenuPassNoProgress << ")");
         }
         if (observer->isInterrupting == this)
         {

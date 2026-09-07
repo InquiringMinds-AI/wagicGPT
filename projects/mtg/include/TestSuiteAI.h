@@ -83,6 +83,18 @@ protected:
     //pin would cost the suite the real 20 minutes an LLM seat is allowed.
     //0 = report no deadline (the pre-#W57-U unbounded exemption).
     long mAiPendingDeadlineMs;
+    //#W71-BP (L1, engine-seat HIGH-0): `aideclineface <card>[ <budget>]` arms a
+    //STANDING decline for one card's own face/mode menu - the answer the model gave
+    //in the wave-70 hang ("CHOICE: 3 (Decline - do nothing)" on a Hengegate Pathway
+    //land drop, correct play at opp 1 life). No scripted click and no heuristic can
+    //produce it: AIPlayerBaka::selectMenuOption always takes a real row, and the
+    //decline came from AIPlayerGPT's menu seam, which needs a live endpoint. This
+    //drives the same choke point the seam does (DecisionManager::applyMenuChoice
+    //with choice = -1), so a fixture reaches the livelock deterministically with no
+    //model. budget 0 = decline for ever (the hang), N = decline the next N menus.
+    std::string mAiDeclineFace;
+    int mAiDeclineBudget;   //0 = unbounded, >0 = remaining declines
+    int mAiDeclineApplied;  //how many declines this command actually made
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);

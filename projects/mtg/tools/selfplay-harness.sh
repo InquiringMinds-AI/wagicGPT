@@ -83,6 +83,18 @@ GAME_TIMEOUT_S=0
 # largest deadline the harness ever sets). A game it stops is REPORTED and
 # credited to NOBODY - like a crash, it owes a rerun.
 NO_PROGRESS_S="${WAGIC_NO_PROGRESS_S:-3600}"
+#W71-BP (L2, engine-seat HIGH-0/HIGH-1): the FAST arm of the same watchdog. The
+#3,600 s clock above is sized for a slow decision and is right for one; the
+#wave-70 hang was not slow, it was SPINNING - byte-identical engine lines at
+#~340 KB/s for 3,641 s, 1.23 GB of stderr, while the seat log did not move at
+#all. The old comment's warning still stands (stderr alone is not progress: the
+#13-hour 404 park printed the whole time), so this arm requires BOTH - the
+#translog silent for FAST_HANG_QUIET_S and the stderr grown by FAST_HANG_MB
+#within that same silence. A slow-writing park cannot reach the byte threshold;
+#a spin reaches it in minutes. That bounds the evidence file too: a wave-70-shaped
+#hang is now stopped around 100 MB instead of 1.2 GB.
+FAST_HANG_QUIET_S="${WAGIC_FAST_HANG_QUIET_S:-300}"
+FAST_HANG_MB="${WAGIC_FAST_HANG_MB:-64}"
 OUTDIR=""
 URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev default)
 MODEL="qwen35"
@@ -245,7 +257,7 @@ run_one_game() {
     local rc=$?
     local hung=0
     [ -f "$marker.hung" ] && hung=1
-    rm -f "$marker" "$marker.hung"
+    rm -f "$marker" "$marker.hung" "$marker.sz"
     local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
     local winner life0 life1 turn
     winner=$(echo "$resline" | grep -oE 'winner=-?[0-9]+' | cut -d= -f2)
@@ -346,6 +358,10 @@ no_progress_sweep() {
     local m
     for m in "$OUTDIR"/.inflight-*; do
         [ -e "$m" ] || continue
+        #W71-BP: the sidecars this loop writes match its own glob - skip them, or
+        #a sweep reads a byte-count file as a marker (the .hung guard below only
+        #covered the case by accident, and .sz would not have been covered at all).
+        case "$m" in *.hung|*.sz) continue;; esac
         [ -e "$m.hung" ] && continue
         local gpid gstart gd0 gd1
         read -r gpid gstart gd0 gd1 < "$m" || continue
@@ -372,11 +388,35 @@ NPY
 )
         [ "${quiet:--1}" = "-1" ] && continue     # no seat log yet: nothing to time
         local since=$(( now - quiet ))
-        [ "$since" -lt "$NO_PROGRESS_S" ] && continue
-        echo ""
-        echo "!! GAME HUNG: deck${gd0} vs deck${gd1} (started ${gstart}) has written NO seat"
-        echo "!! translog record for ${since}s (limit ${NO_PROGRESS_S}s). The engine is not"
-        echo "!! ticking - this is a dead loop, not a slow decision. Stopping THAT GAME only."
+        #W71-BP (L2): the stderr-growth arm. Anchor the byte count to the moment
+        #the translog last moved, so growth is measured across the SILENCE and a
+        #game that is deciding normally keeps re-anchoring and can never trip it.
+        local elog2="$OUTDIR/game-${gd0}v${gd1}-${gstart}.stderr"
+        local cur=0
+        [ -e "$elog2" ] && cur=$(stat -c%s "$elog2" 2>/dev/null || echo 0)
+        local pmark=0 psize=0 spin=0
+        if [ -e "$m.sz" ]; then read -r pmark psize < "$m.sz"; fi
+        if [ "${pmark:-0}" != "$quiet" ]; then
+            echo "$quiet $cur" > "$m.sz"
+        else
+            local grew=$(( (cur - ${psize:-0}) / 1048576 ))
+            if [ "$since" -ge "$FAST_HANG_QUIET_S" ] && [ "$grew" -ge "$FAST_HANG_MB" ]; then
+                spin=1
+                echo ""
+                echo "!! GAME SPINNING: deck${gd0} vs deck${gd1} (started ${gstart}) wrote ${grew} MB"
+                echo "!! of stderr while its seat logs stayed silent for ${since}s. A seat writing"
+                echo "!! megabytes of the same line is a HANG, not thinking (wave-70 152v126:"
+                echo "!! 2,584,190 identical iterations, 1.23 GB, one consumed decision)."
+            fi
+        fi
+        if [ "$spin" -ne 1 ]; then
+            [ "$since" -lt "$NO_PROGRESS_S" ] && continue
+            echo ""
+            echo "!! GAME HUNG: deck${gd0} vs deck${gd1} (started ${gstart}) has written NO seat"
+            echo "!! translog record for ${since}s (limit ${NO_PROGRESS_S}s). The engine is not"
+            echo "!! ticking - this is a dead loop, not a slow decision."
+        fi
+        echo "!! Stopping THAT GAME only."
         echo "!! It is credited to no seat and owes a rerun; the rest of the corpus continues."
         echo "!! Evidence: $OUTDIR/game-${gd0}v${gd1}-${gstart}.stderr and the two seat logs."
         touch "$m.hung" "$OUTDIR/HUNG"
