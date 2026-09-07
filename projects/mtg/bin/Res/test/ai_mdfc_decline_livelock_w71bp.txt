@@ -18,6 +18,13 @@
 #DESC: POST-FIX: the refusal is latched at the decline choke point, the land
 #DESC: candidates skip it, the arm therefore fires exactly ONCE however large its
 #DESC: budget, and the seat spends the recovered window on the Goblin (P2 -> 19).
+#DESC: #W71-BS (F3, Astra review finding 3): the count is 3, not 1. The latch is
+#DESC: scoped to the WINDOW (the board fingerprint the decline was given in), not to
+#DESC: the turn - a turn-long latch removed a legal land drop for the rest of the
+#DESC: turn, which the wave's ruling forbids. The refusal still STICKS inside its
+#DESC: window, which is what breaks this livelock; it is re-offered once the board or
+#DESC: the phase moves (here: after the Goblin is played, and again in main 2). The
+#DESC: end state this fixture asserts is unchanged.
 FORCEABILITY
 AICALLS 120
 [INIT]
@@ -52,7 +59,7 @@ no
 no
 no
 no
-assertdeclinesapplied 1
+assertdeclinesapplied 3
 [ASSERT]
 end
 [PLAYER1]

@@ -6759,14 +6759,60 @@ int AADynamic::resolve()
     //gone (Tribute copy 2, whose sacrifice therefore never happens). So the
     //guard is scoped to the stack-object path, which StackAbility::resolve
     //stamps, and every spell-resolution path is untouched.
+    //#W71-BS (F1/F2, Astra review findings 1 and 2). TWO corrections to the guard
+    //above, both about the same over-reach: "resolving as a stack object" is far
+    //wider than the defect.
+    //(F1) Proper Burial (mtg.txt:89137), Grim Feast (50348) and Death Watch (27072)
+    //are scripted with this SAME primitive family as DEATH TRIGGERS, and their
+    //victim is in the graveyard by definition - the guard suppressed lifegain those
+    //cards expressly grant, on a stamp that cannot tell them apart. What actually
+    //separates Tribute to Hunger is not who resolves but WHAT THE PAYLOAD IS: the
+    //edict carries its own sacrifice (`dynamicability<!...!> sacrifice`, parsed into
+    //this ability's own `storedAbility`), so the life it pays is definitionally the
+    //price of a sacrifice this same object is about to make. A death trigger has no
+    //sacrifice in its payload and is now never touched.
+    //(F2) And when the stored victim IS gone, suppressing the whole payload is still
+    //wrong: Tribute's Oracle does not target the creature - the opponent sacrifices
+    //"a creature of their choice", chosen ON RESOLUTION - so with another creature on
+    //the battlefield the correct answer is that one, and its toughness. The engine
+    //picks its victim when the granted ability goes on the stack, which is what makes
+    //two copies aim at one body; this is the only moment it can look again. The pick
+    //is the lowest toughness: the conservative reading of "their choice" (the
+    //sacrificing player keeps the better body) and the least life this can pay.
+    //Suppression survives only for the case that has no answer - no creature left, so
+    //no sacrifice can happen and no life is owed.
     if (resolvingFromStackAbility
         && effect == DYNAMIC_ABILITY_EFFECT_LIFEGAIN
         && type == DYNAMIC_ABILITY_TYPE_TOUGHNESS
-        && amountsource == DYNAMIC_MYTGT_AMOUNT)
+        && amountsource == DYNAMIC_MYTGT_AMOUNT
+        && dynamic_cast<AASacrificeCard *>(storedAbility)) //the EDICT shape, F1
     {
         MTGCardInstance * victim = dynamic_cast<MTGCardInstance *>(_target);
         if (victim && game && !victim->isInPlay(game))
-            return 0;
+        {
+            MTGCardInstance * replacement = NULL;
+            Player * owner = victim->controller();
+            if (owner && owner->game && owner->game->battlefield)
+            {
+                MTGGameZone * z = owner->game->battlefield;
+                for (int c = 0; c < z->nb_cards; c++)
+                {
+                    MTGCardInstance * cand = z->cards[c];
+                    if (!cand || cand == victim || !cand->isCreature())
+                        continue;
+                    if (cand->has(Constants::CANTBESACRIFIED))
+                        continue;
+                    if (!replacement || cand->toughness < replacement->toughness)
+                        replacement = cand;
+                }
+            }
+            if (!replacement)
+                return 0; //nothing left to sacrifice: no life is owed
+            DebugTrace("W71-BS: edict re-chose " << replacement->getName()
+                       << " - its stored victim " << victim->getName() << " is already gone");
+            target = replacement;         //activateStored copies this into the sacrifice
+            _target = replacement;
+        }
     }
     if(amountsource == 2)
         source = (MTGCardInstance * )_target;

@@ -4595,13 +4595,47 @@ static void scanStackAbilityDraws(MTGAbility * a, Player * seat, int depth, int&
 //your hand". Nothing is folded, because nothing about the replacing hand is
 //knowable: the honest fact is that every hand-derived count on this screen is
 //about to be void, and it is stated once, under the stack block that causes it.
-//The scan is over the SOURCE CARD's script (`bottomoflibrary`/`moveTo` over
-//`all(*|myhand)`) and the source's controller, since `myhand` is the ability
-//controller's hand. Returns the source's name, or "".
+//#W71-BS (F7, Astra review finding 7): derived from the PENDING ABILITY'S OWN
+//PAYLOAD, not from the source card's whole script and not from who controls the
+//source. Teferi's Puzzle Box (mtg.txt:118333-4) carries BOTH halves - a `myhand`
+//trigger for its controller's draw step and an `opponenthand` trigger for the
+//opponent's - so a script scan announced the controller's hand however the trigger
+//had actually fired, and the `src->controller() != seat` gate made the OTHER seat,
+//whose hand really was being replaced, hear nothing. Both inversions are the same
+//mistake: the affected hand is a property of the stack object, and the stack
+//object knows it. `all(*|myhand)` parses to a lord whose TargetChooser carries the
+//hand ZONE (MY_HAND / OPPONENT_HAND / TARGET_OWNER_HAND, resolved against the
+//source card), so the walk reads the zone the payload will actually empty and
+//compares it with this seat's hand. Returns the source's name, or "".
 static string scriptLower(const string & s); //#W71-BR (L8)
+
+//Does this ability nest move cards out of `seat`'s HAND? Walks the nest the way
+//scanStackAbilityDraws does (NestedAbility + MultiAbility, which is what `&&` and
+//`all(...)` build), and reads each node's own TargetChooser zones.
+static bool abilityEmptiesHandOf(MTGAbility * a, GameObserver * observer,
+                                 MTGCardInstance * src, Player * seat, int depth)
+{
+    if (!a || depth > 6 || !observer || !seat)
+        return false;
+    //TargetZoneChooser::targetsZone resolves `myhand` / `opponenthand` against the
+    //SOURCE card, which is exactly the relative reading the script has.
+    if (TargetChooser * atc = a->getActionTc())
+        if (TargetZoneChooser * tz = dynamic_cast<TargetZoneChooser *>(atc))
+            if (seat->game->hand && tz->targetsZone(seat->game->hand, src))
+                return true;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        if (abilityEmptiesHandOf(na->ability, observer, src, seat, depth + 1))
+            return true;
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (abilityEmptiesHandOf(ma->abilities[i], observer, src, seat, depth + 1))
+                return true;
+    return false;
+}
+
 static string stackHandReplacerFor(GameObserver * observer, Player * seat)
 {
-    if (!observer || !observer->mLayers || !seat)
+    if (!observer || !observer->mLayers || !seat || !seat->game)
         return "";
     ActionStack * stack = observer->mLayers->stackLayer();
     if (!stack)
@@ -4612,12 +4646,17 @@ static string stackHandReplacerFor(GameObserver * observer, Player * seat)
         if (!it || it->state != NOT_RESOLVED)
             continue;
         MTGCardInstance * src = dynamic_cast<MTGCardInstance *>(it->source);
-        if (!src || src->controller() != seat)
+        if (!src)
             continue;
+        //the SHAPE gate stays a script read - a hand-wide bottom/move - but WHOSE
+        //hand is answered by the payload below, never by the script.
         const string mt = scriptLower(src->magicText);
-        if (mt.find("all(*|myhand)") == string::npos)
-            continue;
         if (mt.find("bottomoflibrary") == string::npos && mt.find("moveto(") == string::npos)
+            continue;
+        StackAbility * sa = dynamic_cast<StackAbility *>(it);
+        if (!sa || !sa->ability)
+            continue;
+        if (!abilityEmptiesHandOf(sa->ability, observer, src, seat, 0))
             continue;
         return src->getDisplayName();
     }
@@ -15833,6 +15872,26 @@ void AIPlayerGPT::flushWallMissRecord(const char * classOverride)
     writeTransLog("wall_miss", base, "", -1, 0, "", wmClass.c_str(), NULL);
 }
 
+//#W71-BS (F5): arm the answer floor for the seam about to be asked. Called with
+//the number of items the LEGAL answer may have to name (blockers that could each
+//be assigned, cards a PUT list must name), so the ceiling is a function of the
+//board and not of a percentile.
+static long gptDeclarationAnswerFloorTokens(long items, long bytesPerItem); //#W71-BS (F5)
+void AIPlayerGPT::setAnswerFloorForSeam(const char * seam, long items, long bytesPerItem)
+{
+    mAnswerFloorSeam = (seam && *seam) ? seam : "";
+    mAnswerFloorTokens = gptDeclarationAnswerFloorTokens(items, bytesPerItem);
+}
+
+//#W71-BS (F5): is this a seam whose answer is a DECLARATION - a list whose length
+//is set by the board, where a cut silently drops legal choices rather than losing
+//one coded line? Those are the seams that may buy the one raised-ceiling re-ask.
+static bool gptSeamIsADeclaration(const string& seam)
+{
+    return seam == "blockers" || seam == "attackers" || seam == "discard"
+           || seam == "reveal" || seam == "bottom";
+}
+
 int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
                                     const char * seam)
 {
@@ -16017,6 +16076,33 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     //decision's retry has not already been spent. isDecodeGarbage is
     //conservative - ordinary unparsed replies (real prose, no coded line) are
     //not garbage and fall straight through to the heuristic.
+    //#W71-BS (F5, Astra review finding 5). The cap bit before the declaration was
+    //finished. That is not an unparseable reply and not a decline - it is the
+    //engine's own allowance landing mid-list, and a cut after a complete pair still
+    //PARSES, so the surviving prefix executes and the rest of a legal declaration is
+    //silently gone. It buys exactly ONE re-ask, and the re-ask is the same question
+    //with a bigger allowance: no added text, no correction line, nothing that could
+    //license prose (invariant 000). The floor is doubled for the retry, which is
+    //what makes it a different request rather than the same one twice.
+    if (!content.empty() && mLastFinishLength && gptSeamIsADeclaration(mRequestSeam)
+        && userMsg != mRetryDoneBase && userMsg != mCeilingReaskDoneBase)
+    {
+        mCeilingReaskDoneBase = userMsg;
+        mCeilingReasks++;
+        const long raised = (mLastRequestAnswerTokens > 0 ? mLastRequestAnswerTokens : 256) * 2;
+        if (raised > mAnswerFloorTokens)
+        {
+            mAnswerFloorSeam = mRequestSeam;
+            mAnswerFloorTokens = raised;
+        }
+        mRetryFirstLatencyMs = mLastLatencyMs;
+        mRetryBase = userMsg;
+        mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg; //identical bytes, own slot
+        setNotice("that declaration hit its length limit - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: " << mRequestSeam << " reply truncated at the answer ceiling ("
+                   << mLastRequestAnswerTokens << ") - one re-ask at " << mAnswerFloorTokens);
+        return kChoicePending; //next tick polls the same question with more room
+    }
     if (!content.empty() && userMsg != mRetryDoneBase && isDecodeGarbage(content))
     {
         mRetryFirstLatencyMs = mLastLatencyMs;
@@ -16236,6 +16322,26 @@ bool AIPlayerGPT::askReplayRefuse(const std::string & key, std::string & lastKey
 //point is that the log stops being SILENT, not that a replay costs as much as a
 //decision - so it carries only what tells a reader "this window was answered
 //without asking, from there, N times running". Bounded by the refusal above.
+//#W71-BS (F4, Astra review finding 4, second half). A replay record is NOT
+//progress: nothing was asked, nothing was decided, and the seat may be spinning.
+//Written into the main translog it moved the file's mtime every iteration, which
+//is exactly the signal BOTH harness silence arms read (tools/selfplay-harness.sh
+//no_progress_sweep takes max(getmtime) over the seat logs), so making the hang
+//visible would have made the watchdog blind to it. The records are kept - a hung
+//seat log must never again be silent - but they live in a SIDECAR beside the
+//translog, under `askreplay/` with the same basename. The sweep's glob is
+//non-recursive over LOGDIR, so a subdirectory is invisible to it and visible to a
+//reviewer, and the sidecar's own mtime is the spin's timeline.
+string AIPlayerGPT::askReplaySidecarPath() const
+{
+    if (mTransLogPath.empty())
+        return string();
+    const size_t slash = mTransLogPath.find_last_of('/');
+    const string dir = (slash == string::npos) ? string() : mTransLogPath.substr(0, slash + 1);
+    const string base = (slash == string::npos) ? mTransLogPath : mTransLogPath.substr(slash + 1);
+    return dir + "askreplay/" + base;
+}
+
 void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int choice,
                                int optionCount, int fromSeq, int run)
 {
@@ -16254,7 +16360,16 @@ void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int ch
         {"phase", observer ? observer->getCurrentGamePhase() : -1},
         {"question", decision},
     };
-    transLogWrite(rec.dump());
+    //#W71-BS (F4): the sidecar, never the translog the watchdog times.
+    const string side = askReplaySidecarPath();
+    if (side.empty())
+        return;
+    const size_t slash = side.find_last_of('/');
+    if (slash != string::npos)
+        GPT_MKDIR(side.substr(0, slash).c_str());
+    std::ofstream f(side.c_str(), std::ios::app);
+    if (f)
+        f << rec.dump() << "\n";
 }
 
 //One header record per seat log: decks, names, and a game_id BOTH seats
@@ -29891,10 +30006,25 @@ string modeEffectPriceTag(const string& script, const string& optionLabel,
     //A segment carrying either token with a magnitude this tag will not read
     //(non-numeric, implicit player) still returns nothing - claiming "no life"
     //over a `life:x controller` would be the false surface this fix removes.
+    //#W71-BS (F8, Astra review finding 8). The absence of the two tokens this tag
+    //can PRICE is not evidence that the mode changes no life total. Jeskai Charm's
+    //`name(4 damage) damage:4 target(opponent,planeswalker)` mode contains neither
+    //`life:` nor `draw:` and is lethal to an opponent at four; the old veto let it
+    //through and printed "it changes no life total and draws no cards" over it -
+    //the exact false surface the trust doctrine forbids, contradicted by the
+    //mode's own primitive. The negative may only be stated when the segment names
+    //NO life-affecting primitive at all: damage, life/lifegain/lifeloss/lifeleech,
+    //drain, poison, and the dynamic payloads whose magnitude is computed at
+    //resolution. Everything else says nothing, which is what an uncertain forecast
+    //owes the model.
     if (!parsed)
     {
-        if (rawSeg.find("life:") != string::npos || rawSeg.find("draw:") != string::npos)
-            return "";
+        static const char * kLifeAffecting[] = {
+            "life", "draw:", "damage", "drain", "poison", "dynamicability", "dynamic"
+        };
+        for (size_t i = 0; i < sizeof(kLifeAffecting) / sizeof(kLifeAffecting[0]); i++)
+            if (rawSeg.find(kLifeAffecting[i]) != string::npos)
+                return "";
         return kModeNoLifeNoDrawTag;
     }
     std::ostringstream o;
@@ -31328,6 +31458,35 @@ static bool gptSeamTokensDisabled()
 //answer ceiling - never from the seam cap) and is added last.
 //
 //Nothing here is a cap on a CHOICE: no row is withheld and no window is closed.
+//#W71-BS (F5, Astra review finding 5). AN ANSWER CEILING MUST BE A FUNCTION OF
+//THE LEGAL ANSWER, NOT OF LAST WEEK'S PERCENTILES. The wave-71 table fits every
+//declaration seam to the 256-token floor off a corpus whose widest blockers reply
+//was 195 B - but a token board with 512 legal one-to-one blocks needs
+//`BLOCKS: B1:A1, ..., B512:A512`, which is ~6 KB and cannot be written inside 256
+//tokens at any byte rate. A cut after a complete pair still parses (`pairs > 0`),
+//so the surviving prefix executes and the omitted blockers simply do not block:
+//a legal declaration silently removed, which is exactly what the ruling forbids.
+//This is the floor that makes that impossible. It is not a cap and it never
+//lowers anything - `gptResolveMaxTokens` takes the MAX of the fitted ceiling and
+//this - and it bounds only the ANSWER, so invariant 000(d) is untouched.
+//The arithmetic, all of it: the label (`BLOCKS: `, 8 B) plus a closing margin
+//(8 B), plus `bytesPerItem` for every legal item, plus 256 B for the PLAN line
+//(the measured p99.9 PLAN at every seam is under 200 B); converted at the
+//WORST-case 3.15 B/token (#W69-BF K2's measured p10) and rounded up to a multiple
+//of 32. At the review's 512 pairs and 12 B a pair (`B512:A512, `) that is
+//16 + 6144 + 256 = 6416 B -> 2037 -> 2048 tokens.
+static const long kBlockPairAnswerBytes = 12; //"B512:A512, "
+static const long kPutSlotAnswerBytes = 6;    //"512, " plus slack
+static long gptDeclarationAnswerFloorTokens(long items, long bytesPerItem)
+{
+    if (items <= 0 || bytesPerItem <= 0)
+        return 0;
+    const long bytes = 16 + items * bytesPerItem + 256;
+    long tok = (bytes * 100 + 314) / 315; //ceil(bytes / 3.15)
+    tok = ((tok + 31) / 32) * 32;
+    return tok;
+}
+
 struct GptTokenPlan
 {
     long answer;    //tokens allowed for the PLAN line + the action line
@@ -31337,7 +31496,8 @@ struct GptTokenPlan
 
 static GptTokenPlan gptResolveMaxTokens(bool thinking, bool forceClose, long reasoningBudget,
                                         long configuredCeiling, const char * seam,
-                                        bool seamCapsDisabled, bool answerLockedRetry)
+                                        bool seamCapsDisabled, bool answerLockedRetry,
+                                        long legalAnswerFloor = 0)
 {
     GptTokenPlan p;
     //The RAW ceiling: what the operator set, or the built-in default. Kept
@@ -31352,6 +31512,12 @@ static GptTokenPlan gptResolveMaxTokens(bool thinking, bool forceClose, long rea
     //the ANSWER, so a retry under thinking still gets its whole budget.
     if (answerLockedRetry)
         answer = forceClose ? kAnswerReserveTokens : kAnswerLockedRetryTokens;
+    //#W71-BS (F5): the legal answer's own size wins over every fitted number,
+    //including an operator ceiling - a configured 400 may make replies shorter, it
+    //may not make a legal declaration unrepresentable. Zero when the caller has no
+    //cardinality to declare, which is every non-declaration seam.
+    if (legalAnswerFloor > answer)
+        answer = legalAnswerFloor;
     p.answer = answer;
     p.reasoning = 0;
     //Phase 2 (the forced close) is sent with enable_thinking false and resumes
@@ -31457,9 +31623,14 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
         configuredCeiling = atol(mt);                 //env is the operator's ANSWER ceiling
     const bool answerLockedRetry =
         (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt && !timeoutRetry);
+    //#W71-BS (F5): the floor this seam's LEGAL answer needs, carried with the seam
+    //it was computed for so a stale one can never leak into a different window.
+    const long legalFloor = (!mAnswerFloorSeam.empty() && mAnswerFloorSeam == mRequestSeam)
+                            ? mAnswerFloorTokens : 0;
     const GptTokenPlan plan = gptResolveMaxTokens(mThinking, forceClose, mReasoningBudget,
                                                   configuredCeiling, mRequestSeam.c_str(),
-                                                  gptSeamTokensDisabled(), answerLockedRetry);
+                                                  gptSeamTokensDisabled(), answerLockedRetry,
+                                                  legalFloor);
     long maxTokens = plan.total;
     //#W70-BK (C6): the regime was never stated by anyone. It resolves to OFF -
     //the product regime - but never silently: say it once, with the ruling, so
@@ -32028,6 +32199,68 @@ static bool noOpPhraseIsAVerdict(const string& low, const char * phrase)
     return false;
 }
 
+//#W71-BS (F9, Astra review finding 9). A ROW IS A NO-OP ONLY IF EVERY BRANCH IS.
+//The renderer writes one verdict per targeting branch, separated at top level by
+//semicolons: `{right now: they control 1 creature - Rorix is sacrificed; YOU
+//control 0 creatures - targeting yourself does nothing}`. One branch doing nothing
+//is not the row doing nothing - that row is a live removal spell with a useless
+//second target - and calling it a no-op earned the useful cast a no-op re-ask that
+//argued the seat out of it. Conditional branches ("if they gain one before this
+//resolves...") are about a board that does not exist and are not operative; they
+//never rescue a row and never condemn one, which is the same unit rule
+//phraseScopeIsConditional already applies inside a branch.
+static void w71TopLevelBranches(const string& low, vector<string>& out)
+{
+    int depth = 0;
+    bool quoted = false;
+    string cur;
+    for (size_t i = 0; i < low.size(); i++)
+    {
+        const char c = low[i];
+        if (c == '"')
+            quoted = !quoted;
+        else if (!quoted && c == '(')
+            depth++;
+        else if (!quoted && c == ')' && depth > 0)
+            depth--;
+        else if (!quoted && !depth && c == ';')
+        {
+            out.push_back(cur);
+            cur.clear();
+            continue;
+        }
+        cur += c;
+    }
+    out.push_back(cur);
+}
+
+static bool w71BranchIsConditional(const string& branch)
+{
+    size_t a = branch.find_first_not_of(" \t-");
+    if (a == string::npos)
+        return true; //nothing operative in it
+    return branch.compare(a, 3, "if ") == 0;
+}
+
+static bool w71EveryBranchIsANoOp(const string& low)
+{
+    vector<string> branches;
+    w71TopLevelBranches(low, branches);
+    if (branches.size() < 2)
+        return true; //one verdict: the phrase already IS the row's conclusion
+    bool anyOperative = false;
+    for (size_t i = 0; i < branches.size(); i++)
+    {
+        if (w71BranchIsConditional(branches[i]))
+            continue;
+        anyOperative = true;
+        if (!noOpPhraseIsAVerdict(branches[i], "does nothing")
+            && !noOpPhraseIsAVerdict(branches[i], "does not apply"))
+            return false; //this branch does something - the row is not a no-op
+    }
+    return anyOperative;
+}
+
 bool AIPlayerGPT::rowSaysNoOp(const string& row)
 {
     //#W71-BQ (L3): 3 of 3 seat fires were false at deck123 - every non-Morbid
@@ -32043,7 +32276,7 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
         low[i] = (char) tolower((unsigned char) low[i]);
     if (noOpPhraseIsAVerdict(low, "does nothing")
         || noOpPhraseIsAVerdict(low, "does not apply"))
-        return true;
+        return w71EveryBranchIsANoOp(low);
     return rightNowComputedMagnitudesAreZero(row);
 }
 //#W71-BO (R4): `planArguesAgainstRow` is DELETED - it read the reply's own
@@ -34982,6 +35215,17 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                        << ", " << mAskReplaysRefused << " refusals this game): " << decision);
             mAskCache.erase(cached);
             mAskCacheSeq.erase(askKey);
+            //#W71-BS (F4, Astra review finding 4): the refusal must invalidate BOTH
+            //re-serve paths or it invalidates neither. `mRepeatAskKey` is the second
+            //cache below, and it is keyed on turn+phase+question+rows, which in the
+            //livelock is byte-identical too: erasing only the first cache dropped the
+            //window straight into `repeatAskAnswerStands()`, which returned the SAME
+            //answer without a request, and every later tick then MISSED the first
+            //cache and never reached the refusal check again. A refused window goes to
+            //the model or it is not refused.
+            mRepeatAskKey.clear();
+            mRepeatAskTurn = -1;
+            mRepeatAskSeq = -1;
         }
         else
         {
@@ -44123,6 +44367,8 @@ int AIPlayerGPT::chooseAttackers()
     string userMsg = assemblePrompt(attackTail);
 
     string content;
+    //#W71-BS (F5): the legal declaration is at most one line per attacker.
+    setAnswerFloorForSeam("attackers", (long) attackers.size(), kPutSlotAnswerBytes);
     if (pollCompletionRetry(userMsg, content, "attackers") == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
@@ -45178,6 +45424,8 @@ int AIPlayerGPT::chooseBlockers()
     string userMsg = assemblePrompt(blockTail);
 
     string content;
+    //#W71-BS (F5): the widest legal answer here is one `Bi:Aj` pair per blocker.
+    setAnswerFloorForSeam("blockers", (long) blockers.size(), kBlockPairAnswerBytes);
     if (pollCompletionRetry(userMsg, content, "blockers") == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
@@ -45884,6 +46132,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     }
 
     string content;
+    setAnswerFloorForSeam("reveal", (long) revealed.size(), kPutSlotAnswerBytes); //#W71-BS (F5)
     if (pollCompletionRetry(userMsg, content, "reveal") == kChoicePending)
         return 0; //decision in flight; the display waits and re-polls next tick
 
@@ -46216,6 +46465,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
         //#W71-BO (R3): the small-seam truncation re-ask is DELETED.
         string userMsg = assemblePrompt(bottomAskText);
         string content;
+        setAnswerFloorForSeam("bottom", (long) hand.size(), kPutSlotAnswerBytes); //#W71-BS (F5)
         if (pollCompletionRetry(userMsg, content, "bottom") == kChoicePending)
         {
             status = PREGAME_PENDING;
@@ -46833,6 +47083,7 @@ int AIPlayerGPT::cleanupDiscard(int over)
         names.push_back(hand[discardOrder[j]]->name);
     if (!mEndpoint.empty())
     {
+        setAnswerFloorForSeam("discard", (long) hand.size(), kPutSlotAnswerBytes); //#W71-BS (F5)
         if (pollCompletionRetry(userMsg, content, "discard") == kChoicePending)
             return 1; //call in flight; the base Act neither acts nor passes
         //#W52-G (E-1): the discard ask's own label. deck162 vs deck146 seq 17:
@@ -46861,12 +47112,38 @@ int AIPlayerGPT::cleanupDiscard(int over)
         if (repeatedIdx > 0)
             appendParseNote(&mLastParseNote, result >= over ? "duplicate_index_deduped"
                                                             : "duplicate_index_short");
-        //#W71-BO (R3): the truncation re-ask is DELETED here with every other
-        //seam. #W71-BO (R5): the `distinct_index_reask` is DELETED too - 0
-        //fallbacks in 2,119 decisions; a repeated index is still DEDUPED and
-        //stamped (`duplicate_index_deduped` / `duplicate_index_short`) and the
-        //owed count is still enforced by the fill below, so nothing is lost but
-        //the round trip.
+        //#W71-BS (F6, Astra review finding 6): the `distinct_index_reask` is
+        //RESTORED. Zero occurrences in one corpus is not evidence that removing it
+        //is behaviour-neutral, because what it guarded is IRREVERSIBLE: a short
+        //PUT list (`PUT: 1, 2, 2` on a discard of three) now falls straight into
+        //the fill loop below, which discards the highest-mana-value card the model
+        //did NOT name - on the shape the review cites, the finisher it wrote its
+        //PLAN around. One labelled-line re-ask that states the arithmetic ("your
+        //PUT line names N distinct cards; this discard needs M") costs one round
+        //trip and asks the model to complete a selection it started. It reads
+        //nothing but the PUT: line, it licenses no prose, and it fires ONCE per ask
+        //text; the fill loop is still the floor behind it.
+        if (repeatedIdx > 0 && result >= 0 && result < over && !reasked)
+        {
+            std::ostringstream corr;
+            corr << "[RE-ASK] Your PUT: line repeated a card number, so it named only "
+                 << result << " different card" << (result == 1 ? "" : "s")
+                 << " and this discard needs " << over << ". Every number must be DIFFERENT."
+                 << " Answer again with " << over << " different card numbers from the list above.";
+            mDiscardReaskKey = askText;
+            mDiscardReaskLine = corr.str();
+            writeTransLog("discard", userMsg, content, result, (int) hand.size(), "",
+                          "distinct_index_reask", &names);
+            setNotice("that discard list repeated a number - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: cleanup discard named " << result << " distinct of "
+                       << over << " (" << repeatedIdx << " repeated) - re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(askText + "\n" + mDiscardReaskLine), corrected, "discard");
+            return 1; //the caller unwinds; the corrected call answers later
+        }
+        if (reasked)
+            appendParseNote(&mLastParseNote, result >= over ? "distinct_index_reask_recovered"
+                                                            : "distinct_index_reask_exhausted");
     }
     //#W55-D (D18): back from PRINTED positions to hand positions.
     if (result >= 0 && !send.empty())
@@ -75292,11 +75569,20 @@ static const char * kW50Y_r94 =
         CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tragic Slip {b} {right now: does nothing this turn}"),
               "#W71-BQ L3 POSITIVE the same card's own zero verdict still reads as a no-op");
         CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tribute to Hunger {2}{b} {right now: they control"
-                                       " 0 creatures - at 0 this does nothing}")
-                  && AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 1"
-                                              " creature - Rorix is sacrificed; YOU control 0"
-                                              " creatures - targeting yourself does nothing}"),
-              "#W71-BQ L3 REGRESSION a top-level 'does nothing', in any scope of the verdict, still fires");
+                                       " 0 creatures - at 0 this does nothing}"),
+              "#W71-BQ L3 REGRESSION a top-level 'does nothing' in the only branch still fires");
+        //#W71-BS (F9): the same row's OTHER branch kills Rorix. The wave-71 pin
+        //required this to read as a no-op, which condemned a live removal spell
+        //because its self-targeting branch is useless. A row is a no-op only if
+        //EVERY operative branch is.
+        CHECK(!AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 1"
+                                        " creature - Rorix is sacrificed; YOU control 0"
+                                        " creatures - targeting yourself does nothing}"),
+              "#W71-BS F9 NEGATIVE one dead targeting branch does not make the whole cast a no-op");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 0"
+                                       " creatures - targeting them does nothing; YOU control 0"
+                                       " creatures - targeting yourself does nothing}"),
+              "#W71-BS F9 POSITIVE every operative branch a no-op is still a no-op row");
         CHECK(AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 0}")
                   && !AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 3}"),
               "#W71-BQ L3 REGRESSION the computed-magnitude grammar is untouched");
@@ -75732,6 +76018,83 @@ static const char * kW50Y_r94 =
         CHECK(stripNarrationDecoration("sacrifice cards" + string(kModeNoLifeNoDrawTag))
                   == "sacrifice cards",
               "#W71-BR L15 ECHO the negative leaves no residue in the answer-matching name");
+    }
+
+    cout << "\n[#W71-BS] F8 the no-life negative is never stated over a damage mode\n";
+    {
+        //Astra review finding 8. Jeskai Charm (mtg.txt:60163-6), verbatim script:
+        //the damage mode carries neither `life:` nor `draw:` and would have been
+        //declared to change no life total, against an opponent at 4.
+        const string jeskai =
+            "choice name(top of library) moveTo(ownerLibrary) target(creature)\n"
+            "choice name(4 damage) damage:4 target(opponent,planeswalker)\n"
+            "choice name(1/1 and Lifelink) all(creature|myBattlefield)"
+            " transforms((,newability[1/1],lifelink)) ueot";
+        CHECK(modeEffectPriceTag(jeskai, "4 damage", 20, 4).empty(),
+              "#W71-BS F8 REPRO a damage mode says NOTHING - never 'changes no life total'");
+        CHECK(modeEffectPriceTag(jeskai, "4 damage", 20, 4) != kModeNoLifeNoDrawTag,
+              "#W71-BS F8 MUST-NOT-MATCH the negative literal may not reach a damage mode");
+        CHECK(modeEffectPriceTag("choice name(Drain out) drain:2 opponent", "drain out", 20, 4).empty()
+                  && modeEffectPriceTag("choice name(Payload) dynamicability<!mytgt"
+                                        " toughnesslifegain targetcontroller!>", "payload", 20, 4).empty(),
+              "#W71-BS F8 the other life-affecting primitives are silent too, not declared free");
+        CHECK(modeEffectPriceTag("choice name(top of library) moveTo(ownerLibrary) target(creature)",
+                                 "top of library", 20, 4) == kModeNoLifeNoDrawTag,
+              "#W71-BS F8 REGRESSION a mode with no life-affecting primitive still states the negative");
+    }
+
+    cout << "\n[#W71-BS] F5 the answer ceiling is a function of the legal answer\n";
+    {
+        //Astra review finding 5. 512 legal one-to-one blocks need
+        //`BLOCKS: B1:A1, ... B512:A512` - ~6 KB - and no fitted percentile can
+        //represent it. The floor: 16 B of label/margin + 12 B a pair + 256 B for the
+        //PLAN line, at the worst-case 3.15 B/token, rounded up to a multiple of 32.
+        const long floor512 = gptDeclarationAnswerFloorTokens(512, kBlockPairAnswerBytes);
+        CHECK(floor512 == 2048,
+              "#W71-BS F5 512 pairs: 16 + 512*12 + 256 = 6416 B / 3.15 = 2037 -> 2048 tokens");
+        CHECK(floor512 * 315 / 100 > 16 + 512 * kBlockPairAnswerBytes,
+              "#W71-BS F5 the floor buys the whole declaration at the WORST-case byte rate");
+        CHECK(gptDeclarationAnswerFloorTokens(0, kBlockPairAnswerBytes) == 0
+                  && gptDeclarationAnswerFloorTokens(4, 0) == 0,
+              "#W71-BS F5 MUST-NOT-MATCH no cardinality, no floor - every other seam is untouched");
+        //It is a FLOOR, never a cap: a small board keeps the fitted seam number.
+        {
+            const GptTokenPlan small =
+                gptResolveMaxTokens(false, false, 0, -1, "blockers", false, false,
+                                    gptDeclarationAnswerFloorTokens(2, kBlockPairAnswerBytes));
+            CHECK(small.answer == gptSeamMaxTokens("blockers", kDefaultReplyCeilingTokens),
+                  "#W71-BS F5 a two-blocker window keeps the fitted 256 - the floor lowers nothing");
+            const GptTokenPlan wide =
+                gptResolveMaxTokens(false, false, 0, -1, "blockers", false, false, floor512);
+            CHECK(wide.answer == 2048 && wide.total == 2048,
+                  "#W71-BS F5 the 512-pair window is allowed to write its whole declaration");
+            //and an operator ceiling may shorten replies, not delete legal answers
+            const GptTokenPlan clamped =
+                gptResolveMaxTokens(false, false, 0, 400, "blockers", false, false, floor512);
+            CHECK(clamped.answer == 2048,
+                  "#W71-BS F5 a configured 400 cannot make a legal declaration unrepresentable");
+            //invariant 000(d): the reasoning window is untouched by any of it
+            const GptTokenPlan thinking =
+                gptResolveMaxTokens(true, false, 6000, -1, "blockers", false, false, floor512);
+            CHECK(thinking.reasoning == 6000 && thinking.total == 2048 + 6000,
+                  "#W71-BS F5 the floor is an ANSWER floor - the reasoning budget is added, never cut");
+        }
+    }
+
+    cout << "\n[#W71-BS] F9 a row is a no-op only if EVERY branch is\n";
+    {
+        CHECK(!AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 1"
+                                        " creature - Rorix is sacrificed; YOU control 0 creatures"
+                                        " - targeting yourself does nothing}"),
+              "#W71-BS F9 REPRO the review's row: one dead branch, one live kill - not a no-op");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Devour Flesh {1}{b} {right now: they control 0"
+                                       " creatures - targeting them does nothing; YOU control 0"
+                                       " creatures - targeting yourself does nothing}"),
+              "#W71-BS F9 POSITIVE every operative branch dead is still a no-op row");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Tribute to Hunger {2}{b} {right now: they control 0"
+                                       " creatures - at 0 this does nothing; if they gain one"
+                                       " before this resolves it eats that one instead}"),
+              "#W71-BS F9 REGRESSION a CONDITIONAL sibling branch never rescues a dead row");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

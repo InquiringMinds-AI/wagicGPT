@@ -8,6 +8,7 @@
 #include "MTGAbility.h"
 #include "MTGRules.h" //#W64-AI (F4): MTGPlaneswalkerAttackRule
 #include "AIPlayerBaka.h" //#W71-BP (L1 a): the declined-face latch
+#include "LegalActions.h" //#W71-BS (F3): the land-drop legal set
 #include "Player.h"
 #include "TargetChooser.h"
 
@@ -576,6 +577,21 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     return true;
 }
 
+//#W71-BS (F3): is this card one the LAND-DROP seam would propose right now?
+//LegalActionsOracle::legalLandPlays is the same enumeration AIPlayerGPT's land ask
+//and AIPlayerBaka's land candidates read, so "the declined menu was a land drop"
+//is answered by the engine's legal set and never by a guess about the card.
+static bool w71DeclinedProposalIsALandDrop(Player * p, MTGCardInstance * card)
+{
+    if (!p || !card)
+        return false;
+    std::vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(p);
+    for (size_t i = 0; i < lands.size(); i++)
+        if (lands[i].card == card)
+            return true;
+    return false;
+}
+
 void DecisionManager::applyMenuChoice(const DecisionRequest & req, const DecisionAction & act)
 {
     GameObserver * g = req.player->getObserver();
@@ -629,8 +645,15 @@ void DecisionManager::applyMenuChoice(const DecisionRequest & req, const Decisio
     //lives here rather than in any one of them. Scope: a card being proposed FROM
     //HAND. A declined `may` trigger on a battlefield permanent is a different
     //shape (the trigger leaves the stack either way) and is untouched.
+    //#W71-BS (F3, Astra review finding 3): and only when the declined proposal WAS
+    //a land drop. The latch's one consumer is the land-drop candidate list, and
+    //arming it from any declined hand-card menu let an unrelated refusal (a
+    //kicker/mode menu on a spell) erase a legal land. The oracle's own legal set is
+    //the proof - the same set the seam filters - so the arm and its consumer can
+    //never disagree about what a land drop is.
     if (req.contextCard && req.player && req.player->game
-        && req.player->game->hand->hasCard(req.contextCard))
+        && req.player->game->hand->hasCard(req.contextCard)
+        && w71DeclinedProposalIsALandDrop(req.player, req.contextCard))
     {
         AIPlayerBaka * baka = dynamic_cast<AIPlayerBaka *>(req.player);
         if (baka)

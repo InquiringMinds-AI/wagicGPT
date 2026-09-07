@@ -3168,6 +3168,27 @@ std::string AIPlayerBaka::menuPassProbe()
     return o.str();
 }
 
+//#W71-BS (F3): the BOARD half of menuPassProbe. No menu name, no stack size - the
+//menu is open when a decline is given and closed when the proposer asks again, so
+//including either would invalidate every latch on the very next tick and give the
+//livelock back.
+std::string AIPlayerBaka::declineWindowProbe()
+{
+    if (!observer)
+        return std::string();
+    std::ostringstream o;
+    o << observer->turn << ':' << observer->getCurrentGamePhase();
+    for (int i = 0; i < 2; i++)
+    {
+        Player * p = observer->players[i];
+        if (!p)
+            continue;
+        o << '|' << p->life << ',' << p->game->hand->nb_cards << ',' << p->game->inPlay->nb_cards
+          << ',' << p->game->graveyard->nb_cards << ',' << p->game->library->nb_cards;
+    }
+    return o.str();
+}
+
 void AIPlayerBaka::latchDeclinedFace(MTGCardInstance * card)
 {
     if (!card || !observer)
@@ -3177,13 +3198,18 @@ void AIPlayerBaka::latchDeclinedFace(MTGCardInstance * card)
         mDeclinedFaceCards.clear();
         mDeclinedFaceTurn = observer->turn;
     }
+    const std::string window = declineWindowProbe();
     for (size_t i = 0; i < mDeclinedFaceCards.size(); i++)
-        if (mDeclinedFaceCards[i] == card)
+        if (mDeclinedFaceCards[i].card == card && mDeclinedFaceCards[i].window == window)
             return;
-    mDeclinedFaceCards.push_back(card);
+    DeclinedFace d;
+    d.card = card;
+    d.window = window;
+    mDeclinedFaceCards.push_back(d);
     mDeclinedFaceLatches++;
     DebugTrace("AIPlayerBaka: latched declined face menu for " << card->getName()
-               << " (turn " << observer->turn << ", " << mDeclinedFaceLatches << " this game)");
+               << " (turn " << observer->turn << ", window " << window << ", "
+               << mDeclinedFaceLatches << " this game)");
 }
 
 bool AIPlayerBaka::faceDeclinedThisTurn(MTGCardInstance * card)
@@ -3196,8 +3222,9 @@ bool AIPlayerBaka::faceDeclinedThisTurn(MTGCardInstance * card)
         mDeclinedFaceTurn = observer->turn;
         return false;
     }
+    const std::string window = declineWindowProbe();
     for (size_t i = 0; i < mDeclinedFaceCards.size(); i++)
-        if (mDeclinedFaceCards[i] == card)
+        if (mDeclinedFaceCards[i].card == card && mDeclinedFaceCards[i].window == window)
             return true;
     return false;
 }

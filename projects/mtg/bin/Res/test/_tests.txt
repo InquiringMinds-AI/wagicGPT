@@ -1393,3 +1393,6 @@ ai_mdfc_decline_sticky_w71bp.txt
 ai_mdfc_decline_livelock_w71bp.txt
 ai_instant_own_end_step_w71bq.txt
 tribute_to_hunger_double_w71.txt
+proper_burial_death_trigger_w71bs.txt
+tribute_two_creatures_w71bs.txt
+ai_declined_face_reoffered_w71bs.txt
