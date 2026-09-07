@@ -14200,6 +14200,14 @@ static double reasoningRepetitionRatio(const string& s)
 //1 and the whole cap of the phase-2 forced close.
 static const long kAnswerReserveTokens = 400;
 
+//#W70-BK (C4): the request ceiling when nothing is configured. It used to be
+//a bare literal inside buildRequestBody; it is a named constant now because
+//the cap arithmetic moved into a pure function PARSETEST can prove.
+static const long kDefaultReplyCeilingTokens = 4096;
+//The answer-locked retry's own answer ceiling: that re-ask needs the coded
+//line and nothing else.
+static const long kAnswerLockedRetryTokens = 512;
+
 //Default thinking budget, in tokens, when thinking is ON and nothing is
 //configured. The formula (owner, 2026-08-19) is b = 1.5 * (t - p - c) where t
 //is the time bound expressed as tokens; at a 240s bound and ~30 tok/s that
@@ -15812,7 +15820,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAttackTruncReaskTurn(-1), mBlockTruncReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), //#W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -15887,7 +15895,19 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         mPatienceLimit = (float) atof(pt);
     if (mPatienceLimit < 0)
         mPatienceLimit = 0;
-    mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+    //#W70-BK (C6, invariant 000(f)): the regime is a STATED thing. env wins
+    //over the config file, exactly as before; what is new is that the client
+    //remembers whether ANYONE stated it. Unset still resolves to OFF (the
+    //product regime the owner named), but the first request says so out loud
+    //with the ruling attached, so no corpus and no play session can inherit
+    //thinking-off from a stale launch recipe again - which is exactly how
+    //every corpus from wave 44 to wave 69 came to run with reasoning off.
+    {
+        const char * thinkEnv = getenv("WAGIC_GPT_THINKING");
+        mThinkingRegimeExplicit = (thinkEnv && *thinkEnv) || cfg.thinking >= 0;
+        mThinking = thinkEnv ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+        mThinkingRegimeAnnounced = false;
+    }
     //Thinking budget: configured value wins, else the shipped default, and
     //only in thinking mode (a non-thinking reply has no window to bound).
     mReasoningBudget = (cfg.reasoningBudget >= 0) ? cfg.reasoningBudget : kDefaultReasoningBudget;
@@ -16733,6 +16753,18 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //text, so an absent field means the model genuinely returned none, not
     //that the client only implemented the other path. `reply` above is the
     //STRIPPED text, so every length/answer meter measures reply tokens.
+    //#W70-BK (C3, invariant 000(a)/(f)): THE REGIME, stamped on every record.
+    //A corpus used to be unable to say which regime produced it - every corpus
+    //from wave 44 to wave 69 ran with reasoning OFF and nothing in the data
+    //said so. The harness gate reads this field to prove the binary honoured
+    //the regime the launch asked for.
+    rec["thinking"] = mThinking ? "on" : "off";
+    //#W70-BK (C2): the LENGTH is written on every record that carried a round
+    //trip, present or ZERO, so "the model returned no reasoning" and "the field
+    //is not implemented" can never look alike to the harness gate. The text
+    //itself stays present-only-when-true (it is large).
+    if (!userMsg.empty())
+        rec["reasoning_chars"] = (long) mLastReasoning.size();
     if (!mLastReasoning.empty())
     {
         rec["reasoning"] = mLastReasoning;
@@ -16743,7 +16775,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //means re-measuring every record. reasoning_tokens is the server's own
         //number when it reports one - the budget is denominated in tokens, so
         //prefer it and fall back to chars.
-        rec["reasoning_chars"] = (long) mLastReasoning.size();
         mLastReasoning.clear();
     }
     if (mLastReasoningTokens >= 0)
@@ -16898,7 +16929,16 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W68-BA (J3): the cap this reply was decoded under, and whether it bit.
     //A corpus that cannot see the cap cannot tell a short reply from a cut one.
     if (mLastRequestMaxTokens > 0 && !userMsg.empty())
+    {
         rec["max_tokens"] = mLastRequestMaxTokens;
+        //#W70-BK (C4): the two halves of that number. `max_tokens_reasoning` is
+        //what the thinking window was allowed and `max_tokens_answer` is what
+        //the PLAN + action line was allowed; a corpus proves invariant 000(d)
+        //by checking that no record under thinking has a reasoning half of 0,
+        //instead of trusting a code reading of the cap path.
+        rec["max_tokens_answer"] = mLastRequestAnswerTokens;
+        rec["max_tokens_reasoning"] = mLastRequestReasoningTokens;
+    }
     if (mLastFinishLength && !userMsg.empty())
         rec["reply_truncated"] = 1;
     //#W49-S (D2): false whenever the EXECUTED answer is the reply's first coded
@@ -17138,6 +17178,10 @@ void AIPlayerGPT::logGameEnd()
         {"seq", mTransSeq++},
         {"kind", "gameend"},
         {"model", mModel},
+        //#W70-BK (C3): the regime the whole game was played under. Verified
+        //absent before this wave - a harvested corpus could not say whether it
+        //had reasoning at all without opening every decision record.
+        {"thinking", mThinking ? "on" : "off"},
         {"won", iWon},
         {"draw", !iWon && !oppWon},
         {"turn", translogTurn(observer->turn)},
@@ -31480,6 +31524,24 @@ static long gptSeamMaxTokens(const char * seam, long ceilingTokens)
     //bought is a VARIANCE guarantee (max reply 10,951 -> 3,040 B, max latency
     //1,233 -> 315 s) and that is what this table is kept for. At 768/3.97 the ask
     //seam's worst case is ~3,050 B - still 3.6x below the wave-67 tail.
+    //#W70-BK (C4): RE-MEASURED for the two-line reply, and NOTHING MOVED -
+    //the brief expected these to collapse under 200 tokens and the corpus
+    //says otherwise, so the numbers stand and the expectation is what was
+    //wrong. Over matchups-20260906-134120 (2,282 replies), the bytes of the
+    //PLAN line PLUS the action line alone - everything else in the reply
+    //discarded - are p99.5 ask 2,286 B, priority 1,943 B, attackers 2,416 B,
+    //blockers 579 B, discard 492 B, reveal 384 B, bottom 623 B. At the
+    //worst-case 3.15 B/token that is 726 / 617 / 767 / 184 / 156 / 122 / 198
+    //tokens: the three big seams need ESSENTIALLY THE WHOLE 768 they already
+    //have, because today's PLAN line is itself a 2 KB number ledger. Wave 70
+    //lane BL rewrites the PLAN into a short action SEQUENCE, which should
+    //move this distribution hard - but that corpus does not exist yet, and
+    //sizing a cap on a rewrite's PREDICTED effect is exactly what went wrong
+    //in wave 68 (lane BA sized on the previous corpus while the same wave
+    //moved the distribution). Re-fit these from the FIRST two-line corpus,
+    //not from this comment. What DID change this wave is what the number
+    //means: it is now an ANSWER ceiling (gptResolveMaxTokens) and is added
+    //to the reasoning budget, so no value here can bound a thinking window.
     struct SeamCap { const char * seam; long tokens; };
     static const SeamCap kCaps[] = {
         { "ask",       768 }, //#W69-BF (K2): need p99.5 1,768 B + a correction line, at 3.15 B/tok
@@ -31503,6 +31565,64 @@ static bool gptSeamTokensDisabled()
 {
     const char * e = getenv("WAGIC_GPT_SEAMTOKENS");
     return e && *e && atol(e) == 0;
+}
+
+//#W70-BK (C4, invariant 000(d): "per-seam max_tokens caps never bound reasoning
+//tokens"). THE WHOLE max_tokens ARITHMETIC, in one pure function so PARSETEST
+//can prove the ruling without a game, a server or a config file.
+//
+//The shape the ruling forces: a completion under thinking carries TWO things,
+//and only one of them is anybody's to cap. The ANSWER ceiling is the PLAN line
+//plus the action line - that is what a seam cap, a configured max_reply_tokens
+//and the answer-locked retry all size. The REASONING budget is its own summand
+//and is ADDED to that ceiling, never intersected with it. What shipped before
+//this wave broke that in three places, all of them silent:
+//  (1) `if (mMaxTokens > 0) maxTokens = mMaxTokens;` REPLACED the budget sum, so
+//      an operator ceiling bounded the thinking window (audit B7.6);
+//  (2) with thinking on and reasoning_budget=0 ("unbounded") the seam table was
+//      applied to the WHOLE completion - 768 tokens for the ask seam, reasoning
+//      included (audit B7.7);
+//  (3) the answer-locked retry's flat 512 capped a completion that still had to
+//      think (audit B1.6/B7.10).
+//Each of those is now impossible by construction: `reasoning` is computed from
+//the budget (or, when the budget is unbounded, from the RAW ceiling minus the
+//answer ceiling - never from the seam cap) and is added last.
+//
+//Nothing here is a cap on a CHOICE: no row is withheld and no window is closed.
+struct GptTokenPlan
+{
+    long answer;    //tokens allowed for the PLAN line + the action line
+    long reasoning; //tokens allowed for the native thinking window (0 when off)
+    long total;     //what actually goes in the request as max_tokens
+};
+
+static GptTokenPlan gptResolveMaxTokens(bool thinking, bool forceClose, long reasoningBudget,
+                                        long configuredCeiling, const char * seam,
+                                        bool seamCapsDisabled, bool answerLockedRetry)
+{
+    GptTokenPlan p;
+    //The RAW ceiling: what the operator set, or the built-in default. Kept
+    //separate from the answer ceiling below because the unbounded-budget arm
+    //has to subtract one from the other.
+    const long rawCeiling = configuredCeiling > 0 ? configuredCeiling : kDefaultReplyCeilingTokens;
+    long answer = rawCeiling;
+    if (!seamCapsDisabled)
+        answer = gptSeamMaxTokens(seam, answer);
+    //The two answer-locked re-asks want the coded line and nothing else. This
+    //wins over any larger ceiling for those requests only - and now it bounds
+    //the ANSWER, so a retry under thinking still gets its whole budget.
+    if (answerLockedRetry)
+        answer = forceClose ? kAnswerReserveTokens : kAnswerLockedRetryTokens;
+    p.answer = answer;
+    p.reasoning = 0;
+    //Phase 2 (the forced close) is sent with enable_thinking false and resumes
+    //from an already-closed <think> block: there is no thinking window left to
+    //fund, so it is an answer-only request whatever the regime says.
+    if (thinking && !forceClose)
+        p.reasoning = reasoningBudget > 0 ? reasoningBudget
+                                          : (rawCeiling > answer ? rawCeiling - answer : 0);
+    p.total = p.answer + p.reasoning;
+    return p;
 }
 
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
@@ -31575,36 +31695,47 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //~6.9k chars - long combat math plus some repetition loops). Be
     //generous; the protocol text carries the brevity pressure, and the
     //truncation guard turns any residual cut into a safe heuristic answer.
-    long maxTokens = 4096;
-    //THINKING BUDGET (owner ruling 2026-08-19). Thinking tokens are decode
-    //tokens, so an unbounded native window is an unbounded decision. The
-    //budget is a TOKEN COUNT for the thinking window; the request cap is that
-    //plus the answer reserve (the p95 PLAN line + the coded choice line +
-    //margin), so a model that spends its whole budget still has room to
-    //answer - and when it does not, the forced close above recovers the
-    //answer instead of losing the decision.
-    if (mThinking && mReasoningBudget > 0)
-        maxTokens = mReasoningBudget + kAnswerReserveTokens;
-    if (mMaxTokens > 0)
-        maxTokens = mMaxTokens;
+    //THINKING BUDGET (owner ruling 2026-08-19) + the answer ceiling
+    //(#W70-BK, C4). Thinking tokens are decode tokens, so an unbounded native
+    //window is an unbounded decision - but a cap on the ANSWER may never be
+    //spent on the thinking window (invariant 000(d)). Both halves are resolved
+    //by gptResolveMaxTokens, which is pure and pinned by PARSETEST; the only
+    //job left here is to name the inputs.
+    long configuredCeiling = mMaxTokens;              //-1/0 = nothing configured
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
-        maxTokens = atol(mt);
-    //#W68-BA (J3): the seam's own budget, never above the ceiling just resolved.
-    //Skipped when the owner has set an explicit thinking budget (that dial is
-    //already the length answer and is his), and skipped when the mechanism is
-    //disabled.
-    if (!(mThinking && mReasoningBudget > 0) && !gptSeamTokensDisabled())
-        maxTokens = gptSeamMaxTokens(mRequestSeam.c_str(), maxTokens);
-    //Answer-locked retry: the re-ask needs only the coded line, so cap it tight
-    //to fail fast to the heuristic instead of burning another long spiral. This
-    //wins over any larger configured/env default for the retry request only.
-    //#W53-Q (D10): the deadline retry is excluded - it re-sends the SAME ask
-    //and needs the same room; the tight cap belongs to the two retries whose
-    //re-ask is answer-locked.
-    if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt && !timeoutRetry)
-        maxTokens = forceClose ? kAnswerReserveTokens : 512;
+        configuredCeiling = atol(mt);                 //env is the operator's ANSWER ceiling
+    const bool answerLockedRetry =
+        (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt && !timeoutRetry);
+    const GptTokenPlan plan = gptResolveMaxTokens(mThinking, forceClose, mReasoningBudget,
+                                                  configuredCeiling, mRequestSeam.c_str(),
+                                                  gptSeamTokensDisabled(), answerLockedRetry);
+    long maxTokens = plan.total;
+    //#W70-BK (C6): the regime was never stated by anyone. It resolves to OFF -
+    //the product regime - but never silently: say it once, with the ruling, so
+    //a stale launch recipe cannot hide a thinking-off corpus again.
+    if (!mThinkingRegimeExplicit && !mThinkingRegimeAnnounced)
+    {
+        mThinkingRegimeAnnounced = true;
+        const string ruling =
+            "GPT thinking regime was NOT stated (no WAGIC_GPT_THINKING, no thinking= in "
+            "endpoints.txt) - assuming OFF, the product regime. Reasoning belongs in the "
+            "reasoning channel and a plan precedes the action; a CORPUS must state its "
+            "regime explicitly (tools/selfplay-harness.sh --thinking on|off) or it is invalid.";
+        gptLogLine(ruling);
+        DebugTrace("AIPlayerGPT: " << ruling);
+    }
+    //#W70-BK (C4): a configured ceiling that leaves the thinking window nothing
+    //is the one way the arithmetic above can still starve reasoning - it is the
+    //operator's own explicit number, so it is honoured, and said out loud.
+    if (mThinking && !forceClose && plan.reasoning <= 0)
+        gptLogLineOnce("thinking is ON but the resolved reasoning budget is 0 tokens "
+                       "(reasoning_budget/WAGIC_GPT_REASONING_BUDGET unset and the configured "
+                       "max_reply_tokens does not exceed the answer ceiling) - the model has no "
+                       "thinking window this request.");
 
     mLastRequestMaxTokens = maxTokens; //#W68-BA (J3): recorded on the next record
+    mLastRequestAnswerTokens = plan.answer;       //#W70-BK (C4): and its two halves
+    mLastRequestReasoningTokens = plan.reasoning;
     json request = {
         {"model", mModel},
         {"messages", messages},
@@ -77337,6 +77468,100 @@ static const char * kW50Y_r94 =
         CHECK(cannotPayNowClause(0 + 0)
                   == " {you cannot pay this right now: 0 mana available}",
               "#W69-BJ F7 POSITIVE no producers and no pool still states the fact, byte-identical");
+    }
+
+    cout << "\n[#W70-BK] C4 a seam cap is an ANSWER ceiling and never bounds reasoning\n";
+    {
+        //Invariant 000(d), verbatim: "per-seam max_tokens caps never bound
+        //reasoning tokens". Three shipped paths broke it silently (audit
+        //B7.6/B7.7/B7.10); each has a case here that FAILS on the pre-wave
+        //arithmetic and passes on gptResolveMaxTokens.
+        //
+        //THINKING ON, explicit budget: the seam cap sizes the ANSWER and is
+        //ADDED to the budget. Before this wave the seam table was skipped
+        //entirely on this arm and the reply got a flat 400-token reserve.
+        GptTokenPlan p = gptResolveMaxTokens(true, false, 6000, -1, "ask", false, false);
+        CHECK(p.reasoning == 6000 && p.answer == 768 && p.total == 6768,
+              "#W70-BK C4 POSITIVE thinking on: max_tokens = reasoning budget + the seam's answer ceiling");
+        p = gptResolveMaxTokens(true, false, 6000, -1, "blockers", false, false);
+        CHECK(p.reasoning == 6000 && p.answer == 896 && p.total == 6896,
+              "#W70-BK C4 POSITIVE the bundled seam keeps its larger answer ceiling, on top of the budget");
+        //THINKING ON, budget 0 ("unbounded"): the reasoning half is the RAW
+        //ceiling minus the answer ceiling - NEVER the seam cap. This is the arm
+        //that used to hand the ask seam 768 tokens for reasoning + answer
+        //together (audit B7.7).
+        p = gptResolveMaxTokens(true, false, 0, -1, "ask", false, false);
+        CHECK(p.answer == 768 && p.reasoning == kDefaultReplyCeilingTokens - 768
+                  && p.total == kDefaultReplyCeilingTokens,
+              "#W70-BK C4 POSITIVE unbounded budget: the seam cap sizes the answer, the rest is reasoning");
+        CHECK(gptResolveMaxTokens(true, false, 0, -1, "ask", false, false).total > 768,
+              "#W70-BK C4 MUST-NOT-MATCH a seam cap is never the whole completion under thinking");
+        //An operator ceiling is the ANSWER ceiling and is ADDED to the budget,
+        //never substituted for the sum (audit B7.6).
+        p = gptResolveMaxTokens(true, false, 6000, 900, "ask", false, false);
+        CHECK(p.answer == 768 && p.total == 6768,
+              "#W70-BK C4 POSITIVE a configured ceiling is the answer ceiling, added to the budget");
+        p = gptResolveMaxTokens(true, false, 6000, 300, "ask", false, false);
+        CHECK(p.answer == 300 && p.reasoning == 6000 && p.total == 6300,
+              "#W70-BK C4 POSITIVE a ceiling below the seam cap still only clips the ANSWER");
+        //The answer-locked retry (audit B1.6/B7.10): 512 for the coded line,
+        //plus the whole budget, instead of 512 for everything.
+        p = gptResolveMaxTokens(true, false, 6000, -1, "ask", false, true);
+        CHECK(p.answer == kAnswerLockedRetryTokens && p.total == 6000 + kAnswerLockedRetryTokens,
+              "#W70-BK C4 POSITIVE the answer-locked retry caps the answer, not the thinking window");
+        //THINKING OFF: identical to what shipped - the caps ARE the completion,
+        //because there is no reasoning half to protect.
+        p = gptResolveMaxTokens(false, false, 0, -1, "ask", false, false);
+        CHECK(p.reasoning == 0 && p.answer == 768 && p.total == 768,
+              "#W70-BK C4 POSITIVE thinking off: the seam cap is the whole completion, unchanged");
+        p = gptResolveMaxTokens(false, false, 0, -1, "mulligan", false, false);
+        CHECK(p.total == kDefaultReplyCeilingTokens,
+              "#W70-BK C4 MUST-NOT-MATCH an unnamed seam is still never capped by accident");
+        p = gptResolveMaxTokens(false, false, 0, -1, "ask", true, false);
+        CHECK(p.total == kDefaultReplyCeilingTokens,
+              "#W70-BK C4 POSITIVE WAGIC_GPT_SEAMTOKENS=0 still restores the single ceiling");
+        //Phase 2 (the forced close) is sent with enable_thinking false: an
+        //answer-only request, whatever the regime.
+        p = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, true);
+        CHECK(p.reasoning == 0 && p.total == kAnswerReserveTokens,
+              "#W70-BK C4 POSITIVE the forced close funds no thinking window - it resumes a closed one");
+        //The one arm that can still starve reasoning is the operator's own
+        //explicit total, and it is honoured loudly rather than overridden.
+        p = gptResolveMaxTokens(true, false, 0, 400, "ask", false, false);
+        CHECK(p.answer == 400 && p.reasoning == 0,
+              "#W70-BK C4 MUST-NOT-MATCH an explicit tiny ceiling is the operator's number, not a seam cap");
+    }
+
+    cout << "\n[#W70-BK] C5 the request carries the regime and the resolved sum\n";
+    {
+        //The two request fields the ruling turns on: `enable_thinking` follows
+        //the regime (and is false on the forced close, which resumes an already
+        //closed thinking block), and `max_tokens` is the sum above. Built here
+        //as the request builder builds them, so a PARSETEST failure names the
+        //field rather than a downstream symptom.
+        for (int regime = 0; regime <= 1; regime++)
+        {
+            const bool thinking = (regime == 1);
+            const GptTokenPlan p =
+                gptResolveMaxTokens(thinking, false, thinking ? 6000 : 0, -1, "ask", false, false);
+            json request = {
+                {"model", "qwen"},
+                {"max_tokens", p.total},
+            };
+            const bool forceClosePhase = false; //this request is phase 1
+            request["chat_template_kwargs"] =
+                {{"enable_thinking", forceClosePhase ? false : thinking}};
+            CHECK(request["chat_template_kwargs"]["enable_thinking"].get<bool>() == thinking,
+                  "#W70-BK C5 POSITIVE enable_thinking follows the stated regime in BOTH directions");
+            CHECK(request["max_tokens"].get<long>() == (thinking ? 6768 : 768),
+                  "#W70-BK C5 POSITIVE max_tokens is budget + answer ceiling on, the answer ceiling off");
+        }
+        const GptTokenPlan fc = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, false);
+        json forced = {{"max_tokens", fc.total}};
+        forced["chat_template_kwargs"] = {{"enable_thinking", false}};
+        CHECK(!forced["chat_template_kwargs"]["enable_thinking"].get<bool>()
+                  && forced["max_tokens"].get<long>() == 768,
+              "#W70-BK C5 MUST-NOT-MATCH the forced close never re-opens the thinking window");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

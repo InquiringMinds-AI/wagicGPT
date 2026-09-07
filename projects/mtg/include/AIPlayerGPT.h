@@ -1010,6 +1010,14 @@ private:
     string mModel;
     string mApiKey;
     bool mThinking;
+    //#W70-BK (C6, invariant 000(f)): was the regime STATED (env
+    //WAGIC_GPT_THINKING set, or a `thinking=` line in endpoints.txt)? An
+    //unset regime still resolves to OFF - the product regime - but it is
+    //never allowed to be a SILENT default: the first request logs the ruling
+    //and says the regime was assumed. The corpus harness refuses to launch
+    //without `--thinking on|off` so a corpus can never reach this branch.
+    bool mThinkingRegimeExplicit;
+    bool mThinkingRegimeAnnounced; //the announcement is one-shot per seat
     //Codex-backend reasoning tier (config reasoning_effort / WAGIC_GPT_EFFORT,
     //validated against the server's set); empty = the built-in default (low).
     string mReasoningEffort;
@@ -1250,6 +1258,13 @@ private:
     //an option-set key.
     string mRequestSeam;
     long mLastRequestMaxTokens;
+    //#W70-BK (C4, invariant 000(d)): the two HALVES of that number. A seam
+    //cap is an ANSWER ceiling (the PLAN line + the action line) and is added
+    //to the reasoning budget, never subtracted from it - recording both is
+    //how a corpus PROVES no completion carrying reasoning was bounded by a
+    //seam cap, instead of being told so.
+    long mLastRequestAnswerTokens;
+    long mLastRequestReasoningTokens;
     //#W68-BA (J6, deck123 HIGH-2): the no-op re-ask's OWN one-shot, so a row the
     //model itself calls dead is still questioned once when the board's single
     //re-ask has already been spent on a different failure (123 s41 spent it on a

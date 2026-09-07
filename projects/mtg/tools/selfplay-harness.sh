@@ -29,8 +29,20 @@
 # Usage:
 #   tools/selfplay-harness.sh [-p "44,135,140,..."] [-r REPS] [-j JOBS]
 #                             [-t TOTAL_CAP_S] [-T GAME_TIMEOUT_S] [-o OUTDIR]
-#                             [-u URL] [-m MODEL] [-k KEY] [--thinking]
-#                             [--riggedhand]
+#                             [-u URL] [-m MODEL] [-k KEY] --thinking on|off
+#                             [--riggedhand] | --selftest
+#
+#W70-BK (C1, skill invariant 000(f)): --thinking on|off is REQUIRED and has NO
+# default. Every corpus from wave 44 to wave 69 ran with reasoning OFF because
+# this script's default was 0 and no launch recipe overrode it - the regime was
+# never a decision anybody made, and nothing in the harvested data said which
+# regime produced it. It is a stated argument now: a launch without it prints
+# the ruling and exits 2, the regime is stamped on every translog record, and a
+# per-regime GATE (tools/regime-gate.py) reads the first records of the first
+# games and KILLS the corpus if the regime it was asked for is not the regime
+# it is getting. The wave corpora run --thinking on ("fuckin obviously we need
+# reasoning"); --thinking off is the PRODUCT regime and is validated when the
+# owner asks for it.
 #
 # Hands are FAIR by default (owner ruling 2026-08-24, wave-44 lane A: "I want
 # legitimate hands. legit mulligans. none of this fixing hands in advance."):
@@ -75,7 +87,7 @@ OUTDIR=""
 URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev default)
 MODEL="qwen35"
 KEY=""
-THINKING=0
+THINKING=""      #W70-BK (C1): no default. on|off, stated at launch.
 FASTCLOCK=0.1   # game-seconds per engine tick; 0 = real-time pacing
 FAIRHAND=1      # engine default; 0 = --riggedhand legacy-forensics escape
 
@@ -90,13 +102,39 @@ while [ $# -gt 0 ]; do
         -u) URL="$2"; shift 2;;
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
-        --thinking) THINKING=1; shift;;
+        --thinking) THINKING="${2:-}"; shift 2;;
+        --selftest) exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
         --realtime) FASTCLOCK=0; shift;;
         --fairhand) FAIRHAND=1; shift;;
         --riggedhand) FAIRHAND=0; shift;;
         *) echo "unknown arg: $1" >&2; exit 2;;
     esac
 done
+
+#W70-BK (C1): THE REGIME IS A STATED THING. Refuse loudly rather than assume.
+case "$THINKING" in
+    on|off) : ;;
+    *)
+        cat >&2 <<'RULING'
+FATAL: --thinking on|off is REQUIRED and has no default.
+
+  Owner ruling (skill invariant 000): reasoning happens ONLY in the model's
+  native reasoning channel, a plan precedes the action, and the reply is the
+  PLAN line then the action line and nothing else. The wave corpora run with
+  reasoning ON; thinking OFF is the product regime and is validated only when
+  the owner asks for it. Either way the regime is a decision somebody MAKES.
+
+  Every corpus from wave 44 to wave 69 ran with reasoning off because this
+  harness defaulted to it and no launch recipe said otherwise. That default is
+  gone. State the regime:
+
+    tools/selfplay-harness.sh --thinking on  ...   (a wave corpus)
+    tools/selfplay-harness.sh --thinking off ...   (the product regime)
+RULING
+        exit 2;;
+esac
+if [ "$THINKING" = "on" ]; then THINKING_ENV=1; else THINKING_ENV=0; fi
+
 # Spark serves max-num-seqs 16 and its memory is flat under request load (KV is
 # pre-allocated), and Magic is turn-based (~1 in-flight request per game), so 16
 # concurrent games fill the batch. OVERSUBSCRIPTION (-j above 16) is allowed and
@@ -165,8 +203,12 @@ echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings 
 # two-phase budget path (6000-token thinking window since wave-35 + the
 # forced-answer close, ~250-275s at ~30 tok/s); without it, the terse-reply
 # default stands. 420s keeps margin over that rather than shaving it.
-if [ "$THINKING" = "1" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
-echo "  model  : $MODEL @ $URL (thinking=$THINKING, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
+if [ "$THINKING" = "on" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
+#W70-BK (C1): the regime in CAPITALS in the header - it is the first thing a
+#reader of a corpus log has to be able to answer about it.
+THINKING_UP=$(echo "$THINKING" | tr '[:lower:]' '[:upper:]')
+echo "  model  : $MODEL @ $URL (thinking=$THINKING_UP, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
+echo "  regime : thinking=$THINKING_UP - $([ "$THINKING" = "on" ] && echo 'reasoning in the reasoning channel; every record must carry it' || echo 'PRODUCT regime; every reply must be exactly PLAN + action')"
 echo "  caps   : ${TOTAL_CAP_S}s total, $([ "$GAME_TIMEOUT_S" = "0" ] && echo 'NO per-game cap' || echo "${GAME_TIMEOUT_S}s/game") (fastclock=$FASTCLOCK)"
 echo "  hands  : $([ "$FAIRHAND" = "1" ] && echo 'FAIR (real deal, seats unpinned; wave 44+ baseline)' || echo 'RIGGED legacy (OptimizedHand 3/1/3 + agressivity pin) - forensics only, NOT a corpus')"
 echo "  outdir : $OUTDIR"
@@ -193,7 +235,7 @@ run_one_game() {
         WAGIC_SELFPLAY=1 WAGIC_SELFPLAY_ONESHOT=1 \
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
-        WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
+        WAGIC_GPT_THINKING="$THINKING_ENV" WAGIC_GPT_TRANSLOG=1 \
         WAGIC_GPT_TIMEOUT="${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}" \
         ./wagic > "$elog" 2>&1 &
     local gpid=$!
@@ -342,9 +384,71 @@ NPY
     done
 }
 
+#W70-BK (C2): THE PER-REGIME GATE. Invariant 000(a): a corpus whose first
+#records do not carry the regime's own evidence is INVALID - "stop it". This is
+#that stop, automated, so it costs minutes instead of the eleven hours a wave-61
+#corpus cost. It reads the FIRST records of the first seat logs this run wrote
+#(tools/regime-gate.py, self-tested with --selftest) and asks the one question
+#the regime turns on:
+#   thinking on  -> every checked record carries reasoning (reasoning_chars > 0,
+#                   no withheld trace, and a non-zero reasoning budget in the
+#                   recorded max_tokens split - ruling 000(d));
+#   thinking off -> no record carries reasoning text AND the replies are exactly
+#                   a PLAN line plus an action line, with prose counted and
+#                   aborted past WAGIC_CORPUS_PROSE_ABORT percent (default 5).
+#Both arms also verify the regime STAMP on the record equals the regime asked
+#for, which is the check that would have caught wave 44 the day it happened.
+#It is a ONE-SHOT decision, not a monitor (fleet rule feedback-single-wake-
+#batching): once it says PASS or FAIL it never runs again.
+PROSE_ABORT="${WAGIC_CORPUS_PROSE_ABORT:-5}"
+GATE_UNIT="${WAGIC_GATE_UNIT:-selfplay-harness}"
+regime_gate_sweep() {
+    [ -f "$OUTDIR/REGIME-GATE-DONE" ] && return 0
+    local verdict
+    verdict=$(python3 "$HERE/tools/regime-gate.py" --logdir "$LOGDIR" --start "$START" \
+                      --regime "$THINKING" --prose-abort "$PROSE_ABORT" 2>&1)
+    case "$verdict" in
+        PASS*)
+            touch "$OUTDIR/REGIME-GATE-DONE"
+            echo ""
+            echo "== REGIME GATE PASSED: ${verdict#PASS }"
+            return 0;;
+        WAIT*)
+            #No verdict yet. If the corpus has been running long enough that
+            #there SHOULD be records and there are none, that is its own answer.
+            if [ $(( $(date +%s) - START )) -ge 1800 ]; then
+                verdict="FAIL 30 minutes in and there are still no gateable decision records (${verdict#WAIT }) - the seats are not reaching the model."
+            else
+                return 0
+            fi;;
+    esac
+    #FAIL. The corpus is invalid by the ruling; nothing downstream may read it
+    #as evidence, so say so in every place a reader looks.
+    touch "$OUTDIR/REGIME-GATE-DONE"
+    local reason="${verdict#FAIL }"
+    printf '%s\n' "$reason" > "$OUTDIR/REGIME-FAIL"
+    mkdir -p "$HOME/.gatelogs"
+    printf 'REGIME FAIL (thinking=%s): %s\n' "$THINKING" "$reason" \
+        > "$HOME/.gatelogs/${GATE_UNIT}-REGIME-FAIL"
+    [ -n "${WAGIC_DONE_FILE:-}" ] && printf 'FAILED regime gate (thinking=%s): %s\n' \
+        "$THINKING" "$reason" >> "$WAGIC_DONE_FILE"
+    echo ""
+    echo "!! ================== REGIME GATE FAILED - CORPUS INVALID =================="
+    echo "!! launched with --thinking $THINKING"
+    echo "!! $reason"
+    echo "!! Owner ruling (invariant 000): reasoning happens ONLY in the reasoning"
+    echo "!! channel and the reply is the PLAN line then the action line. A corpus"
+    echo "!! that is not in the regime it claims is not evidence of anything."
+    echo "!! Killing all games now. Evidence: $OUTDIR and \$HOME/.gatelogs/${GATE_UNIT}-REGIME-FAIL"
+    echo "!! ========================================================================"
+    kill -TERM "$HARNESS_PID" 2>/dev/null
+    return 1
+}
+
 supervisor() {
     while sleep 45; do
         no_progress_sweep
+        regime_gate_sweep || return 1
         #Uncapped run: a full game can always fit, the latency projection has
         #nothing to violate - that half stands down (the sweep above does not).
         [ "$GAME_TIMEOUT_S" = "0" ] && continue
@@ -408,6 +512,12 @@ wait $(jobs -p | /usr/bin/grep -v "^$WATCHDOG_PID$") 2>/dev/null
 kill "$WATCHDOG_PID" 2>/dev/null
 trap - INT TERM
 rm -f "$OUTDIR"/.inflight-*
+#W70-BK (C2): the regime gate's verdict outlives the supervisor subshell.
+if [ -f "$OUTDIR/REGIME-FAIL" ]; then
+    echo "== CORPUS FAILED: regime gate (thinking=$THINKING). $(cat "$OUTDIR/REGIME-FAIL") =="
+    echo "== The logs in $OUTDIR are NOT a corpus and must not be reviewed as one. =="
+    exit 1
+fi
 if [ -f "$OUTDIR/INFEASIBLE" ]; then
     echo "== CORPUS FAILED: infeasible (see above). Partial logs in $OUTDIR are NOT a corpus. =="
     exit 1
