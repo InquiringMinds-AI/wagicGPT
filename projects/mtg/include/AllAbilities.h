@@ -7915,6 +7915,16 @@ public:
     AASetNameChosen * clone() const;
     ~AASetNameChosen();
 };
+//#W72-BX (F4, Astra review finding 4 - HIGH): may a "choose a card name" menu
+//offer the name of THIS object? CR 201.4: only a card name may be chosen, and a
+//token's name is a card name exactly when the token is a copy of a card - which
+//the card database answers by name. Pure over the two facts, so PARSETEST pins
+//both faces without a board.
+inline bool w72TokenNameChoosable(bool isToken, bool nameIsACardName)
+{
+    return !isToken || nameIsACardName;
+}
+
 class GenericChooseTypeColorName: public ActivatedAbility
 {
 public:

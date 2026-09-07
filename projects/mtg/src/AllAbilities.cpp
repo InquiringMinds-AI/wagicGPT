@@ -4505,7 +4505,18 @@ int GenericChooseTypeColorName::resolve()
                 //trigger could never fire again. Removing it removes an ILLEGAL
                 //option, which is what enforcing legality means; every real card
                 //name in every zone is still offered.
-                if (zone->cards[j] && zone->cards[j]->isToken)
+                //#W72-BX (F4, Astra review finding 4 - HIGH): CR 201.4 - a token
+                //that is a COPY of a card has that card's name, and naming it is
+                //legal. The wave-72 filter dropped every token unconditionally, so
+                //a token copy of a real card removed a legal name from the menu
+                //whenever no nontoken copy sat in a scanned zone. The test is not
+                //"is this object a token" but "is this NAME a card name": the card
+                //database answers it, and a token whose name is no card's (a bare
+                //"Goblin") is still the illegal answer wave 72 removed.
+                if (zone->cards[j]
+                    && !w72TokenNameChoosable(zone->cards[j]->isToken != 0,
+                                              MTGCollection()->getCardByName(zone->cards[j]->name)
+                                                  != NULL))
                     continue;
                 if ((!ANonBasicLand || (!zone->cards[j]->hasType(Subtypes::TYPE_BASIC) && !zone->cards[j]->hasType(Subtypes::TYPE_LAND))) && (!ANonLand || !zone->cards[j]->hasType(Subtypes::TYPE_LAND))){
                      bool added = false;

@@ -1317,6 +1317,15 @@ private:
     //an option-set key (the clause is a {...} group, stripped from all three).
     int mStatedStop;
     int mStatedStopCount;
+    //#W72-BX (F2): the turn the stop above was STATED on. mPlanSetTurn dates the
+    //last plan LINE, whatever it says, so it cannot date a stop.
+    int mStatedStopTurn;
+    //#W72-BX (F3): non-zero while the CASTING seam is assembling or re-asking its
+    //own window. The "this phase's casting decision is already answered" facts
+    //(kCastAnsweredFact, the hand tag) are false inside it - the decision being
+    //rendered IS the open one.
+    int mCastDecisionOpen;
+    void markCastDecisionAnswered(); //#W72-BX (F3)
     //Same mechanism for askModel (cast menus, targets, modes): keyed on the
     //ORIGINAL askKey (state + question), the corrected question is asked once.
     string mAskReaskKey;
