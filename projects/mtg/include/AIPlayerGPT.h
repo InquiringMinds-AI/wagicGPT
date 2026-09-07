@@ -399,6 +399,16 @@ private:
     std::map<std::string, int> mAskCacheSeq; //key -> the seq its answer was consumed at
     std::string mAskReplayKey;               //the key currently on a replay run
     int mAskReplayRun = 0;                   //consecutive replays of that key
+    //#W72-BT (M22, wave-71 engine-seat MED-2): the run counter above is ONE
+    //slot, so any OTHER window's real model answer wiped it - measured in the
+    //wave-71 sidecar (`...deck123-0x5629c69e3090`, turn 36): 18 consecutive
+    //replays of one byte-identical question whose `replay_run` restarted at 1
+    //midway because three unrelated windows were answered in between. A loop
+    //that alternates between two windows therefore never accumulates and the
+    //refusal can never fire on it. The run is now PER WINDOW (state+question),
+    //dropped with the cache at the turn boundary and erased for a window when
+    //that window is really answered.
+    std::map<std::string, int> mAskReplayRuns;
     int mAskReplaysReserved = 0;             //re-served answers this game (gameend)
     int mAskReplaysRefused = 0;              //times the refusal fired (gameend)
     static const int kAskReplayRefuseMax = 64;
@@ -407,6 +417,14 @@ private:
     //named again rather than once.
     static bool askReplayRefuse(const std::string & key, std::string & lastKey,
                                 int & run, int maxRun);
+    //#W72-BT (M22): the same predicate, scoped per window. `runs` holds one
+    //counter per state+question key, so interleaving windows cannot reset one
+    //another and each loop is named on its own. Fires and re-arms exactly as
+    //askReplayRefuse does. Pure and static, so PARSETEST pins both faces.
+    static bool askReplayRefuseScoped(const std::string & key,
+                                      std::map<std::string, int> & runs, int maxRun);
+    //#W72-BT (M14): the count MED-5 could not make.
+    virtual void noteOwnTurnWindowSkipped() { mOwnTurnWindowsSkipped++; }
     //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
     //#W71-BS (F5): the answer floor the CURRENT seam's legal answer needs, and the
     //seam it was computed for. buildRequestBody applies it only when the two agree,
@@ -849,6 +867,23 @@ private:
     //carries the count - a corpus can still see how many windows the seat was
     //offered and how many of them never reached the model.
     int mManaOnlyWindowsSkipped;
+    //#W72-BT (M10, wave-71 deck123 HIGH-1): priority windows auto-passed
+    //because the ONLY live rows were a repeat family whose own rendered verdict
+    //says the model's stated stop is already reached. `123v152` seqs 28-38 are
+    //eleven byte-identical windows over one turn - 1,287 s and 11 model calls to
+    //advance nothing - each answered `CHOICE: 0 (pass)` over the same
+    //`{right now: M=29, your stated stop=29 ... ALREADY AT OR PAST your own
+    //stop}` clause. Same discipline as mManaOnlyWindowsSkipped: counted, never
+    //silent.
+    int mStopReachedWindowsSkipped;
+    //#W72-BT (M14, wave-71 deck146 MED-5): own-turn instant-speed windows the
+    //wave-71 L4 branch entered and left WITHOUT issuing a cast ask, because no
+    //card in a castable-from zone was instant-speed. The engine already asks
+    //nothing there (buildCastSpell finds no row and FindCardToPlay returns
+    //before the model call); the class was simply unmeasurable, which is why
+    //MED-5 could not tell a window that cost a round trip from one that cost
+    //nothing. Report-only.
+    int mOwnTurnWindowsSkipped;
     //#W54-D (D8b): asks whose entire option list rendered as one
     //interchangeable, ordinal-free row and were answered without a model call.
     int mIdenticalOptionAsksResolved;

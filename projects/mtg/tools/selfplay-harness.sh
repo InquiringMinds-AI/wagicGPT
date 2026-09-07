@@ -103,6 +103,44 @@ THINKING=""      #W70-BK (C1): no default. on|off, stated at launch.
 FASTCLOCK=0.1   # game-seconds per engine tick; 0 = real-time pacing
 FAIRHAND=1      # engine default; 0 = --riggedhand legacy-forensics escape
 
+harvest_translogs() {
+    local logdir="$1" outdir="$2" before="$3" f base
+    comm -13 "$before" <(ls "$logdir"/*.jsonl 2>/dev/null | sort) | while read -r f; do
+        cp "$f" "$outdir/"
+        base="$(basename "$f")"
+        if [ -f "$logdir/askreplay/$base" ]; then
+            mkdir -p "$outdir/askreplay"
+            cp "$logdir/askreplay/$base" "$outdir/askreplay/"
+        fi
+    done
+}
+
+#W72-BT (M1): the harvest, self-tested. HIGH-1 was one missing line in a block
+# no test ever ran; the sidecar is invisible to the corpus if it regresses, and
+# invisible evidence is how the wave-71 corpus concluded "0 re-serves". This
+# builds a throwaway LOGDIR with one pre-existing log (must NOT be harvested),
+# one new log and its sidecar (both MUST be), and a sidecar with no matching new
+# log (must NOT be), then asserts on the harvested tree. `--selftest` runs it
+# before the regime-gate selftest and fails the whole flag if it fails.
+harvest_selftest() {
+    local tmp fails=0
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/log/askreplay" "$tmp/out"
+    : > "$tmp/log/old-seat.jsonl"
+    ls "$tmp/log"/*.jsonl 2>/dev/null | sort > "$tmp/before"
+    : > "$tmp/log/new-seat.jsonl"
+    echo '{"kind":"ask_replay"}' > "$tmp/log/askreplay/new-seat.jsonl"
+    echo '{"kind":"ask_replay"}' > "$tmp/log/askreplay/stale-seat.jsonl"
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/new-seat.jsonl" ] || { echo "harvest-selftest FAIL: this run's translog was not harvested" >&2; fails=1; }
+    [ -f "$tmp/out/askreplay/new-seat.jsonl" ] || { echo "harvest-selftest FAIL: the ask_replay sidecar was not harvested (wave-71 HIGH-1)" >&2; fails=1; }
+    [ -f "$tmp/out/old-seat.jsonl" ] && { echo "harvest-selftest FAIL: a pre-existing translog was harvested" >&2; fails=1; }
+    [ -f "$tmp/out/askreplay/stale-seat.jsonl" ] && { echo "harvest-selftest FAIL: a sidecar with no translog of this run was harvested" >&2; fails=1; }
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "harvest-selftest: 4 checks, 0 failed"
+    return "$fails"
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -p) POOL="$2"; shift 2;;
@@ -115,7 +153,7 @@ while [ $# -gt 0 ]; do
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
         --thinking) THINKING="${2:-}"; shift 2;;
-        --selftest) exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
+        --selftest) harvest_selftest || exit 1; exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
         --realtime) FASTCLOCK=0; shift;;
         --fairhand) FAIRHAND=1; shift;;
         --riggedhand) FAIRHAND=0; shift;;
@@ -607,9 +645,15 @@ if [ -n "$HUNG_ROWS" ]; then
 fi
 
 # Harvest this run's translogs.
-comm -13 "$BEFORE_LIST" <(ls "$LOGDIR"/*.jsonl 2>/dev/null | sort) | while read -r f; do
-    cp "$f" "$OUTDIR/"
-done
+#W72-BT (M1, wave-71 engine-seat HIGH-1): the SIDECAR too. The engine writes one
+# `ask_replay` record per silently re-served answer into `$LOGDIR/askreplay/<same
+# basename>` - deliberately a SUBDIRECTORY, because both harness silence arms take
+# max(mtime) over `$LOGDIR/*.jsonl` and a replay is NOT progress (W71-BS F4). The
+# harvest used the same non-recursive glob, so 725 replay records - the corpus's
+# only evidence of a re-serve loop - stayed outside the corpus and a reviewer
+# reading only the corpus concluded "0 re-serves". Copy this run's basenames only:
+# the sidecars are not snapshotted by $BEFORE_LIST and accumulate across runs.
+harvest_translogs "$LOGDIR" "$OUTDIR" "$BEFORE_LIST"
 rm -f "$BEFORE_LIST" "$JOBFILE"
 
 # Summary: decision kinds + win tally.

@@ -3914,6 +3914,16 @@ int AIPlayerBaka::computeActions()
             || phaseNow == MTG_PHASE_COMBATBLOCKERS
             || phaseNow == MTG_PHASE_COMBATDAMAGE
             || phaseNow == MTG_PHASE_ENDOFTURN);
+    //#W72-BT (M14, wave-71 deck146 MED-5): this window is here ONLY because of
+    //the W71-BQ L4 arm (it is the seat's own turn and not a response to anything).
+    //The reviewer's hypothesis was that such a window issues a cast ask with no
+    //instant-speed candidate; it does not - the zone gate below is not entered,
+    //FindCardToPlay is never called and no model call is made. What was missing
+    //was any way to SEE that, so a budget review could not tell a window that
+    //cost a round trip from one that cost nothing. Counted, report-only.
+    const bool ownTurnArmOnly = ownInstantSpeedWindow
+        && !(observer->isInterrupting == this && topController != this);
+    bool searchedForInstantCast = false;
     if (this == currentP
         //and i am the currentlyActivePlayer
         && ((observer->isInterrupting == this && topController != this)
@@ -3930,6 +3940,7 @@ int AIPlayerBaka::computeActions()
 #ifndef AI_CHANGE_TESTING
             findingCard = true;
 #endif //AI_CHANGE_TESTING
+            searchedForInstantCast = true; //#W72-BT (M14)
             ManaCost * icurrentMana = getPotentialMana();
             icurrentMana->add(this->getManaPool());
             if (icurrentMana->getConvertedCost())
@@ -4004,6 +4015,9 @@ int AIPlayerBaka::computeActions()
         }
         if (!nextCardToPlay)
         {
+            //#W72-BT (M14): the own-turn window that asked nothing.
+            if (ownTurnArmOnly && !searchedForInstantCast)
+                noteOwnTurnWindowSkipped();
             selectAbility();
         }
         if (nextCardToPlay)
