@@ -398,24 +398,43 @@ NPY
 #                   aborted past WAGIC_CORPUS_PROSE_ABORT percent (default 5).
 #Both arms also verify the regime STAMP on the record equals the regime asked
 #for, which is the check that would have caught wave 44 the day it happened.
-#It is a ONE-SHOT decision, not a monitor (fleet rule feedback-single-wake-
-#batching): once it says PASS or FAIL it never runs again.
+#W70-BN (F6/F7/F8/F9): a FAIL is terminal and never re-runs. A PASS is not -
+#it is a statement about the seat logs seen SO FAR, remembered in
+#$OUTDIR/regime-gate-state.txt, and every later sweep gates only the seat logs
+#that have appeared since (their first five records). It is still not a monitor
+#(fleet rule feedback-single-wake-batching): nothing wakes an agent, the work is
+#five records per new file, and it stops as soon as the corpus does.
 PROSE_ABORT="${WAGIC_CORPUS_PROSE_ABORT:-5}"
 GATE_UNIT="${WAGIC_GATE_UNIT:-selfplay-harness}"
 regime_gate_sweep() {
-    [ -f "$OUTDIR/REGIME-GATE-DONE" ] && return 0
+    [ -f "$OUTDIR/REGIME-GATE-DONE" ] && return 1
+    #W70-BN (F8): a PASS is NOT a permanent amnesty. It names the seat logs it
+    #checked, they are remembered in the state file, and every sweep keeps
+    #gating the seat logs that have appeared since - a seat that starts late and
+    #returns no reasoning still kills the corpus. The check is cheap: the first
+    #five records of each not-yet-checked seat log.
     local verdict
     verdict=$(python3 "$HERE/tools/regime-gate.py" --logdir "$LOGDIR" --start "$START" \
-                      --regime "$THINKING" --prose-abort "$PROSE_ABORT" 2>&1)
+                      --regime "$THINKING" --prose-abort "$PROSE_ABORT" \
+                      --state "$OUTDIR/regime-gate-state.txt" 2>&1)
     case "$verdict" in
         PASS*)
-            touch "$OUTDIR/REGIME-GATE-DONE"
-            echo ""
-            echo "== REGIME GATE PASSED: ${verdict#PASS }"
+            if [ ! -f "$OUTDIR/REGIME-GATE-PASSED" ]; then
+                touch "$OUTDIR/REGIME-GATE-PASSED"
+                echo ""
+                echo "== REGIME GATE PASSED: ${verdict#PASS }"
+            fi
             return 0;;
         WAIT*)
             #No verdict yet. If the corpus has been running long enough that
             #there SHOULD be records and there are none, that is its own answer.
+            #W70-BN (F7/F8): only the NO-RECORDS wait is a deadline. A seat log
+            #that is merely short of the minimum is still producing evidence, and
+            #any bad record in it FAILs immediately on its own.
+            case "$verdict" in
+                *"no gateable records yet"*) ;;
+                *) return 0;;
+            esac
             if [ $(( $(date +%s) - START )) -ge 1800 ]; then
                 verdict="FAIL 30 minutes in and there are still no gateable decision records (${verdict#WAIT }) - the seats are not reaching the model."
             else
@@ -424,7 +443,7 @@ regime_gate_sweep() {
     esac
     #FAIL. The corpus is invalid by the ruling; nothing downstream may read it
     #as evidence, so say so in every place a reader looks.
-    touch "$OUTDIR/REGIME-GATE-DONE"
+    touch "$OUTDIR/REGIME-GATE-DONE"   #a FAIL is terminal: no further sweeps
     local reason="${verdict#FAIL }"
     printf '%s\n' "$reason" > "$OUTDIR/REGIME-FAIL"
     mkdir -p "$HOME/.gatelogs"

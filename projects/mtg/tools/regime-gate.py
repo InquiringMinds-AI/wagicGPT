@@ -48,12 +48,18 @@ def reply_shape(reply):
 
 
 def run_records(logdir, start, per_file):
-    """The first `per_file` gateable records of each seat log this run wrote.
+    """The first `per_file` GATEABLE records of each seat log this run wrote.
 
-    A gateable record is one that carried a real round trip. `reasoning_chars`
-    is written on exactly those (#W70-BK C2), so its ABSENCE is itself evidence:
-    the binary predates the stamp and the corpus cannot be gated."""
-    out, unstamped, files = [], 0, 0
+    #W70-BN (F7, Astra review finding 7): a gateable record is one that carried a
+    COMPLETED MODEL ROUND TRIP - a non-empty `prompt`. `writeTransLog` always
+    writes `reply` and deliberately omits `reasoning_chars` when the prompt is
+    empty, so the shipped reader counted every engine-answered record as missing
+    instrumentation and the early sweep returned "FAIL - rebuild" on a current
+    binary. Engine-answered records are SKIPPED; only a record that called the
+    model and still carries no `reasoning_chars` is evidence of a stale binary.
+
+    Returns (per-file dict of records, unstamped count, file count)."""
+    out, unstamped, files = {}, 0, 0
     for f in sorted(glob.glob(os.path.join(logdir, '*.jsonl'))):
         try:
             ep = int(os.path.basename(f).split('-')[0])
@@ -62,6 +68,7 @@ def run_records(logdir, start, per_file):
         if ep < start - 2:
             continue
         files += 1
+        name = os.path.basename(f)
         taken = 0
         try:
             fh = open(f)
@@ -77,36 +84,58 @@ def run_records(logdir, start, per_file):
                     continue
                 if r.get('kind') in ('gamestart', 'gameend'):
                     continue
-                if 'reply' not in r and 'reasoning_chars' not in r:
-                    continue          # cache/reuse or a non-ask record
+                if not r.get('prompt'):
+                    continue          # engine-answered, cache hit or reuse
                 if 'reasoning_chars' not in r:
                     unstamped += 1
                     continue
-                out.append((os.path.basename(f), r))
+                out.setdefault(name, []).append(r)
                 taken += 1
     return out, unstamped, files
 
 
-def gate(records, unstamped, regime, prose_abort_pct, min_records):
+def gate(per_file, unstamped, regime, prose_abort_pct, min_records, checked=()):
+    """One verdict over the seat logs this run wrote.
+
+    `per_file` maps a seat-log name to its first N gateable records. `checked` is
+    the set of seat logs a previous sweep already PASSED - #W70-BN (F8): PASS is
+    not a permanent amnesty, it is a statement about the seats seen so far, and a
+    seat log that appears later is gated on its own first records.
+
+    Returns (verdict, why, files_now_checked)."""
+    if isinstance(per_file, list):        # tolerate the flat form in tests
+        d = {}
+        for f, r in per_file:
+            d.setdefault(f, []).append(r)
+        per_file = d
+    pending = sorted(f for f in per_file if f not in checked)
+    records = [(f, r) for f in pending for r in per_file[f]]
     if unstamped and not records:
-        return ('FAIL', 'the seat translogs carry no `reasoning_chars` stamp (%d records checked): '
-                        'this binary predates #W70-BK and the regime cannot be verified - rebuild.'
-                        % unstamped)
-    if len(records) < min_records:
-        return ('WAIT', 'only %d gateable records so far (need %d)' % (len(records), min_records))
+        return ('FAIL', 'the seat translogs carry no `reasoning_chars` stamp on %d records that '
+                        'DID call the model: this binary predates #W70-BK and the regime cannot '
+                        'be verified - rebuild.' % unstamped, [])
+    if not records:
+        return ('WAIT', 'no gateable records yet', [])
+    # #W70-BN (F8): the minimum is PER SEAT LOG. Five records from one fast seat
+    # said nothing about the seat that had not answered yet.
+    short = [f for f in pending if len(per_file[f]) < min_records]
+    if short:
+        return ('WAIT', 'seat log %s has only %d of %d gateable records'
+                        % (short[0], len(per_file[short[0]]), min_records), [])
 
     stamp_bad = [(f, r.get('thinking')) for f, r in records if r.get('thinking') != regime]
     if stamp_bad:
         return ('FAIL', 'the binary played %d of %d checked records with thinking=%s while the launch '
                         'asked for %s (first: %s) - the regime did not reach the engine.'
-                        % (len(stamp_bad), len(records), stamp_bad[0][1], regime, stamp_bad[0][0]))
+                        % (len(stamp_bad), len(records), stamp_bad[0][1], regime, stamp_bad[0][0]), [])
 
     shapes = {}
     for _, r in records:
-        s = reply_shape(r.get('reply', ''))
-        shapes[s] = shapes.get(s, 0) + 1
+        s_ = reply_shape(r.get('reply', ''))
+        shapes[s_] = shapes.get(s_, 0) + 1
     off_shape = len(records) - shapes.get('two_line', 0)
     shape_note = ' shapes: ' + ', '.join('%s=%d' % kv for kv in sorted(shapes.items()))
+    seat_note = ' seats: %d' % len(pending)
 
     if regime == 'on':
         hidden = [f for f, r in records if r.get('reasoning_hidden')]
@@ -114,66 +143,92 @@ def gate(records, unstamped, regime, prose_abort_pct, min_records):
             return ('FAIL', 'reasoning was requested and the provider WITHHELD the trace on %d of %d '
                             'checked records (first: %s). The reviewers read the reasoning channel; a '
                             'corpus without it is invalid (invariant 000(a)).'
-                            % (len(hidden), len(records), hidden[0]))
+                            % (len(hidden), len(records), hidden[0]), [])
         empty = [f for f, r in records if not r.get('reasoning_chars')]
         if empty:
             return ('FAIL', 'thinking=on but %d of %d checked records carry reasoning_chars 0 '
                             '(first: %s). The model is not reasoning in the reasoning channel - '
                             'the corpus is INVALID (invariant 000(a)).'
-                            % (len(empty), len(records), empty[0]))
+                            % (len(empty), len(records), empty[0]), [])
+        # #W70-BN (F6, Astra review finding 6): the ALLOCATION check is about the
+        # request that funded the thinking window. The forced close is phase TWO -
+        # it resumes an already-closed <think> block with enable_thinking false, so
+        # it legitimately allocates 0 reasoning tokens and stamps
+        # `reasoning_forced_close`. A record that carries native reasoning and that
+        # stamp is a SUCCESSFUL recovery, not a capped window; failing it killed
+        # corpora for working correctly.
         capped = [f for f, r in records
-                  if 'max_tokens_reasoning' in r and r.get('max_tokens_reasoning', 0) <= 0]
+                  if 'max_tokens_reasoning' in r and r.get('max_tokens_reasoning', 0) <= 0
+                  and not (r.get('reasoning_forced_close') and r.get('reasoning_chars'))]
         if capped:
             return ('FAIL', 'thinking=on but %d of %d checked records were decoded with a reasoning '
                             'budget of 0 tokens (first: %s) - a cap is bounding the thinking window '
-                            '(invariant 000(d)).' % (len(capped), len(records), capped[0]))
+                            '(invariant 000(d)).' % (len(capped), len(records), capped[0]), [])
         warn = ''
         if off_shape:
             warn = (' WARN %d of %d replies are not the two-line shape (reported, not fatal under '
                     'thinking on).' % (off_shape, len(records)))
-        return ('PASS', 'thinking=on: %d records, all carry reasoning.%s%s'
-                        % (len(records), warn, shape_note))
+        return ('PASS', 'thinking=on: %d records, all carry reasoning.%s%s%s'
+                        % (len(records), warn, seat_note, shape_note), pending)
 
     # regime == 'off'
     reasoned = [f for f, r in records if r.get('reasoning_chars')]
     if reasoned:
         return ('FAIL', 'thinking=off but %d of %d checked records carry reasoning text '
                         '(first: %s) - the server ignored enable_thinking:false and the run is not '
-                        'the product regime it claims to be.' % (len(reasoned), len(records), reasoned[0]))
+                        'the product regime it claims to be.'
+                        % (len(reasoned), len(records), reasoned[0]), [])
+    # #W70-BN (F9, Astra review finding 9): reasoning that is WITHHELD is still
+    # reasoning. `reasoning_chars` is 0 whenever the provider hides the trace, so
+    # the off arm accepted a run that reasoned for 1,200 tokens per decision
+    # behind `reasoning_hidden`. Either field is affirmative evidence.
+    hidden = [f for f, r in records if r.get('reasoning_hidden')]
+    if hidden:
+        return ('FAIL', 'thinking=off but %d of %d checked records report reasoning_hidden (first: '
+                        '%s) - the provider reasoned and withheld the trace, so this is not the '
+                        'product regime.' % (len(hidden), len(records), hidden[0]), [])
+    billed = [f for f, r in records if (r.get('reasoning_tokens') or 0) > 0]
+    if billed:
+        return ('FAIL', 'thinking=off but %d of %d checked records were billed reasoning tokens '
+                        '(first: %s) - the model reasoned whatever the reply shows.'
+                        % (len(billed), len(records), billed[0]), [])
     pct = 100.0 * off_shape / len(records)
     if pct > prose_abort_pct:
         return ('FAIL', 'thinking=off and %.1f%% of the first %d replies are not exactly a PLAN line '
                         'plus an action line (limit %.1f%%).%s The reply protocol is not being '
                         'followed - stop and fix the instructions, not the parsers.'
-                        % (pct, len(records), prose_abort_pct, shape_note))
+                        % (pct, len(records), prose_abort_pct, shape_note), [])
     return ('PASS', 'thinking=off: %d records, no reasoning text, %.1f%% off-protocol replies '
-                    '(limit %.1f%%).%s' % (len(records), pct, prose_abort_pct, shape_note))
+                    '(limit %.1f%%).%s%s' % (len(records), pct, prose_abort_pct, seat_note,
+                                             shape_note), pending)
 
 
 def selftest():
     """Feed the gate synthetic records. No server, no game, no corpus."""
     fails = []
+    n = [0]
 
     def check(cond, label):
+        n[0] += 1
         print(('  ok   ' if cond else '  FAIL ') + label)
         if not cond:
             fails.append(label)
 
-    def rec(**kw):
-        r = {'kind': 'ask', 'reasoning_chars': 0, 'thinking': 'on',
+    def rec(f='f.jsonl', **kw):
+        r = {'kind': 'ask', 'reasoning_chars': 0, 'thinking': 'on', 'prompt': 'p',
              'reply': 'PLAN: a. b.\nCHOICE: 2 (Cast Bear)'}
         r.update(kw)
-        return ('f.jsonl', r)
+        return (f, r)
 
     on_ok = [rec(reasoning_chars=900) for _ in range(5)]
     check(gate(on_ok, 0, 'on', 5.0, 5)[0] == 'PASS', 'thinking on + reasoning on every record = PASS')
     on_bad = on_ok[:4] + [rec(reasoning_chars=0)]
-    v, why = gate(on_bad, 0, 'on', 5.0, 5)
+    v, why, _ = gate(on_bad, 0, 'on', 5.0, 5)
     check(v == 'FAIL' and 'reasoning_chars 0' in why, 'thinking on + ONE record without reasoning = FAIL')
     hid = on_ok[:4] + [rec(reasoning_chars=0, reasoning_hidden=True)]
     check(gate(hid, 0, 'on', 5.0, 5)[0] == 'FAIL', 'thinking on + a withheld trace = FAIL')
     capd = [rec(reasoning_chars=900, max_tokens_reasoning=0) for _ in range(5)]
-    v, why = gate(capd, 0, 'on', 5.0, 5)
+    v, why, _ = gate(capd, 0, 'on', 5.0, 5)
     check(v == 'FAIL' and '000(d)' in why, 'thinking on + a 0-token reasoning budget = FAIL (ruling (d))')
     off_ok = [rec(thinking='off') for _ in range(5)]
     check(gate(off_ok, 0, 'off', 5.0, 5)[0] == 'PASS', 'thinking off + two-line replies = PASS')
@@ -181,13 +236,13 @@ def selftest():
     check(gate(off_reason, 0, 'off', 5.0, 5)[0] == 'FAIL', 'thinking off + reasoning text = FAIL')
     prose = [rec(thinking='off', reply='I should think about this.\nCHOICE: 2 (Cast Bear)\nPLAN: a.')
              for _ in range(5)]
-    v, why = gate(prose, 0, 'off', 5.0, 5)
+    v, why, _ = gate(prose, 0, 'off', 5.0, 5)
     check(v == 'FAIL' and 'not exactly a PLAN line' in why, 'thinking off + prose replies past the threshold = FAIL')
     one_bad = [rec(thinking='off') for _ in range(19)] + [rec(thinking='off', reply='hmm')]
     check(gate(one_bad, 0, 'off', 10.0, 5)[0] == 'PASS', 'one off-protocol reply in 20 is under a 10% limit')
     check(gate(one_bad, 0, 'off', 1.0, 5)[0] == 'FAIL', 'the same 5% is over a 1% limit')
     mism = [rec(thinking='off') for _ in range(5)]
-    v, why = gate(mism, 0, 'on', 5.0, 5)
+    v, why, _ = gate(mism, 0, 'on', 5.0, 5)
     check(v == 'FAIL' and 'did not reach the engine' in why, 'a record stamped off under --thinking on = FAIL')
     check(gate([], 0, 'on', 5.0, 5)[0] == 'WAIT', 'no records yet = WAIT, never a verdict')
     check(gate([], 7, 'on', 5.0, 5)[0] == 'FAIL', 'records with no regime stamp at all = FAIL (stale binary)')
@@ -197,25 +252,84 @@ def selftest():
     check(reply_shape('PLAN: a\nBecause the bear is big\nCHOICE: 1 (x)') == 'off_protocol',
           'prose between the two lines is off-protocol')
 
+    # ---- #W70-BN: the four Astra review findings against this gate ----------
+    # F6: a SUCCESSFUL forced-close recovery. Phase one reasoned, phase two
+    # allocated 0 reasoning tokens and returned the answer. Native reasoning is
+    # on the record; the shipped gate FAILED it and killed the corpus.
+    fc = ([rec(reasoning_chars=900, max_tokens_reasoning=6000) for _ in range(4)]
+          + [rec(reasoning_chars=900, max_tokens_reasoning=0, reasoning_forced_close=True)])
+    check(gate(fc, 0, 'on', 5.0, 5)[0] == 'PASS',
+          '#W70-BN F6 a forced-close record that CARRIES reasoning PASSES')
+    fc_bad = ([rec(reasoning_chars=900, max_tokens_reasoning=6000) for _ in range(4)]
+              + [rec(reasoning_chars=0, max_tokens_reasoning=0, reasoning_forced_close=True)])
+    check(gate(fc_bad, 0, 'on', 5.0, 5)[0] == 'FAIL',
+          '#W70-BN F6 MUST-NOT-MATCH the stamp is not a blanket excuse - no reasoning still FAILs')
+    # F9: withheld or billed reasoning under the OFF regime.
+    off_hidden = ([rec(thinking='off') for _ in range(4)]
+                  + [rec(thinking='off', reasoning_hidden=True)])
+    v, why, _ = gate(off_hidden, 0, 'off', 5.0, 5)
+    check(v == 'FAIL' and 'reasoning_hidden' in why,
+          '#W70-BN F9 thinking off + a WITHHELD trace = FAIL')
+    off_billed = ([rec(thinking='off') for _ in range(4)]
+                  + [rec(thinking='off', reasoning_tokens=1200)])
+    v, why, _ = gate(off_billed, 0, 'off', 5.0, 5)
+    check(v == 'FAIL' and 'billed reasoning tokens' in why,
+          '#W70-BN F9 thinking off + BILLED reasoning tokens = FAIL')
+    check(gate([rec(thinking='off', reasoning_tokens=0) for _ in range(5)], 0, 'off', 5.0, 5)[0] == 'PASS',
+          '#W70-BN F9 MUST-NOT-MATCH an explicit reasoning_tokens 0 is not evidence of reasoning')
+    # F8: the minimum is PER SEAT LOG, and PASS is not a permanent amnesty.
+    two_seats = ([rec('a.jsonl', reasoning_chars=900) for _ in range(5)]
+                 + [rec('b.jsonl', reasoning_chars=900) for _ in range(2)])
+    v, why, _ = gate(two_seats, 0, 'on', 5.0, 5)
+    check(v == 'WAIT' and 'b.jsonl' in why,
+          '#W70-BN F8 a seat log short of the minimum holds the verdict at WAIT')
+    v, why, passed = gate([rec('a.jsonl', reasoning_chars=900) for _ in range(5)], 0, 'on', 5.0, 5)
+    check(v == 'PASS' and passed == ['a.jsonl'], '#W70-BN F8 PASS names the seat logs it checked')
+    later = ([rec('a.jsonl', reasoning_chars=900) for _ in range(5)]
+             + [rec('b.jsonl', reasoning_chars=0) for _ in range(5)])
+    check(gate(later, 0, 'on', 5.0, 5, checked=['a.jsonl'])[0] == 'FAIL',
+          '#W70-BN F8 a LATER seat with no reasoning still kills the corpus after a PASS')
+    check(gate(later[:5], 0, 'on', 5.0, 5, checked=['a.jsonl'])[0] == 'WAIT',
+          '#W70-BN F8 ...and an already-checked seat alone is not re-judged')
+
     # And end to end over real files on disk, so the reader is exercised too.
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, '2000000000-ai_baka_deck44-0xa-vs-ai_baka_deck9.jsonl')
         with open(path, 'w') as fh:
             fh.write(json.dumps({'kind': 'gamestart'}) + '\n')
             for i in range(6):
-                fh.write(json.dumps({'kind': 'ask', 'seq': i, 'thinking': 'on',
+                fh.write(json.dumps({'kind': 'ask', 'seq': i, 'thinking': 'on', 'prompt': 'p',
                                      'reasoning_chars': 500, 'max_tokens_reasoning': 6000,
                                      'reply': 'PLAN: a\nCHOICE: 1 (x)'}) + '\n')
         recs, unst, nf = run_records(td, 2000000000, 5)
-        check(len(recs) == 5 and unst == 0 and nf == 1, 'the reader takes the first N records of each seat log')
+        check(sum(len(v) for v in recs.values()) == 5 and unst == 0 and nf == 1,
+              'the reader takes the first N records of each seat log')
         check(gate(recs, unst, 'on', 5.0, 5)[0] == 'PASS', 'end to end over files on disk = PASS')
         old = os.path.join(td, '1999999999-ai_baka_deck44-0xb-vs-ai_baka_deck9.jsonl')
         with open(old, 'w') as fh:
-            fh.write(json.dumps({'kind': 'ask', 'reply': 'x'}) + '\n')
+            fh.write(json.dumps({'kind': 'ask', 'prompt': 'p', 'reply': 'x'}) + '\n')
         recs2, unst2, _ = run_records(td, 2000000000, 5)
-        check(len(recs2) == 5, 'a log from BEFORE this run is not gated')
+        check(sum(len(v) for v in recs2.values()) == 5, 'a log from BEFORE this run is not gated')
 
-    print('regime-gate selftest: %d checks, %d failed' % (18 + 3, len(fails)))
+    # #W70-BN F7: engine-answered records are not evidence of a stale binary.
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, '2000000000-ai_baka_deck44-0xa-vs-ai_baka_deck9.jsonl')
+        with open(path, 'w') as fh:
+            for i in range(6):
+                fh.write(json.dumps({'kind': 'ask', 'seq': i, 'prompt': '', 'reply': '',
+                                     'choice': -1, 'fallback': 'engine_answered'}) + '\n')
+        recs, unst, _ = run_records(td, 2000000000, 5)
+        v, why, _ = gate(recs, unst, 'on', 5.0, 5)
+        check(unst == 0 and v == 'WAIT',
+              '#W70-BN F7 engine-answered records are SKIPPED, and no gateable record is WAIT')
+        with open(os.path.join(td, '2000000001-ai_baka_deck9-0xb-vs-ai_baka_deck44.jsonl'), 'w') as fh:
+            fh.write(json.dumps({'kind': 'ask', 'prompt': 'p', 'reply': 'PLAN: a\nCHOICE: 1 (x)'}) + '\n')
+        recs, unst, _ = run_records(td, 2000000000, 5)
+        v, why, _ = gate(recs, unst, 'on', 5.0, 5)
+        check(unst == 1 and v == 'FAIL' and 'rebuild' in why,
+              '#W70-BN F7 ...but a record that DID call the model and carries no stamp is a stale binary')
+
+    print('regime-gate selftest: %d checks, %d failed' % (n[0], len(fails)))
     return 1 if fails else 0
 
 
@@ -227,6 +341,9 @@ def main():
     ap.add_argument('--per-file', type=int, default=5)
     ap.add_argument('--min-records', type=int, default=5)
     ap.add_argument('--prose-abort', type=float, default=5.0)
+    #W70-BN (F8): the seat logs a previous sweep already PASSED, one per line.
+    #The file is rewritten on every PASS, so each new seat log is gated once.
+    ap.add_argument('--state')
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest:
@@ -234,8 +351,20 @@ def main():
     if not (a.logdir and a.start and a.regime):
         print('FAIL regime-gate called without --logdir/--start/--regime')
         return 1
+    checked = []
+    if a.state and os.path.exists(a.state):
+        try:
+            checked = [l.strip() for l in open(a.state) if l.strip()]
+        except OSError:
+            checked = []
     recs, unstamped, _ = run_records(a.logdir, a.start, a.per_file)
-    verdict, why = gate(recs, unstamped, a.regime, a.prose_abort, a.min_records)
+    verdict, why, now = gate(recs, unstamped, a.regime, a.prose_abort, a.min_records, checked)
+    if verdict == 'PASS' and a.state:
+        try:
+            with open(a.state, 'w') as fh:
+                fh.write('\n'.join(sorted(set(checked) | set(now))) + '\n')
+        except OSError:
+            pass
     print('%s %s' % (verdict, why))
     return 1 if verdict == 'FAIL' else 0
 

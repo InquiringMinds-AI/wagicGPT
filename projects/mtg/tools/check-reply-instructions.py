@@ -80,6 +80,27 @@ def strip_comments(src):
 
 LIT = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
+# #W70-BN (F1/F2, Astra review findings 1 and 2): the prose readers are DELETED,
+# and a deletion with no guard is a deletion that comes back. These names may
+# still appear in COMMENTS (the history is worth keeping) but must never be
+# CALLED or DEFINED in production code again: each one read bytes outside the
+# PLAN line and the action line and let them decide, veto or replace a
+# declaration. A reply is two labelled lines; everything else is
+# off_protocol_bytes and is never an input to a decision.
+DELETED_READERS = ["truncatedBlockCommitmentAbandoned", "salvageProseAttackers",
+                   "salvageProseBlocks", "proseAttackerOrdinal",
+                   "declineSentenceIsLabelScoped", "laterCodedBlockAssignment"]
+
+
+def deleted_reader_hits(path, raw, src):
+    bad = []
+    for name in DELETED_READERS:
+        for m in re.finditer(re.escape(name) + r"\s*\(", src):
+            line = raw.count("\n", 0, m.start()) + 1
+            bad.append((path, line, "a DELETED prose reader (%s)" % name,
+                        "invariant 000: nothing outside the two lines decides"))
+    return bad
+
 
 def check(path):
     raw = open(path, "r", encoding="utf-8", errors="replace").read()
@@ -87,7 +108,7 @@ def check(path):
     if cut >= 0:
         raw = raw[:cut]
     src = strip_comments(raw)
-    bad = []
+    bad = deleted_reader_hits(path, raw, src)
     start = 0
     # Statement boundaries are semicolons OUTSIDE string literals - the tails
     # themselves contain semicolons, and splitting inside one hid four of the
@@ -111,26 +132,73 @@ def check(path):
     return bad
 
 
+# ---------------------------------------------------------------------------
+# #W70-BN (F12, Astra review finding 12): THE GUIDES ARE INSTRUCTION SURFACES TOO.
+# The wave-70 guide rewrite left PLAN templates that ask for a LEDGER under the
+# plan - deck123's "stop <L+C+3>, M is <M> now, their life <L>, their creatures
+# <C>" on a second physical line, deck130's "THEIRS non-defenders <n>, YOURS
+# names Rorix/Commander <yes/no>" continuation. A model following its guide's
+# literal template writes three lines of board state, which is exactly the shape
+# the reply protocol forbids, and no guard looked at guides at all.
+# The rule this enforces: a PLAN template is ONE line and it is a SEQUENCE OF
+# ACTIONS. A stop is a step ("then make humans until M reaches 25, then pass"),
+# never a tally.
+LEDGER_AFTER_PLAN = ["yes/no", "m is ", "their life", "their creatures",
+                     "opponent life", "theirs", "yours", "creature count"]
+
+
+def guide_check(path):
+    """PLAN templates in a strategy guide: one line, actions only."""
+    bad = []
+    lines = open(path, "r", encoding="utf-8", errors="replace").read().split("\n")
+    for i, line in enumerate(lines):
+        at = line.find("PLAN:")
+        if at < 0 or line[:at].strip():
+            continue          # not a template line - prose that mentions the label
+        indent = len(line) - len(line.lstrip())
+        template = line[at + 5:]
+        low = template.lower()
+        for w in LEDGER_AFTER_PLAN:
+            if w in low:
+                bad.append((path, i + 1, "a ledger (%r) under PLAN:" % w, template.strip()[:120]))
+                break
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if nxt.strip() and (len(nxt) - len(nxt.lstrip())) >= indent and indent > 0:
+            bad.append((path, i + 1, "a SECOND line of the PLAN template",
+                        nxt.strip()[:120]))
+    return bad
+
+
+GUIDE_SUFFIX = ("_strategy.txt",)
+
+
 def main(argv):
     targets = argv[1:] or ["src"]
-    files = []
+    files, guides = [], []
     for t in targets:
         if os.path.isdir(t):
             for root, _, names in os.walk(t):
                 files += [os.path.join(root, f) for f in names
                           if f == "AIPlayerGPT.cpp"]
+                guides += [os.path.join(root, f) for f in names
+                           if f.endswith(GUIDE_SUFFIX)]
+        elif t.endswith(GUIDE_SUFFIX):
+            guides.append(t)
         else:
             files.append(t)
     bad = []
     for f in files:
         bad += check(f)
+    for g in sorted(guides):
+        bad += guide_check(g)
     for path, line, phrase, snip in bad:
         print("check-reply-instructions: %s:%d licenses %r in an instruction string: %s"
               % (path, line, phrase, snip))
     if bad:
         print("check-reply-instructions: FAILED (%d instruction string(s))" % len(bad))
         return 1
-    print("check-reply-instructions: OK (%d file(s))" % len(files))
+    print("check-reply-instructions: OK (%d source file(s), %d guide(s))"
+          % (len(files), len(guides)))
     return 0
 
 

@@ -109,10 +109,10 @@ clock (never for Rorix, who flies over them). Also do not cast on "your mana aff
 SURVIVAL OVERRIDE: add the printed power of every creature on their line; if that sum is at or
 above "Your life:", take the longest THEIRS list whatever YOURS names - unless what it leaves alive
 still totals your life or more, when it buys nothing and you keep the blocker.
-At every window listing "Cast Starstorm" write:
-  PLAN: <Starstorm now / hold it>, then <next action>; THEIRS non-defenders <n>, YOURS names
-  Rorix/Commander <yes/no>
-THEIRS 0, or YOURS yes, means "Cast nothing right now".
+At every "Cast Starstorm" window write one PLAN line of actions:
+  PLAN: <Starstorm now / hold it>, then <next action>
+Answer "Cast nothing right now" when THEIRS holds no non-defender, or YOURS names Rorix or
+your commander.
 ON THE X MENU: option 1 is the LARGEST X, never X=1, and any X your plan names is older than the
 menu. The menu MARKS one row ("[<- most kills at any affordable X ...]" or "[<- best trade: ...]"):
 answer that row's number and read nothing else - a marker answers WHICH X, never WHETHER. With no

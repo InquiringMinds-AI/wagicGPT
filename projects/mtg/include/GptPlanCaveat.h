@@ -887,24 +887,69 @@ inline std::string planCarryCompose(const std::string& plan, size_t maxChars)
 //      CONSUMED - the next window is served the REMAINDER (planStepsAfter).
 //  (3) the steps must be found without changing a byte of the plan: these
 //      helpers return OFFSETS into the plan, so every join is the original text.
-//A step ends at ';' ',' '.' '!' '?' or a newline that is followed by whitespace
-//or the end of the string - so "1,000" and "3.5" do not split a step - and the
-//last step needs no terminator. Pure over one string.
+//#W70-BN (F11, Astra review finding 11). A BARE COMMA IS NOT A STEP BOUNDARY.
+//Card names carry commas ("Thalia, Guardian of Thraben"), and so do timing
+//clauses ("after blockers, cast Giant Growth"), so the wave-70 grammar split
+//"cast Thalia, Guardian of Thraben; attack" into three steps and carried
+//"Guardian of Thraben; attack" as the remainder - a step that names no action
+//and a card that does not exist. The boundaries now are:
+//  * ';' followed by whitespace or the end of the string;
+//  * a newline;
+//  * the word "then", with or without the comma in front of it ("swing all,
+//    then Giant Growth after blockers") - the boundary sits at the comma when
+//    there is one, so the kept step is the model's own text;
+//  * '.' '!' '?' followed by whitespace AND an upper-case letter - a new
+//    sentence. A lower-case continuation ("cast Bear. it trades up") and a
+//    decimal ("3.5") are not boundaries.
+//The last step needs no terminator. The helpers return OFFSETS, so every join
+//is the original text byte for byte. Pure over one string.
+inline bool planStepThenAt(const std::string& plan, size_t i)
+{
+    //"then" as a whole word at `i`, preceded by whitespace or a comma+space.
+    if (i + 4 > plan.size())
+        return false;
+    if (!((plan[i] == 't' || plan[i] == 'T') && plan.compare(i + 1, 3, "hen") == 0))
+        return false;
+    if (i + 4 < plan.size() && (std::isalnum((unsigned char) plan[i + 4]) || plan[i + 4] == '_'))
+        return false;
+    if (i == 0)
+        return false;
+    return std::isspace((unsigned char) plan[i - 1]) != 0;
+}
+
 inline std::vector<size_t> planStepEnds(const std::string& plan)
 {
     std::vector<size_t> ends;
+    const size_t st = plan.find_first_not_of(" \t\r\n;,.!?");
     for (size_t i = 0; i < plan.size(); i++)
     {
         const char c = plan[i];
-        if (c != ';' && c != ',' && c != '.' && c != '!' && c != '?' && c != '\n')
+        size_t end = std::string::npos;
+        if (c == '\n')
+            end = i + 1;
+        else if (c == ';'
+                 && (i + 1 >= plan.size() || std::isspace((unsigned char) plan[i + 1])))
+            end = i + 1;
+        else if ((c == '.' || c == '!' || c == '?')
+                 && i + 2 < plan.size() && std::isspace((unsigned char) plan[i + 1])
+                 && std::isupper((unsigned char) plan[i + 2]))
+            end = i + 1;
+        else if (planStepThenAt(plan, i))
+        {
+            //Cut BEFORE "then", taking a comma and its space with the step
+            //that owns them, so the remainder reads "then <action>".
+            size_t back = i;
+            while (back > 0 && std::isspace((unsigned char) plan[back - 1]))
+                back--;
+            end = back;
+        }
+        if (end == std::string::npos)
             continue;
-        if (c != '\n' && i + 1 < plan.size()
-            && !std::isspace((unsigned char) plan[i + 1]))
-            continue; //"1,000" / "3.5": not a step boundary
-        const size_t st = plan.find_first_not_of(" \t\r\n;,.!?");
-        if (st == std::string::npos || i < st)
+        if (st == std::string::npos || end <= st)
             continue; //nothing but punctuation so far
-        ends.push_back(i + 1);
+        if (!ends.empty() && ends.back() >= end)
+            continue;
+        ends.push_back(end);
     }
     if (ends.empty() || ends.back() < plan.size())
     {

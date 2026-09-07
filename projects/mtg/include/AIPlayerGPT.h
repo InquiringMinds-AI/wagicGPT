@@ -1535,6 +1535,10 @@ private:
     void noteReaskExecuted(const char * seam, int row, const string& text);
     //#W53-Q (D24): the latch's gate, pure so PARSETEST can pin it.
     static bool handedToHeuristic(int choice, const char * fallback);
+    //#W70-BN (F10): a plan step is consumed by an EXECUTED decision, never by a
+    //parse. Pure over the four facts the record already carries.
+    static bool planStepExecuted(bool hasPlan, bool modelCall, int choice,
+                                 const char * fallback);
     //#W54-B (D9): a reply that ANSWERED after eating the whole deadline is
     //not a timeout - noAnswerClassFor only ever classifies a NON-answer, so
     //the wave-53 corpus's six replies above 600 s (one at 868,729 ms = 96.5%

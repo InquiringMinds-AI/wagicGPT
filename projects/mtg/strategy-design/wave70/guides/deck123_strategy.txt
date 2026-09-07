@@ -65,10 +65,9 @@ THEIRS.
 - TAKE THE REPEAT ROW ("repeated N times, then stop") ONCE, with N = (L + C + 3) - M, in its own
   format: CHOICE: 2 (Create human with Thraben Doomsayer x17). A take with no number is re-asked
   and the window spent; the next window is a pass. N of 0 or less is a pass - not "x1", not "x0".
-- Carry the four numbers INSIDE a sequence of actions, every blank filled from the screen, never
-  the bracket text itself:
-    PLAN: this window <x<N> or pass>, then <the next action you intend>, then <the one after>;
-    stop <L+C+3>, M is <M> now, their life <L>, their creatures <C>
+- The stop is a STEP of the sequence, not a ledger under it. One PLAN line, actions only, every
+  blank filled from the screen, never the bracket text itself:
+    PLAN: this window <x<N> or pass>, then <the next action you intend>, then keep making humans until M reaches <L+C+3>, then pass
   The first step names the action the CHOICE line names; a Damnation menu takes its own plan line.
 - Recompute the stop from THIS window's row every time; if your numbers disagree, the arithmetic
   is right.
@@ -95,8 +94,8 @@ The row counts for you: "destroys N of their
 creatures (K without a restriction against attacking), M of yours", and "all of them carry a
 restriction" is K = 0. FIRST, BEFORE THE CHOICE LINE, read M and N off that row: M at 4 or more,
 or N at 0, and Damnation's number is not written this window - answer another row. Only if that
-comparison passes do you go on. Whenever it is listed this is the ONLY plan line:
-    PLAN: Damnation: N <theirs>, K <able to attack>, M <mine>; <cast / hold>
+comparison passes do you go on. Whenever it is listed this is the ONLY plan line, and it is a sequence of actions:
+    PLAN: <cast Damnation now / hold Damnation>, then <the next action you intend>
 - M at 4+: NEVER, whatever N says. Four bodies is a board you win with.
 - M at 0 with K at 2+: cast it, above a maker, the Tutor and the Alarm; at your life 10 or less,
   "hold" is not an option.
