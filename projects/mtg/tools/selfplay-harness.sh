@@ -435,6 +435,13 @@ regime_gate_sweep() {
                 *"no gateable records yet"*) ;;
                 *) return 0;;
             esac
+            #A PASS has been recorded: later sweeps gate only seat logs that
+            #appeared since, and "no gateable records yet" then means "no NEW
+            #seat log", not "the seats are not reaching the model". The
+            #deadline below is for a corpus that has NEVER produced a record
+            #(2026-09-06: the first thinking-on corpus PASSED at 210 records
+            #and was killed by this deadline on the next sweep).
+            [ -f "$OUTDIR/REGIME-GATE-PASSED" ] && return 0
             if [ $(( $(date +%s) - START )) -ge 1800 ]; then
                 verdict="FAIL 30 minutes in and there are still no gateable decision records (${verdict#WAIT }) - the seats are not reaching the model."
             else
