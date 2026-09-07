@@ -1,0 +1,43 @@
+# Wave-71 step-3 brief (lean; REJECT is the expected verdict for anything not paid for by a decision the corpus shows going wrong. Amendment 332 stands: guides are decision-time instruction only, hard ceiling 20,000 bytes, no citations/history in a guide — evidence goes in YOUR review.md.)
+
+Second reasoning-on corpus (invariant 000: reasoning only in the native channel; reply = PLAN line then action line, nothing else). Wave 71 step one DELETED every wave 66-69 in-band-reasoning mechanism (wave70/known-bugs.md §R; wave71/lane-BO.md), fixed the MDFC-decline livelock (lane-BP), opened own-turn instant windows in the SHARED heuristic path + fixed rowSaysNoOp / cast-mode commitment / reveal scope (lane-BQ), fixed Tribute to Hunger at the engine + eleven render truths (lane-BR), and the nine Astra findings (wave71/codex-review.md, lane-BS: narrowed stamp, Tribute re-choose, window-scoped land latch, cache refusal, cardinality-floored answer ceilings + one doubled-allowance re-ask, distinct-index re-ask restored, Puzzle Box hand, life-neutral negative, branch-aware no-op). Records carry `thinking`, `reasoning` (the native reasoning text — read it when a decision looks wrong), `reasoning_chars`, `off_protocol_bytes`, `plan_line_missing`, `plan_steps_done`/`plan_step_count`, `action_before_plan`; re-served answers now write `ask_replay` records in an `askreplay/` sidecar. Wave-71 guide edits for all seven decks are the LIVE guides.
+
+Repo /home/magi/Projects/wagicGPT, game dir projects/mtg. Use python for translogs; use /usr/bin/grep (bare grep drops matches). DO NOT edit anything under bin/Res, src/, or run git or wagic; write only under projects/mtg/strategy-design/wave71/. Never write mechanisms as the owner's positions. Report what you did NOT check.
+
+CORPUS (wave 71, binary = master b31f66cf3 = archives/wagic-b31f66cf3-w71step1, `--thinking on`, WAGIC_GPT_TIMEOUT=900, no operator token ceiling): __CORPUS_DIR__ (__CORPUS_STATS__). One JSONL per SEAT (filename ...deckA-<ptr>-vs-...deckB = the deckA seat); records {seq, kind, prompt, reply, reasoning, choice, chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?, ...}; `prompt` is the full per-decision message the model saw; a closing `gameend` record carries the outcome and the census counters; results.tsv has winners. COUNT FROM THE RENDERED `prompt`, never from the `options` array; a HOLD take census must PREFIX-match the row. Verify every card fact against the primitive (`/usr/bin/grep -n "name=Card Name" -A8 projects/mtg/bin/Res/sets/primitives/*.txt`); if Scryfall (https://api.scryfall.com/cards/named?exact=NAME) disagrees, report both.
+
+## Per-deck agent (one per deck: 146, 152, 125, 126, 162, 123, 130)
+Purpose (owner's words): read the transcripts of your deck, compare the LLM's actions to the
+instruction set (the guide projects/mtg/bin/Res/ai/baka/deck<N>_strategy.txt + the general guide
+wave62/general-strategy.md (wave-59 edition + R331; NOTE from the wave-63..67 syntheses: this file is NOT loaded at runtime (only deck<N>_strategy.txt is opened, AIPlayerGPT.cpp:15332) — the deck guide is the live surface) + the reply protocol in the prompt), find issues in the game, the
+interface, and the guide, and surface anything else worth the core loop's attention.
+Method: for each of your deck's 6 games (your seat's translog; the opponent's for context),
+trace the decisions that decided the game. Classify each misplay PERCEPTION (the model misread a
+true surface, or the surface was false/missing -> ENGINE/RENDER item, cite file+seq) vs STRATEGY
+(read correctly, decided against the guide or against good play -> guide item). Note fallbacks,
+re-asks, and any decision where the prompt's information was insufficient or wasteful (what a
+better interface would have shown). Hands are real (mulligans, bottoming): do not read variance
+as guide effect.
+Output: ONE file, wave71/deck<N>/review.md: (1) game-by-game outcome + the deciding decisions with
+seq citations; (2) engine/interface/card items ranked HIGH/MED/LOW with a concrete repro (file,
+seq, the rendered line) — this is the primary deliverable; (3) guide verdict: KEEP as is (a
+success verdict, state why) or EDIT — if EDIT, also write wave71/deck<N>/strategy.txt (the full
+revised guide, start from the live one) and list each edit before->after with the seq that
+paid for it IN review.md — the guide itself carries NO citation, count, or history (Amendment 332); hard ceiling 20,000 bytes, and an EDIT that grows the guide must say which rule earned its bytes; (4) OPTIONAL proposals, only when
+your evidence supports them: general-guide changes (wave71/deck<N>/general-proposals.md) and
+strategy-writing-skill changes (wave71/deck<N>/skill-proposals.md; current skill edition =
+wave68/strategy-writing-skill-v2.md (the ~40 KB distillation, owner-installed 2026-09-06 after six Astra adversarial rounds; read it in full — it is short; the 1.3 MB wave71/strategy-writing-skill.md is lineage only) — read it before proposing; a proposal that
+restates an existing amendment is noise). No prediction tables, no rotation evidence, no
+docket bookkeeping. Final message: <= 10 lines.
+
+## Engine-narration seat (one agent)
+You read the whole corpus for the engine's sake, not the guides'. Deliverable wave71/engine-seat.md: (1) corpus census as before (games natural/hung/crashed, decisions, fallbacks by kind, `async_drops`, `transport`, timeouts, `deadline_pct`, HOLD renders/takes, reply shape: exactly PLAN+action vs `plan_line_missing` vs `off_protocol_bytes>0` classes, `reasoning_chars` distribution, `reasoning_budget_hit`/`reasoning_forced_close` vs actual phase-2 closes (`max_tokens_reasoning==0` requests), `reply_truncated` at the new 288/256 ceilings (ANY at ask/priority refutes lane BO's fit — quote it), the cardinality-floor re-ask, `ask_replay` sidecar counts, `plan_steps_done` advance vs execution); (2) REGRESSION WATCH for wave 71's shared-path changes — this is the section that matters most: lane BQ's L4 lets a Baka seat act in its own upkeep/blockers/damage/end step — count decisions per turn vs wave 70 (2,119 / 40 seats), any priority ping-pong or double-ask between the two AI seats, any game-advance stall; lane BP's pass-floor no-progress arm and cache refusal — did either fire (`menu_pass_no_progress`, `ask_replays_refused` in gameend) and was the forced pass ever an auto-answered legal decision; lane BS's land latch — any land drop offered in main 2 after a main-1 decline, any turn with a playable land never offered; the restored distinct-index re-ask and the doubled-allowance re-ask — fires and outcomes; (3) adjudicate EVERY prediction in wave71/lane-{BO,BP,BQ,BR,BS}.md as PASS / FAIL / UNTESTED with counts N of M and file+seq (UNTESTED is a real verdict; never infer), plus the carried items (Idyllic Tutor one-window lag; `HOLD PRIORITY:` row head label-shaped — lane BR L18c docket; dungeon room header); (4) engine/render/narration defects ranked HIGH/MED/LOW with repro (file, seq, the rendered line); (5) the owner's lategame specimen (standing rule, alert-only): ONE late-turn decision (turn >= 25, preferably one that mattered), full `prompt` verbatim to wave71/lategame-specimen.txt with a 3-line header. Final message: <= 15 lines, HIGH items first.
+
+## Synthesis (runs only if any deck agent wrote general-proposals.md or skill-proposals.md)
+Read all proposals + engine-seat.md. Decide each proposal: ADOPT (edit wave71/general-strategy.md,
+a copy of wave62's (the R331 edition; waves 63-67 wrote no edition; wave 68 installed wave68/strategy-writing-skill-v2.md as the current edition), or append a numbered amendment to wave71/strategy-writing-skill.md, a
+byte-verbatim copy of wave59's with amendments appended — verify the prefix with cmp) or
+REJECT with one line of reasons. Write wave71/synthesis-notes.md. If a deck agent's guide edit
+contradicts an adopted general change, note it; do not edit deck guides yourself.
+
+METHOD NOTE (from the wave-59 engine seat): the translog `phase` field is not the rendered phase — count phase-gated facts from the prompt text.
