@@ -179,7 +179,7 @@ PLANESWALKERS - USE THEM EVERY TURN THEY ARE OUT; an idle walker on your turn is
   life 6 or less -> do NOT take the 0; pass, or -3 if she has the loyalty.
 - KAYA: her -3 is removal, above; never idle.
 
-THE HOLD-PRIORITY ROW ("Hold priority: pass now ...") is the same pass as "Cast nothing right
+THE HOLD-PRIORITY ROW ("Hold priority - pass now ...") is the same pass as "Cast nothing right
 now", plus it stops the identical list re-asking. THE TEST IS ONE LITERAL: you have decided on no
 action AND the prompt carries "[you declined this exact list N times already this turn]" -> answer
 the HOLD row; that line absent -> "Cast nothing right now".

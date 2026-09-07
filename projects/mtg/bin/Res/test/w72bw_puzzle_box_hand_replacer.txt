@@ -1,0 +1,36 @@
+#NAME: the hand-replacement warning reaches the pending ability's payload at all
+#W72-BW (M3; wave-71 engine-seat HIGH-3, lane-BS F7's own weakest evidence).
+#`stackHandReplacerFor` decides whether "EVERY COUNT TAKEN FROM YOUR HAND ON THIS
+#SCREEN IS ABOUT TO BE VOID" is printed. It had no fixture and no pin, and it
+#returned nothing on its first live shape (123v162 seq 43-45, the opponent's
+#Teferi's Puzzle Box trigger unresolved in this seat's own draw step): the scan
+#read `Interruptible::source`, which StackAbility NEVER SETS - it stays NULL from
+#the base ctor - so the shape gate and the payload walk below it were unreachable
+#for every triggered and activated ability, always.
+#Teferi's Puzzle Box (mtg.txt:118333-4) carries BOTH halves - all(*|myhand) for
+#its controller's draw step and all(*|opponenthand) for the other player's - so
+#with one Box on EACH side, of the four registered triggers exactly TWO empty any
+#given seat's hand: its own Box's `myhand` line and their Box's `opponenthand`
+#line. `asserthandreplacer` stages them one at a time and counts.
+#0 = the scan never reaches a payload (the base tree, and the live FAIL);
+#4 = the whole SCRIPT is being read instead of the payload;
+#2 = the payload, read relative to its own source.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Teferi's Puzzle Box
+hand:Mind Stone
+[PLAYER2]
+inplay:Teferi's Puzzle Box
+hand:Mind Stone
+[DO]
+asserthandreplacer 2 teferi's puzzle box
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Teferi's Puzzle Box
+hand:Mind Stone
+[PLAYER2]
+inplay:Teferi's Puzzle Box
+hand:Mind Stone
+[END]

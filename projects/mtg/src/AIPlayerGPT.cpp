@@ -367,7 +367,7 @@ const char * kRevealWindowScopeFact =
 //to pass it, a reorder cannot make it false, and a caller that appends a
 //decline row nobody named still gets the flag's answer. Pure over the rendered
 //row text; PREFIX-matched, because a decline row carries its own annotations
-//("Cast nothing right now (combat comes next this turn)", "Hold priority: pass
+//("Cast nothing right now (combat comes next this turn)", "Hold priority - pass
 //now, and do not ask me again ...").
 bool declineRowText(const string& row)
 {
@@ -2172,6 +2172,36 @@ static bool scriptHasActivatedAnimate(const string& lowScript)
     return false;
 }
 
+//#W72-BW (M20): the COST head of the first activated animation line, verbatim
+//from the script that owns it (lowercased with the rest of the script read, the
+//same casing every other script-derived cost in this prompt carries). "" when
+//there is no activated animation or the line has no cost head.
+static string scriptActivatedAnimateCost(const string& lowScript)
+{
+    size_t lp = 0;
+    while (lp <= lowScript.size())
+    {
+        const size_t nl = lowScript.find('\n', lp);
+        const string line = lowScript.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? lowScript.size() + 1 : nl + 1;
+        if (line.empty() || line[0] == '@')
+            continue;
+        const size_t bp = line.find("becomes(creature");
+        if (bp == string::npos)
+            continue;
+        const size_t colon = line.find(':');
+        if (colon == string::npos || colon >= bp)
+            continue;
+        string cost = line.substr(0, colon);
+        while (!cost.empty() && cost[0] == ' ')
+            cost.erase(0, 1);
+        while (!cost.empty() && cost[cost.size() - 1] == ' ')
+            cost.erase(cost.size() - 1);
+        return cost;
+    }
+    return "";
+}
+
 static bool permanentCanAnimate(MTGCardInstance * c)
 {
     if (!c || c->isCreature())
@@ -2206,6 +2236,18 @@ static string animatableNotCountedTail(int n)
                                  " creature and is not in that count"
                                : " noncreature permanents of theirs can animate into"
                                  " creatures and are not in that count");
+    //#W72-BW (M20, wave-71 engine-seat MED-1): the wave-71 tail says what the
+    //count does NOT cover and stops there, and `125v152` seq 64 read that as a
+    //reason to cast a sweeper - `PLAN: Cast Supreme Verdict to remove the
+    //impending Lair of the Hydra threat` over a row whose own verdict was
+    //`destroys 0 ... 0 of yours`, at 2 life. The missing half is the tense: an
+    //un-animated land is not a creature AS THE BOARD STANDS, so nothing that
+    //only touches creatures reaches it now. Stated as a fact about the board,
+    //never as advice about the row.
+    o << (n == 1 ? " - it is not a creature as the board stands"
+                 : " - none of them is a creature as the board stands")
+      << ", so nothing that only affects creatures reaches "
+      << (n == 1 ? "it" : "them") << " right now";
     return o.str();
 }
 
@@ -4684,8 +4726,16 @@ static bool abilityEmptiesHandOf(MTGAbility * a, GameObserver * observer,
     //SOURCE card, which is exactly the relative reading the script has.
     if (TargetChooser * atc = a->getActionTc())
         if (TargetZoneChooser * tz = dynamic_cast<TargetZoneChooser *>(atc))
-            if (seat->game->hand && tz->targetsZone(seat->game->hand, src))
-                return true;
+            if (seat->game->hand && src)
+            {
+                //#W72-BW (M3): targetsZone(zone, source) ASSIGNS the chooser's
+                //own `source`, so a read of a LIVE chooser must put it back.
+                MTGCardInstance * keep = tz->source;
+                bool hit = tz->targetsZone(seat->game->hand, src);
+                tz->source = keep;
+                if (hit)
+                    return true;
+            }
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
         if (abilityEmptiesHandOf(na->ability, observer, src, seat, depth + 1))
             return true;
@@ -4708,16 +4758,28 @@ static string stackHandReplacerFor(GameObserver * observer, Player * seat)
         Interruptible * it = (Interruptible *) stack->mObjects[i];
         if (!it || it->state != NOT_RESOLVED)
             continue;
+        StackAbility * sa = dynamic_cast<StackAbility *>(it);
+        if (!sa || !sa->ability)
+            continue;
+        //#W72-BW (M3, wave-71 engine-seat HIGH-3): the source is the ABILITY's,
+        //not the stack entry's. `StackAbility` never assigns `Interruptible::
+        //source` - the base ctor leaves it NULL and nothing on the push path
+        //(ActionStack::addAbility -> StackAbility ctor) fills it - so the old
+        //`dynamic_cast<MTGCardInstance *>(it->source)` was NULL for EVERY
+        //triggered and activated ability and this scan returned "" every time,
+        //before the shape gate or the payload walk below it ever ran. That is
+        //why the wave-71 F7 payload fix did not fire on its first live shape
+        //(123v162 seq 43-45). `StackAbility::getDisplayName` reads
+        //`ability->source` for exactly this reason; so does this now.
         MTGCardInstance * src = dynamic_cast<MTGCardInstance *>(it->source);
+        if (!src)
+            src = sa->ability->source;
         if (!src)
             continue;
         //the SHAPE gate stays a script read - a hand-wide bottom/move - but WHOSE
         //hand is answered by the payload below, never by the script.
         const string mt = scriptLower(src->magicText);
         if (mt.find("bottomoflibrary") == string::npos && mt.find("moveto(") == string::npos)
-            continue;
-        StackAbility * sa = dynamic_cast<StackAbility *>(it);
-        if (!sa || !sa->ability)
             continue;
         if (!abilityEmptiesHandOf(sa->ability, observer, src, seat, 0))
             continue;
@@ -8673,15 +8735,25 @@ string graveyardZoneLine(bool mine, const vector<string>& entries)
 //where it would change the plan. So the fact goes on the PERMANENT, where it is
 //readable at every window. Neutral about affordability: it states the rule, not
 //a rung, and is therefore true on either board. Pure over the two predicates.
-static string manlandBoardTag(bool canAnimate, bool tapsForMana)
+//#W72-BW (M20): the two facts the wave-71 tag left out - what the animation
+//COSTS, and that the permanent is not a creature until that cost is paid. Both
+//come off the same script line the tag is derived from, so neither can drift
+//from it. `cost` empty keeps the wave-71 strings byte-identical.
+static string manlandBoardTag(bool canAnimate, bool tapsForMana, const string& cost = "")
 {
     if (!canAnimate)
         return "";
-    if (!tapsForMana)
-        return " [creature-land: it can animate into a creature at its own activation window]";
-    return " [creature-land: it can animate into a creature at its own activation window,"
-           " and its OWN mana is not counted toward that activation - tapping it for mana"
-           " leaves it tapped, and a tapped permanent can neither attack nor block]";
+    std::ostringstream o;
+    o << " [creature-land: it can animate into a creature at its own activation window";
+    if (tapsForMana)
+        o << ", and its OWN mana is not counted toward that activation - tapping it for"
+             " mana leaves it tapped, and a tapped permanent can neither attack nor block";
+    o << "]";
+    if (!cost.empty())
+        o << " [the animation costs " << cost << ", and until it is paid this permanent is"
+             " NOT a creature - it cannot attack or block and nothing that only affects"
+             " creatures reaches it]";
+    return o.str();
 }
 
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
@@ -8853,7 +8925,8 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             {
                 const string mlow = scriptLower(card->magicText);
                 if (scriptHasActivatedAnimate(mlow))
-                    out << manlandBoardTag(true, mlow.find(":add") != string::npos);
+                    out << manlandBoardTag(true, mlow.find(":add") != string::npos,
+                                           scriptActivatedAnimateCost(mlow)); //#W72-BW (M20)
             }
             //the LIVE keyword set - granted/lost abilities the decklist
             //text cannot show (Bloodghast "can't block", taught flying...)
@@ -21483,6 +21556,32 @@ string loopNonChainingClause(const string& converter, const string& mirror, bool
 //(hand, library, graveyard) rather than in exile, which no card leaves unless
 //another card says so. Nothing is deleted: the consequence of a close is still
 //stated, conditionally, and the zone is still named.
+//#W72-BW (M19, wave-70 deck126 HIGH-3, routed at wave 71). Salience was exactly
+//inverted: the DEAD state (a half in a zone it never returns from) printed a
+//five-line block 158 times in one game, and the WINNING state - both halves on
+//one battlefield - printed no header at all, only a LIFE-TO-DAMAGE CONVERTER
+//line naming ONE of the two halves (deck123 seq 21). This is that header. It
+//states the closure and the two entry points into the chain, which is what a
+//decision at a closed loop turns on, and nothing about what to do with it.
+//Pure over the two names and the side.
+string closedLoopHeaderText(const string& converter, const string& mirror, bool theirs)
+{
+    if (converter.empty() || mirror.empty())
+        return "";
+    std::ostringstream o;
+    o << "LOOP COMPLETE: BOTH halves of a life LOOP (" << converter << " + " << mirror
+      << ") are on " << (theirs ? "THEIR" : "YOUR") << " battlefield right now.";
+    if (theirs)
+        o << " Any life YOU lose, and any life THEY gain, chains until you are at 0 -"
+             " so every life payment on this screen is fatal rather than expensive, and"
+             " a number that reads as life to them is lethal to you.";
+    else
+        o << " Any life THEY lose, and any life YOU gain, chains until they are at 0 -"
+             " so any one point of either, from any source, ends the game in your"
+             " favour.";
+    return o.str();
+}
+
 string pendingLoopWarningText(const string& inPlayHalf, const string& seenHalf,
                               const string& seenWhere, bool theirs,
                               const string& affordClause = "",
@@ -21775,8 +21874,13 @@ static string loopPendingSituationLine(Player * me, Player * opp,
             continue;
         string conv, mir;
         loopHalvesInZone(pl->game->inPlay, true, conv, mir);
-        if ((conv.empty() && mir.empty()) || (!conv.empty() && !mir.empty()))
-            continue; //nothing in play, or the pair is already closed
+        if (conv.empty() && mir.empty())
+            continue; //nothing in play
+        //#W72-BW (M19): the pair CLOSED on this battlefield used to fall through
+        //to `continue` - the state that decides the game announced itself with
+        //nothing. It gets the header now.
+        if (!conv.empty() && !mir.empty())
+            return closedLoopHeaderText(conv, mir, side == 0);
         const bool wantMirror = mir.empty();
         string found, where;
         bool halfCanReturn = true; //#W67-AY (I8)
@@ -21864,6 +21968,14 @@ static string loopPendingSituationLine(Player * me, Player * opp,
                                                      sources, colours);
             }
         }
+        //#W72-BW (M19): a pair whose other half cannot come back is not a state
+        //any decision on this screen turns on, and it printed the LONGEST block
+        //in the prompt - 158 renders in one vs125 game, at full length, in a
+        //game where it could never close. It is silent now; the half that IS in
+        //play still carries its own converter/mirror lines in the board frame,
+        //so nothing about the live board goes unsaid.
+        if (!halfCanReturn)
+            continue;
         return pendingLoopWarningText(conv.empty() ? mir : conv, found, where, side == 0, afford,
                                      halfCanReturn, blockedByExile); //#W67-AY (I8), #W67-AZ (R6)
     }
@@ -24151,6 +24263,28 @@ static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3]
     return o.str();
 }
 
+//#W72-BW (M11): the trend samples read as a rise. Same buffer, same sampling
+//gate, same turn labels as the "Opponent life trend:" line - so a row clause
+//built on this can never disagree with the frame three lines above it.
+bool AIPlayerGPT::oppLifeRise(int& gain, int& turns) const
+{
+    gain = 0;
+    turns = 0;
+    if (mOppLifeSamples < 2)
+        return false;
+    Player * opp = ((Player *) this)->opponent();
+    if (!opp)
+        return false;
+    const int first = 3 - mOppLifeSamples;
+    const int g = opp->life - mOppLifeByTurn[first];
+    const int t = translogTurn(observer ? observer->turn : 0) - mOppLifeTurnNo[first];
+    if (g <= 0 || t <= 0)
+        return false;
+    gain = g;
+    turns = t;
+    return true;
+}
+
 //#W47 (R7): `optionText` is THIS window's option block (assemblePrompt hands it
 //down; the board-hash callers pass nothing). It is read for one purpose - to
 //tell a permanent that already explains itself on an option row from one that
@@ -25924,6 +26058,10 @@ static string stripNarrationDecoration(const string& in)
                 //#W68-BB (J9): the pending stack's death verdict is true of the
                 //stack in front of the model, and of nothing afterwards.
                 || (in.compare(i, 20, "{answers the stack: ") == 0)
+                //#W72-BW (M21): the plain decline's scope clause is true of THIS
+                //window's menu (it names the hold row standing beside it) and of
+                //nothing once the window closes.
+                || (in.compare(i, 22, "{closes ONLY this wind") == 0)
                 //#W64-AH (F11): the crack-back cover tag prices a line that is
                 //true of THIS window's board and false the moment combat
                 //happens - decision-time pricing, never history.
@@ -26494,12 +26632,20 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //loops the row exists for): it says what it costs where it costs it. The HEAD
 //is shared by both spellings, so every consumer that identifies the row by its
 //head - holdRowIndexOf, isReservedHoldEcho - binds either.
+//#W72-BW (M23b, wave-71 lane-BR L18c docket, deck125 E-5). The head was
+//`Hold priority:` - LABEL-SHAPED, and the parser never accepts a label it did
+//not ask for. `125v152` seq 110 answered `HOLD PRIORITY: 2 (Hold priority)`
+//and was refused: the model copied a rendered heading into its label slot, the
+//same failure lane BR fixed one row higher for `YOUR PLAN:` (L11). The colon is
+//a dash now on all three spellings; the head is still shared, so holdRowIndexOf
+//and isReservedHoldEcho bind either, and the two head comparisons that spelled
+//the colon out are cut back to the colon-free prefix.
 static const char * kHoldPriorityRowHead =
-    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    "Hold priority - pass now, and do not ask me again - this turn or later -"
     " until one of the rows above changes (any change re-opens this window;";
 
 static const char * kHoldPriorityRowText =
-    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    "Hold priority - pass now, and do not ask me again - this turn or later -"
     " until one of the rows above changes (any change re-opens this window; you"
     " give up no cast)";
 
@@ -26514,7 +26660,7 @@ static const char * kHoldPriorityRowText =
 //holdRowIndexOf / isReservedHoldEcho bind this one exactly as they bind the
 //others.
 static const char * kHoldPriorityRowTextActivation =
-    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    "Hold priority - pass now, and do not ask me again - this turn or later -"
     " until one of the rows above changes (any change re-opens this window; the"
     " rows above include ACTIVATED abilities that are usable RIGHT NOW, and"
     " taking this row gives every one of them up for as long as these rows stand)";
@@ -26522,7 +26668,7 @@ static const char * kHoldPriorityRowTextActivation =
 //The same row on a CASTING menu, where "you give up no cast" is exactly the
 //claim that is false.
 static const char * kHoldPriorityRowTextCast =
-    "Hold priority: pass now, and do not ask me again - this turn or later -"
+    "Hold priority - pass now, and do not ask me again - this turn or later -"
     " until one of the rows above changes (any change re-opens this window; on"
     " THIS menu that means you also give up this turn's remaining CASTING"
     " windows for as long as these rows stand)";
@@ -26940,8 +27086,39 @@ static void appendStackDeathToDeclineRows(std::vector<string>& rows,
     if (clause.empty())
         return;
     for (size_t i = 0; i < rows.size(); i++)
-        if (rows[i].compare(0, 14, "Hold priority:") == 0
+        if (rows[i].compare(0, 13, "Hold priority") == 0 //#W72-BW (M23b)
             || rows[i].compare(0, 12, "Cast nothing") == 0)
+            rows[i] += clause;
+}
+
+//#W72-BW (M21, deck125 A-4 - 17 of 65 declined-count windows mis-answered, the
+//same ~20-26% for two waves running while the guide stated the rule in capitals
+//in both). The two decline rows are not equivalent and only ONE of them says
+//so: the hold row carries `holdRowBenefitClause` ("this same question is not
+//put to you again..."), and the plain decline carries nothing, so a pilot
+//reading the pair top-down has no printed difference to price. This is the
+//plain decline's own scope, stated as the restriction it is. It is
+//UNCONDITIONAL wherever a hold row exists - a clause that appeared only once
+//the declined count rose would change the row text mid-turn and mint a fresh
+//askKey (the exact trap `declinedListNote` was built to avoid) - and it carries
+//NO number for the same reason. Pure over the one predicate.
+static string plainDeclineScopeClause(bool holdRowOffered)
+{
+    if (!holdRowOffered)
+        return "";
+    return " {closes ONLY this window - the same list can be put to you again this"
+           " turn, at this seam or another; the hold row is the row that closes the"
+           " run}";
+}
+
+//The plain decline row - never the hold row, whose own clause says the other half.
+static void appendPlainDeclineScope(std::vector<string>& rows, bool holdRowOffered)
+{
+    const string clause = plainDeclineScopeClause(holdRowOffered);
+    if (clause.empty())
+        return;
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].compare(0, 12, "Cast nothing") == 0)
             rows[i] += clause;
 }
 
@@ -28590,8 +28767,52 @@ static string animateRungCeilingClause(const string& name)
 //row at all. Two additive corrections: the denominator says CREATURE, and when
 //a player is on the same enumeration the damage that reaches them is stated
 //with its consequence. Pure over its inputs.
+//#W72-BW (M11, wave-71 deck130 HIGH): the frame prints the opponent's LIFE
+//TREND and the row prints its own damage, and nothing ever put the two numbers
+//in the same sentence. `130v125` ran 25 consecutive Hammer of Bogardan returns
+//for 3 to the face against `Opponent life trend: turn 50: 29 ... now 44 (+15
+//since turn 50)` on the same screen - 3 a turn against +3.75 a turn - and took
+//the row every time. This states the SUBTRACTION and nothing else: it does not
+//call the row repeatable (the engine does not know that here), does not tell the
+//pilot to decline, and is silent unless the engine owns both halves - a MEASURED
+//rise over at least one turn that is at least as fast as this row's damage. A
+//row that is lethal now never gets it (the WINS THE GAME branch returns first).
+//Pure over (dmg, gain, turns).
+static string oppLifeRaceClause(int dmg, int gain, int turns)
+{
+    if (dmg <= 0 || turns <= 0 || gain <= 0)
+        return "";
+    if (gain < dmg * turns)   //they are not gaining at least as fast as this row hits
+        return "";
+    std::ostringstream o;
+    o << " - and their life has RISEN " << gain << " over the last " << turns
+      << (turns == 1 ? " turn (+" : " turns (+");
+    if (gain % turns == 0)
+        o << (gain / turns);
+    else
+    {
+        int hundredths = (gain * 100) / turns;
+        o << (hundredths / 100) << ".";
+        int f = hundredths % 100;
+        if (f < 10)
+            o << "0";
+        o << f;
+        //a trailing zero on a two-decimal fraction reads as precision it has
+        if (f % 10 == 0)
+        {
+            string t = o.str();
+            t.erase(t.size() - 1);
+            o.str("");
+            o << t;
+        }
+    }
+    o << " per turn), so " << dmg << " a turn does not close that gap";
+    return o.str();
+}
+
 static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife,
-                                  int myLife = -1, int lifeLossFirst = 0) //#W60-L (B1)
+                                  int myLife = -1, int lifeLossFirst = 0, //#W60-L (B1)
+                                  int oppLifeGain = 0, int oppGainTurns = 0) //#W72-BW (M11)
 {
     if (dmg <= 0 || !oppTargetable || oppLife < 0)
         return "";
@@ -28605,7 +28826,10 @@ static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife,
         o << " " << (blocked.empty() ? string("WINS THE GAME") : blocked);
     }
     else
+    {
         o << " leaves them at " << (oppLife - dmg);
+        o << oppLifeRaceClause(dmg, oppLifeGain, oppGainTurns); //#W72-BW (M11)
+    }
     return o.str();
 }
 //#W55-C (D15), same defect on the magnitude emitter: a `{kills: ...}` list that
@@ -28705,7 +28929,8 @@ static int spellPTDropAmount(GameObserver * observer, MTGCardInstance * src)
 //The enumeration is deliberately narrower than the cast row's five-zone walk:
 //that walk is wide because it also PRINTS the target list, and the kill test it
 //feeds already discards everything that is not a battlefield creature.
-static string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card)
+static string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card,
+                                 int oppLifeGain = 0, int oppGainTurns = 0) //#W72-BW (M11)
 {
     if (!g || !me || !card)
         return "";
@@ -28754,7 +28979,8 @@ static string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance 
         mag << "-" << drop << "/-" << drop;
     Player * oppP = me->opponent();
     const string playerTail = castPlayerDamageTail(dmg, oppP && tc->canTarget(oppP),
-                                                   oppP ? oppP->life : -1, me->life, 0);
+                                                   oppP ? oppP->life : -1, me->life, 0,
+                                                   oppLifeGain, oppGainTurns); //#W72-BW (M11)
     const string out = castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
                                           killedMine);
     SAFE_DELETE(tc);
@@ -29717,6 +29943,17 @@ static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draw
     o << ". This price is PER CAST, not one-off: it is charged again every time"
          " you cast a card with that name while their " << sourceName
       << " is on the battlefield, so declining now does not make it go away";
+    //#W72-BW (M23a, deck123 MED-3): the price is real and the row states it
+    //exactly, and every ORDERING surface the pilot has - the mana line, the
+    //`{leaves N of your M untapped mana sources untapped}` clause, the cost in
+    //the row's own head - is denominated in MANA, so a comparison across rows
+    //cannot see this at all. `123v146` seq 86 read the tag at 7 life with a
+    //3-life-per-cast tax on the row. Say which currency it is NOT in; the row
+    //already owns both numbers.
+    if (lifeLoss > 0)
+        o << ". This is NOT part of the mana cost and is not counted in the mana line"
+             " or in any \"leaves N untapped\" clause on this menu: paying it is a"
+             " LIFE payment on top of the mana, at every cast";
     o << "]";
     return o.str();
 }
@@ -32949,7 +33186,8 @@ static bool menuIsBareXAnnounce(const std::vector<string> * options)
             xRows++;
             continue;
         }
-        if (r.compare(0, 7, "Decline") == 0 || r.compare(0, 14, "Hold priority:") == 0)
+        if (r.compare(0, 7, "Decline") == 0
+            || r.compare(0, 13, "Hold priority") == 0) //#W72-BW (M23b)
             continue;
         return false; //a row this menu class does not have: not an X menu
     }
@@ -34837,6 +35075,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //lethal screen is held over a row that says so.
     appendStackDeathToDeclineRows(shownLines,
                                   pendingStackLifeLossToSeat(observer, this), life);
+    appendPlainDeclineScope(shownLines, holdRow > 0); //#W72-BW (M21)
     const string holdNote = holdReopenNote("priority", shownLines);
     if (holdRow > 0 && holdHonoured("priority", shownLines))
     {
@@ -37530,9 +37769,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             //#W54-C (D4 part ii): the damage that reaches the
                             //PLAYER on the same enumeration, and what it means.
                             Player * oppP = this->opponent();
+                            int m11Gain = 0, m11Turns = 0; //#W72-BW (M11)
+                            oppLifeRise(m11Gain, m11Turns);
                             string playerTail = castPlayerDamageTail(
                                 castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1,
-                                life, rowSelfLifeCost); //#W60-L (B1)
+                                life, rowSelfLifeCost, m11Gain, m11Turns); //#W60-L (B1), #W72-BW (M11)
                             o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
                                                     killedMine); //#W55-C (D15)
                         }
@@ -38041,6 +38282,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         appendStackDeathToDeclineRows(menu,
                                       pendingStackLifeLossToSeat(observer, this),
                                       life); //#W68-BB (J9)
+        appendPlainDeclineScope(menu, holdRow >= 0); //#W72-BW (M21)
         if (attempt == 0)
             mCastHoldNote = holdReopenNote("cast", menu);
         mNextAskPromptNote += mCastHoldNote;
@@ -40238,7 +40480,9 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 //#W66-AT (deck130 MED): the cast row's own live verdict, on the
                 //row that casts. Silent for every card the predicates cannot
                 //price, exactly as on the cast menu.
-                opts[i] += castKillVerdictNow(observer, this, ctx);
+                int m11Gain = 0, m11Turns = 0; //#W72-BW (M11)
+                oppLifeRise(m11Gain, m11Turns);
+                opts[i] += castKillVerdictNow(observer, this, ctx, m11Gain, m11Turns);
                 castRowIdx = (int) i; //#W57-C (D21)
                 castCostStr = cost;
                 castClauseStr = printedFirstClause(ctx->text);
@@ -60065,7 +60309,7 @@ static const char * kW50Y_r94 =
         //#W61-U (C14): AMENDED AGAIN. The wave-55 literal promised a hold that
         //expired with the TURN, and the latch behind it did - which is the
         //deck146 HIGH-3 defect. The row now states the rule the engine keeps.
-        CHECK(row == "Hold priority: pass now, and do not ask me again - this turn or later -"
+        CHECK(row == "Hold priority - pass now, and do not ask me again - this turn or later -"
                      " until one of the rows above changes (any change re-opens this window; you"
                      " give up no cast)",
               "#W61-U C14 the hold row renders the turn-free literal");
@@ -61447,7 +61691,7 @@ static const char * kW50Y_r94 =
               "#W54-A D2a the whole row echoed back (nested parens) answers as its own row");
         // ECHO SHAPE: the row's own leading clause, comma and all, is the hold row
         bool st6 = false;
-        CHECK(parseChoice("CHOICE: 0 (Hold priority: pass now,"
+        CHECK(parseChoice("CHOICE: 0 (Hold priority - pass now,"
                           " and do not ask me again)",
                           (int) menu.size(), &menu, &st6, NULL, NULL, true) == 2,
               "#W61-U C14 the reworded row's disambiguating prefix is still the hold row");
@@ -62601,8 +62845,8 @@ static const char * kW50Y_r94 =
         CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
               == " [NAMED BY THEIR Silverquill Silencer #1: casting this costs you 3 life"
                  " and draws them a card - you would be at 21"
-                 ". This price is PER CAST, not one-off: it is charged again every time you cast a card with that name while their Silverquill Silencer #1 is on the battlefield, so declining now does not make it go away]",
-              "#W55-C D10 seq 42's row, priced (#W57-D D27: with the per-cast clause)");
+                 ". This price is PER CAST, not one-off: it is charged again every time you cast a card with that name while their Silverquill Silencer #1 is on the battlefield, so declining now does not make it go away. This is NOT part of the mana cost and is not counted in the mana line or in any \"leaves N untapped\" clause on this menu: paying it is a LIFE payment on top of the mana, at every cast]",
+              "#W55-C D10 seq 42's row, priced (#W57-D D27: with the per-cast clause; #W72-BW M23a: with the currency it is not in)");
         // ---- #W57-D (D27): the row now answers "does declining make it go away".
         CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
                   .find("PER CAST, not one-off") != string::npos
@@ -68147,7 +68391,7 @@ static const char * kW50Y_r94 =
                     " on the battlefield - no legend rule] {leaves 8 of your 10 untapped mana sources untapped}");
         m.push_back("Cast Teferi's Puzzle Box {4} {leaves 6 of your 10 untapped mana sources untapped}");
         m.push_back("Cast nothing right now (combat comes next this turn)");
-        m.push_back("Hold priority: pass now, and do not ask me again - this turn or later - until one"
+        m.push_back("Hold priority - pass now, and do not ask me again - this turn or later - until one"
                     " of the rows above changes (any change re-opens this window; you give up no cast)"
                     + holdRowBenefitClause());
         bool st = false;
@@ -74495,7 +74739,7 @@ static const char * kW50Y_r94 =
         s32.push_back("Cast Devour Flesh {1}{b} {right now: they control 2 creatures - they choose"
                       " which one; YOU control 25 creatures - targeting yourself sacrifices one of"
                       " them, your choice, and you gain its toughness}");
-        s32.push_back("Hold priority: pass now, and do not ask me again - this turn or later -"
+        s32.push_back("Hold priority - pass now, and do not ask me again - this turn or later -"
                       " until one of the rows above changes");
         s32.push_back("Cast nothing right now");
         appendStackDeathToDeclineRows(s32, 3, 2);
@@ -74506,7 +74750,7 @@ static const char * kW50Y_r94 =
               " something is not given a verdict the engine cannot prove");
         {
             vector<string> alive(s32.begin(), s32.begin() + 1);
-            alive.push_back("Hold priority: pass now");
+            alive.push_back("Hold priority - pass now");
             alive.push_back("Cast nothing right now");
             const vector<string> before(alive);
             appendStackDeathToDeclineRows(alive, 3, 20);
@@ -74540,7 +74784,7 @@ static const char * kW50Y_r94 =
               "#W68-BB J9 exactly-lethal crack-back is LETHAL");
         std::set<string> held;
         vector<string> rowsNow;
-        rowsNow.push_back("Hold priority: pass now, and do not ask me again");
+        rowsNow.push_back("Hold priority - pass now, and do not ask me again");
         rowsNow.push_back("Cast nothing right now");
         for (size_t i = 0; i < rowsNow.size(); i++)
             held.insert(holdKeyRow(rowsNow[i]));
@@ -74562,7 +74806,7 @@ static const char * kW50Y_r94 =
         {
             // AU R1 stays true: the life NUMBER alone still does not re-open.
             vector<string> moved;
-            moved.push_back("Hold priority: pass now, and do not ask me again");
+            moved.push_back("Hold priority - pass now, and do not ask me again");
             moved.push_back("Cast nothing right now");
             moved.push_back(crackBackVerdictKey(4, 11, 20));
             CHECK(holdStillStands(held, moved, &why),
@@ -75511,7 +75755,7 @@ static const char * kW50Y_r94 =
                                  " {right now: destroys 2 of their creatures}"),
               "#W69-BH K4c MUST-NOT-MATCH a live magnitude is never a no-op");
         CHECK(!noopRowEarnsReask("Cast nothing right now {right now: destroys 0 of their creatures}")
-                  && !noopRowEarnsReask("Hold priority: pass now, and do not ask me again"),
+                  && !noopRowEarnsReask("Hold priority - pass now, and do not ask me again"),
               "#W69-BH K4c MUST-NOT-MATCH the decline rows are exempt - a pass is not a contradiction");
     }
 
@@ -75606,7 +75850,7 @@ static const char * kW50Y_r94 =
             vector<string> rows;
             rows.push_back("Life with Elixir of Immortality [cost: {2}, Tap]"
                            + stackAnswerYesRowClause(5, 4, 3));
-            rows.push_back("Hold priority: pass now");
+            rows.push_back("Hold priority - pass now");
             appendStackDeathToDeclineRows(rows, 4, 3);
             CHECK(rows[0].find("{answers the stack: YES") != string::npos
                       && rows[0].find("{answers the stack: NO") == string::npos
@@ -76541,13 +76785,19 @@ static const char * kW50Y_r94 =
                             std::vector<std::string>(), 1)
                   == "destroys 0 of their creatures (0 without a restriction against"
                      " attacking), 0 of yours - 1 noncreature permanent of theirs can"
-                     " animate into a creature and is not in that count",
-              "#W71-BR L7 REPRO the sweeper row says what its K does not cover");
+                     " animate into a creature and is not in that count - it is not a"
+                     " creature as the board stands, so nothing that only affects"
+                     " creatures reaches it right now",
+              "#W71-BR L7 + #W72-BW M20 REPRO the sweeper row says what its K does not"
+              " cover AND that the row cannot reach it now");
         CHECK(attackPunisherClause(0, std::vector<WipeVictim>(), 2)
                   == "they control 0 creatures able to attack - deals 0 until they have an"
                      " attacker - 2 noncreature permanents of theirs can animate into"
-                     " creatures and are not in that count",
-              "#W71-BR L7 REPRO Lightmine Field's N says what it does not cover");
+                     " creatures and are not in that count - none of them is a creature as"
+                     " the board stands, so nothing that only affects creatures reaches"
+                     " them right now",
+              "#W71-BR L7 + #W72-BW M20 REPRO Lightmine Field's N says what it does not"
+              " cover AND that the row cannot reach it now");
         CHECK(sweeperClause("destroys", 0, 0, 0) == sweeperClause("destroys", 0, 0, 0, false,
                   std::vector<std::string>(), std::vector<std::string>(),
                   std::vector<std::string>(), std::vector<std::string>(), 0)
@@ -77382,6 +77632,172 @@ static const char * kW50Y_r94 =
         }
     }
 
+    cout << "\n[#W72-BW] M11 a repeatable row is priced against the life TREND\n";
+    {
+        //`130v125` seq 138: `Cast Hammer of Bogardan ... - and 3 to the opponent at
+        //life 44 leaves them at 41` beside `Opponent life trend: ... now 44 (+15
+        //since turn 50)` on the same screen, 25 turns running.
+        const string t = castPlayerDamageTail(3, true, 44, 20, 0, 15, 4);
+        CHECK(t == " - and 3 to the opponent at life 44 leaves them at 41 - and their life"
+                   " has RISEN 15 over the last 4 turns (+3.75 per turn), so 3 a turn does"
+                   " not close that gap",
+              "#W72-BW M11 REPRO the row now does the subtraction the frame left open");
+        CHECK(oppLifeRaceClause(3, 15, 4).find("+3.75 per turn") != string::npos
+                  && oppLifeRaceClause(3, 12, 4).find("+3 per turn") != string::npos
+                  && oppLifeRaceClause(3, 15, 2).find("+7.5 per turn") != string::npos,
+              "#W72-BW M11 the rate reads as a rate: whole, two-decimal and one-decimal");
+        CHECK(oppLifeRaceClause(4, 15, 4).empty(),
+              "#W72-BW M11 NEGATIVE a row that outruns the trend (4 a turn vs +3.75) says"
+              " nothing - the clause is only ever the closing verdict it can prove");
+        CHECK(oppLifeRaceClause(3, 0, 4).empty() && oppLifeRaceClause(3, -5, 4).empty()
+                  && oppLifeRaceClause(3, 15, 0).empty() && oppLifeRaceClause(0, 15, 4).empty(),
+              "#W72-BW M11 NEGATIVE no rise, no span or no damage, no clause");
+        CHECK(castPlayerDamageTail(3, true, 44, 20, 0)
+                  == " - and 3 to the opponent at life 44 leaves them at 41"
+              && castPlayerDamageTail(3, true, 3, 20, 0, 15, 4)
+                  == " - and 3 to the opponent at life 3 WINS THE GAME",
+              "#W72-BW M11 MUST-NOT-MATCH an untrended row is byte-identical to wave 71,"
+              " and a LETHAL row is never argued out of being lethal");
+        CHECK(stripNarrationDecoration("Cast Hammer of Bogardan {1}{r}{r} {kills 0 of the 0"
+                                       " CREATURE targets at 3 damage" + t + "}")
+                  == "Cast Hammer of Bogardan {1}{r}{r}",
+              "#W72-BW M11 ECHO the arithmetic rides the {right now: ...} channel and leaves"
+              " the answer-matching name untouched");
+    }
+
+    cout << "\n[#W72-BW] M19 the loop's salience is the right way up\n";
+    {
+        //wave-70 deck126 HIGH-3: 158 renders of the DEAD state in one game and no
+        //header at all for the state that wins it (deck123 seq 21).
+        const string mine = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", false);
+        CHECK(mine == "LOOP COMPLETE: BOTH halves of a life LOOP (Sanguine Bond + Exquisite"
+                      " Blood) are on YOUR battlefield right now. Any life THEY lose, and any"
+                      " life YOU gain, chains until they are at 0 - so any one point of"
+                      " either, from any source, ends the game in your favour.",
+              "#W72-BW M19 REPRO the completed pair finally has a header");
+        const string theirs = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true);
+        CHECK(theirs.find("on THEIR battlefield") != string::npos
+                  && theirs.find("Any life YOU lose") != string::npos
+                  && theirs.find("fatal rather than expensive") != string::npos,
+              "#W72-BW M19 the other side's header names the other entry into the chain");
+        CHECK(closedLoopHeaderText("", "Exquisite Blood", false).empty()
+                  && closedLoopHeaderText("Sanguine Bond", "", false).empty(),
+              "#W72-BW M19 NEGATIVE half a pair is not a complete pair");
+        CHECK(mine.compare(0, 14, "LOOP COMPLETE:") == 0
+                  && mine.find("LOOP HALF PENDING") == string::npos,
+              "#W72-BW M19 the two blocks are distinguishable by their own first word");
+        CHECK(stripNarrationDecoration("Cast Sanguine Bond {3}{b}")
+                  == "Cast Sanguine Bond {3}{b}",
+              "#W72-BW M19 ECHO the header is a frame line, never part of a row's name");
+    }
+
+    cout << "\n[#W72-BW] M20 the animatable tail says the tense, and the tag says the cost\n";
+    {
+        //`125v152` seq 64: `PLAN: Cast Supreme Verdict to remove the impending Lair of
+        //the Hydra threat` over a row reading `destroys 0 ... 0 of yours`, at 2 life.
+        CHECK(animatableNotCountedTail(1)
+                  == " - 1 noncreature permanent of theirs can animate into a creature and is"
+                     " not in that count - it is not a creature as the board stands, so"
+                     " nothing that only affects creatures reaches it right now",
+              "#W72-BW M20 REPRO the tail says the TENSE, not only the omission");
+        CHECK(animatableNotCountedTail(2).find("none of them is a creature as the board"
+                                               " stands") != string::npos
+                  && animatableNotCountedTail(2).find("reaches them right now") != string::npos,
+              "#W72-BW M20 the plural agrees with itself");
+        CHECK(animatableNotCountedTail(0).empty() && animatableNotCountedTail(-1).empty(),
+              "#W72-BW M20 NEGATIVE no animator, no clause");
+        CHECK(animatableNotCountedTail(1).find("do not cast") == string::npos
+                  && animatableNotCountedTail(1).find("worth") == string::npos,
+              "#W72-BW M20 MUST-NOT-MATCH the tail states the board, never what to do");
+        const string cost = manlandBoardTag(true, true, "{2}{g}{g}");
+        CHECK(cost.find("[the animation costs {2}{g}{g}, and until it is paid this permanent"
+                        " is NOT a creature - it cannot attack or block and nothing that only"
+                        " affects creatures reaches it]") != string::npos,
+              "#W72-BW M20 REPRO the permanent names what the animation costs");
+        CHECK(manlandBoardTag(true, true) == manlandBoardTag(true, true, "")
+                  && manlandBoardTag(true, false, "").find("OWN mana") == string::npos,
+              "#W72-BW M20 MUST-NOT-MATCH no cost read, and the wave-71 strings are"
+              " byte-identical");
+        CHECK(scriptActivatedAnimateCost("{2}{g}{g}:becomes(creature 0/0 hydra)"
+                                         " ueot") == "{2}{g}{g}"
+                  && scriptActivatedAnimateCost("@each my upkeep:becomes(creature)").empty()
+                  && scriptActivatedAnimateCost("becomes(creature 2/2)").empty(),
+              "#W72-BW M20 the cost head comes off the activated line and nothing else");
+        CHECK(stripNarrationDecoration("Lair of the Hydra" + cost) == "Lair of the Hydra",
+              "#W72-BW M20 ECHO both brackets leave the answer-matching name untouched");
+    }
+
+    cout << "\n[#W72-BW] M21 the plain decline states its own scope\n";
+    {
+        //deck125 A-4: 17 of 65 declined-count windows answered `Cast nothing right
+        //now` - 26%, unchanged across two waves of guide capitals.
+        const string c = plainDeclineScopeClause(true);
+        CHECK(c == " {closes ONLY this window - the same list can be put to you again this"
+                   " turn, at this seam or another; the hold row is the row that closes the"
+                   " run}",
+              "#W72-BW M21 REPRO the plain decline finally prints the difference");
+        CHECK(plainDeclineScopeClause(false).empty(),
+              "#W72-BW M21 NEGATIVE with no hold row on the menu there is no comparison to"
+              " make, and no claim is made");
+        {
+            std::vector<string> rows;
+            rows.push_back("Cast Damnation {2}{b}{b}");
+            rows.push_back("Cast nothing right now (combat comes next this turn)");
+            rows.push_back(string(kHoldPriorityRowText));
+            appendPlainDeclineScope(rows, true);
+            CHECK(rows[0] == "Cast Damnation {2}{b}{b}"
+                      && rows[1].find("closes ONLY this window") != string::npos
+                      && rows[2] == string(kHoldPriorityRowText),
+                  "#W72-BW M21 only the plain decline is tagged - never a live row, never"
+                  " the hold row whose own clause says the other half");
+            CHECK(optionSetKeyLine(rows[1]) == optionSetKeyLine("Cast nothing right now"),
+                  "#W72-BW M21 the clause is stripped from the option-set key, so the"
+                  " declined count it is about still reaches the same list");
+        }
+        CHECK(c.find("2 times") == string::npos && c.find_first_of("0123456789") == string::npos,
+              "#W72-BW M21 MUST-NOT-MATCH the clause carries no number: a number that moved"
+              " with the answers would mint a fresh askKey every window");
+        CHECK(stripNarrationDecoration("Cast nothing right now" + c) == "Cast nothing right now",
+              "#W72-BW M21 ECHO the clause stays inside the brace and out of the history");
+    }
+
+    cout << "\n[#W72-BW] M23 the hold row's head is not label-shaped; the tax names its currency\n";
+    {
+        //`125v152` seq 110 answered `HOLD PRIORITY: 2 (Hold priority)` and was
+        //refused: the row's own head was `Hold priority:`, and the model copied a
+        //rendered heading into its label slot (the L11 shape, one row lower).
+        const string row = kHoldPriorityRowText;
+        CHECK(row.compare(0, 15, "Hold priority -") == 0
+                  && row.find("Hold priority:") == string::npos,
+              "#W72-BW M23b REPRO the head is no longer label-shaped");
+        CHECK(string(kHoldPriorityRowTextCast).find("Hold priority:") == string::npos
+                  && string(kHoldPriorityRowHead).find("Hold priority:") == string::npos,
+              "#W72-BW M23b MUST-NOT-MATCH neither the cast spelling nor the shared head"
+              " carries the colon either");
+        {
+            std::vector<string> menu;
+            menu.push_back("Cast Damnation {2}{b}{b}");
+            menu.push_back(row);
+            bool stale = false;
+            CHECK(parseChoice("CHOICE: 2 (Hold priority)", (int) menu.size(), &menu, &stale,
+                              NULL, NULL, true) == 2 && !stale,
+                  "#W72-BW M23b the short-name echo still binds the row after the de-colon");
+        }
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24)
+                  .find("NOT part of the mana cost and is not counted in the mana line")
+                  != string::npos,
+              "#W72-BW M23a REPRO the life tax names the currency the ordering surfaces"
+              " are NOT denominated in");
+        CHECK(namedCastPriceTag("Silverquill Silencer #1", 0, 1, 24)
+                  .find("NOT part of the mana cost") == string::npos,
+              "#W72-BW M23a NEGATIVE a draw-only naming permanent charges no life and makes"
+              " no claim about the mana line");
+        CHECK(stripNarrationDecoration("Cast Bloodline Keeper {2}{b}{b}"
+                  + namedCastPriceTag("Silverquill Silencer #1", 3, 1, 24))
+                  == "Cast Bloodline Keeper {2}{b}{b}",
+              "#W72-BW M23a ECHO the whole tag stays out of the history line");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
@@ -77396,6 +77812,12 @@ static const char * kW50Y_r94 =
 int gptStackPendingDrawsFor(GameObserver * observer, Player * seat, MTGCardInstance * exclude)
 {
     return stackPendingDrawsFor(observer, seat, exclude);
+}
+
+//#W72-BW (M3): the same door onto the hand-replacement scan.
+std::string gptStackHandReplacerFor(GameObserver * observer, Player * seat)
+{
+    return stackHandReplacerFor(observer, seat);
 }
 
 //Free-function entry so the JGE layer's main() can trigger the self-test
