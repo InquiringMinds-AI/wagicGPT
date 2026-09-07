@@ -1,0 +1,71 @@
+#NAME: A declined face menu must not be re-proposed (#W71-BP L1a)
+#DESC: Wave-70 engine-seat HIGH-0, the one HUNG game of the corpus (152v126,
+#DESC: 3,641 s, 1.23 GB of stderr, the game lost to the harness kill). The seat's
+#DESC: land-drop seam picked a modal double-faced land (Hengegate Pathway) and the
+#DESC: model answered the face menu that followed with its decline row - correct
+#DESC: play, the opponent was on 1 life and five attackers were ready.
+#DESC: MECHANISM: the decline cancels the menu and changes NOTHING - the card is
+#DESC: still in hand, the land drop is still unused - so AIPlayerBaka's land
+#DESC: heuristic re-proposes the same card on the next tick, the identical menu
+#DESC: re-arms, and the ask cache replays the cached decline with no request and no
+#DESC: record. 2,584,190 iterations; `menu pass floor reached ... not passing`
+#DESC: 2,584,166 times, fired 0, because the floor's hasAnyLegalAction arm is inert
+#DESC: in a livelock by definition (a livelock IS a legal action never executed).
+#DESC: FIX: the decline is latched at the single choke point every declining
+#DESC: consumer passes through (DecisionManager::applyMenuChoice) and the LAND
+#DESC: candidates of AIPlayerBaka::FindCardToPlay skip a card latched this turn -
+#DESC: the `held the land drop` shape the seam one level up already has.
+#DESC: WITNESS: P1 holds Branchloft Pathway and a HASTE Raging Goblin with a
+#DESC: Mountain untapped. `aideclineface` arms the model's own answer (choice = -1
+#DESC: through DecisionManager, the exact call AIPlayerGPT::chooseMenuAction makes)
+#DESC: with a budget of 4. PRE-FIX the seat re-proposes the pathway after every
+#DESC: decline, burns the budget, and the FIFTH menu is answered by the heuristic's
+#DESC: option 0 - so the land it refused is on the battlefield at the end.
+#DESC: POST-FIX the refusal sticks: exactly ONE decline is applied, the pathway
+#DESC: stays in hand, and the seat spends the window it got back on the Goblin
+#DESC: (P2 20 -> 19). The declines-applied count is the sharp discriminator.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+aideclineface Branchloft Pathway 4
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+assertdeclinesapplied 1
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mountain,Raging Goblin
+hand:Branchloft Pathway
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:19
+[END]

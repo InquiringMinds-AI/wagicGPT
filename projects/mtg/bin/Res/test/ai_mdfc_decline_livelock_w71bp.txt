@@ -1,0 +1,65 @@
+#NAME: The wave-70 livelock, reproduced with no model (#W71-BP L1)
+#DESC: The sibling of ai_mdfc_decline_sticky_w71bp with the decline arm UNBOUNDED -
+#DESC: the live shape exactly. In the corpus the model answered the Hengegate
+#DESC: Pathway face menu with its decline row ONCE; after that the ask cache
+#DESC: replayed that answer with no request, no trace and no record, because the
+#DESC: decline left the game byte-identical and the heuristic re-proposed the same
+#DESC: card every tick. The cycle ran 2,584,190 times over 3,641 s and wrote a
+#DESC: 1.23 GB stderr; the seat log simply STOPS at seq 55 with no error in it, and
+#DESC: `menu pass floor fired` is 0 because the floor's hasAnyLegalAction arm can
+#DESC: never fire in a livelock (a livelock IS a legal action never executed).
+#DESC: Here `aideclineface <card>` with no budget stands in for the cached answer:
+#DESC: the same DecisionManager::applyMenuChoice(choice = -1) the model seam makes,
+#DESC: every time the menu re-arms, for ever.
+#DESC: PRE-FIX: the seat never leaves main phase 1. It re-proposes the pathway after
+#DESC: every decline, the script runs off its end while the phase ring stands still,
+#DESC: and the fixture asserts in FIRSTMAIN against an END-phase expectation (a
+#DESC: bounded stand-in for what the corpus got, which was the harness kill).
+#DESC: POST-FIX: the refusal is latched at the decline choke point, the land
+#DESC: candidates skip it, the arm therefore fires exactly ONCE however large its
+#DESC: budget, and the seat spends the recovered window on the Goblin (P2 -> 19).
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+aideclineface Branchloft Pathway
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+assertdeclinesapplied 1
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mountain,Raging Goblin
+hand:Branchloft Pathway
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:19
+[END]

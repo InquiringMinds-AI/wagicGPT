@@ -227,6 +227,42 @@ class AIPlayerBaka: public AIPlayer{
     //tick answers no menu; the cap is the livelock floor (see Act).
     int mMenuPassHold = 0;
     static const int kMenuPassHoldMax = 24;
+    //#W71-BP (L1 b): the NO-PROGRESS arm of the same floor. The hasAnyLegalAction
+    //arm below is inert in exactly the situation the floor exists for: a livelock
+    //is DEFINED by a legal action that never executes, so "a legal action remains"
+    //is true on every one of its ticks (wave-70 game 152v126: `menu pass floor
+    //reached ... not passing` 2,584,166 times, fired 0, 3,641 s, 1.23 GB of stderr).
+    //A pass that removes a legal action the seat has provably refused to take for
+    //kMenuPassNoProgressMax consecutive ticks removes nothing it was going to use.
+    //mMenuPassProbe is a cheap fingerprint of the visible state plus the armed
+    //menu's identity - it does not have to be a full serialization, only to CHANGE
+    //when anything the seat could act on changes.
+    std::string mMenuPassProbe;
+    //The no-progress PREDICATE, pure and static so it can be pinned without a
+    //game: it answers "this exact fingerprint has now repeated maxRun times in a
+    //row". It re-arms after firing, so a stall that survives the forced pass is
+    //named again rather than once.
+    static bool menuPassNoProgress(const std::string & probe, std::string & lastProbe,
+                                   int & run, int maxRun);
+    std::string menuPassProbe(); //the fingerprint itself (visible state + armed menu)
+    int mMenuPassProbeRun = 0;
+    int mMenuPassNoProgress = 0; //how many times the no-progress arm forced the pass
+    static const int kMenuPassNoProgressMax = 200;
+    //#W71-BP (L1 a): cards whose OWN face/mode menu this seat declined this turn.
+    //Declining the menu cancels the click but leaves the proposing intent intact,
+    //so the heuristic re-proposes the same card on the very next tick and the menu
+    //re-arms for ever. The land-drop seam one level up already has this shape (its
+    //`held the land drop` returns "nothing to play"); a declined face menu had no
+    //equivalent. Latched at the single decline choke point
+    //(DecisionManager::applyMenuChoice) and consulted by FindCardToPlay's LAND
+    //candidates, so both the heuristic seat and the model seat stop re-proposing
+    //a card the deciding seat just refused. Cleared on the turn boundary: a land
+    //drop is a once-per-turn window, and the refusal is scoped to it.
+    std::vector<MTGCardInstance *> mDeclinedFaceCards;
+    int mDeclinedFaceTurn = -1;
+    int mDeclinedFaceLatches = 0; //observable count (translog / fixtures)
+    void latchDeclinedFace(MTGCardInstance * card);
+    bool faceDeclinedThisTurn(MTGCardInstance * card);
     //#W64-AK (R2): how many times the floor has actually FORCED a pass - which
     //it now does only when LegalActionsOracle::hasAnyLegalAction says nothing
     //legal remains, so a nonzero count is a livelock breaker firing on an empty

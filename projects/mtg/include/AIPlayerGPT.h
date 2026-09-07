@@ -388,6 +388,28 @@ private:
     // strategy-design/wave54/lane-M.md. WAGIC_GPT_AUDIT_M_OFF=1 disables every
     // lane-M behaviour at runtime (the "was it me?" flag).
     int mAskCacheTurn = -1;          //A17: the turn mAskCache was last cleared on
+    //#W71-BP (L1 c / L2): the ask cache is the link that makes a livelock SILENT.
+    //A replayed answer costs no request and, until this wave, wrote no record - so
+    //a seat that answered the same window 2.5 million times looked, in its own log,
+    //exactly like a seat that was never asked. Two things change that: every
+    //re-served answer now writes a compact record naming the seq it was served FROM,
+    //and a key replayed kAskReplayRefuseMax times in a row is REFUSED - the entry is
+    //dropped and the window goes back to the model, so a loop either breaks or
+    //becomes visible as real traffic instead of a 1.2 GB stderr file.
+    std::map<std::string, int> mAskCacheSeq; //key -> the seq its answer was consumed at
+    std::string mAskReplayKey;               //the key currently on a replay run
+    int mAskReplayRun = 0;                   //consecutive replays of that key
+    int mAskReplaysReserved = 0;             //re-served answers this game (gameend)
+    int mAskReplaysRefused = 0;              //times the refusal fired (gameend)
+    static const int kAskReplayRefuseMax = 64;
+    //Pure, so it is pinned without a game: "this key has now been replayed maxRun
+    //times running". Re-arms after firing, so a loop that survives one refusal is
+    //named again rather than once.
+    static bool askReplayRefuse(const std::string & key, std::string & lastKey,
+                                int & run, int maxRun);
+    //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
+    void logAskReplay(const char * why, const std::string & decision, int choice,
+                      int optionCount, int fromSeq, int run);
     //#W66-AQ (H1): draws already RESOLVED inside the current draw step, per
     //seat, keyed on the turn they were counted in. Read by the DRAW FORECAST so
     //it charges only the draws still ahead; a stale turn key reads as 0.
@@ -833,6 +855,7 @@ private:
     string mRepeatAskPlan;
     int mRepeatAskTurn;
     int mRepeatAskChoice;   //the CALLER's 1-based index, exactly as returned
+    int mRepeatAskSeq = -1; //#W71-BP (L2): the seq that answer was consumed at
     int mRepeatAskAnswersReserved; //gameend report field
     //#W50-Z (D12): the "turn:phase" step in which THIS seat last took a mana
     //activation of its own choosing. Floating mana keeps a mana-only window

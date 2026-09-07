@@ -15952,6 +15952,51 @@ void AIPlayerGPT::noticeFallback(const string& text, float seconds)
     mDegradedTicks = 45 * 60; //~45s since the last one; lapses if it recovers
 }
 
+//#W71-BP (L1 c): the replay-refusal predicate. Pure and static so the fixture
+//cannot reach it but PARSETEST can: the live path needs a model, a cache hit and
+//a stalled board at once. Firing resets the run, so a loop that survives one
+//refusal is named on every subsequent cycle rather than once.
+bool AIPlayerGPT::askReplayRefuse(const std::string & key, std::string & lastKey,
+                                  int & run, int maxRun)
+{
+    if (key.empty() || key != lastKey)
+    {
+        lastKey = key;
+        run = 1;
+        return false;
+    }
+    run++;
+    if (run < maxRun)
+        return false;
+    run = 0;
+    return true;
+}
+
+//#W71-BP (L2): the record a re-served answer writes. Compact ON PURPOSE - the
+//point is that the log stops being SILENT, not that a replay costs as much as a
+//decision - so it carries only what tells a reader "this window was answered
+//without asking, from there, N times running". Bounded by the refusal above.
+void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int choice,
+                               int optionCount, int fromSeq, int run)
+{
+    if (mTransLogPath.empty())
+        return;
+    ensureGameStartRecord();
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "ask_replay"},
+        {"why", why ? why : ""},
+        {"replayed_from", fromSeq},
+        {"replay_run", run},
+        {"choice", choice},
+        {"options", optionCount},
+        {"turn", translogTurn(observer ? observer->turn : 0)},
+        {"phase", observer ? observer->getCurrentGamePhase() : -1},
+        {"question", decision},
+    };
+    transLogWrite(rec.dump());
+}
+
 //One header record per seat log: decks, names, and a game_id BOTH seats
 //share (the observer's address) - reviewers previously paired seat logs by
 //filename epoch arithmetic, which broke on harvested copies (wave-7 7d).
@@ -17276,6 +17321,16 @@ void AIPlayerGPT::logGameEnd()
         //removed - a window the model answered once and did not want re-put.
         {"hold_windows_skipped", mHoldWindowsSkipped},
         //#W69-BI (K7, engine MED-5): the same total by suppression class.
+        //#W71-BP (L1/L2, engine-seat HIGH-0/HIGH-1): the livelock instrumentation.
+        //A hung seat used to be INVISIBLE here - the wave-70 hang's seat log simply
+        //stopped at seq 55. These four say how much of this game was answered
+        //without asking, how often that had to be refused, how often a stalled menu
+        //had to be broken by the pass floor's no-progress arm, and how many face
+        //declines were made sticky. All four are expected 0 in a healthy game.
+        {"ask_replays_reserved", mAskReplaysReserved},
+        {"ask_replays_refused", mAskReplaysRefused},
+        {"menu_pass_no_progress", mMenuPassNoProgress},
+        {"declined_face_latches", mDeclinedFaceLatches},
         {"hold_windows_skipped_priority", mHoldWindowsSkippedPriority},
         {"hold_windows_skipped_cast", mHoldWindowsSkippedCast},
         //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
@@ -34854,6 +34909,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     if (!auditMOff() && mAskCacheTurn != observer->turn)
     {
         mAskCache.clear();
+        mAskCacheSeq.clear(); //#W71-BP (L2): the provenance map is the cache's shadow
+        mAskReplayKey.clear();
+        mAskReplayRun = 0;
         mAskCacheTurn = observer->turn;
     }
     //"Only one valid action": no decision to make, no model call.
@@ -34978,8 +35036,37 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
     {
-        mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
-        return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
+        //#W71-BP (L1 c / L2). Two changes to a path that used to be completely
+        //silent. (1) REFUSE a key that has been replayed kAskReplayRefuseMax times
+        //running: in the wave-70 hang both halves of this key were byte-identical
+        //every tick because the answer changed nothing, so the cache served the same
+        //decline 2,584,190 times with no request, no trace and no record. Dropping
+        //the entry sends the window back to the model, which either breaks the loop
+        //or turns it into traffic a corpus can see. (2) RECORD every replay, with
+        //the seq it came from - a hung seat log must never again end mid-game with
+        //no error in it.
+        std::map<string, int>::iterator cs = mAskCacheSeq.find(askKey);
+        const int fromSeq = (cs == mAskCacheSeq.end()) ? -1 : cs->second;
+        if (askReplayRefuse(askKey, mAskReplayKey, mAskReplayRun, kAskReplayRefuseMax))
+        {
+            mAskReplaysRefused++;
+            logAskReplay("cache_replay_refused", decision, cached->second,
+                         (int) options.size(), fromSeq, kAskReplayRefuseMax);
+            DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: refusing the ask cache after "
+                       << kAskReplayRefuseMax << " identical replays of the same state+question"
+                       << " (answer " << cached->second << ", first served at seq " << fromSeq
+                       << ", " << mAskReplaysRefused << " refusals this game): " << decision);
+            mAskCache.erase(cached);
+            mAskCacheSeq.erase(askKey);
+        }
+        else
+        {
+            mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
+            mAskReplaysReserved++;
+            logAskReplay("cache_replay", decision, cached->second, (int) options.size(),
+                         fromSeq, mAskReplayRun);
+            return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
+        }
     }
     //#W59-J (K10): the same question, asked again with the board moved under it.
     //The cache above wants the board too, and a resolving drain loop moves it
@@ -34996,6 +35083,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     {
         mRepeatAskAnswersReserved++;
         mAskAnswerReserved = true; //#W60-M (B13c): the model was not shown this window
+        //#W71-BP (L2): the OTHER silent re-serve path. Same argument, same record.
+        mAskReplaysReserved++;
+        logAskReplay("repeat_ask_reserved", decision, mRepeatAskChoice,
+                     (int) optionsIn.size(), mRepeatAskSeq, mRepeatAskAnswersReserved);
         DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the same ask again, unchanged - re-serving"
                    " this seat's own answer " << mRepeatAskChoice << " of " << optionsIn.size()
                    << " (" << mRepeatAskAnswersReserved << " this game): " << decision);
@@ -35310,6 +35401,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     if (askReordered && choice >= 1 && choice <= (int) askOrder.size())
         callerChoice = (int) askOrder[choice - 1] + 1;
     mAskCache[askKey] = callerChoice;
+    mAskCacheSeq[askKey] = mTransSeq; //#W71-BP (L2): where a later replay was served FROM
+    mAskReplayKey.clear(); //a real model answer ends any replay run
+    mAskReplayRun = 0;
     //#W59-J (K10): latch the answer for a re-ask of this exact window. Only a
     //VALID choice: a fallback is not an answer and is never re-served.
     if (callerChoice >= 1 && callerChoice <= (int) optionsIn.size())
@@ -35318,6 +35412,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mRepeatAskPlan = mCurrentPlan;
         mRepeatAskTurn = observer ? observer->turn : -1;
         mRepeatAskChoice = callerChoice;
+        mRepeatAskSeq = mTransSeq; //#W71-BP (L2)
     }
     else
     {
@@ -36124,6 +36219,25 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     if (!strcmp(type, "land"))
     {
         vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
+        //#W71-BP (L1 a): a card whose own face menu THIS SEAT declined during this
+        //turn's land drop is not offered again. The latch is the base class's (set at
+        //DecisionManager::applyMenuChoice, the one place a decline is applied), so the
+        //ask and the heuristic validation pass below agree by construction rather
+        //than by two copies of the same rule. Without it the wave-70 hang re-forms
+        //here: the same land ask, the same cached answer, the same declined menu.
+        {
+            size_t before = lands.size();
+            for (size_t li = 0; li < lands.size(); )
+            {
+                if (faceDeclinedThisTurn(lands[li].card))
+                    lands.erase(lands.begin() + li);
+                else
+                    li++;
+            }
+            if (lands.size() != before)
+                DebugTrace("AIPlayerGPT: land-drop ask drops " << (before - lands.size())
+                           << " card(s) whose face menu this seat already declined this turn");
+        }
         //#W43-12. An ask with no options must never reach the model seam, and
         //the skip must not be silent: a land in hand that the oracle declines
         //to offer (its own cast restrictions forbid the play - the flipped
@@ -75688,6 +75802,107 @@ static const char * kW50Y_r94 =
             CHECK(gptcaveat::planStepCount("draw 1,000 cards") == 1
                       && gptcaveat::planStepCount("hold at 3.5 mana") == 1,
                   "#W70-BN F11 REGRESSION numerals are still never step boundaries");
+        }
+    }
+
+    // ---- #W71-BP (L1 b / L1 c): the two loop breakers, as pure predicates ----
+    // The live paths need a game and a model respectively; the PREDICATES are what
+    // decides whether a stall is broken, and they are pinnable here.
+    cout << "\n[W71-BP] livelock breakers: the no-progress arm and the ask-cache refusal\n";
+    {
+        // (b) the pass floor's no-progress arm. A fingerprint that keeps changing is
+        // progress and must never fire, however long it runs.
+        {
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 1000; i++)
+            {
+                std::ostringstream moving;
+                moving << "turn5|life20," << i;
+                if (AIPlayerBaka::menuPassNoProgress(moving.str(), last, run, 200))
+                    fired = true;
+            }
+            CHECK(!fired,
+                  "#W71-BP L1b NEGATIVE a state that moves every tick never trips the no-progress arm");
+        }
+        {
+            // The livelock's own shape: one byte-identical fingerprint, for ever.
+            std::string last;
+            int run = 0;
+            int firedAt = -1, fires = 0;
+            const std::string stuck = "15:1|20,7,5,0,40|1,3,9,2,31|0|Hengegate Pathway";
+            for (int i = 0; i < 601; i++)
+                if (AIPlayerBaka::menuPassNoProgress(stuck, last, run, 200))
+                {
+                    if (firedAt < 0)
+                        firedAt = i;
+                    fires++;
+                }
+            CHECK(firedAt == 200 && fires == 3,
+                  "#W71-BP L1b POSITIVE 200 identical ticks force the pass, and the arm re-arms after firing");
+        }
+        {
+            // A stall that is BROKEN restarts the count - the arm must not carry a
+            // grudge across a board that moved.
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 199; i++)
+                fired = fired || AIPlayerBaka::menuPassNoProgress("A", last, run, 200);
+            fired = fired || AIPlayerBaka::menuPassNoProgress("B", last, run, 200);
+            for (int i = 0; i < 199; i++)
+                fired = fired || AIPlayerBaka::menuPassNoProgress("A", last, run, 200);
+            CHECK(!fired,
+                  "#W71-BP L1b NEGATIVE one tick of real progress resets the stall run");
+        }
+        {
+            // An empty fingerprint is "cannot tell" - never an excuse to pass.
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 500; i++)
+                fired = fired || AIPlayerBaka::menuPassNoProgress("", last, run, 200);
+            CHECK(!fired,
+                  "#W71-BP L1b NEGATIVE an unavailable fingerprint never forces a pass");
+        }
+        // (c) the ask-cache replay refusal. Same shape, keyed on the state+question.
+        {
+            std::string last;
+            int run = 0;
+            int fires = 0, firstAt = -1;
+            const std::string key = "board...\nChoose an option for Hengegate Pathway:";
+            for (int i = 0; i < 200; i++)
+                if (AIPlayerGPT::askReplayRefuse(key, last, run, 64))
+                {
+                    if (firstAt < 0)
+                        firstAt = i;
+                    fires++;
+                }
+            CHECK(firstAt == 63 && fires == 3,
+                  "#W71-BP L1c POSITIVE the 64th identical replay is refused, and the counter re-arms");
+        }
+        {
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 300; i++)
+            {
+                std::ostringstream k;
+                k << "state" << (i % 2) << "|question";
+                fired = fired || AIPlayerGPT::askReplayRefuse(k.str(), last, run, 64);
+            }
+            CHECK(!fired,
+                  "#W71-BP L1c NEGATIVE alternating windows within one tick are not a replay run");
+        }
+        {
+            std::string last;
+            int run = 0;
+            bool fired = false;
+            for (int i = 0; i < 63; i++)
+                fired = fired || AIPlayerGPT::askReplayRefuse("K", last, run, 64);
+            CHECK(!fired && run == 63,
+                  "#W71-BP L1c REGRESSION a long-but-finite legitimate re-serve run is still served");
         }
     }
 
