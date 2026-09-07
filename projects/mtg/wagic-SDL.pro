@@ -30,7 +30,7 @@ unix:QMAKE_PRE_LINK += python3 $$PWD/tools/check-ctor-init.py $$PWD/src
 # ruling: the reply is a PLAN line then the action line, nothing else). Waves
 # 66-69 each re-added one of those because their corpora ran with thinking off;
 # this makes the next one loud at link time instead of one corpus later.
-unix:QMAKE_PRE_LINK += && python3 $$PWD/tools/check-reply-instructions.py $$PWD/src
+unix:QMAKE_PRE_LINK += && python3 $$PWD/tools/check-reply-instructions.py $$PWD/src $$PWD/bin/Res/ai/baka
 # audit-W54 O2: the reply-parser self-test corpus compiles in only here (desktop)
 unix:DEFINES += WAGIC_GPT_PARSETEST_BUILD
 unix:INCLUDEPATH += include/thirdparty
