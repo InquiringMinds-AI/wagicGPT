@@ -1,0 +1,253 @@
+YOUR DECK: mono-red LAND DESTRUCTION. Take their lands while they are still cheap to take, kill
+every creature they deploy, then land one real body - Siege-Gang Commander or Rorix Bladewing - and
+attack until they are dead. You are NOT a burn deck: every damage card is REMOVAL that can also hit
+a face, and all of it totals 11 damage, which is not a clock. Every turn has a job - destroy a
+land, kill a creature, or add a body. The kill is Rorix (6 a turn, flying) or Siege-Gang plus
+Goblin sacrifices. All 24 lands tap for {R}, plus Talisman of Impulse: colour
+never justifies a mulligan or a declined spell, and "Mana available:" is correct.
+
+=== ORDER OF OPERATIONS ===
+Play a land every turn. At each "which card do you cast" ask take the FIRST entry below matching a
+row on your menu and stop there, then take the ask again - more than one spell a turn is allowed.
+ 1. STARSTORM, when STARSTORM'S X below clears it. Sweep BEFORE you deploy: the affordable X
+    shrinks with each spell cast first, and it kills your own bodies too.
+ 2. A single-target damage spell (Pyrite Spellbomb, Spark Spray, Hammer of Bogardan) aimed by
+    TARGETING below. A token-MAKER on their line (Thraben Doomsayer 2/2, Bloodline Keeper 3/3) is
+    what this entry exists for and outranks entry 4.
+ 3. STONE RAIN, MOLTEN RAIN or LAY WASTE at one of their lands, under THE LAND PLAN's two numbers
+    (their lands 4 or fewer AND your life 9 or more); either failing ends the land plan for good.
+ 4. RORIX at six lands, or SIEGE-GANG at five - never into a board where 1 still applies, and never
+    as the FIRST spell of a turn while THEY COUNTER below is true.
+ 5. DWARVEN BLASTMINER or TALISMAN OF IMPULSE early, when nothing above matched.
+ 6. A cycling row, by CYCLING below, with mana you were not going to spend.
+ 7. "Cast nothing right now".
+By land count: 2 Blastminer / Talisman / Spellbomb; 3 Stone Rain or Molten Rain (never a Spellbomb
+"first" with the land destruction left in hand); 4 a second land-kill plus a Blastminer activation;
+5 Siege-Gang; 6+ Rorix, or a land-kill plus an activation. "Land drop: NOT yet used this turn" with
+a land in hand -> play it first, ahead of any cycling row. In your own upkeep answer CHOICE: 0
+(pass) unless the row destroys a land, kills a creature, or is the Hammer return under EMPTY-HAND;
+cycle in second main phase.
+
+=== DRAW PUNISHERS - READ BEFORE ANY OPTIONAL DRAW ===
+The frame prints a summed line when they are out: "DRAW PUNISHERS on the battlefield ... Every card
+YOU draw costs you 1 life to theirs." That number is N; no line, no punisher.
+ - N is 1 and "Your life:" above 5 -> you may cycle.
+ - N is 2 or more, OR N at or above your life minus 5 -> take NO optional draw: no cycling row, no
+   Forgotten Cave cycle, no Spellbomb draw mode. Pass.
+YOUR DRAW STEP IS MANDATORY AND NO ROW SKIPS IT - not "Cast nothing right now", not "Pass
+priority", not the Hold-priority row; "DRAW FORECAST:" says what it costs, not that you may skip
+it.
+PUNISHERS PUNISH DRAWS AND NOTHING ELSE - casting, playing a land, attacking, blocking, activating
+and a token entering cost you nothing there. A row marked "[castable now]" is not a draw: cast it,
+especially when the crack-back line says their next attack would kill you. Killing the punisher
+outranks casting a creature: Fate Unraveler is a 3/4, out of range of Hammer (3) and Spellbomb (2)
+but not of Starstorm at X=4.
+
+=== CYCLING - LAY WASTE AND STARSTORM ARE NOT CARD DRAW ===
+A cycle is an option beginning "cycling with ", or row 1 ("1. cycling") of a "Choose an option for"
+menu. Costs: Spark Spray and Forgotten Cave {R}, Lay Waste {2}, Starstorm {3}.
+ Forgotten Cave -> it enters tapped; while the land drop is unused, or a second land sits in hand,
+   PLAY it, and after that cycle freely with spare mana.
+ Spark Spray -> cycle when its target list shows no opponent creature whose row reads "takes 1
+   damage - DIES". A SURVIVES row is not one, nor is the face row.
+ Lay Waste -> CAST it at a land; the gate is the MANA line, not a land count, so at "Mana
+   available:" of 4 or more it is castable. Cycle only when it is uncastable this turn AND you hold
+   another land-kill, or once the land plan's two numbers are dead. Never twice in one turn.
+ Starstorm -> do not cycle while the "Opponent battlefield" line names ANY creature. The release is
+   that line's count: "of which 0 are creatures" and no Forgotten Cave in hand -> cycle it; with a
+   Cave in hand, cycle the Cave first.
+CASTING AT X=0 IS NOT CYCLING: only the "cycling" row draws a card, while "Cast Card Normally" at
+X=0 deals 0 and bins the card; on a "Choose an option" menu reached by mistake, "Decline - do
+nothing" is the way back. ONCE THE LAND PLAN IS OVER THE CYCLE IS YOUR ONLY LINE: at "Mana
+available:" 10 or more against 5 or more of their lands, with only a cycle or a pass, CYCLE.
+
+=== TARGETING DAMAGE ===
+Spellbomb, Spark Spray, Starstorm, Hammer and Siege-Gang's sacrifice list their choices, the face
+row reading "The opponent (player, life N)". Top down:
+ 0. LETHAL FIRST. Read "Opponent life:" on every decision. If one row deals that number or more to
+    a player - Hammer 3, Spellbomb 2, Spark Spray 1, each Goblin sacrificed 2 - take the face row
+    NOW; nothing below applies and nothing killing you applies. Its kill count counts CREATURES
+    only, so "{kills 0 of the 2 legal targets}" can still be lethal, and a repeatable cost counts
+    once per payment you can afford: three Goblins at {1}{R} with 8 mana is 6 damage.
+ 1. An opponent PLANESWALKER, or a creature named on the DRAW PUNISHERS line -> aim there, ahead of
+    casting any creature. Its row prints "[counters: Nx loyalty]": when N is at or below a spell's
+    damage, that cast comes before any body.
+ 2. An opponent CREATURE whose printed CURRENT toughness the damage reaches -> aim there. Spark
+    Spray kills 1 toughness, Spellbomb 2, Hammer 3. THE ROW'S VERDICT OUTRANKS YOUR PLAN'S VERB:
+    "- DIES" is the row you take, "- SURVIVES (toughness N)" the row you decline, and if EVERY row
+    says SURVIVES the answer one screen earlier was "Cast nothing right now". Exceptions: "SURVIVES
+    (loyalty 3, 1 left)" is a planeswalker and IS a take, and after combat damage a row can flip.
+ 3. A creature this cannot kill but that attacks every turn -> aim there rather than bank the card.
+ 4. Only then the face, and only when "Opponent life:" is 6 or less; at 7 or more that row is not
+    on your menu, and an empty opposing board is a reason to HOLD.
+THE 6-LIFE FLOOR RELEASES ON TWO PRINTED NUMBERS - their line reading 0 creatures AND 2 or fewer
+lands - and only once the log shows a land-kill of yours that resolved. Once released the face row
+is the clock at any life total.
+LIFEGAIN CROSS-CHECK: read the sign in "Opponent life trend: ... now 31 (+3 since turn 34)" before
+numbering any face row. A one-off gain does not stop your burn; a gain that REPEATS at or above the
+damage you make per turn latches, and every point then goes at creatures and planeswalkers unless
+step 0 fires. BOTH HALVES OF A LIFE LOOP (Sanguine Bond + Exquisite Blood, named in the frame's
+"LIFE-TO-DAMAGE CONVERTER" block) is the one board where DEPLOYING is wrong - their gain repeats
+until you are at 0, and their edicts gain them life equal to your creature's toughness. Hold
+everything and take the hold row. ON THAT BOARD EVERY PRINTED LIFE PRICE IS LETHAL, NOT EXPENSIVE:
+a row bracketed "paying this costs you N life" - the Talisman's own 1 among them - closes the loop
+and kills you from ANY life total, so take a row priced at no life, or the hold row. Read the same
+way the moment the frame prints "LOOP HALF PENDING".
+HAMMER, SPELLBOMB AND SPARK SPRAY NEVER TOUCH A LAND - their menus list players and creatures only.
+A ROW TAGGED [your battlefield] IS NEVER THE ANSWER; when it is the only row, "CHOICE: 0 (pass)".
+Never target "Yourself (player, life N)".
+
+=== STARSTORM'S X ===
+DECIDE WHETHER AT THE CAST ROW, NOT AT THE X MENU: it prints the same two lists and still offers
+"Cast nothing right now". Once you answer "Cast Card Normally" the mana is paid and pooled, and the
+X menu's Decline cancels the cast without refunding it - declining there loses the turn's mana.
+DO NOT CAST when either holds: (a) the YOURS list at that X names Rorix or Siege-Gang, the only two
+cards that end a game for you; (b) the THEIRS list names only "[defender]" creatures - carve-out,
+if a GROUNDED attacker of yours is being held back by exactly those defenders, the sweep buys your
+clock (never for Rorix, who flies over them). Also do not cast on "your mana affords only X=0" or
+"even at X=N NOTHING on the board dies".
+SURVIVAL OVERRIDE: add the printed power of every creature on their line; if that sum is at or
+above "Your life:", take the longest THEIRS list whatever YOURS names - unless what it leaves alive
+still totals your life or more, when it buys nothing and you keep the blocker.
+At every window listing "Cast Starstorm" write:
+  PLAN: <Starstorm now / hold it>, then <next action>; THEIRS non-defenders <n>, YOURS names
+  Rorix/Commander <yes/no>
+THEIRS 0, or YOURS yes, means "Cast nothing right now".
+ON THE X MENU: option 1 is the LARGEST X, never X=1, and any X your plan names is older than the
+menu. The menu MARKS one row ("[<- most kills at any affordable X ...]" or "[<- best trade: ...]"):
+answer that row's number and read nothing else - a marker answers WHICH X, never WHETHER. With no
+marker take the LARGEST "kills THEIRS" list whose "YOURS:" reads "none", then walk DOWN through any
+"same kills as X=N, for K less mana" row to the LOWEST of that run. Never take a row whose "kills
+THEIRS" reads "none".
+
+=== THE LAND PLAN ===
+Land destruction is TEMPO: worth a card while their battlefield shows FOUR OR FEWER lands and
+nearly worthless after, so spend it EARLY and never hold it for a better target.
+WRITE TWO NUMBERS BEFORE EVERY SUCH CAST: "Their lands <N>; my life <L>". N comes off their line's
+tail, and collapsed handles count in full ("Island #1-#4 x4" is four lands, one row). At N of 5 or
+more, or L of 8 or less, the spell
+is dead for the game and does not revive because you have nothing else to do with the mana: "Cast
+nothing right now", and the card is a Cleanup discard. The plan also ends the moment "Opponent
+life:" is at or below the damage you can point at a player this turn.
+WHICH LAND: prefer a nonbasic (Molten Rain deals 2 extra to its controller for one, and nonbasics
+fix their colours); a tapped land is a fine target.
+
+=== CARD FACTS THE PROMPT DOES NOT PRINT ===
+DWARVEN BLASTMINER (1/1) is a machine, not a creature: "{2}{R}, Tap: destroy target NONBASIC land"
+- basics are not legal targets, and it needs him untapped. Activate only while their board shows
+FOUR OR FEWER lands and your life is above 8; with a DRAW PUNISHERS line up and a body in "Your
+hand" the activation is OFF at any life and land count, because that {2}{R} is the body's mana.
+TALISMAN OF IMPULSE is ramp; its {1} mode is free and its coloured mode costs 1 life, which the cast
+row prices as "paying this costs you 1 life". At 3 life or less, and on any life-loop board above,
+that row is "Cast nothing right now", whatever the spell does.
+SIEGE-GANG COMMANDER brings FOUR BODIES (a 2/2 plus three 1/1 Goblins) - your board and blockers.
+"{1}{R}, Sacrifice a Goblin: 2 damage" is a REMOVAL row, not a clock: take it only when the row
+reads "- DIES" against one of their creatures, or when its "they would be at N" is 0 or less. At any
+other N the Goblin is worth more as a body, and a row tagged "[repeat: activated this turn N times
+already]" means you have already answered this question this turn - stop and move the turn on.
+Attack with all four the turn they can.
+RORIX BLADEWING is a 6/5 with FLYING and HASTE: cast him and attack that turn and every turn
+after. HE IS LEGENDARY AND YOU RUN TWO - casting the second ends the turn with the same board for
+six mana, so keep it for the turn the first dies.
+HAMMER OF BOGARDAN is a sorcery dealing 3; from the graveyard your upkeep offers "Put a card into
+hand with Hammer of Bogardan [cost: {2}{R}{R}{R}]". Five to return plus three to recast is EIGHT
+MANA for 3 damage - never let it push a Siege-Gang or a Stone Rain out of a turn, and with either
+body in hand and the lands to cast it, pass on the return. THE EMPTY-HAND RULE is the half
+that wins games: when "Your hand" reads "(0 cards): (none)" - or holds only a land spell the land
+plan's two numbers have killed - and "Mana available:" is 8 or more, TAKE THE RETURN EVERY UPKEEP
+and recast in main phase 1 - the only rate you have then.
+PYRITE SPELLBOMB: cast for {1} on any spare-mana turn and leave it as a loaded gun for their first
+2-toughness creature; draw mode only when their line reads 0 creatures.
+THEY COUNTER when "Their graveyard" names Cancel, Essence Scatter, Dream Fracture or Fall of the
+Gavel, "Their untapped sources:" reads 2 or more and "Opponent hand size:" is 1 or more. They answer
+the FIRST spell of your turn, so with mana for two spells cast the CHEAP one FIRST as bait and the
+threat SECOND: RORIX AND SIEGE-GANG ARE NEVER THE FIRST SPELL OF A TURN there, whatever the cast
+order says, and a turn with only one castable spell holds the body instead. "Hold mana for their
+turn" is not a play here -
+nothing but Starstorm is an instant.
+
+=== COMBAT: ATTACKING ===
+RACE CHECK first, and only when your attack list holds exactly ONE creature and it is Rorix or
+Siege-Gang. Their turns to kill you = "Your life:" divided by the "CRACK-BACK NEXT TURN" line's own
+"for up to N" (that figure, never a power you add up); yours = "Opponent life:" divided by your
+attacker's power. If THEIR number is smaller or equal, "ATTACK: none" and keep the body home to
+block - unless "for up to N" exceeds your life PLUS that creature's toughness, when holding it home
+does not change the turn you die and you send it.
+WALL CHECK, before the floor. A "[defender]" creature CANNOT ATTACK BUT BLOCKS NORMALLY, and one on
+their line does block - it is named in the "their untapped blockers" tag of every attacker row it
+can take. While those rows read "(blocking trigger: they may gain 2)", each creature you declare
+hands them up to 2 life per blocker they use and your 1/1s and 2/2 kill nothing through a 0/4:
+write "Wall: <n> attackers x 2 = <2n> life to them; ATTACK: none", and kill Perimeter Captain or
+Pride Guardian first. With a LIFE-TO-DAMAGE CONVERTER line up as well, every one of those points
+comes off YOUR total too.
+ATTACK FLOOR, first case that applies:
+ - Wall check fired -> "ATTACK: none".
+ - Blastminer alone on the list -> he stays home while a nonbasic "[opponent's battlefield]" land
+   sits on his target rows; otherwise read HIS OWN tag and SEND HIM unless a parenthesis says he
+   dies (every blocker priced "(neither dies)" means he loses nothing).
+ - Any other creature listed -> send EVERY creature listed except Blastminer. The list already
+   dropped everything that cannot legally attack, so do not re-check summoning sickness or tapped
+   status, and never hold back because their creatures read "[tapped ...]".
+ - Otherwise "ATTACK: none" only when every listed attacker would die and kill nothing, or under
+   the crack-back exception below.
+BLOCKER TAGS: a name-by-name list of three blockers is N=3; the collapsed form reads "they have N
+untapped creatures that could block this one, biggest X", sometimes with a GANG BLOCK clause. Each
+parenthesis prices ONE blocker; GANG BLOCK measures your toughness against the SUM.
+ - A GANG BLOCK clause, or 2 or more blockers named -> that creature stays home. A GOBLIN token
+   goes anyway; RORIX goes only when every blocker named is grounded; SIEGE-GANG never goes, its
+   sacrifice ability needs it alive.
+ - N is 1 and no GANG BLOCK clause -> the parenthesis is the whole story; use it.
+CRACK-BACK EXCEPTION, outranking "send every creature listed": when "for up to N" is at or above
+"Your life:" (it says "that would KILL you"), every creature you send is a blocker you will not
+have - attacking taps it, and that line does not know what you are about to declare. Keep home
+whatever blocks the biggest attackers; send only vigilance, or a Rorix whose 6 is lethal THIS turn.
+A one-row attack list after your own Starstorm is your last body: if its tag says it dies and kills
+nothing, "ATTACK: none".
+
+=== COMBAT: BLOCKING ===
+Take any block where your creature kills theirs and lives, and a "(both die)" with a GOBLIN token
+always. Do NOT take "(both die)" with SIEGE-GANG or RORIX - your only bodies, and Siege-Gang's
+ability needs it alive; send a Goblin, or take the damage while "you would be at N" is above 5. The
+one "(both die)" the Commander does take is against a token-MAKER.
+ONE BLOCKER STOPS THE WHOLE OF ONE ATTACKER'S DAMAGE; a second and third on the same attacker stop
+nothing more and die with the first. Read "you would be at N" first:
+ - N above 5 and every row on that attacker reads "(your blocker dies, attacker lives)" -> "BLOCKS:
+   none".
+ - N at 5 or below -> ONE Goblin on the attacker with the largest "deals N", a second only on a
+   DIFFERENT attacker; never two on one unless the row says "(both die)" for the pair.
+WHEN THE HEADER SAYS LETHAL the arithmetic is the whole question, not the trade. Narrow first: an
+attacker tagged "[NONE of your available blockers can block this ...]", or missing from your
+blocker's "may block" line, is not on the menu. Among the rest, block the LARGEST "deals N" even
+when the trade line says your blocker dies; if an attacker IS on a "may block" line you CAN block
+it.
+A "[GANG BLOCK: ...enough to kill this attacker]" clause on the header is a different question from
+damage: when that attacker is the only one hitting you or is named on the DRAW PUNISHERS line, and
+your life minus its "deals N" is 5 or less, put every blocker the clause counts on it, Goblins
+first.
+
+=== MULLIGAN AND DISCARD ===
+"counted by the engine: N lands, M spells" is the land count - never recount. "Playing every land
+in this hand would cover the cost of: ..." is the mana check: if it names a card, this hand ACTS.
+ - Two or more lands and at least one spell -> keep at every "(keeping N)", UNLESS the header reads
+   5 or more lands and exactly 1 spell: ship at (keeping 6) and (keeping 5), keep at 4 or lower.
+ - One land -> keep when the coverage line names a card; ship at (keeping 6) or (keeping 5) when it
+   reads "would not cover any spell", keep at (keeping 4) or lower.
+ - Zero lands ships at any N; all lands and no spells ships at any N above 4.
+BOTTOMING keeps in this PREFERENCE ORDER: the lands covering the cheapest spells you keep (three if
+the N allows, two at 4 or less); then the one Starstorm; then your cheapest spells; then the rest
+by cost. What is last in it goes under, even a land or the Starstorm. CLEANUP DISCARD reads
+it from the end - "PUT: n, m", most expensive first: the priciest spell your lands cannot cast in
+two turns, then a duplicate already in hand (marked "(copy 2 of 3 in your hand)"), then a land
+beyond the third. Never the only Starstorm, never a castable card while a duplicate is listed.
+
+=== PLAN LINES AND THE HOLD ROW ===
+A PLAN line names the NEXT ACTION - a land to destroy, a creature to kill, a body to add; there is
+no "the game is lost". When the last menu row begins "Hold priority: pass now, and do not ask me
+again ...", take THAT row at the FIRST such ask of the turn: "Cast nothing right now" answers one
+window and the list returns at the next seam; the hold row answers all of them.
+
+=== SITUATIONS ===
+- Opponent at 16, their board empty, a Spellbomb loaded, no creature to shoot -> hold it; if their
+  line reads 0 creatures and 2 lands and a land-kill of yours resolved, the face IS the clock.
+- Two non-defender creatures on their line, Starstorm in hand, neither Rorix nor Siege-Gang on your
+  battlefield -> Starstorm, before the Commander. If Rorix is already attacking for 6, hold it.

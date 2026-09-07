@@ -1,0 +1,260 @@
+REVELATION FRACTURE - UW DRAW-GO CONTROL
+
+=== THE DECK ===
+You never have a creature on the battlefield and nothing here attacks. You answer every threat and
+kill them one damage at a time with Staff of Nin, while Elixir of Immortality shuffles your spent
+answers back into your library. Your mana is 26 lands and nothing else.
+
+=== ORDER OF OPERATIONS ===
+1. Play a land, every turn.
+2. On THEIR turn: counter what is on the stack; otherwise take the hold row.
+3. On YOUR turn: ping with every Staff, then spend mana ABOVE the price of the cheapest counterspell
+   in hand - a first Staff, an Elixir, a Path/sweeper/Lightmine Field the board calls for, a
+   Revelation the three stops below allow.
+4. End your turn with {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture.
+Your plan line is this sequence of actions and nothing else:
+   "Hold the counter in my hand payable, then Staff of Nin from a row whose leaves N covers that
+   counter's cost, then an Elixir row before any ping while my library reads 16 or less, then ping
+   their face each turn - the punisher instead whenever a DRAW PUNISHERS line is printed; no
+   Emrakul while a converter of theirs is printed."
+Never append a per-card verdict to it: it is echoed atop every later window and outlives the board
+that made it. WHEN A ROW AND YOUR PLAN LINE DISAGREE, THE ROW IS TRUE.
+
+=== THE TAP-OUT GATE ===
+Covers every mana you spend on your OWN turn: a Staff, an Elixir ACTIVATION, a Lightmine Field, a
+Revelation. Not a counter cast at the stack, and not the Elixir CAST ({1} is always paid at once).
+Cast rows end "{leaves N of your M untapped mana sources untapped}", "casting this taps you out"
+(N=0), or "{spends K of your M ...; <card> needs N}", where M minus K is left and the card that
+clause names is the cheapest card you cannot pay for, NOT your price. THE PRICE is the
+cheapest COUNTERSPELL on your hand line: Essence Scatter 2, Cancel and Dream Fracture 3, Fall of the
+Gavel 5 - and Essence Scatter counts against every opponent. Take the row only when what is left is
+at least that; below it, "Cast nothing right now". A Revelation row prints no such clause: read
+its "{X pricing: max affordable X=N (M mana total)}" and treat the cast as spending all M.
+THE GATE IS OPEN, whatever N reads, in four shapes and only four:
+ (a) a sweeper row whose "{right now: destroys/exiles K of their creatures}" reads K of 2 or more;
+ (b) your life is 5 or less and the row gains life (Elixir activation, Revelation);
+ (c) the cheapest counter in hand costs MORE than the row's own M;
+ (d) the row is "Cast Staff of Nin" and NO Staff is on your battlefield line - the FIRST Staff is the
+     only card in this deck that ends a game. A SECOND Staff is NOT this shape.
+With no counterspell in hand at all, the gate is open at any N. "Mana available:" means the number on
+that line, one exception: at "0 total (no untapped sources) | Already in pool: ... (N mana ALREADY
+produced and floating)", what you can spend IN THIS DECISION is N; mana kept open for a counterspell
+must be an UNTAPPED SOURCE, never a pool.
+
+=== STAFF OF NIN - THE CLOCK AND THE WIN CONDITION ===
+{6} artifact, two copies: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1
+damage to any target." A "[second copy: ... no legend rule]" tag means both stay, each drawing and
+pinging; the same tag on an Elixir means each copy activates on its own.
+READ "Your library: N cards" BEFORE EVERY PING. At 16 or less, with a "Life with Elixir of
+Immortality" row anywhere on the same menu, TAKE THAT ROW and ping in the next window: the 5 life is
+not the point, the shuffle is, and it is the only thing in this deck that puts your graveyard back
+and stops you decking. Every Staff you control also draws a card each upkeep, so the count falls by
+more than one a turn and the row that saves you is on the menu now.
+Otherwise take "Deal 1 Damage with Staff of Nin ... targeting a player" in EVERY window offered,
+upkeep included, with EVERY Staff.
+- THE PING GOES AT THE FACE, one printed exception: while "DRAW PUNISHERS on the battlefield: theirs
+  - <names>" is printed and a ping row offers one of those names, PING THE PUNISHER with every Staff,
+  every window, until its row stops printing "SURVIVES", then back to the face. Your plan line's
+  "ping their face" is a default and that line outranks it.
+- With NO punisher line printed, aim at a creature or planeswalker only when 1 damage finishes it
+  (toughness 1, or 1 loyalty counter); otherwise at the player.
+
+=== EMRAKUL ===
+Costs {15}. Until "Cast Emrakul, the Aeons Torn" is a numbered row it is a blank card.
+- When the row IS printed, take it: only a cast you can pay for is printed, the extra turn is real,
+  and it outranks the tap-out gate.
+- THE ONE BOARD WHERE IT IS OFF: the prompt prints "LIFE-TO-DAMAGE CONVERTER on the battlefield:
+  theirs", or the row carries "{their converter:". Then the Emrakul row is not on your menu at any
+  life total: an edict makes them sacrifice it and their converter turns the 15 they gain into 15 off
+  you. Answer another row and let the Staff finish. IT FIRES ON LIFE THEY GAIN, never on yours: your
+  Revelation, Elixir and Fall of the Gavel's 5 are never converted against you.
+- With an Emrakul of yours out: attack in every attackers window offering it, block whenever the
+  block line does not read "your blocker dies", and answer "Cast nothing right now" to a sweeper row
+  whose tail reads "1 of yours" - that is your Emrakul.
+
+=== COUNTERSPELLS ===
+13: 4 Essence Scatter (creature spells only), 3 Dream Fracture, 3 Cancel, 3 Fall of the Gavel (gains
+you 5). Decide from the TYPE, MANA COST and (P/T) the stack line and the counter row print:
+- (creature P/T) printed POWER 2 or more: COUNTER IT.
+- [defender] at any power, or printed power 0 or 1: LET IT RESOLVE - it takes no point off you, and
+  neither winning nor spare mana is a reason to counter one. UNLESS its "{target text:}" contains
+  "{T}:", "Whenever ... attacks", "At the beginning of" or "venture", which act EVERY turn: then
+  COUNTER IT whatever the P/T reads, [defender] included.
+- (instant)/(sorcery) reading "Destroy target land": COUNTER at 5 of your lands or fewer; LET IT
+  RESOLVE at 6 or more.
+- (land), (artifact) with no P/T, or an (instant)/(sorcery) that only draws or searches: LET IT
+  RESOLVE - above all a MANA ARTIFACT, anything whose {target text:} says "Add" and nothing else.
+  Being far ahead on life is no exception.
+COUNTER ON SIGHT whatever the numbers: every planeswalker; every permanent that hits you or grows
+them EVERY turn (Underworld Dreams, Fate Unraveler, Sanguine Bond, Exquisite Blood, Howling Mine,
+Staff of Nin, Liliana's Caress); Idyllic Tutor, which fetches the enchantment half of their combo;
+and anything that makes a player DRAW extra cards, whatever its type - that outranks the artifact
+line. Every counterspell you can pay for has its own row, so COUNT THE ROWS: when exactly ONE is
+printed it is your LAST answer, spent only on that list or a creature of power 2 or more.
+WHICH ONE, when two or more rows can counter the same spell: the CHEAPEST - one exception, and it
+outranks the price. Your printed life is 12 or less: take Fall of the Gavel. Its 5 life is the only
+life this deck gains without spending a card on it, and an "INCOMING THIS COMBAT ... you would be at
+N" line tells you what this turn costs before you get another window.
+
+=== PATH TO EXILE ===
+{W} instant, four copies: "Exile target creature." The ONLY cards that remove a creature that has
+already resolved; the basic land it hands their controller is its price and it is worth paying.
+DECIDE AT THE CAST ROW, NOT AT THE TARGET ASK - it prints "{removes: A, B, C}" and a "legal targets
+right now:" clause giving each candidate's (P/T) and tags. In order:
+1. "LIFE-TO-DAMAGE CONVERTER ... theirs" is printed and a candidate is [lifelink]: Path that one, at
+   any power and any life.
+2. A candidate whose own text reads "{T}:", "Whenever ... attacks", "At the beginning of" or
+   "venture": Path it the first window offered, at any life total. "When this creature enters" is NOT
+   that line.
+3. Otherwise the highest printed power, [flying] outranking a ground body of equal power.
+4. EVERY name on that clause [defender] or printed power 0 or 1: answer "Cast nothing right now" at
+   THAT window and never open the target ask, at any life above 12.
+YOUR LIFE IS 12 OR LESS AND ANY CANDIDATE READS POWER 2 OR MORE: Path the biggest in that window.
+"[tapped]" says nothing about next turn and it untaps.
+
+=== SWEEPERS - THE HEADER COUNTS THE ATTACKERS FOR YOU ===
+Supreme Verdict {1}{W}{W}{U} "can't be countered" and destroys; Final Judgment {4}{W}{W} EXILES - use
+it against anything that returns from a graveyard. The opponent header prints TWO numbers and only
+the SECOND matters: "N are creatures, K of them without a restriction against attacking" (on the
+active player's board, "K of them able to attack right now"). Walls are already off K, a [tapped]
+creature is still counted, and the sweeper row repeats K.
+- K IS 0: Supreme Verdict and Final Judgment are NOT castable plays this turn, in either main phase;
+  "Cast nothing right now" and keep them. This outranks being ahead, being BEHIND, spare mana, a plan
+  naming a wipe, the sweeper being your only cast row or your last card, and the phase.
+- K of 2 or more: cast Supreme Verdict, or Final Judgment if anything of theirs recurs.
+- K of 1, and that creature is [defender] or power 0-1 with none of the engine text the Path section
+  names: cast NOTHING, no sweeper and no Path, at any life total.
+- K of 1 with power 2 or more and Path in your list: take the Path, keep the sweeper.
+- K of 1 with power 2 or more and no Path: cast the sweeper at power 4 or more; otherwise keep it,
+  unless your life is 10 or less and nothing else in your list answers it.
+
+=== LIGHTMINE FIELD ===
+{2}{W}{W}: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those
+creatures equal to the number of attacking creatures." Its row prints "{right now: they control N
+creatures able to attack - deals N to each}", and N is also the damage each takes, so it kills every
+counted creature whose printed TOUGHNESS - the second number in "(2/1)" - is N or less.
+ - N of 0: "Cast nothing right now", always.
+ - N of 1 or more with a counted creature at printed toughness N or less: CAST IT, subject only to
+   the tap-out gate. "[tapped]" is no reason to wait - the row counted them and they untap.
+ - N of 1 or more and every counted creature is tougher: hold it, read the row next window.
+SURVIVAL OUTRANKS THAT KILL TEST: when the printed power of their creatures able to attack totals at
+or above your printed life, any row with N of 1 or more is a cast.
+
+=== PUNISHER BOARDS (read the printed line, not the battlefield listing) ===
+- "DRAW PUNISHERS on the battlefield: theirs" (Underworld Dreams, Fate Unraveler, Ob Nixilis): every
+  card you draw costs 1 life per such permanent and they stack. Revelation stop (1) covers it; take
+  no other draw you are taking for the cards either, and take life from an Elixir, which draws none.
+- "DISCARD PUNISHERS on the battlefield: theirs": Revelation stop (2) covers it, and that tail
+  UNDERSTATES the bill, since draw triggers on the stack add cards it did not count.
+- Forced Fruition {4}{U}{U}: every spell YOU cast draws you seven first, and only CASTING triggers
+  it - not an Elixir activation, not a land drop. Counter it on the stack. Beside a draw punisher,
+  cast nothing on your own turn; alone, cast nothing while "Your library: N cards" reads 14 or less.
+- A COUNTERSPELL IS NOT AN OPTIONAL DRAW and no stop here reaches one: under Forced Fruition or a
+  draw punisher, cast a counter off a "[DRAW PRICE: ... - you would be at K]" row reading K of 15 or
+  more - and at any K above 1 when the spell countered has draw text of its own.
+
+=== SPHINX'S REVELATION ===
+{X}{W}{U}{U} instant: "You gain X life and draw X cards." X=0 does nothing.
+THREE PRINTED STOPS COME FIRST. Answer "Cast nothing right now" while ANY of these is on the screen,
+at any mana, any X and any life:
+ (1) a "DRAW PUNISHERS on the battlefield: theirs" paragraph;
+ (2) a "{... CLEANUP PRICE at X=N ...}" tail on the row;
+ (3) their printed life is 10 or less AND a Staff of Nin is on YOUR battlefield line - the Staffs
+     finish from there, and every card you draw past that point is one your library cannot spare.
+THE LOW-LIFE FLOOR LIFTS STOPS (2) AND (3), never (1), off two printed strings: your life is 6 OR
+LESS and the prompt carries no "DRAW PUNISHERS on the battlefield: theirs" paragraph. Then the row
+is your answer at ANY "max affordable X" of 1 or more - ahead of the tap-out gate, the size floor,
+"Cast nothing right now" and the hold row - and you take it in the FIRST window printing it. Same
+override when the printed power of their creatures able to attack totals at or above your life.
+Then, in order:
+- THE TAP-OUT GATE: take the row only when what it leaves covers the cheapest counter in your hand.
+- THE SIZE FLOOR: cast only from a row whose "{X pricing: max affordable X=N ...}" reads 3 or more;
+  X=1 and X=2 are both "Cast nothing right now" at any life above 10. Exception: your life is 10 or
+  less and nothing else in your list is worth casting, then cast at the largest X offered. The
+  "[<- best X for this cast: ...]" badge ranks X values and does not know this floor; when they
+  disagree, the floor wins. Spare mana is never a reason, and a menu of only rows this guide already
+  answers - a dead Lightmine Field, a sweeper at K=0, a Path at a [defender] - is an EMPTY menu.
+THE X MENU. The ask prints "... X=K is the largest value on this menu the library pays for." THAT K
+HOLDS BACK ONE DRAW ONLY - your draw step, as the sentence says. EACH Staff of Nin on your
+battlefield line draws you one more card at your next upkeep, and that K does not count them, so
+announce K MINUS ONE PER STAFF, never larger; at 0 or less take the "Decline - do not cast this
+after all" row. With no such sentence printed, use "library, minus 2, minus one per Staff". A row's
+own "{library: ... - L-N left}" counts the library ALONE, so "0 left" with no warning can deck you.
+When option 1 carries a life bill naming a surviving X, announce that X; when it says no listed X
+leaves you alive, answer
+"Cast nothing right now" and do not open the menu. Otherwise announce the largest X the ceiling
+allows; the menu prints largest-first and may collapse its middle.
+
+=== ELIXIR OF IMMORTALITY ===
+{1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard
+into library." Every counterspell and Path you have spent goes back into your deck. CAST it the turn
+it is listed whenever you have a spare {1}. ACTIVATE it whenever your life is 15 or less OR "Your
+library: N cards" reads 16 or less - in that window, ahead of a Staff ping and ahead of any spell.
+Sixteen, not twelve, and the library half is not about your life: at 90 life with 12 cards left you
+are losing. Above 15 life AND above 16 library, activate only when the activation row leaves at or
+above the cheapest counter in hand, unless gate shape (a), (b) or (c) applies.
+
+=== YOUR WINDOWS, AND THE HOLD ROW ===
+A window with nothing under "ON THE STACK" has one right answer: decline it - a spell they cast later
+opens its own window.
+THE LAST ROW OF EVERY MENU is "Hold priority: pass now, and do not ask me again ...". When the prompt
+carries "[you declined this exact list N times already this turn]", THAT ROW IS THE ANSWER and "Cast
+nothing right now" is the wrong one - take it at the FIRST such window, and again when the same rows
+come back. Only it stops the next identical ask, and never cast something because a window opened.
+
+=== LAND DROPS ===
+When the prompt asks "Land drop:" and lists "Play <land>" options, TAKE ONE - every turn, at any life
+total, with any hand, however many lands you have, TAPPED OR NOT (a tapped land taps for mana from
+next turn on). "Play no land right now" is never your answer while a land is listed. WHICH LAND: with
+an UNTAPPED row and a TAPPED row both offered take the UNTAPPED one - a Seachrome Coast past your
+third land makes no mana this turn.
+Otherwise take the colour you have fewest of.
+
+=== CLEANUP DISCARD ===
+Above seven at end of turn the ask prints your hand as a NUMBERED list and says how many to send
+("PUT: n, m"). What you choose is the hand you KEEP - counterspells you can pay for, and a Path. Send
+in this order:
+ 1. Lightmine Field, unless the opponent header's K reads 3 or more.
+ 2. EVERY LAND on the list, while numbers still need sending, whenever your own battlefield line
+    reads "and N are lands" with N of 6 or more. Read N there; do not count your hand.
+ 3. A second Supreme Verdict or Final Judgment - and a LONE sweeper too when K reads 0 AND every
+    creature they have cast is a wall.
+ 4. Emrakul, unless your battlefield line prints 13 or more lands.
+ 5. A Sphinx's Revelation beyond the first.
+ 6. A Staff of Nin, ONLY when a Staff of yours is already on your battlefield line.
+ 7. Only then a counterspell, MOST EXPENSIVE FIRST - Gavel before Cancel, Cancel before Scatter,
+    reversed to Scatters first when every creature they have cast is a wall.
+STEPS 1 TO 3 ARE A TIER, NOT A SEQUENCE - any order, and only when it is exhausted read on to 4-7.
+WHILE ANY LAND, OR A LIGHTMINE FIELD STEP 1 WANTS, IS ON THE LIST, A COUNTERSPELL IS NOT YOUR ANSWER.
+THE ROW TAGS SORT THE LIST: send "{dead right now:}" and "{spare:}" rows first, then untagged rows by
+the tier list, and a "{right now:}" row LAST - untagged means the engine could not price it, NOT that
+the card is dead, and a LONE sweeper or Path against a deck that has cast a real creature is never
+sent for carrying "{dead right now:}".
+HAND ALREADY OVER SEVEN WITH A DISCARD PUNISHER PRINTED: cleanup bills 2 life per card above seven
+and you cannot decline it, so while "Your hand (N cards)" is above seven on YOUR turn "Cast nothing
+right now" is the one row you may not take - cast one castable card per card you are over.
+
+=== MULLIGAN ===
+Your job is REACTIVE, so a slow start costs only the threats that land before you can answer. Read
+the engine's own counts and its "Playing every land in this hand would cover the cost of: ..." line.
+ - 2 to 5 lands and a coverage line naming a card: KEEP, at any price.
+ - "would not cover any spell in it": ship a seven and a six; at five or smaller keep a land plus a
+   spell castable in two draws.
+ - ONE LAND: SHIP a seven and a six - that coverage line names your one-mana cards because they cost
+   one mana, not because the hand does anything. At five or smaller keep it if it names a card.
+ - Seven lands and no spell, or seven spells and no land: ship at any price.
+BOTTOM IN THIS ORDER: Emrakul; then any "(copy 2 of 2 in your hand)" duplicate, a duplicate LAND
+included; then a land beyond the fifth; then your most expensive spell; then the cheapest card that
+is neither a land nor an answer. Keep the LANDS and at least ONE answer; Glacial Fortress "enters
+tapped unless you control a Plains or an Island".
+
+=== SITUATIONS ===
+- "Your library: 13 cards", you are at 44 to their 12, two Staffs are out, and the menu offers a ping
+  and a "Life with Elixir of Immortality" row. Take the Elixir: the life is beside the point, the
+  ping can wait a window, and the shuffle is the whole game.
+- The X ask reads "X=7 is the largest value on this menu the library pays for" and two Staffs are on
+  your battlefield line. Announce X = 5.
+- Their life is 8, two Staffs are out, and a Revelation row is offered at max affordable X=12. "Cast
+  nothing right now": the Staffs need four more upkeeps and your library has to reach them.
+- The same rows have been offered four times this turn and the prompt says so: take the hold priority
+  row, and again when they come back.
