@@ -1,0 +1,35 @@
+#NAME: A phase-restricted activation legal RIGHT NOW is visible to the oracle (#W73-CB F1b)
+#DESC: Astra wave-73 review finding 1, second blind spot. LegalActions.cpp's
+#DESC: shared usability scan dropped EVERY activation whose restriction was not
+#DESC: NO_RESTRICTION / PLAYER_TURN_ONLY / OPPONENT_TURN_ONLY whenever the window
+#DESC: was not a sorcery-speed one - so a "only during your upkeep" ability was
+#DESC: invisible DURING ITS OWN UPKEEP, both to the chain-collapse predicate and
+#DESC: to the human's ability border. The engine's own gate
+#DESC: (ActivatedAbility::isReactingToClick) compares the restriction against the
+#DESC: CURRENT PHASE; the oracle now mirrors it.
+#DESC: WITNESS: P1 in its own upkeep with Balduvian Hydra
+#DESC: ({R}{R}{R}: put a +1/+0 counter on it, only during your upkeep) and {R}{R}{R}
+#DESC: in pool, against P2's standing Sanguine Bond + Exquisite Blood loop.
+#DESC: PRE-FIX assertusable reads 0 and assertloopautopass reads 1; POST-FIX 1 and 0.
+[INIT]
+upkeep
+[PLAYER1]
+inplay:Balduvian Hydra
+manapool:{R}{R}{R}
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[DO]
+assertusable 1 Balduvian Hydra
+assertloopautopass 0 1
+[ASSERT]
+upkeep
+[PLAYER1]
+inplay:Balduvian Hydra
+manapool:{R}{R}{R}
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[END]

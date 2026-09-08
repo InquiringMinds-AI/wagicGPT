@@ -98,6 +98,10 @@ public:
     //#W73-BY (N16): a MAIN PHASE of this seat's own turn that reached no
     //casting window. Report-only, like the hook above; the GPT seat counts it.
     virtual void noteMainPhaseWindowSkipped(const char * /*why*/) {}
+    //#W73-CB (F6): this seat's own main phase DID reach the sorcery-speed
+    //casting window. Paired with the note above so the meter counts a phase
+    //that ended with no casting opportunity, not every tick that took a branch.
+    virtual void noteMainPhaseCastingOffered() {}
  protected:
     virtual int orderBlockers();
     //Permute atk->blockers so autoaffectDamage's lethal-first walk kills
