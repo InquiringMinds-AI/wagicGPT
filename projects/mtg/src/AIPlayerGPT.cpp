@@ -479,7 +479,7 @@ static const size_t kPlanCarryMaxSteps = 12;
 static string planContradictedBlock(const string& deniedName)
 {
     std::ostringstream o;
-    o << "\nYOUR PLAN was withdrawn: it says you have no \"" << deniedName
+    o << "\nTHE PLAN YOU LAST STATED was withdrawn: it says you have no \"" << deniedName
       << "\", and the CURRENT SITUATION below shows \"" << deniedName
       << "\" on your own battlefield. State a fresh plan from the board as it is now.\n";
     return o.str();
@@ -494,7 +494,7 @@ static string planContradictedBlock(const string& deniedName)
 static string planAssertedAbsentBlock(const string& assertedName)
 {
     std::ostringstream o;
-    o << "\nYOUR PLAN was withdrawn: it says \"" << assertedName
+    o << "\nTHE PLAN YOU LAST STATED was withdrawn: it says \"" << assertedName
       << "\" is on a battlefield, and the CURRENT SITUATION below shows \"" << assertedName
       << "\" on neither battlefield. State a fresh plan from the board as it is now.\n";
     return o.str();
@@ -2950,6 +2950,21 @@ string legibleCounterName(const string& engineName)
         low[i] = (char) tolower((unsigned char) low[i]);
     if (low == "teferieffect")
         return "bookkeeping (Teferi's +1)";
+    //#W73-CA (N14, deck152 MED-1): the next engine-named counter this table was
+    //written for. `152v146` seq 25 printed `[counters: 1x ghostform]` bare on
+    //Nadaar and the combat tag beside it read `(both die)`; the seat traded its
+    //Intrepid Adversary for a blocker that went back to its owner's hand and
+    //left a 1/1 flier behind. The tag is true - the creature does die - and the
+    //counter is where the rest of the story is, so the counter says it.
+    //Verified against Kaya the Inexorable's own `text=` line
+    //(`Res/sets/primitives/planeswalkers.txt:1877`): "+1: Put a ghostform
+    //counter on up to one target nontoken creature. It gains 'When this creature
+    //dies or is put into exile, return it to its owner's hand and create a 1/1
+    //white Spirit creature token with flying.'"
+    if (low == "ghostform")
+        return "ghostform (when this creature dies or is exiled its owner returns"
+               " it to hand and creates a 1/1 white flying Spirit - killing it is"
+               " not removal)";
     return engineName;
 }
 
@@ -4052,10 +4067,24 @@ static int heuristicRevealIndex(const std::vector<int>& cmc,
 //taking it strands a sorcery-speed card in hand? `sorceryReserveClause` is the
 //only emitter of the group, and the group is what makes the decline a decision
 //about the whole step rather than about this window. Pure.
+//#W73-CA (N12, wave-72 engine-seat MED-3): this predicate matched the reserve
+//clause's WAVE-67 OPENING WORDS - `{reserve: this row is INSTANT SPEED`. #W72-BV
+//(M9) rewrote sorceryReserveClause to LEAD with the consequence, so the live
+//clause opens `{reserve: TAKE THIS ROW AND YOU CANNOT CAST <name> AT ALL THIS
+//TURN. This row is INSTANT SPEED...` and this find() stopped matching anything.
+//Measured on `matchups-20260907-163626`: 55 windows rendered a reserve clause,
+//`{reserve: this row is INSTANT SPEED` appears 0 times corpus-wide, and BOTH
+//counters this predicate gates read 0 on all 42 gameends
+//(`reserve_decline_windows_skipped`, `reserve_decline_windows_noted`). The
+//PARSETEST pins were green throughout because they feed it the WAVE-67 corpus
+//rows the renderer no longer produces - the instrument tested the predicate
+//against text nothing emits. Match the clause FAMILY (` {reserve: `, which is
+//also the once-only literal the #W69-BJ F1 composed-row census uses), so a
+//reword of the clause body can never silently disarm the latch again.
 static bool menuHasReserveRow(const std::vector<string>& rows)
 {
     for (size_t i = 0; i < rows.size(); i++)
-        if (rows[i].find("{reserve: this row is INSTANT SPEED") != string::npos)
+        if (rows[i].find("{reserve: ") != string::npos)
             return true;
     return false;
 }
@@ -5297,11 +5326,21 @@ static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOppos
 {
     if (totalOpposing <= 0 || cannotBlock.empty())
         return ""; //nothing is restricted -> nothing to state
+    //#W73-CA (N14, deck146 MED 5): the old head was `[held back, it CANNOT
+    //block: X]`, and on `146v152` seq 31 it sat one bracket away from `[their
+    //untapped blockers: X]` naming the SAME creature. Two claims in opposite
+    //directions - what THIS creature can block, and what can block IT - and the
+    //first named no subject, so they read as a contradiction: "This is
+    //contradictory. Usually, 'their untapped blockers' lists creatures that CAN
+    //block." The fix is the SUBJECT, not the fact: the tag now says whose
+    //blocking it is about, and the `<label>: <name>` shape that mirrored the
+    //other tag is gone from the short form. "held back" is kept verbatim - the
+    //scope footnote below and a live deck guide both key on it. Still
+    //restriction-first, still no affirmative "can block" substring.
     std::ostringstream o;
-    o << " [held back, it CANNOT block";
+    o << " [held back, THIS creature could not block ";
     if ((int) cannotBlock.size() >= totalOpposing)
-        o << " ANY of their " << totalOpposing << " creatures";
-    o << ": ";
+        o << "ANY of their " << totalOpposing << " creatures: ";
     size_t shown = cannotBlock.size() < 3 ? cannotBlock.size() : 3;
     for (size_t i = 0; i < shown; i++)
         o << (i ? ", " : "") << cannotBlock[i];
@@ -16678,8 +16717,15 @@ string AIPlayerGPT::askReplaySidecarPath() const
     return dir + "askreplay/" + base;
 }
 
+//#W73-CA (N8, wave-72 engine-seat MED-2): `replay_run` meant TWO different
+//things. The `cache_replay` path passed this window's own run; the
+//`repeat_ask_reserved` path passed `mRepeatAskAnswersReserved`, the GAME's
+//running total - so the corpus's maximum `replay_run` read 90 against a cap of
+//64 (a breach that never happened) while the true maximum per-window run was
+//11. One field, one meaning: `replay_run` is ALWAYS this window's consecutive
+//run against the same key, and the game total moves to its own field.
 void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int choice,
-                               int optionCount, int fromSeq, int run)
+                               int optionCount, int fromSeq, int run, int gameTotal)
 {
     if (mTransLogPath.empty())
         return;
@@ -16690,6 +16736,7 @@ void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int ch
         {"why", why ? why : ""},
         {"replayed_from", fromSeq},
         {"replay_run", run},
+        {"replays_this_game", gameTotal},
         {"choice", choice},
         {"options", optionCount},
         {"turn", translogTurn(observer ? observer->turn : 0)},
@@ -18653,10 +18700,24 @@ static string planMenuDiffClause(const string& absentName);
 //verb, and the line no longer reads `<CAPS>: <text>`. The words "YOUR PLAN"
 //are kept exactly - three live deck guides key on that string - and nothing
 //else about the carry changes. Pure over its three inputs.
+//#W73-CA (N17, wave-72 engine-seat / deck152 MED-4 / deck130 MED / deck146 LOW
+//7): L11 took the COLON off the heading and the echoes did not stop. Measured on
+//`matchups-20260907-163626`: 10 of 1,910 replies (0.52%) still open
+//`YOUR PLAN: <sentence>` - 13.7% of the corpus's 73 `plan_line_missing` records,
+//every one of them a mislabelled plan line and an off-protocol charge. What the
+//model copies is not the punctuation, it is the CAPS PHRASE - `YOUR PLAN` is the
+//only all-caps label-shaped token on the screen that names a plan, so it gets
+//reused in the label slot. L11 kept the phrase because "three live deck guides
+//key on that string"; that reason has expired - the wave-72 guide pool contains
+//no key on it (`deck125` line 16 and `deck130` line 80 use "YOUR PLAN LINE" /
+//"YOUR PLAN'S VERB" in prose, neither reading the heading). So the phrase goes.
+//The parser is untouched (invariant 000: a second accepted label is prose-shaped
+//tolerance), the quotation shape L11 established is untouched, and the heading
+//still cannot be split `<label>: <text>`.
 static string carriedPlanHeaderText(const string& ageClause, const string& absentClause,
                                     const string& plan)
 {
-    return string("\nYOUR PLAN (as you last stated it") + ageClause + absentClause
+    return string("\nTHE PLAN YOU LAST STATED (as you stated it") + ageClause + absentClause
            + ") reads \"" + plan + "\"\n";
 }
 
@@ -25999,9 +26060,21 @@ static string mdfcRowHead(const string& printedName, const string& menuToken)
     return printedName + " (menu text: " + menuToken + ")";
 }
 
+//#W73-CA (N14, deck146 MED-4): `frontIsLand`. A Pathway's front face is a land,
+//so the "can no longer be cast" clause would be nonsense about it - and the
+//wave-59 fix for that passed an EMPTY front name, which dropped the identity
+//link with the clause. `146v125` seq 35 then printed `Hand: Brightclimb Pathway`
+//over a menu reading `1. Brightclimb Pathway (menu text: Play Land)` and
+//`2. Grimclimb Pathway [PLAY THIS AS A LAND ...]`, with nothing saying the two
+//rows are ONE card: the reasoning read it as "a typo in the prompt's menu
+//generation, or maybe I have a Grimclimb in hand?". Measured on
+//`matchups-20260907-163626`: 58 of 295 rendered tags carry no front-face clause
+//at all. The name is now always printed; only the CONSEQUENCE differs, because
+//only the consequence differs in the rules.
 static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
                                  const string& frontName,
-                                 const string& arrivalTag = string())
+                                 const string& arrivalTag = string(),
+                                 bool frontIsLand = false)
 {
     string s = " -> PLAY THIS AS A LAND: puts \"" + backName + "\" onto the"
                " battlefield as a land";
@@ -26009,7 +26082,11 @@ static string mdfcLandPlayRowTag(const string& backName, const string& backMana,
         s += " (taps for " + backMana + ")";
     s += ". It costs no mana and uses no stack, and it USES YOUR LAND DROP for"
          " this turn";
-    if (!frontName.empty())
+    if (!frontName.empty() && frontIsLand)
+        s += ", and it is the OTHER FACE of \"" + frontName + "\" in your hand -"
+             " one card with two land faces, not two cards: playing either face"
+             " spends the same card and the same land drop";
+    else if (!frontName.empty())
         s += ", so \"" + frontName + "\" leaves your hand with it and that face"
              " can no longer be cast";
     s += ".";
@@ -26264,6 +26341,9 @@ static string stripNarrationDecoration(const string& in)
                 //#W63-AC (E5): the rung ceiling explains THIS menu's top row
                 //and says nothing about what happened.
                 || (in.compare(i, 15, "{rung ceiling: ") == 0)
+                //#W73-CA (N14a): the animation row's death price is the same
+                //species - it prices a decision, it does not record one.
+                || (in.compare(i, 14, "{death price: ") == 0)
                 //#W68-BB (J5): the post-announcement decline's clause prices THIS
                 //window's pool; the moment the step ends it is false.
                 //#W68-BE (R6): its opening words changed with the wording fix, and
@@ -29082,6 +29162,24 @@ static string animateRungCeilingClause(const string& name)
            " menu is what your OTHER untapped sources pay for}";
 }
 
+//#W73-CA (N14, deck152 HIGH-2): the animation row priced the MANA and the
+//DURATION and never priced the LOSS. `152v146` seq 30 animated Lair of the
+//Hydra into a 1/1, seq 32 sent it into a listed blocker whose own tag said the
+//attacker dies, and the seat did not lose a creature - it lost a LAND, off a
+//four-land board, two turns before a seven-attacker lethal swing. Nothing on
+//that row said the body and the mana source are the same permanent. This is a
+//RULES FACT about the row, true on any board and independent of the rung taken,
+//so it rides the row wherever the rungs do. Pure over the name.
+static string animateDeathPriceClause(const string& name)
+{
+    if (name.empty())
+        return "";
+    return " {death price: " + name + " is a LAND you control - while it is"
+           " animated it is a creature AND still that land, so if it dies in"
+           " combat or to removal you lose the land itself and the mana it makes,"
+           " not just a body}";
+}
+
 //#W53-O (D5, wave-52 ledger HIGH): a targeted spell's CAST row - the REFUSABLE
 //window - carried less information than the forced target ask that follows it.
 //`123v146` seq 18 (turn 10, 6 life) offered "Cast Tragic Slip {b} {right now:
@@ -31668,6 +31766,12 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             if (asrc && !asrc->isCreature() && unwrapSelfAnimate(action.ability, 0)
                 && scriptLower(asrc->magicText).find(":add") != string::npos)
                 out << animateRungCeilingClause(asrc->getDisplayName());
+            //#W73-CA (N14, deck152 HIGH-2): and the price of losing it. Gated on
+            //LAND, not on being a mana source: a creature-land that makes no mana
+            //is still a land the seat loses when the animated body dies.
+            if (asrc && !asrc->isCreature() && asrc->hasType(Subtypes::TYPE_LAND)
+                && unwrapSelfAnimate(action.ability, 0))
+                out << animateDeathPriceClause(asrc->getDisplayName());
         }
     }
     if (action.click)
@@ -31721,9 +31825,11 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             //lost and the "can no longer be cast" clause would be nonsense
             //about a land (live probe 20260903 printed it on Hengegate
             //Pathway). Only a spell front face names itself here.
-            out << mdfcLandPlayRowTag(backName, backMana,
-                                      fc->isLand() ? string() : fc->getDisplayName(),
-                                      arrival);
+            //#W73-CA (N14): ...but the front face is NAMED either way now - the
+            //land branch says the two faces are one card instead of saying
+            //nothing at all.
+            out << mdfcLandPlayRowTag(backName, backMana, fc->getDisplayName(),
+                                      arrival, fc->isLand() != 0);
         }
     }
 
@@ -36354,6 +36460,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mAskReplayKey.clear();
         mAskReplayRun = 0;
         mAskReplayRuns.clear(); //#W72-BT (M22): the per-window runs die with the keys
+        //#W73-CA (N8): the repeat latch's runs are turn-scoped too - its own key
+        //embeds the turn, so they are dead keys from here on either way.
+        mRepeatAskRuns.clear();
         mAskCacheTurn = observer->turn;
     }
     //"Only one valid action": no decision to make, no model call.
@@ -36493,7 +36602,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             mAskReplaysRefused++;
             logAskReplay("cache_replay_refused", decision, cached->second,
-                         (int) options.size(), fromSeq, kAskReplayRefuseMax);
+                         (int) options.size(), fromSeq, kAskReplayRefuseMax,
+                         mAskReplaysReserved);
             DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: refusing the ask cache after "
                        << kAskReplayRefuseMax << " identical replays of the same state+question"
                        << " (answer " << cached->second << ", first served at seq " << fromSeq
@@ -36517,7 +36627,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
             mAskReplaysReserved++;
             logAskReplay("cache_replay", decision, cached->second, (int) options.size(),
-                         fromSeq, mAskReplayRuns[askKey]); //#W72-BT (M22): this window's own run
+                         fromSeq, mAskReplayRuns[askKey], //#W72-BT (M22): this window's own run
+                         mAskReplaysReserved); //#W73-CA (N8): the game total, on its own field
             return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
         }
     }
@@ -36534,16 +36645,43 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                               mRepeatAskTurn, observer ? observer->turn : -1,
                               mRepeatAskChoice, (int) optionsIn.size()))
     {
+        //#W73-CA (N8, wave-72 engine-seat MED-2, second half): BOTH re-serve
+        //paths are bounded or neither is. The ask cache above has refused after
+        //kAskReplayRefuseMax identical replays since #W71-BP; this path - now 327
+        //of the corpus's 521 replays, up from 68 of 725 - was bounded only by the
+        //turn boundary, so the wave-71 drain loop's successor could live here
+        //unrefusable. The same predicate, the same cap, the same consequence: the
+        //latch is dropped and the window goes to the model.
+        if (askReplayRefuseScoped(nowRepeatKey, mRepeatAskRuns, kAskReplayRefuseMax))
+        {
+            mAskReplaysRefused++;
+            logAskReplay("repeat_ask_refused", decision, mRepeatAskChoice,
+                         (int) optionsIn.size(), mRepeatAskSeq, kAskReplayRefuseMax,
+                         mAskReplaysReserved);
+            DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: refusing the repeat latch after "
+                       << kAskReplayRefuseMax << " identical re-serves of the same turn+question"
+                       << " (answer " << mRepeatAskChoice << ", first served at seq "
+                       << mRepeatAskSeq << ", " << mAskReplaysRefused
+                       << " refusals this game): " << decision);
+            mRepeatAskKey.clear();
+            mRepeatAskTurn = -1;
+            mRepeatAskSeq = -1;
+        }
+        else
+        {
         mRepeatAskAnswersReserved++;
         mAskAnswerReserved = true; //#W60-M (B13c): the model was not shown this window
         //#W71-BP (L2): the OTHER silent re-serve path. Same argument, same record.
         mAskReplaysReserved++;
         logAskReplay("repeat_ask_reserved", decision, mRepeatAskChoice,
-                     (int) optionsIn.size(), mRepeatAskSeq, mRepeatAskAnswersReserved);
+                     (int) optionsIn.size(), mRepeatAskSeq,
+                     mRepeatAskRuns[nowRepeatKey], //#W73-CA (N8): this window's run
+                     mRepeatAskAnswersReserved);   //...and the game total, separately
         DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the same ask again, unchanged - re-serving"
                    " this seat's own answer " << mRepeatAskChoice << " of " << optionsIn.size()
                    << " (" << mRepeatAskAnswersReserved << " this game): " << decision);
         return mRepeatAskChoice - 1;
+        }
     }
 
     string userTail = tailStr;
@@ -36759,6 +36897,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //#W72-BT (M22): ...but only for THIS window. Wiping every window's run is
     //what let an interleaved answer hide an 18-deep replay loop.
     mAskReplayRuns.erase(askKey);
+    //#W73-CA (N8): the same discipline for the repeat latch's run - a window the
+    //model really answered starts its run over, and only THAT window's.
+    mRepeatAskRuns.erase(nowRepeatKey);
     //#W59-J (K10): latch the answer for a re-ask of this exact window. Only a
     //VALID choice: a fallback is not an answer and is never re-served.
     if (callerChoice >= 1 && callerChoice <= (int) optionsIn.size())
@@ -40957,9 +41098,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 if (opts[i].compare(0, raw.size(), raw) == 0)
                     opts[i] = mdfcRowHead(landBack, raw) + opts[i].substr(raw.size());
                 opts[i] += " ["
-                    + mdfcLandPlayRowTag(landBack, landBackMana,
-                                         ctx->isLand() ? string() : ctx->getDisplayName(),
-                                         landArrival).substr(4)
+                    + mdfcLandPlayRowTag(landBack, landBackMana, ctx->getDisplayName(),
+                                         landArrival, ctx->isLand() != 0).substr(4) //#W73-CA (N14)
                     + "]";
             }
     }
@@ -45661,7 +45801,14 @@ int AIPlayerGPT::chooseAttackers()
     if (anyHeldBack)
         tail << "A \"held back\" tag lists their CURRENT creatures that body could"
                 " not legally block if you keep it home. It says nothing about"
-                " whether they will attack with those creatures.\n";
+                " whether they will attack with those creatures."
+                //#W73-CA (N14, deck146 MED 5): and which DIRECTION it runs in,
+                //because the same names appear in a \"their untapped blockers\"
+                //tag on the same line and the two were read as one claim.
+                " It runs the opposite way from a \"their untapped blockers\" tag:"
+                " that one lists creatures that could block THIS attacker, this one"
+                " lists creatures THIS body could not block. The same name can"
+                " honestly appear in both.\n";
     //W42-3 SCOPE, stated once rather than on every line - the same trade-trust
     //register the blockers window uses for its parentheses. The forecast is the
     //naive 1-on-1 fight and the defender chooses whether to block at all, so say
@@ -53176,8 +53323,18 @@ void AIPlayerGPT::runParseSelfTest()
         // next turn" - which flies. The restriction leads and names the cause.
         string t1 = heldBackBlockTag(one, 3);
         cout << "     1 of 3 unblockable-by-it: \"" << t1 << "\"\n";
-        CHECK(t1 == " [held back, it CANNOT block: Elite Spellbinder #1 (flying)]",
+        CHECK(t1 == " [held back, THIS creature could not block Elite Spellbinder #1 (flying)]",
               "W41-13 the restriction leads and carries the proven cause");
+        //#W73-CA (N14, deck146 MED 5): the SUBJECT is named, and the short form
+        //no longer shares the `<label>: <name>` shape of the "their untapped
+        //blockers" tag it sits beside on the same A-line.
+        CHECK(t1.find("THIS creature") != string::npos && t1.find("block:") == string::npos,
+              "#W73-CA N14 the held-back tag names whose blocking it is about");
+        CHECK((" A1. Nadaar, Selfless Paladin (3/3)" + t1
+               + " [their untapped blockers: Elite Spellbinder (3/1) (both die)]")
+                  .find("could not block Elite Spellbinder #1 (flying)] [their untapped blockers:")
+              != string::npos,
+              "#W73-CA N14 REPRO 146v152 seq 31: the two tags now read as two claims, not one");
         // ALL of their creatures -> the count is stated, so the hold has no
         // defensive value at all and the model is told so in one clause.
         vector<string> all3;
@@ -53186,10 +53343,15 @@ void AIPlayerGPT::runParseSelfTest()
         all3.push_back("Shadow Rat #1 (shadow)");
         string t2 = heldBackBlockTag(all3, 3);
         cout << "     all 3: \"" << t2 << "\"\n";
-        CHECK(t2 == " [held back, it CANNOT block ANY of their 3 creatures:"
+        CHECK(t2 == " [held back, THIS creature could not block ANY of their 3 creatures:"
                     " Elite Spellbinder #1 (flying), Faerie Vandal #1 (flying),"
                     " Shadow Rat #1 (shadow)]",
               "W41-13 a total restriction says so and names them");
+        //#W73-CA (N14) MUST-NOT-MATCH: the wording that reads as a claim about
+        //THEIR blocking is gone from both faces of the tag.
+        CHECK(t1.find("it CANNOT block") == string::npos
+              && t2.find("it CANNOT block") == string::npos,
+              "#W73-CA N14 MUST-NOT-MATCH the old subject-less head is gone");
         // Wave-29 wording rung: no affirmative "can block" substring exists for
         // the model to latch as permission (the "can attack next turn" misread).
         CHECK(t1.find("can block") == string::npos && t2.find("can block") == string::npos,
@@ -61113,7 +61275,7 @@ static const char * kW50Y_r94 =
               "#W53-N D12a 146v125 seq 163 -> 177: the docket's literal shape");
         //#W71-BR (L11): the same line in the non-label shape.
         string block = carriedPlanHeaderText(planAgeClauseText(45, 32), "", "nothing right now");
-        CHECK(block == "\nYOUR PLAN (as you last stated it, 45 windows ago on turn 32) reads"
+        CHECK(block == "\nTHE PLAN YOU LAST STATED (as you stated it, 45 windows ago on turn 32) reads"
                        " \"nothing right now\"\n",
               "#W53-N D12a / #W71-BR L11 the whole header line, at the repro's own age");
         // D12b: which coded line the engine latched
@@ -62380,7 +62542,7 @@ static const char * kW50Y_r94 =
         string header = carriedPlanHeaderText(planAgeClauseText(1, 10),
                                               planMenuDiffClause("Master of the Feast"),
                                               "cast Master of the Feast.");
-        CHECK(header == "\nYOUR PLAN (as you last stated it, 1 window ago on turn 10; "
+        CHECK(header == "\nTHE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 10; "
                         "\"Master of the Feast\" is no longer on your menu) reads \"cast Master"
                         " of the Feast.\"\n",
               "#W54-A D12b / #W71-BR L11 the whole header line, at the repro's own age");
@@ -66639,7 +66801,7 @@ static const char * kW50Y_r94 =
                   "#W60-M B13a POSITIVE `126v125` s48: the plan says \"No Exquisite Blood\" while"
                   " the battlefield line prints Exquisite Blood - the echo is withdrawn");
             CHECK(planContradictedBlock("Exquisite Blood")
-                  == "\nYOUR PLAN was withdrawn: it says you have no \"Exquisite Blood\", and the"
+                  == "\nTHE PLAN YOU LAST STATED was withdrawn: it says you have no \"Exquisite Blood\", and the"
                      " CURRENT SITUATION below shows \"Exquisite Blood\" on your own battlefield."
                      " State a fresh plan from the board as it is now.\n",
                   "#W60-M B13a ECHO the withdrawal names the claim, the board and what to do -"
@@ -77517,13 +77679,38 @@ static const char * kW50Y_r94 =
         //replies opened `YOUR PLAN: <sentence>` - the heading's own words in the
         //label slot. The heading is what is fixed; the parser gains nothing.
         const string h = carriedPlanHeaderText(planAgeClauseText(1, 10), "", "Pass priority.");
-        CHECK(h == "\nYOUR PLAN (as you last stated it, 1 window ago on turn 10) reads"
+        //#W73-CA (N17): the heading again, with the CAPS PHRASE gone as well as
+        //the colon. 10 of 1,910 wave-72 replies still opened `YOUR PLAN:` after
+        //L11 took the colon off - what is copied is the only all-caps token on
+        //the screen that names a plan.
+        CHECK(h == "\nTHE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 10) reads"
                    " \"Pass priority.\"\n",
               "#W71-BR L11 REPRO 125v146 seq 49's heading, in the shape that is not a label");
         CHECK(h.find("YOUR PLAN:") == string::npos && h.find("PLAN:") == string::npos,
               "#W71-BR L11 MUST-NOT-MATCH no `PLAN:` and no `YOUR PLAN:` anywhere in the heading");
-        CHECK(h.find("YOUR PLAN") != string::npos,
-              "#W71-BR L11 the words the live deck guides key on are unchanged");
+        CHECK(h.find("YOUR PLAN") == string::npos,
+              "#W73-CA N17 MUST-NOT-MATCH the phrase the 10 echoes copied is not on the screen");
+        //#W73-CA (N17) POSITIVE: the heading still names a plan, still quotes it,
+        //and the two WITHDRAWAL headings drop the phrase with it.
+        CHECK(h.find("THE PLAN YOU LAST STATED") != string::npos,
+              "#W73-CA N17 the heading still names what it carries");
+        CHECK(planContradictedBlock("X").find("YOUR PLAN") == string::npos
+              && planAssertedAbsentBlock("X").find("YOUR PLAN") == string::npos,
+              "#W73-CA N17 the two withdrawal headings lose the phrase too");
+        //#W73-CA (N17) ECHO: the exact reply shape the 10 wave-72 records carried
+        //(`123v152` seq 81 and nine siblings). It is STILL not a plan line and it
+        //is STILL charged as off-protocol bytes - the parser is untouched; what
+        //changed is that the prompt no longer supplies the phrase to copy.
+        {
+            const string echoed = "YOUR PLAN: Ping Staff #2 to opponent.\n"
+                                  "CHOICE: 1 (Deal 1 damage with Staff of Nin #2)";
+            CHECK(firstLineLeadingPlanPos(echoed) == string::npos
+                      && offProtocolBytes(echoed) > 0,
+                  "#W73-CA N17 ECHO 123v152 seq 81's reply is still a missing plan line and still"
+                  " charged - the parser did not move");
+            CHECK(h.find("YOUR PLAN: ") == string::npos,
+                  "#W73-CA N17 ECHO the phrase that reply copied is no longer on the screen");
+        }
         //The heading no longer has the protocol's own line shape: label, colon,
         //space, sentence. Proven over the composed line, not over an emitter.
         {
@@ -78683,6 +78870,134 @@ static const char * kW50Y_r94 =
                       && plain.find("You chose row 6") != string::npos,
                   "#W73-BZ N15 NEGATIVE an index answered as written gets no name-match clause");
         }
+    }
+
+
+    // ---- #W73-CA: wave-72 N8 (the replay meters), N12 (the dead reserve
+    // predicate) and N14 (four render residues) ----
+    cout << "\n[#W73-CA] N8 both re-serve paths are bounded and counted the same way\n";
+    {
+        //N8. The corpus's maximum `replay_run` was 90 against a cap of 64 - not a
+        //breach, a second meaning: the `repeat_ask_reserved` path passed the
+        //GAME total where `cache_replay` passed the window's run. The bound is
+        //the same predicate on its own map, so the two paths now behave alike.
+        std::map<std::string, int> runs;
+        bool fired = false;
+        for (int i = 0; i < 63; i++)
+            fired = fired || AIPlayerGPT::askReplayRefuseScoped("REPEAT-KEY", runs, 64);
+        CHECK(!fired && runs["REPEAT-KEY"] == 63,
+              "#W73-CA N8 a long-but-finite repeat-latch run is still re-served");
+        CHECK(AIPlayerGPT::askReplayRefuseScoped("REPEAT-KEY", runs, 64) && runs["REPEAT-KEY"] == 0,
+              "#W73-CA N8 REPRO the repeat latch refuses at the SAME cap the ask cache does,"
+              " and re-arms - it was bounded only by the turn boundary before");
+        //MUST-NOT-MATCH: a window the model really answers resets only ITS run,
+        //and an interleaved second key cannot reset the first.
+        runs.clear();
+        for (int i = 0; i < 30; i++)
+        {
+            AIPlayerGPT::askReplayRefuseScoped("A", runs, 64);
+            AIPlayerGPT::askReplayRefuseScoped("B", runs, 64);
+        }
+        runs.erase("A");
+        CHECK(runs.find("A") == runs.end() && runs["B"] == 30,
+              "#W73-CA N8 MUST-NOT-MATCH answering one window leaves the other window's run intact");
+        //ECHO SHAPE: the record's two numbers are distinct fields, so a reader
+        //can no longer mistake a game total for a breached cap.
+        CHECK(std::string("replay_run") != std::string("replays_this_game"),
+              "#W73-CA N8 ECHO the run and the game total are two named fields, not one");
+    }
+
+    cout << "\n[#W73-CA] N12 the reserve-row predicate matches what the renderer emits\n";
+    {
+        //N12. `menuHasReserveRow` matched the WAVE-67 opening words. #W72-BV (M9)
+        //rewrote the clause to lead with the consequence, and both counters this
+        //predicate gates read 0 on all 42 gameends of
+        //`matchups-20260907-163626` while 55 windows rendered a reserve clause.
+        //The pins were green because they fed it text the renderer no longer
+        //produces. POSITIVE: the LIVE clause, straight off sorceryReserveClause.
+        const string live = sorceryReserveClause(1, "Underworld Dreams", "{b}{b}{b}", 3);
+        cout << "     live reserve clause: \"" << live.substr(0, 80) << "...\"\n";
+        std::vector<string> liveMenu;
+        liveMenu.push_back("Cast Dictate of Kruphix {1}{u}{u}" + live);
+        liveMenu.push_back("Cast nothing right now");
+        CHECK(!live.empty() && menuHasReserveRow(liveMenu),
+              "#W73-CA N12 REPRO the clause the renderer ACTUALLY emits arms the reserve latch");
+        CHECK(live.find("{reserve: TAKE THIS ROW AND YOU CANNOT CAST") != string::npos
+                  && live.find("{reserve: this row is INSTANT SPEED") == string::npos,
+              "#W73-CA N12 the wave-72 rewording is what the wave-67 literal stopped matching");
+        //REGRESSION: the wave-67 wording the old pins carry still matches, so a
+        //historical row is not silently demoted.
+        std::vector<string> oldMenu;
+        oldMenu.push_back("Cast Dictate of Kruphix {1}{u}{u} {reserve: this row is INSTANT SPEED -"
+                          " it still has a window at the end of THEIR turn}");
+        CHECK(menuHasReserveRow(oldMenu),
+              "#W73-CA N12 REGRESSION the wave-67 wording still arms it");
+        //MUST-NOT-MATCH: an ordinary priced row takes no reservation latch, and
+        //neither does a row that merely says the word.
+        std::vector<string> plainMenu;
+        plainMenu.push_back("Cast Howling Mine {2} {leaves 3 of your 5 untapped mana sources"
+                            " untapped} {card text: \"reserve your judgement\"}");
+        plainMenu.push_back("Cast nothing right now");
+        CHECK(!menuHasReserveRow(plainMenu),
+              "#W73-CA N12 MUST-NOT-MATCH the bare word in card text is not the clause");
+    }
+
+    cout << "\n[#W73-CA] N14 the four render residues\n";
+    {
+        //N14 (a). deck152 HIGH-2: the animation row priced mana and duration and
+        //never said the body IS the land.
+        const string dp = animateDeathPriceClause("Lair of the Hydra");
+        cout << "     death price: \"" << dp << "\"\n";
+        CHECK(dp.find("{death price: Lair of the Hydra is a LAND you control") != string::npos
+                  && dp.find("you lose the land itself") != string::npos,
+              "#W73-CA N14a REPRO 152v146 seq 30->32: the row now prices the LAND, not just a body");
+        CHECK(animateDeathPriceClause("").empty(),
+              "#W73-CA N14a MUST-NOT-MATCH no name -> no clause invented");
+        //ECHO SHAPE: it is a brace annotation like every other row fact, so the
+        //answer matcher strips it and it never forges an index.
+        CHECK(stripNarrationDecoration("becomes a 16/16 hydra with Lair of the Hydra" + dp)
+                  == "becomes a 16/16 hydra with Lair of the Hydra",
+              "#W73-CA N14a ECHO the brace is decision-time pricing and never enters history");
+        //It states a rule, so it is true at every rung and on either board - the
+        //rung ceiling clause remains the one that talks about affordability.
+        CHECK(dp.find("rung") == string::npos && dp.find("untapped") == string::npos,
+              "#W73-CA N14a the death price is a rules fact, never a board arithmetic claim");
+
+        //N14 (b). deck152 MED-1: a counter that changes what a death DOES,
+        //printed bare beside a trade tag that reads "(both die)".
+        const string gf = legibleCounterName("Ghostform");
+        cout << "     ghostform: \"" << gf << "\"\n";
+        CHECK(gf.find("returns") != string::npos && gf.find("1/1 white flying Spirit") != string::npos
+                  && gf != "Ghostform",
+              "#W73-CA N14b REPRO 152v146 seq 25: the ghostform counter says what it does");
+        CHECK(legibleCounterName("ghostform") == gf,
+              "#W73-CA N14b the engine's own casing reaches the same gloss");
+        CHECK(legibleCounterName("loyalty") == "loyalty"
+                  && legibleCounterName("+1/+1") == "+1/+1"
+                  && legibleCounterName("TeferiEffect") == "bookkeeping (Teferi's +1)",
+              "#W73-CA N14b MUST-NOT-MATCH every other counter name is untouched");
+
+        //N14 (c). deck146 MED-4: a Pathway's back face named with no link to the
+        //hand card. 58 of 295 rendered tags carried no front-face clause at all.
+        const string linked = mdfcLandPlayRowTag("Grimclimb Pathway", "{B}",
+                                                 "Brightclimb Pathway", "", true);
+        cout << "     linked land face: \"" << linked << "\"\n";
+        CHECK(linked.find("it is the OTHER FACE of \"Brightclimb Pathway\" in your hand") != string::npos
+                  && linked.find("one card with two land faces, not two cards") != string::npos,
+              "#W73-CA N14c REPRO 146v125 seq 35: the back-face row names the hand card it IS");
+        CHECK(linked.find("can no longer be cast") == string::npos,
+              "#W73-CA N14c MUST-NOT-MATCH a LAND front face is never said to be uncastable");
+        //REGRESSION: a spell front face keeps the wave-57 clause byte for byte.
+        const string spellFace = mdfcLandPlayRowTag("Agadeem, the Undercrypt", "{B}",
+                                                    "Agadeem's Awakening");
+        CHECK(spellFace.find("so \"Agadeem's Awakening\" leaves your hand with it and that face"
+                             " can no longer be cast") != string::npos
+                  && spellFace.find("OTHER FACE") == string::npos,
+              "#W73-CA N14c REGRESSION the spell-face wording is unchanged");
+        CHECK(mdfcLandPlayRowTag("Mistgate Pathway", "{U}", "").find("leaves your hand") == string::npos
+                  && mdfcLandPlayRowTag("Mistgate Pathway", "{U}", "", "", true)
+                         .find("OTHER FACE") == string::npos,
+              "#W73-CA N14c MUST-NOT-MATCH an unknown front face invents no link");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -440,8 +440,18 @@ private:
     //#W71-BS (F4): where a replay record goes - a sidecar beside the translog, so
     //re-serving an answer never advances the file the harness watchdog times.
     std::string askReplaySidecarPath() const;
+    //#W73-CA (N8): `run` is ALWAYS this window's consecutive run against its own
+    //key; `gameTotal` is this game's running total of re-served answers. The two
+    //used to share one field with two meanings.
     void logAskReplay(const char * why, const std::string & decision, int choice,
-                      int optionCount, int fromSeq, int run);
+                      int optionCount, int fromSeq, int run, int gameTotal);
+    //#W73-CA (N8, second half): the per-window run counter for the REPEAT
+    //re-serve path (repeatAskAnswerStands), which was bounded only by the turn
+    //boundary while the ask-cache path was bounded at kAskReplayRefuseMax - and
+    //which carried 327 of the corpus's 521 replays. Same map shape, same
+    //predicate, same lifetime (dropped at the turn boundary, erased for a window
+    //the model really answers).
+    std::map<std::string, int> mRepeatAskRuns;
     //#W66-AQ (H1): draws already RESOLVED inside the current draw step, per
     //seat, keyed on the turn they were counted in. Read by the DRAW FORECAST so
     //it charges only the draws still ahead; a stale turn key reads as 0.
