@@ -1400,3 +1400,5 @@ ai_opp_turn_after_attackers_w72bu.txt
 ai_opp_turn_after_blockers_w72bu.txt
 ai_opp_turn_end_step_w72bu.txt
 w72bw_puzzle_box_hand_replacer.txt
+w73cb_f1_petal_response.txt
+w73cb_f1_upkeep_activation.txt

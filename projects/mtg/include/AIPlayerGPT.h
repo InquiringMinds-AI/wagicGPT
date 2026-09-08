@@ -139,6 +139,11 @@ struct NarrationCycleHolder
     void flush(vector<string>& out);
 };
 
+//#W73-CB (F6): the meter's rule, in one pure place so PARSETEST can pin it -
+//a main phase is counted ONCE, when it ends, and only if it never reached the
+//sorcery-speed casting window.
+inline bool w73MainPhaseSkipCounts(bool castingWasOffered) { return !castingWasOffered; }
+
 class AIPlayerGPT : public AIPlayerBaka
 {
 public:
@@ -430,12 +435,54 @@ private:
     //window; 2 of the corpus's 102 own turns did this and NOTHING counted it -
     //`own_turn_windows_skipped` is scoped to the non-main instant-speed phases,
     //so the class was invisible. Report-only, with the reach reason on stderr.
+    //#W73-CB (F6, Astra wave-73 review finding 6): a PHASE, not a tick. The
+    //wave-73 hook incremented on every main-phase tick that took the
+    //unresolved-stack branch, so a spell cast normally in main 1 and then
+    //resolving counted as "no casting window" once per tick - the meter could
+    //not distinguish a swallowed phase (the class it exists to measure) from
+    //ordinary stack processing. The note is now a PENDING candidate for
+    //(turn, phase); noteMainPhaseCastingOffered cancels it, and the count is
+    //taken once when that phase ENDS having offered nothing.
     virtual void noteMainPhaseWindowSkipped(const char * why)
     {
-        mMainPhaseWindowsSkipped++;
-        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: own main phase reached NO casting"
-                   " window - " << (why ? why : "?") << " (" << mMainPhaseWindowsSkipped
-                   << " this game)");
+        if (!observer)
+            return;
+        const int t = observer->turn;
+        const int ph = (int) observer->getCurrentGamePhase();
+        if (t != mMainSkipPendTurn || ph != mMainSkipPendPhase)
+        {
+            flushMainPhaseSkip();
+            mMainSkipPendTurn = t;
+            mMainSkipPendPhase = ph;
+            mMainSkipPendWhy = why ? why : "?";
+        }
+    }
+    virtual void noteMainPhaseCastingOffered()
+    {
+        if (!observer)
+            return;
+        mMainCastOfferedTurn = observer->turn;
+        mMainCastOfferedPhase = (int) observer->getCurrentGamePhase();
+    }
+    //#W73-CB (F6): close the pending phase. Counts at most once per phase, and
+    //only when that phase never reached the casting window.
+    void flushMainPhaseSkip()
+    {
+        if (mMainSkipPendTurn < 0)
+            return;
+        const bool castingWasOffered = (mMainCastOfferedTurn == mMainSkipPendTurn
+                                        && mMainCastOfferedPhase == mMainSkipPendPhase);
+        if (w73MainPhaseSkipCounts(castingWasOffered))
+        {
+            mMainPhaseWindowsSkipped++;
+            DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: own main phase (turn "
+                       << mMainSkipPendTurn << ", phase " << mMainSkipPendPhase
+                       << ") ENDED with NO casting window - " << mMainSkipPendWhy
+                       << " (" << mMainPhaseWindowsSkipped << " this game)");
+        }
+        mMainSkipPendTurn = -1;
+        mMainSkipPendPhase = -1;
+        mMainSkipPendWhy.clear();
     }
     //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
     //#W71-BS (F5): the answer floor the CURRENT seam's legal answer needs, and the
@@ -455,8 +502,15 @@ private:
     //#W73-CA (N8): `run` is ALWAYS this window's consecutive run against its own
     //key; `gameTotal` is this game's running total of re-served answers. The two
     //used to share one field with two meanings.
+    //#W73-CB (F7, Astra wave-73 review finding 7): `gameTotal` is GONE as a
+    //parameter. Two call sites passed the combined re-serve total and one
+    //passed the repeat latch's own subtotal, so ten cache replays followed by
+    //the first repeat replay wrote 10 -> 1 for eleven re-served answers - the
+    //same mixed-semantics defect N8 removed from `replay_run`, under a new
+    //name. The record now reads the ONE combined counter itself, so no call
+    //site can disagree with another.
     void logAskReplay(const char * why, const std::string & decision, int choice,
-                      int optionCount, int fromSeq, int run, int gameTotal);
+                      int optionCount, int fromSeq, int run);
     //#W73-CA (N8, second half): the per-window run counter for the REPEAT
     //re-serve path (repeatAskAnswerStands), which was bounded only by the turn
     //boundary while the ask-cache path was bounded at kAskReplayRefuseMax - and
@@ -1436,6 +1490,12 @@ private:
     //cache of an ANSWER: the engine only replays a hold the model itself chose,
     //and only while the screen it was chosen on is still the screen.
     int mHoldTurn;
+    //#W73-CB (F2): whose turn the hold was taken on. The holder's next untap is
+    //the next turn when the hold was taken on the opponent's turn and the turn
+    //after that when it was taken on the holder's own, so this is what makes
+    //the expiry answerable at ANY later moment instead of only while a menu
+    //happens to be asking during the holder's own turn.
+    bool mHoldOwnTurnAtTake;
     std::map<string, std::set<string> > mHoldRows;
     //#W72-BU (M4): THE HOLD IS A WINDOW HOLD, NOT A SEAM HOLD. The row says
     //"pass now, and do not ask me again - this turn or later - until one of the
@@ -1475,6 +1535,12 @@ private:
     //scoped to the non-main instant-speed phases), which is why `152v146` t18
     //was invisible. Report-only.
     int mMainPhaseWindowsSkipped; //gameend report field
+    //#W73-CB (F6): the pending phase candidate and the casting-offered stamp.
+    int mMainSkipPendTurn;
+    int mMainSkipPendPhase;
+    string mMainSkipPendWhy;
+    int mMainCastOfferedTurn;
+    int mMainCastOfferedPhase;
     //#W68-BB (J5): the card the last payment receipt was written for, and the
     //step it was written in. A post-announcement decline consumes it and says
     //in the narration that the cast did NOT happen - the receipt alone reads as
@@ -1575,6 +1641,9 @@ private:
     //when the hold still stands (the caller passes without a model call);
     //clears the latch and returns false on any re-opener.
     bool holdHonoured(const char * seam, const std::vector<string>& rows);
+    //#W73-CB (F2): drop the hold once the holder's untap has passed. Called
+    //from the phase-change event, the per-tick async gate and holdHonoured.
+    bool releaseHoldIfUntapPassed();
     //#W68-BB (J9): the crack-back verdict WORD, recomputed off the live board,
     //as a member of the held row set.
     string crackBackVerdictNow();

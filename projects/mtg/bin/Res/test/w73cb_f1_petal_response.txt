@@ -1,0 +1,33 @@
+#NAME: The chain collapse sees a response payable only by a sacrifice-cost producer (#W73-CB F1a)
+#DESC: Astra wave-73 review finding 1. loopAutoPassFor asked
+#DESC: LegalActionsOracle::hasAnyLegalAction, which prices casts under
+#DESC: ManaEngine::FreeProducerPolicy - a policy that REFUSES any producer whose
+#DESC: activation carries a real extra cost. Lotus Petal ({T}, Sacrifice: add one
+#DESC: mana of any colour) is exactly that, so the oracle read "no mana at all"
+#DESC: while the model's OWN cast menu - which runs GptManaPolicy
+#DESC: (AIPlayerBaka::canHandleCost, and that accepts the sacrifice) - would have
+#DESC: offered the Shock. The window was closed on a legal option.
+#DESC: WITNESS: P1 holds Shock over a lone Lotus Petal while P2's Sanguine
+#DESC: Bond + Exquisite Blood loop stands. PRE-FIX assertloopautopass reads 1
+#DESC: (the ask is suppressed); POST-FIX it reads 0 and the model is asked.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Lotus Petal
+hand:Shock
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[DO]
+assertloopautopass 0 1
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Lotus Petal
+hand:Shock
+life:20
+[PLAYER2]
+inplay:Sanguine Bond,Exquisite Blood
+life:20
+[END]

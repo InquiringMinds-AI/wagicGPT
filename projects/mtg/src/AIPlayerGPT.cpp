@@ -2943,6 +2943,53 @@ string legibleKeywordName(const string& engineName)
 //fact the pilot had to account for beside real loyalty counters ("[counters: 5x
 //loyalty 1x teferieffect]"). Name what it IS. A table, because the next
 //engine-named counter will want the same treatment.
+//#W73-CB (F5, Astra wave-73 review finding 5). A ghostform COUNTER is a
+//reminder, not the ability: Kaya's +1 grants the return-to-hand trigger and
+//puts a counter to mark it, and anything that removes the creature's abilities
+//(Sudden Spoiling) leaves the counter behind with nothing behind IT. The gloss
+//promised "killing it is not removal" off the counter alone - a false surface
+//in exactly the state where the trade it discourages is the right one. The
+//gloss is now conditional on the GRANTED TRIGGER being live; with no trigger
+//(or no card to ask) the counter prints bare, which is what it is.
+//Pure over (the engine's counter name, whether the granted trigger is live).
+string legibleCounterName(const string& engineName); //fwd: the unconditional table
+string legibleCounterNameForGrant(const string& engineName, bool grantedTriggerLive)
+{
+    string low = engineName;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    if (low == "ghostform" && !grantedTriggerLive)
+        return "ghostform (a marker only - the ability that returned it is gone)";
+    return legibleCounterName(engineName);
+}
+
+//#W73-CB (F5): is the granted death/exile trigger still on this creature? The
+//ability the card script grants is named by the script itself ("Put back to
+//hand"), and ALoseAbilities REMOVES granted ability objects from the action
+//layer, so the action layer is the live answer. No mutation.
+bool w73GhostformTriggerLive(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    Player * p = card->controller();
+    GameObserver * g = p ? p->getObserver() : NULL;
+    if (!g || !g->mLayers || !g->mLayers->actionLayer())
+        return false;
+    ActionLayer * al = g->mLayers->actionLayer();
+    for (size_t i = 1; i < al->mObjects.size(); i++)
+    {
+        MTGAbility * a = (MTGAbility *) al->mObjects[i];
+        if (!a || a->source != card)
+            continue;
+        if (!dynamic_cast<TriggeredAbility *>(a))
+            continue;
+        const string mt = a->getMenuText();
+        if (mt.find("Put back to hand") != string::npos)
+            return true;
+    }
+    return false;
+}
+
 string legibleCounterName(const string& engineName)
 {
     string low = engineName;
@@ -8456,7 +8503,8 @@ bool optionRowMentions(const string& optionText, const string& name)
 //(`atOut` = the index of the label occurrence), so an ownership test can read
 //the words in front of it. `repeatPlanScanNumber` below is the unchanged
 //wrapper every existing caller keeps using.
-static int repeatPlanScanNumberAt(const string& plan, const char * label, size_t * atOut)
+static int repeatPlanScanNumberAt(const string& plan, const char * label, size_t * atOut,
+                                  size_t * endOut = NULL) //#W73-CB (F3)
 {
     string low;
     for (size_t i = 0; i < plan.size(); i++)
@@ -8509,6 +8557,7 @@ static int repeatPlanScanNumberAt(const string& plan, const char * label, size_t
             while (d < low.size() && isdigit((unsigned char) low[d]) && v < 1000000)
                 v = v * 10 + (low[d++] - '0');
             if (atOut) *atOut = labelAt; //#W72-BX (F2)
+            if (endOut) *endOut = d;      //#W73-CB (F3): where the number ends
             return v;
         }
     }
@@ -8520,12 +8569,51 @@ static int repeatPlanScanNumber(const string& plan, const char * label)
     return repeatPlanScanNumberAt(plan, label, NULL);
 }
 
+//#W73-CB (F3, Astra wave-73 review finding 3 - HIGH). WHAT IS THE NUMBER A
+//COUNT OF? The filler-word tolerance N3 added makes `PLAN: Stop at 3 life;
+//M=10 creatures` parse as stop=3 - and a repeat row that counts CREATURES then
+//compares its live creature count against a LIFE TOTAL and reports the model's
+//stop as reached. A stop only binds when it is a count of the thing the repeat
+//row repeats, so a number whose own unit word says it is something else is not
+//a stop at all. The list is the units a repeat row never counts; anything else
+//(a bare number, `now`, `creatures`, `vampires`) still binds exactly as before.
+//Failing this test costs an ASK - the permissive direction - never a suppressed
+//row. Pure over the lowered plan text and the index just past the number.
+static bool w73StopUnitIsCountable(const string& planLower, size_t numEnd)
+{
+    size_t d = numEnd;
+    while (d < planLower.size() && (planLower[d] == ' ' || planLower[d] == '\t'))
+        d++;
+    size_t e = d;
+    while (e < planLower.size() && isalpha((unsigned char) planLower[e]))
+        e++;
+    if (e == d)
+        return true; //nothing follows the number: a bare count
+    const string word = planLower.substr(d, e - d);
+    static const char * kNotACount[] = { "life", "lives", "mana", "card", "cards",
+                                         "turn", "turns", "damage", "points", "poison",
+                                         "loyalty", "lands", "land" };
+    for (size_t i = 0; i < sizeof(kNotACount) / sizeof(kNotACount[0]); i++)
+        if (word == kNotACount[i])
+            return false;
+    return true;
+}
+
 //The pilot's own stop, and the count it says it is at. Both or nothing: a
 //half-stated plan is not a stop the engine may hold anyone to.
+//#W73-CB (F3): and each number must be a COUNT - see w73StopUnitIsCountable.
 static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * currentOut)
 {
-    const int s = repeatPlanScanNumber(plan, "stop");
-    const int m = repeatPlanScanNumber(plan, "m");
+    string low;
+    for (size_t i = 0; i < plan.size(); i++)
+        low += (char) tolower((unsigned char) plan[i]);
+    size_t sEnd = string::npos, mEnd = string::npos;
+    int s = repeatPlanScanNumberAt(plan, "stop", NULL, &sEnd);
+    int m = repeatPlanScanNumberAt(plan, "m", NULL, &mEnd);
+    if (s >= 0 && sEnd != string::npos && !w73StopUnitIsCountable(low, sEnd))
+        s = -1;
+    if (m >= 0 && mEnd != string::npos && !w73StopUnitIsCountable(low, mEnd))
+        m = -1;
     if (stopOut) *stopOut = s;
     if (currentOut) *currentOut = m;
     return s >= 0 && m >= 0;
@@ -8537,6 +8625,14 @@ static bool repeatPlanStopAndCurrent(const string& plan, int * stopOut, int * cu
 //stated stop and could then silence the seat's own windows. A stop the reply
 //attributes to the OPPONENT is not an answer this seat gave. Pure over the plan
 //text: the words immediately before the label decide.
+//#W73-CB (F3, review finding 3, second half): the CLAUSE, not the one word in
+//front of the label. `PLAN: Their intended stop at 24; M=30; develop my board`
+//passed the wave-72 test because the word immediately before `stop` is
+//"intended" - the attribution sits one word further back. Ownership is a
+//property of the whole clause the label is written in, so the test now reads
+//every word from the start of that clause (the PLAN label, or the last `;`
+//`,` `.`) up to the label. Any attribution word in it and the number is the
+//OPPONENT's plan, which this seat never made and may not be silenced by.
 static bool repeatPlanStopIsOwn(const string& plan)
 {
     size_t at = string::npos;
@@ -8545,22 +8641,32 @@ static bool repeatPlanStopIsOwn(const string& plan)
     string before;
     for (size_t i = 0; i < at; i++)
         before += (char) tolower((unsigned char) plan[i]);
-    //the last two words in front of the label are enough for every attribution
-    //the corpus writes ("their stop", "opponent's stop", "his stop").
-    static const char * kTheirs[] = { "their ", "theirs ", "opponent's ", "opponents ",
-                                      "opponent ", "his ", "her ", "its " };
-    size_t tail = before.size();
-    while (tail > 0 && (before[tail - 1] == ' ' || before[tail - 1] == '='
-                        || before[tail - 1] == ':'))
-        tail--;
-    //walk back over one word (the possessive) and test it
-    size_t wordEnd = tail;
-    while (tail > 0 && before[tail - 1] != ' ' && before[tail - 1] != ',' && before[tail - 1] != ';')
-        tail--;
-    const string word = before.substr(tail, wordEnd - tail) + " ";
-    for (size_t i = 0; i < sizeof(kTheirs) / sizeof(kTheirs[0]); i++)
-        if (word == kTheirs[i])
-            return false;
+    //the clause: back to the nearest separator (or the plan label / line start)
+    size_t clauseAt = 0;
+    for (size_t i = 0; i < before.size(); i++)
+        if (before[i] == ';' || before[i] == ',' || before[i] == '.' || before[i] == ':'
+            || before[i] == '\n')
+            clauseAt = i + 1;
+    static const char * kTheirs[] = { "their", "theirs", "opponent's", "opponents",
+                                      "opponent", "they", "them", "his", "her", "its",
+                                      "enemy", "enemy's" };
+    string word;
+    for (size_t i = clauseAt; i <= before.size(); i++)
+    {
+        const char c = (i < before.size()) ? before[i] : ' ';
+        if (isalpha((unsigned char) c) || c == '\'')
+        {
+            word += c;
+            continue;
+        }
+        if (!word.empty())
+        {
+            for (size_t k = 0; k < sizeof(kTheirs) / sizeof(kTheirs[0]); k++)
+                if (word == kTheirs[k])
+                    return false;
+            word.clear();
+        }
+    }
     return true;
 }
 
@@ -9132,7 +9238,8 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                         continue;
                     out << " " << ct->nb << "x ";
                     if (!ct->name.empty() && ct->name != " ")
-                        out << legibleCounterName(ct->name); //W43-LOW defect 9
+                        out << legibleCounterNameForGrant(ct->name,
+                                w73GhostformTriggerLive(card)); //W43-LOW defect 9, #W73-CB (F5)
                     else
                         out << (ct->power >= 0 ? "+" : "") << ct->power << "/"
                             << (ct->toughness >= 0 ? "+" : "") << ct->toughness;
@@ -16465,7 +16572,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -16724,8 +16831,10 @@ string AIPlayerGPT::askReplaySidecarPath() const
 //64 (a breach that never happened) while the true maximum per-window run was
 //11. One field, one meaning: `replay_run` is ALWAYS this window's consecutive
 //run against the same key, and the game total moves to its own field.
+//#W73-CB (F7): `replays_this_game` is ALWAYS mAskReplaysReserved - this game's
+//combined total of answers re-served without asking, over BOTH paths.
 void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int choice,
-                               int optionCount, int fromSeq, int run, int gameTotal)
+                               int optionCount, int fromSeq, int run)
 {
     if (mTransLogPath.empty())
         return;
@@ -16736,7 +16845,7 @@ void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int ch
         {"why", why ? why : ""},
         {"replayed_from", fromSeq},
         {"replay_run", run},
-        {"replays_this_game", gameTotal},
+        {"replays_this_game", mAskReplaysReserved}, //#W73-CB (F7)
         {"choice", choice},
         {"options", optionCount},
         {"turn", translogTurn(observer ? observer->turn : 0)},
@@ -18030,6 +18139,8 @@ void AIPlayerGPT::logGameEnd()
     //recovery record that names what answered instead.
     flushWallMissRecord();
     flushRecoveryRecord();
+    flushMainPhaseSkip(); //#W73-CB (F6): a phase still pending at game end is
+                          //still a phase that ended without a casting window
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
     bool oppWon = opponent() ? observer->didWin(opponent()) : false;
@@ -20328,6 +20439,16 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
 int AIPlayerGPT::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);
+
+    //#W73-CB (F2): the untap EVENT. Any phase change is cheap to test (the
+    //release predicate returns immediately when no hold stands), and turn
+    //ownership is read off observer->currentPlayer - never off the event's own
+    //`to->player`, which is INVERTED from turn 2 on.
+    if (dynamic_cast<WEventPhaseChange *>(event))
+    {
+        releaseHoldIfUntapPassed();
+        flushMainPhaseSkip(); //#W73-CB (F6): the phase ENDED - count it now or never
+    }
 
     //#W66-AQ (H1, engine HIGH-1): count the library->hand moves that happen
     //INSIDE a draw step, for whichever seat's step it is. This is the term the
@@ -27178,8 +27299,18 @@ static const char * kCastNoRowZeroFact =
 //ACTING row, the hold-answers-all sentence is replaced by the fact that those
 //rows stand on their own. `actingRowsPresent` is read off the same rows the
 //menu is about to print, so the sentence and the list cannot disagree.
+//#W73-CB (F4, Astra wave-73 review finding 4). N5's replacement sentence
+//declared the rows above "NOT part of the chain" off a BOOLEAN - whether any
+//acting row exists at all. A Sanguine Bond / Exquisite Blood chain is fed by
+//life the seat LOSES and life the opponent GAINS, so a row whose cost is life
+//(Phyrexian Reclamation's "pay 2 life") or whose effect moves life feeds the
+//very loop the bracket says it has nothing to do with - a false surface, and
+//the trust doctrine says the surface owes the model truth. The claim is now
+//per-row: only where NO acting row touches life is the categorical sentence
+//printed; where one does, the bracket says the rows are available and points at
+//the life term instead of denying it. Nothing is removed either way.
 static string loopChainingNote(bool oppLoopProven, bool holdRowOffered,
-                               bool actingRowsPresent)
+                               bool actingRowsPresent, bool actingRowTouchesLife)
 {
     if (!oppLoopProven || !holdRowOffered)
         return "";
@@ -27187,15 +27318,36 @@ static string loopChainingNote(bool oppLoopProven, bool holdRowOffered,
              " battlefield and the chain is live, so this same question is put to"
              " you again for every link of it, with only its numbers moved. Nothing"
              " on this list stops the chain.");
-    if (actingRowsPresent)
-        s += " The rows above are NOT part of the chain and are not answered by it:"
-             " each one is a play that stands on its own, and the HOLD row gives"
+    if (actingRowsPresent && actingRowTouchesLife)
+        s += " At least one row above pays or moves LIFE, and while their loop"
+             " stands life YOU lose or life THEY gain is what the chain eats:"
+             " weigh that row with the chain, not apart from it. Every row above"
+             " is still a play that stands on its own, and the HOLD row gives"
              " every one of them up.]";
+    else if (actingRowsPresent)
+        s += " The rows above are still available: each one is a play that stands"
+             " on its own, and the HOLD row gives every one of them up.]";
     else
         s += " If your answer would be the same for"
              " every link, the HOLD row answers all of them at once; a row that"
              " changes in WORDS, or a row that is new, still re-opens the question.]";
     return s;
+}
+
+//#W73-CB (F4): does this printed row touch LIFE - as a cost it pays, or as an
+//effect it deals, drains or gains? Substring on the row the model is about to
+//read, so the bracket's claim is measured on the same bytes. Deliberately
+//generous: a row that MIGHT feed the chain must never be declared unrelated.
+static bool w73RowTouchesLife(const string& row)
+{
+    string low;
+    for (size_t i = 0; i < row.size(); i++)
+        low += (char) tolower((unsigned char) row[i]);
+    static const char * kLife[] = { "life", "drain", "lifelink", "damage" };
+    for (size_t i = 0; i < sizeof(kLife) / sizeof(kLife[0]); i++)
+        if (low.find(kLife[i]) != string::npos)
+            return true;
+    return false;
 }
 
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
@@ -27797,11 +27949,25 @@ static bool w72HeldMenuShowedEveryRow(const std::set<string>& heldRowKeys,
 //model is ASKED again, which is the permissive direction - and the model may
 //simply take the row again over the same board. Pure over (the turn the hold
 //was taken, the turn now, whether this seat is the active player now).
-static bool w73HoldExpiresAtUntap(int heldTurn, int nowTurn, bool ownTurnNow)
+//#W73-CB (F2, Astra wave-73 review finding 2). THE UNTAP IS AN EVENT, NOT A
+//CHECK. The predicate below used to read "is it MY TURN NOW and is that turn
+//later than the one the hold was taken on" - which is only ever asked when a
+//menu reaches holdHonoured. A hold taken on the OPPONENT's turn 14 (Ghost
+//Town's return-to-hand activation) whose holder then has an own turn 15 with no
+//castable card and no non-mana activation is never asked that question during
+//turn 15, and on opponent turn 16 `ownTurnNow` is false - so the promised untap
+//passed with nothing recording it and the latch suppressed the row again.
+//The rule is now stated so the ANSWER cannot depend on when it is asked: this
+//is a two-player game, so the holder's next untap is the NEXT turn when the
+//hold was taken on the opponent's turn, and the turn after that when it was
+//taken on the holder's own. Pure over (the turn taken, whose turn that was, the
+//turn now); no call site can miss it, and releaseHoldIfUntapPassed() also fires
+//it eagerly at the phase change so the release is traced when it happens.
+static bool w73HoldExpiredByUntap(int heldTurn, bool ownTurnAtHold, int nowTurn)
 {
     if (heldTurn < 0)
         return false; //no hold taken at all
-    return ownTurnNow && nowTurn > heldTurn;
+    return nowTurn >= heldTurn + (ownTurnAtHold ? 2 : 1);
 }
 
 //#W73-BY (N1, wave-72 engine-seat HIGH-1). THE SIBLING KEY, MINUS THE ANSWER.
@@ -27858,6 +28024,33 @@ static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int
     return w72HeldMenuShowedEveryRow(heldRowKeys, nowRowKeys); //#W72-BX (F1)
 }
 
+//#W73-CB (F2). The release itself, callable from anywhere: the phase-change
+//event (so a hold dies at the untap that was promised, with a trace at the
+//moment it happens), the async gate that runs on every AI tick, and
+//holdHonoured (so a missed event cannot resurrect a dead latch). Idempotent.
+bool AIPlayerGPT::releaseHoldIfUntapPassed()
+{
+    if (!observer)
+        return false;
+    if (!w73HoldExpiredByUntap(mHoldTurn, mHoldOwnTurnAtTake, observer->turn))
+        return false;
+    mHoldReleasedTurn++;
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED at this seat's"
+               " untap (taken on turn " << mHoldTurn
+               << (mHoldOwnTurnAtTake ? " (own turn)" : " (their turn)")
+               << ", now turn " << observer->turn
+               << "; " << mHoldReleasedTurn << " released this game) - a once-per-turn row"
+               " never changes, so the turn retires the latch");
+    mHoldRows.clear();
+    mHoldTurn = -1;
+    mHoldOwnTurnAtTake = false;
+    mHoldWindowSeam.clear();
+    mHoldWindowTurn = -1;
+    mHoldWindowPhase = -1;
+    mHoldWindowBoard.clear();
+    return true;
+}
+
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
 //took the HOLD row this turn, at this seam, and the board it took it on is
 //still the board in front of it with no row it has not already seen. Every
@@ -27882,22 +28075,8 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //seat holds is dropped together (they were all taken before this untap), the
     //release is counted for the gameend record, and the very next window asks
     //the model again - the permissive direction.
-    if (w73HoldExpiresAtUntap(mHoldTurn, observer->turn,
-                              observer->currentPlayer == this))
-    {
-        mHoldReleasedTurn++;
-        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED at this seat's"
-                   " untap (taken on turn " << mHoldTurn << ", now turn " << observer->turn
-                   << "; " << mHoldReleasedTurn << " released this game) - a once-per-turn row"
-                   " never changes, so the turn retires the latch");
-        mHoldRows.clear();
-        mHoldTurn = -1;
-        mHoldWindowSeam.clear();
-        mHoldWindowTurn = -1;
-        mHoldWindowPhase = -1;
-        mHoldWindowBoard.clear();
+    if (releaseHoldIfUntapPassed())
         return false;
-    }
     std::set<string> heldRowKeys;
     {
         std::map<string, std::set<string> >::iterator hit = mHoldRows.find(mHoldWindowSeam);
@@ -28019,6 +28198,9 @@ void AIPlayerGPT::markCastDecisionAnswered()
 void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 {
     mHoldTurn = observer->turn;
+    //#W73-CB (F2): whose turn it was taken on decides WHICH turn the holder's
+    //next untap falls on, and that is what the expiry is measured against.
+    mHoldOwnTurnAtTake = (observer->currentPlayer == this);
     //#W72-BU (M4): and the WINDOW it was taken at, for the sibling seam.
     mHoldWindowSeam = seam ? seam : "";
     mHoldWindowTurn = observer->turn;
@@ -28228,6 +28410,23 @@ bool AIPlayerGPT::loopAutoPassFor(Player * p)
         p->getObserver()->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0; //#W73-BY (N6)
     if (!chainOnStack && !lifeLoopProvenWin(p->opponent()))
         return false;
+    //#W73-CB (F1a, Astra wave-73 review finding 1). ASK THE QUESTION THE MENU
+    //ASKS. hasAnyLegalAction priced casts under FreeProducerPolicy - a policy
+    //written for the HUMAN auto-tap seat, which may not sacrifice a permanent
+    //on a player's behalf - while this seat's own cast menu runs GptManaPolicy
+    //(AIPlayerBaka::canHandleCost). Two untapped Lotus Petals and a Counterspell
+    //therefore read as "no legal action" to the collapse and as a cast row to
+    //the menu, and the window closed on an option the model would have seen.
+    //The collapse may only stand where the menus the model WOULD see are empty,
+    //so it runs the menus' own willingness. Fail closed as before: a seat that
+    //is not an AI keeps the conservative default.
+    AIPlayerBaka * seat = dynamic_cast<AIPlayerBaka *>(p);
+    if (seat)
+    {
+        GptManaPolicy menuPolicy(seat);
+        return chainAutoPassApplies(chainOnStack, lifeLoopProvenWin(p->opponent()),
+                                    LegalActionsOracle::hasAnyLegalAction(p, &menuPolicy));
+    }
     return chainAutoPassApplies(chainOnStack, lifeLoopProvenWin(p->opponent()),
                                 LegalActionsOracle::hasAnyLegalAction(p));
 }
@@ -35850,12 +36049,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //the menu is about to print, with the same decline/hold filter the hold
     //latch uses, so the bracket's claim and the list cannot disagree.
     bool loopNoteActingRows = false;
-    for (size_t lnr = 0; lnr < shownLines.size() && !loopNoteActingRows; lnr++)
-        if (!w72RowIsDeclineOrHold(holdKeyRow(shownLines[lnr])))
-            loopNoteActingRows = true;
+    bool loopNoteLifeRow = false; //#W73-CB (F4): does an acting row touch LIFE?
+    for (size_t lnr = 0; lnr < shownLines.size(); lnr++)
+    {
+        if (w72RowIsDeclineOrHold(holdKeyRow(shownLines[lnr])))
+            continue;
+        loopNoteActingRows = true;
+        if (w73RowTouchesLife(shownLines[lnr]))
+            loopNoteLifeRow = true;
+    }
     const string promptNotes = declinedNote + holdNote //#W61-U (C14): same channel
         + loopChainingNote(lifeLoopProvenWin(opponent()), holdRow > 0,
-                           loopNoteActingRows); //#W66-AS (H3), #W73-BY (N5)
+                           loopNoteActingRows, loopNoteLifeRow); //#W66-AS (H3), #W73-BY (N5), #W73-CB (F4)
     if (!promptNotes.empty() && optionsEnd <= userTail.size())
         userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
@@ -36832,8 +37037,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             mAskReplaysRefused++;
             logAskReplay("cache_replay_refused", decision, cached->second,
-                         (int) options.size(), fromSeq, kAskReplayRefuseMax,
-                         mAskReplaysReserved);
+                         (int) options.size(), fromSeq, kAskReplayRefuseMax);
             DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: refusing the ask cache after "
                        << kAskReplayRefuseMax << " identical replays of the same state+question"
                        << " (answer " << cached->second << ", first served at seq " << fromSeq
@@ -36857,8 +37061,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
             mAskReplaysReserved++;
             logAskReplay("cache_replay", decision, cached->second, (int) options.size(),
-                         fromSeq, mAskReplayRuns[askKey], //#W72-BT (M22): this window's own run
-                         mAskReplaysReserved); //#W73-CA (N8): the game total, on its own field
+                         fromSeq, mAskReplayRuns[askKey]); //#W72-BT (M22): this window's own run
             return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
         }
     }
@@ -36886,8 +37089,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             mAskReplaysRefused++;
             logAskReplay("repeat_ask_refused", decision, mRepeatAskChoice,
-                         (int) optionsIn.size(), mRepeatAskSeq, kAskReplayRefuseMax,
-                         mAskReplaysReserved);
+                         (int) optionsIn.size(), mRepeatAskSeq, kAskReplayRefuseMax);
             DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: refusing the repeat latch after "
                        << kAskReplayRefuseMax << " identical re-serves of the same turn+question"
                        << " (answer " << mRepeatAskChoice << ", first served at seq "
@@ -36905,8 +37107,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mAskReplaysReserved++;
         logAskReplay("repeat_ask_reserved", decision, mRepeatAskChoice,
                      (int) optionsIn.size(), mRepeatAskSeq,
-                     mRepeatAskRuns[nowRepeatKey], //#W73-CA (N8): this window's run
-                     mRepeatAskAnswersReserved);   //...and the game total, separately
+                     mRepeatAskRuns[nowRepeatKey]); //#W73-CA (N8): this window's run
+                                                    //#W73-CB (F7): the game total is the
+                                                    //record's own combined counter
         DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the same ask again, unchanged - re-serving"
                    " this seat's own answer " << mRepeatAskChoice << " of " << optionsIn.size()
                    << " (" << mRepeatAskAnswersReserved << " this game): " << decision);
@@ -39174,11 +39377,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mNextAskPromptNote += mCastHoldNote;
         //#W66-AS (H3 second half): prompt-only, same channel, never in a key.
         bool loopNoteActingRows = false; //#W73-BY (N5): same rule as the priority seam
-        for (size_t lnr = 0; lnr < menu.size() && !loopNoteActingRows; lnr++)
-            if (!w72RowIsDeclineOrHold(holdKeyRow(menu[lnr])))
-                loopNoteActingRows = true;
+        bool loopNoteLifeRow = false;    //#W73-CB (F4): ...and the same per-row life test
+        for (size_t lnr = 0; lnr < menu.size(); lnr++)
+        {
+            if (w72RowIsDeclineOrHold(holdKeyRow(menu[lnr])))
+                continue;
+            loopNoteActingRows = true;
+            if (w73RowTouchesLife(menu[lnr]))
+                loopNoteLifeRow = true;
+        }
         mNextAskPromptNote += loopChainingNote(lifeLoopProvenWin(opponent()), holdRow >= 0,
-                                               loopNoteActingRows);
+                                               loopNoteActingRows, loopNoteLifeRow);
         //The model's own hold, honoured: no model call, no row withheld.
         if (attempt == 0 && holdHonoured("cast", menu))
             return NULL;
@@ -39524,6 +39733,9 @@ bool AIPlayerGPT::decisionPending(float dt)
     //c5d: the async gate is a policy hook now - the base AIPlayerBaka::Act
     //consults it at entry and again after computeActions, so the mirrored
     //Act body this class used to carry is gone.
+    //#W73-CB (F2): this hook runs on every tick this seat acts, so the hold
+    //dies at its untap even in a turn where no menu ever reaches holdHonoured.
+    releaseHoldIfUntapPassed();
     if (mEndpoint.empty())
         return false;
     if (asyncBusy())
@@ -73197,14 +73409,15 @@ static const char * kW50Y_r94 =
         CHECK(!AIPlayerGPT::loopAutoPassApplies(false, true),
               "#W66-AS H3b NEGATIVE neither input: nothing happens");
         // The prompt-only note that carries the other half of H3b.
-        const string note = loopChainingNote(true, true, false);
+        const string note = loopChainingNote(true, true, false, false);
         CHECK(note.find("[LOOP RUNNING:") != string::npos
               && note.find("the HOLD row answers all of them at once") != string::npos
               && note.find("Nothing on this list stops the chain") != string::npos,
               "#W66-AS H3b POSITIVE the note names the chain and the one row that closes the run");
         CHECK(note.find_first_of("0123456789") == string::npos,
               "#W66-AS H3b KEY the note carries no number, so no rebuild of one window can move it");
-        CHECK(loopChainingNote(false, true, false).empty() && loopChainingNote(true, false, false).empty(),
+        CHECK(loopChainingNote(false, true, false, false).empty()
+                  && loopChainingNote(true, false, false, false).empty(),
               "#W66-AS H3b NEGATIVE no proven loop, or no hold row to point at: no note");
     }
 
@@ -79214,13 +79427,24 @@ static const char * kW50Y_r94 =
 
         //N14 (b). deck152 MED-1: a counter that changes what a death DOES,
         //printed bare beside a trade tag that reads "(both die)".
-        const string gf = legibleCounterName("Ghostform");
+        const string gf = legibleCounterNameForGrant("Ghostform", true);
         cout << "     ghostform: \"" << gf << "\"\n";
         CHECK(gf.find("returns") != string::npos && gf.find("1/1 white flying Spirit") != string::npos
                   && gf != "Ghostform",
               "#W73-CA N14b REPRO 152v146 seq 25: the ghostform counter says what it does");
-        CHECK(legibleCounterName("ghostform") == gf,
+        CHECK(legibleCounterNameForGrant("ghostform", true) == gf,
               "#W73-CA N14b the engine's own casing reaches the same gloss");
+        //#W73-CB (F5): ...and only while the granted trigger is live.
+        {
+            const string gone = legibleCounterNameForGrant("Ghostform", false);
+            CHECK(gone.find("returns") == string::npos && gone.find("not removal") == string::npos
+                      && gone.find("marker only") != string::npos,
+                  "#W73-CB F5 REPRO Sudden Spoiling removes the granted trigger: the counter"
+                  " stops promising a return it can no longer make");
+            CHECK(legibleCounterNameForGrant("TeferiEffect", false) == "bookkeeping (Teferi's +1)"
+                      && legibleCounterNameForGrant("loyalty", false) == "loyalty",
+                  "#W73-CB F5 MUST-NOT-MATCH no other counter name is touched by the grant test");
+        }
         CHECK(legibleCounterName("loyalty") == "loyalty"
                   && legibleCounterName("+1/+1") == "+1/+1"
                   && legibleCounterName("TeferiEffect") == "bookkeeping (Teferi's +1)",
@@ -79254,20 +79478,22 @@ static const char * kW50Y_r94 =
         // ---- N2 a: a hold is released at the holder's untap ----
         // RED on base: the base has no release at all - the only retirement is a
         // printed row changing, and a once-per-turn row never changes. Reverting
-        // w73HoldExpiresAtUntap to `return false` fails every POSITIVE below.
-        CHECK(w73HoldExpiresAtUntap(13, 15, true),
+        // w73HoldExpiredByUntap to `return false` fails every POSITIVE below.
+        // #W73-CB (F2) re-signed it: the third argument is now whose turn the
+        // hold was TAKEN on, not whose turn it is at the check - see below.
+        CHECK(w73HoldExpiredByUntap(13, true, 15),
               "#W73-BY N2a REPRO 152v162 seq 34: a hold taken on turn 13 is released when this"
               " seat's turn 15 begins - Teferi's loyalty row is byte-identical every turn, so"
               " nothing else could ever retire it");
-        CHECK(!w73HoldExpiresAtUntap(13, 14, false),
+        CHECK(!w73HoldExpiredByUntap(13, true, 14),
               "#W73-BY N2a MUST-NOT-MATCH the OPPONENT's turn does not release it: the release"
               " is this seat's untap, not any turn boundary (the wave-61 C14 defect)");
-        CHECK(!w73HoldExpiresAtUntap(13, 13, true),
+        CHECK(!w73HoldExpiredByUntap(13, true, 13),
               "#W73-BY N2a MUST-NOT-MATCH the turn it was TAKEN on is not a later turn - a hold"
               " must still cover the rest of the window it was taken in");
-        CHECK(!w73HoldExpiresAtUntap(-1, 15, true),
+        CHECK(!w73HoldExpiredByUntap(-1, true, 15),
               "#W73-BY N2a MUST-NOT-MATCH no hold taken, nothing to release");
-        CHECK(w73HoldExpiresAtUntap(27, 29, true) && !w73HoldExpiresAtUntap(27, 28, false),
+        CHECK(w73HoldExpiredByUntap(27, true, 29) && !w73HoldExpiredByUntap(27, true, 28),
               "#W73-BY N2a 125v130 seq 46: the own-turn hold at turn 27 survives the opponent's"
               " turn 28 and dies at turn 29 - four skipped turns become one");
 
@@ -79365,10 +79591,11 @@ static const char * kW50Y_r94 =
 
         // ---- N5 second half: the LOOP RUNNING bracket's advice ----
         {
-            const string withPlays = loopChainingNote(true, true, true);
-            const string bare = loopChainingNote(true, true, false);
+            const string withPlays = loopChainingNote(true, true, true, false);
+            const string bare = loopChainingNote(true, true, false, false);
             CHECK(withPlays.find("the HOLD row answers all of them at once") == string::npos
-                      && withPlays.find("each one is a play that stands on its own") != string::npos,
+                      && withPlays.find("each one is a play that stands"
+                                        " on its own") != string::npos,
                   "#W73-BY N5 REPRO 162v126 seq 26/29: over a menu of Ob Nixilis loyalty rows the"
                   " bracket no longer points at the HOLD row as the answer to all of them");
             CHECK(bare.find("the HOLD row answers all of them at once") != string::npos,
@@ -79376,8 +79603,8 @@ static const char * kW50Y_r94 =
                   " stands - that is the window class it was written for");
             CHECK(withPlays.find("Nothing on this list stops the chain") != string::npos,
                   "#W73-BY N5 the TRUE chain fact is kept on both faces - nothing is deleted");
-            CHECK(loopChainingNote(false, true, true).empty()
-                      && loopChainingNote(true, false, true).empty(),
+            CHECK(loopChainingNote(false, true, true, false).empty()
+                      && loopChainingNote(true, false, true, false).empty(),
                   "#W73-BY N5 MUST-NOT-MATCH no proven loop or no hold row, no bracket");
         }
 
@@ -79402,6 +79629,94 @@ static const char * kW50Y_r94 =
         CHECK(!AIPlayerGPT::chainAutoPassApplies(true, true, true),
               "#W73-BY N6 MUST-NOT-MATCH not even a proven loop plus a chain collapses a window"
               " the seat can act in");
+    }
+
+    cout << "\n[#W73-CB] the Astra wave-73 review: legality, lifecycle, meaning\n";
+    {
+        // ---- F2: a hold outlives the untap it promised to die at ----
+        // RED on base: base asked "is it my turn NOW and is it later than the
+        // turn the hold was taken on", so the sequence below - hold on THEIR
+        // turn 14, an own turn 15 in which no menu reaches holdHonoured, a call
+        // on their turn 16 - never released it. On base the equivalent call is
+        // w73HoldExpiresAtUntap(14, 16, false) = false.
+        CHECK(w73HoldExpiredByUntap(14, false, 15),
+              "#W73-CB F2 REPRO Ghost Town held on THEIR turn 14: the holder's untap is turn 15,"
+              " so the hold is dead the moment that turn begins");
+        CHECK(w73HoldExpiredByUntap(14, false, 16),
+              "#W73-CB F2 REPRO the review's sequence: no qualifying own-turn call happened, and"
+              " the hold is STILL dead on their turn 16 - the answer no longer depends on when"
+              " it is asked");
+        CHECK(!w73HoldExpiredByUntap(14, false, 14),
+              "#W73-CB F2 MUST-NOT-MATCH the hold still covers the rest of the turn it was taken"
+              " in - the untap has not happened yet");
+        CHECK(!w73HoldExpiredByUntap(27, true, 28) && w73HoldExpiredByUntap(27, true, 29),
+              "#W73-CB F2 an OWN-turn hold still spans the opponent's turn and dies at the next"
+              " own untap - the wave-73 BY rule, unchanged");
+
+        // ---- F3: a threshold in the plan is not a repeat stop ----
+        // RED on base: base's repeatPlanStopAndCurrent("PLAN: Stop at 3 life;
+        // M=10 creatures; ...") returned true with stop=3, so a creature repeat
+        // row compared its live creature count against a LIFE total.
+        {
+            int st = -1, cu = -1;
+            CHECK(!repeatPlanStopAndCurrent("PLAN: Stop at 3 life; M=10 creatures;"
+                                            " make two more creatures this window.", &st, &cu),
+                  "#W73-CB F3 REPRO a life threshold is not a creature stop - nothing binds");
+            st = -1; cu = -1;
+            CHECK(repeatPlanStopAndCurrent("PLAN: stop=24 creatures; M=2 creatures; x22 this"
+                                           " window", &st, &cu) && st == 24 && cu == 2,
+                  "#W73-CB F3 POSITIVE the row's OWN unit still binds exactly as before");
+            st = -1; cu = -1;
+            CHECK(repeatPlanStopAndCurrent("PLAN: L 20, C 1, stop 24; M 24 now; this window:"
+                                           " pass.", &st, &cu) && st == 24 && cu == 24,
+                  "#W73-CB F3 REGRESSION the N3 forms with no unit word are untouched");
+            st = -1; cu = -1;
+            CHECK(!repeatPlanStopAndCurrent("PLAN: stop at 12 cards in hand; M=4 cards", &st, &cu),
+                  "#W73-CB F3 MUST-NOT-MATCH cards are not the unit a repeat row counts either");
+        }
+        CHECK(!repeatPlanStopIsOwn("PLAN: Their intended stop at 24; M=30; develop my board"),
+              "#W73-CB F3 REPRO the attribution is a property of the CLAUSE, not of the one word"
+              " in front of the label - base read 'intended' and called this stop the seat's own");
+        CHECK(!repeatPlanStopIsOwn("PLAN: they will stop=29; M=29"),
+              "#W73-CB F3 'they' anywhere in the clause voids the stop as surely as 'their'");
+        CHECK(repeatPlanStopIsOwn("PLAN: kill their blocker, then stop=20; M=2"),
+              "#W73-CB F3 MUST-NOT-MATCH an attribution in an EARLIER clause does not void this"
+              " seat's own stop - the clause is the scope");
+
+        // ---- F4: the LOOP RUNNING bracket may not declare a life row unrelated ----
+        {
+            const string lifeRow = loopChainingNote(true, true, true, true);
+            const string plainRow = loopChainingNote(true, true, true, false);
+            CHECK(lifeRow.find("NOT part of the chain") == string::npos
+                      && plainRow.find("NOT part of the chain") == string::npos,
+                  "#W73-CB F4 REPRO Phyrexian Reclamation pays LIFE into a Sanguine Bond chain:"
+                  " no row is declared unrelated on a boolean any more");
+            CHECK(lifeRow.find("pays or moves LIFE") != string::npos
+                      && lifeRow.find("weigh that row with the chain") != string::npos,
+                  "#W73-CB F4 a life-paying row is named as part of what the chain eats");
+            CHECK(plainRow.find("still available") != string::npos
+                      && plainRow.find("pays or moves LIFE") == string::npos,
+                  "#W73-CB F4 with no life row the bracket says only that the rows are available");
+            CHECK(w73RowTouchesLife("2. {2}{B}, Pay 2 life: Return target creature card"
+                                    " from your graveyard to your hand")
+                      && w73RowTouchesLife("3. Activate: each opponent loses 2 life")
+                      && !w73RowTouchesLife("1. +1: Put a loyalty counter on Ob Nixilis"),
+                  "#W73-CB F4 the per-row test reads the row the model reads");
+        }
+
+        // ---- F6: the missing-main-phase meter counts phases, not ticks ----
+        CHECK(w73MainPhaseSkipCounts(false),
+              "#W73-CB F6 REPRO a main phase that ended with NO casting window is counted once");
+        CHECK(!w73MainPhaseSkipCounts(true),
+              "#W73-CB F6 MUST-NOT-MATCH a phase that DID reach the casting window is not a"
+              " skipped window, however many unresolved-stack ticks it took on the way");
+
+        // ---- F7: one meaning for replays_this_game ----
+        // Not a CHECK: the fix is structural. logAskReplay no longer TAKES a
+        // game total - it reads mAskReplaysReserved, the one combined counter -
+        // so the two call sites that disagreed (10 cache replays -> 10, then the
+        // first repeat replay -> 1) cannot exist. The compiler is the test.
+        cout << "     F7: replays_this_game is written from mAskReplaysReserved only\n";
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

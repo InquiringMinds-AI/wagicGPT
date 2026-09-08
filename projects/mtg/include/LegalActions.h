@@ -81,14 +81,20 @@ public:
     //costs are not target-validated): a spurious window costs one
     //auto-answered decision; a missed window costs a game. This is the
     //auto-pass predicate of the priority engine.
-    static bool hasInstantResponse(Player * p);
+    //#W73-CB (F1): `policy` is the WILLINGNESS the caller's own menus run.
+    //NULL keeps the historical FreeProducerPolicy (the human auto-tap seat,
+    //which may not sacrifice on a player's behalf); an AI seat that will pay
+    //a producer's extra cost passes its own policy so this predicate cannot
+    //answer "no response" about a cast its menu would offer (Lotus Petal).
+    static bool hasInstantResponse(Player * p, ManaEngine::ManaPolicy * policy = NULL);
 
     //The castability display set: every card in p's hand a click could
     //legally play right now (spells via legalCasts; lands when a land drop
     //is available at sorcery speed). PURE - unlike the rules layer's
     //isReactingToClick walk, which mutates (Leyline auto-resolution) and is
     //not safe to probe from rendering code.
-    static std::set<MTGCardInstance*> castableForDisplay(Player * p);
+    static std::set<MTGCardInstance*> castableForDisplay(Player * p,
+                                                        ManaEngine::ManaPolicy * policy = NULL); //#W73-CB (F1)
 
     //Combat declaration sets (W3b). Pure predicates the engine consults to
     //decide whether a declare-attackers / declare-blockers decision even
@@ -125,7 +131,7 @@ public:
     //action" skips a window the player needed and can lose them the game,
     //while a false "has an action" costs one keypress. When in doubt this
     //answers true.
-    static bool hasAnyLegalAction(Player * p);
+    static bool hasAnyLegalAction(Player * p, ManaEngine::ManaPolicy * policy = NULL); //#W73-CB (F1)
 
     //PER-CARD display predicates. The set-level predicates above answer "does
     //a decision exist"; these answer "is THIS card one of the reasons", which

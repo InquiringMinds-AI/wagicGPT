@@ -4151,6 +4151,12 @@ int AIPlayerBaka::computeActions()
         case MTG_PHASE_FIRSTMAIN:
         case MTG_PHASE_SECONDMAIN:
             {
+                //#W73-CB (F6): the sorcery-speed casting window IS reached in
+                //this phase - the counterpart signal to
+                //noteMainPhaseWindowSkipped, so a phase that offered casting at
+                //any point in it can never be reported as a phase that did not.
+                if (ownMainPhaseNow)
+                    noteMainPhaseCastingOffered();
                 ManaCost * currentMana = getPotentialMana();
                 currentMana->add(this->getManaPool());
 
