@@ -95,6 +95,9 @@ public:
     //#W72-BT (M14): the GPT seat counts own-turn instant-speed windows the
     //W71-BQ L4 arm left without issuing a cast ask. No-op for the heuristic.
     virtual void noteOwnTurnWindowSkipped() {}
+    //#W73-BY (N16): a MAIN PHASE of this seat's own turn that reached no
+    //casting window. Report-only, like the hook above; the GPT seat counts it.
+    virtual void noteMainPhaseWindowSkipped(const char * /*why*/) {}
  protected:
     virtual int orderBlockers();
     //Permute atk->blockers so autoaffectDamage's lethal-first walk kills
