@@ -3924,6 +3924,20 @@ int AIPlayerBaka::computeActions()
     const bool ownTurnArmOnly = ownInstantSpeedWindow
         && !(observer->isInterrupting == this && topController != this);
     bool searchedForInstantCast = false;
+    //#W73-BY (N16, wave-72 deck152 MED-3): a MAIN PHASE of this seat's own turn
+    //is a SORCERY-SPEED window, and only the "standard actions" branch below
+    //offers one (land drop + every card type). The response arm just below is
+    //instant-speed only, and its reach test (`isInterrupting == this` with a
+    //stack object whose controller is not this seat - a NextGamePhase has NO
+    //controller) can be true DURING a main phase; the standard branch is then
+    //never reached and the whole main phase passes with no cast ask. Neither
+    //counter could see it: `own_turn_windows_skipped` is scoped to the non-main
+    //instant-speed phases. `152v146` t18 is one instance (two `[castable now]`
+    //planeswalkers in hand, no main-1 window; 2 of 102 own turns corpus-wide).
+    //REPORT-ONLY this wave - the reach rule is not changed here, it is measured,
+    //so the next corpus says which arm swallows the phase and how often.
+    const bool ownMainPhaseNow = (this == currentP)
+        && (phaseNow == MTG_PHASE_FIRSTMAIN || phaseNow == MTG_PHASE_SECONDMAIN);
     if (this == currentP
         //and i am the currentlyActivePlayer
         && ((observer->isInterrupting == this && topController != this)
@@ -3931,6 +3945,9 @@ int AIPlayerBaka::computeActions()
             //empty stack has no controller and is a response window too).
             || ownInstantSpeedWindow))
     {
+        if (ownMainPhaseNow) //#W73-BY (N16)
+            noteMainPhaseWindowSkipped("the instant-speed response arm answered it;"
+                                       " no sorcery-speed casting window was offered");
         bool ipotential = false;
         if(p->game->hand->hasType("instant") || p->game->hand->hasAbility(Constants::FLASH) || p->game->hand->hasAbility(Constants::ASFLASH) ||
             p->game->graveyard->hasType("instant") || p->game->graveyard->hasAbility(Constants::FLASH) || p->game->graveyard->hasAbility(Constants::ASFLASH) ||
@@ -4354,6 +4371,14 @@ int AIPlayerBaka::computeActions()
     }
     else
     {
+        //#W73-BY (N16): the OTHER way a own main phase reaches no casting
+        //window - a NOT_RESOLVED object on the stack keeps the standard branch
+        //out of reach, and this abilities-only tail answers the phase. Measured,
+        //not changed.
+        if (ownMainPhaseNow)
+            noteMainPhaseWindowSkipped("an unresolved stack object kept the standard"
+                                       " main-phase branch out of reach; only abilities"
+                                       " were offered");
         switch (observer->getCurrentGamePhase())
         {
         case MTG_PHASE_UPKEEP:

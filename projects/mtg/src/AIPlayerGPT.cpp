@@ -16465,7 +16465,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -18074,6 +18074,9 @@ void AIPlayerGPT::logGameEnd()
         //corpus measured (44 same-board cast/priority pairs, 19 hold-opened);
         //a rise here is model calls saved, not windows removed.
         {"sibling_window_asks_skipped", mSiblingWindowAsksSkipped},
+        {"hold_released_turn", mHoldReleasedTurn},         //#W73-BY (N2 a)
+        {"chain_windows_collapsed", mChainWindowsCollapsed}, //#W73-BY (N6)
+        {"main_phase_windows_skipped", mMainPhaseWindowsSkipped}, //#W73-BY (N16)
         //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
         //per-decision `async_drops` field is consumed with its record, so this
         //is the only place a reader can take the game's number from.
@@ -21745,6 +21748,23 @@ string loopCautionClause(const string& converter, const string& mirror, bool the
 //number CAN enter the chain, and the line whose number cannot now says so and
 //names the two entries that can. Pure over the two names, so PARSETEST proves
 //both faces.
+//#W73-BY (N5, wave-72 deck162 HIGH). ONE SCOPE SENTENCE, SHARED. The
+//`LOOP COMPLETE` header and this `LOOP SCOPE` clause stated OPPOSITE things
+//about the same number in the same prompt: the header's tail read "a number
+//that reads as life to them is lethal to you" while the scope clause read
+//"this number is life THEY lose ... does not enter it". `162v126` seq 29 obeyed
+//the header, held its only removal and lost 0-28. The two surfaces now compose
+//the SAME sentence from this one function, so they cannot disagree - and the
+//PARSETEST pin proves it byte for byte. Pure over the side.
+string loopChainEntrySentence(bool theirs)
+{
+    return theirs
+        ? string("Their chain starts only from life YOU lose or life THEY gain -"
+                 " life THEY lose does not enter it.")
+        : string("Your chain starts only from life THEY lose or life YOU gain -"
+                 " life YOU lose does not enter it.");
+}
+
 string loopNonChainingClause(const string& converter, const string& mirror, bool theirs)
 {
     if (converter.empty() || mirror.empty())
@@ -21754,14 +21774,12 @@ string loopNonChainingClause(const string& converter, const string& mirror, bool
         o << " LOOP SCOPE: they control BOTH halves of a life LOOP (" << converter
           << " + " << mirror << "), and THIS number does not enter it - " << mirror
           << " gains THEM life when an OPPONENT of theirs (you) loses life, and this"
-             " number is life THEY lose. Their chain starts only from life YOU lose"
-             " or life THEY gain.";
+             " number is life THEY lose. " << loopChainEntrySentence(true);
     else
         o << " LOOP SCOPE: you control BOTH halves of a life LOOP (" << converter
           << " + " << mirror << "), and THIS number does not enter it - " << mirror
           << " gains YOU life when an OPPONENT of yours (them) loses life, and this"
-             " number is life YOU lose. Your chain starts only from life THEY lose"
-             " or life YOU gain.";
+             " number is life YOU lose. " << loopChainEntrySentence(false);
     return o.str();
 }
 
@@ -21824,14 +21842,21 @@ string closedLoopHeaderText(const string& converter, const string& mirror, bool 
     std::ostringstream o;
     o << "LOOP COMPLETE: BOTH halves of a life LOOP (" << converter << " + " << mirror
       << ") are on " << (theirs ? "THEIR" : "YOUR") << " battlefield right now.";
+    //#W73-BY (N5): the header's own tail claimed the OPPOSITE of the LOOP SCOPE
+    //clause printed on the same screen ("a number that reads as life to them is
+    //lethal to you" against "this number is life THEY lose ... does not enter
+    //it"). The false half is deleted and the shared scope sentence takes its
+    //place, so the two surfaces state one rule. Nothing true is withheld: the
+    //fatal direction is still named, first.
     if (theirs)
         o << " Any life YOU lose, and any life THEY gain, chains until you are at 0 -"
-             " so every life payment on this screen is fatal rather than expensive, and"
-             " a number that reads as life to them is lethal to you.";
+             " so every life payment on this screen is fatal rather than expensive. "
+          << loopChainEntrySentence(true);
     else
         o << " Any life THEY lose, and any life YOU gain, chains until they are at 0 -"
              " so any one point of either, from any source, ends the game in your"
-             " favour.";
+             " favour. "
+          << loopChainEntrySentence(false);
     return o.str();
 }
 
@@ -24567,6 +24592,14 @@ bool AIPlayerGPT::oppLifeRise(int& gain, int& turns) const
 //own order against the same willingness policy and the same untapped-source
 //count the "Mana available:" line three lines above is built from - one
 //prompt cannot then contradict itself. Pure, so every shape is provable.
+//#W73-BY (N1): the two castability tags as ONE source, because the sibling
+//hold key normalises between them (w73SiblingBoardKey, further down) and a
+//second copy of either string would silently break that key.
+static const char * kHandCastableNowTagText = " [castable now]";
+static const char * kHandCastAnsweredTagText =
+    " [no cast row now: you already answered this phase's Casting decision, so"
+    " this window does not offer it - it is otherwise castable and its own"
+    " casting window this turn has passed]";
 enum HandCastVerdict
 {
     kHandCastableNow = 0,
@@ -24612,7 +24645,9 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
     switch (verdict)
     {
     case kHandCastableNow:
-        return " [castable now]";
+        //#W73-BY (N1): ONE source for the two tags the sibling key normalises
+        //(w73SiblingBoardKey), so the render and the key cannot disagree.
+        return kHandCastableNowTagText;
     //#W72-BT (M13, deck146 MED-4; `146v125` seq 150). `Lolth, Spider Queen
     //{3}{b}{b} [planeswalker] [castable now]` printed over a legal-action list
     //that held only a loyalty ability, an animation and Hold; 27 of that seat's
@@ -24625,9 +24660,7 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
     //castability this turn is still stated - deleting the fact would invite the
     //confabulation the trust doctrine warns about.
     case kHandCastableAnswered:
-        return " [no cast row now: you already answered this phase's Casting decision, so"
-               " this window does not offer it - it is otherwise castable and its own"
-               " casting window this turn has passed]";
+        return kHandCastAnsweredTagText; //#W73-BY (N1): one source, see above
     case kHandNeedsMana:
         o << " [cannot pay now: needs " << need << " mana, you have " << have << "]";
         return o.str();
@@ -26427,6 +26460,10 @@ static string stripNarrationDecoration(const string& in)
                 //decision-time pricing - true while the row is offered, spent
                 //the moment the land is on the battlefield.
                 || (in.compare(i, 17, "{taking this row ") == 0)
+                //#W73-BY (N2 a): the hold row's benefit brace now OPENS with the
+                //untap release, so the wave-57 prefix above no longer covers it.
+                //Same species, same reason: it prices THIS window's latch.
+                || (in.compare(i, 27, "{it is released at the star") == 0)
                 || (in.compare(i, 18, "{it enters TAPPED ") == 0)
                 //#W67-AW: three new decision-time row tags, all true of THIS
                 //window only. (I4) the library remainder a row's draws leave;
@@ -26934,14 +26971,24 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //a dash now on all three spellings; the head is still shared, so holdRowIndexOf
 //and isReservedHoldEcho bind either, and the two head comparisons that spelled
 //the colon out are cut back to the colon-free prefix.
+//#W73-BY (N2 c, N9): the HEADLINE, rewritten. Two facts were true of this row
+//and printed nowhere a reader lands: (a) the latch outlives THIS window, so a
+//pilot that means "pass once" cannot come back for one of the rows above later
+//in the same turn - the clause that said so sat ~600 chars deep in the benefit
+//brace (`125` seq 36/101 held over their own +1); (b) with the wave-73 untap
+//release the latch now has a hard END, and the row may as well name it. Both
+//lead. Nothing is withheld and no row is removed: this is the same row, priced.
 static const char * kHoldPriorityRowHead =
-    "Hold priority - pass now, and do not ask me again - this turn or later -"
-    " until one of the rows above changes (any change re-opens this window;";
+    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
+    " begins, or until one of the rows above changes (any change re-opens this"
+    " window;";
 
 static const char * kHoldPriorityRowText =
-    "Hold priority - pass now, and do not ask me again - this turn or later -"
-    " until one of the rows above changes (any change re-opens this window; you"
-    " give up no cast)";
+    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
+    " begins, or until one of the rows above changes (any change re-opens this"
+    " window; you give up no cast)";
 
 //#W72-BV (M6, deck126 HIGH-1): the third spelling, for the PRIORITY menu whose
 //rows are ACTIVATIONS. "you give up no cast" is true there and beside the point:
@@ -26954,18 +27001,21 @@ static const char * kHoldPriorityRowText =
 //holdRowIndexOf / isReservedHoldEcho bind this one exactly as they bind the
 //others.
 static const char * kHoldPriorityRowTextActivation =
-    "Hold priority - pass now, and do not ask me again - this turn or later -"
-    " until one of the rows above changes (any change re-opens this window; the"
-    " rows above include ACTIVATED abilities that are usable RIGHT NOW, and"
-    " taking this row gives every one of them up for as long as these rows stand)";
+    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
+    " begins, or until one of the rows above changes (any change re-opens this"
+    " window; the rows above include ACTIVATED abilities that are usable RIGHT"
+    " NOW, and taking this row gives every one of them up for as long as these"
+    " rows stand)";
 
 //The same row on a CASTING menu, where "you give up no cast" is exactly the
 //claim that is false.
 static const char * kHoldPriorityRowTextCast =
-    "Hold priority - pass now, and do not ask me again - this turn or later -"
-    " until one of the rows above changes (any change re-opens this window; on"
-    " THIS menu that means you also give up this turn's remaining CASTING"
-    " windows for as long as these rows stand)";
+    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
+    " begins, or until one of the rows above changes (any change re-opens this"
+    " window; on THIS menu that means you also give up this turn's remaining"
+    " CASTING windows for as long as these rows stand)";
 
 //#W56-A (D1): the hold's board key is GONE. Wave 53-55 keyed the latch on
 //the situation block (phase line, hidden-zone counters and finally the life
@@ -27064,7 +27114,13 @@ static string holdRowBenefitClause()
     //latch now also ignores the bracket a target row carries only while an
     //opponent spell is on the stack; the row says so, because a difference the
     //key forgives silently is exactly the blind cache the latch must not become.
-    return string(" {taking this row skips every later window that asks THIS"
+    //#W73-BY (N2 a): and the hard END. The latch is released at the start of
+    //this seat's next turn whatever the rows say, so the row states that here
+    //too - the head leads with it and the brace's scope sentence must not read
+    //as forever.
+    return string(" {it is released at the start of your next turn whatever the"
+                  " rows do; until then, taking this row skips every later window"
+                  " that asks THIS"
                   " SAME question with rows identical to these; a different"
                   " question is still asked. A pass row that differs only by"
                   " naming which step comes next is the same row, so a hold"
@@ -27112,16 +27168,34 @@ static const char * kCastNoRowZeroFact =
 //is the fact that makes ONE answer serve all of them. PROMPT-ONLY, spliced
 //into the same channel as the declined count and the hold check, so it can
 //never enter the ask key or the async slot key. Constant text, no numbers.
-static string loopChainingNote(bool oppLoopProven, bool holdRowOffered)
+//#W73-BY (N5 second half, wave-72 deck162 HIGH). THE BRACKET ONLY WHERE ITS
+//ADVICE IS TRUE. Its one actionable sentence points at the HOLD row, and on
+//`162v126` seq 26/29 it was printed over a menu whose rows 1-4 were Ob Nixilis
+//loyalty activations that do not enter the chain at all - so the seat read
+//"the HOLD row answers all of them at once" and surrendered four live plays to
+//a chain none of them was about. The bracket is not deleted (the chain fact is
+//true and worth its bytes) and no row is removed: when the menu carries an
+//ACTING row, the hold-answers-all sentence is replaced by the fact that those
+//rows stand on their own. `actingRowsPresent` is read off the same rows the
+//menu is about to print, so the sentence and the list cannot disagree.
+static string loopChainingNote(bool oppLoopProven, bool holdRowOffered,
+                               bool actingRowsPresent)
 {
     if (!oppLoopProven || !holdRowOffered)
         return "";
-    return string("\n[LOOP RUNNING: both halves of the opponent's life LOOP are on the"
-                  " battlefield and the chain is live, so this same question is put to"
-                  " you again for every link of it, with only its numbers moved. Nothing"
-                  " on this list stops the chain. If your answer would be the same for"
-                  " every link, the HOLD row answers all of them at once; a row that"
-                  " changes in WORDS, or a row that is new, still re-opens the question.]");
+    string s("\n[LOOP RUNNING: both halves of the opponent's life LOOP are on the"
+             " battlefield and the chain is live, so this same question is put to"
+             " you again for every link of it, with only its numbers moved. Nothing"
+             " on this list stops the chain.");
+    if (actingRowsPresent)
+        s += " The rows above are NOT part of the chain and are not answered by it:"
+             " each one is a play that stands on its own, and the HOLD row gives"
+             " every one of them up.]";
+    else
+        s += " If your answer would be the same for"
+             " every link, the HOLD row answers all of them at once; a row that"
+             " changes in WORDS, or a row that is new, still re-opens the question.]";
+    return s;
 }
 
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
@@ -27708,6 +27782,64 @@ static bool w72HeldMenuShowedEveryRow(const std::set<string>& heldRowKeys,
 //options by a latch, which the doctrine forbids. The row sets now decide: the
 //collapse stands only where the sibling offers nothing the held menu did not
 //already show.
+//#W73-BY (N2 a, THE HOLD FAMILY - wave-72 deck152 HIGH-1, deck123 HIGH-2,
+//deck125 HIGH A-2). Four seats lost turns or games to ONE mechanism: the
+//latch's only release is "a printed row changed", and a ONCE-PER-TURN row is
+//byte-identical every turn it is offered. A loyalty ability, a {T}: create
+//token, a repeat activation - each renders the same string on turn 13 and on
+//turn 25, so the release condition cannot occur while the maker sits there and
+//"pass this window" silently became "concede this permanent for the game"
+//(`152v162` seq 34 silenced Teferi for 6 turns and the seat died at 0;
+//`123v130` seq 31 held a Create row for 15 turns; `125v130` seq 46 skipped
+//turns 27-30 at 18 life and the seat died at -1).
+//The release is now a CLOCK the rows cannot stop: a hold ends at the start of
+//the holder's next turn. Nothing is removed by this - a released hold means the
+//model is ASKED again, which is the permissive direction - and the model may
+//simply take the row again over the same board. Pure over (the turn the hold
+//was taken, the turn now, whether this seat is the active player now).
+static bool w73HoldExpiresAtUntap(int heldTurn, int nowTurn, bool ownTurnNow)
+{
+    if (heldTurn < 0)
+        return false; //no hold taken at all
+    return ownTurnNow && nowTurn > heldTurn;
+}
+
+//#W73-BY (N1, wave-72 engine-seat HIGH-1). THE SIBLING KEY, MINUS THE ANSWER.
+//`gptHoldCoversSiblingWindow` compares two `serializeGameState()` strings, and
+//BT M13 / BX F3 put the CASTING-DECISION STATE inside that string: a hand card
+//reads `[castable now]` while the cast window is open and carries the answered
+//tag once it closes. `takeHold` records the board from inside the cast loop, so
+//the sibling priority window's board differs from the recorded one on EVERY
+//castable hand card - 220 of the 242 differing pairs in the wave-72 corpus, and
+//`sibling_window_asks_skipped` 19 -> 0. Two fixes cancelled each other: M13 made
+//the hand line truthful and in doing so made M4's key non-comparable across the
+//seam boundary. The key now normalises the one annotation the cast window's own
+//state writes, so the two menus of one window compare on the BOARD.
+//Pure over the string; the rendered prompt is untouched.
+static string w73SiblingBoardKey(const string& board)
+{
+    const string from = kHandCastAnsweredTagText;
+    const string to = kHandCastableNowTagText;
+    if (board.find(from) == string::npos)
+        return board;
+    string out;
+    out.reserve(board.size());
+    size_t at = 0;
+    for (;;)
+    {
+        const size_t hit = board.find(from, at);
+        if (hit == string::npos)
+        {
+            out.append(board, at, string::npos);
+            break;
+        }
+        out.append(board, at, hit - at);
+        out += to;
+        at = hit + from.size();
+    }
+    return out;
+}
+
 static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int heldPhase,
                                 const string& heldBoard,
                                 const std::set<string>& heldRowKeys,
@@ -27745,6 +27877,27 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //cast and priority seams both key on it already), so this costs one string.
     //#W72-BX (F1): with the rows of BOTH menus - the set the hold was recorded
     //over, and the keys of the rows this window is about to print.
+    //#W73-BY (N2 a): the UNTAP RELEASE, before every other arm. A once-per-turn
+    //row cannot retire this latch by changing, so the turn does. Every latch the
+    //seat holds is dropped together (they were all taken before this untap), the
+    //release is counted for the gameend record, and the very next window asks
+    //the model again - the permissive direction.
+    if (w73HoldExpiresAtUntap(mHoldTurn, observer->turn,
+                              observer->currentPlayer == this))
+    {
+        mHoldReleasedTurn++;
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED at this seat's"
+                   " untap (taken on turn " << mHoldTurn << ", now turn " << observer->turn
+                   << "; " << mHoldReleasedTurn << " released this game) - a once-per-turn row"
+                   " never changes, so the turn retires the latch");
+        mHoldRows.clear();
+        mHoldTurn = -1;
+        mHoldWindowSeam.clear();
+        mHoldWindowTurn = -1;
+        mHoldWindowPhase = -1;
+        mHoldWindowBoard.clear();
+        return false;
+    }
     std::set<string> heldRowKeys;
     {
         std::map<string, std::set<string> >::iterator hit = mHoldRows.find(mHoldWindowSeam);
@@ -27756,7 +27909,8 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         nowRowKeys.push_back(holdKeyRow(rows[nr]));
     if (gptHoldCoversSiblingWindow(mHoldWindowSeam, mHoldWindowTurn, mHoldWindowPhase,
                                    mHoldWindowBoard, heldRowKeys, seam, observer->turn,
-                                   observer->getCurrentGamePhase(), serializeGameState(),
+                                   observer->getCurrentGamePhase(),
+                                   w73SiblingBoardKey(serializeGameState()), //#W73-BY (N1)
                                    nowRowKeys))
     {
         mSiblingWindowAsksSkipped++;
@@ -27765,11 +27919,33 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
             mHoldWindowsSkippedCast++;
         else
             mHoldWindowsSkippedPriority++;
-        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the model held this window at the "
-                   << mHoldWindowSeam << " seam - not asking the " << seam
-                   << " seam over the same board (turn " << observer->turn
-                   << ", phase " << observer->getCurrentGamePhase() << "; "
-                   << mSiblingWindowAsksSkipped << " sibling asks skipped this game)");
+        //#W73-BY (N1): THE COVERING RULE, STATED, and BOTH option sets recorded.
+        //The rule is: the same window (same turn, same phase, the same board once
+        //the casting seam's own answered-tag is normalised away) AND the sibling
+        //menu offers no ACTING row the held menu did not already print. Declines
+        //and hold rows are not acting rows. So the collapse can only ever fire on
+        //a sibling whose acting-row set is a SUBSET of the one the model already
+        //answered - it can never remove a play the model has not seen. A skip
+        //with an empty `now` set is a menu that offers nothing but declines; a
+        //skip with a non-empty one is a genuine repeat of rows already answered.
+        //Both sets are printed so a corpus reader can adjudicate every skip
+        //without re-deriving the boards.
+        {
+            std::ostringstream heldSetO, nowSetO;
+            for (std::set<string>::const_iterator hk = heldRowKeys.begin();
+                 hk != heldRowKeys.end(); ++hk)
+                heldSetO << (hk == heldRowKeys.begin() ? "" : " | ") << *hk;
+            for (size_t nk = 0; nk < nowRowKeys.size(); nk++)
+                nowSetO << (nk ? " | " : "") << nowRowKeys[nk];
+            DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the model held this window at the "
+                       << mHoldWindowSeam << " seam - not asking the " << seam
+                       << " seam over the same board (turn " << observer->turn
+                       << ", phase " << observer->getCurrentGamePhase() << "; "
+                       << mSiblingWindowAsksSkipped << " sibling asks skipped this game)"
+                       << " | covering rule: every ACTING row here was on the held menu"
+                       << " | held rows: " << heldSetO.str()
+                       << " | rows now: " << nowSetO.str());
+        }
         return true;
     }
     std::map<string, std::set<string> >::iterator it = mHoldRows.find(seam);
@@ -27847,7 +28023,12 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
     mHoldWindowSeam = seam ? seam : "";
     mHoldWindowTurn = observer->turn;
     mHoldWindowPhase = observer->getCurrentGamePhase();
-    mHoldWindowBoard = serializeGameState();
+    //#W73-BY (N1): recorded through the same normaliser the comparison uses -
+    //this call happens INSIDE the cast loop, where every castable hand card
+    //still reads `[castable now]`, and the sibling priority window sees the
+    //answered tag instead. Keying on the normalised string is what makes the
+    //two menus of ONE window comparable at all.
+    mHoldWindowBoard = w73SiblingBoardKey(serializeGameState());
     //#W61-U (C14): the seam's set is REPLACED, not added to. With the turn
     //boundary no longer clearing it (holdHonoured), a union would let a second
     //hold widen the set of rows the first one was taken over - which is exactly
@@ -28016,15 +28197,39 @@ bool AIPlayerGPT::loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction)
     return oppLoopProven && !anyLegalAction;
 }
 
+//#W73-BY (N6, wave-72 deck130 HIGH). THE SAME RULE, OFF THE LIFE LOOP. The H3
+//collapse above was scoped to a proven opponent life loop; `130v162` turn 10 is
+//the same shape with a different engine - 20 consecutive windows, one per link
+//of a resolving trigger chain, each re-opened because the countdown on the
+//decline row ("13 damage ... 11 damage ... 6 damage") is a figure the hold's
+//same-row carve-out does not forgive, and the seat's only instant was not
+//castable in any of them. ~90 s of inference per window for a decision the
+//rules had already made.
+//The generalisation is exactly as narrow as the original: a CHAIN is resolving
+//(something NOT_RESOLVED is on the stack) AND the oracle says this seat has NO
+//legal action at all - no cast, no activation, no land drop, at this phase and
+//this speed. The only rows such a window can print are the pass/hold/decline
+//family, so no legal option is removed, capped or auto-answered: there is none.
+//Fail CLOSED, as before - any legal action at all and the ask goes out.
+//Pure over the three facts, so PARSETEST proves every corner.
+bool AIPlayerGPT::chainAutoPassApplies(bool chainOnStack, bool oppLoopProven,
+                                       bool anyLegalAction)
+{
+    return (chainOnStack || oppLoopProven) && !anyLegalAction;
+}
+
 bool AIPlayerGPT::loopAutoPassFor(Player * p)
 {
-    if (!p || !p->opponent())
+    if (!p || !p->opponent() || !p->getObserver() || !p->getObserver()->mLayers)
         return false;
-    //the cheap board read first: hasAnyLegalAction walks the action layer, and
+    //the cheap board reads first: hasAnyLegalAction walks the action layer, and
     //this runs on every AI tick.
-    if (!lifeLoopProvenWin(p->opponent()))
+    const bool chainOnStack =
+        p->getObserver()->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0; //#W73-BY (N6)
+    if (!chainOnStack && !lifeLoopProvenWin(p->opponent()))
         return false;
-    return loopAutoPassApplies(true, LegalActionsOracle::hasAnyLegalAction(p));
+    return chainAutoPassApplies(chainOnStack, lifeLoopProvenWin(p->opponent()),
+                                LegalActionsOracle::hasAnyLegalAction(p));
 }
 
 bool AIPlayerGPT::loopAutoPassWindow()
@@ -28032,9 +28237,11 @@ bool AIPlayerGPT::loopAutoPassWindow()
     if (loopAutoPassFor(this))
     {
         mLoopAutoPassRun++;
-        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: their life LOOP is chaining and this"
+        mChainWindowsCollapsed++; //#W73-BY (N6): every collapse, both arms
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: a chain is resolving and this"
                    " seat has no legal action - passing without an ask ("
-                   << mLoopAutoPassRun << " in a row)");
+                   << mLoopAutoPassRun << " in a row, " << mChainWindowsCollapsed
+                   << " chain windows collapsed this game)");
         return true;
     }
     //The receipt, once, on the first window that IS a decision again: the
@@ -28044,7 +28251,11 @@ bool AIPlayerGPT::loopAutoPassWindow()
     if (mLoopAutoPassRun > 0)
     {
         std::ostringstream n;
-        n << "Their life LOOP ran " << mLoopAutoPassRun << (mLoopAutoPassRun == 1 ? " link" : " links")
+        //#W73-BY (N6): the receipt no longer claims a life LOOP - the collapse
+        //now also covers a plain resolving trigger chain, and a receipt that
+        //named the wrong engine would be a false surface.
+        n << "A chain resolved for " << mLoopAutoPassRun
+          << (mLoopAutoPassRun == 1 ? " window" : " windows")
           << " while you had no legal action; the engine passed each one for you.";
         narrateDecision(n.str());
         writeTransLog("defer", "", "", -1, 0, "", "loop_autopass");
@@ -35396,8 +35607,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //LAST row instead of a clause buried in the reply-format sentence. The
     //index is 0, which the parser has always accepted, so nothing about the
     //answer grammar changes - only the model's ability to see the choice.
-    if (baseIndex == 1)
-        tail << "0. " << kPassPriorityRowText << "\n";
+    //#W73-BY (N2 d, wave-72 deck146 HIGH-1): ON EVERY PRIORITY WINDOW. The
+    //answer sentence below has ALWAYS said "0 = pass priority" unconditionally,
+    //and the row it names was printed only where baseIndex == 1: 36 of deck146's
+    //66 priority windows advertised a pass with no row for it, and the seat then
+    //bought a durable HOLD 12 times while its own PLAN line said "pass". The
+    //model's own reasoning at `146v125` seq 180 names the gap ("there is no
+    //'Pass priority' option except the hold row"). Row 0 is an index the parser
+    //has always accepted and the engine has always been able to execute, so this
+    //adds nothing to the grammar and removes nothing from the menu - it prints
+    //the option the sentence already promised. It stays OUT of shownLines for
+    //the same reason it always was: the hold latch's row set and the option-set
+    //key are about the ACTING rows, and a decline is not a play.
+    tail << "0. " << kPassPriorityRowText << "\n";
     //#W53-N (D2): where the option list ends and the per-ask facts begin. The
     //prompt-only decline annotation is spliced in here, so it reads with the
     //list it is about and still never enters the ask key.
@@ -35624,8 +35846,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
     string userTail = tailStr;
+    //#W73-BY (N5): does this menu carry a row that is a PLAY? Read off the rows
+    //the menu is about to print, with the same decline/hold filter the hold
+    //latch uses, so the bracket's claim and the list cannot disagree.
+    bool loopNoteActingRows = false;
+    for (size_t lnr = 0; lnr < shownLines.size() && !loopNoteActingRows; lnr++)
+        if (!w72RowIsDeclineOrHold(holdKeyRow(shownLines[lnr])))
+            loopNoteActingRows = true;
     const string promptNotes = declinedNote + holdNote //#W61-U (C14): same channel
-        + loopChainingNote(lifeLoopProvenWin(opponent()), holdRow > 0); //#W66-AS (H3)
+        + loopChainingNote(lifeLoopProvenWin(opponent()), holdRow > 0,
+                           loopNoteActingRows); //#W66-AS (H3), #W73-BY (N5)
     if (!promptNotes.empty() && optionsEnd <= userTail.size())
         userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
@@ -38943,7 +39173,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             mCastHoldNote = holdReopenNote("cast", menu);
         mNextAskPromptNote += mCastHoldNote;
         //#W66-AS (H3 second half): prompt-only, same channel, never in a key.
-        mNextAskPromptNote += loopChainingNote(lifeLoopProvenWin(opponent()), holdRow >= 0);
+        bool loopNoteActingRows = false; //#W73-BY (N5): same rule as the priority seam
+        for (size_t lnr = 0; lnr < menu.size() && !loopNoteActingRows; lnr++)
+            if (!w72RowIsDeclineOrHold(holdKeyRow(menu[lnr])))
+                loopNoteActingRows = true;
+        mNextAskPromptNote += loopChainingNote(lifeLoopProvenWin(opponent()), holdRow >= 0,
+                                               loopNoteActingRows);
         //The model's own hold, honoured: no model call, no row withheld.
         if (attempt == 0 && holdHonoured("cast", menu))
             return NULL;
@@ -61034,10 +61269,20 @@ static const char * kW50Y_r94 =
         //#W61-U (C14): AMENDED AGAIN. The wave-55 literal promised a hold that
         //expired with the TURN, and the latch behind it did - which is the
         //deck146 HIGH-3 defect. The row now states the rule the engine keeps.
-        CHECK(row == "Hold priority - pass now, and do not ask me again - this turn or later -"
-                     " until one of the rows above changes (any change re-opens this window; you"
-                     " give up no cast)",
-              "#W61-U C14 the hold row renders the turn-free literal");
+        //#W73-BY (N2 c / N9): AMENDED A THIRD TIME. The row now LEADS with the
+        //cost the pilot kept missing ("you cannot come back later this turn") and
+        //names the latch's hard end (the untap release), because the wave-72
+        //corpus lost four seats to a hold read as a one-window pass.
+        CHECK(row == "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+                     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
+                     " begins, or until one of the rows above changes (any change re-opens this"
+                     " window; you give up no cast)",
+              "#W61-U C14 / #W73-BY N2c the hold row renders its literal");
+        CHECK(row.find("YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN")
+                  < row.find("any change re-opens this window")
+              && row.find("it stands until your next turn begins") != string::npos,
+              "#W73-BY N9 REPRO the cannot-take-it-later clause LEADS the row instead of"
+              " sitting ~600 chars deep in the benefit brace, and the untap end is named");
         //NEGATIVE: the retired promise must be gone, not merely reworded around.
         CHECK(row.find("for the rest of this turn") == string::npos,
               "#W61-U C14 NEGATIVE the row no longer promises a turn-scoped hold");
@@ -63086,7 +63331,8 @@ static const char * kW50Y_r94 =
         //#W63-AD (E10): ...and the pass row's phase clause is now out of the
         //latch's identity key, so the row says which difference it forgives.
         CHECK(holdRowBenefitClause()
-              == " {taking this row skips every later window that asks THIS SAME question"
+              == " {it is released at the start of your next turn whatever the rows do;"
+                 " until then, taking this row skips every later window that asks THIS SAME question"
                  " with rows identical to these; a different question is still asked."
                  " A pass row that differs only by naming which step comes next is the"
                  " same row, so a hold taken in your first main phase also covers your"
@@ -68759,7 +69005,8 @@ static const char * kW50Y_r94 =
         CHECK(scopeTheirs == " LOOP SCOPE: they control BOTH halves of a life LOOP (Sanguine Bond #1 +"
                              " Exquisite Blood #1), and THIS number does not enter it - Exquisite Blood #1"
                              " gains THEM life when an OPPONENT of theirs (you) loses life, and this number"
-                             " is life THEY lose. Their chain starts only from life YOU lose or life THEY gain.",
+                             " is life THEY lose. Their chain starts only from life YOU lose or life"
+                             " THEY gain - life THEY lose does not enter it.",
               "#W62-Y D3 the THEIRS pair on a they-lose number says the chain is not entered, and names both entries");
         CHECK(scopeMine.find(" LOOP SCOPE: you control BOTH halves") == 0
                   && scopeMine.find("this number is life YOU lose") != string::npos
@@ -72950,14 +73197,14 @@ static const char * kW50Y_r94 =
         CHECK(!AIPlayerGPT::loopAutoPassApplies(false, true),
               "#W66-AS H3b NEGATIVE neither input: nothing happens");
         // The prompt-only note that carries the other half of H3b.
-        const string note = loopChainingNote(true, true);
+        const string note = loopChainingNote(true, true, false);
         CHECK(note.find("[LOOP RUNNING:") != string::npos
               && note.find("the HOLD row answers all of them at once") != string::npos
               && note.find("Nothing on this list stops the chain") != string::npos,
               "#W66-AS H3b POSITIVE the note names the chain and the one row that closes the run");
         CHECK(note.find_first_of("0123456789") == string::npos,
               "#W66-AS H3b KEY the note carries no number, so no rebuild of one window can move it");
-        CHECK(loopChainingNote(false, true).empty() && loopChainingNote(true, false).empty(),
+        CHECK(loopChainingNote(false, true, false).empty() && loopChainingNote(true, false, false).empty(),
               "#W66-AS H3b NEGATIVE no proven loop, or no hold row to point at: no note");
     }
 
@@ -78457,7 +78704,9 @@ static const char * kW50Y_r94 =
         CHECK(mine == "LOOP COMPLETE: BOTH halves of a life LOOP (Sanguine Bond + Exquisite"
                       " Blood) are on YOUR battlefield right now. Any life THEY lose, and any"
                       " life YOU gain, chains until they are at 0 - so any one point of"
-                      " either, from any source, ends the game in your favour.",
+                      " either, from any source, ends the game in your favour."
+                      " Your chain starts only from life THEY lose or life YOU gain -"
+                      " life YOU lose does not enter it.",
               "#W72-BW M19 REPRO the completed pair finally has a header");
         const string theirs = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood", true, true);
         CHECK(theirs.find("on THEIR battlefield") != string::npos
@@ -78998,6 +79247,161 @@ static const char * kW50Y_r94 =
                   && mdfcLandPlayRowTag("Mistgate Pathway", "{U}", "", "", true)
                          .find("OTHER FACE") == string::npos,
               "#W73-CA N14c MUST-NOT-MATCH an unknown front face invents no link");
+    }
+
+    cout << "\n[#W73-BY] the HOLD family, the window key, the loop scope and the chain\n";
+    {
+        // ---- N2 a: a hold is released at the holder's untap ----
+        // RED on base: the base has no release at all - the only retirement is a
+        // printed row changing, and a once-per-turn row never changes. Reverting
+        // w73HoldExpiresAtUntap to `return false` fails every POSITIVE below.
+        CHECK(w73HoldExpiresAtUntap(13, 15, true),
+              "#W73-BY N2a REPRO 152v162 seq 34: a hold taken on turn 13 is released when this"
+              " seat's turn 15 begins - Teferi's loyalty row is byte-identical every turn, so"
+              " nothing else could ever retire it");
+        CHECK(!w73HoldExpiresAtUntap(13, 14, false),
+              "#W73-BY N2a MUST-NOT-MATCH the OPPONENT's turn does not release it: the release"
+              " is this seat's untap, not any turn boundary (the wave-61 C14 defect)");
+        CHECK(!w73HoldExpiresAtUntap(13, 13, true),
+              "#W73-BY N2a MUST-NOT-MATCH the turn it was TAKEN on is not a later turn - a hold"
+              " must still cover the rest of the window it was taken in");
+        CHECK(!w73HoldExpiresAtUntap(-1, 15, true),
+              "#W73-BY N2a MUST-NOT-MATCH no hold taken, nothing to release");
+        CHECK(w73HoldExpiresAtUntap(27, 29, true) && !w73HoldExpiresAtUntap(27, 28, false),
+              "#W73-BY N2a 125v130 seq 46: the own-turn hold at turn 27 survives the opponent's"
+              " turn 28 and dies at turn 29 - four skipped turns become one");
+
+        // ---- N2 c / N9: the row says so ----
+        CHECK(string(kHoldPriorityRowTextCast).find(kHoldPriorityRowHead) == 0
+                  && string(kHoldPriorityRowTextActivation).find(kHoldPriorityRowHead) == 0
+                  && string(kHoldPriorityRowText).find(kHoldPriorityRowHead) == 0,
+              "#W73-BY N2c all three spellings still share the HEAD, so holdRowIndexOf and the"
+              " reserved-echo binder move with the reword");
+        CHECK(string(kHoldPriorityRowTextCast).find("until your next turn begins") != string::npos
+                  && string(kHoldPriorityRowTextActivation).find("until your next turn begins")
+                     != string::npos,
+              "#W73-BY N2c every spelling names the untap end the engine now keeps");
+        CHECK(holdRowBenefitClause().find("{it is released at the start of your next turn") == 1,
+              "#W73-BY N2a the benefit brace OPENS with the release, so the scope sentence"
+              " cannot read as forever");
+        CHECK(stripNarrationDecoration(holdRowLine(true)) == kHoldPriorityRowTextCast,
+              "#W73-BY N2a ECHO the reworded brace still leaves no residue in the narrated"
+              " record - the strip list moved with the brace's opening words");
+
+        // ---- N2 d: the pass ROW, on every priority window ----
+        // RED on base: `AIPlayerGPT.cpp` printed row 0 only under `baseIndex == 1`
+        // while the answer sentence promised it unconditionally (deck146 HIGH-1,
+        // 36 of 66 windows). The grammar is unchanged, which is the point.
+        {
+            std::vector<std::string> multi;
+            multi.push_back("Activate +1: tap or untap permanents with Teferi");
+            multi.push_back("Activate -2: reveal top 3 cards with Teferi");
+            multi.push_back(holdRowLine());
+            bool stale = false;
+            CHECK(parseChoice(std::string("CHOICE: 0 (") + kPassPriorityRowText + ")",
+                              (int) multi.size(), &multi, &stale) == 0 && !stale,
+                  "#W73-BY N2d the pass row's own index is answerable on a MULTI-option menu -"
+                  " the row the answer sentence always promised is now printed there");
+            CHECK(string(kPassPriorityRowText).find("Pass priority") == 0
+                      && string(kHoldPriorityRowText).find("Pass priority") != 0,
+                  "#W73-BY N2d MUST-NOT-MATCH the two decline rows still lead with DIFFERENT"
+                  " words (the wave-55 D11b collision)");
+        }
+
+        // ---- N1: the sibling key excludes the casting seam's own answered tag ----
+        // RED on base: base compares raw serializeGameState() strings, so the tag
+        // BT M13 writes onto every castable hand card makes the cast and priority
+        // menus of ONE window disagree on the board (19 -> 0 skips corpus-wide).
+        {
+            const string open = "Your hand (2 cards): Teferi {2}{u}{w}"
+                                + string(kHandCastableNowTagText) + "; Path to Exile {w}"
+                                + string(kHandCastableNowTagText) + "\n";
+            const string answered = "Your hand (2 cards): Teferi {2}{u}{w}"
+                                    + string(kHandCastAnsweredTagText) + "; Path to Exile {w}"
+                                    + string(kHandCastAnsweredTagText) + "\n";
+            CHECK(w73SiblingBoardKey(answered) == open && w73SiblingBoardKey(open) == open,
+                  "#W73-BY N1 REPRO the two boards of ONE window compare equal once the casting"
+                  " seam's own answered-tag is normalised - the wave-72 key could not");
+            CHECK(w73SiblingBoardKey("Your hand (1 card): Teferi {2}{u}{w} [cannot pay now:"
+                                     " needs 4 mana, you have 2 untapped sources]\n")
+                  == "Your hand (1 card): Teferi {2}{u}{w} [cannot pay now: needs 4 mana, you"
+                     " have 2 untapped sources]\n",
+                  "#W73-BY N1 MUST-NOT-MATCH every OTHER castability verdict is untouched: a"
+                  " board that really moved still re-opens the window");
+            CHECK(w73SiblingBoardKey("Opponent life: 8\n") == "Opponent life: 8\n"
+                      && w73SiblingBoardKey("Opponent life: 7\n") != w73SiblingBoardKey("Opponent life: 8\n"),
+                  "#W73-BY N1 MUST-NOT-MATCH the normaliser touches nothing but the one tag -"
+                  " a moved life total is still a different board");
+            CHECK(handCastabilityTag(kHandCastableNow, 3, 5, "{2}{b}") == kHandCastableNowTagText
+                      && handCastabilityTag(kHandCastableAnswered, 3, 5, "{2}{b}")
+                         == kHandCastAnsweredTagText,
+                  "#W73-BY N1 the RENDER and the key read the same two strings - a second copy"
+                  " of either would break the key silently");
+        }
+
+        // ---- N5: one scope wording, shared by the header and the clause ----
+        // RED on base: the header's tail said "a number that reads as life to them
+        // is lethal to you" while the LOOP SCOPE clause in the same prompt said the
+        // opposite (162v126 seq 29, lost 0-28).
+        {
+            const string header = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood",
+                                                       true, true);
+            const string scope = loopNonChainingClause("Sanguine Bond", "Exquisite Blood", true);
+            CHECK(header.find(loopChainEntrySentence(true)) != string::npos
+                      && scope.find(loopChainEntrySentence(true)) != string::npos,
+                  "#W73-BY N5 REPRO the LOOP COMPLETE header and the LOOP SCOPE clause carry the"
+                  " SAME scope sentence, byte for byte, so one prompt cannot state both rules");
+            CHECK(header.find("reads as life to them is lethal to you") == string::npos,
+                  "#W73-BY N5 MUST-NOT-MATCH the false half is deleted, not reworded around");
+            CHECK(header.find("fatal rather than expensive") != string::npos,
+                  "#W73-BY N5 the TRUE half - the direction that really is fatal - still leads");
+            const string headerMine = closedLoopHeaderText("Sanguine Bond", "Exquisite Blood",
+                                                          false, true);
+            CHECK(headerMine.find(loopChainEntrySentence(false)) != string::npos
+                      && loopChainEntrySentence(false) != loopChainEntrySentence(true),
+                  "#W73-BY N5 the mirror side composes the mirror sentence, and the two sides"
+                  " are not the same string");
+        }
+
+        // ---- N5 second half: the LOOP RUNNING bracket's advice ----
+        {
+            const string withPlays = loopChainingNote(true, true, true);
+            const string bare = loopChainingNote(true, true, false);
+            CHECK(withPlays.find("the HOLD row answers all of them at once") == string::npos
+                      && withPlays.find("each one is a play that stands on its own") != string::npos,
+                  "#W73-BY N5 REPRO 162v126 seq 26/29: over a menu of Ob Nixilis loyalty rows the"
+                  " bracket no longer points at the HOLD row as the answer to all of them");
+            CHECK(bare.find("the HOLD row answers all of them at once") != string::npos,
+                  "#W73-BY N5 POSITIVE on a menu with nothing but declines the wave-66 sentence"
+                  " stands - that is the window class it was written for");
+            CHECK(withPlays.find("Nothing on this list stops the chain") != string::npos,
+                  "#W73-BY N5 the TRUE chain fact is kept on both faces - nothing is deleted");
+            CHECK(loopChainingNote(false, true, true).empty()
+                      && loopChainingNote(true, false, true).empty(),
+                  "#W73-BY N5 MUST-NOT-MATCH no proven loop or no hold row, no bracket");
+        }
+
+        // ---- N6: the chain collapse, off the life loop ----
+        // RED on base: base's loopAutoPassApplies needs a PROVEN life loop, so
+        // 130v162's 20-window trigger chain (turn 10) was put to the seat once per
+        // link. No legal option is removed by the generalisation: the arm requires
+        // the oracle's own "this seat has no legal action at all".
+        CHECK(AIPlayerGPT::chainAutoPassApplies(true, false, false),
+              "#W73-BY N6 REPRO 130v162 t10: a resolving chain the seat cannot answer collapses"
+              " without a proven life loop");
+        CHECK(!AIPlayerGPT::chainAutoPassApplies(true, false, true),
+              "#W73-BY N6 MUST-NOT-MATCH one legal action and the ask goes out - a window with a"
+              " play in it is never collapsed");
+        CHECK(!AIPlayerGPT::chainAutoPassApplies(false, false, false),
+              "#W73-BY N6 MUST-NOT-MATCH no chain and no loop: an ordinary empty window is still"
+              " asked, exactly as before");
+        CHECK(AIPlayerGPT::chainAutoPassApplies(false, true, false)
+                  && AIPlayerGPT::loopAutoPassApplies(true, false),
+              "#W73-BY N6 the wave-66 life-loop arm is a strict SUBSET of the new rule - nothing"
+              " that collapsed before stops collapsing");
+        CHECK(!AIPlayerGPT::chainAutoPassApplies(true, true, true),
+              "#W73-BY N6 MUST-NOT-MATCH not even a proven loop plus a chain collapses a window"
+              " the seat can act in");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

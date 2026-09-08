@@ -425,6 +425,18 @@ private:
                                       std::map<std::string, int> & runs, int maxRun);
     //#W72-BT (M14): the count MED-5 could not make.
     virtual void noteOwnTurnWindowSkipped() { mOwnTurnWindowsSkipped++; }
+    //#W73-BY (N16, wave-72 deck152 MED-3): `152v146` t18 ran a whole main
+    //phase 1 with Teferi x2 and Katilda all `[castable now]` and no casting
+    //window; 2 of the corpus's 102 own turns did this and NOTHING counted it -
+    //`own_turn_windows_skipped` is scoped to the non-main instant-speed phases,
+    //so the class was invisible. Report-only, with the reach reason on stderr.
+    virtual void noteMainPhaseWindowSkipped(const char * why)
+    {
+        mMainPhaseWindowsSkipped++;
+        DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: own main phase reached NO casting"
+                   " window - " << (why ? why : "?") << " (" << mMainPhaseWindowsSkipped
+                   << " this game)");
+    }
     //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
     //#W71-BS (F5): the answer floor the CURRENT seam's legal answer needs, and the
     //seam it was computed for. buildRequestBody applies it only when the two agree,
@@ -1447,6 +1459,22 @@ private:
     int mHoldWindowPhase;
     string mHoldWindowBoard;
     int mSiblingWindowAsksSkipped; //gameend report field
+    //#W73-BY (N2 a): holds released by the UNTAP rule - the hold family's one
+    //mechanism. A once-per-turn row (loyalty, a {T} maker, a repeat activation)
+    //is byte-identical every turn, so "until one of the rows above changes" can
+    //never fire on it and one hold silenced a planeswalker for a whole game
+    //(`152v162` seq 34). A hold is now released at the start of the holder's
+    //next turn whatever the rows do, and every release is counted.
+    int mHoldReleasedTurn; //gameend report field
+    //#W73-BY (N6): windows collapsed because a resolving CHAIN the seat cannot
+    //answer put the same unanswerable question once per link (`130v162` t10 =
+    //20 windows). Counted separately from the life-loop arm it generalises.
+    int mChainWindowsCollapsed; //gameend report field
+    //#W73-BY (N16): a MAIN PHASE of this seat's own turn that produced no
+    //casting window. `own_turn_windows_skipped` cannot see this class (it is
+    //scoped to the non-main instant-speed phases), which is why `152v146` t18
+    //was invisible. Report-only.
+    int mMainPhaseWindowsSkipped; //gameend report field
     //#W68-BB (J5): the card the last payment receipt was written for, and the
     //step it was written in. A post-announcement decline consumes it and says
     //in the narration that the cast did NOT happen - the receipt alone reads as
@@ -1510,6 +1538,11 @@ public:
     //public so the test-suite driver command `assertloopautopass` can pin them
     //against a REAL board (the suite has no model seat, so nothing else could).
     static bool loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction);
+    //#W73-BY (N6): the same rule, generalised off the life loop onto ANY
+    //resolving chain. Pure over (a chain is on the stack, the proven loop, this
+    //seat has a legal action).
+    static bool chainAutoPassApplies(bool chainOnStack, bool oppLoopProven,
+                                     bool anyLegalAction);
     static bool loopAutoPassFor(Player * p);
 private:
     bool loopAutoPassWindow(); //the per-window gate, and the receipt
