@@ -1,0 +1,557 @@
+# wave-72 lategame specimen: 1788816990-ai_baka_deck152-0x561e5a77dde0-vs-ai_baka_deck125.jsonl seq 68
+# turn 53, phase Upkeep (opponent 63 life, seat 11), priority, 17 options, 36.1 s, 6,046 reasoning chars, prompt 37917 B
+# chose option 8 = "becomes a 16/16 hydra with Lair of the Hydra"; reply: '\n\nPLAN: Animate Lair of the Hydra for 16, attack with it in main phase 1.\nCHOICE: 8 (becomes a 16/16 hydra with Lair of the Hydra)'
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Katilda, Dawnhart Prime, Intrepid Adversary, Sigarda, Champion of Light, Elite Spellbinder x3, Briarbridge Tracker, Tovolar's Huntmaster x2, Brutal Cathar, Teferi, Who Slows the Sunset, Luminarch Aspirant, Augur of Autumn; opponent - empty; exiled at trim: you - Brutal Cathar x3, Sigarda, Champion of Light, Luminarch Aspirant; opponent - Final Judgment)
+- Phase: Draw
+- Opponent drew a card
+=== Turn 15 - YOUR turn ===
+- Phase: Untap
+- It became Night
+- Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike, nightbound)
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- Paid {2}{w} for Brutal Cathar (3 sources)
+- You cast Brutal Cathar
+- Your Brutal Cathar resolved and entered the battlefield
+- Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike, nightbound)
+- Phase: Attackers
+- You declared attackers: Moonrage Brute
+- Phase: Combat damage
+- Your Moonrage Brute dealt 3 damage to the opponent (now 22)
+=== Turn 16 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Path to Exile
+- You used: this spell costs 3 life more with Moonrage Brute #1 targeting Path to Exile
+- Opponent lost 3 life (now 19)
+- Your Moonrage Brute was exiled from the battlefield (that Moonrage Brute was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Your Plains entered the battlefield from your library
+- Phase: Draw
+- Opponent drew a card
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Briarbridge Tracker
+- Phase: Main phase 1
+- Paid {2}{g} for Briarbridge Tracker (3 sources)
+- You cast Briarbridge Tracker
+- Opponent cast Cancel
+- Your Briarbridge Tracker was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+- Phase: Attackers
+- You declared attackers: Moonrage Brute
+- Phase: Combat damage
+- Your Moonrage Brute dealt 3 damage to the opponent (now 16)
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Tovolar's Huntmaster
+- Phase: Main phase 1
+- Paid {4}{g}{g} for Tovolar's Huntmaster (6 sources)
+- You cast Tovolar's Huntmaster
+- Opponent cast Fall of the Gavel
+- Your Tovolar's Huntmaster was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 21)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+- Phase: Attackers
+- You declared attackers: Moonrage Brute
+- Phase: Combat damage
+- Your Moonrage Brute dealt 3 damage to the opponent (now 18)
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Supreme Verdict
+- Your Moonrage Brute died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Sigarda, Champion of Light
+- Phase: Main phase 1
+- Paid {1}{g}{w}{w} for Sigarda, Champion of Light (4 sources)
+- You cast Sigarda, Champion of Light
+- Your Sigarda, Champion of Light resolved and entered the battlefield
+=== Turn 22 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Sphinx's Revelation
+- Opponent gained 3 life (now 21)
+- Opponent drew 3 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Branchloft Pathway
+- Phase: Main phase 1
+- You chose Branchloft Pathway (menu text: Play Land) for Branchloft Pathway
+- You played Branchloft Pathway
+- Phase: Attackers
+- You declared attackers: Sigarda, Champion of Light
+- Phase: Combat damage
+- Your Sigarda, Champion of Light dealt 4 damage to the opponent (now 17)
+=== Turn 24 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Sphinx's Revelation
+- Opponent gained 4 life (now 21)
+- Opponent drew 4 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 25 - YOUR turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- You drew Deserted Beach
+- Phase: Main phase 1
+- You played Deserted Beach
+- Paid {2}{u}{w} for Teferi, Who Slows the Sunset (4 sources)
+- You cast Teferi, Who Slows the Sunset
+- Your Teferi, Who Slows the Sunset resolved and entered the battlefield
+- Your Teferi, Who Slows the Sunset got 4 loyalty counters (now 4)
+- You used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
+- Your Teferi, Who Slows the Sunset lost 2 loyalty counters
+- You revealed your Barkchannel Pathway from your library
+- You revealed your Branchloft Pathway from your library
+- You revealed your Sigarda, Champion of Light from your library
+- You revealed 3 cards and took Barkchannel Pathway (put in hand)
+- You used: Put a card into hand with Teferi, Who Slows the Sunset targeting Barkchannel Pathway
+- Your revealed Barkchannel Pathway went to your hand
+- Your revealed Branchloft Pathway went to your library
+- Your revealed Sigarda, Champion of Light went to your library
+- Phase: Attackers
+- You declared attackers: Sigarda, Champion of Light
+- Phase: Combat damage
+- Your Sigarda, Champion of Light dealt 4 damage to the opponent (now 17)
+=== Turn 26 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: Life with Elixir of Immortality
+- Opponent cast Sphinx's Revelation
+- Opponent gained 3 life (now 20)
+- Opponent drew 3 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (7 cards) into their library with Elixir of Immortality
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Path to Exile
+- Your Sigarda, Champion of Light was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Hengegate Pathway
+- Phase: Main phase 1
+- You chose Barkchannel Pathway (menu text: Play Land) for Barkchannel Pathway
+- You played Barkchannel Pathway
+- You used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
+- Your Teferi, Who Slows the Sunset lost 2 loyalty counters
+- Your Teferi, Who Slows the Sunset was put into your graveyard from the battlefield
+- You revealed your Luminarch Aspirant from your library
+- You revealed your Overgrown Farmland from your library
+- You revealed your Elite Spellbinder from your library
+- You revealed 3 cards and took Elite Spellbinder (put in hand)
+- You used: Put a card into hand with Teferi, Who Slows the Sunset targeting Elite Spellbinder
+- Your revealed Elite Spellbinder went to your hand
+- Your revealed Overgrown Farmland went to your library
+- Your revealed Luminarch Aspirant went to your library
+- Paid {2}{w} for Elite Spellbinder (3 sources)
+- You cast Elite Spellbinder
+- Your Elite Spellbinder resolved and entered the battlefield
+- You targeted Final Judgment with Elite Spellbinder's ability (exile a non-land card)
+- You used: exile a non-land card with Elite Spellbinder targeting Final Judgment
+- Opponent's Final Judgment was exiled from the opponent's hand
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lightmine Field
+- Opponent's Lightmine Field resolved and entered the battlefield
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 30)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent's Path to Exile was put into the opponent's library from the opponent's graveyard
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Branchloft Pathway
+- Phase: Main phase 1
+- You chose Branchloft Pathway (menu text: Play Land) for Branchloft Pathway
+- You played Branchloft Pathway
+- Phase: Attackers
+- You declared attackers: Elite Spellbinder
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Elite Spellbinder
+- Your Elite Spellbinder died
+=== Turn 30 - opponent's turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sphinx's Revelation
+- Opponent gained 4 life (now 34)
+- Opponent drew 4 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent played Tundra
+- Phase: Cleanup
+- Opponent discarded Lightmine Field
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Elite Spellbinder
+- Phase: Main phase 1
+- You chose Hengegate Pathway (menu text: Play Land) for Hengegate Pathway
+- You played Hengegate Pathway
+- Paid {2}{w} for Elite Spellbinder (3 sources)
+- You cast Elite Spellbinder
+- Your Elite Spellbinder resolved and entered the battlefield
+- You targeted Staff of Nin with Elite Spellbinder's ability (exile a non-land card)
+- You used: exile a non-land card with Elite Spellbinder targeting Staff of Nin
+- Opponent's Staff of Nin was exiled from the opponent's hand
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Staff of Nin from the opponent's exile
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting Elite Spellbinder
+- Opponent's Staff of Nin dealt 1 damage to Elite Spellbinder
+- Your Elite Spellbinder died
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Deserted Beach
+- Phase: Main phase 1
+- You played Deserted Beach
+=== Turn 34 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 19)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sphinx's Revelation
+- Opponent gained 7 life (now 41)
+- Opponent drew 7 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent played Tundra
+- Phase: Cleanup
+- Opponent discarded Fall of the Gavel (x2)
+- Opponent discarded Supreme Verdict
+- Opponent discarded Seachrome Coast
+- Opponent discarded Sphinx's Revelation
+- Opponent discarded Emrakul, the Aeons Torn
+- Opponent discarded Tundra
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (10 cards) into their library with Emrakul, the Aeons Torn
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Luminarch Aspirant
+- Phase: Main phase 1
+- Paid {1}{w} for Luminarch Aspirant (2 sources)
+- You cast Luminarch Aspirant
+- Your Luminarch Aspirant resolved and entered the battlefield
+- Phase: Combat begins
+- You used: Put a +1/+1 counter with Luminarch Aspirant targeting Luminarch Aspirant
+- Your Luminarch Aspirant got a +1/+1 counter (now 2/2)
+=== Turn 36 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent cast Sphinx's Revelation
+- Opponent gained 8 life (now 49)
+- Opponent drew 8 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 18)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Phase: Cleanup
+- Opponent discarded Cancel (x2)
+- Opponent discarded Fall of the Gavel
+- Opponent discarded Island
+- Opponent discarded Staff of Nin
+- Opponent discarded Glacial Fortress
+- Opponent discarded Plains (x2)
+=== Turn 37 - YOUR turn ===
+- Phase: Draw
+- You drew Tovolar's Huntmaster
+- Phase: Main phase 1
+- Paid {4}{g}{g} for Tovolar's Huntmaster (6 sources)
+- You cast Tovolar's Huntmaster
+- Your Tovolar's Huntmaster resolved and entered the battlefield
+- Your Tovolar's Huntmaster created 2 2/2 Wolf tokens
+- Your Tovolar's Packleader created 2 2/2 Wolf tokens
+- Your Tovolar's Huntmaster transformed into Tovolar's Packleader (now 7/7 nightbound)
+- Phase: Combat begins
+- You targeted Luminarch Aspirant (2/2) with Luminarch Aspirant's ability (put a +1/+1 counter)
+- You used: Put a +1/+1 counter with Luminarch Aspirant targeting Luminarch Aspirant
+- Your Luminarch Aspirant got a +1/+1 counter (now 3/3)
+- Phase: Attackers
+- You declared attackers: Luminarch Aspirant
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Luminarch Aspirant
+- Phase: Combat damage
+- Your Luminarch Aspirant dealt 3 damage to the opponent (now 46)
+=== Turn 38 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 17)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Supreme Verdict
+- Your Luminarch Aspirant died
+- Your Wolf died (that Wolf was 1 of 4 copies on your battlefield; the other 3 are still there)
+- Your Wolf (token) ceased to exist and left your graveyard [x4 - this exact line 4 times in this batch]
+- Your Wolf died (that Wolf was 1 of 3 copies on your battlefield; the other 2 are still there)
+- Your Tovolar's Packleader died
+- Your Wolf died (that Wolf was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Wolf died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+- Phase: Cleanup
+- Opponent discarded Lightmine Field
+=== Turn 39 - YOUR turn ===
+- Phase: Draw
+- You drew Brutal Cathar
+- Phase: Main phase 1
+- Paid {2}{w} for Brutal Cathar (3 sources)
+- You cast Brutal Cathar
+- Your Brutal Cathar resolved and entered the battlefield
+- Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike, nightbound)
+=== Turn 40 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent cast Path to Exile
+- You used: this spell costs 3 life more with Moonrage Brute targeting Path to Exile
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 16)
+- Opponent lost 3 life (now 43)
+- Your Moonrage Brute was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 41 - YOUR turn ===
+- Phase: Draw
+- You drew Barkchannel Pathway
+- Phase: Main phase 1
+- You chose Barkchannel Pathway (menu text: Play Land) for Barkchannel Pathway
+- You played Barkchannel Pathway
+=== Turn 42 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 15)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+- Phase: Cleanup
+- Opponent discarded Final Judgment
+=== Turn 43 - YOUR turn ===
+- Phase: Draw
+- You drew Augur of Autumn
+- Phase: Main phase 1
+- Paid {1}{g}{g} for Augur of Autumn (3 sources)
+- You cast Augur of Autumn
+- Opponent cast Essence Scatter
+- Your Augur of Autumn was COUNTERED by Essence Scatter and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+=== Turn 44 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 14)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 45 - YOUR turn ===
+- Phase: Draw
+- You drew Lair of the Hydra
+=== Turn 46 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 13)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Phase: Cleanup
+- Opponent discarded Seachrome Coast
+=== Turn 47 - YOUR turn ===
+- Phase: Draw
+- You drew Deserted Beach
+- Phase: Main phase 1
+- You played Deserted Beach
+=== Turn 48 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent cast Sphinx's Revelation
+- Opponent gained 13 life (now 56)
+- Opponent drew 13 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 12)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Opponent discarded Dream Fracture
+- Opponent discarded Essence Scatter
+- Opponent discarded Dream Fracture (x2)
+- Opponent discarded Essence Scatter
+- Opponent discarded Fall of the Gavel
+- Opponent discarded Supreme Verdict (x2)
+- Opponent discarded Path to Exile
+- Opponent discarded Sphinx's Revelation
+- Opponent discarded Island
+- Opponent discarded Path to Exile
+=== Turn 49 - YOUR turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- You drew Luminarch Aspirant
+- Phase: Main phase 1
+- You played Lair of the Hydra
+- Paid {1}{w} for Luminarch Aspirant (2 sources)
+- You cast Luminarch Aspirant
+- Your Luminarch Aspirant resolved and entered the battlefield
+- Phase: Combat begins
+- You used: Put a +1/+1 counter with Luminarch Aspirant targeting Luminarch Aspirant
+- Your Luminarch Aspirant got a +1/+1 counter (now 2/2)
+=== Turn 50 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Path to Exile
+- Your Luminarch Aspirant was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 61)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (29 cards) into their library with Elixir of Immortality
+- Opponent cast Sphinx's Revelation
+- Opponent gained 11 life (now 72)
+- Opponent drew 11 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 11)
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Opponent discarded Cancel
+- Opponent discarded Emrakul, the Aeons Torn
+- Opponent discarded Fall of the Gavel
+- Opponent discarded Sphinx's Revelation
+- Opponent discarded Island
+- Opponent discarded Final Judgment
+- Opponent discarded Fall of the Gavel
+- Opponent discarded Dream Fracture
+- Opponent discarded Sphinx's Revelation
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (10 cards) into their library with Emrakul, the Aeons Torn
+=== Turn 51 - YOUR turn ===
+- Phase: Draw
+- You drew Katilda, Dawnhart Prime
+- Phase: Main phase 1
+- Paid {g}{w} for Katilda, Dawnhart Prime (2 sources)
+- You cast Katilda, Dawnhart Prime
+- Your Katilda, Dawnhart Prime resolved and entered the battlefield
+- You used: becomes a 14/14 hydra with Lair of the Hydra
+- Paid {14}{g} for Lair of the Hydra (15 sources)
+- Phase: Attackers
+- You declared attackers: Lair of the Hydra
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Lair of the Hydra
+- Phase: Combat damage
+- Your Lair of the Hydra dealt 14 damage to the opponent (now 58)
+=== Turn 52 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Path to Exile
+- Your Katilda, Dawnhart Prime was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 10)
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality #1
+- Opponent gained 5 life (now 63)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield (that Elixir of Immortality was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Path to Exile was put into the opponent's library from the opponent's graveyard
+=== Turn 53 - YOUR turn ===
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+It is currently Day.
+Your life: 10 | Opponent life: 63
+Opponent life trend: turn 50: 56, turn 51: 72, turn 53: 63, now 63 (+7 since turn 50).
+Mana available: 18 total (untapped sources, tapped automatically when you cast; colours you can make: {g}{u}{w} (sources that can make each: {W} 12, {U} 3, {G} 9 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Plains #1 {w}; Overgrown Farmland #1 {g} or {w}; Overgrown Farmland #2 {g} or {w}; Hengegate Pathway #1 {w}; Overgrown Farmland #3 {g} or {w}; Hengegate Pathway #2 {w}; Forest {g}; Plains #2 {w}; Plains #3 {w}; Branchloft Pathway #1 {g}; Deserted Beach #1 {w} or {u}; Barkchannel Pathway #1 {g}; Branchloft Pathway #2 {g}; Hengegate Pathway #3 {w}; Deserted Beach #2 {w} or {u}; Barkchannel Pathway #2 {g}; Deserted Beach #3 {w} or {u}; Lair of the Hydra {g}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (0 cards): (none)
+Your battlefield (18 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 18 are lands; 1 of those noncreature permanents can animate into a creature and is in no creature count above): Barkchannel Pathway #1; Barkchannel Pathway #2; Branchloft Pathway #1; Branchloft Pathway #2; Deserted Beach #1-#3 x3; Forest; Hengegate Pathway #1-#3 x3; Lair of the Hydra [creature-land: it can animate into a creature at its own activation window, and its OWN mana is not counted toward that activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block] [the animation costs {1}{g}, and until it is paid this permanent is NOT a creature - it cannot attack or block and nothing that only affects creatures reaches it]; Overgrown Farmland #1-#3 x3; Plains #1-#3 x3
+Your graveyard (13 cards): Katilda, Dawnhart Prime {g}{w} (creature 1/1); Intrepid Adversary {1}{w} (creature 3/1); Sigarda, Champion of Light {1}{g}{w}{w} (creature 4/4); Elite Spellbinder {2}{w} (creature 3/1) x3; Briarbridge Tracker {2}{g} (creature 2/3); Tovolar's Huntmaster {4}{g}{g} (creature 6/6) x2; Brutal Cathar {2}{w} (creature 2/2); Teferi, Who Slows the Sunset {2}{u}{w}; Luminarch Aspirant {1}{w} (creature 1/1); Augur of Autumn {1}{g}{g} (creature 2/3)
+Opponent battlefield (22 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 19 are lands): Elixir of Immortality {1} [artifact] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}; Glacial Fortress #1; Glacial Fortress #2; Island #4-#6 x3; Island #1-#3 [tapped] x3; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #2-#4 x3; Plains #1 [tapped]; Seachrome Coast #1-#3 x3; Staff of Nin {6} [artifact] [tapped] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#4 x4
+Their untapped sources: 15 (colours they could make: {u}{w})
+Opponent hand size: 6 | Opponent library: 31 cards
+Artifacts in play: you 0 | opponent 2
+Your library: 23 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 51) reads "Attack with Lair of the Hydra."
+
+Your legal actions (Upkeep, YOUR turn):
+1. becomes a 1/1 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {1}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+2. becomes a 10/10 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {10}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+3. becomes a 11/11 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {11}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+4. becomes a 12/12 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {12}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+5. becomes a 13/13 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {13}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+6. becomes a 14/14 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {14}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+7. becomes a 15/15 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {15}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+8. becomes a 16/16 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {16}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+9. becomes a 2/2 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {2}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+10. becomes a 3/3 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {3}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+11. becomes a 4/4 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {4}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+12. becomes a 5/5 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {5}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+13. becomes a 6/6 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {6}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+14. becomes a 7/7 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {7}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+15. becomes a 8/8 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {8}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+16. becomes a 9/9 hydra {rung ceiling: Lair of the Hydra's OWN mana is not counted toward this activation - tapping it for mana leaves it tapped, and a tapped permanent can neither attack nor block, so the largest rung on this menu is what your OTHER untapped sources pay for} with Lair of the Hydra [cost: {9}{g}] {card text: "If you control two or more other lands, Lair of the Hydra enters tapped. -- {T}: Add {G}. -- {X}{G}: Until end of turn, Lair of the Hydra becomes an X/X green Hydra creature. it's still a land. X can't be 0."} [Upkeep offer: this animation lasts only until end of turn, and the same row is offered again in your main phase - declining here counts toward this turn's two declines]
+17. Hold priority - pass now, and do not ask me again - this turn or later - until one of the rows above changes (any change re-opens this window; the rows above include ACTIVATED abilities that are usable RIGHT NOW, and taking this row gives every one of them up for as long as these rows stand) {taking this row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked. A pass row that differs only by naming which step comes next is the same row, so a hold taken in your first main phase also covers your second main phase while these rows do not change; so is a row that differs only by a bracket saying it cannot reach a spell on the stack; and so is a row that differs only by a LIFE TOTAL it projects - what you or they would be at - because that number moves with the board and not with the row. Any OTHER change re-opens this window, including a kill count, a damage figure, a survivor count, a price, and a row that begins saying it kills you}
+
+[hold check: 2 rows above are new since the last window at this seam - a row moving is what re-opens a hold, so a hold taken here lasts only until one moves again]
+Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other main-phase cards are NOT castable in this window - your main phase's own Casting decision is where you cast them, later this same turn.
+You will have priority again later this turn, so instants and activated abilities you hold stay castable this turn.
+
+Which action do you take? Write your PLAN: line first, then on a line of its own CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list) or "CHOICE: 0 (pass)". Write nothing else.
