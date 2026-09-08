@@ -725,6 +725,31 @@ string loyaltyClausePrefix(const string& menuText)
     return menuText.substr(bgn, i - bgn + 1);
 }
 
+//#W73-BZ (N11, wave-72 MED): BV M16 gave every loyalty clause the focus
+//allowance on the ROWS of a walker's menu, and the BOARD FRAME - which has no
+//row and therefore no focus prefix - kept the flat per-clause budget: the
+//ultimate and the sibling abilities were still cut mid-sentence in 92 prompts.
+//A planeswalker's text is one clause per printed ability, so the frame asks for
+//the first of them by name and M16's loop does the rest. "" for any text that
+//carries no loyalty clause, which routes to boardEffectSnippet byte for byte.
+string firstLoyaltyClausePrefix(const string& raw)
+{
+    const string sep = " -- ";
+    size_t at = 0;
+    for (;;)
+    {
+        const size_t k = raw.find(sep, at);
+        const string part = (k == string::npos) ? raw.substr(at) : raw.substr(at, k - at);
+        const string p = loyaltyClausePrefix(clauseLeadTrim(part));
+        if (!p.empty())
+            return p;
+        if (k == string::npos)
+            break;
+        at = k + sep.size();
+    }
+    return string();
+}
+
 string boardEffectSnippetFocus(const string& raw, size_t maxLen, const string& focusPrefix)
 {
     if (focusPrefix.empty())
@@ -8409,14 +8434,36 @@ static int repeatPlanScanNumberAt(const string& plan, const char * label, size_t
         if (!boundedBefore || !boundedAfter)
             continue; //"stopped", "master": the label is part of a word
         size_t d = after;
+        //#W73-BZ (N3, wave-72 HIGH-2): the row's own bracket asked for the stop
+        //"in words" and the models answered in words - "stop count 24",
+        //"stop at 24" - so a plan that stated its stop TWICE, correctly, in the
+        //seat's own voice yielded stop = -1 and `repeatRowStopClause` rendered 0
+        //times in 379 Doomsayer prompts. The label is still a LABEL and the
+        //number still has to follow it on the PLAN line: what is allowed between
+        //them is a bounded list of filler words the corpus actually wrote. Not a
+        //prose read - no word outside this list is skipped, and no number
+        //without a label in front of it is ever taken.
+        static const char * kFiller[] = { "is", "count", "at" };
+        for (int guard = 0; guard < 2; guard++)
+        {
+            while (d < low.size() && (low[d] == ' ' || low[d] == '=' || low[d] == ':' || low[d] == '('))
+                d++;
+            bool skipped = false;
+            for (size_t f = 0; f < sizeof(kFiller) / sizeof(kFiller[0]) && !skipped; f++)
+            {
+                const size_t fn = strlen(kFiller[f]);
+                if (d + fn <= low.size() && low.compare(d, fn, kFiller[f]) == 0
+                    && (d + fn >= low.size() || !isalnum((unsigned char) low[d + fn])))
+                {
+                    d += fn;
+                    skipped = true;
+                }
+            }
+            if (!skipped)
+                break;
+        }
         while (d < low.size() && (low[d] == ' ' || low[d] == '=' || low[d] == ':' || low[d] == '('))
             d++;
-        if (d + 2 < low.size() && low.compare(d, 3, "is ") == 0)
-        {
-            d += 3;
-            while (d < low.size() && low[d] == ' ')
-                d++;
-        }
         if (d < low.size() && isdigit((unsigned char) low[d]))
         {
             int v = 0;
@@ -9162,8 +9209,13 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 string nm = card->getDisplayName();
                 std::map<string, int>::iterator ec = effectCopies.find(nm);
                 if (ec != effectCopies.end() && effectDone[nm]++ == 0)
-                    out << boardEffectTag(boardEffectSnippet(card->text, effectLen),
-                                          ec->second > 1, opponentsZone); //#W72-BV (M8)
+                    out << boardEffectTag(
+                               //#W73-BZ (N11): a walker's loyalty clauses get the
+                               //focus allowance in the FRAME too, not only on its
+                               //rows - the ultimate is the fact late games turn on.
+                               boardEffectSnippetFocus(card->text, effectLen,
+                                                       firstLoyaltyClausePrefix(card->text)),
+                               ec->second > 1, opponentsZone); //#W72-BV (M8)
             }
         }
         //#W61-T (C7): the castability verdict, LAST on the entry so a card's
@@ -16847,6 +16899,35 @@ static string protocolLinesOnly(const string& replyIn)
         at = nl + 1;
     }
     return out;
+}
+
+//#W73-BZ (N3): the stop scan's span is the PLAN LINE, and only that line. The
+//stop-and-count store used to be fed `protocolLinesOnly`, which is the PLAN line
+//AND the action line - so a count echoed in a CHOICE parenthetical could supply
+//half of a "stated stop" the model never stated in its plan. The plan is where
+//the row's own bracket says to write it; a labelled number on THAT line is the
+//whole permitted read (invariant 000). Returns "" when the reply has no plan
+//line. Pure over the reply text.
+static string planLineOnly(const string& replyIn)
+{
+    const string two = protocolLinesOnly(replyIn);
+    size_t at = 0;
+    while (at <= two.size())
+    {
+        const size_t nl = two.find('\n', at);
+        const size_t end = (nl == string::npos) ? two.size() : nl;
+        const string line = two.substr(at, end - at);
+        string low;
+        for (size_t i = 0; i < line.size(); i++)
+            low += (char) tolower((unsigned char) line[i]);
+        const size_t b = low.find_first_not_of(" \t");
+        if (b != string::npos && low.compare(b, 5, "plan:") == 0)
+            return line;
+        if (nl == string::npos)
+            break;
+        at = nl + 1;
+    }
+    return string();
 }
 
 //#W70-BM (E3, audit B4.6): set by parseAttackerSet on the call that stripped a
@@ -28050,9 +28131,16 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
       //identically-shaped windows three apart in one game (123v126 seq 18 and
       //21) got opposite answers and one of the deck's two fallbacks. The rule
       //is now stated on the row that enforces it.
-      << "; a count on this row REQUIRES a PLAN line stating your stop count, the count"
-         " you are at now, and how many you perform this window - a count with no PLAN"
-         " line is refused and re-asked]";
+      //#W73-BZ (N3, wave-72 HIGH-2): this bracket asked for the two numbers IN
+      //WORDS ("your stop count, the count you are at now"), the models wrote
+      //them in words ("stop count 24", "reached the stop (24"), and the engine
+      //read neither - `repeatRowStopClause` rendered 0 times in 379 windows on
+      //the very card the mechanism was built for. State the LITERAL form the
+      //engine reads back, on the row that demands it.
+      << "; a count on this row REQUIRES a PLAN line carrying the two numbers in this"
+         " exact shape - \"stop=<N>; M=<N>\", where stop= is the count you mean to"
+         " finish at and M= is the count you are at now - plus how many you perform"
+         " this window; a count with no PLAN line is refused and re-asked]";
     return o.str();
 }
 
@@ -33241,10 +33329,24 @@ static bool w72ProspectiveZeroOnAPermanent(const string& row)
 //`{right now: ...}` clause is the engine's statement about the row, so the
 //re-ask quotes it. Still ONE labelled line, still no prose read from the reply
 //and no new answer shape - invariant 000 is untouched.
-static string noopReaskLine(int choice, const string& renderedRow)
+//#W73-BZ (N15, deck125 MED A-1): the re-ask has to quote the row the engine
+//MATCHED - number and short name - and, when the number the reply wrote is not
+//that number, say WHY it is being answered about a different row. 152v125 seq 62
+//wrote `CHOICE: 14 (becomes a 14/14 hydra)`, the short-name match rescued it to
+//row 6, and the re-ask opened "You chose row 6" - a sentence the reader cannot
+//reconcile with what it wrote, at the one seam whose whole job is to be learned
+//from. `nameMatched` is the parser's own `name_over_index` verdict; the written
+//line is quoted verbatim. Pure over its arguments.
+static string noopReaskLine(int choice, const string& renderedRow,
+                            bool nameMatched = false, const string& writtenLine = "")
 {
     std::ostringstream corr;
-    corr << "[RE-ASK] You chose row " << choice << " (\""
+    corr << "[RE-ASK] ";
+    if (nameMatched && !writtenLine.empty())
+        corr << "Your line (\"" << writtenLine << "\") names a row by its short name, and that"
+                " short name is row " << choice << " on this list - not the number in the line -"
+                " so this is about row " << choice << ". ";
+    corr << "You chose row " << choice << " (\""
          << stripNarrationDecoration(renderedRow) << "\")";
     const string verdict = rowVerdictClause(renderedRow);
     if (!verdict.empty())
@@ -34685,6 +34787,52 @@ void AIPlayerGPT::endRepeatPlan(const char * why)
     mRepeatAbsent = 0;
 }
 
+//#W73-BZ (N4, wave-72 HIGH-3): the priority menu is rendered in its own TEXT
+//order so an unchanged board renders unchanged bytes (the wave-41 livelock fix).
+//That order was a plain byte compare, and a byte compare puts "10/10" between
+//"1/1" and "2/2": every creature-land rung menu with ten or more rungs came out
+//1, 10, 11, 12, 13, 14, 2, 3 ... The pilot answered `CHOICE: 14 (becomes a 14/14
+//hydra)` and index 14 was the 9/9 - the corpus's `echo_index_conflict` and one of
+//its two fallbacks (152v125 seq 62; all 5 rung menus this corpus mis-ordered).
+//Compare digit RUNS as numbers and everything else byte for byte: still a total
+//order over the same texts (equal-number runs fall back to the run's own bytes,
+//so no two distinct strings compare equal in both directions), so the prompt
+//stays byte-stable for an unchanged state. Pure.
+static bool naturalTextLess(const string& a, const string& b)
+{
+    size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size())
+    {
+        const bool da = isdigit((unsigned char) a[i]) != 0;
+        const bool db = isdigit((unsigned char) b[j]) != 0;
+        if (da && db)
+        {
+            size_t ea = i, eb = j;
+            while (ea < a.size() && isdigit((unsigned char) a[ea])) ea++;
+            while (eb < b.size() && isdigit((unsigned char) b[eb])) eb++;
+            const string na = a.substr(i, ea - i), nb = b.substr(j, eb - j);
+            //strip leading zeros for the magnitude compare; the raw run breaks ties
+            size_t za = na.find_first_not_of('0'), zb = nb.find_first_not_of('0');
+            const string ma = (za == string::npos) ? string("0") : na.substr(za);
+            const string mb = (zb == string::npos) ? string("0") : nb.substr(zb);
+            if (ma.size() != mb.size())
+                return ma.size() < mb.size();
+            if (ma != mb)
+                return ma < mb;
+            if (na != nb)
+                return na < nb; //"007" before "07" before "7": a stable tiebreak
+            i = ea;
+            j = eb;
+            continue;
+        }
+        if (a[i] != b[j])
+            return (unsigned char) a[i] < (unsigned char) b[j];
+        i++;
+        j++;
+    }
+    return a.size() - i < b.size() - j;
+}
+
 const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranking)
 {
     if (!ranking.size() || mEndpoint.empty())
@@ -34822,7 +34970,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     std::stable_sort(renderOrder.begin(), renderOrder.end(),
                      [](const std::pair<string, const OrderedAIAction *>& a,
                         const std::pair<string, const OrderedAIAction *>& b)
-                     { return a.first < b.first; });
+                     { return naturalTextLess(a.first, b.first); }); //#W73-BZ (N4)
     //W41-18 (wave-40 L-123b): "Flip Side with Bloodline Keeper -> DISPLAY TOGGLE
     //only" was offered at nearly every priority window a Bloodline Keeper was in
     //play - 38 of 285 prompts - changing nothing about the game state, and by
@@ -35526,7 +35674,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             //#W70-BN (F4): the two permitted lines are the whole span.
             int stStop = -1, stNow = -1;
-            const string protOnly = protocolLinesOnly(content);
+            //#W73-BZ (N3): the PLAN line alone, not both protocol lines.
+            const string protOnly = planLineOnly(content);
             if (repeatPlanStopAndCurrent(protOnly, &stStop, &stNow)
                 && repeatPlanStopIsOwn(protOnly)) //#W72-BX (F2)
             {
@@ -35582,7 +35731,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             mPriorityNoopReaskBoard = boardKey;
             //#W72-BT (M2): the verdict, named. The " or 0 (pass)" tail is the
             //priority seam's own third answer and stays.
-            mPriorityReaskLine = noopReaskLine(choice, shownLines[choice - 1])
+            mPriorityReaskLine = noopReaskLine(choice, shownLines[choice - 1],
+                                               parseNote.find("name_over_index") != string::npos,
+                                               firstLabelledLine(content, "choice:")) //#W73-BZ (N15)
                                  + " (0 passes.)";
             mPriorityReaskKind = "noop_plan";
             if (!parseNote.empty())
@@ -35623,14 +35774,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             {
                 corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
                      << quotedChoiceLine << "\") but carries no PLAN line. Answer again with a"
-                        " PLAN line stating your stop count, the count you are at now, and how"
-                        " many you perform this window, and then the CHOICE line; or 0 (pass)."; //#W70-BL (E4)
+                        " PLAN line carrying \"stop=<N>; M=<N>\" - the count you mean to finish"
+                        " at and the count you are at now - plus how many you perform this"
+                        " window, and then the CHOICE line; or 0 (pass)."; //#W70-BL (E4) #W73-BZ (N3)
                 fb = "plan_missing";
                 mPriorityReaskKind = "plan_missing";
             }
             else //#W66-AR (H8) #W69-BH (K4c): noopRowZero, the last trigger left
             {
-                corr << noopReaskLine(choice, shownLines[choice - 1]) //#W72-BT (M2)
+                corr << noopReaskLine(choice, shownLines[choice - 1], //#W72-BT (M2)
+                                      parseNote.find("name_over_index") != string::npos,
+                                      firstLabelledLine(content, "choice:")) //#W73-BZ (N15)
                      << " (0 passes.)";
                 fb = "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
                 mPriorityReaskKind = "noop_plan";
@@ -35994,6 +36148,67 @@ static bool rowSaysHalfDead(const string& row)
     return low.find("half dead") != string::npos;
 }
 
+//#W73-BZ (N10, deck146 MED-3): the worked example cut the row's core at a hard
+//48 bytes, mid-token, and emitted the halves of quotes and parentheses it had
+//opened - `(Nadaar, Selfless Paladin #1 (4/4) - "Vigilance -)`, `(goblin lair
+//(room 2 of 7 in Lost Mine of Phandel)`, `(Hold priority - pass now, and do not
+//ask me agai)`. 79 of 279 exemplified asks were malformed and 20 reasonings
+//stopped to call the prompt a typo - the surface teaching the model to distrust
+//it (trust doctrine). So: cut at the row's own first separator (` - ` or ` (`),
+//which is where its NAME ends and its gloss begins; if the name alone is still
+//over the ceiling, cut at a whitespace boundary; and never return a string whose
+//quotes or parens are unbalanced. Pure, so every shape pins without a board.
+static string exampleCoreTrim(const string& coreIn, size_t maxLen)
+{
+    string core = coreIn;
+    if (core.size() <= maxLen)
+        return core; //#W73-BZ (N10): a row that fits was never the defect
+    size_t cut = string::npos;
+    const size_t dash = core.find(" - ");
+    const size_t paren = core.find(" (");
+    if (dash != string::npos) cut = dash;
+    if (paren != string::npos && (cut == string::npos || paren < cut)) cut = paren;
+    if (cut != string::npos && cut > 0)
+        core = core.substr(0, cut);
+    if (core.size() > maxLen)
+    {
+        size_t at = core.rfind(' ', maxLen);
+        core = (at == string::npos || at == 0) ? core.substr(0, maxLen) : core.substr(0, at);
+    }
+    //balance: drop trailing tokens until every quote is paired and no bracket is
+    //left open. Bounded by the string's own token count.
+    for (;;)
+    {
+        int paren2 = 0, brace = 0, square = 0, quote = 0;
+        bool bad = false;
+        for (size_t i = 0; i < core.size(); i++)
+        {
+            const char c = core[i];
+            if (c == '(') paren2++;
+            else if (c == ')') { if (--paren2 < 0) bad = true; }
+            else if (c == '{') brace++;
+            else if (c == '}') { if (--brace < 0) bad = true; }
+            else if (c == '[') square++;
+            else if (c == ']') { if (--square < 0) bad = true; }
+            else if (c == '"') quote++;
+        }
+        if (!bad && paren2 == 0 && brace == 0 && square == 0 && (quote % 2) == 0)
+            break;
+        const size_t at = core.find_last_of(" ([{\"");
+        if (at == string::npos)
+        {
+            core.clear();
+            break;
+        }
+        core = core.substr(0, at);
+    }
+    while (!core.empty()
+           && (isspace((unsigned char) core[core.size() - 1]) || core[core.size() - 1] == ','
+               || core[core.size() - 1] == '-' || core[core.size() - 1] == ':'))
+        core.erase(core.size() - 1);
+    return core;
+}
+
 static string askExemplar(const vector<string>& options, int * usedRow = NULL)
 {
     size_t pick = 0;
@@ -36035,8 +36250,18 @@ static string askExemplar(const vector<string>& options, int * usedRow = NULL)
     while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
         core.erase(core.size() - 1);
     core = stripTrailingPT(core); //#W50-Y D8
-    if (core.size() > 48)
-        core = core.substr(0, 48);
+    {
+        const string trimmed = exampleCoreTrim(core, 48); //#W73-BZ (N10)
+        //a row whose whole core is one unbalanced token leaves nothing to quote:
+        //fall back to the FORMAT template rather than print an empty name.
+        if (trimmed.empty())
+        {
+            if (usedRow)
+                *usedRow = 0;
+            return string("CHOICE: <row number> (<that row's short name>)");
+        }
+        core = trimmed;
+    }
     std::ostringstream ex;
     ex << "CHOICE: " << (options.empty() ? 1 : (int) pick + 1) << " (" << core << ")";
     return ex.str();
@@ -36414,7 +36639,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         && choice >= 1 && choice <= (int) options.size())
     {
         mAskNoopReaskKey = askKey0;
-        const string corrLine = noopReaskLine(choice, options[choice - 1]); //#W72-BT (M2)
+        const string corrLine = noopReaskLine(choice, options[choice - 1], //#W72-BT (M2)
+                                              parseNote.find("name_over_index") != string::npos,
+                                              firstLabelledLine(content, "choice:")); //#W73-BZ (N15)
         mAskReaskKey = askKey0;
         mAskReaskLine = corrLine;
         mAskReaskKind = "noop_plan";
@@ -36453,7 +36680,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             //#W66-AR (H8): quote the row's OWN verdict and the reply's own
             //sentence, so the contradiction the model must resolve is visible.
-            corr << noopReaskLine(choice, options[choice - 1]); //#W72-BT (M2)
+            corr << noopReaskLine(choice, options[choice - 1], //#W72-BT (M2)
+                                  parseNote.find("name_over_index") != string::npos,
+                                  firstLabelledLine(content, "choice:")); //#W73-BZ (N15)
             mAskReaskKind = "noop_plan";
             mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
             mAskReaskPriorChoice = choice; //#W69-BJ (F8): see the priority seam
@@ -47128,6 +47357,21 @@ static string revealEligMarker(const string & optOneLabel)
     return " [eligible for \"" + optOneLabel + "\"]";
 }
 
+//#W73-BZ (N7, deck146 HIGH-2): the price of a card on a reveal/search list, in
+//the same two facts the ELIGIBILITY header decides on - the PRINTED cost and its
+//mana value. An empty cost string is a card that has none (a land); say so
+//rather than print nothing (a silent gap is confabulated - the {0}-cost lesson).
+//Pure over the two values, so both faces pin without a board.
+static string revealCostTag(const string& printedCost, int manaValue)
+{
+    std::ostringstream o;
+    if (printedCost.empty())
+        o << " [no mana cost (mana value 0)]";
+    else
+        o << " [cost: " << printedCost << " (mana value " << manaValue << ")]";
+    return o.str();
+}
+
 //#W61-V (R1): does option one's own target() spec license taking NONE? This is
 //the engine's own arity grammar, read the way TargetChooser::createTargetChooser
 //reads it (TargetChooser.cpp:503-528): a `<...>` prefix sets a MINIMUM equal to
@@ -47317,6 +47561,22 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
             string tt = typeTag(revealed[j]);
             if (!tt.empty())
                 row << " (" << tt << ")";
+        }
+        //#W73-BZ (N7, deck146 HIGH-2): the ELIGIBILITY header gates this list on
+        //mana VALUE ("only a manacost>=3 card may go to ...") and the rows printed
+        //no cost at all - the one number the header makes decisive was the one
+        //number withheld, so "biggest body" read as "biggest threat" and 146v125
+        //seq 14 took Emrakul over the Supreme Verdict that swept it at seq 39.
+        //The cast menu already prices every row; so does this one now.
+        {
+            string mcText;
+            int mv = 0;
+            if (revealed[j]->data && revealed[j]->data->getManaCost())
+            {
+                mcText = revealed[j]->data->getManaCost()->toString();
+                mv = revealed[j]->data->getManaCost()->getConvertedCost();
+            }
+            row << revealCostTag(mcText, mv);
         }
         string kw = keywordList(revealed[j]);
         if (!kw.empty())
@@ -68088,10 +68348,11 @@ static const char * kW50Y_r94 =
         CHECK(string(kLandDropDeclineRow).find("Hold ") == string::npos,
               "#W62-W D17 NEGATIVE the one-land decline is no longer a Hold row");
         const string rr = repeatRowLine("Ping for 1", 4, -1);
-        CHECK(rr.find("a count on this row REQUIRES a PLAN line stating your stop count,"
-                      " the count you are at now, and how many you perform this window")
+        CHECK(rr.find("a count on this row REQUIRES a PLAN line carrying the two numbers in"
+                      " this exact shape - \"stop=<N>; M=<N>\"")
                   != string::npos,
-              "#W62-W D17 123v126 seq 21: the plan_missing rule is stated where it is enforced");
+              "#W62-W D17 123v126 seq 21 / #W73-BZ N3: the plan_missing rule is stated where it"
+              " is enforced, in the LITERAL form the parser reads back");
         CHECK(rr.find("refused and re-asked]") != string::npos
               && rr.find("\n") == string::npos,
               "#W62-W D17 the rule closes the row's own bracket and adds no line");
@@ -78235,6 +78496,193 @@ static const char * kW50Y_r94 =
                   && !lifeLoopWinnable(true, true, false)
                   && !lifeLoopWinnable(true, false, true),
               "#W72-BX F9 the header consults the SAME predicate the loop-half warning does");
+    }
+
+    //#W73-BZ (wave-73 lane BZ: the stop grammar and list truth - N3, N4, N7,
+    //N10, N11, N15). Every case below is RED on 90f8d1d68.
+    {
+        // ---- N3: the stated stop is read back, off the PLAN LINE, by label ----
+        const string seq11 = "PLAN: Tap Thraben Doomsayer 22 times to reach 24 creatures"
+                             " (stop count 24, currently at 2, making 22 this window), then"
+                             " attack for lethal next turn.";
+        CHECK(repeatPlanScanNumber(seq11, "stop") == 24,
+              "#W73-BZ N3 REPRO 123v162 seq 11: \"stop count 24\" is the stop the reply stated"
+              " (base: -1, and repeatRowStopClause rendered 0 times in 379 windows)");
+        int st = -1, cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: stop=24; M=2; this window: x22", &st, &cu)
+                  && st == 24 && cu == 2,
+              "#W73-BZ N3 the literal form the row now prints parses");
+        st = cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: stop 24; M 2 now; this window: x22", &st, &cu)
+                  && st == 24 && cu == 2,
+              "#W73-BZ N3 form: bare label then number");
+        st = cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: stop count 24, M is 2, this window: x22", &st, &cu)
+                  && st == 24 && cu == 2,
+              "#W73-BZ N3 form: \"stop count N\" and \"M is N\"");
+        st = cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: stop at 24; M at 2; this window: x22", &st, &cu)
+                  && st == 24 && cu == 2,
+              "#W73-BZ N3 form: \"stop at N\"");
+        st = cu = -1;
+        CHECK(!repeatPlanStopAndCurrent("PLAN: make 24 creatures, then 2 more, then attack",
+                                        &st, &cu) && st < 0,
+              "#W73-BZ N3 MUST-NOT-MATCH a bare number with no label in front of it");
+        st = cu = -1;
+        CHECK(!repeatPlanStopAndCurrent("PLAN: keep going until they are dead", &st, &cu),
+              "#W73-BZ N3 MUST-NOT-MATCH a plan that states no numbers at all");
+        st = cu = -1;
+        CHECK(repeatPlanScanNumber("PLAN: the loop stopped at the Doomsayer", "stop") < 0,
+              "#W73-BZ N3 MUST-NOT-MATCH \"stopped\" - the label is part of a word");
+        CHECK(planLineOnly("<think>x</think>\nPLAN: keep making humans\nCHOICE: 2 (Create x22)")
+                  == "PLAN: keep making humans",
+              "#W73-BZ N3 planLineOnly returns the PLAN line and only the PLAN line");
+        st = cu = -1;
+        CHECK(!repeatPlanStopAndCurrent(
+                  planLineOnly("PLAN: keep making humans\nCHOICE: 2 (Create x22, stop=24; M=2)"),
+                  &st, &cu),
+              "#W73-BZ N3 MUST-NOT-MATCH a stop written OUTSIDE the PLAN line (the action line)");
+        CHECK(planLineOnly("just prose about stop=9").empty(),
+              "#W73-BZ N3 MUST-NOT-MATCH prose with no PLAN label: nothing is read");
+        const string rowN3 = repeatRowLine("Create human with Thraben Doomsayer", 1, 2);
+        CHECK(rowN3.find("\"stop=<N>; M=<N>\"") != string::npos
+                  && rowN3.find("stating your stop count") == string::npos,
+              "#W73-BZ N3 the row's bracket states the LITERAL form the parser reads back");
+        st = cu = -1;
+        CHECK(repeatPlanStopAndCurrent("PLAN: their stop=29; their M=29; develop my board",
+                                       &st, &cu)
+                  && !repeatPlanStopIsOwn("PLAN: their stop=29; their M=29; develop my board"),
+              "#W73-BZ N3 REGRESSION BX F2's ownership test still refuses the opponent's stop");
+
+        // ---- N4: rung menus sort NUMERICALLY ----
+        CHECK(naturalTextLess("becomes a 2/2 hydra with Lair of the Hydra",
+                              "becomes a 10/10 hydra with Lair of the Hydra"),
+              "#W73-BZ N4 REPRO 152v125 seq 62: 2/2 sorts BEFORE 10/10 (base: byte order put"
+              " 10/10 second and the 9/9 at index 14)");
+        {
+            vector<string> rungs;
+            for (int n = 1; n <= 14; n++)
+            {
+                std::ostringstream r;
+                r << "becomes a " << n << "/" << n << " hydra with Lair of the Hydra [cost: {"
+                  << n << "}{g}]";
+                rungs.push_back(r.str());
+            }
+            //the menu as the byte comparator delivered it: 1, 10, 11, ... 2, 3 ...
+            vector<string> shuffled = rungs;
+            std::sort(shuffled.begin(), shuffled.end());
+            CHECK(shuffled[1] != rungs[1],
+                  "#W73-BZ N4 REPRO the byte comparator really does mis-order this menu");
+            std::stable_sort(shuffled.begin(), shuffled.end(), naturalTextLess);
+            bool ordered = true;
+            for (size_t i = 0; i < rungs.size(); i++)
+                if (shuffled[i] != rungs[i])
+                    ordered = false;
+            CHECK(ordered,
+                  "#W73-BZ N4 the 14-rung menu renders 1/1 .. 14/14 in numeric order, so an"
+                  " index and the power the row names agree");
+        }
+        CHECK(!naturalTextLess("Cast Bear {1}{g}", "Cast Bear {1}{g}")
+                  && naturalTextLess("Cast Ancestral", "Cast Bear")
+                  && !naturalTextLess("Cast Bear", "Cast Ancestral"),
+              "#W73-BZ N4 NEGATIVE non-numeric rows keep byte order and no row precedes itself");
+        CHECK(naturalTextLess("x 07", "x 7") && !naturalTextLess("x 7", "x 07"),
+              "#W73-BZ N4 equal magnitudes keep a total order (the prompt stays byte-stable)");
+
+        // ---- N7: reveal/search rows carry the cost the header decides on ----
+        CHECK(revealCostTag("{4}{w}{w}", 6) == " [cost: {4}{w}{w} (mana value 6)]",
+              "#W73-BZ N7 REPRO 146v125 seq 14: Supreme Verdict's row now prints its cost and"
+              " the mana value the ELIGIBILITY header gates on (base: no cost on any row)");
+        CHECK(revealCostTag("{15}", 15) == " [cost: {15} (mana value 15)]",
+              "#W73-BZ N7 Emrakul's 15 is a COST beside its 15/15 body, not only a body");
+        CHECK(revealCostTag("", 0) == " [no mana cost (mana value 0)]",
+              "#W73-BZ N7 a card with no printed cost SAYS so - the gap is not left to be"
+              " confabulated");
+        CHECK(revealCostTag("{1}{u}", 2).substr(0, 2) == " ["
+                  && revealCostTag("{1}{u}", 2)[revealCostTag("{1}{u}", 2).size() - 1] == ']',
+              "#W73-BZ N7 echo shape: the tag is a [...] tail, which answer matching strips off"
+              " an already-anchored candidate");
+
+        // ---- N10: the worked example cuts at a token boundary and balances ----
+        {
+            const char * malformed[3] = {
+                "Nadaar, Selfless Paladin #1 (4/4) - \"Vigilance - whenever\"",
+                "goblin lair (room 2 of 7 in Lost Mine of Phandelver)",
+                "Hold priority - pass now, and do not ask me again - this turn or later"
+            };
+            const char * want[3] = { "Nadaar, Selfless Paladin #1", "goblin lair",
+                                     "Hold priority" };
+            bool allGood = true;
+            for (int i = 0; i < 3; i++)
+            {
+                const string got = exampleCoreTrim(malformed[i], 48);
+                if (got != want[i])
+                    allGood = false;
+                int par = 0, q = 0;
+                for (size_t k = 0; k < got.size(); k++)
+                {
+                    if (got[k] == '(') par++;
+                    else if (got[k] == ')') par--;
+                    else if (got[k] == '"') q++;
+                }
+                if (par != 0 || (q % 2) != 0 || got.size() > 48)
+                    allGood = false;
+            }
+            CHECK(allGood,
+                  "#W73-BZ N10 REPRO deck146 MED-3 (79 of 279 asks malformed): every one of the"
+                  " three observed shapes cuts at its own separator, balanced and inside 48");
+        }
+        CHECK(exampleCoreTrim("Cast Fire // Ice (fused)", 48) == "Cast Fire // Ice (fused)",
+              "#W73-BZ N10 NEGATIVE a row that FITS is returned byte for byte - the wave-50"
+              " non-P/T parenthetical is still kept");
+        {
+            const string longName(60, 'x');
+            const string got = exampleCoreTrim(longName, 48);
+            CHECK(got.size() <= 48 && !got.empty(),
+                  "#W73-BZ N10 a single over-long token still yields a printable core");
+        }
+
+        // ---- N11: the loyalty clause is untruncated in the BOARD FRAME ----
+        {
+            const string sorin =
+                "+1: Put a 1/1 black Vampire creature token with lifelink onto the battlefield."
+                " -- -2: You get an emblem with \"Creatures you control get +1/+0.\""
+                " -- -6: Destroy up to three target creatures and/or other planeswalkers."
+                " Return each card put into a graveyard this way to the battlefield under your"
+                " control.";
+            const string frameBase = boardEffectSnippet(sorin, 140);
+            const string frameNow = boardEffectSnippetFocus(sorin, 140,
+                                                            firstLoyaltyClausePrefix(sorin));
+            CHECK(firstLoyaltyClausePrefix(sorin) == "+1:",
+                  "#W73-BZ N11 the frame asks for the walker's first loyalty clause by name");
+            CHECK(frameNow.find("under your control") != string::npos
+                      && frameBase.find("under your control") == string::npos,
+                  "#W73-BZ N11 REPRO (92 prompts): the -6's controller clause survives in the"
+                  " board frame and did not on base");
+            CHECK(frameNow.find("+1:") != string::npos && frameNow.find("-2:") != string::npos,
+                  "#W73-BZ N11 every loyalty clause is still printed, in printed order");
+            CHECK(firstLoyaltyClausePrefix("Whenever a creature dies, you gain 1 life.").empty(),
+                  "#W73-BZ N11 NEGATIVE a non-walker text carries no loyalty clause and routes"
+                  " to boardEffectSnippet unchanged");
+        }
+
+        // ---- N15: the noop re-ask says WHICH row was matched and WHY ----
+        {
+            const string hydraRow = "becomes a 9/9 hydra with Lair of the Hydra [cost: {9}{g}]"
+                                    " {right now: does nothing this turn}";
+            const string withWhy = noopReaskLine(6, hydraRow, true,
+                                                 "CHOICE: 14 (becomes a 14/14 hydra)");
+            CHECK(withWhy.find("CHOICE: 14 (becomes a 14/14 hydra)") != string::npos
+                      && withWhy.find("short name is row 6") != string::npos,
+                  "#W73-BZ N15 REPRO 152v125 seq 62: the re-ask quotes what the reply WROTE and"
+                  " names the row the short name matched (base: a bare \"You chose row 6\")");
+            CHECK(withWhy.find("You chose row 6") != string::npos,
+                  "#W73-BZ N15 the matched row is still named by number and by its own text");
+            const string plain = noopReaskLine(6, hydraRow);
+            CHECK(plain.find("short name is row") == string::npos
+                      && plain.find("You chose row 6") != string::npos,
+                  "#W73-BZ N15 NEGATIVE an index answered as written gets no name-match clause");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
