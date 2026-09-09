@@ -273,6 +273,141 @@ pilot_stall_sweep() {
     return 0
 }
 
+#W74-CG: THE WINDOW LOOP. The wave-74 corpus (run 20260909-015553) burned 8 h
+# with 11 of 21 games frozen at turns 3-15 and NOTHING in the supervisor saw it:
+# every decision was answered by the model, on time, with reasoning - so the
+# pilot-stall predicate above (which reads endpoint SILENCE) was correctly OK the
+# whole way. What was actually happening is the opposite failure: one seat asked
+# the SAME turn-4 Main-1 casting window 384 times, each a full ~60-100 s model
+# call, because the decline row's re-ask clause carried a count that rose with
+# every answer and rode into the ask key, so the identical-window cache could
+# never hit again. The observable is in the prompt the seat is being served: a
+# `declined this exact list N times` that keeps climbing inside ONE turn. Healthy
+# waves sit at N <= 3 (wave 73's whole corpus); N >= 40 in one turn is not a
+# pilot deliberating, it is a window that cannot close. A game that cannot leave
+# a phase is not going to finish, and invariant 00 makes that a STOP, not a
+# warning. Read off the NEWEST record of each live seat only - an old high count
+# from a turn the seat has since left is history, not a wedge.
+WINDOW_LOOP_N="${WAGIC_WINDOW_LOOP_N:-40}"
+window_loop_verdict() {
+    #$1 = logdir, $2 = run start epoch, $3 = N -> "LOOP <n> <seat>" | "OK <n>"
+    python3 - "$1" "$2" "$3" <<'WLY'
+import glob, json, os, re, sys
+logdir, start, n = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+DECL = re.compile(r"declined this exact list (\d+) times? this turn")
+
+worst, worstSeat = 0, ""
+for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
+    try:
+        ep = int(os.path.basename(f).split("-")[0])
+    except ValueError:
+        continue
+    if ep < start - 5:
+        continue
+    newest, ended = None, False
+    try:
+        for line in open(f, errors="replace"):
+            try: r = json.loads(line)
+            except Exception: continue
+            if r.get("kind") == "gameend":
+                ended = True
+                continue
+            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery"):
+                continue
+            newest = r
+    except OSError:
+        continue
+    #Only a game STILL IN FLIGHT can be looping; a finished game's counts are
+    #whatever it ended on.
+    if ended or newest is None:
+        continue
+    counts = [int(x) for x in DECL.findall(str(newest.get("prompt", "")))]
+    if counts and max(counts) > worst:
+        worst, worstSeat = max(counts), os.path.basename(f)
+
+if worst >= n:
+    print("LOOP %d %s" % (worst, worstSeat))
+else:
+    print("OK %d" % worst)
+WLY
+}
+
+window_loop_sweep() {
+    local verdict
+    verdict=$(window_loop_verdict "$LOGDIR" "$START" "$WINDOW_LOOP_N") || return 0
+    case "$verdict" in
+        LOOP*)
+            set -- $verdict
+            echo ""
+            echo "== WINDOW LOOP: a live seat is being served the same window over and over."
+            echo "== $3 has just been told it declined this exact list $2 times THIS TURN"
+            echo "== (healthy corpora sit at 3 or fewer). The model IS answering - this is not"
+            echo "== a pilot stall - but the window never closes, so the phase never advances"
+            echo "== and every repeat is another full model call. The game cannot finish, and a"
+            echo "== corpus that does not complete games has failed (invariant 00). Stopping."
+            echo "== Read that seat's newest two prompts: if they differ only in this count,"
+            echo "== the ask key is unstable again (wave-74 lane CG)."
+            touch "$OUTDIR/WINDOW-LOOP"
+            kill -TERM "$HARNESS_PID" 2>/dev/null
+            return 1;;
+    esac
+    return 0
+}
+
+window_loop_selftest() {
+    local tmp fails=0 v
+    tmp="$(mktemp -d)"
+    mk() { #$1 = file, then the record lines
+        local f="$tmp/$1"; shift; printf '%s\n' "$@" > "$f"
+    }
+    #a: the wave-74 shape - a live seat whose NEWEST prompt carries a high count
+    mk 9999999999-ai_baka_deck123-a.jsonl \
+      '{"kind":"ask","seq":299,"prompt":"3. Cast nothing {this same question will be asked again this turn: taking this row closes this window only, and you have already declined this exact list 294 times this turn}"}' \
+      '{"kind":"ask","seq":300,"prompt":"3. Cast nothing {... you have already declined this exact list 295 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40)
+    case "$v" in "LOOP 295 9999999999-ai_baka_deck123-a.jsonl") ;;
+      *) echo "window-loop-selftest FAIL: the wave-74 shape gave '$v', want 'LOOP 295 ...'" >&2; fails=1;; esac
+    #b: a healthy corpus - wave-73 counts never left single digits
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck125-b.jsonl \
+      '{"kind":"ask","seq":9,"prompt":"3. Cast nothing {... you have already declined this exact list 3 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40)
+    case "$v" in "OK 3") ;; *) echo "window-loop-selftest FAIL: a wave-73 count gave '$v', want 'OK 3'" >&2; fails=1;; esac
+    #c: the count is only evidence while the game is LIVE - a finished game's
+    #tail is history and must not stop the next run's sweep.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-c.jsonl \
+      '{"kind":"ask","seq":300,"prompt":"{... declined this exact list 295 times this turn}"}' \
+      '{"kind":"gameend","seq":301,"won":1}'
+    v=$(window_loop_verdict "$tmp" 1 40)
+    case "$v" in "OK 0") ;; *) echo "window-loop-selftest FAIL: a finished game gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #d: a high count the seat has ALREADY left behind is history, not a wedge -
+    #only the newest record of a live seat counts.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-d.jsonl \
+      '{"kind":"ask","seq":300,"prompt":"{... declined this exact list 295 times this turn}"}' \
+      '{"kind":"ask","seq":301,"prompt":"1. Attack with Bear"}'
+    v=$(window_loop_verdict "$tmp" 1 40)
+    case "$v" in "OK 0") ;; *) echo "window-loop-selftest FAIL: a count the seat moved on from gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #e: an older run's logs in the same directory are not this run's evidence.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-e.jsonl \
+      '{"kind":"ask","seq":300,"prompt":"{... declined this exact list 295 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 99999999999 40)
+    case "$v" in "OK 0") ;; *) echo "window-loop-selftest FAIL: an older-run log gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #f: the threshold is the threshold - 40 fires, 39 does not.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-f.jsonl \
+      '{"kind":"ask","seq":40,"prompt":"{... declined this exact list 40 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40)
+    case "$v" in LOOP\ 40*) ;; *) echo "window-loop-selftest FAIL: N=40 gave '$v', want LOOP" >&2; fails=1;; esac
+    v=$(window_loop_verdict "$tmp" 1 41)
+    case "$v" in "OK 40") ;; *) echo "window-loop-selftest FAIL: N=40 under a 41 threshold gave '$v', want 'OK 40'" >&2; fails=1;; esac
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "window-loop-selftest: 7 checks, 0 failed"
+    return "$fails"
+}
+
 #O26: both halves of the tripwire, self-tested on crafted logs - the wedge is
 # rare and expensive, so the predicate cannot wait for the next one to be checked.
 pilot_stall_selftest() {
@@ -442,7 +577,7 @@ while [ $# -gt 0 ]; do
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
         --thinking) THINKING="${2:-}"; shift 2;;
-        --selftest) harvest_selftest || exit 1; pilot_stall_selftest || exit 1; exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
+        --selftest) harvest_selftest || exit 1; pilot_stall_selftest || exit 1; window_loop_selftest || exit 1; exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
         --realtime) FASTCLOCK=0; shift;;
         --fairhand) FAIRHAND=1; shift;;
         --riggedhand) FAIRHAND=0; shift;;
@@ -843,6 +978,7 @@ supervisor() {
         no_progress_sweep
         regime_gate_sweep || return 1
         pilot_stall_sweep || return 1
+        window_loop_sweep || return 1
         #Uncapped run: a full game can always fit, the latency projection has
         #nothing to violate - that half stands down (the sweep above does not).
         [ "$GAME_TIMEOUT_S" = "0" ] && continue

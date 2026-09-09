@@ -28324,15 +28324,80 @@ static string reserveDeclineCarryNote(bool declinedThisTurn)
 //reached 1, resetting the very count it reports, so the clause is a `{...}`
 //group - stripped from every key by stripRenderAnnotationsLc, exactly like the
 //cleanup price beside it. Pure over N.
+//#W74-CG: the literal head of that clause, shared by the builder and the
+//stripper below so the two can never drift apart.
+static const char * const kDeclineReaskTagHead =
+    " {this same question will be asked again this turn:";
+
 static string declineRowReaskTag(int n)
 {
     if (n < 1)
         return string();
     std::ostringstream o;
-    o << " {this same question will be asked again this turn: taking this row closes"
+    o << kDeclineReaskTagHead << " taking this row closes"
          " this window only, and you have already declined this exact list " << n
       << (n == 1 ? " time" : " times") << " this turn}";
     return o.str();
+}
+
+//#W74-CG: #W74-CD's pass-gate hold, as a pure function of the armed prompt and
+//the clock, so both of its halves are pinnable. The bound is measured from when
+//the armed prompt was FIRST SEEN, so it releases the pass only while that prompt
+//is STABLE - which is the second reason a rising count may not ride the rendered
+//tail the armed prompt is built from.
+static bool w74RetryArmedHold(const string& armedPrompt, string& seen,
+                              long& sinceMs, long nowMs, long holdMs)
+{
+    if (armedPrompt.empty())
+    {
+        seen.clear();
+        return false;
+    }
+    if (seen != armedPrompt)
+    {
+        seen = armedPrompt;
+        sinceMs = nowMs;
+        return true;
+    }
+    return (nowMs - sinceMs) < holdMs;
+}
+
+//#W74-CG (CORPUS-KILLING REGRESSION, run 20260909-015553): the clause above
+//carries a COUNT THAT RISES WITH EVERY ANSWER, and #W74-CE put it on the
+//DECLINE ROW - inside the numbered option list. Both ask seams build their
+//cache key from that rendered list (`boardKey + tailStr` at the priority seam,
+//`situationPrefill + tailStr` at the ask seam) and both hand the same bytes to
+//`assemblePrompt`'s keyTail, which is half the async slot key. So every answer
+//minted a FRESH key for a question that had not moved: `mAskCache` never hit
+//again, and one deck123 seat paid 384 full model calls (~60-100 s each, 8 h)
+//for one turn-4 Main-1 window whose declined count walked 1 -> 297. Corpus-wide
+//`ask_replays_reserved` / `identical_ask_answers_reserved` were 3 / 1 over 20
+//gameends (wave 73: 1262 / 999 over 42). O11's INTENT is kept - the row still
+//says the question comes back, and it still says how many times the model has
+//declined it - only its reach into the KEYS is removed: every key is computed
+//from rows with this one volatile clause taken out, so two windows that differ
+//only in the count are one question again. `{...}` shape alone was not enough:
+//`stripRenderAnnotationsLc` guards the OPTION-SET key, not the ask key.
+static string stripDeclineReaskTags(const string& s)
+{
+    const size_t headLen = strlen(kDeclineReaskTagHead);
+    string out;
+    size_t from = 0;
+    for (;;)
+    {
+        const size_t at = s.find(kDeclineReaskTagHead, from);
+        if (at == string::npos)
+            break;
+        const size_t close = s.find('}', at + headLen);
+        if (close == string::npos)
+            break; //truncated render: leave the tail as it is
+        out += s.substr(from, at - from);
+        from = close + 1;
+    }
+    if (from == 0)
+        return s; //the common case: nothing to strip, no copy of the whole tail
+    out += s.substr(from);
+    return out;
 }
 
 static string declinedListNote(int n)
@@ -36981,7 +37046,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (!mPriorityReaskBoard.empty())
         tail << "\n" << mPriorityReaskLine;
     const string tailStr = tail.str(); //#W54-M (L5): the option list is copied once
-    string askKey = boardKey + tailStr;
+    //#W74-CG: the KEY half of that list, with the one clause whose text moves
+    //with the answer count taken out. The model still reads `tailStr`.
+    const string keyTailStr = stripDeclineReaskTags(tailStr);
+    string askKey = boardKey + keyTailStr;
     //#W53-N (D2): the decline annotation goes into the PROMPT only - askKey is
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
@@ -37006,7 +37074,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         userTail = userTail.substr(0, optionsEnd) + promptNotes + userTail.substr(optionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForPriority(shownLines, logWindowStackRespondable());
-    string userMsg = assemblePrompt(userTail, NULL, &tailStr); //#W62-fix: notes stay out of the slot key
+    string userMsg = assemblePrompt(userTail, NULL, &keyTailStr); //#W62-fix: notes stay out of the slot key; #W74-CG: and so does the decline count
     bool unchanged = (askKey == mLastAskKey);
 
     //Deadlock breaker: priority is decided every AI tick. If the game state
@@ -37968,12 +38036,20 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //narration and the plan (see the header) so that consuming one answer
     //cannot invalidate another already given for this same state - the
     //earlier picks of a multi-target selection re-derive from this cache.
-    string askKey0 = ((situationPrefill.empty() || auditMOff()) ? serializeGameState() : situationPrefill) + tailStr;
+    //#W74-CG: the KEY half of the rendered list - the decline row's re-ask
+    //clause carries a count that rises with every answer, and leaving it in the
+    //key minted a fresh question per window (384 model calls for one turn-4
+    //Main-1 window, run 20260909-015553). The model still reads `tailStr`.
+    string keyTailStr = stripDeclineReaskTags(tailStr);
+    string askKey0 = ((situationPrefill.empty() || auditMOff()) ? serializeGameState() : situationPrefill) + keyTailStr;
     //#W49-S (D8): this state+question already earned its one re-ask - the
     //corrected question is THE question from here on (its own cache slot).
     bool reasked = (!mAskReaskKey.empty() && mAskReaskKey == askKey0);
     if (reasked)
+    {
         tailStr += "\n" + mAskReaskLine;
+        keyTailStr += "\n" + mAskReaskLine; //#W74-CG: the slot key tracks the render
+    }
     string askKey = reasked ? askKey0 + "\n" + mAskReaskLine : askKey0; //#W54-M (A19): same bytes, no second render
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
@@ -38078,7 +38154,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         userTail = userTail.substr(0, askOptionsEnd) + promptOnlyNote + userTail.substr(askOptionsEnd);
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForAsk(decision, options);
-    string userMsg = assemblePrompt(userTail, NULL, &tailStr); //#W62-fix: notes stay out of the slot key
+    string userMsg = assemblePrompt(userTail, NULL, &keyTailStr); //#W62-fix: notes stay out of the slot key; #W74-CG: and so does the decline count
     string content;
     if (pollCompletionRetry(userMsg, content, "ask") == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
@@ -38179,7 +38255,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         setNotice("the chosen row's own note says it does nothing - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: noop row re-ask (budget-exempt) -> re-asking once");
         string corrected;
-        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
+        //#W74-CG: the corrected leg's slot key is built from the same stripped
+        //tail the next tick's rebuild will use, or every retry would drift.
+        const string retryKeyTail = keyTailStr + "\n" + mAskReaskLine;
+        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine, NULL, &retryKeyTail),
+                            corrected, "ask");
         return kChoicePending; //the caller unwinds; the corrected call answers later
     }
     //#W70-BL (E5): askReversedInProse is gone from the trigger with the re-ask it
@@ -38227,7 +38307,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                                  : "the chosen row's own note says it does nothing - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
-        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected, "ask");
+        //#W74-CG: the corrected leg's slot key is built from the same stripped
+        //tail the next tick's rebuild will use, or every retry would drift.
+        const string retryKeyTail = keyTailStr + "\n" + mAskReaskLine;
+        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine, NULL, &retryKeyTail),
+                            corrected, "ask");
         return kChoicePending; //the caller unwinds; the corrected call answers later
     }
     if (reasked)
@@ -40763,23 +40847,22 @@ bool AIPlayerGPT::decisionArmed()
     //the bottom of Act must still wait for it.
     const string& armedPrompt = !mRetryActivePrompt.empty() ? mRetryActivePrompt
                                                             : mRetryPark.activePrompt;
-    if (mEndpoint.empty() || armedPrompt.empty())
+    if (mEndpoint.empty())
     {
         mRetryArmedSeen.clear();
         return false;
     }
-    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    if (mRetryArmedSeen != armedPrompt)
-    {
-        mRetryArmedSeen = armedPrompt;
-        mRetryArmedSince = now;
-        return true;
-    }
-    const long heldMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
-        now - mRetryArmedSince).count();
-    if (heldMs >= kRetryArmedHoldMs)
-        return false;
-    return true;
+    //#W74-CG: the decision itself is the pure helper above, so PARSETEST can pin
+    //the parked-leg release without a live seat.
+    const long nowMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    long sinceMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+        mRetryArmedSince.time_since_epoch()).count();
+    const bool held = w74RetryArmedHold(armedPrompt, mRetryArmedSeen, sinceMs, nowMs,
+                                        (long) kRetryArmedHoldMs);
+    mRetryArmedSince = std::chrono::steady_clock::time_point(
+        std::chrono::milliseconds(sinceMs));
+    return held;
 }
 
 bool AIPlayerGPT::attackDeclarationAnswered()
@@ -81716,6 +81799,89 @@ static const char * kW50Y_r94 =
               " wave-56 descending map still applies");
         CHECK(w74XPickToContractIndex(0, 3, 4, false, 4) == 3,
               "#W74-CF O19 MUST-NOT-MATCH the descending map-back is byte-identical");
+    }
+
+    cout << "\n[#W74-CG] the declined count is furniture to the ASK KEY\n";
+    {
+        // REPRO run 20260909-015553, seat 1788936956-ai_baka_deck123: asks 300 and
+        // 301 are the SAME turn-4 Main-1 casting window; the only difference inside
+        // the numbered option list is 295 -> 296 in the decline row's re-ask tag.
+        // Both seams key on that list, so every answer minted a fresh question and
+        // `mAskCache` never hit again: 384 full model calls for one window.
+        const string row = "3. Cast nothing right now (combat comes next this turn)";
+        const string closes = " {closes ONLY this window - the same list can be put to"
+                              " you again this turn, at this seam or another}";
+        const string w295 = row + declineRowReaskTag(295) + closes + "\n";
+        const string w296 = row + declineRowReaskTag(296) + closes + "\n";
+        CHECK(w295 != w296,
+              "#W74-CG REPRO the two rendered windows do differ - that is the bug's input");
+        CHECK(stripDeclineReaskTags(w295) == stripDeclineReaskTags(w296),
+              "#W74-CG REPRO asks 300 and 301 are ONE askKey: two windows differing only in"
+              " the declined count key identically");
+        CHECK(stripDeclineReaskTags(w295) == row + closes + "\n",
+              "#W74-CG the key keeps every OTHER annotation on the row - only the clause"
+              " whose text moves with the answer count is dropped");
+        // O11's intent is untouched: the model still reads the clause.
+        CHECK(w295.find("this same question will be asked again this turn") != string::npos
+                  && w295.find("already declined this exact list 295 times this turn")
+                         != string::npos,
+              "#W74-CG the tag itself is unchanged - only its reach into the key is removed");
+        // MUST NOT MATCH: a window whose ROWS moved is still a different question.
+        const string other = "3. Cast nothing right now (this is your last main phase)"
+                             + declineRowReaskTag(295) + closes + "\n";
+        CHECK(stripDeclineReaskTags(w295) != stripDeclineReaskTags(other),
+              "#W74-CG MUST-NOT-MATCH a real change to the row is still a fresh question");
+        // Both seams render the clause (the priority seam's row 0 and the casting
+        // seam's decline row): a tail carrying two of them strips both.
+        const string two = "0. Pass priority" + declineRowReaskTag(7) + "\n"
+                           + "3. Cast nothing right now" + declineRowReaskTag(7) + "\n";
+        CHECK(stripDeclineReaskTags(two) == "0. Pass priority\n3. Cast nothing right now\n",
+              "#W74-CG both seams' rows are stripped, not just the first");
+        // Untagged tails are returned byte-identical, and a truncated render is
+        // left exactly as it arrived rather than swallowing the rest of the list.
+        const string plain = "1. Cast Devour Flesh {1}{b}\n2. Hold priority\n";
+        CHECK(stripDeclineReaskTags(plain) == plain,
+              "#W74-CG MUST-NOT-MATCH a tail with no tag is returned byte-identical");
+        const string cut = "3. Cast nothing right now {this same question will be asked again"
+                           " this turn: taking this row";
+        CHECK(stripDeclineReaskTags(cut) == cut,
+              "#W74-CG MUST-NOT-MATCH an unterminated clause truncates nothing");
+    }
+
+    cout << "\n[#W74-CG] an armed leg the seat cannot re-enter releases the pass\n";
+    {
+        // #W74-CD's pass gate holds the phase while a second leg is armed, bounded
+        // by kRetryArmedHoldMs so a leg whose seam is never reached again cannot
+        // hold the phase for ever. The bound is measured from the moment the ARMED
+        // PROMPT was first seen, so it only fires while that prompt is STABLE -
+        // which is the second reason the count had to leave the rendered tail the
+        // armed prompt is built from.
+        string seen;
+        long since = 0;
+        const string parked = "Land drop: NOT yet used this turn\n1. Play Swamp\n";
+        CHECK(w74RetryArmedHold(parked, seen, since, 0, kRetryArmedHoldMs)
+                  && w74RetryArmedHold(parked, seen, since, 1999, kRetryArmedHoldMs),
+              "#W74-CG a freshly armed leg holds the pass");
+        CHECK(!w74RetryArmedHold(parked, seen, since, 2000, kRetryArmedHoldMs),
+              "#W74-CG PIN a parked land-drop leg the seat cannot re-enter stops holding at"
+              " kRetryArmedHoldMs: decisionArmed() is false and Act passes");
+        CHECK(!w74RetryArmedHold(string(), seen, since, 3000, kRetryArmedHoldMs) && seen.empty(),
+              "#W74-CG no armed leg, no hold");
+        // MUST NOT MATCH: a prompt that changes every window never reaches the bound.
+        string seen2;
+        long since2 = 0;
+        bool everReleased = false;
+        for (int t = 0; t < 20; t++)
+        {
+            std::ostringstream w;
+            w << "3. Cast nothing right now" << declineRowReaskTag(t + 1) << "\n";
+            if (!w74RetryArmedHold(w.str(), seen2, since2, t * 1000L, kRetryArmedHoldMs))
+                everReleased = true;
+        }
+        CHECK(!everReleased,
+              "#W74-CG MUST-NOT-MATCH an armed prompt carrying the rising count resets the"
+              " bound every window and never releases - the tag had to leave the keyed tail"
+              " for this reason too");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
