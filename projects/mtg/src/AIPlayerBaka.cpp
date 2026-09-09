@@ -3980,6 +3980,15 @@ int AIPlayerBaka::computeActions()
             }
             if (!nextCardToPlay)
             {
+                //#W74-CD (O10, wave-73 engine-seat HIGH-2): THIS ARM ISSUES A
+                //CASTING DECISION TOO. FindCardToPlay is the cast ask for the
+                //GPT seat (c5c), so a main phase that reached this line DID put
+                //a casting window to the model - 233 of the 375 phases the
+                //skip meter counted were exactly this, which made the meter's
+                //name false and its number unusable. Same signal, same phase
+                //scope, as the standard branch's own call below.
+                if (ownMainPhaseNow)
+                    noteMainPhaseCastingOffered();
                 nextCardToPlay = FindCardToPlay(icurrentMana, ""); //Now AI will not search just for instant cards.
                 bool canPlay = false;
                 if(nextCardToPlay && p->game->hand->hasCard(nextCardToPlay)){
@@ -5722,6 +5731,21 @@ int AIPlayerBaka::Act(float dt)
         //neither pass priority nor decline the interrupt
         if (decisionPending(0))
             return 0;
+        //#W74-CD (O2, wave-73 deck152 HIGH-1). ...and neither is a decision
+        //whose SECOND LEG is armed but not yet in flight. A seam that hits the
+        //two-phase reasoning budget (or a transport retry, or the answer-ceiling
+        //re-ask) consumes the first reply, arms the follow-up prompt and returns
+        //kChoicePending - with the async slot EMPTY, so decisionPending is false
+        //on exactly that tick and the pass below fired over the top of a live
+        //decision. Corpus 20260907-225637-final: 33 forced closes were issued and
+        //only 2 phase-2 answers were ever consumed; three of the 31 losses were a
+        //declare-attackers window that vanished with legal attackers on the board
+        //(the deciding decision of one lost game). The armed leg launches on the
+        //NEXT tick - computeActions still runs here every tick - and
+        //decisionArmed's own hold cap keeps a leg that never launches from
+        //holding the phase for ever.
+        if (decisionArmed())
+            return 0;
         //#W64-AI (F3, deck152 HIGH-1): a tick that ANSWERED a menu is not a
         //tick with nothing to do. computeActions handles an armed menu IN
         //PLACE (doReactTo / DecisionManager::applyMenuChoice) and queues no
@@ -5873,6 +5897,35 @@ int AIPlayerBaka::Act(float dt)
                     && observer->combatStep == BLOCKERS
                     && !observer->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
                     && LegalActionsOracle::hasLegalBlock(defender);
+                //#W74-CD (O2): THE ENTRY-SIDE COUNTERPART TO THE COMBAT TRACER.
+                //GameObserver's [combattrace] fires from INSIDE
+                //pendingCombatDecision and names the gate that suppressed a
+                //declaration - so a declare-attackers window that is lost
+                //because the gate PASSED and the seat then passed priority
+                //anyway leaves no line at all, which is exactly what wave 73
+                //could not diagnose (three windows, no trace of any reason).
+                //This one fires where the window actually dies: the seat is the
+                //attacking player, at the attackers step, with a legal attacker
+                //on the board, and it is about to advance the phase without
+                //having declared. Once per (turn, seat). Dev builds only.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                if (observer->getCurrentGamePhase() == MTG_PHASE_COMBATATTACKERS
+                    && observer->currentPlayer == this
+                    && LegalActionsOracle::hasLegalAttacker(this)
+                    && !attackDeclarationAnswered())
+                {
+                    static int lastTurn = -1; static void * lastSeat = NULL;
+                    if (lastTurn != observer->turn || lastSeat != (void *) this)
+                    {
+                        lastTurn = observer->turn; lastSeat = (void *) this;
+                        fprintf(stderr, "[combatentry] t%d seat=%p PASSING declare-attackers"
+                                        " with a legal attacker on the board"
+                                        " (pending=%d armed=%d)\n",
+                                observer->turn, (void *) this,
+                                decisionPending(0) ? 1 : 0, decisionArmed() ? 1 : 0);
+                    }
+                }
+#endif
                 if (!humanBlockHold)
                     observer->userRequestNextGamePhase();
             }

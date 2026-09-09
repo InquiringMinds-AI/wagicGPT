@@ -230,6 +230,22 @@ public:
     //entry (with the frame dt) and again after computeActions (dt 0, a
     //call may have just started). Baka decides synchronously: never holds.
     virtual bool decisionPending(float dt) { (void) dt; return false; }
+    //#W74-CD (O2): TRUE while a decision has a SECOND LEG ARMED BUT NOT YET
+    //LAUNCHED - the tick on which a seam scheduled a forced close, a transport
+    //retry or an answer-ceiling re-ask and returned kChoicePending with the
+    //async slot already emptied. decisionPending is false in that window (no
+    //round trip is in flight), so the empty-clickstream branch below used to
+    //commit the pass in the SAME tick and close the window the pending decision
+    //was for - the declare-attackers step among them. Consulted ONLY at the
+    //post-computeActions pass gate, never at Act entry: computeActions has to
+    //keep running every tick or the armed leg would never be polled and the
+    //seat would deadlock. Baka has no out-of-band leg: never holds.
+    virtual bool decisionArmed() { return false; }
+    //#W74-CD (O2): has this seat already ANSWERED the declare-attackers
+    //question this turn? Only consulted by the [combatentry] trace, so a
+    //deliberate no-attack turn is not reported as a lost window. Baka
+    //answers synchronously inside the step and never needs the memo.
+    virtual bool attackDeclarationAnswered() { return false; }
     void initTimer();
     virtual int computeActions();
     bool findingCard = false; //computeActions re-entrancy guard, per instance (see the .cpp)
