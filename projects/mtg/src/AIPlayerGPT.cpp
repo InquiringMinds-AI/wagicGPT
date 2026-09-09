@@ -16360,7 +16360,22 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     //missed the wall will never be consumed - write it down before it is lost.
     if (wallMissAbandoned(mWallMissPending, mWallMissBase, userMsg))
         flushWallMissRecord();
-    if (!mRetryActivePrompt.empty())
+    //#W74-CD (O2, wave-73 deck152 HIGH-1). THE ARMED SECOND LEG BELONGS TO ONE ARM.
+    //The async slots are split per arm (#W57-A D5: land-drop and casting each
+    //remember their own request), but this retry state is a single per-seat slot -
+    //so the seam that runs on the NEXT tick, whichever arm it belongs to, matched
+    //`userMsg == mRetryBase` against its own question, failed, and executed the
+    //"decision changed under a pending retry: drop it" branch on the OTHER arm's
+    //leg. Two arms alternating tick by tick therefore destroyed each other's
+    //forced close for ever: measured on a stub endpoint that makes every reply
+    //reasoning-only, 409 forced closes were armed and 38 phase-2 requests were
+    //ever sent, and the live corpus shows the same ratio (33 armed, 2 consumed).
+    //A leg is now only consumed or abandoned by the arm that armed it; the other
+    //arm polls its own slot and leaves it alone, and the arm that owns it reaches
+    //it on its next window.
+    const bool retryArmMatches = mRetryActivePrompt.empty()
+        || mRetryArmLand == asyncLandArm(mPromptTail);
+    if (!mRetryActivePrompt.empty() && retryArmMatches)
     {
         if (userMsg == mRetryBase)
         {
@@ -16435,6 +16450,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBase = userMsg;
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
+        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2): which arm owns this leg
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
         //into this branch is a reply that ended its thinking naturally and
         //simply never wrote an answer line - the rescue is identical, the
@@ -16498,6 +16514,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBudgetMs = retryBudgetMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
+        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2)
         //#W55-E (D23): arm the wall-miss account on a DEADLINE miss. Whichever comes
         //first closes it: the record that consumes this prompt stamps wall_miss,
         //or the decision is abandoned and flushWallMissRecord writes it down.
@@ -16554,6 +16571,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryFirstLatencyMs = mLastLatencyMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg; //identical bytes, own slot
+        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2)
         setNotice("that declaration hit its length limit - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << mRequestSeam << " reply truncated at the answer ceiling ("
                    << mLastRequestAnswerTokens << ") - one re-ask at " << mAnswerFloorTokens);
@@ -16572,7 +16590,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mMainHoldHeldTurn(-1), mMainHoldHeldPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -18187,6 +18205,9 @@ void AIPlayerGPT::logGameEnd()
         {"sibling_window_asks_skipped", mSiblingWindowAsksSkipped},
         {"hold_released_turn", mHoldReleasedTurn},         //#W73-BY (N2 a)
         {"chain_windows_collapsed", mChainWindowsCollapsed}, //#W73-BY (N6)
+        {"chain_windows_only_selfharm", mChainWindowsOnlySelfharm}, //#W74-CD (O13)
+        {"chain_selfharm_rows", mChainSelfharmRows}, //#W74-CD (O13)
+        {"chain_acting_rows", mChainActingRows}, //#W74-CD (O13)
         {"main_phase_windows_skipped", mMainPhaseWindowsSkipped}, //#W73-BY (N16)
         //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
         //per-decision `async_drops` field is consumed with its record, so this
@@ -26109,6 +26130,91 @@ static void mdfcBackFaceLandStatus(Player * p, bool& playable, bool& haveLand)
     }
 }
 
+//#W74-CD (O23, wave-73 deck130 LOW). THE ABANDONMENT PATH THE INSTRUMENT COULD
+//NOT SEE. `dropped after its X was announced` lives in MTGPutInPlayRule::
+//reactToClick (MTGRules.cpp:475) and fires only when a CLICK arrives on a card
+//whose setX is set and which is no longer castable. `130v162` seq 52 -> 53
+//abandoned an announced X by a different route entirely: 9 mana was already
+//floated, the ANNOUNCE_X menu was put to the model, and the model took that
+//menu's own `Decline - do not cast this after all` row - a menu answer, not a
+//click, so reactToClick was never reached and the counter read 0 across the
+//whole corpus while an abandonment had demonstrably happened. This is the line
+//for that path. The SEARCH STRING is kept byte-identical to the rules one
+//(every existing census greps `dropped after its X was announced`); what
+//differs is the site and the floating-mana figure, which is the payment loss
+//the carried docket wants counted. Pure, so PARSETEST pins the wording.
+static string w74XAbandonTraceLine(const string& cardName, int floating)
+{
+    std::ostringstream o;
+    o << "AIPlayerGPT: cast of " << (cardName.empty() ? "this spell" : cardName)
+      << " dropped after its X was announced (the model took the X menu's own decline"
+         " row - " << floating << " mana already paid stays floating and is lost when the"
+         " step ends); announcement cancelled, card stays in hand";
+    return o.str();
+}
+
+//#W74-CD (O4, wave-73 deck146 HIGH 2). THE LAND-DROP MENU MUST NOT HIDE A FACE.
+//The dedicated `Land drop:` question is built from legalLandPlays, which sees a
+//modal double-faced land as ONE card under its front-face name - so `146v162`
+//seq 3 offered `1. Play Brightclimb Pathway / 2. Play Plains / 3. Play no land
+//right now` with the {B} face nowhere on it, the model committed to a face that
+//was not on the menu, and only THEN (seq 4) was the full two-face menu put to
+//it. The drop was decided twice and the first answer anchored the second ("I'll
+//stick with 1... Actually, I'll go with Brightclimb"); same double-ask at
+//deck152 seq 17->18, deck126 seq 23->24 and 31->32, deck130 seq 29->30, and the
+//deck146 game was lost. NOTHING IS REMOVED - the row still plays the card, both
+//faces still reach the face menu - the row now SAYS that the face is chosen at
+//the next window, which is what makes the first answer not a face commitment.
+//Pure over the face's own facts, so PARSETEST proves the text.
+static string w74MdfcLandDropFaceTag(const string& backName, const string& backMana)
+{
+    if (backName.empty())
+        return "";
+    string s = " {TWO FACES, ONE CARD: this card's other face is \"" + backName + "\"";
+    if (!backMana.empty())
+        s += " (taps for " + backMana + ")";
+    s += ", also a land. Taking this row does NOT pick a face - the next window asks"
+         " which face enters the battlefield, and either face spends this same land"
+         " drop. Choose the face there, not here.}";
+    return s;
+}
+
+//The back face of a land in hand, read off the card's own MDFC land-play
+//ability on the action layer (the same ability the casting menu annotates), and
+//resolved through the collection so the NAME is the decklist's casing and the
+//tap mana is the back face's own script. Empty when the card has no land back
+//face. Same walk as mdfcBackFaceLandStatus, scoped to one card.
+static string landTapMana(const string& text); //fwd (defined below)
+static string w74MdfcLandBackFace(Player * p, MTGCardInstance * card, string& backMana)
+{
+    backMana.clear();
+    if (!p || !card)
+        return "";
+    GameObserver * g = p->getObserver();
+    if (!g || !g->mLayers || !g->mLayers->actionLayer())
+        return "";
+    ActionLayer * al = g->mLayers->actionLayer();
+    for (size_t k = 0; k < al->mObjects.size(); k++)
+    {
+        MTGAbility * ma = dynamic_cast<MTGAbility *>((ActionElement *) al->mObjects[k]);
+        if (!ma || ma->source != card)
+            continue;
+        AAFlip * f = asMdfcLandPlay(ma);
+        if (!f || f->flipStats.empty())
+            continue;
+        string backName = f->flipStats;
+        if (MTGCard * bc = MTGCollection()->getCardByName(backName, card->setId))
+            if (bc->data)
+            {
+                backMana = landTapMana(bc->data->text);
+                if (!bc->data->name.empty())
+                    backName = bc->data->name;
+            }
+        return backName;
+    }
+    return "";
+}
+
 //#W56-D (D8): what that row DOES, in one place for both emitters (the priority
 //seam's describeAction row and the CHOOSE_MENU option tail) so the two cannot
 //drift - the reason three Flip-Side texts had to be corrected one wave at a
@@ -27389,6 +27495,30 @@ static string holdReopenNoteText(int unseenRows, int repeats)
     return o.str();
 }
 
+//#W74-CD (O6, wave-73 deck130 HIGH). THE BRACKET AND THE LATCH MUST APPLY THE
+//SAME CARVE-OUT. The hold row's own contract, printed on the same menu, says a
+//row "that differs only by a LIFE TOTAL it projects - what you or they would be
+//at - because that number moves with the board and not with the row" is the SAME
+//row, and holdStillStands enforces exactly that through holdKeyRow. This note
+//did not: it compared RAW row text, so a Siege-Gang row whose only delta was
+//`you would be at 12` -> `11` counted as new, the bracket announced `4 rows above
+//are new`, the run reset and the hold re-opened at every window - eleven windows
+//across two turns of `130v162`, ~90 s each, on a chain the seat could not touch.
+//Both sides through holdKeyRow: the count is then the rows genuinely absent from
+//the held set, which is the second half of the same defect (it reported 4 where
+//one row had moved). Nothing is removed - a row that really changed still counts,
+//and every word of every verdict still keeps its digits. Pure over the two lists,
+//so both halves are pinned in PARSETEST.
+static string holdKeyRow(const string& row); //#W74-CD (O6): defined below, used here
+int w74HoldUnseenRows(const std::set<string>& lastKeys, const std::vector<string>& rows)
+{
+    int unseen = 0;
+    for (size_t i = 0; i < rows.size(); i++)
+        if (!lastKeys.count(holdKeyRow(rows[i])))
+            unseen++;
+    return unseen;
+}
+
 //The per-seam memory the note is measured against, and the note. Updated once
 //per window at each seam; the predicate is holdStillStands' own.
 string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>& rows)
@@ -27397,9 +27527,7 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
     int unseen = 0;
     bool first = (it == mLastMenuRows.end());
     if (!first)
-        for (size_t i = 0; i < rows.size(); i++)
-            if (!it->second.count(rows[i]))
-                unseen++;
+        unseen = w74HoldUnseenRows(it->second, rows); //#W74-CD (O6)
     std::map<string, int>::iterator sq = mMenuRepeatSeq.find(seam);
     if (holdNoteSameWindow(first, unseen, sq == mMenuRepeatSeq.end() ? -1 : sq->second, mTransSeq))
         return mMenuRepeatNote[seam]; //#W62-fix: a rebuild of the window already measured
@@ -27416,7 +27544,7 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
     std::set<string>& mem = mLastMenuRows[seam];
     mem.clear();
     for (size_t i = 0; i < rows.size(); i++)
-        mem.insert(rows[i]);
+        mem.insert(holdKeyRow(rows[i])); //#W74-CD (O6): the same key both sides
     return note;
 }
 
@@ -27563,6 +27691,16 @@ static string holdKeyRow(const string& row)
     static const char * kCombatNextClause = " (combat comes next this turn)";
     static const char * kStackTargetClause =
         " [this cannot target the spell on the stack - battlefield permanents only]";
+    //#W74-CD (O6, wave-73 deck130 HIGH - the SECOND delta on those windows). The
+    //last-offer clause is a statement about the ASK'S OWN BOOKKEEPING (whether
+    //this row retires if the seat passes), not about what the row offers: the
+    //same card, the same cost, the same objects, with or without it. It appeared
+    //on `130v162` seq 36 and was gone at seq 37 on rows the diff otherwise found
+    //identical, which is the other half of the `4 rows above are new` count on a
+    //menu where one row had actually moved. Third named clause, same bounded
+    //shape as the two above; every price and verdict still compares byte for byte.
+    static const char * kLastOfferClause =
+        " {if you pass here, this option is not offered again until the board changes}";
     string core = row;
     const size_t c = core.find(kCombatNextClause);
     if (c != string::npos)
@@ -27570,6 +27708,9 @@ static string holdKeyRow(const string& row)
     const size_t t = core.find(kStackTargetClause); //#W64-AJ
     if (t != string::npos)
         core.erase(t, strlen(kStackTargetClause));
+    const size_t lo = core.find(kLastOfferClause); //#W74-CD (O6)
+    if (lo != string::npos)
+        core.erase(lo, strlen(kLastOfferClause));
     return holdKeyLifeProjectionsNormalised(core); //#W66-AS (H7) + #W66-AU (R1)
 }
 
@@ -28093,6 +28234,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                                    nowRowKeys))
     {
         mSiblingWindowAsksSkipped++;
+        noteMainPhaseHoldSuppressed(); //#W74-CD (O10)
         mHoldWindowsSkipped++;
         if (strcmp(seam, "cast") == 0)
             mHoldWindowsSkippedCast++;
@@ -28158,6 +28300,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
             mHoldTurn = -1;
         return false;
     }
+    noteMainPhaseHoldSuppressed(); //#W74-CD (O10)
     mHoldWindowsSkipped++;
     //#W69-BI (K7, engine MED-5): and the suppression CLASS - which seam's latch
     //closed the window. The two counters sum to the total above.
@@ -29250,6 +29393,31 @@ static string laterStepRouteClause(const string& offendingName,
 //only rows were its own Forgotten Caves at every window (130v126 seq 34-48,
 //one taken). Legality is untouched: the rows stay, the fact rides them.
 const char * kSelfTargetClause = " {this hits YOUR permanent}";
+
+//#W74-CD (O13, wave-73 deck130 HIGH 2 + engine-seat section 2 - MEASURE ONLY, NO
+//COLLAPSE). `chain_windows_collapsed` reads 0 because the collapse asks "does a
+//legal action exist", and on the deck130 chain windows one did: eight rows, of
+//which five aimed the seat's own Siege-Gang damage at its own permanents, one at
+//its own face, one at a target the row itself verdicts as SURVIVES, and three
+//were cycling rows under two draw punishers. Legally non-empty, decision-
+//theoretically empty - and the legal-option boundary forbids collapsing them, so
+//this lane only COUNTS them. The classifier reads the row's OWN rendered
+//verdict, never a re-derivation of the board:
+//  - {this hits YOUR permanent} / targeting you  : the seat's own stuff
+//  - SURVIVES                                    : the row says it does nothing
+//  - [DRAW PRICE                                 : the draw is paid in life
+//NOT covered, deliberately: the eighth row of that menu ("targeting the opponent
+//{right now: takes 2 damage - they would be at 15}") is a real chip at a face 17
+//away, and calling it empty needs a threshold nobody has agreed. So the
+//all-rows counter below is a LOWER bound, and the two row counters beside it are
+//what says how close a window came. Pure - pinned in PARSETEST.
+bool w74RowIsDecisionEmpty(const string& row)
+{
+    return row.find(kSelfTargetClause) != string::npos
+        || row.find("targeting you ") != string::npos
+        || row.find("SURVIVES") != string::npos
+        || row.find("[DRAW PRICE") != string::npos;
+}
 
 //#W51-E D6 (wave-50 seat-123-130 H2): the SAME verdict the spell target menu
 //prints, on the activated-ability target row - "Deal 2 damage with Siege-Gang
@@ -36024,6 +36192,28 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mLastChoice = 0;
         return NULL;
     }
+    //#W74-CD (O13): MEASURE ONLY - this window is about to be asked exactly as
+    //before. Counted only while a chain is actually resolving, which is the
+    //population `chain_windows_collapsed` reports 0 for.
+    if (observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0)
+    {
+        int acting = 0, empty = 0;
+        for (size_t s13 = 0; s13 < shownLines.size(); s13++)
+        {
+            if (w72RowIsDeclineOrHold(holdKeyRow(shownLines[s13])))
+                continue;
+            acting++;
+            if (w74RowIsDecisionEmpty(shownLines[s13]))
+                empty++;
+        }
+        if (acting > 0)
+        {
+            mChainActingRows += acting;
+            mChainSelfharmRows += empty;
+            if (empty == acting)
+                mChainWindowsOnlySelfharm++;
+        }
+    }
     //#W49-S (D8/D3): the one re-ask for this board state. Appending the
     //correction makes this a DIFFERENT question (its own askKey, a fresh
     //call); the board moving on retires it. It is deliberately NOT cleared on
@@ -38190,6 +38380,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //is nearly always right - decline goes LAST, house ordering rule).
         vector<string> opts;
         for (size_t li = 0; li < lands.size(); li++)
+        {
+            //#W74-CD (O4): the OTHER FACE, named on the row that plays the card.
+            string backMana;
+            const string backFace = w74MdfcLandBackFace(this, lands[li].card, backMana);
             opts.push_back("Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel
                            //#W61-T (C7): the tapped-land fact, on the row that plays it.
                            //#W62-W (D1): resolved against the battlefield this
@@ -38197,7 +38391,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                            + landEntersTappedTagResolved(lands[li].card, this)
                            //#W66-AT (deck146 MED): and the half the mana clause
                            //never priced - this land is also a creature.
-                           + landDropThreatTag(lands[li].card->magicText));
+                           + landDropThreatTag(lands[li].card->magicText)
+                           + w74MdfcLandDropFaceTag(backFace, backMana)); //#W74-CD (O4)
+        }
         opts.push_back(kLandDropDeclineRow);
 
         std::ostringstream q;
@@ -39750,6 +39946,43 @@ bool AIPlayerGPT::decisionPending(float dt)
     return false;
 }
 
+//#W74-CD (O2, wave-73 deck152 HIGH-1): a decision whose SECOND LEG is armed and
+//not yet launched. The three arms that schedule one (the two-phase forced close,
+//the transport/deadline retry, the answer-ceiling re-ask) all CONSUME the first
+//reply before they arm, so the async slot is empty and decisionPending is false
+//for exactly the tick between arming and the next poll - and the pass at the
+//bottom of AIPlayerBaka::Act fired in that window, closing the step the decision
+//belonged to. Bounded, because an armed leg that is never re-entered (its seam
+//no longer reached, the window gone) must not hold the phase for ever: after
+//kRetryArmedHoldMs the pass goes through exactly as before, so nothing is
+//removed, only deferred. Time rather than tick count so the pass gate and the
+//[combatentry] trace can both ask in one tick without the reads disagreeing.
+bool AIPlayerGPT::decisionArmed()
+{
+    if (mEndpoint.empty() || mRetryActivePrompt.empty())
+    {
+        mRetryArmedSeen.clear();
+        return false;
+    }
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if (mRetryArmedSeen != mRetryActivePrompt)
+    {
+        mRetryArmedSeen = mRetryActivePrompt;
+        mRetryArmedSince = now;
+        return true;
+    }
+    const long heldMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - mRetryArmedSince).count();
+    if (heldMs >= kRetryArmedHoldMs)
+        return false;
+    return true;
+}
+
+bool AIPlayerGPT::attackDeclarationAnswered()
+{
+    return mAttacksDoneTurn == observer->turn;
+}
+
 //A call still in flight after the patience window is one a person has been
 //watching with no way to act. The duel screen asks rather than deciding for
 //them. No re-entry guard is needed: raising the prompt moves the duel into
@@ -40929,6 +41162,11 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                                        getManaPool()->getConvertedCost()));
                 mPaidPendingCard.clear();
             }
+            //#W74-CD (O23): the abandonment, on the path it actually takes.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+            fprintf(stderr, "%s\n",
+                    w74XAbandonTraceLine(paidFor, getManaPool()->getConvertedCost()).c_str());
+#endif
             act.choice = -1; //applyMenuChoice clicks the menu's own Cancel row
             return 0;
         }
@@ -79711,12 +79949,135 @@ static const char * kW50Y_r94 =
               "#W73-CB F6 MUST-NOT-MATCH a phase that DID reach the casting window is not a"
               " skipped window, however many unresolved-stack ticks it took on the way");
 
+        // ---- #W74-CD (O23): the X abandonment fires on the path it takes ----
+        CHECK(w74XAbandonTraceLine("Starstorm", 9)
+                  .find("dropped after its X was announced") != string::npos,
+              "#W74-CD O23 the trace keeps the rules file's search string, so every existing"
+              " census over `dropped after its X was announced` sees this path too");
+        CHECK(w74XAbandonTraceLine("Starstorm", 9).find("Starstorm") != string::npos
+                  && w74XAbandonTraceLine("Starstorm", 9).find("9 mana already paid")
+                         != string::npos,
+              "#W74-CD O23 ...and it names the card and the floating mana the decline strands"
+              " (130v162 seq 53: 9 mana)");
+        CHECK(w74XAbandonTraceLine("", 0).find("this spell") != string::npos,
+              "#W74-CD O23 an unnamed context still produces a readable line");
+
+        // ---- #W74-CD (O4): the land-drop row names the card's other face ----
+        {
+            const string tag = w74MdfcLandDropFaceTag("Grimclimb Pathway", "{B}");
+            CHECK(tag.find("Grimclimb Pathway") != string::npos
+                      && tag.find("(taps for {B})") != string::npos,
+                  "#W74-CD O4 the land-drop row NAMES the back face and what it taps for");
+            CHECK(tag.find("does NOT pick a face") != string::npos
+                      && tag.find("next window asks") != string::npos,
+                  "#W74-CD O4 ...and says the face is chosen at the NEXT window, which is what"
+                  " stops the first answer anchoring the second (146v162 seq 3 -> 4)");
+            CHECK(tag.find("same land drop") != string::npos,
+                  "#W74-CD O4 ...and that either face spends the same drop");
+            CHECK(w74MdfcLandDropFaceTag("", "{B}").empty(),
+                  "#W74-CD O4 MUST-NOT-MATCH an ordinary single-faced land takes no tag");
+            CHECK(w74MdfcLandDropFaceTag("Boulderloft Pathway", "").find("taps for")
+                      == string::npos,
+                  "#W74-CD O4 a back face whose tap mana is unknown says nothing about it"
+                  " rather than guessing");
+        }
+
+        // ---- #W74-CD (O6): the hold-check bracket applies the row's own carve-out ----
+        // The `130v162` seq 36 -> 37 pair, verbatim in its two deltas: one row
+        // reprices the life total it projects, and two rows lose the last-offer
+        // clause. The bracket said `4 rows above are new`; the menu offered the
+        // same eight actions, and the hold re-opened for eleven windows.
+        {
+            const string lifeA = "Deal 2 damage with Siege-Gang Commander targeting you"
+                                 " {right now: takes 2 damage - you would be at 12}"
+                                 " [cost: {1}{r}, Sacrifice]";
+            const string lifeB = "Deal 2 damage with Siege-Gang Commander targeting you"
+                                 " {right now: takes 2 damage - you would be at 11}"
+                                 " [cost: {1}{r}, Sacrifice]";
+            const string offerA = "cycling with Forgotten Cave [cost: {r}, Cycle]"
+                                  " [DRAW PRICE: this draws 1 card]"
+                                  " {if you pass here, this option is not offered again"
+                                  " until the board changes}";
+            const string offerB = "cycling with Forgotten Cave [cost: {r}, Cycle]"
+                                  " [DRAW PRICE: this draws 1 card]";
+            const string moved  = "Deal 2 damage with Siege-Gang Commander targeting"
+                                  " Fate Unraveler [opponent's battlefield] {right now:"
+                                  " takes 2 damage - SURVIVES (toughness 4)}";
+            const string movedNow = "Deal 2 damage with Siege-Gang Commander targeting"
+                                    " Fate Unraveler [opponent's battlefield] {right now:"
+                                    " takes 2 damage - DIES}";
+            std::set<string> held;
+            held.insert(holdKeyRow(lifeA));
+            held.insert(holdKeyRow(offerA));
+            held.insert(holdKeyRow(moved));
+            std::vector<string> now;
+            now.push_back(lifeB); now.push_back(offerB); now.push_back(moved);
+            CHECK(w74HoldUnseenRows(held, now) == 0,
+                  "#W74-CD O6 a row that differs only by a life total it projects, or only by"
+                  " the last-offer clause, is NOT new - the bracket now applies the carve-out"
+                  " the hold row's own contract prints");
+            std::vector<string> nowMoved;
+            nowMoved.push_back(lifeB); nowMoved.push_back(offerB); nowMoved.push_back(movedNow);
+            CHECK(w74HoldUnseenRows(held, nowMoved) == 1,
+                  "#W74-CD O6 MUST-NOT-MATCH a verdict that really moved (SURVIVES -> DIES) is"
+                  " still new, and is counted ONCE - the count is rows genuinely absent");
+            std::vector<string> nowExtra(nowMoved);
+            nowExtra.push_back("Cast Rorix Bladewing {3}{r}{r}{r} (6/5) [flying] [haste]");
+            CHECK(w74HoldUnseenRows(held, nowExtra) == 2,
+                  "#W74-CD O6 a newly available row counts too");
+        }
+
+        // ---- #W74-CD (O10): the two exemptions the wave-73 corpus demanded ----
+        CHECK(w74MainPhaseSkipCounts(false, false),
+              "#W74-CD O10 a main phase that offered nothing and was not held is still counted");
+        CHECK(!w74MainPhaseSkipCounts(true, false),
+              "#W74-CD O10 MUST-NOT-MATCH a phase that DID offer a casting decision - from"
+              " EITHER arm - is not a skipped phase (233 of wave-73's 375 were this)");
+        CHECK(!w74MainPhaseSkipCounts(false, true),
+              "#W74-CD O10 MUST-NOT-MATCH a phase closed by the seat's OWN hold latch is held,"
+              " not swallowed - counting it double-counts one event with hold_windows_skipped");
+        CHECK(!w74MainPhaseSkipCounts(true, true),
+              "#W74-CD O10 both exemptions together still exempt");
+
         // ---- F7: one meaning for replays_this_game ----
         // Not a CHECK: the fix is structural. logAskReplay no longer TAKES a
         // game total - it reads mAskReplaysReserved, the one combined counter -
         // so the two call sites that disagreed (10 cache replays -> 10, then the
         // first repeat replay -> 1) cannot exist. The compiler is the test.
         cout << "     F7: replays_this_game is written from mAskReplaysReserved only\n";
+    }
+
+    // ==== #W74-CD (O13, MEASURE ONLY): the decision-empty row classifier ====
+    // The eight rows of `130v162` seq 37 verbatim - the menu whose existence is
+    // why `chain_windows_collapsed` reads 0. Nothing here changes what is asked;
+    // these pin what the COUNTER will call empty on the next corpus.
+    {
+        CHECK(w74RowIsDecisionEmpty("Deal 2 damage with Siege-Gang Commander targeting"
+                                    " Goblin #1 [your battlefield] {this hits YOUR permanent}"
+                                    " {right now: takes 2 damage - DIES} [cost: {1}{r}, Sacrifice]"),
+              "#W74-CD O13 a row aimed at the seat's OWN permanent is decision-empty");
+        CHECK(w74RowIsDecisionEmpty("Deal 2 damage with Siege-Gang Commander targeting you"
+                                    " {right now: takes 2 damage - you would be at 11}"),
+              "#W74-CD O13 a row aimed at the seat's own FACE is decision-empty");
+        CHECK(w74RowIsDecisionEmpty("Deal 2 damage with Siege-Gang Commander targeting"
+                                    " Fate Unraveler [opponent's battlefield] {right now: takes"
+                                    " 2 damage - SURVIVES (toughness 4)}"),
+              "#W74-CD O13 a row whose own verdict is SURVIVES is decision-empty");
+        CHECK(w74RowIsDecisionEmpty("cycling with Forgotten Cave [cost: {r}, Cycle]"
+                                    " [DRAW PRICE: this draws 1 card, and the opponent's"
+                                    " Underworld Dreams punishes it]"),
+              "#W74-CD O13 a draw row priced in life is decision-empty");
+        CHECK(!w74RowIsDecisionEmpty("Deal 2 damage with Siege-Gang Commander targeting the"
+                                     " opponent {right now: takes 2 damage - they would be at 15}"),
+              "#W74-CD O13 MUST-NOT-MATCH a real chip at the opponent's face is NOT called empty"
+              " however far from lethal it is - that judgement needs a threshold nobody has set,"
+              " so the all-rows counter is a LOWER bound and says so");
+        CHECK(!w74RowIsDecisionEmpty("Cast Rorix Bladewing {3}{r}{r}{r} (6/5) [flying] [haste]"),
+              "#W74-CD O13 MUST-NOT-MATCH an ordinary cast row is not empty");
+        CHECK(!w74RowIsDecisionEmpty("Deal 2 damage with Pyrite Spellbomb targeting Master of the"
+                                     " Feast [opponent's battlefield] {right now: takes 2 damage"
+                                     " - DIES}"),
+              "#W74-CD O13 MUST-NOT-MATCH a kill on an opposing body is not empty");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

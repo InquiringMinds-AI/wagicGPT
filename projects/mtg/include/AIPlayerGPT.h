@@ -143,6 +143,11 @@ struct NarrationCycleHolder
 //a main phase is counted ONCE, when it ends, and only if it never reached the
 //sorcery-speed casting window.
 inline bool w73MainPhaseSkipCounts(bool castingWasOffered) { return !castingWasOffered; }
+//#W74-CD (O10): the same verdict with the second exemption the wave-73 corpus
+//demanded - a phase the seat's OWN hold latch closed is not a phase that was
+//swallowed. Pure, so both exemptions are pinned in PARSETEST.
+inline bool w74MainPhaseSkipCounts(bool castingWasOffered, bool heldByOwnLatch)
+{ return w73MainPhaseSkipCounts(castingWasOffered || heldByOwnLatch); }
 
 class AIPlayerGPT : public AIPlayerBaka
 {
@@ -178,6 +183,11 @@ public:
     //interrupt-offer timer is kept alive so a slow model cannot time out of
     //its response window. Render draws the "thinking" indicator.
     virtual bool decisionPending(float dt);
+    //#W74-CD (O2): the second half of the same gate - a follow-up leg armed on
+    //this tick and not yet in flight. See AIPlayerBaka::decisionArmed.
+    virtual bool decisionArmed();
+    //#W74-CD (O2): the turn's attack declaration is already in.
+    virtual bool attackDeclarationAnswered();
     //#W54-R: the const, side-effect-free half of the same fact, for the
     //stall floor. An endpoint-less seat is never in flight (all its seams
     //fall through to the heuristic).
@@ -464,6 +474,18 @@ private:
         mMainCastOfferedTurn = observer->turn;
         mMainCastOfferedPhase = (int) observer->getCurrentGamePhase();
     }
+    //#W74-CD (O10, wave-73 engine-seat HIGH-2 + deck126 MED-3): a phase whose
+    //window was closed by THIS SEAT'S OWN HOLD LATCH is not a phase the engine
+    //swallowed - the seat asked for it to be skipped, and the two meters were
+    //double-counting one event (deck126: 58 skips alongside 640 holds, and 0
+    //where holds were 0). Recorded per (turn, phase) by the hold latch itself.
+    void noteMainPhaseHoldSuppressed()
+    {
+        if (!observer)
+            return;
+        mMainHoldHeldTurn = observer->turn;
+        mMainHoldHeldPhase = (int) observer->getCurrentGamePhase();
+    }
     //#W73-CB (F6): close the pending phase. Counts at most once per phase, and
     //only when that phase never reached the casting window.
     void flushMainPhaseSkip()
@@ -472,7 +494,10 @@ private:
             return;
         const bool castingWasOffered = (mMainCastOfferedTurn == mMainSkipPendTurn
                                         && mMainCastOfferedPhase == mMainSkipPendPhase);
-        if (w73MainPhaseSkipCounts(castingWasOffered))
+        //#W74-CD (O10): ...or the seat held this very phase shut itself.
+        const bool heldByOwnLatch = (mMainHoldHeldTurn == mMainSkipPendTurn
+                                     && mMainHoldHeldPhase == mMainSkipPendPhase);
+        if (w74MainPhaseSkipCounts(castingWasOffered, heldByOwnLatch))
         {
             mMainPhaseWindowsSkipped++;
             DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: own main phase (turn "
@@ -760,6 +785,10 @@ private:
     //passes, so the same seam re-reaches the same prompt and consumes the
     //answer when it lands.
     static const int kChoicePending = -2;
+    //#W74-CD (O2): the livelock floor on the armed-leg hold. The follow-up
+    //launches on the very next tick in the ordinary case; this is the ceiling
+    //for the case where its seam is never re-entered.
+    static const long kRetryArmedHoldMs = 2000;
 
     //Async completion: state shared with the worker thread. The worker owns
     //a shared_ptr copy, so a game that ends mid-request cannot leave the
@@ -1530,6 +1559,12 @@ private:
     //answer put the same unanswerable question once per link (`130v162` t10 =
     //20 windows). Counted separately from the life-loop arm it generalises.
     int mChainWindowsCollapsed; //gameend report field
+    //#W74-CD (O13, MEASURE ONLY): chain windows every acting row of which the
+    //render itself calls empty (own permanent / own face / SURVIVES / DRAW
+    //PRICE), and the row totals behind that verdict. No behaviour change.
+    int mChainWindowsOnlySelfharm;
+    int mChainSelfharmRows;
+    int mChainActingRows;
     //#W73-BY (N16): a MAIN PHASE of this seat's own turn that produced no
     //casting window. `own_turn_windows_skipped` cannot see this class (it is
     //scoped to the non-main instant-speed phases), which is why `152v146` t18
@@ -1541,6 +1576,10 @@ private:
     string mMainSkipPendWhy;
     int mMainCastOfferedTurn;
     int mMainCastOfferedPhase;
+    //#W74-CD (O10): the (turn, phase) whose window this seat's own hold latch
+    //closed. Not a skipped phase - a held one.
+    int mMainHoldHeldTurn;
+    int mMainHoldHeldPhase;
     //#W68-BB (J5): the card the last payment receipt was written for, and the
     //step it was written in. A post-announcement decline consumes it and says
     //in the narration that the cast did NOT happen - the receipt alone reads as
@@ -1678,6 +1717,18 @@ private:
     //first (garbage) attempt, summed into mLastLatencyMs at retry completion.
     //mLastRetry: set when the reply handed back was a retry (translog retry=1).
     string mRetryActivePrompt;
+    //#W74-CD (O2): the armed-but-not-yet-launched window. mRetryArmedSeen is the
+    //prompt the hold is currently counted against (a NEW arming restarts the
+    //clock); mRetryArmedSince is when it was first seen. The hold is bounded in
+    //TIME rather than ticks so that decisionArmed() can be asked twice in a tick
+    //(the pass gate and the O2 trace) without the second read changing it.
+    //#W74-CD (O2): which async arm armed the pending leg (land-drop vs casting).
+    //The retry state is one per-seat slot while the async slots are per-arm, so
+    //without this the other arm's next window consumed or discarded a leg that
+    //was never its own. Meaningless while mRetryActivePrompt is empty.
+    bool mRetryArmLand;
+    string mRetryArmedSeen;
+    std::chrono::steady_clock::time_point mRetryArmedSince;
     string mRetryBase;
     string mRetryDoneBase;
     long mRetryFirstLatencyMs;

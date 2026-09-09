@@ -141,6 +141,170 @@ harvest_selftest() {
     return "$fails"
 }
 
+#O26 (wave-73 psp-work NOTES 2026-09-08, the pilot-wedge incident). A WEDGED
+# PILOT IS INVISIBLE TO EVERY WATCHDOG ABOVE. When the inference server stops
+# generating but its API front end keeps answering, each seat waits out its full
+# deadline, writes a `timeout` fallback record and plays on with the heuristic:
+# translog mtimes advance (so no_progress_sweep sees progress), games do not hang
+# (so the hang guard is silent), and latency is not measurable from records that
+# never came back (so the feasibility half stands down). The 4-h check saw "22
+# active logs" and called it normal while six games ran ~8 h on heuristics.
+# A game answered by heuristics is not a corpus game (invariant 00), so this is a
+# STOP condition, not a warning. Predicate: pool the last 3 records of every seat
+# log of THIS run; if at least K of them are pooled and EVERY one is a `timeout`
+# fallback, the pilot is not answering anybody. Pure - the same script backs the
+# --selftest.
+PILOT_STALL_K="${WAGIC_PILOT_STALL_K:-6}"
+pilot_stall_verdict() {
+    #$1 = logdir, $2 = run start epoch, $3 = K -> "STALL <n>" | "OK <n>"
+    python3 - "$1" "$2" "$3" <<'PSY'
+import glob, json, os, sys
+logdir, start, k = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+pooled = []
+for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
+    try:
+        ep = int(os.path.basename(f).split("-")[0])
+    except ValueError:
+        continue
+    if ep < start - 5:
+        continue
+    recs = []
+    ended = False
+    try:
+        for line in open(f, errors="replace"):
+            try: r = json.loads(line)
+            except Exception: continue
+            if r.get("kind") == "gameend":
+                ended = True
+                continue
+            #`recovery` is bookkeeping written BESIDE the failed decision (which
+            #arm answered it), not a decision of its own - counting it as an
+            #answer hides the very tail this predicate exists to read.
+            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery"):
+                continue
+            recs.append(r)
+    except OSError:
+        continue
+    #Only a game STILL IN FLIGHT can be wedged. A finished seat log's tail is
+    #whatever it ended on, and pooling those dilutes the live seats out of the
+    #verdict: over the wave-73 run's own directory the un-scoped predicate reads
+    #OK while six live games sat on nothing but timeouts.
+    if ended:
+        continue
+    pooled.extend(recs[-3:])
+#Every class that means THE ENDPOINT DID NOT ANSWER. A wedged pilot writes
+#`timeout` and, once the deadline can no longer fit a retry, `wall_miss_no_retry`
+#- the wave-73 tails alternate between exactly those two, so keying on the single
+#word "timeout" reads the run as healthy. `unparsed_reply` is deliberately NOT
+#here: that is the model answering badly, which is a play problem, not a wedge.
+SILENT = ("timeout", "wall_miss_no_retry", "wall_miss_unrecorded",
+          "empty_reply", "http_error")
+timeouts = [r for r in pooled if str(r.get("fallback", "")).startswith(SILENT)]
+if pooled and len(pooled) >= k and len(timeouts) == len(pooled):
+    print("STALL %d" % len(timeouts))
+else:
+    print("OK %d" % len(timeouts))
+PSY
+}
+
+pilot_stall_sweep() {
+    local verdict
+    verdict=$(pilot_stall_verdict "$LOGDIR" "$START" "$PILOT_STALL_K") || return 0
+    case "$verdict" in
+        STALL*)
+            set -- $verdict
+            echo ""
+            echo "== PILOT STALL: the last records of every live seat are timeout fallbacks ($2 of $2)."
+            echo "== The endpoint's API may still answer /v1/models while its engine has stopped"
+            echo "== generating (wave-73: frozen at ~17h, GPU pinned, zero throughput). Every seat"
+            echo "== is now playing on the heuristic, and a game answered by heuristics is not a"
+            echo "== corpus game (invariant 00). Stopping the run."
+            echo "== Restart the pilot, then RERUN the affected matchups."
+            touch "$OUTDIR/PILOT-STALL"
+            kill -TERM "$HARNESS_PID" 2>/dev/null
+            return 1;;
+    esac
+    return 0
+}
+
+#O26: both halves of the tripwire, self-tested on crafted logs - the wedge is
+# rare and expensive, so the predicate cannot wait for the next one to be checked.
+pilot_stall_selftest() {
+    local tmp fails=0 v
+    tmp="$(mktemp -d)"
+    #a: every seat's tail is a timeout fallback -> STALL
+    printf '%s\n' \
+      '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":3,"fallback":"timeout"}' > "$tmp/9999999999-ai_baka_deck1-a.jsonl"
+    cp "$tmp/9999999999-ai_baka_deck1-a.jsonl" "$tmp/9999999999-ai_baka_deck2-b.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in STALL\ 6) ;; *) echo "pilot-stall-selftest FAIL: all-timeout tails gave '$v', want 'STALL 6'" >&2; fails=1;; esac
+    #b: one live answer in the pool -> OK (the pilot is answering somebody)
+    printf '%s\n' \
+      '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":3}' > "$tmp/9999999999-ai_baka_deck2-b.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK\ 5) ;; *) echo "pilot-stall-selftest FAIL: a live answer gave '$v', want 'OK 5'" >&2; fails=1;; esac
+    #c: too few records to judge -> OK (never stop a run on one seat's first ask)
+    rm -f "$tmp/9999999999-ai_baka_deck2-b.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK\ 3) ;; *) echo "pilot-stall-selftest FAIL: 3 records gave '$v', want 'OK 3'" >&2; fails=1;; esac
+    #f: the REAL wave-73 tail shape - wall_miss_no_retry, a `recovery` bookkeeping
+    #record between them, then timeout. Keying on the word "timeout" alone, or
+    #counting the recovery record as an answer, reads this as healthy.
+    printf '%s\n' \
+      '{"kind":"wall_miss","seq":1,"fallback":"wall_miss_no_retry"}' \
+      '{"kind":"recovery","seq":2,"recovers_fallback":"wall_miss_no_retry"}' \
+      '{"kind":"priority","seq":3,"fallback":"timeout"}' > "$tmp/9999999999-ai_baka_deck3-c.jsonl"
+    cp "$tmp/9999999999-ai_baka_deck3-c.jsonl" "$tmp/9999999999-ai_baka_deck4-d.jsonl"
+    rm -f "$tmp/9999999999-ai_baka_deck1-a.jsonl" "$tmp/9999999999-ai_baka_deck2-b.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 4)
+    case "$v" in STALL\ 4) ;; *) echo "pilot-stall-selftest FAIL: the wave-73 tail shape gave '$v', want 'STALL 4'" >&2; fails=1;; esac
+    #g: a FINISHED game's tail is not evidence of a wedge - only a live game can be
+    #wedged, and pooling finished seats dilutes the live ones out of the verdict.
+    printf '%s\n' \
+      '{"kind":"priority","seq":1,"fallback":"timeout"}' \
+      '{"kind":"gameend","seq":2,"won":true}' > "$tmp/9999999999-ai_baka_deck5-e.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 8)
+    case "$v" in OK\ 4) ;; *) echo "pilot-stall-selftest FAIL: a finished seat log gave '$v', want 'OK 4'" >&2; fails=1;; esac
+    rm -f "$tmp/9999999999-ai_baka_deck3-c.jsonl" "$tmp/9999999999-ai_baka_deck4-d.jsonl" "$tmp/9999999999-ai_baka_deck5-e.jsonl"
+    printf '%s\n' \
+      '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":3,"fallback":"timeout"}' > "$tmp/9999999999-ai_baka_deck1-a.jsonl"
+    #d: logs from a PREVIOUS run are not this run's evidence
+    mv "$tmp/9999999999-ai_baka_deck1-a.jsonl" "$tmp/1000000000-ai_baka_deck1-a.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 9999999999 6)
+    case "$v" in OK\ 0) ;; *) echo "pilot-stall-selftest FAIL: older-run filter gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #e: the per-game banner count reads the same field
+    v=$(timeout_fallbacks_in "$tmp/1000000000-ai_baka_deck1-a.jsonl")
+    case "$v" in 3) ;; *) echo "pilot-stall-selftest FAIL: per-game count gave '$v', want '3'" >&2; fails=1;; esac
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 7 checks, 0 failed"
+    return "$fails"
+}
+
+#O26 (b): the per-game half of the same fact, for the results banner. A game that
+# finished but answered N decisions on timeout fallbacks is not a clean corpus game
+# and the banner has to say so per game, not corpus-wide.
+timeout_fallbacks_in() {
+    python3 - "$1" <<'TFY'
+import json, sys
+n = 0
+try:
+    for line in open(sys.argv[1], errors="replace"):
+        try: r = json.loads(line)
+        except Exception: continue
+        if r.get("fallback") == "timeout":
+            n += 1
+except OSError:
+    pass
+print(n)
+TFY
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -p) POOL="$2"; shift 2;;
@@ -153,7 +317,7 @@ while [ $# -gt 0 ]; do
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
         --thinking) THINKING="${2:-}"; shift 2;;
-        --selftest) harvest_selftest || exit 1; exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
+        --selftest) harvest_selftest || exit 1; pilot_stall_selftest || exit 1; exec python3 "$(dirname "$0")/regime-gate.py" --selftest;;
         --realtime) FASTCLOCK=0; shift;;
         --fairhand) FAIRHAND=1; shift;;
         --riggedhand) FAIRHAND=0; shift;;
@@ -553,6 +717,7 @@ supervisor() {
     while sleep 45; do
         no_progress_sweep
         regime_gate_sweep || return 1
+        pilot_stall_sweep || return 1
         #Uncapped run: a full game can always fit, the latency projection has
         #nothing to violate - that half stands down (the sweep above does not).
         [ "$GAME_TIMEOUT_S" = "0" ] && continue
@@ -620,6 +785,11 @@ rm -f "$OUTDIR"/.inflight-*
 if [ -f "$OUTDIR/REGIME-FAIL" ]; then
     echo "== CORPUS FAILED: regime gate (thinking=$THINKING). $(cat "$OUTDIR/REGIME-FAIL") =="
     echo "== The logs in $OUTDIR are NOT a corpus and must not be reviewed as one. =="
+    exit 1
+fi
+if [ -f "$OUTDIR/PILOT-STALL" ]; then
+    echo "== CORPUS FAILED: the pilot stalled (see above). The games still running when it"
+    echo "== stalled were answered by the heuristic and are NOT corpus games; rerun them. =="
     exit 1
 fi
 if [ -f "$OUTDIR/INFEASIBLE" ]; then
@@ -692,6 +862,26 @@ for i, line in enumerate(open(res)):
 print(f"\n== results ({sum(games.values())//2} games, {to} timeouts/draws, {adj} life-adjudicated at cap, {crash} CRASHED, {hung} HUNG - no winner, rerun owed) ==")
 for d in sorted(games, key=lambda x:-(wins[x]/games[x] if games[x] else 0)):
     print(f"  deck{d:<4s} {wins[d]}/{games[d]} wins  ({100*wins[d]/games[d]:.0f}%)")
+#O26 (b): per-game timeout-fallback counts. The wave-73 corpus lost six games to
+# a wedged pilot and the banner said nothing: the games finished, so nothing in the
+# summary distinguished a full GPT game from one the heuristic played out. Any
+# non-zero here means that seat spent decisions at the wall - read them before
+# treating the game as evidence, and rerun the matchup if the count is material.
+to_fb = {}
+for f in files:
+    n = 0
+    for line in open(f, errors="replace"):
+        try: r = json.loads(line)
+        except: continue
+        if r.get("fallback") == "timeout": n += 1
+    if n: to_fb[os.path.basename(f)] = n
+print(f"\n== timeout fallbacks (decisions the model never answered; the heuristic played them) ==")
+if not to_fb:
+    print("  none - every decision in every seat log was answered by the model")
+else:
+    print(f"  {sum(to_fb.values())} across {len(to_fb)} of {len(files)} seat logs - these games are NOT clean corpus games")
+    for b, n in sorted(to_fb.items(), key=lambda kv: -kv[1]):
+        print(f"  {n:5d}  {b}")
 print(f"\nlogs + results.tsv in: {out}")
 PY
 
