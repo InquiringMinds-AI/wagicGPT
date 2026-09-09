@@ -1452,6 +1452,51 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertchoosertargeted ") == 0)
+    {
+        //#W74-CC (O3): is the chooser the engine is WAITING on a real
+        //`target(...)` pick, or the untargeted `notaTarget(...)` chooser an
+        //EDICT uses? The GPT render's FORCED SACRIFICE header now keys on that
+        //difference (a modal card's magicText carries every mode, so reading
+        //"sacrifice" off the card cannot say which mode is acting), and the
+        //difference is invisible to every zone assertion.
+        //Syntax: assertchoosertargeted <0 notatarget|1 targeted>
+        int expect = atoi(action.substr(22).c_str());
+        TargetChooser * ctc = observer->getCurrentTargetChooser();
+        int got = ctc ? (ctc->targetter != NULL ? 1 : 0) : -1;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertchoosertargeted: expected " << expect
+                      << " got " << got << (ctc ? "" : " (no chooser armed)")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
+    else if (action.find("assertghostformlive ") == 0)
+    {
+        //#W74-CC (O1, wave-73 engine-seat HIGH-1): the ghostform counter gloss
+        //("killing it is not removal") is conditional on the GRANTED return
+        //trigger still being on the creature, and the wave-73 predicate read
+        //that off a menu text the grant never produces - so it answered 0 on
+        //56 of 56 renders where the trigger was live. The gloss is a GPT render
+        //string, which no zone or P/T assertion can see; this command asks the
+        //predicate itself, so a fixture that resolves Kaya the Inexorable's +1
+        //is RED on the pre-fix tree and GREEN after.
+        //Syntax: assertghostformlive <0|1> <card name>
+        string rest = action.substr(20);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.c_str());
+        string cname = (sp == string::npos) ? "" : rest.substr(sp + 1);
+        MTGCardInstance * gc = getCard(cname);
+        int got = gc ? (gptGhostformGrantLive(gc) ? 1 : 0) : -1;
+        if (!gc || got != expect)
+        {
+            std::cerr << "TESTSUITE assertghostformlive: '" << cname << "' expected "
+                      << expect << " got " << got << (gc ? "" : " (no such card)")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertabilitycount ") == 0)
     {
         //#W54-I: pin HOW MANY entries a click on this card puts in its ability
