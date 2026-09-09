@@ -1723,6 +1723,11 @@ private:
     //#W68-BB (J9): the crack-back verdict WORD, recomputed off the live board,
     //as a member of the held row set.
     string crackBackVerdictNow();
+    //#W74-CH: the PENDING STACK's death verdict, the same shape - a synthetic
+    //marker row in the held set, so a hold taken over a survivable stack is
+    //re-opened the window that stack turns lethal (the action key strips the
+    //`{answers the stack: ...}` clause J9 printed on the decline rows).
+    string stackDeathVerdictNow();
     //#W61-U (C14): the prompt-only note stating which of the two hold regimes
     //this menu is in, measured against the previous window's rows at this seam.
     string holdReopenNote(const char * seam, const std::vector<string>& rows);
