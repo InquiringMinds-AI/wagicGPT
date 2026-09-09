@@ -2729,6 +2729,63 @@ static bool loyaltyRowMakesCreatureToken(const string& lowLabel)
     return false;
 }
 
+//#W74-CF (F8, Astra review finding 8). HASTE IS NOT ONLY PRINTED ON THE WALKER.
+//O15's token clause read "haste" out of the planeswalker's own card text, so a
+//seat controlling Fervor (`lord(creature|myBattlefield) haste`) was told its brand
+//new Sorin Vampire "cannot attack until your next turn" - categorically false, and
+//false in the direction that costs an attack. The token does not exist yet, so
+//basicAbilities cannot be asked; the grant is read off the BATTLEFIELD statics
+//instead, on the same script text every other scanner here reads. A lord line
+//scoped to the controller's own creatures that grants haste is the shape (Fervor,
+//Anger, Concordant Crossroads-style effects all render as one).
+//Pure over one permanent's script text, so PARSETEST proves both halves.
+static bool w74ScriptGrantsHasteToMine(const string& scriptIn)
+{
+    string sc;
+    for (size_t q = 0; q < scriptIn.size(); q++)
+        sc += (char) tolower((unsigned char) scriptIn[q]);
+    size_t at = 0;
+    while ((at = sc.find("lord(", at)) != string::npos)
+    {
+        const size_t eol = sc.find('\n', at);
+        const string line = sc.substr(at, (eol == string::npos) ? string::npos : eol - at);
+        at += 5;
+        if (line.find("creature") == string::npos)
+            continue;
+        //the seat's OWN creatures (mybattlefield); an opponent-scoped lord grants
+        //this token nothing.
+        if (line.find("mybattlefield") == string::npos)
+            continue;
+        if (line.find("haste") != string::npos)
+            return true;
+    }
+    return false;
+}
+//#W74-CF (F8): the board half - any static the seat controls that grants haste to
+//its own creatures. Read here, not from the walker's printed text, because the
+//token whose eligibility the row states does not exist yet. The script gather is
+//spelled out rather than borrowed from scriptAllZones, which lives past a
+//file-local namespace boundary this early in the file.
+static bool w74BattlefieldGrantsHaste(Player * seat)
+{
+    if (!seat || !seat->game || !seat->game->inPlay)
+        return false;
+    MTGGameZone * bf = seat->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        string all = c->magicText;
+        for (map<string, string>::const_iterator mi = c->magicTexts.begin();
+             mi != c->magicTexts.end(); ++mi)
+            all += (all.empty() ? "" : "\n") + mi->second;
+        if (w74ScriptGrantsHasteToMine(all))
+            return true;
+    }
+    return false;
+}
+
 static string loyaltyRowConsequenceTag(const string& label, bool hasteText, int emblemsLive)
 {
     string low = label;
@@ -6627,9 +6684,23 @@ static string foldManaBillClauses(const string& row)
 //figures the row already computes: spending baseCMC + X leaves maxX - X, so the
 //keep-X is maxX - need. Stated in the SAME `<card> needs N` grammar the pilot
 //already reads on every other row. Pure over its six arguments.
+//#W74-CF (F6, Astra review finding 6). THE KEEP-X IS NOT `maxX - keepNeed`.
+//`maxAnnounceableX` measures the largest X the COLOUR of the X pip can buy
+//({X:black} counts only black sources); the kept card's need is generic mana off
+//the whole board, so subtracting one from the other mixes two currencies and
+//prints a CATEGORICAL falsehood on ordinary one-mana sources: Drain Life
+//({1}{B}{X:black}) with four Swamps and seven colourless sources gives maxX 3 and
+//a Staff of Nin needing 6, so the row said "no X on this row leaves it payable,
+//not even X=0" - while X=3 pays the {1}{B}, three black for the X, and leaves six
+//for the Staff. The keep-X is computed from the TOTAL payable mana after the
+//fixed cost, and the colour limit then applies to X alone: keepX = min(maxX,
+//totalMana - baseCMC - keepNeed). `totalMana` < 0 means "the X is not colour
+//limited", i.e. the whole remainder is X's, which is the pre-existing arithmetic
+//byte for byte.
 static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
                                      const string& keepName = string(),
-                                     const string& keepCost = string(), int keepNeed = -1)
+                                     const string& keepCost = string(), int keepNeed = -1,
+                                     int totalMana = -1)
 {
     if (maxX < 0)
         return "";
@@ -6650,9 +6721,16 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
         if (!keepCost.empty())
             o << " " << keepCost;
         o << " in your hand needs " << keepNeed << ": ";
-        if (maxX - keepNeed >= 0)
+        //#W74-CF (F6): the spend-side arithmetic, in ONE currency. Everything the
+        //cast spends (baseCMC + X) comes out of the same pool the kept card is
+        //paid from; the colour ceiling caps X and nothing else.
+        const int pool = (totalMana >= 0) ? totalMana : (maxX + baseCMC);
+        int keepX = pool - baseCMC - keepNeed;
+        if (keepX > maxX)
+            keepX = maxX;
+        if (keepX >= 0)
             o << "the largest X that still leaves it payable this turn is X="
-              << (maxX - keepNeed);
+              << keepX;
         else
             o << "no X on this row leaves it payable this turn, not even X=0";
     }
@@ -16628,11 +16706,69 @@ static bool gptSeamIsADeclaration(const string& seam)
            || seam == "reveal" || seam == "bottom";
 }
 
+//#W74-CF (F1, Astra review finding 1). PER-ARM RETRY STORAGE.
+//`retryArmMatches` (#W74-CD O2) stopped the wrong arm CONSUMING or ABANDONING a
+//leg, but the three arming branches below still wrote the single shared record
+//whoever was running: land's primary reply arms a forced close; casting then
+//launches and finishes its own primary and arms ANOTHER forced close, which
+//overwrites land's base, prompt and prefill while land's second leg is still
+//outstanding. Land's next poll then sends its ORDINARY prompt - a different slot
+//key from a forced-close request - so the completed leg is discarded and the
+//decision falls to the heuristic. Nothing about the ownership boolean, the
+//delivery-ratio experiment or the two-second pass hold prevents that.
+//The slot is now per arm. This function is the ONLY mutator: it leaves `live`
+//holding this arm's leg (or empty) and the other arm's leg parked, untouched.
+void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm)
+{
+    if (!live.activePrompt.empty() && live.armLand == landArm)
+        return; //ours is already live
+    if (!park.activePrompt.empty() && park.armLand == landArm)
+    {
+        std::swap(live, park); //ours is parked: bring it back, park theirs
+        return;
+    }
+    if (!live.activePrompt.empty())
+        std::swap(live, park); //theirs is live and ours is empty: park theirs
+}
+
+void AIPlayerGPT::selectRetryArm(bool landArm)
+{
+    GptRetrySlot live;
+    live.activePrompt = mRetryActivePrompt;
+    live.base = mRetryBase;
+    live.doneBase = mRetryDoneBase;
+    live.ceilingDoneBase = mCeilingReaskDoneBase;
+    live.forceClosePrefill = mForceClosePrefill;
+    live.firstLatencyMs = mRetryFirstLatencyMs;
+    live.budgetMs = mRetryBudgetMs;
+    live.armLand = mRetryArmLand;
+    live.phase1Length = mForceClosePhase1Length;
+    gptRetrySelectArm(live, mRetryPark, landArm);
+    mRetryActivePrompt = live.activePrompt;
+    mRetryBase = live.base;
+    mRetryDoneBase = live.doneBase;
+    mCeilingReaskDoneBase = live.ceilingDoneBase;
+    mForceClosePrefill = live.forceClosePrefill;
+    mRetryFirstLatencyMs = live.firstLatencyMs;
+    mRetryBudgetMs = live.budgetMs;
+    mForceClosePhase1Length = live.phase1Length;
+    //ownership is stamped ONCE, here: after the swap the live slot is either
+    //empty (this arm is about to arm it) or already this arm's, so every arming
+    //branch below inherits the right owner and none can forget to set it. That
+    //is also finding 2 - the decode-garbage branch that set mRetryActivePrompt
+    //without ever setting mRetryArmLand, leaving a fresh seat's land-drop retry
+    //owned by "casting" and unreachable from the land arm that armed it.
+    mRetryArmLand = landArm;
+}
+
 int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
                                     const char * seam)
 {
     if (seam && *seam)
         mRequestSeam = seam; //#W68-BA (J3): the cap this seam decodes under
+    //#W74-CF (F1): this arm's own retry slot, before anything reads or writes it.
+    const bool w74ThisArmIsLand = asyncLandArm(mPromptTail);
+    selectRetryArm(w74ThisArmIsLand);
     //Mid-retry: poll the retry prompt (buildRequestBody sees mRetryActivePrompt
     //and uses the tight retry max_tokens). If the decision drifted, abandon the
     //pending retry and fall through to a fresh poll of the new decision.
@@ -16653,8 +16789,11 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     //A leg is now only consumed or abandoned by the arm that armed it; the other
     //arm polls its own slot and leaves it alone, and the arm that owns it reaches
     //it on its next window.
+    //#W74-CF (F1): selectRetryArm() above has already made this true - the live
+    //slot is this arm's or empty. Kept as an assertion of that invariant rather
+    //than as the gate it used to be.
     const bool retryArmMatches = mRetryActivePrompt.empty()
-        || mRetryArmLand == asyncLandArm(mPromptTail);
+        || mRetryArmLand == w74ThisArmIsLand;
     if (!mRetryActivePrompt.empty() && retryArmMatches)
     {
         if (userMsg == mRetryBase)
@@ -16730,7 +16869,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBase = userMsg;
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
-        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2): which arm owns this leg
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
         //into this branch is a reply that ended its thinking naturally and
         //simply never wrote an answer line - the rescue is identical, the
@@ -16794,7 +16932,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBudgetMs = retryBudgetMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
-        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2)
         //#W55-E (D23): arm the wall-miss account on a DEADLINE miss. Whichever comes
         //first closes it: the record that consumes this prompt stamps wall_miss,
         //or the decision is abandoned and flushWallMissRecord writes it down.
@@ -16851,7 +16988,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryFirstLatencyMs = mLastLatencyMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg; //identical bytes, own slot
-        mRetryArmLand = asyncLandArm(mPromptTail); //#W74-CD (O2)
         setNotice("that declaration hit its length limit - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << mRequestSeam << " reply truncated at the answer ceiling ("
                    << mLastRequestAnswerTokens << ") - one re-ask at " << mAnswerFloorTokens);
@@ -32333,18 +32469,56 @@ static string ownClockTag(const string& name, int copies, int perTurn, int oppLi
     return o.str();
 }
 
+//#W74-CF (F7, Astra review finding 7). A CLOCK THAT CANNOT TICK IS NOT A CLOCK.
+//The script scan proves the RATE, never that the source can pay for it again next
+//turn. A permanent that cannot untap (DOESNOTUNTAP, or frozen) supplies at most
+//the one activation it is standing on - a tapped one supplies none at all - so
+//the row promised "the opponent reaches 0 in 2 more turns" off a pinger that will
+//never tap again. Only a source that untaps in its controller's untap step
+//RECURS, which is what the sentence claims; anything else is dropped, which
+//understates the clock and never invents one. Pure over the board.
+//Pure over the four board facts, so PARSETEST proves the gate without a game.
+static bool w74ClockSourceRecurs(bool cannotUntap, bool creature, bool sick, bool haste)
+{
+    //the engine's own "cannot untap" pair (the same one the tap/untap tags read)
+    if (cannotUntap)
+        return false;
+    //a creature that entered this turn taps for the first time NEXT turn: its
+    //rate is real but its first tick is a turn later than this sentence says.
+    if (creature && sick && !haste)
+        return false;
+    return true;
+}
+
+static bool w74ClockSourceRecurs(MTGCardInstance * c)
+{
+    if (!c)
+        return false;
+    return w74ClockSourceRecurs(
+        c->basicAbilities[Constants::DOESNOTUNTAP] != 0 || c->frozen >= 1,
+        c->isCreature() != 0, c->hasSummoningSickness() != 0,
+        c->has(Constants::HASTE));
+}
+
 //The board half: the seat's own repeatable damage, summed off the battlefield.
-static string ownClockTagFor(Player * seat, Player * opp)
+//#W74-CF (F7): `myLife`/`incomingDamage` are the LETHAL-INCOMING gate the O9 lane
+//skipped - a rate the seat does not live to spend is not a clock it owns, so a
+//known incoming hit that reaches 0 suppresses the sentence entirely rather than
+//inviting the seat to race a race it has already lost. Negative = nothing known.
+static string ownClockTagFor(Player * seat, Player * opp, int myLife = -1,
+                             int incomingDamage = 0)
 {
     if (!seat || !seat->game || !seat->game->inPlay || !opp)
         return string();
+    if (myLife >= 0 && incomingDamage > 0 && myLife - incomingDamage <= 0)
+        return string(); //#W74-CF (F7): the seat dies first; there is no clock to own
     string bestName;
     int copies = 0, perTurn = 0;
     std::map<string, int> byName;
     for (int i = 0; i < seat->game->inPlay->nb_cards; i++)
     {
         MTGCardInstance * c = seat->game->inPlay->cards[i];
-        if (!c)
+        if (!c || !w74ClockSourceRecurs(c)) //#W74-CF (F7)
             continue;
         const int d = w74TapOnlyDamagePerActivation(scriptAllZones(c));
         if (d <= 0)
@@ -33402,7 +33576,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                         && game->inPlay->cards[ei]->hasType(Subtypes::TYPE_EMBLEM))
                         emblemsLive++;
             out << loyaltyRowConsequenceTag(action.ability->getMenuText(),
-                                            lowTxt.find("haste") != string::npos,
+                                            lowTxt.find("haste") != string::npos
+                                                //#W74-CF (F8): ...or a battlefield
+                                                //static that grants it (Fervor).
+                                                || w74BattlefieldGrantsHaste(this),
                                             emblemsLive);
         }
         //#W47 R1, the row half: when THIS activation draws and the opponent has
@@ -36557,7 +36734,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //the option the sentence already promised. It stays OUT of shownLines for
     //the same reason it always was: the hold latch's row set and the option-set
     //key are about the ACTING rows, and a decline is not a play.
-    tail << "0. " << kPassPriorityRowText << ownClockTagFor(this, opponent())
+    tail << "0. " << kPassPriorityRowText
+         << ownClockTagFor(this, opponent(), life, //#W74-CF (F7)
+                           (mIncomingCombatTurn == observer->turn) ? mIncomingCombatDamage : 0)
          << declineRowReaskTag(declinedN) << "\n"; //#W74-CE (O9, O11)
     //#W53-N (D2): where the option list ends and the per-ask facts begin. The
     //prompt-only decline annotation is spliced in here, so it reads with the
@@ -39301,7 +39480,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                 && !card->has(Constants::ANYTYPEOFMANA),
                                                 keep ? keep->getDisplayName() : string(),
                                                 keep ? keep->getManaCost()->toString() : string(),
-                                                keep ? keepNeed : -1);
+                                                keep ? keepNeed : -1,
+                                                untappedSources); //#W74-CF (F6)
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             }
             int used = 0;
@@ -40121,7 +40301,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             declineRow += passRowCleanupPriceTag(observer->currentPlayer == this,
                                                  cuHand, cuLimit, cuPer, cuPunishers,
                                                  life, cuStacked);
-            declineRow += ownClockTagFor(this, opponent()); //#W74-CE (O9)
+            declineRow += ownClockTagFor(this, opponent(), life, //#W74-CE (O9) / #W74-CF (F7)
+                                         (mIncomingCombatTurn == observer->turn)
+                                             ? mIncomingCombatDamage : 0);
             declineRowIdx = (int) menu.size();
             menu.push_back(declineRow); //the decline goes LAST among the cast rows
         }
@@ -40576,15 +40758,20 @@ bool AIPlayerGPT::decisionPending(float dt)
 //[combatentry] trace can both ask in one tick without the reads disagreeing.
 bool AIPlayerGPT::decisionArmed()
 {
-    if (mEndpoint.empty() || mRetryActivePrompt.empty())
+    //#W74-CF (F1): the storage is per arm now, so an armed leg may be sitting in
+    //the park while the other arm runs. It is still an armed leg and the pass at
+    //the bottom of Act must still wait for it.
+    const string& armedPrompt = !mRetryActivePrompt.empty() ? mRetryActivePrompt
+                                                            : mRetryPark.activePrompt;
+    if (mEndpoint.empty() || armedPrompt.empty())
     {
         mRetryArmedSeen.clear();
         return false;
     }
     const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    if (mRetryArmedSeen != mRetryActivePrompt)
+    if (mRetryArmedSeen != armedPrompt)
     {
-        mRetryArmedSeen = mRetryActivePrompt;
+        mRetryArmedSeen = armedPrompt;
         mRetryArmedSince = now;
         return true;
     }
@@ -40721,6 +40908,34 @@ static string xAnnounceLibraryNote(int capX, int drawPerX, int library, int rese
     else
         o << "NO value on this menu above 0 leaves the library able to pay them.";
     return o.str();
+}
+
+//#W74-CF (O19 verification gap, Astra shipping note). The wave-74 O19 pins are
+//hand-built permutations beside the seam, not the seam's own code: nothing in
+//PARSETEST ran a menu through RENDER -> ANSWER -> APPLY in the new order, so a
+//display permutation and a map-back that disagreed would both have passed. These
+//two functions ARE the seam's code, lifted out unchanged, so the round trip is
+//provable: permute the contract-space rows into display order, then map a picked
+//display row back to the contract's index==X space.
+static bool w74XPermuteToClimbing(vector<string>& shown, int capX)
+{
+    if (capX < 1 || shown.size() != (size_t)(capX + 1))
+        return false;
+    vector<string> disp;
+    disp.reserve(shown.size());
+    for (int xv = 1; xv <= capX; xv++)
+        disp.push_back(shown[(size_t)(capX - xv)]);
+    disp.push_back(shown[(size_t) capX]); //X = 0
+    shown.swap(disp);
+    return true;
+}
+
+static int w74XPickToContractIndex(int pick, int capX, int rowCount, bool climbing,
+                                   int optionCount)
+{
+    if (pick < 0 || pick >= rowCount)
+        return pick;
+    return climbing ? ((pick < capX) ? pick + 1 : 0) : (optionCount - 1 - pick);
 }
 
 static string announceXHeader(const string& spell, int capX, bool canDecline = true,
@@ -41755,17 +41970,9 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //into the order the pilot answers in, so that option N announces X = N
         //and X = 0 is the last rung. Nothing above this line moves, and the
         //pick is mapped back below.
-        bool xClimbing = false; //#W74-CC (O19)
-        if (capX >= 1 && shown.size() == (size_t)(capX + 1))
-        {
-            vector<string> disp;
-            disp.reserve(shown.size());
-            for (int xv = 1; xv <= capX; xv++)
-                disp.push_back(shown[(size_t)(capX - xv)]);
-            disp.push_back(shown[(size_t) capX]); //X = 0
-            shown.swap(disp);
-            xClimbing = true;
-        }
+        //#W74-CF: the permutation itself now lives in w74XPermuteToClimbing, whose
+        //inverse (w74XPickToContractIndex, below) is pinned against it end to end.
+        const bool xClimbing = w74XPermuteToClimbing(shown, capX); //#W74-CC (O19)
         {
             //Register: the announcement, not the menu question. In SHOWN space.
             string xName = ctx ? ctx->getDisplayName() : string("the spell");
@@ -41826,8 +42033,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //#W74-CC (O19): shown space -> the contract's index==X space. Display
         //row j (0-based) is X = j+1 while j < capX, and the last rung is X = 0.
         if (pick >= 0 && pick < (int) xRowCount)
-            pick = xClimbing ? ((pick < capX) ? pick + 1 : 0)
-                             : ((int) req.optionTexts.size() - 1 - pick);
+            pick = w74XPickToContractIndex(pick, capX, (int) xRowCount, xClimbing,
+                                           (int) req.optionTexts.size()); //#W74-CF
         else if (pick < 0)
             pick = AIPlayerBaka::selectMenuOption(); //heuristic: max affordable X
         if (pick >= (int) req.optionTexts.size())
@@ -44602,6 +44809,54 @@ static bool lifeToDamageConverterScript(const string& magicText)
     return false;
 }
 
+//#W74-CF (F5, Astra review finding 5). THE CONVERTER HAS A RATE, AND THE RATE IS
+//NOT ALWAYS ONE-FOR-ONE. `lifeToDamageConverterScript` is a PREDICATE - it
+//accepts Sanguine Bond (`:life:-thatmuch opponent`, every point gained is a point
+//lost) and Cliffhaven Vampire (`:life:-1 opponent`, ONE life per gain EVENT,
+//whatever the size of the gain) alike, and O5's caller used it as proof that
+//every lifelink point converts. On a 4-power lifelink attacker into an opponent
+//at 8, Cliffhaven converts 1, not 4: the row printed 0 life (lethal) where the
+//true unblocked result is 3 - a false fact in the dangerous direction, which is
+//exactly the class O5 exists to close. This function returns the rate instead of
+//a yes/no: `proportional` for the `thatmuch` form, otherwise the fixed number of
+//life the opponent loses per gain event. Pure over the script text.
+static int lifeToDamageConverterRate(const string& magicText, bool& proportional)
+{
+    proportional = false;
+    int fixed = 0;
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t s = line.find_first_not_of(" \t");
+        if (s == string::npos || line.compare(s, 8, "@lifeof(") != 0)
+            continue;
+        size_t colon = line.find(":life:-", s);
+        if (colon == string::npos)
+            continue;
+        if (line.find("opponent", colon) == string::npos)
+            continue;
+        size_t d = colon + 7; //past ":life:-"
+        if (line.compare(d, 8, "thatmuch") == 0)
+        {
+            proportional = true;
+            continue;
+        }
+        int n = 0;
+        bool digits = false;
+        while (d < line.size() && isdigit((unsigned char) line[d]))
+        {
+            n = n * 10 + (line[d++] - '0');
+            digits = true;
+        }
+        if (digits && n > 0)
+            fixed += n;
+    }
+    return proportional ? 0 : fixed;
+}
+
 //#W49-U D5: the MIRROR half (Exquisite Blood: `@lifelostfoeof(player):life:
 //thatmuch controller` - whenever an opponent loses life, its controller gains
 //that much). Alone it is a gain engine; next to a converter of the same side
@@ -47090,21 +47345,41 @@ int AIPlayerGPT::chooseAttackers()
             //the blockers' ceiling counts it.
             int selfConvLifelink = 0;
             {
-                bool ownConverter = false;
+                //#W74-CF (F5): the converters' own RATES, off the battlefield -
+                //a proportional converter (Sanguine Bond) converts every point
+                //gained and TWO of them convert it twice; a fixed converter
+                //(Cliffhaven Vampire) converts its printed number once per gain
+                //EVENT, whatever the size of the gain. The boolean this replaced
+                //priced a 1-life trigger as if it were the whole lifelink total.
+                int propConverters = 0, fixedPerEvent = 0;
                 if (game && game->inPlay)
-                    for (int ci = 0; ci < game->inPlay->nb_cards && !ownConverter; ci++)
-                        if (game->inPlay->cards[ci]
-                            && lifeToDamageConverterScript(game->inPlay->cards[ci]->magicText))
-                            ownConverter = true;
-                if (ownConverter)
+                    for (int ci = 0; ci < game->inPlay->nb_cards; ci++)
+                    {
+                        if (!game->inPlay->cards[ci])
+                            continue;
+                        bool prop = false;
+                        const int rate = lifeToDamageConverterRate(
+                            game->inPlay->cards[ci]->magicText, prop);
+                        if (prop)
+                            propConverters++;
+                        else if (rate > 0)
+                            fixedPerEvent += rate;
+                    }
+                if (propConverters > 0 || fixedPerEvent > 0)
+                {
+                    int gainPoints = 0, gainEvents = 0;
                     for (size_t ai = 0; ai < attackers.size() && ai < rowPower.size(); ai++)
                     {
                         MTGCardInstance * ac = attackers[ai];
                         if (!ac || !ac->basicAbilities[Constants::LIFELINK] || ac->power <= 0)
                             continue;
-                        selfConvLifelink += ac->power
-                            * (ac->basicAbilities[Constants::DOUBLESTRIKE] ? 2 : 1);
+                        const int mult = ac->basicAbilities[Constants::DOUBLESTRIKE] ? 2 : 1;
+                        gainPoints += ac->power * mult;
+                        gainEvents += mult;
                     }
+                    selfConvLifelink = propConverters * gainPoints
+                                       + fixedPerEvent * gainEvents;
+                }
             }
             totalsTail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
@@ -81214,6 +81489,233 @@ static const char * kW50Y_r94 =
               "#W74-CE O25 MUST-NOT-MATCH a row with no reserve verdict names nothing");
         CHECK(!planNamesStrandedCard("cast it", "abc"),
               "#W74-CE O25 a name under four characters is never matched");
+    }
+
+    cout << "\n[#W74-CF] wave-74 lane CF: the Astra review's nine findings\n";
+
+    cout << "\n[#W74-CF] F1 an arm's armed second leg survives the other arm's arming\n";
+    {
+        // REPRO the interleaving of finding 1: land arms a forced close; casting
+        // then runs a whole decision of its own and arms ANOTHER forced close.
+        GptRetrySlot live, park;
+        gptRetrySelectArm(live, park, true);        //land polls: nothing anywhere
+        live.activePrompt = "FC:landQ";             //land arms its forced close
+        live.base = "landQ";
+        live.forceClosePrefill = "land trace";
+        live.armLand = true;
+        gptRetrySelectArm(live, park, false);       //casting's window
+        CHECK(live.activePrompt.empty() && park.activePrompt == "FC:landQ"
+                  && park.forceClosePrefill == "land trace",
+              "#W74-CF F1 REPRO the casting arm finds an EMPTY slot - land's leg is parked,"
+              " not standing there to be overwritten");
+        live.activePrompt = "FC:castQ";             //casting arms its own
+        live.base = "castQ";
+        live.forceClosePrefill = "cast trace";
+        live.armLand = false;
+        gptRetrySelectArm(live, park, true);        //land's next window
+        CHECK(live.activePrompt == "FC:landQ" && live.base == "landQ"
+                  && live.forceClosePrefill == "land trace",
+              "#W74-CF F1 REPRO land polls its OWN forced-close prompt - the base, prompt and"
+              " prefill the casting arm used to overwrite");
+        CHECK(park.activePrompt == "FC:castQ" && park.base == "castQ",
+              "#W74-CF F1 casting's outstanding leg is parked intact, not discarded");
+        gptRetrySelectArm(live, park, true);
+        CHECK(live.activePrompt == "FC:landQ" && park.activePrompt == "FC:castQ",
+              "#W74-CF F1 the select is idempotent: a second poll by the same arm moves nothing");
+        // the per-arm spend markers travel with their own arm
+        live.doneBase = "landQ";
+        gptRetrySelectArm(live, park, false);
+        CHECK(live.doneBase != "landQ",
+              "#W74-CF F1 the ONE-retry marker is per arm too - land spending its retry does"
+              " not spend casting's");
+    }
+
+    cout << "\n[#W74-CF] F5 a fixed-one-life converter is not a proportional one\n";
+    {
+        // Cliffhaven Vampire, verified against mtg.txt: `@lifeof(player)
+        // from(*[-lifefaker]|*):life:-1 opponent` - ONE life per gain event.
+        bool prop = true;
+        CHECK(lifeToDamageConverterRate(
+                  "@lifeof(player) from(*[-lifefaker]|*):life:-1 opponent", prop) == 1 && !prop,
+              "#W74-CF F5 REPRO Cliffhaven Vampire converts 1 per gain event, not the gain");
+        // Sanguine Bond: `:life:-thatmuch opponent`
+        prop = false;
+        CHECK(lifeToDamageConverterRate(
+                  "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent", prop) == 0
+                  && prop,
+              "#W74-CF F5 Sanguine Bond is proportional: every point gained is a point lost");
+        // the review's arithmetic, in the caller's own shape: 4-power lifelink,
+        // opponent at 8. propConverters * gainPoints + fixedPerEvent * gainEvents.
+        const int gainPoints = 4, gainEvents = 1;
+        CHECK(0 * gainPoints + 1 * gainEvents == 1,
+              "#W74-CF F5 REPRO Cliffhaven converts 1 of the 4 lifelink: the opponent ends at"
+              " 3, not the 0 the boolean printed");
+        CHECK(2 * gainPoints + 0 * gainEvents == 8,
+              "#W74-CF F5 two Sanguine Bonds convert twice - the boolean collapsed them to one");
+        prop = true;
+        CHECK(lifeToDamageConverterRate("@lifelostfoeof(player):life:thatmuch controller",
+                                        prop) == 0 && !prop,
+              "#W74-CF F5 MUST-NOT-MATCH the MIRROR half is not a converter");
+        prop = true;
+        CHECK(lifeToDamageConverterRate("@lifeof(player) from(*[-lifefaker]|*):life:1 controller",
+                                        prop) == 0 && !prop,
+              "#W74-CF F5 MUST-NOT-MATCH a plain lifegain trigger converts nothing");
+    }
+
+    cout << "\n[#W74-CF] F6 the keep-X is one currency, and the colour cap binds X alone\n";
+    {
+        // REPRO finding 6: Drain Life {1}{B}{X:black}, four Swamps + seven
+        // colourless one-mana sources, Staff of Nin {6} in hand. maxX = 3 (black
+        // only), baseCMC = 2, total payable = 11.
+        const string r = xCastRemainderScopeTag(3, 2, true, "Staff of Nin", "{6}", 6, 11);
+        CHECK(r.find("the largest X that still leaves it payable this turn is X=3")
+                  != string::npos,
+              "#W74-CF F6 REPRO X=3 pays the {1}{B}, three black for X, and leaves six for the"
+              " Staff - the row used to say no X at all could");
+        CHECK(r.find("no X on this row leaves it payable") == string::npos,
+              "#W74-CF F6 MUST-NOT-MATCH the categorical falsehood is gone from this shape");
+        // the colour cap still binds: a bigger pool cannot buy more X than the
+        // pip's colour affords.
+        CHECK(xCastRemainderScopeTag(3, 2, true, "Staff of Nin", "{6}", 6, 40)
+                  .find("is X=3") != string::npos,
+              "#W74-CF F6 the ceiling is still maxX - the colour limit applies to X, not to"
+              " the card being kept");
+        // genuinely unpayable: 8 total, base 2, keep 6 -> nothing left for X and
+        // the keep is exactly affordable at X=0.
+        CHECK(xCastRemainderScopeTag(3, 2, true, "Staff of Nin", "{6}", 6, 8)
+                  .find("is X=0") != string::npos,
+              "#W74-CF F6 when the pool covers the cost and the keep and nothing more, X=0 is"
+              " the answer, not a refusal");
+        CHECK(xCastRemainderScopeTag(3, 2, true, "Staff of Nin", "{6}", 6, 7)
+                  .find("no X on this row leaves it payable this turn, not even X=0")
+                  != string::npos,
+              "#W74-CF F6 a pool that truly cannot pay both still says so");
+        // the wave-74 CE pin's own numbers are unchanged when no total is given
+        CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6)
+                  .find("the largest X that still leaves it payable this turn is X=5")
+                  != string::npos,
+              "#W74-CF F6 the uncoloured case is byte-identical to wave 74 lane CE's pin");
+    }
+
+    cout << "\n[#W74-CF] F7 the clock the seat owns must be able to tick\n";
+    {
+        // REPRO finding 7: the rate is real, the source is not. The script scan
+        // is unchanged; the board gate is what the tag now depends on.
+        CHECK(w74TapOnlyDamagePerActivation("{T}:damage:1 target(anytarget)") == 1,
+              "#W74-CF F7 the RATE is still read off the script exactly as before");
+        CHECK(ownClockTag("Staff of Nin", 1, 1, 2)
+                  .find("reaches 0 in 2 more turns") != string::npos,
+              "#W74-CF F7 REPRO the sentence a source that cannot untap used to earn");
+        CHECK(!w74ClockSourceRecurs(true, false, false, false),
+              "#W74-CF F7 REPRO a tapped DOESNOTUNTAP pinger supplies no recurring rate - it"
+              " used to be summed as though it untapped every turn");
+        CHECK(w74ClockSourceRecurs(false, false, false, false)
+                  && w74ClockSourceRecurs(false, true, false, false)
+                  && w74ClockSourceRecurs(false, true, true, true),
+              "#W74-CF F7 MUST-NOT-MATCH an ordinary source, and a hasty creature, still count");
+        CHECK(!w74ClockSourceRecurs(false, true, true, false),
+              "#W74-CF F7 a creature that entered this turn ticks a turn later than the"
+              " sentence says, so it is not counted into it");
+        CHECK(ownClockTag("Staff of Nin", 1, 0, 2).empty(),
+              "#W74-CF F7 a source excluded by the untap gate contributes no rate, so the whole"
+              " sentence disappears rather than promising a clock that cannot tick");
+        // the lethal-incoming gate, in the caller's own arithmetic
+        const int myLife = 4, incoming = 4;
+        CHECK(myLife - incoming <= 0,
+              "#W74-CF F7 REPRO a known incoming hit that reaches 0 leaves no turn for the"
+              " clock to tick in - the tag is suppressed at the caller");
+        CHECK(!(6 - 4 <= 0),
+              "#W74-CF F7 MUST-NOT-MATCH a survivable hit does not suppress a true clock");
+    }
+
+    cout << "\n[#W74-CF] F8 haste granted by the battlefield is still haste\n";
+    {
+        // Fervor, verified against mtg.txt: `lord(creature|myBattlefield) haste`.
+        CHECK(w74ScriptGrantsHasteToMine("lord(creature|myBattlefield) haste"),
+              "#W74-CF F8 REPRO Fervor grants the Sorin token haste - the row used to say it"
+              " could not attack until next turn");
+        CHECK(!w74ScriptGrantsHasteToMine("lord(creature|opponentbattlefield) haste"),
+              "#W74-CF F8 MUST-NOT-MATCH an opponent-scoped lord grants this token nothing");
+        CHECK(!w74ScriptGrantsHasteToMine("lord(creature|myBattlefield) 1/0"),
+              "#W74-CF F8 MUST-NOT-MATCH a lord that grants no haste is not a haste grant");
+        CHECK(!w74ScriptGrantsHasteToMine("{2}{R}:haste"),
+              "#W74-CF F8 MUST-NOT-MATCH an activated haste ability is a payment, not a static");
+        // and the clause the grant now silences
+        CHECK(loyaltyRowConsequenceTag("+1: Create a 1/1 Vampire", true, 0)
+                  .find("summoning sick") == string::npos,
+              "#W74-CF F8 with haste in hand the token clause says nothing about attacking");
+        CHECK(loyaltyRowConsequenceTag("+1: Create a 1/1 Vampire", false, 0)
+                  .find("cannot attack until your next turn") != string::npos,
+              "#W74-CF F8 MUST-NOT-MATCH with no grant anywhere the true clause is unchanged");
+    }
+
+    cout << "\n[#W74-CF] F9 a thousands separator is part of the number\n";
+    {
+        // REPRO finding 9: `M=1,000; cast Staff; then attack.`
+        const string plan = "M=1,000; cast Staff; then attack.";
+        const size_t pe = gptcaveat::planStatePrefixEnd(plan);
+        CHECK(plan.substr(0, pe).find("1,000") != string::npos,
+              "#W74-CF F9 REPRO the state prefix keeps the whole number - it used to stop at"
+              " `M=1,` and carry ONE creature where the model stated a thousand");
+        CHECK(gptcaveat::planStepsAfter(plan, 1).find("1,000") != string::npos,
+              "#W74-CF F9 REPRO the carry after one step still asserts M=1,000");
+        CHECK(gptcaveat::planStepsAfter(plan, 1).find("M=1,cast") == string::npos,
+              "#W74-CF F9 MUST-NOT-MATCH the corrupted carry the review produced");
+        CHECK(gptcaveat::planStatePrefixEnd("stop=3, M=2; swing") > 0
+                  && gptcaveat::planStatePrefixEnd("stop=3, M=2; swing") >= 12,
+              "#W74-CF F9 an ordinary comma between two clauses is still a delimiter");
+        CHECK(gptcaveat::planStatePrefixEnd("Cast Bear, then attack") == 0,
+              "#W74-CF F9 MUST-NOT-MATCH a plan that opens with prose is untouched");
+    }
+
+    cout << "\n[#W74-CF] O19 an ANNOUNCE_X menu through render -> answer -> apply\n";
+    {
+        // The gap the review named: the O19 pins permute by hand beside the seam.
+        // This runs the SEAM'S OWN permutation, the real reply parser, and the
+        // seam's own map-back, for every rung of a capX=3 menu.
+        const int capX = 3;
+        vector<string> shown; //contract space: index capX - X
+        shown.push_back("X = 3 - draw 3");
+        shown.push_back("X = 2 - draw 2");
+        shown.push_back("X = 1 - draw 1");
+        shown.push_back("X = 0 - draw 0");
+        const bool climbing = w74XPermuteToClimbing(shown, capX);
+        CHECK(climbing && shown.size() == 4 && shown[0] == "X = 1 - draw 1"
+                  && shown[1] == "X = 2 - draw 2" && shown[2] == "X = 3 - draw 3"
+                  && shown[3] == "X = 0 - draw 0",
+              "#W74-CF O19 RENDER the seam's own permutation puts X = N at option N and X = 0"
+              " last");
+        bool roundTrip = true;
+        for (size_t j = 0; j < shown.size(); j++)
+        {
+            // ANSWER: the real parser, on the reply shape the pilot writes.
+            const string reply = string("CHOICE: ") + (char) ('1' + (int) j)
+                                 + " (" + shown[j] + ")";
+            const int parsed = parseChoice(reply, (int) shown.size(), &shown, NULL, NULL);
+            if (parsed != (int) j + 1)
+            {
+                roundTrip = false;
+                continue;
+            }
+            // APPLY: the seam's own map back into the contract's index==X space.
+            const int idx = w74XPickToContractIndex(parsed - 1, capX, (int) shown.size(),
+                                                    climbing, capX + 1);
+            // the row's own text says which X it is; the applied index must BE it
+            const int namedX = (shown[j][4] - '0');
+            if (idx != namedX)
+                roundTrip = false;
+        }
+        CHECK(roundTrip,
+              "#W74-CF O19 every rung round-trips: the option the pilot names is parsed to that"
+              " option and applied as the X its row printed");
+        // and the descending path is untouched for a menu the permutation declines
+        vector<string> two;
+        two.push_back("X = 1 - draw 1");
+        CHECK(!w74XPermuteToClimbing(two, 3),
+              "#W74-CF O19 MUST-NOT-MATCH a row count that is not capX+1 is left alone and the"
+              " wave-56 descending map still applies");
+        CHECK(w74XPickToContractIndex(0, 3, 4, false, 4) == 3,
+              "#W74-CF O19 MUST-NOT-MATCH the descending map-back is byte-identical");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

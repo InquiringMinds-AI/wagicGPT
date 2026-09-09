@@ -154,13 +154,46 @@ harvest_selftest() {
 # log of THIS run; if at least K of them are pooled and EVERY one is a `timeout`
 # fallback, the pilot is not answering anybody. Pure - the same script backs the
 # --selftest.
+#O26/#W74-CF (F3, Astra review finding 3). "The last three records of every
+# unfinished log" is neither the newest K decisions nor evidence that every active
+# seat has stopped being answered, and it fails in BOTH directions:
+#  - it KILLS a slow healthy run: 21 live logs, six carrying one initial timeout
+#    each and fifteen still on `gamestart` with their first request pending, reads
+#    STALL 6. Nothing established that the fifteen had failed at all.
+#  - it MISSES a stalled tail: one unfinished seat with twenty consecutive
+#    timeouts, everything else finished, reads OK 3 - that seat can never reach K
+#    on a three-record-per-log pool.
+#  - and one ARBITRARILY OLD record vetoes the newest failure streak: an
+#    unfinished log holding a single stale success plus six newer failures
+#    elsewhere reads OK 6.
+# The predicate is now: the newest K decision records ACROSS seats (logs ordered by
+# mtime, newest first - during a live sweep a log's mtime IS the time of its last
+# record; the harvest that rewrites mtimes happens after the run and this predicate
+# never reads a harvested directory), STALL only when all K are silent-fallback AND
+# every active seat has produced at least one decision record. That last clause is
+# what keeps a young run alive: a seat still waiting on its first answer is not
+# evidence of a wedge, it is a seat with no evidence either way.
 PILOT_STALL_K="${WAGIC_PILOT_STALL_K:-6}"
+#Every class that means THE ENDPOINT DID NOT ANSWER. A wedged pilot writes
+#`timeout` and, once the deadline can no longer fit a retry, `wall_miss_no_retry`
+#- the wave-73 tails alternate between exactly those two, so keying on the single
+#word "timeout" reads the run as healthy. `unparsed_reply` is deliberately NOT
+#here: that is the model answering badly, which is a play problem, not a wedge.
+#ONE list, exported, so the tripwire and the results banner cannot disagree about
+#what "the model never answered this" means (#W74-CF F4).
+PILOT_SILENT_CLASSES="timeout wall_miss_no_retry wall_miss_unrecorded empty_reply http_error"
+export PILOT_SILENT_CLASSES
 pilot_stall_verdict() {
     #$1 = logdir, $2 = run start epoch, $3 = K -> "STALL <n>" | "OK <n>"
     python3 - "$1" "$2" "$3" <<'PSY'
 import glob, json, os, sys
 logdir, start, k = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-pooled = []
+SILENT = tuple(os.environ.get("PILOT_SILENT_CLASSES", "timeout").split())
+
+def silent(r):
+    return str(r.get("fallback", "")).startswith(SILENT)
+
+live = []   # (mtime, [decision records, newest first]) for every ACTIVE seat
 for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
     try:
         ep = int(os.path.basename(f).split("-")[0])
@@ -187,20 +220,33 @@ for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
         continue
     #Only a game STILL IN FLIGHT can be wedged. A finished seat log's tail is
     #whatever it ended on, and pooling those dilutes the live seats out of the
-    #verdict: over the wave-73 run's own directory the un-scoped predicate reads
-    #OK while six live games sat on nothing but timeouts.
+    #verdict.
     if ended:
         continue
-    pooled.extend(recs[-3:])
-#Every class that means THE ENDPOINT DID NOT ANSWER. A wedged pilot writes
-#`timeout` and, once the deadline can no longer fit a retry, `wall_miss_no_retry`
-#- the wave-73 tails alternate between exactly those two, so keying on the single
-#word "timeout" reads the run as healthy. `unparsed_reply` is deliberately NOT
-#here: that is the model answering badly, which is a play problem, not a wedge.
-SILENT = ("timeout", "wall_miss_no_retry", "wall_miss_unrecorded",
-          "empty_reply", "http_error")
-timeouts = [r for r in pooled if str(r.get("fallback", "")).startswith(SILENT)]
-if pooled and len(pooled) >= k and len(timeouts) == len(pooled):
+    try:
+        mt = os.path.getmtime(f)
+    except OSError:
+        mt = 0
+    live.append((mt, list(reversed(recs))))
+
+#EVERY ACTIVE SEAT REPRESENTED: a seat that has not answered (or failed) a single
+#decision yet carries no evidence, and a run where any seat is in that state is a
+#run we cannot call wedged. This is the whole difference between Astra's case (a),
+#a young run that must live, and case (c), an old record that must not veto.
+allHaveEvidence = bool(live) and all(recs for _, recs in live)
+
+#the newest K decisions ACROSS seats: newest log first, its newest record first.
+pool = []
+for _, recs in sorted(live, key=lambda lr: -lr[0]):
+    for r in recs:
+        pool.append(r)
+        if len(pool) >= k:
+            break
+    if len(pool) >= k:
+        break
+
+timeouts = [r for r in pool if silent(r)]
+if allHaveEvidence and len(pool) >= k and len(timeouts) == len(pool):
     print("STALL %d" % len(timeouts))
 else:
     print("OK %d" % len(timeouts))
@@ -279,25 +325,104 @@ pilot_stall_selftest() {
     v=$(pilot_stall_verdict "$tmp" 9999999999 6)
     case "$v" in OK\ 0) ;; *) echo "pilot-stall-selftest FAIL: older-run filter gave '$v', want 'OK 0'" >&2; fails=1;; esac
     #e: the per-game banner count reads the same field
-    v=$(timeout_fallbacks_in "$tmp/1000000000-ai_baka_deck1-a.jsonl")
+    v=$(silent_fallbacks_in "$tmp/1000000000-ai_baka_deck1-a.jsonl")
     case "$v" in 3) ;; *) echo "pilot-stall-selftest FAIL: per-game count gave '$v', want '3'" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
+    ##W74-CF (F3): Astra's three lifecycle/cardinality counterexamples. Each one
+    # is a verdict the "last three per unfinished log" predicate got wrong, in a
+    # direction that either kills viable work or certifies a wedged run.
+    #h: A SLOW HEALTHY RUN MUST LIVE. 21 live logs: six carry one initial timeout,
+    #   fifteen are still on `gamestart` with their first request pending. The old
+    #   predicate pooled only the six and read STALL 6 - terminating a corpus
+    #   without establishing that fifteen seats had failed at all.
+    for i in 1 2 3 4 5 6; do
+        printf '%s\n' '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+            > "$tmp/9999999999-ai_baka_deck$i-h$i.jsonl"
+    done
+    for i in 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21; do
+        printf '%s\n' '{"kind":"gamestart","seq":0}' \
+            > "$tmp/9999999999-ai_baka_deck$i-h$i.jsonl"
+    done
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: 15 seats still on their first ask gave '$v', want OK (a seat with no decision record is no evidence of a wedge)" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
+    #i: A STALLED TAIL MUST BE CAUGHT. One unfinished seat with twenty consecutive
+    #   timeouts; every other seat finished. The old three-per-log pool could never
+    #   reach K from one log, so it read OK 3 for ever.
+    : > "$tmp/9999999999-ai_baka_deck1-i.jsonl"
+    for i in $(seq 1 20); do
+        printf '%s\n' "{\"kind\":\"ask\",\"seq\":$i,\"fallback\":\"timeout\"}" \
+            >> "$tmp/9999999999-ai_baka_deck1-i.jsonl"
+    done
+    printf '%s\n' '{"kind":"ask","seq":1}' '{"kind":"gameend","seq":2,"won":true}' \
+        > "$tmp/9999999999-ai_baka_deck2-i.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in STALL\ 6) ;; *) echo "pilot-stall-selftest FAIL: a 20-timeout live tail gave '$v', want 'STALL 6'" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
+    #j: AN ARBITRARILY OLD RECORD MUST NOT VETO THE NEWEST STREAK. One unfinished
+    #   log holds a single stale success; six newer failures sit in other live
+    #   logs. The old predicate pooled the stale record beside them and read OK 6.
+    #   The pool is now the newest K by log mtime, so the stale success is not in
+    #   it - and the seat still counts as having evidence, so the run is judged.
+    printf '%s\n' '{"kind":"ask","seq":1}' > "$tmp/9999999999-ai_baka_deck9-j.jsonl"
+    touch -d "@1000000000" "$tmp/9999999999-ai_baka_deck9-j.jsonl"
+    for i in 1 2 3 4 5 6; do
+        printf '%s\n' "{\"kind\":\"ask\",\"seq\":$i,\"fallback\":\"timeout\"}" \
+            > "$tmp/9999999999-ai_baka_deck$i-j.jsonl"
+        touch -d "@2000000000" "$tmp/9999999999-ai_baka_deck$i-j.jsonl"
+    done
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in STALL\ 6) ;; *) echo "pilot-stall-selftest FAIL: one stale success vetoed six newer failures, giving '$v', want 'STALL 6'" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
+    ##W74-CF (F4): the tripwire and the published banner must agree about what
+    # "the model never answered this" means. A log of wall_miss_no_retry is
+    # endpoint silence by the tripwire's own class list; the banner counted 0 for
+    # it and printed "every decision was answered by the model".
+    printf '%s\n' \
+      '{"kind":"wall_miss","seq":1,"fallback":"wall_miss_no_retry"}' \
+      '{"kind":"priority","seq":2,"fallback":"empty_reply"}' \
+      '{"kind":"priority","seq":3,"fallback":"http_error"}' \
+      > "$tmp/9999999999-ai_baka_deck1-k.jsonl"
+    v=$(silent_fallbacks_in "$tmp/9999999999-ai_baka_deck1-k.jsonl")
+    case "$v" in 3) ;; *) echo "pilot-stall-selftest FAIL: the banner counted '$v' of 3 non-timeout silences, want '3' (it used to publish 'every decision answered by the model')" >&2; fails=1;; esac
+    #and the two surfaces read the SAME list
+    v=$(pilot_stall_verdict "$tmp" 1 3)
+    case "$v" in STALL\ 3) ;; *) echo "pilot-stall-selftest FAIL: the tripwire read '$v' on the log the banner counts 3 silences in - the two surfaces disagree" >&2; fails=1;; esac
+    #a decision the model DID answer badly is neither surface's business
+    printf '%s\n' \
+      '{"kind":"priority","seq":1,"fallback":"unparsed_reply"}' \
+      > "$tmp/9999999999-ai_baka_deck2-k.jsonl"
+    v=$(silent_fallbacks_in "$tmp/9999999999-ai_baka_deck2-k.jsonl")
+    case "$v" in 0) ;; *) echo "pilot-stall-selftest FAIL: unparsed_reply counted as silence ('$v'), want '0'" >&2; fails=1;; esac
+
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 7 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 13 checks, 0 failed"
     return "$fails"
 }
 
 #O26 (b): the per-game half of the same fact, for the results banner. A game that
-# finished but answered N decisions on timeout fallbacks is not a clean corpus game
+# finished but answered N decisions on silent fallbacks is not a clean corpus game
 # and the banner has to say so per game, not corpus-wide.
-timeout_fallbacks_in() {
+##W74-CF (F4, Astra review finding 4): it counted ONLY the exact string `timeout`
+# and the banner then published "none - every decision was answered by the model".
+# A log full of `wall_miss_no_retry` - a class the tripwire itself calls endpoint
+# silence - counted 0 and was certified clean; `empty_reply` and `http_error` the
+# same. One list ($PILOT_SILENT_CLASSES) now backs the tripwire, this helper and
+# the banner, and the banner names the classes it counted.
+silent_fallbacks_in() {
     python3 - "$1" <<'TFY'
-import json, sys
+import json, os, sys
+SILENT = tuple(os.environ.get("PILOT_SILENT_CLASSES", "timeout").split())
 n = 0
 try:
     for line in open(sys.argv[1], errors="replace"):
         try: r = json.loads(line)
         except Exception: continue
-        if r.get("fallback") == "timeout":
+        if str(r.get("fallback", "")).startswith(SILENT):
             n += 1
 except OSError:
     pass
@@ -867,19 +992,32 @@ for d in sorted(games, key=lambda x:-(wins[x]/games[x] if games[x] else 0)):
 # summary distinguished a full GPT game from one the heuristic played out. Any
 # non-zero here means that seat spent decisions at the wall - read them before
 # treating the game as evidence, and rerun the matchup if the count is material.
+#W74-CF (F4): the SAME class list the stall tripwire uses. Counting only the exact
+# string `timeout` let a log full of `wall_miss_no_retry` publish "every decision
+# was answered by the model" - a certification the tripwire's own definition
+# contradicts. The banner now says which classes it counted, so the two surfaces
+# can be checked against each other by reading them.
+SILENT = tuple(os.environ.get("PILOT_SILENT_CLASSES", "timeout").split())
 to_fb = {}
+by_class = Counter()
 for f in files:
     n = 0
     for line in open(f, errors="replace"):
         try: r = json.loads(line)
         except: continue
-        if r.get("fallback") == "timeout": n += 1
+        fb = str(r.get("fallback", ""))
+        if fb.startswith(SILENT):
+            n += 1
+            by_class[fb] += 1
     if n: to_fb[os.path.basename(f)] = n
-print(f"\n== timeout fallbacks (decisions the model never answered; the heuristic played them) ==")
+print(f"\n== silent fallbacks (decisions the model never answered; the heuristic played them) ==")
+print(f"   counted classes: {', '.join(SILENT)}")
 if not to_fb:
-    print("  none - every decision in every seat log was answered by the model")
+    print("  none of those classes appears in any seat log - every decision was answered by the model")
 else:
     print(f"  {sum(to_fb.values())} across {len(to_fb)} of {len(files)} seat logs - these games are NOT clean corpus games")
+    for c, n in by_class.most_common():
+        print(f"  {n:5d}  class {c}")
     for b, n in sorted(to_fb.items(), key=lambda kv: -kv[1]):
         print(f"  {n:5d}  {b}")
 print(f"\nlogs + results.tsv in: {out}")

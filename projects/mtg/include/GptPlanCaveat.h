@@ -938,6 +938,26 @@ inline bool planStateLabelWord(const std::string& w)
     return w == "stop" || w == "m" || w == "l" || w == "c";
 }
 
+//#W74-CF (F9, Astra review finding 9). A THOUSANDS SEPARATOR IS NOT A CLAUSE
+//DELIMITER. The scanner splits clauses on ',' as well as ';', so `M=1,000; cast
+//Staff; then attack` accepted only `M=1,` and the carry asserted ONE creature
+//where the model stated a thousand - the number the whole plan is measured
+//against, silently changed. A comma is part of the NUMBER when it sits between a
+//digit and exactly three digits that are not themselves followed by a digit
+//(`\d{1,3}(,\d{3})*`); every other comma still ends the clause, so a plan that
+//opens with prose is untouched byte for byte.
+inline bool planStateThousandsComma(const std::string& s, size_t i)
+{
+    if (i == 0 || i >= s.size() || s[i] != ',')
+        return false;
+    if (!std::isdigit((unsigned char) s[i - 1]))
+        return false;
+    for (size_t q = 1; q <= 3; q++)
+        if (i + q >= s.size() || !std::isdigit((unsigned char) s[i + q]))
+            return false;
+    return !(i + 4 < s.size() && std::isdigit((unsigned char) s[i + 4]));
+}
+
 inline size_t planStatePrefixEnd(const std::string& plan)
 {
     size_t i = plan.find_first_not_of(" \t");
@@ -948,7 +968,8 @@ inline size_t planStatePrefixEnd(const std::string& plan)
     {
         //one clause: up to the next ';' or ',' (or the end)
         size_t sep = i;
-        while (sep < plan.size() && plan[sep] != ';' && plan[sep] != ',' && plan[sep] != '\n')
+        while (sep < plan.size() && plan[sep] != ';' && plan[sep] != '\n'
+               && (plan[sep] != ',' || planStateThousandsComma(plan, sep)))
             sep++;
         std::string clause = plan.substr(i, sep - i);
         //label
@@ -988,7 +1009,10 @@ inline size_t planStatePrefixEnd(const std::string& plan)
         }
         if (k >= clause.size() || !std::isdigit((unsigned char) clause[k]))
             break;
-        while (k < clause.size() && std::isdigit((unsigned char) clause[k]))
+        //#W74-CF (F9): the number may carry thousands groups - consume them with it.
+        while (k < clause.size()
+               && (std::isdigit((unsigned char) clause[k])
+                   || planStateThousandsComma(clause, k)))
             k++;
         //at most a short tail (a unit word, "now", a closing paren)
         std::string tailBit = clause.substr(k);
