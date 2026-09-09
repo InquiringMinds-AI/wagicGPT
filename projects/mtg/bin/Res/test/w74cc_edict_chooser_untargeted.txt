@@ -1,0 +1,47 @@
+# W74-CC (O3, wave-73 deck146 HIGH 1). The GPT render's FORCED SACRIFICE header
+# is keyed on the acting card's magicText carrying `sacrifice` over
+# `notatarget(creature|mybattlefield)` - and a MODAL card's magicText carries
+# every mode at once, so Silverquill Command's four sacrifice modes made the
+# match on a run whose CHOSEN mode was a `target(creature)` pump (`146v125`
+# seq 60: "FORCED SACRIFICE OF ONE OF YOUR OWN CREATURES ... pick the creature
+# you can best AFFORD TO LOSE", over a pump target picker).
+# The discriminator the header now uses is the chooser itself: an EDICT is
+# written notaTarget(...) and AbilityFactory clears tc->targetter for exactly
+# that spelling, while a real target(...) keeps it. This fixture is the
+# EMPIRICAL half of that claim - it asserts the flag on both shapes with the
+# engine's own choosers, so the header's new gate is not resting on a reading
+# of the parser.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Runeclaw Bear,Mind Stone
+hand:Fleshbag Marauder,Giant Growth
+manapool:{9}{G}{B}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Giant Growth
+assertchoosertargeted 1
+Grizzly Bears
+no
+no
+Fleshbag Marauder
+no
+no
+assertchoosertargeted 0
+Runeclaw Bear
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Mind Stone,Fleshbag Marauder
+graveyard:Runeclaw Bear,Giant Growth
+manapool:{7}
+life:20
+[PLAYER2]
+life:20
+[END]

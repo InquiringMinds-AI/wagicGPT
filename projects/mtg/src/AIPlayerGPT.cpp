@@ -2703,6 +2703,60 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
                                                 ? card->controller()->opponent() : NULL)); //#W71-BR (L7)
 }
 
+//#W74-CC (O15, wave-73 deck126 MED-2): LOYALTY ROWS CARRY NO CONSEQUENCE.
+//`dynamicMagnitudes` skips planeswalkers outright (N-146g: a walker's magicText
+//bundles every loyalty ability, so a card-level scan cannot attribute a number
+//to the row being offered), and nothing else priced them - so `126v130` seat
+//seq 42 offered Sorin's `+1: create a 1/1 vampire` and `-2: emblem` with the
+//two facts that decide between them unsaid: the token is summoning sick (the
+//attackers seam says so one window later, too late), and the emblem is
+//CUMULATIVE with the one already live. That was the deciding decision of that
+//loss. Both facts are per-ROW and derivable from the row's own label plus the
+//board, which is exactly the scope the card-level scan lacked. Pure over the
+//three inputs, so both clauses are provable without a game.
+//Deliberately NOT priced here: the loyalty's magnitude. That is the number
+//N-146g proved unattributable from the card text, and a wrong one is worse than
+//none.
+static bool loyaltyRowMakesCreatureToken(const string& lowLabel)
+{
+    if (lowLabel.find("token") == string::npos && lowLabel.find("creat") == string::npos)
+        return false;
+    //a P/T is what makes it a BODY rather than an emblem or a counter.
+    for (size_t i = 1; i + 1 < lowLabel.size(); i++)
+        if (lowLabel[i] == '/' && isdigit((unsigned char) lowLabel[i - 1])
+            && isdigit((unsigned char) lowLabel[i + 1]))
+            return true;
+    return false;
+}
+
+static string loyaltyRowConsequenceTag(const string& label, bool hasteText, int emblemsLive)
+{
+    string low = label;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    if (loyaltyClausePrefix(low).empty())
+        return ""; //not a loyalty row
+    std::ostringstream o;
+    int n = 0;
+    if (loyaltyRowMakesCreatureToken(low) && !hasteText)
+        o << "the body this makes arrives summoning sick - it cannot attack"
+             " until your next turn", n++;
+    if (low.find("emblem") != string::npos)
+    {
+        o << (n++ ? ", " : "");
+        if (emblemsLive > 0)
+            o << "you already control " << emblemsLive << " emblem"
+              << (emblemsLive == 1 ? "" : "s") << " - a new emblem is ADDED to"
+                 " them, it does not replace them, and no emblem can be removed";
+        else
+            o << "an emblem is permanent - nothing in the game removes one once"
+                 " you have it";
+        }
+    if (!n)
+        return "";
+    return " {right now: " + o.str() + "}";
+}
+
 string dynamicMagnitudes(MTGCardInstance * card, CastRowBoardAnswer * ans = NULL) //#W61-U (C10)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -2967,6 +3021,46 @@ string legibleCounterNameForGrant(const string& engineName, bool grantedTriggerL
 //ability the card script grants is named by the script itself ("Put back to
 //hand"), and ALoseAbilities REMOVES granted ability objects from the action
 //layer, so the action layer is the live answer. No mutation.
+//#W74-CC (O1, wave-73 engine-seat HIGH-1): the MENU-TEXT half of that test was
+//never true of this grant, so the gloss read "(a marker only - the ability that
+//returned it is gone)" on 56 of 56 renders while the event line six lines above
+//said "killing it is not removal". Kaya's +1 grants
+//`newability[@movedto(this|graveyard) ...:name(Put back to hand)
+//all(creature[...]|mygraveyard) moveto(myhand) ...]`
+//(planeswalkers.txt:1874). `all(...)` is a LORD keyword, so the object the
+//factory builds is a GenericTriggeredAbility whose nested ability is an ALord -
+//and neither GenericTriggeredAbility::getMenuText (which forwards to the
+//nested ability) nor ALord (which has no override, so ActionElement's base
+//"Ability") ever produces the script's own name(). Judge the grant
+//STRUCTURALLY instead: a live triggered ability sourced on this creature whose
+//nested payload is an AAMover into a HAND. That is exactly the promise the
+//gloss makes ("its owner returns it to hand"), it survives every wrapper the
+//factory may add, and it disappears with the ability objects when
+//ALoseAbilities removes them (that removal keys on `source == target`, the same
+//pointer this scan keys on). No mutation.
+static bool w74GrantMovesToHand(MTGAbility * a, int depth)
+{
+    if (!a || depth > 8)
+        return false;
+    if (AAMover * mv = dynamic_cast<AAMover *>(a))
+    {
+        string d = mv->destination;
+        for (size_t i = 0; i < d.size(); i++)
+            d[i] = (char) tolower((unsigned char) d[i]);
+        if (d.find("hand") != string::npos)
+            return true;
+        if (w74GrantMovesToHand(mv->andAbility, depth + 1))
+            return true;
+    }
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (w74GrantMovesToHand(ma->abilities[i], depth + 1))
+                return true;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return w74GrantMovesToHand(na->ability, depth + 1);
+    return false;
+}
+
 bool w73GhostformTriggerLive(MTGCardInstance * card)
 {
     if (!card)
@@ -2983,8 +3077,12 @@ bool w73GhostformTriggerLive(MTGCardInstance * card)
             continue;
         if (!dynamic_cast<TriggeredAbility *>(a))
             continue;
+        //the name, where a script does surface one...
         const string mt = a->getMenuText();
         if (mt.find("Put back to hand") != string::npos)
+            return true;
+        //...and the effect itself, which is what the gloss actually promises.
+        if (w74GrantMovesToHand(a, 0)) //#W74-CC (O1)
             return true;
     }
     return false;
@@ -5133,10 +5231,22 @@ static string stackAbilityBody(Interruptible * it, Player * seat,
 //deliberately NOT here: on the seat whose turn it is not, those are true of
 //every creature they control and say nothing about the attack that is coming).
 //Pure so PARSETEST can prove every branch without a board.
+//#W74-CC (O12, wave-73 deck125 A-4): a fifth restriction, and the one the
+//static count could not see. `125v123` seq 399 printed "103 of them without a
+//restriction against attacking" over `Human #1-#102 (1/1) [doesn't untap during
+//its controller's untap step] [tapped - cannot attack or block this turn]` -
+//two Intruder Alarms on the board, so those 102 bodies are tapped and have no
+//untap step to come back from. Tappedness alone is NOT a restriction on the
+//non-live board (it clears at their untap), which is why this predicate ignores
+//it; tapped AND no-untap is permanent and belongs here. The deck125 guide has
+//carried a compensating sentence since wave 70 and this corpus falsified half
+//of it.
 static bool attackRestrictionFree(bool cantAttack, bool defenderWithoutOverride,
-                                  bool flyersOnlyWithoutFlying, bool isBattle)
+                                  bool flyersOnlyWithoutFlying, bool isBattle,
+                                  bool tappedAndWillNotUntap = false) //#W74-CC (O12)
 {
-    return !(cantAttack || defenderWithoutOverride || flyersOnlyWithoutFlying || isBattle);
+    return !(cantAttack || defenderWithoutOverride || flyersOnlyWithoutFlying || isBattle
+             || tappedAndWillNotUntap);
 }
 
 //#W47 (R14a): the header's per-creature test. `live` is true only on the board
@@ -5151,7 +5261,12 @@ static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live)
     return attackRestrictionFree(c->has(Constants::CANTATTACK) != 0,
                                  c->has(Constants::DEFENSER) && !c->has(Constants::CANATTACK),
                                  c->has(Constants::FLYERSONLY) && !c->has(Constants::FLYING),
-                                 c->hasType(Subtypes::TYPE_BATTLE) != 0);
+                                 c->hasType(Subtypes::TYPE_BATTLE) != 0,
+                                 //#W74-CC (O12): the same pair the row's own tags
+                                 //print - tapped, and nothing untaps it.
+                                 c->isTapped() != 0
+                                 && (c->basicAbilities[Constants::DOESNOTUNTAP]
+                                     || c->frozen >= 1));
 }
 
 //#W47 (R14a, wave-46 MED): the header stated the creature COUNT and every
@@ -5735,7 +5850,8 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               int blockGain = 0, const string& attackPunishers = "",
                               bool oppLifeLoop = false, //#W62-X (D2)
                               bool * outKillClaim = NULL, //#W65-AN (G6)
-                              int blockLifelink = 0) //#W65-AP (R4)
+                              int blockLifelink = 0, //#W65-AP (R4)
+                              int selfConverterLifelink = 0) //#W74-CC (O5)
 {
     //#W65-AN (G6, deck123 HIGH-1): the A-row life-LOOP clause on the same
     //screen has to yield to this line's kill verdict, and a second computation
@@ -5776,8 +5892,25 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
     //two gates every other kill claim on this line rides (an unpriced attack
     //punisher, and a life LOOP of theirs), and it is scoped to the assumption
     //it is computed under - none of them blocked.
-    if (oppLife - totalPower > 0)
-        o << " That is NOT lethal: they survive at " << (oppLife - totalPower)
+    //#W74-CC (O5, wave-73 deck126 HIGH-1): the seat's OWN life-to-damage
+    //converter. `126v130` seat seq 43 printed "at 3 ... That is NOT lethal"
+    //over one 2-power LIFELINK attacker while Sanguine Bond sat on the seat's
+    //own battlefield: the lifelink gain of 2 is life the opponent ALSO loses,
+    //so the true unblocked figure was 1, not 3, and the categorical verdict was
+    //computed from a number the same prompt's own CONVERTER paragraph
+    //contradicts. Lifelink damage is counted ONCE MORE here, before the figure
+    //and before the verdict, so the two surfaces cannot disagree. Scoped to a
+    //converter the ACTING seat controls (a converter of theirs converts THEIR
+    //gains, which this line does not compute), and to the same
+    //none-of-them-blocked assumption the sentence already states.
+    const int convFigure = oppLife - totalPower - selfConverterLifelink;
+    if (selfConverterLifelink > 0)
+        o << " " << selfConverterLifelink << " of that damage is LIFELINK, and your"
+             " LIFE-TO-DAMAGE CONVERTER turns the life it gains you into that much"
+             " life off them as well, so with none of them blocked they are at "
+          << convFigure << ", not " << (oppLife - totalPower) << ".";
+    if (convFigure > 0)
+        o << " That is NOT lethal: they survive at " << convFigure
           << " even with none of them blocked.";
     else if (attackPunishers.empty())
         o << " That IS lethal - but only if none of them is blocked.";
@@ -8275,14 +8408,22 @@ static bool splitMonotoneXRow(const string& row, string& erased, int& xval)
 //the decode is stated, so the collapse deletes no fact and no option: every
 //number in the range is still separately choosable and its X is arithmetic the
 //row states. Pure, so the shape is provable in PARSETEST.
-static string monotoneXRangeRow(size_t firstLabel, size_t lastLabel, int xHigh, int xLow,
-                                const string& highRow, const string& lowRow)
+//#W74-CC (O19): direction-aware. The run may now climb (option N is X = N), and
+//a range row that says "down to" over a climbing run would be the false surface
+//the collapse exists to avoid. The DESCENDING wording is byte-identical to
+//wave 56's, so every existing pin holds.
+static string monotoneXRangeRow(size_t firstLabel, size_t lastLabel, int xFirst, int xLast,
+                                const string& firstRow, const string& lastRow)
 {
+    const bool climbing = (xLast > xFirst); //#W74-CC (O19)
     std::ostringstream o;
-    o << firstLabel << "-" << lastLabel << ". X = " << xHigh << " down to X = " << xLow
-      << " - one option per X in that range, largest X first, each reading the same line with"
-         " its own number: option " << firstLabel << " is \"" << highRow << "\" and option "
-      << lastLabel << " is \"" << lowRow << "\" x" << (lastLabel - firstLabel + 1);
+    o << firstLabel << "-" << lastLabel << ". X = " << xFirst
+      << (climbing ? " up to X = " : " down to X = ") << xLast
+      << " - one option per X in that range, "
+      << (climbing ? "smallest X first" : "largest X first")
+      << ", each reading the same line with"
+         " its own number: option " << firstLabel << " is \"" << firstRow << "\" and option "
+      << lastLabel << " is \"" << lastRow << "\" x" << (lastLabel - firstLabel + 1);
     return o.str();
 }
 
@@ -8405,12 +8546,19 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
                    && total[j] == total[i] && scope[j] == scope[i])
                 j++;
         else if (form[i] == 3)
-            //#W56-C (D7 c): X falls by exactly one each row (the menu's own
+        {
+            //#W56-C (D7 c): X moves by exactly one each row (the menu's own
             //order) and the digit-erased text is identical.
+            //#W74-CC (O19): the menu now climbs, so the step is read off the
+            //run's own first pair instead of being hard-coded to -1. A run of
+            //one keeps the wave-56 step and collapses nothing, as before.
+            const int step = (i + 1 < n && form[i + 1] == 3 && blockRef[i + 1] < 0
+                              && rank[i + 1] == rank[i] + 1) ? 1 : -1;
             while (j < n && blockRef[j] < 0 && form[j] == 3
-                   && rank[j] == rank[i] - (int) (j - i)
+                   && rank[j] == rank[i] + step * (int) (j - i)
                    && head[j] == head[i])
                 j++;
+        }
         else
             //#W54-D (D8a): a run of BYTE-IDENTICAL rows carrying no instance
             //ordinal. The 17 library Mountains had nothing to collapse on and
@@ -26057,6 +26205,16 @@ bool isLandBackedDisplayToggle(MTGAbility * a, MTGCardInstance * click)
 //row offers that face for real in the same window); 0 = the toggle is OFFERED
 //(a spell back face, whose alternative cast is still gated behind isflipped -
 //D33 - so the toggle is its only route); -1 = the card has no display toggle.
+//#W74-CC (O1): the ghostform-grant predicate, named for the suite and given
+//EXTERNAL linkage (the helper itself lives in this file's anonymous namespace).
+//`assertghostformlive` is the only instrument that can see this defect - the
+//gloss is a GPT render string and the suite asserts zones, so a fixture that
+//resolves Kaya's +1 and asks the predicate directly is the RED-on-base evidence.
+bool gptGhostformGrantLive(MTGCardInstance * card)
+{
+    return w73GhostformTriggerLive(card);
+}
+
 int gptDisplayToggleSuppressed(MTGCardInstance * c, ActionLayer * al)
 {
     if (!c || !al)
@@ -27136,7 +27294,9 @@ static const char * kHoldPriorityRowTextCast =
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
     " begins, or until one of the rows above changes (any change re-opens this"
     " window; on THIS menu that means you also give up this turn's remaining"
-    " CASTING windows for as long as these rows stand)";
+    " CASTING windows for as long as these rows stand, and NOT the priority"
+    " window that follows on this same step - that is a different question at a"
+    " different seam and you will still be asked it)";
 
 //#W56-A (D1): the hold's board key is GONE. Wave 53-55 keyed the latch on
 //the situation block (phase line, hidden-zone counters and finally the life
@@ -29999,8 +30159,18 @@ static string secondCopyTag(const string& name, const string& magicText = string
     if (verdict == 2)
         return head + ", but the effect it gives your OTHER permanents is already on -"
                       " this copy adds only its own abilities]";
+    //#W74-CC (O21, wave-73 deck126 LOW-5): the stacking verdict fired 55 times
+    //and read as one-sided encouragement - its first half is permission ("no
+    //legend rule") and its second an argument in favour, with no cost side at
+    //all. The cost is the same on every one of those rows and is a FACT, not a
+    //recommendation: a card and a cast buy a second instance of an effect the
+    //seat already has on the battlefield, not a new one. Named, so the row
+    //prices both sides; the seat declined all 55, so nothing here is a fix for
+    //a taken row - it is the missing half of a priced one.
     return head + ", and this copy is one more of the same effect - each line it"
-                  " repeats happens again]";
+                  " repeats happens again; the price is a card and this window's"
+                  " cast spent DOUBLING an effect you already have on the"
+                  " battlefield, not adding one you do not]";
 }
 static void appendCappedNames(std::ostringstream& o, const vector<string>& names, size_t cap)
 {
@@ -30936,6 +31106,35 @@ static string removalVictimTag(const string& verb, const std::vector<std::string
     }
     o << "}";
     return o.str();
+}
+
+//#W74-CC (O3, wave-73 deck146 HIGH 1): WHICH PICK IS THE EDICT. The detection
+//below reads a `sacrifice` over `notatarget(creature|mybattlefield)` off the
+//acting card's magicText, and a MODAL card's magicText carries every mode at
+//once: Silverquill Command's four sacrifice modes
+//(borderline.txt:102740-102747) made the string match on the run where the
+//chosen mode was `creature gains 3/3 and you draw`, whose target(creature) pick
+//is a PUMP. `146v125` seq 60 rendered that pump target picker under "FORCED
+//SACRIFICE OF ONE OF YOUR OWN CREATURES ... Pick the creature you can best
+//AFFORD TO LOSE" - every sentence false and the instruction inverted; the seat
+//picked its worst body and made a 7/7 by accident. The sibling mode WITH the
+//sacrifice half (`146v126` seq 27) escaped only because the opponent had
+//creatures on the pump's legal list, which is luck, not a guard.
+//The structural discriminator is the chooser itself: an EDICT is written
+//`notaTarget(...)`, and AbilityFactory clears `tc->targetter` for exactly that
+//spelling (MTGAbility.cpp, the notatarget branch), while a real `target(...)`
+//keeps it. So a chooser that IS targeted is never this ask, whatever the card's
+//other modes say. Pure over the three facts, so both corpus seqs pin as a
+//contrast pair without a game.
+static bool forcedSacrificeShape(const string& lowScript, bool allMineBattlefieldCreatures,
+                                 bool chooserIsTargeted)
+{
+    if (lowScript.empty() || !allMineBattlefieldCreatures)
+        return false;
+    if (chooserIsTargeted) //#W74-CC (O3): a targeted pick is not an edict
+        return false;
+    return lowScript.find("sacrifice") != string::npos
+        && lowScript.find("notatarget(creature|mybattlefield)") != string::npos;
 }
 
 //#W60-O (B10, wave-59 deck152 HIGH-3, deck130 MED): the header for a FORCED
@@ -32722,6 +32921,26 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
         out << dynamicMagnitudes(src);
+        //#W74-CC (O15): the two consequences a walker's loyalty row never
+        //carried. dynamicMagnitudes returns "" for a planeswalker by design, so
+        //this is the only `{right now: ...}` this row can hold - the guard is
+        //the same duplicate rail the composed-row census enforces.
+        if (action.ability && src->hasType(Subtypes::TYPE_PLANESWALKER)
+            && out.str().find(" {right now: ") == string::npos)
+        {
+            string lowTxt = txt;
+            for (size_t li = 0; li < lowTxt.size(); li++)
+                lowTxt[li] = (char) tolower((unsigned char) lowTxt[li]);
+            int emblemsLive = 0;
+            if (game && game->inPlay)
+                for (int ei = 0; ei < game->inPlay->nb_cards; ei++)
+                    if (game->inPlay->cards[ei]
+                        && game->inPlay->cards[ei]->hasType(Subtypes::TYPE_EMBLEM))
+                        emblemsLive++;
+            out << loyaltyRowConsequenceTag(action.ability->getMenuText(),
+                                            lowTxt.find("haste") != string::npos,
+                                            emblemsLive);
+        }
         //#W47 R1, the row half: when THIS activation draws and the opponent has
         //draw punishers out, the price of the draw rides the row that pays it.
         //deck130 vs162 seq 27 answered "cycling with Starstorm [cost: {3},
@@ -36788,6 +37007,20 @@ static string askExemplar(const vector<string>& options, int * usedRow = NULL)
     size_t brace = core.find(" {");
     if (brace != string::npos)
         core = core.substr(0, brace);
+    //#W74-CC (O21, wave-73 deck146 MED 4): the sentence carrying this example
+    //says "copy nothing from the {...} annotations", and deck130 seq 14's
+    //example was `CHOICE: 1 (Brightclimb Pathway (menu text: Play Land))` -
+    //an annotation, in the example, under that instruction. The model called it
+    //"slightly contradictory" and copied the string anyway. `(menu text: ...)`
+    //is a RENDER gloss, not part of the row's short name, so it leaves the
+    //example the same way a `{...}` tail does. Only that exact spelling is cut:
+    //rows whose short name genuinely ends in parentheses (the mulligan row's
+    //"(a keep after this one would keep 6 cards)") are untouched.
+    {
+        const size_t mt = core.find(" (menu text: ");
+        if (mt != string::npos)
+            core = core.substr(0, mt);
+    }
     while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
         core.erase(core.size() - 1);
     core = stripTrailingPT(core); //#W50-Y D8
@@ -39880,15 +40113,30 @@ static string announceXHeader(const string& spell, int capX, bool canDecline = t
     xa << "Announce the value of X for " << spell
        << ". You can afford X up to " << capX << " with your current mana"
        << " - higher values are NOT offered (they are unaffordable), so do not"
-       << " plan around an X above " << capX << ". Every listed value is"
-       << " affordable; option 1 is the LARGEST X (X = " << capX << ").";
+       << " plan around an X above " << capX << ".";
+    //#W74-CC (O19, wave-73 engine-seat MED-3): the ladder now CLIMBS, and the
+    //option number IS the value. The descending menu was the corpus's only
+    //index/name conflict class two waves running (`125v126` seq 100 answered
+    //"CHOICE: 5 (X = 5)" on a list whose option 5 was X = 3; `125v123` seq 624
+    //the same shape - both rescued by the name match, both a wasted seam). The
+    //wave-23 reason for descending was that the model replies its intended
+    //VALUE as the option number; with X = N at option N that slip is no longer
+    //a slip, which is strictly better than either previous order. X = 0 is the
+    //ladder's last rung rather than its first, so the numbering can hold.
+    if (capX >= 1)
+        xa << " Every listed value is affordable, and THE OPTION NUMBER IS THE X:"
+              " option N announces X = N, up to option " << capX << " (X = " << capX
+           << "), the largest X you can afford. X = 0 is the last rung, at option "
+           << (capX + 1) << ".";
+    else
+        xa << " The only value your mana affords is X = 0, at option 1.";
     if (!canDecline)
         xa << " There is no decline row on this menu: this spell's costs are"
               " ALREADY PAID, so the announcement can no longer be cancelled and"
               " the card cannot go back to your hand from here. Every listed"
               " value spends it; X = 0 is the smallest commitment, not a way out.";
     xa << libraryNote; //#W67-AW (I4)
-    xa << " Reply with the OPTION number, not the X value:";
+    xa << " Reply with the OPTION number:"; //#W74-CC (O19): they are now the same number
     return xa.str();
 }
 
@@ -40780,15 +41028,10 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //"Cast <spell> with X=N" against the bare "X = N" option, and INDEX-WINS
         //treats an echo that names the source spell as a self-reference rather
         //than a stale answer (wave-23 ITEM A shape 1, deck140 Black Sun's Zenith).
-        {
-            //Register: the announcement, not the menu question.
-            string xName = ctx ? ctx->getDisplayName() : string("the spell");
-            vector<string> narr;
-            for (size_t xi = 0; xi < shown.size(); xi++)
-                narr.push_back("You announced " + stripNarrationDecoration(shown[xi])
-                               + " for " + xName);
-            setAskNarration(narr);
-        }
+        //#W74-CC (O19): the ask narration is registered AFTER the display
+        //permutation below, because it is indexed in SHOWN space - registering
+        //it here would have narrated the wrong X for every row once the ladder
+        //started climbing.
         //#W45-5: price each X row with what dies for it, on BOTH sides, off the
         //same survey that priced the cast row (see xKillRowCore). Presentation
         //only: req.optionTexts is untouched, and the option count and ORDER are
@@ -40890,6 +41133,31 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //exposed it (see DecisionContract.cpp #W62-Y (D5)). Nothing is capped and
         //no window is removed: one more TRUE row, the one that lets an X spell
         //whose only affordable X does nothing go back to the hand.
+        //#W74-CC (O19): the LAST act of assembly, after every annotation above
+        //has been placed at its `capX - X` index - permute the finished rows
+        //into the order the pilot answers in, so that option N announces X = N
+        //and X = 0 is the last rung. Nothing above this line moves, and the
+        //pick is mapped back below.
+        bool xClimbing = false; //#W74-CC (O19)
+        if (capX >= 1 && shown.size() == (size_t)(capX + 1))
+        {
+            vector<string> disp;
+            disp.reserve(shown.size());
+            for (int xv = 1; xv <= capX; xv++)
+                disp.push_back(shown[(size_t)(capX - xv)]);
+            disp.push_back(shown[(size_t) capX]); //X = 0
+            shown.swap(disp);
+            xClimbing = true;
+        }
+        {
+            //Register: the announcement, not the menu question. In SHOWN space.
+            string xName = ctx ? ctx->getDisplayName() : string("the spell");
+            vector<string> narr;
+            for (size_t xi = 0; xi < shown.size(); xi++)
+                narr.push_back("You announced " + stripNarrationDecoration(shown[xi])
+                               + " for " + xName);
+            setAskNarration(narr);
+        }
         const size_t xRowCount = shown.size();
         if (req.canDecline)
             shown.push_back(string("Decline - do not cast this after all"
@@ -40933,8 +41201,11 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             return 0;
         }
         mPaidPendingCard.clear(); //#W68-BB (J5): this announcement is going through
+        //#W74-CC (O19): shown space -> the contract's index==X space. Display
+        //row j (0-based) is X = j+1 while j < capX, and the last rung is X = 0.
         if (pick >= 0 && pick < (int) xRowCount)
-            pick = (int) req.optionTexts.size() - 1 - pick; //shown space -> index==X space
+            pick = xClimbing ? ((pick < capX) ? pick + 1 : 0)
+                             : ((int) req.optionTexts.size() - 1 - pick);
         else if (pick < 0)
             pick = AIPlayerBaka::selectMenuOption(); //heuristic: max affordable X
         if (pick >= (int) req.optionTexts.size())
@@ -42970,7 +43241,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                         || !game || mc->currentZone != game->inPlay)
                         allMineCreatures = false;
                 }
-                forcedSacrifice = allMineCreatures;
+                //#W74-CC (O3): ...and only when the pick is the EDICT's own
+                //untargeted chooser, not a sibling mode's target(...).
+                forcedSacrifice = forcedSacrificeShape(script, allMineCreatures,
+                                                       tc && tc->targetter != NULL);
                 if (forcedSacrifice)
                 {
                     if (script.find("toughnesslifegain targetopponent") != string::npos)
@@ -46187,13 +46461,37 @@ int AIPlayerGPT::chooseAttackers()
                 }
             }
             blockGain = blockingLifeCeiling(blockerLife, blockerCanBlockOffered);
+            //#W74-CC (O5, deck126 HIGH-1): the lifelink half of the seat's OWN
+            //attack, when the seat controls a life-to-damage converter. Read off
+            //the SAME offered rows the total above is summed from, so the two
+            //cannot disagree; double strike deals its damage twice, exactly as
+            //the blockers' ceiling counts it.
+            int selfConvLifelink = 0;
+            {
+                bool ownConverter = false;
+                if (game && game->inPlay)
+                    for (int ci = 0; ci < game->inPlay->nb_cards && !ownConverter; ci++)
+                        if (game->inPlay->cards[ci]
+                            && lifeToDamageConverterScript(game->inPlay->cards[ci]->magicText))
+                            ownConverter = true;
+                if (ownConverter)
+                    for (size_t ai = 0; ai < attackers.size() && ai < rowPower.size(); ai++)
+                    {
+                        MTGCardInstance * ac = attackers[ai];
+                        if (!ac || !ac->basicAbilities[Constants::LIFELINK] || ac->power <= 0)
+                            continue;
+                        selfConvLifelink += ac->power
+                            * (ac->basicAbilities[Constants::DOUBLESTRIKE] ? 2 : 1);
+                    }
+            }
             totalsTail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
                                     infectExcluded, suppressed, blockGain,
                                     attackDeclarationPunishers(oppL),
                                     playerHasLifeLoop(oppL), //#W62-X (D2)
                                     &attackTotalKillClaim, //#W65-AN (G6)
-                                    blockLifelinkCeiling); //#W65-AP (R4)
+                                    blockLifelinkCeiling, //#W65-AP (R4)
+                                    selfConvLifelink); //#W74-CC (O5)
             //#W64-AK (R1): and the exclusion this wave's new row class creates.
             {
                 int walkerOnlyRows = 0;
@@ -48480,6 +48778,27 @@ static string mulliganRowLabel(int next)
     return o.str();
 }
 
+//#W74-CC (O16, wave-73 deck130 MED): the FRESH-7 window said nothing about what
+//a keep keeps. Every later window carries "(keeping N)" - that spelling is what
+//the deck guides' mulligan bullets key on - and the first one, which is the one
+//every game has and most games only have, printed the size clause only when
+//mullsTaken > 0. So on deck130 seq 2 (identical in all games) the bullets were
+//unreachable. Same spelling, on every window. Pure over the two inputs.
+static string mulliganKeepClause(int mullsTaken, int keepSize)
+{
+    std::ostringstream o;
+    if (mullsTaken <= 0)
+    {
+        o << " (keeping " << keepSize << ")";
+        return o.str();
+    }
+    o << ", and having already taken " << mullsTaken << " mulligan"
+      << (mullsTaken > 1 ? "s" : "") << " you will bottom " << mullsTaken
+      << " card" << (mullsTaken > 1 ? "s" : "") << " on a keep (keeping "
+      << keepSize << ")";
+    return o.str();
+}
+
 int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
 {
     mPregameMullsSeen = mullsTaken; //the true count, for the bottom ask (N-139i)
@@ -48490,11 +48809,7 @@ int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
     int keepSize = startingHandSize() - mullsTaken;
     q << "Pre-game mulligan decision (London mulligan). You have a fresh "
       << game->hand->nb_cards << "-card opening hand";
-    if (mullsTaken > 0)
-        q << ", and having already taken " << mullsTaken << " mulligan"
-          << (mullsTaken > 1 ? "s" : "") << " you will bottom " << mullsTaken
-          << " card" << (mullsTaken > 1 ? "s" : "") << " on a keep (keeping "
-          << keepSize << ")";
+    q << mulliganKeepClause(mullsTaken, keepSize); //#W74-CC (O16)
     q << ". Keep this hand, or mulligan (shuffle back and draw " << startingHandSize()
       << " again, bottoming one more at the next keep)?";
     vector<string> opts;
@@ -50119,7 +50434,14 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(h6.find("X up to 6") != string::npos, "W23-X header states the numeric cap");
         CHECK(h6.find("Black Sun's Zenith") != string::npos, "W23-X header names the spell");
         CHECK(h6.find("above 6") != string::npos, "W23-X header warns against planning above the cap");
-        CHECK(h6.find("LARGEST X (X = 6)") != string::npos, "W23-X header ties option 1 to the cap value");
+        //#W74-CC (O19): SUPERSEDED. The ladder climbs now, so the cap is tied to
+        //the LAST rung of the ladder rather than to option 1 - and the number
+        //that names it is the X itself.
+        CHECK(h6.find("option N announces X = N, up to option 6 (X = 6), the largest X"
+                      " you can afford") != string::npos,
+              "W23-X header ties the cap value to the option that announces it");
+        CHECK(h6.find("LARGEST X (X = 6)") == string::npos,
+              "#W74-CC O19 MUST-NOT-MATCH the descending header's option-1 claim is gone");
         // A different cap threads the same value everywhere (data-driven, no hardcode).
         string h2 = announceXHeader("Rakdos's Return", 2);
         CHECK(h2.find("X up to 2") != string::npos && h2.find("(X = 2)") != string::npos,
@@ -62039,10 +62361,14 @@ static const char * kW50Y_r94 =
         //#W69-BG (K8): the stacking verdict now answers the usefulness question
         //too. The wave-52 HEAD is byte-identical (guides key on it); the
         //stacking clause is APPENDED, exactly as verdicts 1 and 2 already are.
+        //#W74-CC (O21): SUPERSEDED - the same tag, with the cost side the
+        //wave-73 review found missing. The wave-52 HEAD is still byte-identical.
         CHECK(secondCopyTag("Howling Mine", mine9)
               == " [second copy: you already control Howling Mine; both stay on the battlefield"
                  " - no legend rule, and this copy is one more of the same effect - each line it"
-                 " repeats happens again]",
+                 " repeats happens again; the price is a card and this window's cast spent"
+                 " DOUBLING an effect you already have on the battlefield, not adding one you"
+                 " do not]",
               "#W69-BG K8 POSITIVE a stacking card's tag says the copy is one more of the effect");
         CHECK(secondCopyTag("Howling Mine", mine9)
               .compare(0, strlen(" [second copy: you already control Howling Mine; both stay on"
@@ -70729,9 +71055,15 @@ static const char * kW50Y_r94 =
               "#W63-AD E7 POSITIVE 125v146 seq 12's shape states the fact checkCantCancel proved");
         CHECK(cant.find("X = 0 is the smallest commitment, not a way out") != string::npos,
               "#W63-AD E7 ...and names what the smallest row actually is, so X=0 is not read as a cancel");
-        CHECK(cant.find("Reply with the OPTION number, not the X value:")
-              == cant.size() - strlen("Reply with the OPTION number, not the X value:"),
+        //#W74-CC (O19): the instruction is still last; its wording dropped the
+        //"not the X value" half, which stopped being true when the option
+        //number BECAME the X value.
+        CHECK(cant.find(" Reply with the OPTION number:")
+              == cant.size() - strlen(" Reply with the OPTION number:"),
               "#W63-AD E7 the answer instruction stays LAST on the header");
+        CHECK(cant.find("not the X value") == string::npos,
+              "#W74-CC O19 MUST-NOT-MATCH the header no longer separates the option number"
+              " from the X it announces");
         // Echo shape: the clause is header prose and opens no {..} or [..]
         // annotation channel, so no row parser and no key sees a new token.
         CHECK(cant.find('{') == string::npos && cant.find('[') == string::npos,
@@ -79717,6 +80049,196 @@ static const char * kW50Y_r94 =
         // so the two call sites that disagreed (10 cache replays -> 10, then the
         // first repeat replay -> 1) cannot exist. The compiler is the test.
         cout << "     F7: replays_this_game is written from mAskReplaysReserved only\n";
+    }
+
+    cout << "\n[#W74-CC] wave-74 lane CC: render truth (O3, O5, O12, O15, O16, O19, O21)\n";
+    {
+        // ---- O3: which pick is the EDICT (deck146 HIGH 1) ----
+        // `146v125` seq 60 vs `146v126` seq 27. Silverquill Command's magicText
+        // carries all eight modes at once (borderline.txt:102740-102747), so the
+        // script test alone matches on the run whose chosen mode was
+        // "creature gains 3/3 and you draw" - a target(creature) PUMP whose
+        // legal list happened to be all the seat's own bodies.
+        const string sqc = "choice name(creature gains 3/3 and sacrifice creature)"
+                           " target(creature) transforms((,newability[3/3],flying)) ueot"
+                           " && ability$!name(sacrifice creature) name(sacrifice creature)"
+                           " notatarget(creature|mybattlefield) sacrifice!$ opponent";
+        // The wave-73 rule, written out: script match AND all-mine, nothing else.
+        const bool wave73Rule = sqc.find("sacrifice") != string::npos
+            && sqc.find("notatarget(creature|mybattlefield)") != string::npos;
+        CHECK(wave73Rule && !forcedSacrificeShape(sqc, true, true),
+              "#W74-CC O3 REPRO `146v125` seq 60: the wave-73 rule FIRES on this script over"
+              " a board of the seat's own creatures (that is the false header) and the"
+              " wave-74 one does not, because the pick is a target(...)");
+        CHECK(forcedSacrificeShape(sqc, true, false),
+              "#W74-CC O3 the edict's own untargeted chooser on the SAME card still is");
+        // The real edict (Tribute to Hunger / Fleshbag Marauder): untargeted.
+        const string tribute = "notatarget(creature|mybattlefield) toughnesslifegain"
+                               " targetopponent sacrifice";
+        CHECK(forcedSacrificeShape(tribute, true, false),
+              "#W74-CC O3 MUST-NOT-MATCH the wave-60 shape this header was built for is"
+              " untouched");
+        CHECK(!forcedSacrificeShape(tribute, false, false),
+              "#W74-CC O3 MUST-NOT-MATCH a list carrying anything that is not one of the"
+              " seat's own battlefield creatures is still not this ask");
+        CHECK(!forcedSacrificeShape("", true, false)
+                  && !forcedSacrificeShape("target(creature) destroy", true, false),
+              "#W74-CC O3 MUST-NOT-MATCH a script with no sacrifice/notatarget pair never"
+              " reaches the header");
+
+        // ---- O5: ATTACK TOTAL under the seat's own converter (deck126 HIGH-1) ----
+        // `126v130` seat seq 43: opponent at 5, one 2-power LIFELINK attacker,
+        // Sanguine Bond on the SEAT's battlefield. Old figure 3 and "NOT lethal".
+        const string s43 = attackTotalLine(1, 2, 5, 0, 2, 0, false, 0, "", false, NULL, 0, 2);
+        CHECK(s43.find("2 of that damage is LIFELINK") != string::npos
+                  && s43.find("they are at 1, not 3") != string::npos,
+              "#W74-CC O5 REPRO the converted figure is printed beside the combat-only one");
+        CHECK(s43.find("That is NOT lethal: they survive at 1") != string::npos
+                  && s43.find("survive at 3") == string::npos,
+              "#W74-CC O5 the verdict is computed from the figure the converter makes true");
+        const string s43lethal = attackTotalLine(1, 2, 4, 0, 2, 0, false, 0, "", false, NULL, 0, 2);
+        CHECK(s43lethal.find("That IS lethal") != string::npos,
+              "#W74-CC O5 and a converted total that reaches 0 is named lethal, scoped to"
+              " none-of-them-blocked as every other claim on this line is");
+        CHECK(attackTotalLine(1, 2, 5, 0, 2, 0, false, 0, "", false, NULL, 0, 0)
+                  == attackTotalLine(1, 2, 5, 0, 2),
+              "#W74-CC O5 MUST-NOT-MATCH no converter, no clause: the line is byte-identical"
+              " to wave 73");
+        CHECK(attackTotalLine(1, 2, 5, 0, 2, 0, false, 0, "", false, NULL, 0, 2)
+                  .find("LIFELINK, and your LIFE-TO-DAMAGE CONVERTER") != string::npos,
+              "#W74-CC O5 the clause names the permanent class the CURRENT SITUATION block"
+              " already explains, in its own words");
+
+        // ---- O12: tapped + no-untap is a restriction (deck125 A-4) ----
+        // `125v123` seq 399: 103 Humans under two Intruder Alarms, every one of
+        // 102 tagged `[doesn't untap ...] [tapped ...]` and all 103 counted.
+        CHECK(!attackRestrictionFree(false, false, false, false, true),
+              "#W74-CC O12 REPRO a tapped creature that does not untap carries a restriction"
+              " against attacking");
+        CHECK(attackRestrictionFree(false, false, false, false, false),
+              "#W74-CC O12 MUST-NOT-MATCH an unrestricted creature is unchanged");
+        CHECK(attackRestrictionFree(false, false, false, false)
+                  == attackRestrictionFree(false, false, false, false, false),
+              "#W74-CC O12 MUST-NOT-MATCH every wave-73 call site keeps its answer");
+
+        // ---- O15: loyalty rows carry their consequence (deck126 MED-2) ----
+        // `126v130` seat seq 42, the deciding decision of that loss.
+        const string plusOne = loyaltyRowConsequenceTag(
+            "+1: create a 1/1 vampire with Sorin, Lord of Innistrad", false, 0);
+        CHECK(plusOne.find("summoning sick - it cannot attack until your next turn")
+                  != string::npos,
+              "#W74-CC O15 REPRO the +1's token says what the attackers seam only said one"
+              " window later");
+        const string minusTwo = loyaltyRowConsequenceTag(
+            "-2: emblem: \"creatures get +1/+0\" with Sorin, Lord of Innistrad", false, 1);
+        CHECK(minusTwo.find("you already control 1 emblem - a new emblem is ADDED to them")
+                  != string::npos,
+              "#W74-CC O15 REPRO the -2 says the emblem is cumulative with the one live");
+        CHECK(loyaltyRowConsequenceTag("-2: emblem with Sorin", false, 0)
+                  .find("an emblem is permanent") != string::npos,
+              "#W74-CC O15 with no emblem out yet the row states the permanence instead of a"
+              " count it does not have");
+        CHECK(loyaltyRowConsequenceTag(
+                  "+1: create a 1/1 vampire with Sorin, Lord of Innistrad", true, 0).empty(),
+              "#W74-CC O15 MUST-NOT-MATCH a HASTE token is not summoning sick and says nothing");
+        CHECK(loyaltyRowConsequenceTag("-3: exile non-land permanent with Kaya the"
+                                       " Inexorable", false, 2).empty(),
+              "#W74-CC O15 MUST-NOT-MATCH a loyalty row that makes no body and no emblem is"
+              " left alone - the magnitude is what N-146g proved unattributable");
+        CHECK(loyaltyRowConsequenceTag("Cast Sorin, Lord of Innistrad", false, 1).empty(),
+              "#W74-CC O15 MUST-NOT-MATCH a row with no loyalty prefix is not a loyalty row");
+        CHECK(loyaltyRowConsequenceTag("+1: emblem with Sorin", false, 0).find(" {right now: ")
+                  == 0,
+              "#W74-CC O15 ECHO the clause rides the same bracket every other priced fact on"
+              " this row uses, so the composed-row duplicate census sees it");
+
+        // ---- O16: (keeping N) on the FIRST mulligan window (deck130 MED) ----
+        CHECK(mulliganKeepClause(0, 7) == " (keeping 7)",
+              "#W74-CC O16 REPRO the fresh-7 window carries the spelling the deck guides'"
+              " mulligan bullets key on");
+        CHECK(mulliganKeepClause(1, 6)
+              == ", and having already taken 1 mulligan you will bottom 1 card on a keep"
+                 " (keeping 6)",
+              "#W74-CC O16 MUST-NOT-MATCH the later windows are byte-identical to wave 73");
+        CHECK(mulliganKeepClause(2, 5).find("(keeping 5)") != string::npos
+                  && mulliganKeepClause(0, 7).find("(keeping 7)") != string::npos,
+              "#W74-CC O16 one spelling across every window");
+
+        // ---- O19: the X ladder climbs (engine-seat MED-3) ----
+        // `125v126` seq 100 and `125v123` seq 624: "CHOICE: 5 (X = 5)" on a list
+        // whose option 5 was X = 3.
+        {
+            const string h = announceXHeader("Sphinx's Revelation", 7);
+            CHECK(h.find("THE OPTION NUMBER IS THE X: option N announces X = N, up to option"
+                         " 7 (X = 7)") != string::npos,
+                  "#W74-CC O19 REPRO the header states the identity the numbering now has");
+            CHECK(h.find("X = 0 is the last rung, at option 8.") != string::npos,
+                  "#W74-CC O19 X = 0 keeps its row and is told where it is");
+            CHECK(announceXHeader("Starstorm", 0).find("The only value your mana affords is"
+                                                       " X = 0, at option 1.") != string::npos,
+                  "#W74-CC O19 the zero-slack menu says what its one row is");
+            // the display permutation, as the seam computes it
+            const int capX = 7;
+            vector<int> shownX;
+            for (int xv = 1; xv <= capX; xv++)
+                shownX.push_back(xv);
+            shownX.push_back(0);
+            bool tracks = true;
+            for (size_t j = 0; j + 1 < shownX.size(); j++)
+                if (shownX[j] != (int) j + 1)
+                    tracks = false;
+            CHECK(tracks && shownX.back() == 0,
+                  "#W74-CC O19 option N is X = N for every rung above zero, and X = 0 is last");
+            // and the map back into the contract's index==X space
+            bool roundTrip = true;
+            for (int j = 0; j <= capX; j++)
+            {
+                const int back = (j < capX) ? j + 1 : 0;
+                if (back != shownX[(size_t) j])
+                    roundTrip = false;
+            }
+            CHECK(roundTrip,
+                  "#W74-CC O19 the shown-space -> index==X map is the inverse of the display"
+                  " permutation, so no pick lands on a different X than the one it named");
+        }
+        CHECK(monotoneXRangeRow(2, 6, 2, 6, "X = 2 ...", "X = 6 ...")
+                  .find("X = 2 up to X = 6 - one option per X in that range, smallest X first")
+                  != string::npos,
+              "#W74-CC O19 the collapsed range reads in the direction the rows run");
+        CHECK(monotoneXRangeRow(2, 6, 6, 2, "X = 6 ...", "X = 2 ...")
+                  .find("X = 6 down to X = 2 - one option per X in that range, largest X first")
+                  != string::npos,
+              "#W74-CC O19 MUST-NOT-MATCH a descending run still renders wave 56's sentence,"
+              " byte for byte");
+
+        // ---- O21: the worked example stops copying an annotation (deck146 MED 4) ----
+        {
+            vector<string> ex;
+            ex.push_back("Brightclimb Pathway (menu text: Play Land)");
+            int usedRow = -1;
+            CHECK(askExemplar(ex, &usedRow) == "CHOICE: 1 (Brightclimb Pathway)",
+                  "#W74-CC O21 REPRO deck130 seq 14's example no longer copies the gloss the"
+                  " same sentence forbids");
+            vector<string> mull;
+            mull.push_back("Keep this hand");
+            mull.push_back(mulliganRowLabel(6));
+            CHECK(askExemplar(mull, &usedRow) == "CHOICE: 1 (Keep this hand)",
+                  "#W74-CC O21 MUST-NOT-MATCH a row whose short name genuinely ends in"
+                  " parentheses is untouched");
+            CHECK(askExemplar(mull, &usedRow).find("(menu text") == string::npos,
+                  "#W74-CC O21 only that one spelling is cut");
+        }
+
+        // ---- O20: the casting hold says which seam still asks (deck130 LOW) ----
+        CHECK(holdRowLine(true).find("NOT the priority window that follows on this same"
+                                     " step - that is a different question at a different"
+                                     " seam and you will still be asked it") != string::npos,
+              "#W74-CC O20 REPRO 15 of 21 upkeep holds were followed by a priority record in"
+              " the same phase; the row's headline no longer reads as false there");
+        CHECK(holdRowLine(false).find("NOT the priority window") == string::npos
+                  && holdRowLine(false, true).find("NOT the priority window") == string::npos,
+              "#W74-CC O20 MUST-NOT-MATCH the two PRIORITY spellings are byte-identical to"
+              " wave 73 - the priority seam is the one being described, not a sibling");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

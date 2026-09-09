@@ -1,0 +1,35 @@
+# W74-CC (O1, wave-73 engine-seat HIGH-1). Kaya the Inexorable's +1 GRANTS the
+# return-to-hand trigger and marks it with a ghostform counter. The GPT board
+# render's counter gloss ("killing it is not removal") is conditional on that
+# grant still being live, and the wave-73 predicate looked for the menu text
+# "Put back to hand" - which the grant never produces, because `all(...)` wraps
+# the mover in an ALord whose getMenuText is ActionElement's base "Ability". So
+# the gloss read "(a marker only - the ability that returned it is gone)" on
+# 56 of 56 corpus renders while the event line above it said the opposite.
+# RED on the seeded tree at the second assert (predicate answers 0); GREEN with
+# the structural test (a live triggered ability on this creature whose payload
+# moves it to a HAND).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Kaya the Inexorable,Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertghostformlive 0 Grizzly Bears
+Kaya the Inexorable
+choice 1
+Grizzly Bears
+no
+no
+no
+assertghostformlive 1 Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Kaya the Inexorable,Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[END]

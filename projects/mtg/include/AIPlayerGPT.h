@@ -126,6 +126,11 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
 class ActionLayer;
 int gptDisplayToggleSuppressed(MTGCardInstance * c, ActionLayer * al);
 
+//#W74-CC (O1): is a ghostform-style GRANTED return-to-hand trigger still live
+//on this creature? The board render's counter gloss is conditional on it, and
+//the suite's `assertghostformlive <0|1> <card>` asks it directly.
+bool gptGhostformGrantLive(MTGCardInstance * card);
+
 struct NarrationCycleHolder
 {
     vector<string> cycle;      //the established repeating block (empty = none)
