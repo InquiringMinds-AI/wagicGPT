@@ -1,0 +1,544 @@
+# wave-73 lategame specimen (standing rule, alert-only). Corpus matchups-20260907-225637-final.
+# 1788902003-ai_baka_deck125-0x5622aac60850-vs-ai_baka_deck126.jsonl seq 435 | turn 63, Upkeep, kind priority, 5 options | life 126 vs 3 | 51.0 s | reasoning_chars 5828 | prompt 32487 B
+# chose: Deal 1 damage with Staff of Nin targeting the opponent {right now: takes 1 damage - they would be at 2} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+#
+# Full `prompt` verbatim below.
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Path to Exile x4, Cancel x2, Fall of the Gavel, Dream Fracture; opponent - Idyllic Tutor x3, Sanguine Bond, Sorin, Lord of Innistrad, Pride Guardian, Perimeter Captain x3, Overgrown Battlement, Staff of Nin; exiled at trim: you - none; opponent - Wall of Omens x2, Pride Guardian x2)
+- You cast Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Pride Guardian died
+- Opponent's Perimeter Captain died (that Perimeter Captain was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Perimeter Captain died (that Perimeter Captain was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Perimeter Captain died
+- Your Supreme Verdict resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Final Judgment
+- You discarded Final Judgment
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+=== Turn 33 - YOUR turn ===
+- Phase: Upkeep
+- You drew Tundra
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality (2 sources)
+- You gained 5 life (now 41)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (17 cards) into your library with Elixir of Immortality
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You played Tundra
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+=== Turn 35 - YOUR turn ===
+- Phase: Upkeep
+- You drew Elixir of Immortality
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- Phase: Draw
+- You drew Cancel
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Cancel, Final Judgment
+- You discarded Cancel (that Cancel was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Final Judgment
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+=== Turn 37 - YOUR turn ===
+- Phase: Upkeep
+- You drew Tundra
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Tundra
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (14 sources)
+- You announced X = 9 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 9 life (now 50)
+- You drew Sphinx's Revelation
+- You drew Island
+- You drew Supreme Verdict
+- You drew Elixir of Immortality
+- You drew Glacial Fortress
+- You drew Plains
+- You drew Staff of Nin
+- You drew Island
+- You drew Fall of the Gavel
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Paid {1} for Elixir of Immortality from mana already floating
+- You cast Elixir of Immortality (that Elixir of Immortality was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Elixir of Immortality resolved and entered the battlefield
+- Paid {1} for Elixir of Immortality from mana already floating
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 14, limit 7): you chose Sphinx's Revelation, Island, Supreme Verdict, Glacial Fortress, Plains, Staff of Nin, Island
+- You discarded Sphinx's Revelation
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+- You discarded Glacial Fortress
+- You discarded Plains
+- You discarded Staff of Nin
+- You discarded Island
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 39 - YOUR turn ===
+- Phase: Upkeep
+- You drew Emrakul, the Aeons Torn
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Emrakul, the Aeons Torn, Final Judgment
+- You discarded Emrakul, the Aeons Torn
+- You discarded Final Judgment
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (13 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 40 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Overgrown Battlement
+- Paid {1}{u} for Essence Scatter (2 sources)
+- You cast Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Overgrown Battlement was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 41 - YOUR turn ===
+- Phase: Upkeep
+- You drew Final Judgment
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (14 sources)
+- You announced X = 11 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 11 life (now 61)
+- You drew Fall of the Gavel
+- You drew Supreme Verdict
+- You drew Path to Exile
+- You drew Island
+- You drew Dream Fracture
+- You drew Seachrome Coast
+- You drew Staff of Nin
+- You drew Dream Fracture
+- You drew Path to Exile
+- You drew Island
+- You drew Path to Exile
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 17, limit 7): you chose Fall of the Gavel, Essence Scatter, Essence Scatter, Cancel, Cancel, Fall of the Gavel, Fall of the Gavel, Seachrome Coast, Staff of Nin, Island
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Essence Scatter
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Cancel
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Fall of the Gavel
+- You discarded Seachrome Coast
+- You discarded Staff of Nin
+- You discarded Island
+=== Turn 42 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+=== Turn 43 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+- You used: Life with Elixir of Immortality #1
+- Paid {2} for Elixir of Immortality (2 sources)
+- You gained 5 life (now 66)
+- Your Elixir of Immortality was put into your library from the battlefield (that Elixir of Immortality was 1 of 2 copies on your battlefield; the other 1 is still there)
+- You shuffled your graveyard (12 cards) into your library with Elixir of Immortality
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Final Judgment, Dream Fracture
+- You discarded Final Judgment
+- You discarded Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 44 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 45 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (15 sources)
+- You announced X = 12 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 12 life (now 78)
+- You drew Island
+- You drew Essence Scatter
+- You drew Seachrome Coast
+- You drew Fall of the Gavel
+- You drew Cancel
+- You drew Island
+- You drew Supreme Verdict
+- You drew Island
+- You drew Sphinx's Revelation
+- You drew Dream Fracture
+- You drew Plains (x2)
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 19, limit 7): you chose Path to Exile, Path to Exile, Path to Exile, Path to Exile, Essence Scatter, Essence Scatter, Seachrome Coast, Cancel, Island, Island, Plains, Plains
+- You discarded Path to Exile (that Path to Exile was 1 of 4 copies in your hand; the other 3 are still there)
+- You discarded Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Path to Exile
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Essence Scatter
+- You discarded Seachrome Coast
+- You discarded Cancel
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Plains (that Plains was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Plains
+=== Turn 46 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 47 - YOUR turn ===
+- Phase: Upkeep
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (16 sources)
+- You announced X = 13 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 13 life (now 91)
+- You drew Staff of Nin
+- You drew Supreme Verdict
+- You drew Fall of the Gavel
+- You drew Cancel
+- You drew Lightmine Field
+- You drew Essence Scatter
+- You drew Elixir of Immortality
+- You drew Emrakul, the Aeons Torn
+- You drew Glacial Fortress
+- You drew Lightmine Field
+- You drew Cancel
+- You drew Final Judgment
+- You drew Sphinx's Revelation
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You drew Fall of the Gavel
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {1} for Elixir of Immortality (1 source)
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 19, limit 7): you chose Fall of the Gavel, Supreme Verdict, Dream Fracture, Supreme Verdict, Fall of the Gavel, Lightmine Field, Emrakul, the Aeons Torn, Lightmine Field, Cancel, Final Judgment, Fall of the Gavel, Plains
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 4 copies in your hand; the other 3 are still there)
+- You discarded Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Lightmine Field (that Lightmine Field was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Emrakul, the Aeons Torn
+- You discarded Lightmine Field
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Final Judgment
+- You discarded Fall of the Gavel
+- You discarded Plains
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (28 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 48 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 49 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (17 sources)
+- You announced X = 14 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 14 life (now 105)
+- You drew Path to Exile [x4 - this exact line 4 times in this batch]
+- You drew Plains
+- You drew Island
+- You drew Lightmine Field
+- You drew Final Judgment
+- You drew Dream Fracture (x2)
+- You drew Island (x2)
+- You drew Emrakul, the Aeons Torn
+- You drew Glacial Fortress
+- You drew Sphinx's Revelation
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- Phase: Draw
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Cleanup
+- Cleanup discard (hand 21, limit 7): you chose Supreme Verdict, Dream Fracture, Supreme Verdict, Staff of Nin, Cancel, Essence Scatter, Plains, Island, Lightmine Field, Final Judgment, Island, Island, Emrakul, the Aeons Torn, Sphinx's Revelation
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Dream Fracture (that Dream Fracture was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Supreme Verdict
+- You discarded Staff of Nin
+- You discarded Cancel
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Plains
+- You discarded Island (that Island was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Lightmine Field
+- You discarded Final Judgment
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Emrakul, the Aeons Torn
+- You discarded Sphinx's Revelation
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (15 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 50 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Opponent put the revealed Sanguine Bond into their hand
+- Opponent cast Sanguine Bond
+- Opponent's Sanguine Bond resolved and entered the battlefield
+=== Turn 51 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You played Plains
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Final Judgment
+- You discarded Final Judgment
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 53 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You used: Life with Elixir of Immortality #1
+- Paid {2} for Elixir of Immortality (2 sources)
+- You gained 5 life (now 110)
+- Your Elixir of Immortality was put into your library from the battlefield (that Elixir of Immortality was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Final Judgment was put into your library from your graveyard
+- Paid {w} for Path to Exile (1 source)
+- You targeted Wall of Omens (0/4) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 4 copies in your hand; the other 3 are still there)
+- Opponent's Wall of Omens was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Forest
+- Opponent's Forest entered the battlefield from the opponent's library
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Cancel
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin targeting Pride Guardian
+- Your Staff of Nin dealt 1 damage to Pride Guardian
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Cancel, Fall of the Gavel
+- You discarded Cancel
+- You discarded Fall of the Gavel
+=== Turn 56 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Staff of Nin
+- Paid {1}{u}{u} for Dream Fracture (3 sources)
+- You cast Dream Fracture (that Dream Fracture was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Staff of Nin was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Elixir of Immortality
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+- Phase: Combat begins
+- Paid {w} for Path to Exile (1 source)
+- You targeted Pride Guardian #2 (0/3) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Pride Guardian was exiled from the battlefield (that Pride Guardian was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Your Path to Exile resolved and went to your graveyard
+- Phase: Attackers
+- Paid {w} for Path to Exile (1 source)
+- You targeted Pride Guardian (0/3) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Pride Guardian was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Phase: Combat ends
+- Paid {w} for Path to Exile (1 source)
+- You cast Path to Exile
+- Opponent's Wall of Omens was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+=== Turn 57 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 5)
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality (1 source)
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 58 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+=== Turn 59 - YOUR turn ===
+- Phase: Upkeep
+- You drew Emrakul, the Aeons Torn
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 4)
+=== Turn 60 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 61 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (19 sources)
+- You announced X = 16 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 16 life (now 126)
+- You drew Sphinx's Revelation
+- You drew Supreme Verdict
+- You drew Lightmine Field (x2)
+- You drew Fall of the Gavel
+- You drew Final Judgment
+- You drew Plains
+- You drew Supreme Verdict
+- You drew Fall of the Gavel
+- You drew Supreme Verdict
+- You drew Seachrome Coast
+- You drew Island
+- You drew Essence Scatter
+- You drew Sphinx's Revelation
+- You drew Plains
+- You drew Island
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Your Staff of Nin dealt 1 damage to the opponent (now 3)
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Plains
+- Phase: Cleanup
+- Cleanup discard (hand 23, limit 7): you chose Essence Scatter, Dream Fracture, Dream Fracture, Essence Scatter, Cancel, Essence Scatter, Supreme Verdict, Final Judgment, Supreme Verdict, Supreme Verdict, Seachrome Coast, Island, Essence Scatter, Plains, Island, Island
+- You discarded Essence Scatter (that Essence Scatter was 1 of 4 copies in your hand; the other 3 are still there)
+- You discarded Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Dream Fracture
+- You discarded Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Cancel
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Final Judgment
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+- You discarded Seachrome Coast
+- You discarded Island (that Island was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Essence Scatter
+- You discarded Plains
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+=== Turn 62 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+=== Turn 63 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+Your life: 126 | Opponent life: 3
+Opponent life trend: turn 60: 4, turn 61: 4, turn 63: 3, now 3 (-1 since turn 60).
+Mana available: 20 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 15, {U} 15 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Tundra #1 {w} or {u}; Island #1 {u}; Plains #1 {w}; Island #2 {u}; Glacial Fortress #1 {w} or {u}; Tundra #2 {w} or {u}; Glacial Fortress #2 {w} or {u}; Seachrome Coast #1 {w} or {u}; Plains #2 {w}; Island #3 {u}; Seachrome Coast #2 {w} or {u}; Plains #3 {w}; Tundra #3 {w} or {u}; Tundra #4 {w} or {u}; Island #4 {u}; Island #5 {u}; Glacial Fortress #3 {w} or {u}; Glacial Fortress #4 {w} or {u}; Plains #4 {w}; Plains #5 {w}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options), so the absence of a land from the choices below does not mean the drop is gone. ONE exception: a modal double-faced card whose back face is a land is offered in the casting menu on its own row, marked PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends this same drop.
+Your hand (8 cards): Emrakul, the Aeons Torn {15} (15/15) [creature] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase]; Sphinx's Revelation (copy 1 of 2 in your hand) {u}{u}{w}{x} [instant] [no cast row now: you already answered this phase's Casting decision, so this window does not offer it - it is otherwise castable and its own casting window this turn has passed]; Lightmine Field (copy 1 of 2 in your hand) {2}{w}{w} [enchantment] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase]; Lightmine Field (copy 2 of 2 in your hand) {2}{w}{w} [enchantment] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase]; Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Fall of the Gavel (copy 2 of 2 in your hand) {3}{u}{w} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Sphinx's Revelation (copy 2 of 2 in your hand) {u}{u}{w}{x} [instant] [no cast row now: you already answered this phase's Casting decision, so this window does not offer it - it is otherwise castable and its own casting window this turn has passed]; Seachrome Coast (land: taps for {W}{U})
+Your battlefield (23 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 20 are lands): Elixir of Immortality #1 {1} [artifact]; Elixir of Immortality #2 {1} [artifact]; Glacial Fortress #1-#4 x4; Island #1-#5 x5; Plains #1-#5 x5; Seachrome Coast #1; Seachrome Coast #2; Staff of Nin {6} [artifact]; Tundra #1-#4 x4
+Your graveyard (25 cards): Path to Exile {w} x4; Cancel {1}{u}{u} x3; Fall of the Gavel {3}{u}{w}; Dream Fracture {1}{u}{u} x3; Sphinx's Revelation {u}{u}{w}{x}; Essence Scatter {1}{u} x4; Supreme Verdict {1}{u}{w}{w} x3; Final Judgment {4}{w}{w}; Seachrome Coast; Island x3; Plains
+Opponent battlefield (24 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 20 are lands): Bayou #1-#3 x3; Chromatic Lantern #2 {3} [artifact]; Chromatic Lantern #1 {3} [artifact] {effect (each copy of this card does this) (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "Lands you control have "{T}: Add one mana of any color." -- {T}: Add one mana of any color."}; Exquisite Blood {4}{b} [enchantment] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "Whenever an opponent loses life, you gain that much life."}; Forest; Isolated Chapel #1; Isolated Chapel #2; Plains; Sanguine Bond {3}{b}{b} [enchantment] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "Whenever you gain life, target opponent loses that much life."}; Savannah #1-#3 x3; Scrubland #1-#4 x4; Sunpetal Grove #1-#4 x4; Swamp; Woodland Cemetery
+Their graveyard (11 cards): Idyllic Tutor {2}{w} x3; Sanguine Bond {3}{b}{b}; Sorin, Lord of Innistrad {2}{b}{w}; Pride Guardian {w} (creature 0/3); Perimeter Captain {w} (creature 0/4) x3; Overgrown Battlement {1}{g} (creature 0/4); Staff of Nin {6}
+Their untapped sources: 22 (colours they could make: {g}{u}{r}{b}{w})
+Opponent hand size: 7 | Opponent library: 14 cards
+Artifacts in play: you 3 | opponent 2
+LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond. While it is in play, life ITS CONTROLLER gains also makes the other player lose that much life. A converter of THEIRS turns every life THEY gain - lifelink, blocking triggers, drains, any of it - into that much life off YOUR total as well; a converter of YOURS does the same to life YOU gain, and leaves their gains alone. This is not a trade: when they gain N, their total goes UP by N and yours goes DOWN by N in the same event. Both halves of a life LOOP are on THEIR battlefield (Sanguine Bond + Exquisite Blood): Exquisite Blood turns every life the other player loses back into life for them, which Sanguine Bond turns into life loss again, without limit. Any life they gain, or any life you lose, chains until YOU are at 0 - so ANY nonzero payment on a tag above is fatal, not merely expensive.
+LOOP COMPLETE: BOTH halves of a life LOOP (Sanguine Bond + Exquisite Blood) are on THEIR battlefield right now. Any life YOU lose, and any life THEY gain, chains until you are at 0 - so every life payment on this screen is fatal rather than expensive. Their chain starts only from life YOU lose or life THEY gain - life THEY lose does not enter it.
+Your library: 4 cards
+
+THE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 63) reads "then activate Staff of Nin to deal 1 damage. Repeat next turn to win."
+
+Your legal actions (Upkeep, YOUR turn):
+1. Deal 1 damage with Staff of Nin targeting the opponent {right now: takes 1 damage - they would be at 2} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+2. Deal 1 damage with Staff of Nin targeting you {right now: takes 1 damage - you would be at 125} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+3. Life with Elixir of Immortality #1 {right now: shuffles your 25-card graveyard and this card back into your library - your library goes from 4 to 30 cards} [cost: {2}, Tap] {card text: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}
+4. Life with Elixir of Immortality #2 {right now: shuffles your 25-card graveyard and this card back into your library - your library goes from 4 to 30 cards} [cost: {2}, Tap] {card text: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}
+5. Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; the rows above include ACTIVATED abilities that are usable RIGHT NOW, and taking this row gives every one of them up for as long as these rows stand) {it is released at the start of your next turn whatever the rows do; until then, taking this row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked. A pass row that differs only by naming which step comes next is the same row, so a hold taken in your first main phase also covers your second main phase while these rows do not change; so is a row that differs only by a bracket saying it cannot reach a spell on the stack; and so is a row that differs only by a LIFE TOTAL it projects - what you or they would be at - because that number moves with the board and not with the row. Any OTHER change re-opens this window, including a kill count, a damage figure, a survivor count, a price, and a row that begins saying it kills you}
+0. Pass priority (take no action this window)
+
+[hold check: every row above was also on the menu at the last window at this seam (1 window in a row now) - a hold taken here holds until one of them changes]
+[LOOP RUNNING: both halves of the opponent's life LOOP are on the battlefield and the chain is live, so this same question is put to you again for every link of it, with only its numbers moved. Nothing on this list stops the chain. At least one row above pays or moves LIFE, and while their loop stands life YOU lose or life THEY gain is what the chain eats: weigh that row with the chain, not apart from it. Every row above is still a play that stands on its own, and the HOLD row gives every one of them up.]
+Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other main-phase cards are NOT castable in this window - your main phase's own Casting decision is where you cast them, later this same turn.
+You will have priority again later this turn, so instants and activated abilities you hold stay castable this turn.
+You have already answered this phase's Casting decision (a card you did not cast there is not re-offered below). The rows below are the OTHER actions available now.
+
+Which action do you take? Write your PLAN: line first, then on a line of its own CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list) or "CHOICE: 0 (pass)". Write nothing else.
