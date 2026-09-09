@@ -288,13 +288,46 @@ pilot_stall_sweep() {
 # a phase is not going to finish, and invariant 00 makes that a STOP, not a
 # warning. Read off the NEWEST record of each live seat only - an old high count
 # from a turn the seat has since left is history, not a wedge.
+#
+#W74-CH: AND THE BOARD MUST NOT HAVE MOVED. The count alone is a FALSE POSITIVE
+# on a finite TRIGGER CHAIN, and it fired on one inside a day: run
+# 20260909-104713 was stopped at 18/21 games because game `125v126`'s deck126
+# seat was served 41 casting windows in one upkeep while its OWN Sanguine Bond +
+# Exquisite Blood chain drained the opponent 21 -> 1 - one link per window, the
+# chain one link from winning the game. That is progress, not a wedge: each
+# window's board differs from the last. The dead loop of 20260909-015553 is the
+# opposite - 384 windows at turn 4 Main 1 with `my_life` 20, `opp_life` 20 and an
+# empty stack on every single record. So the predicate is now BOTH terms: the
+# count at or above N, AND an UNCHANGED BOARD across the newest K decisions of
+# that seat (identical my_life, identical opp_life, identical stack-top line -
+# or no `events` on any of them). Either term alone is wrong: the count alone
+# kills healthy chains, the board alone would stop any seat deliberating twice.
 WINDOW_LOOP_N="${WAGIC_WINDOW_LOOP_N:-40}"
+WINDOW_LOOP_K="${WAGIC_WINDOW_LOOP_K:-8}"
 window_loop_verdict() {
-    #$1 = logdir, $2 = run start epoch, $3 = N -> "LOOP <n> <seat>" | "OK <n>"
-    python3 - "$1" "$2" "$3" <<'WLY'
+    #$1 = logdir, $2 = run start epoch, $3 = N, $4 = K (default 8)
+    #   -> "LOOP <n> <seat>" | "OK <n>"
+    python3 - "$1" "$2" "$3" "${4:-8}" <<'WLY'
 import glob, json, os, re, sys
 logdir, start, n = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+k = int(sys.argv[4]) if len(sys.argv) > 4 else 8
 DECL = re.compile(r"declined this exact list (\d+) times? this turn")
+STACK_HEAD = "ON THE STACK"
+
+def stack_top(prompt):
+    #The board frame's stack header, then the first non-empty line under it. No
+    #header at all is an EMPTY stack, which is its own (stable) value.
+    lines = str(prompt).split("\n")
+    for i, ln in enumerate(lines):
+        if STACK_HEAD in ln:
+            for nxt in lines[i + 1:]:
+                if nxt.strip():
+                    return nxt.strip()
+            return "<empty>"
+    return "<no stack>"
+
+def board_of(r):
+    return (r.get("my_life"), r.get("opp_life"), stack_top(r.get("prompt", "")))
 
 worst, worstSeat = 0, ""
 for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
@@ -304,7 +337,7 @@ for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
         continue
     if ep < start - 5:
         continue
-    newest, ended = None, False
+    recs, ended = [], False
     try:
         for line in open(f, errors="replace"):
             try: r = json.loads(line)
@@ -314,15 +347,23 @@ for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
                 continue
             if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery"):
                 continue
-            newest = r
+            recs.append(r)
     except OSError:
         continue
     #Only a game STILL IN FLIGHT can be looping; a finished game's counts are
     #whatever it ended on.
-    if ended or newest is None:
+    if ended or not recs:
         continue
-    counts = [int(x) for x in DECL.findall(str(newest.get("prompt", "")))]
-    if counts and max(counts) > worst:
+    counts = [int(x) for x in DECL.findall(str(recs[-1].get("prompt", "")))]
+    if not counts or max(counts) <= worst:
+        continue
+    #W74-CH: the SECOND term. The newest K decisions of this seat must sit on
+    #ONE board - a trigger chain advances the board at every link, and the 41
+    #windows it costs are 41 links of progress, not a window that cannot close.
+    window = recs[-k:]
+    boards = set(board_of(r) for r in window)
+    events = [str(r.get("events") or "").strip() for r in window]
+    if len(boards) == 1 or not any(events):
         worst, worstSeat = max(counts), os.path.basename(f)
 
 if worst >= n:
@@ -334,7 +375,7 @@ WLY
 
 window_loop_sweep() {
     local verdict
-    verdict=$(window_loop_verdict "$LOGDIR" "$START" "$WINDOW_LOOP_N") || return 0
+    verdict=$(window_loop_verdict "$LOGDIR" "$START" "$WINDOW_LOOP_N" "$WINDOW_LOOP_K") || return 0
     case "$verdict" in
         LOOP*)
             set -- $verdict
@@ -345,8 +386,11 @@ window_loop_sweep() {
             echo "== a pilot stall - but the window never closes, so the phase never advances"
             echo "== and every repeat is another full model call. The game cannot finish, and a"
             echo "== corpus that does not complete games has failed (invariant 00). Stopping."
+            echo "== Its newest $WINDOW_LOOP_K decisions also sit on ONE board (same life totals,"
+            echo "== same stack top), so this is not a trigger chain making progress."
             echo "== Read that seat's newest two prompts: if they differ only in this count,"
-            echo "== the ask key is unstable again (wave-74 lane CG)."
+            echo "== the ask key is unstable again (wave-74 lane CG); if they differ only in a"
+            echo "== {...} or [...] annotation, the hold key is reading the render (lane CH)."
             touch "$OUTDIR/WINDOW-LOOP"
             kill -TERM "$HARNESS_PID" 2>/dev/null
             return 1;;
@@ -403,8 +447,60 @@ window_loop_selftest() {
     case "$v" in LOOP\ 40*) ;; *) echo "window-loop-selftest FAIL: N=40 gave '$v', want LOOP" >&2; fails=1;; esac
     v=$(window_loop_verdict "$tmp" 1 41)
     case "$v" in "OK 40") ;; *) echo "window-loop-selftest FAIL: N=40 under a 41 threshold gave '$v', want 'OK 40'" >&2; fails=1;; esac
+    #W74-CH g: A TRIGGER CHAIN IS NOT A LOOP. The real shape that tripped the
+    #wave-74 relaunch: game 125v126's deck126 seat, turn 32 Upkeep, its own
+    #Sanguine Bond + Exquisite Blood chain draining the opponent one life per
+    #window. The count walks past 40 - and the BOARD moves at every link, so the
+    #run must NOT be stopped (it was one link from winning).
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck126-g.jsonl \
+      '{"kind":"ask","seq":306,"turn":32,"my_life":37,"opp_life":2,"events":"- Opponent lost 1 life (now 2)","prompt":"ON THE STACK, waiting to resolve:\n- Sanguine Bond trigger\n3. Cast nothing {... reaches 0 in 2 more turns ...} {... you have already declined this exact list 38 times this turn}"}' \
+      '{"kind":"ask","seq":307,"turn":32,"my_life":38,"opp_life":2,"events":"- You gained 1 life (now 38)","prompt":"ON THE STACK, waiting to resolve:\n- Exquisite Blood trigger\n3. Cast nothing {... reaches 0 in 2 more turns ...} {... you have already declined this exact list 39 times this turn}"}' \
+      '{"kind":"ask","seq":308,"turn":32,"my_life":38,"opp_life":1,"events":"- Opponent lost 1 life (now 1)","prompt":"ON THE STACK, waiting to resolve:\n- Sanguine Bond trigger\n3. Cast nothing {... reaches 0 in 1 more turn ...} {... you have already declined this exact list 40 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8)
+    case "$v" in "OK 0") ;;
+      *) echo "window-loop-selftest FAIL: a moving-life chain gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #W74-CH h: the REAL dead loop still reads LOOP. Run 20260909-015553, deck123
+    #seat: 384 windows at turn 4 Main 1, my_life 20, opp_life 20, empty stack and
+    #no events on every record.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-h.jsonl \
+      '{"kind":"ask","seq":384,"turn":4,"my_life":20,"opp_life":20,"prompt":"1. Play Swamp\n3. Cast nothing {... you have already declined this exact list 293 times this turn}"}' \
+      '{"kind":"ask","seq":385,"turn":4,"my_life":20,"opp_life":20,"prompt":"1. Play Swamp\n3. Cast nothing {... you have already declined this exact list 294 times this turn}"}' \
+      '{"kind":"ask","seq":386,"turn":4,"my_life":20,"opp_life":20,"prompt":"1. Play Swamp\n3. Cast nothing {... you have already declined this exact list 295 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8)
+    case "$v" in "LOOP 295 9999999999-ai_baka_deck123-h.jsonl") ;;
+      *) echo "window-loop-selftest FAIL: the real dead loop gave '$v', want 'LOOP 295 ...'" >&2; fails=1;; esac
+    #W74-CH i: the second instance - the life that moves is the seat's OWN, under
+    #the OPPONENT's punisher chain (125v162, turn 27 Draw). Also not a loop.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck125-i.jsonl \
+      '{"kind":"ask","seq":138,"turn":27,"my_life":26,"opp_life":18,"events":"- You lost 2 life","prompt":"3. Cast nothing {... declined this exact list 41 times this turn}"}' \
+      '{"kind":"ask","seq":139,"turn":27,"my_life":25,"opp_life":18,"events":"- You lost 1 life","prompt":"3. Cast nothing {... declined this exact list 42 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8)
+    case "$v" in "OK 0") ;;
+      *) echo "window-loop-selftest FAIL: a chain moving the seat's own life gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #W74-CH j: LIFE alone is not the board - a chain that moves only the STACK is
+    #still progress.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck130-j.jsonl \
+      '{"kind":"ask","seq":10,"turn":9,"my_life":20,"opp_life":20,"events":"- trigger","prompt":"ON THE STACK, waiting to resolve:\n- Howling Mine trigger\n3. Cast nothing {... declined this exact list 55 times this turn}"}' \
+      '{"kind":"ask","seq":11,"turn":9,"my_life":20,"opp_life":20,"events":"- trigger","prompt":"ON THE STACK, waiting to resolve:\n- Underworld Dreams trigger\n3. Cast nothing {... declined this exact list 56 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8)
+    case "$v" in "OK 0") ;;
+      *) echo "window-loop-selftest FAIL: a moving stack top gave '$v', want 'OK 0'" >&2; fails=1;; esac
+    #W74-CH k: a seat whose board is frozen but which HAS events is still a loop
+    #when the life totals and stack top never move - the two terms are OR'd on
+    #the "unmoved" side deliberately, so a noisy narration cannot hide a wedge.
+    rm -f "$tmp"/*.jsonl
+    mk 9999999999-ai_baka_deck123-k.jsonl \
+      '{"kind":"ask","seq":1,"turn":4,"my_life":20,"opp_life":20,"events":"- Phase: Main phase 1","prompt":"3. Cast nothing {... declined this exact list 99 times this turn}"}' \
+      '{"kind":"ask","seq":2,"turn":4,"my_life":20,"opp_life":20,"events":"- Phase: Main phase 1","prompt":"3. Cast nothing {... declined this exact list 100 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8)
+    case "$v" in LOOP\ 100*) ;;
+      *) echo "window-loop-selftest FAIL: a frozen board with narration gave '$v', want LOOP" >&2; fails=1;; esac
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "window-loop-selftest: 7 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "window-loop-selftest: 12 checks, 0 failed"
     return "$fails"
 }
 

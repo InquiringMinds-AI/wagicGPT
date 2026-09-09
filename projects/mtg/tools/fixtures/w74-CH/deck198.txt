@@ -1,0 +1,8 @@
+#NAME:W74-CH chain probe
+#DESC:Sanguine Bond + Exquisite Blood, started every upkeep by Nyx-Fleece Ram; Tribute to Hunger is the no-op acting row that keeps the cast window open (the corpus seat's own shape).
+Sanguine Bond (*) *4
+Exquisite Blood (*) *4
+Nyx-Fleece Ram (*) *4
+Tribute to Hunger (*) *4
+Swamp (*) *16
+Plains (*) *8

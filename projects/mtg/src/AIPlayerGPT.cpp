@@ -28159,6 +28159,109 @@ static string holdKeyRow(const string& row)
     return holdKeyLifeProjectionsNormalised(core); //#W66-AS (H7) + #W66-AU (R1)
 }
 
+//#W74-CH (wave-74 regression #2, corpus 20260909-104713 - THE HOLD RE-OPENED AT
+//EVERY LINK OF A TRIGGER CHAIN). Game `125v126`, deck126 seat, turn 32 Upkeep:
+//41 casting-decision asks inside ONE phase, every one a full model call, every
+//one answered `Hold priority`, while that seat's own Sanguine Bond + Exquisite
+//Blood chain drained the opponent 21 -> 1 (one life per link; the harness killed
+//the run one link from the win). The stderr prints
+//`took the hold row at the cast seam on turn 31 - later cast windows are held
+//until one of these rows changes` 33 times and
+//`hold re-opened at the cast seam - a printed row changed or is newly available`
+//240 times in that one game. NOTHING THE MODEL COULD ACT ON MOVED. What moved,
+//measured byte for byte off the seat's own `options_text` (seq 266->267 and
+//307->308):
+//  * the O9 own-clock tag on the decline row - `{the clock you already control:
+//    your Staff of Nin deal 1 damage a turn between them - at that rate alone the
+//    opponent reaches 0 in 21 more turns}` -> `20` -> ... -> `1 more turn`: a
+//    countdown of the OPPONENT'S LIFE, printed on the row that declines;
+//  * the O11 re-ask tag - `declined this exact list 1 time` -> `40 times`: a
+//    count of the seat's own answers, which appears the moment the first answer
+//    lands and therefore re-opens the hold at link ONE.
+//The second instance (`125v162`, deck125 seat, turn 27 Draw, 38 asks under the
+//OPPONENT'S Ob Nixilis + Underworld Dreams chain) moved a THIRD text: the X-cast
+//row's bracket `[<- best X ... counted from the 8 life the 18 damage ALREADY ON
+//THE STACK leaves you on ...]` -> `17 damage`, plus the same O11 count.
+//
+//Every one of the three lives inside a `{...}` or `[...]` RENDER ANNOTATION.
+//#W66-AU (R1)'s named-anchor normaliser was built for exactly this class and
+//cannot keep up with it: it enumerates the WORDS that introduce a life total, so
+//each new annotation that prices the board against a life total (O9's clock,
+//O7c's stated-stop restatement, O8's X pricing) re-opens every hold again until
+//somebody adds its spelling. That is a losing race, and it cost 79 model calls
+//and two frozen games in one corpus.
+//
+//THE KEY IS THE ACTION, NOT THE RENDER. What a hold is a decision about is the
+//SET OF THINGS THE SEAT COULD DO: this card, at this cost, against these
+//objects. Annotations are the render's commentary ON that set - prices,
+//forecasts, clocks, bookkeeping - and every one of them is derived from a board
+//the hold does not claim is frozen. So the identity key is the row with every
+//annotation stripped, through the SAME `stripRenderAnnotationsLc` the option-set
+//key already uses (`optionSetKeyOf`), which is why the O11 count never disturbed
+//THAT key and why #W74-CE could believe it was safe everywhere.
+//
+//WHAT STILL RE-OPENS A HOLD, unchanged: a row appearing, a row disappearing, a
+//row naming a different card / cost / target - every ACTION difference; the
+//holder's own untap (#W73-BY N2a, `releaseHoldIfUntapPassed`), which retires the
+//latch every turn whatever the rows do; and the two LETHALITY VERDICTS, which
+//are deliberately NOT row annotations but synthetic marker rows joined to the
+//held set (the crack-back verdict of #W68-BB J9, and its stack twin added
+//below). Those are the two classes that have actually lost games to a stale
+//hold, and they are recomputed off the live board at every window.
+//WHAT NO LONGER RE-OPENS ONE, stated plainly: a magnitude or a verdict WORD
+//inside an annotation - #W66-AU (R1)'s `kills 0 of their 1 creatures` ->
+//`kills 1 of their 1 creatures`. Within one turn, under a hold the model itself
+//took over that row, the seat now waits for its untap. That is the price of
+//making the key finite, and the untap release is what bounds it.
+static const char * const kHoldVerdictMarkerHead[] = {
+    "[crack-back verdict:",  //#W68-BB (J9)
+    "[stack death verdict:"  //#W74-CH
+};
+
+//A synthetic verdict marker is not a row the model can take: it is a fact about
+//the board joined to the held set so a change in it re-opens the window. It is
+//all brackets, so it must never be stripped - it IS its own key.
+static bool w74HoldVerdictMarker(const string& row)
+{
+    const size_t n = sizeof(kHoldVerdictMarkerHead) / sizeof(kHoldVerdictMarkerHead[0]);
+    for (size_t i = 0; i < n; i++)
+        if (row.compare(0, strlen(kHoldVerdictMarkerHead[i]), kHoldVerdictMarkerHead[i]) == 0)
+            return true;
+    return false;
+}
+
+static string holdActionKeyRow(const string& row)
+{
+    if (w74HoldVerdictMarker(row))
+        return row; //the marker is the key, byte for byte
+    //`(combat comes next this turn)` is a plain parenthetical, not an
+    //annotation group, so the stripper keeps it: erase it by name as #W56-A did.
+    static const char * kCombatNextClause = " (combat comes next this turn)";
+    string core = row;
+    const size_t c = core.find(kCombatNextClause);
+    if (c != string::npos)
+        core.erase(c, strlen(kCombatNextClause));
+    //Belt and braces: a life total printed OUTSIDE any annotation (none is known
+    //today) still normalises, so #W66-AS (H7) cannot regress through a gap.
+    return holdKeyLifeProjectionsNormalised(stripRenderAnnotationsLc(core));
+}
+
+//#W74-CH: the stack's death verdict as a MARKER ROW, the exact shape #W68-BB
+//(J9) gave the crack-back verdict. J9 stated the pending stack's lethality as a
+//`{answers the stack: NO ...}` clause ON the decline rows; with the action key
+//that clause is stripped, so the fact it carries needs its own row or a hold
+//taken over a survivable stack would stand once the stack turned lethal - the
+//one window the seat dies in. Recomputed off the live board at every window,
+//never latched. Pure over two ints.
+static string stackDeathVerdictKey(int stackLossToMe, int myLife)
+{
+    if (stackLossToMe <= 0 || myLife < 0)
+        return "[stack death verdict: nothing lethal on the stack]";
+    return (myLife - stackLossToMe <= 0)
+               ? string("[stack death verdict: the stack KILLS you]")
+               : string("[stack death verdict: you survive the stack]");
+}
+
 //#W68-BB (J9, deck123 HIGH-1): `123v162` s32 printed
 //`ON THE STACK: 3 damage to you - you would be at -1; that would KILL you` in
 //the board frame and then, ~40 lines later, a three-row menu. The seat wrote
@@ -28243,21 +28346,29 @@ static string crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife)
                                      : string("[crack-back verdict: you survive]");
 }
 
+//#W74-CH: WHICH key. The predicate is one function and the two callers differ
+//only in what they call a difference: the model's own HOLD passes
+//`holdActionKeyRow` (the action identity - annotations are the render's
+//commentary on it), and every other caller keeps `holdKeyRow`, the render key
+//the re-open BRACKET counts rows with (#W74-CD O6). Defaulted so no existing
+//caller or pin changes meaning.
+typedef string (*HoldRowKeyFn)(const string&);
 static bool holdStillStands(const std::set<string>& heldRows,
                             const std::vector<string>& nowRows,
-                            const char ** whyOut)
+                            const char ** whyOut,
+                            HoldRowKeyFn keyOf = holdKeyRow)
 {
     if (whyOut) *whyOut = "";
     //#W63-AD (E10): both sides through the same normaliser, so a set stored
     //before this change (or by a caller that keeps raw rows) compares the same.
     std::set<string> heldKeys;
     for (std::set<string>::const_iterator h = heldRows.begin(); h != heldRows.end(); ++h)
-        heldKeys.insert(holdKeyRow(*h));
+        heldKeys.insert(keyOf(*h));
     std::set<string> nowSet;
     for (size_t i = 0; i < nowRows.size(); i++)
     {
-        nowSet.insert(holdKeyRow(nowRows[i]));
-        if (heldKeys.find(holdKeyRow(nowRows[i])) == heldKeys.end())
+        nowSet.insert(keyOf(nowRows[i]));
+        if (heldKeys.find(keyOf(nowRows[i])) == heldKeys.end())
         {
             if (whyOut) *whyOut = "a printed row changed or is newly available";
             return false;
@@ -28516,6 +28627,12 @@ string AIPlayerGPT::crackBackVerdictNow()
     return crackBackVerdictKey(atk, dmg, life);
 }
 
+//#W74-CH: the same, off the live stack.
+string AIPlayerGPT::stackDeathVerdictNow()
+{
+    return stackDeathVerdictKey(pendingStackLifeLossToSeat(observer, this), life);
+}
+
 //#W72-BX (F1, Astra review finding 1 - HIGH): a row that DECLINES rather than
 //acts. The two seams word their declines differently by construction (the cast
 //seam's "Cast nothing right now", the priority seam's row 0 "Pass priority"),
@@ -28530,9 +28647,25 @@ static bool w72RowIsDeclineOrHold(const string& row)
         "Hold priority", "Pass priority", "Cast nothing right now", "Cast nothing",
         "Decline", "Do nothing", "Done", "Hold "
     };
+    //#W74-CH: CASE-INSENSITIVE on the head. The sibling rule feeds this the same
+    //row keys the hold latch compares, and those are now `holdActionKeyRow`
+    //keys, which lower-case through `stripRenderAnnotationsLc`. A case-sensitive
+    //head would have called every decline row an ACTING row and asked the
+    //sibling seam over a menu the model had already answered - the exact removal
+    //#W72-BX (F1) built this predicate to prevent, inverted. The labels are
+    //fixed English strings, so folding case widens nothing else.
     for (size_t i = 0; i < sizeof(kDeclines) / sizeof(kDeclines[0]); i++)
-        if (row.compare(0, strlen(kDeclines[i]), kDeclines[i]) == 0)
+    {
+        const size_t n = strlen(kDeclines[i]);
+        if (row.size() < n)
+            continue;
+        size_t k = 0;
+        while (k < n
+               && tolower((unsigned char) row[k]) == tolower((unsigned char) kDeclines[i][k]))
+            k++;
+        if (k == n)
             return true;
+    }
     return false;
 }
 
@@ -28758,7 +28891,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     }
     std::vector<string> nowRowKeys;
     for (size_t nr = 0; nr < rows.size(); nr++)
-        nowRowKeys.push_back(holdKeyRow(rows[nr]));
+        nowRowKeys.push_back(holdActionKeyRow(rows[nr])); //#W74-CH: the action identity
     if (gptHoldCoversSiblingWindow(mHoldWindowSeam, mHoldWindowTurn, mHoldWindowPhase,
                                    mHoldWindowBoard, heldRowKeys, seam, observer->turn,
                                    observer->getCurrentGamePhase(),
@@ -28810,7 +28943,8 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //exactly the window the seat dies in.
     std::vector<string> rowsWithVerdict = rows;
     rowsWithVerdict.push_back(crackBackVerdictNow());
-    if (!holdStillStands(it->second, rowsWithVerdict, &why))
+    rowsWithVerdict.push_back(stackDeathVerdictNow()); //#W74-CH: J9's other half
+    if (!holdStillStands(it->second, rowsWithVerdict, &why, holdActionKeyRow)) //#W74-CH
     {
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         //#W63-AD (E10, engine HIGH-2). THE PROMISE WAS BROKEN BY THE NEIGHBOUR.
@@ -28894,9 +29028,10 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
     std::set<string>& s = mHoldRows[seam];
     s.clear();
     for (size_t i = 0; i < rows.size(); i++)
-        s.insert(holdKeyRow(rows[i])); //#W56-A (D1) + #W63-AD (E10): byte for byte
-                                       //but for the pass row's phase clause
-    s.insert(holdKeyRow(crackBackVerdictNow())); //#W68-BB (J9)
+        s.insert(holdActionKeyRow(rows[i])); //#W74-CH: the ACTION identity - the row
+                                             //with every render annotation stripped
+    s.insert(holdActionKeyRow(crackBackVerdictNow())); //#W68-BB (J9)
+    s.insert(holdActionKeyRow(stackDeathVerdictNow())); //#W74-CH
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - later " << seam
                << " windows are held until one of these rows changes"); //#W61-U (C14)
@@ -81883,6 +82018,249 @@ static const char * kW50Y_r94 =
               " bound every window and never releases - the tag had to leave the keyed tail"
               " for this reason too");
     }
+
+        // ================= #W74-CH: THE HOLD KEY IS THE ACTION, NOT THE RENDER
+        // Corpus `matchups-20260909-104713`, stopped by the wave-74 WINDOW LOOP
+        // tripwire at 18/21 games. Two seats re-opened a hold at EVERY LINK of a
+        // trigger chain because a `{...}`/`[...]` annotation on an unchanged row
+        // carried a board-derived number that moved with the chain. The rows
+        // below are verbatim `options_text` off those two seats.
+        {
+            // ---- instance 1: `125v126`, deck126 seat, turn 32 Upkeep, 41 asks.
+            // Its own Sanguine Bond + Exquisite Blood chain drained 21 -> 1 while
+            // the seat answered `Hold priority` 41 times. seq 266 -> 267 is
+            // LINK ONE: the only delta is the O11 re-ask tag ARRIVING on the
+            // decline row (`declined this exact list 1 time`).
+            const string a266row0 = "Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at "
+            "0 this does nothing} {leaves 16 of your 19 untapped mana sources "
+            "untapped} - legal targets right now: the opponent {card text: \"Target "
+            "opponent sacrifices a creature of their choice. You gain life equal to "
+            "that creature's toughness.\"}";
+            const string a266row1 = "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK "
+            "AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your "
+            "next turn begins, or until one of the rows above changes (any change "
+            "re-opens this window; on THIS menu that means you also give up this "
+            "turn's remaining CASTING windows for as long as these rows stand, and "
+            "NOT the priority window that follows on this same step - that is a "
+            "different question at a different seam and you will still be asked it) "
+            "{it is released at the start of your next turn whatever the rows do; "
+            "until then, taking this row skips every later window that asks THIS SAME "
+            "question with rows identical to these; a different question is still "
+            "asked. A pass row that differs only by naming which step comes next is "
+            "the same row, so a hold taken in your first main phase also covers your "
+            "second main phase while these rows do not change; so is a row that "
+            "differs only by a bracket saying it cannot reach a spell on the stack; "
+            "and so is a row that differs only by a LIFE TOTAL it projects - what you "
+            "or they would be at - because that number moves with the board and not "
+            "with the row. Any OTHER change re-opens this window, including a kill "
+            "count, a damage figure, a survivor count, a price, and a row that begins "
+            "saying it kills you}";
+            const string a266row2 = "Cast nothing right now {the clock you already control: your Staff of Nin "
+            "deal 1 damage a turn between them - at that rate alone the opponent "
+            "reaches 0 in 21 more turns, with no card spent} {closes ONLY this window "
+            "- the same list can be put to you again this turn, at this seam or "
+            "another; the hold row is the row that closes the run}";
+            const string a267row2 = "Cast nothing right now {the clock you already control: your Staff of Nin "
+            "deal 1 damage a turn between them - at that rate alone the opponent "
+            "reaches 0 in 21 more turns, with no card spent} {this same question will "
+            "be asked again this turn: taking this row closes this window only, and "
+            "you have already declined this exact list 1 time this turn} {closes ONLY "
+            "this window - the same list can be put to you again this turn, at this "
+            "seam or another; the hold row is the row that closes the run}";
+            CHECK(a266row2 != a267row2,
+                  "#W74-CH REPRO the two rendered decline rows DO differ - that is the"
+                  " input the base key re-opened the hold on");
+            std::set<string> held266;
+            held266.insert(holdActionKeyRow(a266row0));
+            held266.insert(holdActionKeyRow(a266row1));
+            held266.insert(holdActionKeyRow(a266row2));
+            std::vector<string> now267;
+            now267.push_back(a266row0); now267.push_back(a266row1); now267.push_back(a267row2);
+            const char * why = "";
+            CHECK(holdStillStands(held266, now267, &why, holdActionKeyRow)
+                      && string(why).empty(),
+                  "#W74-CH PIN seq 266 -> 267: the two consecutive t32-upkeep windows differ"
+                  " only in a render annotation, so they are ONE hold key and the hold stands");
+            // RED ON BASE, in the same breath: the shipped render key re-opens it.
+            std::set<string> held266base;
+            held266base.insert(holdKeyRow(a266row0));
+            held266base.insert(holdKeyRow(a266row1));
+            held266base.insert(holdKeyRow(a266row2));
+            CHECK(!holdStillStands(held266base, now267, &why),
+                  "#W74-CH RED-ON-BASE the render key (#W66-AU R1's named anchors) calls the"
+                  " same pair a changed menu - 41 model calls in one phase");
+
+            // seq 307 -> 308, the LAST link before the harness killed the run: the
+            // O9 own-clock tag counts the opponent's life down (`2 more turns` ->
+            // `1 more turn`) AND the O11 count moves (39 -> 40). Still one action.
+            const string a307row2 = "Cast nothing right now {the clock you already control: your Staff of Nin "
+            "deal 1 damage a turn between them - at that rate alone the opponent "
+            "reaches 0 in 2 more turns, with no card spent} {this same question will "
+            "be asked again this turn: taking this row closes this window only, and "
+            "you have already declined this exact list 39 times this turn} {closes "
+            "ONLY this window - the same list can be put to you again this turn, at "
+            "this seam or another; the hold row is the row that closes the run}";
+            const string a308row2 = "Cast nothing right now {the clock you already control: your Staff of Nin "
+            "deal 1 damage a turn between them - at that rate alone the opponent "
+            "reaches 0 in 1 more turn, with no card spent} {this same question will "
+            "be asked again this turn: taking this row closes this window only, and "
+            "you have already declined this exact list 40 times this turn} {closes "
+            "ONLY this window - the same list can be put to you again this turn, at "
+            "this seam or another; the hold row is the row that closes the run}";
+            CHECK(a307row2.find("reaches 0 in 2 more turns") != string::npos
+                      && a308row2.find("reaches 0 in 1 more turn") != string::npos,
+                  "#W74-CH REPRO the O9 own-clock tag is what counts down with the"
+                  " opponent's life on an otherwise unchanged decline row");
+            CHECK(holdActionKeyRow(a307row2) == holdActionKeyRow(a308row2),
+                  "#W74-CH PIN the clock tag and the declined count are both render"
+                  " annotations: one hold key across the whole chain");
+            CHECK(holdKeyRow(a307row2) != holdKeyRow(a308row2),
+                  "#W74-CH RED-ON-BASE ...and two keys under the shipped render key");
+            CHECK(holdActionKeyRow(a266row2) == holdActionKeyRow(a308row2),
+                  "#W74-CH PIN link 1 and link 40 of the chain are the SAME action:"
+                  " `Cast nothing right now` with no annotation left on it");
+
+            // MUST-NOT-MATCH: an ACTION appearing still re-opens the window.
+            std::vector<string> grown = now267;
+            grown.push_back("Cast Path to Exile {w} {removes: Fog Bank} - legal targets"
+                            " right now: Fog Bank {1}{u} (creature 0/2)");
+            CHECK(!holdStillStands(held266, grown, &why, holdActionKeyRow)
+                      && string(why) == "a printed row changed or is newly available",
+                  "#W74-CH MUST-NOT-MATCH a genuinely new action row is a different key -"
+                  " the hold re-opens");
+            // MUST-NOT-MATCH: an action LEAVING still re-opens it.
+            std::vector<string> shrunk;
+            shrunk.push_back(a266row1); shrunk.push_back(a267row2);
+            CHECK(!holdStillStands(held266, shrunk, &why, holdActionKeyRow)
+                      && string(why) == "a printed row it was held over is gone",
+                  "#W74-CH MUST-NOT-MATCH a row the hold was taken over disappearing"
+                  " re-opens the window");
+            // MUST-NOT-MATCH: the same card against a DIFFERENT object is a
+            // different action, annotations or none.
+            std::vector<string> retargeted;
+            string other = a266row0;
+            const size_t at = other.find("the opponent {card text:");
+            CHECK(at != string::npos, "#W74-CH REPRO the target row names its object");
+            other.replace(at, strlen("the opponent"), "Fate Unraveler");
+            retargeted.push_back(other); retargeted.push_back(a266row1);
+            retargeted.push_back(a267row2);
+            CHECK(!holdStillStands(held266, retargeted, &why, holdActionKeyRow),
+                  "#W74-CH MUST-NOT-MATCH the same card aimed at a different object is a"
+                  " different action - the target name is OUTSIDE the annotations");
+
+            // ---- instance 2: `125v162`, deck125 seat, turn 27 Draw, 38 asks under
+            // the OPPONENT'S Ob Nixilis + Underworld Dreams chain. The row that
+            // moved is NOT a decline row and NOT an O6 `would be at N` spelling:
+            // it is the X-cast bracket restating the damage already on the stack.
+            const string b138row0 = "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 "
+            "mana total); each point of X gains you 1 life and draws you 1 card; DRAW "
+            "PRICE: every card X draws costs you 2 life to their Ob Nixilis, the "
+            "Hate-Twisted, Underworld Dreams (at X=9: 9 cards = 18 life)} [<- best X "
+            "for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 "
+            "cards; no listed X does more - but NET -9 life for this cast, counted "
+            "from the 8 life the 18 damage ALREADY ON THE STACK leaves you on, puts "
+            "you at -1; this KILLS you. X=7 is the largest listed X whose NET (-7) "
+            "leaves you alive, at 1] {no {leaves ...} count on this row: what it "
+            "spends depends on the X you announce at the next window. At the largest "
+            "X this row prices (X=9, 12 mana total) your mana affords no larger X, so "
+            "that cast leaves you nothing more to spend on X; every step below it "
+            "leaves one more mana untapped. Path to Exile {w} in your hand needs 1: "
+            "the largest X that still leaves it payable this turn is X=8} {card text: "
+            "\"You gain X life and draw X cards.\"}";
+            const string b139row0 = "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 "
+            "mana total); each point of X gains you 1 life and draws you 1 card; DRAW "
+            "PRICE: every card X draws costs you 2 life to their Ob Nixilis, the "
+            "Hate-Twisted, Underworld Dreams (at X=9: 9 cards = 18 life)} [<- best X "
+            "for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 "
+            "cards; no listed X does more - but NET -9 life for this cast, counted "
+            "from the 8 life the 17 damage ALREADY ON THE STACK leaves you on, puts "
+            "you at -1; this KILLS you. X=7 is the largest listed X whose NET (-7) "
+            "leaves you alive, at 1] {no {leaves ...} count on this row: what it "
+            "spends depends on the X you announce at the next window. At the largest "
+            "X this row prices (X=9, 12 mana total) your mana affords no larger X, so "
+            "that cast leaves you nothing more to spend on X; every step below it "
+            "leaves one more mana untapped. Path to Exile {w} in your hand needs 1: "
+            "the largest X that still leaves it payable this turn is X=8} {card text: "
+            "\"You gain X life and draw X cards.\"}";
+            CHECK(b138row0 != b139row0
+                      && b138row0.find("the 18 damage ALREADY ON THE STACK") != string::npos
+                      && b139row0.find("the 17 damage ALREADY ON THE STACK") != string::npos,
+                  "#W74-CH REPRO instance 2's delta is the X-cast bracket's stack figure,"
+                  " inside `[<- best X for this cast: ...]` - a third annotation class");
+            CHECK(holdActionKeyRow(b138row0) == holdActionKeyRow(b139row0),
+                  "#W74-CH PIN instance 2 keys identically - the bracket is stripped whole,"
+                  " so no new annotation class can re-open a hold by arithmetic again");
+            CHECK(holdKeyRow(b138row0) != holdKeyRow(b139row0),
+                  "#W74-CH RED-ON-BASE ...and differs under the shipped render key, which is"
+                  " why that seat paid 38 model calls in one draw step");
+            CHECK(holdActionKeyRow(b138row0).find("sphinx's revelation") != string::npos,
+                  "#W74-CH the action survives the strip - the card is still named in the key");
+        }
+        {
+            // ---- the two LETHALITY VERDICTS are marker rows, not annotations, so
+            // the action key must return them byte for byte or the hold would
+            // stand through the window the seat dies in.
+            const char * why = "";
+            const string cbSurvive = crackBackVerdictKey(2, 3, 20);
+            const string cbLethal  = crackBackVerdictKey(2, 3, 3);
+            CHECK(holdActionKeyRow(cbSurvive) == cbSurvive
+                      && !holdActionKeyRow(cbLethal).empty(),
+                  "#W74-CH the crack-back marker IS its own key - stripping it would erase"
+                  " it (it is all brackets) and #W68-BB (J9) would silently retire");
+            std::vector<string> rows;
+            rows.push_back("Cast Tribute to Hunger {2}{b} {right now: nothing}");
+            std::set<string> held;
+            held.insert(holdActionKeyRow(rows[0]));
+            held.insert(holdActionKeyRow(cbSurvive));
+            std::vector<string> nowSame = rows; nowSame.push_back(cbSurvive);
+            CHECK(holdStillStands(held, nowSame, &why, holdActionKeyRow),
+                  "#W74-CH a survivable crack-back that stays survivable holds");
+            std::vector<string> nowLethal = rows; nowLethal.push_back(cbLethal);
+            CHECK(!holdStillStands(held, nowLethal, &why, holdActionKeyRow),
+                  "#W74-CH MUST-NOT-MATCH survive -> LETHAL still re-opens the hold");
+
+            // The stack twin, added because the action key strips J9's
+            // `{answers the stack: NO ...}` clause off the decline rows.
+            CHECK(stackDeathVerdictKey(0, 20).find("nothing lethal") != string::npos,
+                  "#W74-CH an empty stack has its own verdict word");
+            CHECK(stackDeathVerdictKey(3, 20).find("you survive") != string::npos,
+                  "#W74-CH 3 damage at 20 life is survivable");
+            CHECK(stackDeathVerdictKey(3, 2).find("KILLS you") != string::npos,
+                  "#W74-CH 3 damage at 2 life is lethal (the `123v162` s32 shape)");
+            std::set<string> held2;
+            held2.insert(holdActionKeyRow(rows[0]));
+            held2.insert(holdActionKeyRow(stackDeathVerdictKey(3, 20)));
+            std::vector<string> stackNow = rows;
+            stackNow.push_back(stackDeathVerdictKey(3, 2));
+            CHECK(!holdStillStands(held2, stackNow, &why, holdActionKeyRow),
+                  "#W74-CH MUST-NOT-MATCH a hold taken over a survivable stack re-opens the"
+                  " window the stack turns lethal - J9's fact, moved to a marker row");
+            std::vector<string> stackSame = rows;
+            stackSame.push_back(stackDeathVerdictKey(3, 20));
+            CHECK(holdStillStands(held2, stackSame, &why, holdActionKeyRow),
+                  "#W74-CH ...and an unchanged stack verdict holds");
+        }
+        {
+            // ---- the sibling rule reads the SAME keys, and those are now
+            // lower-cased. A case-sensitive decline head would have called every
+            // decline row an ACTING row and inverted #W72-BX (F1).
+            CHECK(w72RowIsDeclineOrHold(holdActionKeyRow("Cast nothing right now"
+                                                         " {closes ONLY this window}")),
+                  "#W74-CH the plain decline is still a decline once keyed");
+            CHECK(w72RowIsDeclineOrHold(holdActionKeyRow("Hold priority - pass now")),
+                  "#W74-CH the hold row is still a decline once keyed");
+            CHECK(w72RowIsDeclineOrHold(holdActionKeyRow("Pass priority (combat comes next"
+                                                          " this turn)")),
+                  "#W74-CH the pass row keeps its phase carve-out and is still a decline");
+            CHECK(!w72RowIsDeclineOrHold(holdActionKeyRow("Cast Path to Exile {w}")),
+                  "#W74-CH MUST-NOT-MATCH a real cast is an ACTING row and always was");
+            // the pass row's phase clause is still erased by name, so main 1 and
+            // main 2 remain one row (#W56-A D1).
+            CHECK(holdActionKeyRow("Pass priority (combat comes next this turn)")
+                      == holdActionKeyRow("Pass priority"),
+                  "#W74-CH #W56-A (D1) survives: the combat-next clause is erased by name,"
+                  " not by the stripper (it is a plain parenthetical)");
+        }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

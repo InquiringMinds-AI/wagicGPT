@@ -1,0 +1,3 @@
+#NAME:W74-CH chain probe opponent
+#DESC:Inert - lands only, so the chain seat is never disturbed.
+Swamp (*) *40
