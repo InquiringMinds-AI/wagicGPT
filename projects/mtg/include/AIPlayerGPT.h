@@ -154,6 +154,29 @@ inline bool w73MainPhaseSkipCounts(bool castingWasOffered) { return !castingWasO
 inline bool w74MainPhaseSkipCounts(bool castingWasOffered, bool heldByOwnLatch)
 { return w73MainPhaseSkipCounts(castingWasOffered || heldByOwnLatch); }
 
+//#W74-CF (F1, Astra review finding 1): ONE ARM'S SECOND LEG, WHOLE. Every field
+//the three retry-arming branches write, kept together so an arm's leg can be
+//parked and restored as a unit rather than half-overwritten by the other arm.
+//`activePrompt` empty = this slot holds nothing.
+struct GptRetrySlot
+{
+    std::string activePrompt;
+    std::string base;
+    std::string doneBase;
+    std::string ceilingDoneBase;
+    std::string forceClosePrefill;
+    long firstLatencyMs;
+    long budgetMs;
+    bool armLand;
+    bool phase1Length;
+    GptRetrySlot() : firstLatencyMs(-1), budgetMs(0), armLand(false), phase1Length(false) {}
+};
+
+//#W74-CF (F1): the swap itself, pure over two slots so PARSETEST can replay the
+//exact interleaving the review names. After it returns, `live` is either empty or
+//owned by `landArm`, and whatever belonged to the other arm is in `park`.
+void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm);
+
 class AIPlayerGPT : public AIPlayerBaka
 {
 public:
@@ -1740,6 +1763,16 @@ private:
     //The retry state is one per-seat slot while the async slots are per-arm, so
     //without this the other arm's next window consumed or discarded a leg that
     //was never its own. Meaningless while mRetryActivePrompt is empty.
+    //#W74-CF (F1, Astra review finding 1): the ownership FLAG alone only stopped
+    //the wrong arm CONSUMING or ABANDONING a leg. Every arming branch below still
+    //wrote the one shared record unconditionally, so a casting forced-close armed
+    //while the land arm's second leg was outstanding overwrote its base, prompt
+    //and prefill - and land then polled its ordinary prompt, whose slot key does
+    //not match a forced-close request, so the completed leg was discarded. The
+    //storage is now per-arm: mRetryPark holds the OTHER arm's slot while this
+    //arm's is live, selectRetryArm() swaps them at the top of every poll, and
+    //ownership is stamped once there rather than by each arming branch (which is
+    //also what closes finding 2 - the decode-garbage branch that stamped none).
     bool mRetryArmLand;
     string mRetryArmedSeen;
     std::chrono::steady_clock::time_point mRetryArmedSince;
@@ -1752,6 +1785,11 @@ private:
     //remainder of this decision's deadline, which is what a TRANSPORT retry
     //gets so that first attempt plus retry never exceed one deadline.
     long mRetryBudgetMs;
+    //#W74-CF (F1): the other arm's parked retry slot. Empty activePrompt = nothing
+    //parked. Swapped in and out by selectRetryArm(); never read anywhere else, so
+    //every existing reader of the live members keeps reading this arm's own leg.
+    GptRetrySlot mRetryPark;
+    void selectRetryArm(bool landArm);
     bool mLastRetry;
 
     //NATIVE REASONING (wave-34 #1a/#1b). With the post-answer scratch block
