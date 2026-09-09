@@ -68,7 +68,7 @@ THEIRS.
   an Elixir, a big draw spell) add their LARGEST single gain so far on top, and read L again in the
   ATTACK window: while the maker is still untapped an overshoot costs you nothing, and finishing
   one short leaves them alive with your whole board tapped.
-- TAKE THE REPEAT ROW ("repeated N times, then stop") ONCE, with N = (L + C + 3) - M, in its own
+- TAKE THE REPEAT ROW ("repeated then stop") ONCE, with N = (L + C + 3) - M, in its own
   format: CHOICE: 2 (Create human with Thraben Doomsayer x17). A take with no number is re-asked
   and the window spent; the next window is a pass. N of 0 or less is a pass - not "x1", not "x0".
 - The stop is a STEP of the sequence, not a ledger under it. One PLAN line, actions only, every

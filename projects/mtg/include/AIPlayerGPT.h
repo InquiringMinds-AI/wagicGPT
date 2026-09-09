@@ -1396,6 +1396,12 @@ private:
     //#W72-BX (F2): the turn the stop above was STATED on. mPlanSetTurn dates the
     //last plan LINE, whatever it says, so it cannot date a stop.
     int mStatedStopTurn;
+    //#W74-CE (O7c, deck123 MED-3): the OPPONENT'S LIFE when the stop was stated.
+    //A stop is an arithmetic against a life total ("stop=103" off `Opponent life:
+    //100`), and that total moves - `123v125` seq 686 swung 102 attackers into a
+    //life that had run 100 -> 108 and left them at 6. Render-only, like the two
+    //numbers above; -1 = no stop stated yet.
+    int mStatedStopOppLife;
     //#W72-BX (F3): non-zero while the CASTING seam is assembling or re-asking its
     //own window. The "this phase's casting decision is already answered" facts
     //(kCastAnsweredFact, the hand tag) are false inside it - the decision being
@@ -1587,6 +1593,9 @@ private:
     string mReserveDeclineSpanKey;
     int mReserveDeclineSpanTurn;
     int mReserveDeclineNoted; //gameend report field
+    //#W74-CE (O25): PLAN lines naming a card the taken row's reserve verdict
+    //strands this turn. Instrument only - nothing in the engine reads it.
+    int mPlanNamesStrandedCard;
     int mEngineRevealFloorPicks; //#W67-AZ (R7): gameend report field
 public:
     void noteEngineRevealFloor(const string& card); //#W67-AZ (R7)

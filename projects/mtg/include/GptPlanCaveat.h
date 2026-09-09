@@ -917,10 +917,115 @@ inline bool planStepThenAt(const std::string& plan, size_t i)
     return std::isspace((unsigned char) plan[i - 1]) != 0;
 }
 
+//#W74-CE (O7, wave-73 deck123 HIGH-1). A `stop=`/`M=` CLAUSE IS STATE, NOT A
+//STEP. The repeat row's own bracket demands the shape `stop=<N>; M=<N>` and
+//then the sequence ("this window x27, then attack next turn"). The wave-70
+//grammar opens a step at every `; `, so those counts became STEP ONE - and step
+//one is what the executed action consumes, so the very next window was served a
+//carry with the two numbers deleted (50 carries in one seat; the stated stop
+//oscillated 56 -> 46 -> 51 -> 106 -> 51 inside one turn with no screen memory to
+//correct it). The clause is not an action the seat can perform and can never be
+//"done"; it is the state every later step is measured against, so it belongs to
+//the whole plan and rides every carry.
+//The prefix is a LEADING run of label=number clauses, separated by `;` or `,`.
+//The labels are the ones the repeat row's contract and the corpus's own plans
+//use - `stop`, `m`, and the `L=`/`C=` pair models write beside them - and each
+//clause must be exactly a label, a filler (`=`, `:`, `is`, `at`, a space), a
+//number, and at most a short unit word ("now", "creatures"). Anything else ends
+//the prefix, so a plan that opens with prose is untouched, byte for byte.
+inline bool planStateLabelWord(const std::string& w)
+{
+    return w == "stop" || w == "m" || w == "l" || w == "c";
+}
+
+inline size_t planStatePrefixEnd(const std::string& plan)
+{
+    size_t i = plan.find_first_not_of(" \t");
+    if (i == std::string::npos)
+        return 0;
+    size_t accepted = 0;
+    while (i < plan.size())
+    {
+        //one clause: up to the next ';' or ',' (or the end)
+        size_t sep = i;
+        while (sep < plan.size() && plan[sep] != ';' && plan[sep] != ',' && plan[sep] != '\n')
+            sep++;
+        std::string clause = plan.substr(i, sep - i);
+        //label
+        size_t k = 0;
+        while (k < clause.size() && (clause[k] == ' ' || clause[k] == '\t'))
+            k++;
+        size_t ls = k;
+        while (k < clause.size() && std::isalpha((unsigned char) clause[k]))
+            k++;
+        std::string label;
+        for (size_t q = ls; q < k; q++)
+            label += (char) std::tolower((unsigned char) clause[q]);
+        if (!planStateLabelWord(label))
+            break;
+        //filler: '=' ':' '(' spaces, or the words "is"/"at"/"of"
+        while (k < clause.size())
+        {
+            const char c = clause[k];
+            if (c == ' ' || c == '\t' || c == '=' || c == ':' || c == '(')
+            {
+                k++;
+                continue;
+            }
+            if (std::isalpha((unsigned char) c))
+            {
+                size_t ws = k;
+                while (k < clause.size() && std::isalpha((unsigned char) clause[k]))
+                    k++;
+                std::string w;
+                for (size_t q = ws; q < k; q++)
+                    w += (char) std::tolower((unsigned char) clause[q]);
+                if (w == "is" || w == "at" || w == "of")
+                    continue;
+                k = ws;
+            }
+            break;
+        }
+        if (k >= clause.size() || !std::isdigit((unsigned char) clause[k]))
+            break;
+        while (k < clause.size() && std::isdigit((unsigned char) clause[k]))
+            k++;
+        //at most a short tail (a unit word, "now", a closing paren)
+        std::string tailBit = clause.substr(k);
+        size_t t0 = tailBit.find_first_not_of(" \t)");
+        if (t0 != std::string::npos)
+        {
+            std::string rest = tailBit.substr(t0);
+            while (!rest.empty() && (rest[rest.size() - 1] == ' ' || rest[rest.size() - 1] == '\t'))
+                rest.erase(rest.size() - 1);
+            if (rest.size() > 12)
+                break;
+            bool alphaOnly = true;
+            for (size_t q = 0; q < rest.size() && alphaOnly; q++)
+                alphaOnly = (std::isalpha((unsigned char) rest[q]) != 0 || rest[q] == ' ');
+            if (!alphaOnly)
+                break;
+        }
+        //accepted: swallow the separator and its whitespace
+        size_t next = sep;
+        if (next < plan.size() && (plan[next] == ';' || plan[next] == ','))
+            next++;
+        while (next < plan.size() && (plan[next] == ' ' || plan[next] == '\t'))
+            next++;
+        accepted = next;
+        if (sep >= plan.size() || plan[sep] == '\n')
+            break;
+        i = next;
+    }
+    return accepted;
+}
+
 inline std::vector<size_t> planStepEnds(const std::string& plan)
 {
     std::vector<size_t> ends;
     const size_t st = plan.find_first_not_of(" \t\r\n;,.!?");
+    //#W74-CE (O7): no step may OPEN inside the state prefix.
+    const size_t statePrefix = planStatePrefixEnd(plan);
     for (size_t i = 0; i < plan.size(); i++)
     {
         const char c = plan[i];
@@ -945,6 +1050,8 @@ inline std::vector<size_t> planStepEnds(const std::string& plan)
         }
         if (end == std::string::npos)
             continue;
+        if (end <= statePrefix)
+            continue; //#W74-CE (O7): inside the state clause - not a step end
         if (st == std::string::npos || end <= st)
             continue; //nothing but punctuation so far
         if (!ends.empty() && ends.back() >= end)
@@ -984,6 +1091,12 @@ inline std::string planStepsAfter(const std::string& plan, size_t done)
         at++;
     if (at >= plan.size())
         return plan;
+    //#W74-CE (O7): the state clause rides EVERY carry. It is not a step, so it
+    //is never consumed; a remainder served without it asks the seat to measure
+    //its own loop against numbers the screen has deleted.
+    const size_t statePrefix = planStatePrefixEnd(plan);
+    if (statePrefix > 0 && at > statePrefix)
+        return plan.substr(0, statePrefix) + plan.substr(at);
     return plan.substr(at);
 }
 
