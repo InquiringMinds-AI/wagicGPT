@@ -1980,6 +1980,43 @@ static bool edictVictimAlreadyOnStack(MTGCardInstance * card, const vector<MTGCa
 //edict clause use (display name + copy handle + live P/T + the `(printed X/Y)`
 //tail when they differ + the live keyword set). Same count, same scope wording,
 //same order: with both rosters empty the string is BYTE-IDENTICAL to before.
+//#W76-CP (Q10): O1's ghostform-liveness predicate is defined far below, inside
+//this same anonymous namespace; its first caller (the sweeper roster) is here.
+bool w73GhostformTriggerLive(MTGCardInstance * card);
+
+//#W76-CP (Q10, wave-75 deck125 B-1): A GHOSTFORM BODY IS NOT REMOVED. The
+//`{removes: ...}` roster and the sweeper's kill/exile list both counted a
+//creature carrying a LIVE ghostform counter as gone, while the battlefield line
+//in the SAME prompt said, in full, that killing it returns it to its owner's
+//hand and leaves a 1/1 Spirit behind (Kaya the Inexorable's +1). `125v146`
+//deck125 seq 71 spent the seat's only removal on exactly that body. 4 false
+//clauses in 13 ghostform windows. The body stays on the list - it IS a legal
+//target and the spell does resolve against it - and the row now says what
+//taking it actually buys. The liveness test is O1's own predicate, so the row
+//and the counter gloss cannot disagree: a ghostform counter whose granting
+//trigger is gone is a marker only, and gets no tail.
+static const char * kGhostformNotRemovalTail =
+    " (NOT removal: it returns to its owner's hand and leaves a 1/1 white flying Spirit)";
+
+static bool w76BodyReturnsInsteadOfDying(MTGCardInstance * c)
+{
+    if (!c || !c->counters)
+        return false;
+    bool marked = false;
+    for (size_t i = 0; i < c->counters->counters.size() && !marked; i++)
+    {
+        Counter * ct = c->counters->counters[i];
+        if (!ct || ct->nb <= 0 || ct->name.empty())
+            continue;
+        string low = ct->name;
+        for (size_t k = 0; k < low.size(); k++)
+            low[k] = (char) tolower((unsigned char) low[k]);
+        if (low == "ghostform")
+            marked = true;
+    }
+    return marked && w73GhostformTriggerLive(c);
+}
+
 static string sweeperVictimName(MTGCardInstance * c)
 {
     if (!c)
@@ -1992,6 +2029,8 @@ static string sweeperVictimName(MTGCardInstance * c)
     string kw = keywordList(c);
     if (!kw.empty())
         o << " [" << kw << "]";
+    if (w76BodyReturnsInsteadOfDying(c)) //#W76-CP (Q10)
+        o << kGhostformNotRemovalTail;
     return o.str();
 }
 
@@ -2014,6 +2053,19 @@ static string sweeperRegenerationTail(MTGCardInstance * c, int destroyKind)
     return " (may survive: it can regenerate)";
 }
 
+//#W76-CP (Q2, wave-75 engine-seat HIGH-2): THE ROSTER HAD NO CARDINALITY
+//BUDGET. `125v123` deck125 seq 394 rendered five sweeper rows of 9,450-9,497 B
+//each, every one re-enumerating all 100 opposing bodies one at a time, in an
+//80,805-byte prompt. The board header two lines above the SAME prompt said the
+//same thing in 1,186 B, because it groups identical bodies and prints one
+//handle RANGE per distinct shape. This is that summary, applied to the roster:
+//a COUNT plus the DISTINCT shapes. Nothing is dropped silently - the count is
+//the whole population, every distinct body still prints in full, and the one
+//place a body can be left unprinted (more distinct shapes than the group cap)
+//NAMES the residue rather than trimming it away. Below the collapse floor the
+//string is BYTE-IDENTICAL to the wave-60 wording, so no existing pin moves.
+string joinVictimRoster(const std::vector<std::string>& entries); //#W76-CP (Q2)
+
 static string sweeperRosterTail(const std::vector<std::string>& theirNames,
                                 const std::vector<std::string>& myNames)
 {
@@ -2023,13 +2075,11 @@ static string sweeperRosterTail(const std::vector<std::string>& theirNames,
     o << " - THEIRS: ";
     if (theirNames.empty())
         o << "none";
-    for (size_t i = 0; i < theirNames.size(); i++)
-        o << (i ? ", " : "") << theirNames[i];
+    o << joinVictimRoster(theirNames); //#W76-CP (Q2)
     if (!myNames.empty())
     {
         o << "; YOURS: ";
-        for (size_t i = 0; i < myNames.size(); i++)
-            o << (i ? ", " : "") << myNames[i];
+        o << joinVictimRoster(myNames); //#W76-CP (Q2)
     }
     return o.str();
 }
@@ -2257,6 +2307,89 @@ static int animatableCount(Player * p)
         if (permanentCanAnimate(p->game->inPlay->cards[i]))
             n++;
     return n;
+}
+
+//#W76-CP (Q11, wave-75 deck126 MED-2 and LOW-7): A LOYALTY ROW THAT NAMES ONE
+//TARGET FOR AN ABILITY THAT DOES NOT HAVE ONE. Two shapes, both from the same
+//Sorin menu and both false on the row's own face:
+//  (a) `-6: destroy up to three and reanimate with Sorin, Lord of Innistrad
+//      targeting Silverquill Silencer [opponent's battlefield]` - the engine's
+//      AIAction carries ONE target for an `<upto:3>` ability, and at `126v146`
+//      seq 39/40 the ability destroyed and reanimated three OTHER permanents
+//      while the named one survived. The guide tells the pilot "the name in the
+//      parentheses is what the engine executes", so this row would let a model
+//      take the ultimate believing it removes the one body it must remove.
+//  (b) `-2: emblem: "creatures get +1/+0" with Sorin, Lord of Innistrad
+//      targeting Sorin, Lord of Innistrad [your battlefield]` - the -2 gives its
+//      controller an emblem and targets nothing at all; 13 windows carried it.
+//The test is over the ROW AS RENDERED SO FAR, which is the same text the reader
+//gets, so the two cannot disagree. Returns 0 = the row names its single target
+//exactly as before (every non-loyalty row in the corpus, and every loyalty row
+//with one real target), 1 = an emblem/no-target loyalty ability (say nothing),
+//2 = an up-to-N chooser (`n` is the N its own text states). Pure.
+static int w76NumberWordValue(const string& s)
+{
+    static const char * kWords[] = { "one", "two", "three", "four", "five",
+                                     "six", "seven", "eight", "nine", "ten" };
+    for (int i = 0; i < 10; i++)
+        if (s == kWords[i])
+            return i + 1;
+    return 0;
+}
+
+int w76LoyaltyRowTargetForm(const string& row, int& upTo)
+{
+    upTo = 0;
+    if (loyaltyClausePrefix(row).empty())
+        return 0; //not a loyalty row: nothing here touches it
+    string low = row;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    //(a) the chooser. "up to <n>" in the ability's OWN words, and a count above
+    //one - "up to one" is a single-target chooser and the row names it truly.
+    const string upTok = "up to ";
+    size_t u = low.find(upTok);
+    if (u != string::npos)
+    {
+        size_t p = u + upTok.size();
+        int n = 0;
+        if (p < low.size() && isdigit((unsigned char) low[p]))
+        {
+            while (p < low.size() && isdigit((unsigned char) low[p]))
+                n = n * 10 + (low[p++] - '0');
+        }
+        else
+        {
+            size_t e = p;
+            while (e < low.size() && isalpha((unsigned char) low[e]))
+                e++;
+            n = w76NumberWordValue(low.substr(p, e - p));
+        }
+        if (n > 1)
+        {
+            upTo = n;
+            return 2;
+        }
+    }
+    //(b) the emblem. An emblem is created for its controller and targets
+    //nothing; a loyalty ability whose own text says "target" is excluded, so an
+    //emblem ability that DOES target something keeps its name.
+    if (low.find("emblem") != string::npos && low.find("target") == string::npos)
+        return 1;
+    return 0;
+}
+
+//The clause the chooser row prints instead of a name. It is a BRACKET group, so
+//it rides the annotation channel every other decision-time fact rides: stripped
+//from the narration echo and from the hold / option-set keys, exactly like the
+//forecasts beside it. It states the arity and refuses to name what it cannot.
+static string w76UpToNTargetClause(int n)
+{
+    std::ostringstream o;
+    o << " [this ability chooses up to " << n
+      << " targets as it resolves - this row cannot name them yet, and they need"
+         " not include any one body you have in mind]";
+    return o.str();
 }
 
 //#W72-BX (F8, Astra review finding 8 - MED): what THIS seat could still put in
@@ -7016,14 +7149,25 @@ static bool planNamesStrandedCard(const string& plan, const string& cardName)
 //review must sample it. Nothing is refused, re-asked or rendered.
 //#W75-CL (P23 d): which of the three deviations this reply was. Pure over the
 //two measures it is computed from, so PARSETEST walks all four states.
-const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolBytes)
+//#W76-CP (Q15, wave-75 engine-seat LOW-1): A FORCED CLOSE'S OWN PREFILL IS NOT
+//THE MODEL'S PROSE. `126v146` deck126 seq 22 is a `reasoning_forced_close`
+//record whose 823 off-protocol bytes are the phase-2 prefill's trace echoed
+//back ahead of a correctly-formed PLAN/ATTACK pair, and the answer was consumed
+//correctly. Counting it as `prose_outside_two_lines` made the class mean 3 of 3
+//where the honest reading is 2 of 3. The record is NOT dropped and the two
+//underlying fields are untouched - the class simply names what this one was, so
+//a reviewer can separate the rescue's echo from a reply that wrote prose of its
+//own. A forced close that ALSO lost its plan line is still reported as the plan
+//defect it is; only the bytes-only shape is re-named.
+const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolBytes,
+                                       bool forcedClose = false)
 {
     if (planLineMissing && offProtocolBytes > 0)
         return "unlabelled_plan";
     if (planLineMissing)
         return "plan_absent";
     if (offProtocolBytes > 0)
-        return "prose_outside_two_lines";
+        return forcedClose ? "forced_close_prefill_echo" : "prose_outside_two_lines";
     return "compliant";
 }
 
@@ -8375,6 +8519,116 @@ static string expandRowHandleFold(const string& tail, int first, int last)
     return out;
 }
 
+//#W76-CP (Q2): the roster collapse. The entries arrive ALREADY RENDERED
+//("Vampire #17 (4/4) (printed 2/2) [flying, ...]"), so the instance handle is
+//recovered from the string with the same grammar joinNumberedRows uses
+//(splitRowHandle: the first " #<digits>" token that ends there). Groups are
+//keyed on head+tail in FIRST-APPEARANCE order, so the caller's opponent-first /
+//board order survives; inside a group the members are sorted by rank and a run
+//of CONSECUTIVE ranks at or above the collapse floor prints as one handle range
+//with its count, exactly as the battlefield line does. A body with no handle,
+//or one whose ranks are not consecutive, prints in full on its own. The COUNT
+//leads whenever the list is at or above the floor, so the reader has the whole
+//population even where the shapes are folded; below the floor nothing is added
+//and the string is byte-identical to the uncollapsed wording.
+//The group CAP is the only lossy edge and it is stated: past it the remaining
+//DISTINCT shapes are counted and named as unlisted, never silently trimmed.
+const size_t kVictimRosterGroupCap = 12; //#W76-CP (Q2)
+
+string joinVictimRoster(const std::vector<std::string>& entries)
+{
+    if (entries.empty())
+        return "";
+    std::vector<string> keyOrder;
+    std::map<string, std::vector<size_t> > groups;
+    std::vector<string> head(entries.size()), tail(entries.size());
+    std::vector<int> rank(entries.size(), -1);
+    for (size_t k = 0; k < entries.size(); k++)
+    {
+        string h, t;
+        int r = -1;
+        string key;
+        if (splitRowHandle(entries[k], h, t, r) && r > 0)
+        {
+            head[k] = h;
+            tail[k] = t;
+            rank[k] = r;
+            key = h + "\x01" + t;
+        }
+        else
+        {
+            head[k] = entries[k];
+            tail[k].clear();
+            rank[k] = -1;
+            key = string("\x03") + entries[k];
+        }
+        if (groups.find(key) == groups.end())
+            keyOrder.push_back(key);
+        groups[key].push_back(k);
+    }
+    const bool wide = entries.size() >= kBattlefieldCollapseFloor;
+    std::ostringstream o;
+    if (wide)
+        o << entries.size() << (entries.size() == 1 ? " body" : " bodies") << ": ";
+    bool first = true;
+    size_t emitted = 0;
+    size_t unlistedShapes = 0, unlistedBodies = 0;
+    for (size_t g = 0; g < keyOrder.size(); g++)
+    {
+        std::vector<size_t>& idx = groups[keyOrder[g]];
+        if (emitted >= kVictimRosterGroupCap)
+        {
+            unlistedShapes++;
+            unlistedBodies += idx.size();
+            continue;
+        }
+        //ascending rank inside a group (stable insertion sort)
+        for (size_t a = 1; a < idx.size(); a++)
+        {
+            size_t v = idx[a];
+            size_t b = a;
+            while (b > 0 && rank[idx[b - 1]] > rank[v])
+            {
+                idx[b] = idx[b - 1];
+                b--;
+            }
+            idx[b] = v;
+        }
+        size_t i = 0;
+        while (i < idx.size())
+        {
+            size_t j = i + 1;
+            const int r0 = rank[idx[i]];
+            if (r0 > 0)
+                while (j < idx.size() && rank[idx[j]] == r0 + (int) (j - i))
+                    j++;
+            size_t run = j - i;
+            if (!first)
+                o << ", ";
+            first = false;
+            if (r0 > 0 && run >= kBattlefieldCollapseFloor)
+            {
+                o << head[idx[i]] << " #" << r0 << "-#" << (r0 + (int) run - 1)
+                  << tail[idx[i]] << " x" << run;
+                i = j;
+            }
+            else
+            {
+                o << entries[idx[i]];
+                i++;
+            }
+        }
+        emitted++;
+    }
+    if (unlistedShapes > 0)
+        o << ", + " << unlistedBodies
+          << (unlistedBodies == 1 ? " more body" : " more bodies")
+          << " in " << unlistedShapes
+          << (unlistedShapes == 1 ? " further shape" : " further shapes")
+          << " not listed here (the count above covers them)";
+    return o.str();
+}
+
 //#W55-D (D18): the SECOND instance grammar the render uses. A reveal / search /
 //hand list does not print "#N" - two identical cards are told apart by
 //`copyOfTag` ("(copy 2 of 4 in this list)"), deliberately, because a hand
@@ -8420,6 +8674,24 @@ bool splitCopyRowHandle(const string& row, string& head, string& tail, int& rank
     total = n;
     scope = row.substr(s, close - s);
     return true;
+}
+
+//#W76-CP (Q2, wave-75 engine-seat HIGH-2, the SECOND defect): WHICH INSTANCE
+//GRAMMAR OWNS THE ROW. Both collapses try the "#N" handle FIRST and the copy
+//tag only as a fallback, and a hand row's own ANNOTATION can carry a "#N" that
+//belongs to a body on the battlefield, not to this option: `125v123` seq 394's
+//three `Supreme Verdict (copy N of 3 in your hand) ... - THEIRS: ... Vampire #1
+//(4/4) ...` rows keyed on `Vampire #1`, so their heads differed by the copy
+//ordinal, no two rows compared equal, and 28.5 KB of byte-identical text
+//printed three times. The ordinal that IDENTIFIES the option is whichever comes
+//FIRST: a copy tag ahead of every "#N" means the "#N" is inside the row's
+//commentary about the board. Pure, and it can only re-route rows that carry
+//both notations - a row with one grammar, or with the copy tag after the
+//handle ("Vampire #2 (copy 1 of 2 in this list)"), decomposes exactly as before.
+static bool copyTagOwnsRow(const string& row, const string& handleHead)
+{
+    size_t cp = row.find(" (copy ");
+    return cp != string::npos && cp < handleHead.size();
 }
 
 //#W55-D (D18): the printed form of a collapsed copy run. Nothing is invented -
@@ -8586,7 +8858,8 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
     {
         string head, tail;
         int r = -1;
-        if (splitRowHandle(rows[i], head, tail, r))
+        //#W76-CP (Q2): the copy tag wins when it comes first - see copyTagOwnsRow.
+        if (splitRowHandle(rows[i], head, tail, r) && !copyTagOwnsRow(rows[i], head))
         {
             key[i] = head + "\x01" + tail;
             rank[i] = r;
@@ -8730,7 +9003,10 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
     vector<int> rank(n, -1), total(n, 0), form(n, 0);
     for (size_t i = 0; i < n; i++)
     {
-        if (splitRowHandle(rows[i], head[i], tail[i], rank[i]))
+        //#W76-CP (Q2): same precedence test as groupNumberedRows, so the gather
+        //and the print cannot disagree about which grammar a row is in.
+        if (splitRowHandle(rows[i], head[i], tail[i], rank[i])
+            && !copyTagOwnsRow(rows[i], head[i]))
             form[i] = 1;
         //#W55-D (D18): the copy-tag grammar, tried second so nothing about the
         //"#N" collapse changes.
@@ -18718,7 +18994,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //at all. The two underlying fields are kept: they are what the class is
         //computed from and deleting a measure to add one is how instruments lose
         //their audit trail.
-        const char * devClass = w75ProtocolDeviationClass(planLineMissing, (int) replyOffProtocol);
+        //#W76-CP (Q15): the forced-close marker was written into `rec` a few
+        //dozen lines above (and the latch cleared there), so the record itself
+        //is what this reads - the one source that cannot drift from the field
+        //the reviewer will filter on.
+        const char * devClass = w75ProtocolDeviationClass(planLineMissing, (int) replyOffProtocol,
+                                                         rec.count("reasoning_forced_close") > 0);
         rec["protocol_deviation"] = string(devClass);
         if (planLineMissing || replyOffProtocol > 0)
             mProtocolDeviationReplies++;
@@ -28442,6 +28723,25 @@ static string holdRowLine(bool castSeam = false, bool activationLive = false) //
     return string(head) + holdRowBenefitClause();
 }
 
+//#W76-CP (Q12, wave-75 deck126 MED-3): WHERE THE HOLD ROW GOES, ONE RULE. The
+//two closing rows of a casting menu are the hold and the plain decline, and
+//every such menu ends with the same sentence - "the LAST row of this menu
+//declines: it is a real answer, not a fallback". Wave 66 put the hold FIRST
+//only where the seat held an instant-speed answer, so 127 of one seat's menus
+//read `Hold priority` then `Cast nothing right now` and 32 read the reverse,
+//and on those 32 the sentence named the HOLD row - which is not the plain
+//decline and whose own text says it gives up the turn's remaining casting
+//windows. The order is now a fact about the menu, not about the board: the
+//plain decline is LAST and the hold sits immediately before it; with no decline
+//row on the menu the hold is appended. Pure, so the rule the seam runs and the
+//rule the pin asserts are one function.
+static int w76ClosingRowInsertAt(int declineRowIdx, size_t menuSize)
+{
+    if (declineRowIdx >= 0 && declineRowIdx <= (int) menuSize)
+        return declineRowIdx;
+    return (int) menuSize;
+}
+
 //#W66-AS (deck123 MED): the casting menu HAS NO ROW 0 and the priority menu
 //does, and nothing said so. `123v162` seq 45 answered `CHOICE: 0 (pass)` on a
 //casting menu whose decline was the numbered "Cast nothing right now" row -
@@ -33571,10 +33871,18 @@ static string ownClockTag(const string& name, int copies, int perTurn, int oppLi
         return string();
     const int turns = (oppLife + perTurn - 1) / perTurn;
     std::ostringstream o;
+    //#W76-CP (Q15, deck125 B-5 / deck126 LOW-8, third wave): ONE source is not
+    //"them". With a single Staff of Nin the clause read `your Staff of Nin deal
+    //1 damage a turn between them`, a plural verb and a plural pronoun over one
+    //permanent. The arithmetic never moved; the grammar now agrees with the
+    //count the same sentence is built from. Two or more sources keep the
+    //wave-63 wording byte for byte.
     o << " {the clock you already control: your " << name;
     if (copies > 1)
         o << " #1-#" << copies;
-    o << " deal " << perTurn << " damage a turn between them - at that rate alone"
+    o << (copies > 1 ? " deal " : " deals ") << perTurn << " damage a turn"
+      << (copies > 1 ? " between them" : "")
+      << " - at that rate alone"
          " the opponent reaches 0 in " << turns << (turns == 1 ? " more turn" : " more turns")
       << ", with no card spent}";
     return o.str();
@@ -34329,6 +34637,16 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //#W43-9: name, instance handle AND the owner/zone tag - the same
         //reference the spell-target rows already carried. A bare name here read
         //as "some Forgotten Cave" and the pilot destroyed its own.
+        //#W76-CP (Q11, wave-75 deck126 MED-2 + LOW-7): ...but only where the
+        //ability HAS that one target. See w76LoyaltyRowTargetForm.
+        const string w76rowSoFar = out.str(); //#W76-CP (Q11)
+        int w76UpTo = 0;
+        const int w76Form = w76LoyaltyRowTargetForm(w76rowSoFar, w76UpTo);
+        if (w76Form == 2)
+            out << w76UpToNTargetClause(w76UpTo);
+        else if (w76Form == 1)
+            ; //an emblem / no-target loyalty ability names no target at all
+        else
         out << " targeting " << targetReference(this, action.target);
         if (action.target->controller() == this && isHarmToTargetAbility(action.ability))
             out << kSelfTargetClause;
@@ -41162,6 +41480,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                         || kc->currentZone != kc->controller()->game->inPlay)
                                         continue;
                                     string nm = kc->getDisplayName() + instanceHandle(kc);
+                                    if (w76BodyReturnsInsteadOfDying(kc)) //#W76-CP (Q10)
+                                        nm += kGhostformNotRemovalTail;
                                     if (rverb == "kills"
                                         && kc->basicAbilities[Constants::INDESTRUCTIBLE] != 0)
                                         immune.push_back(nm);
@@ -41669,19 +41989,25 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //removed and nothing is renumbered away: both rows are on the menu,
         //the decline is still the last row, and every consumer below reads the
         //index this block just assigned rather than a position it assumed.
-        const bool holdFirstDecline = LegalActionsOracle::hasInstantResponse(this);
-        int holdRow;
-        if (holdFirstDecline && declineRowIdx >= 0)
+        //#W76-CP (Q12, wave-75 deck126 MED-3): THE CLOSING ROWS NOW HAVE ONE
+        //ORDER. The hold was listed before the decline only where the seat held
+        //an instant-speed answer, so 127 of this seat's menus printed
+        //`Hold priority` then `Cast nothing right now` and 32 printed the
+        //reverse - while every one of them ended with the same sentence,
+        //"the LAST row of this menu declines". On those 32 that sentence named
+        //the HOLD row, which is not the plain decline and says so in its own
+        //text. The order is now unconditional: the plain decline is LAST and
+        //the hold sits immediately before it. The option SET is untouched -
+        //both rows are on every menu that had them, nothing is renumbered away,
+        //and every consumer below reads the index assigned here.
+        const int holdRow = w76ClosingRowInsertAt(declineRowIdx, menu.size()); //#W76-CP (Q12)
+        if (declineRowIdx >= 0)
         {
-            holdRow = declineRowIdx;
-            menu.insert(menu.begin() + declineRowIdx, holdRowLine(true)); //#W71-BR (L17)
+            menu.insert(menu.begin() + holdRow, holdRowLine(true)); //#W71-BR (L17)
             declineRowIdx++;
         }
         else
-        {
-            holdRow = (int) menu.size();
             menu.push_back(holdRowLine(true)); //#W71-BR (L17)
-        }
         //#W61-U (C14): the hold's own re-open rule for THIS menu, measured over
         //the rows the latch reads and BEFORE the latch consumes the window (a
         //held window still updates the memory). Only attempt 0 measures: a
@@ -42413,8 +42739,32 @@ static string lifePaymentVerdict(int life, int cost)
 //W36 lane C: the ask also NAMES the land (all three arm-C fallbacks on this
 //ask class clustered on the nameless shape); empty landName keeps the old
 //generic wording.
+//#W76-CP (Q14, wave-75 deck146 MED-3): THE USABLE TAG NAMES WHAT THE PERMANENT
+//CAN ACTUALLY DO. All 8 `pay 3 life` rows in the wave-75 corpus printed
+//`[usable (tap for mana / attack) this turn]` over Emeria, Shattered Skyclave
+//and Agadeem, the Undercrypt - ordinary lands with no animation ability and
+//nothing that can ever attack - and one of them is the screen where the seat
+//paid 3 life for nothing (`146v162` seq 22). The bracket is a benefit claim and
+//it has to be true of THIS permanent: `attack` is emitted only for a permanent
+//that is a creature or can animate into one, `tap for mana` only for one with a
+//mana ability. A permanent with neither gets the arrival fact and no usability
+//claim at all (a silent omission would be worse - the sentence still says what
+//paying buys, which is that it enters untapped). Pure over the two board facts.
+static string etbUsableClause(bool canTapForMana, bool canAttackEver)
+{
+    if (canTapForMana && canAttackEver)
+        return " [usable (tap for mana / attack) this turn]";
+    if (canTapForMana)
+        return " [usable (tap for mana) this turn]";
+    if (canAttackEver)
+        return " [usable (attack) this turn]";
+    return " [it is on the battlefield untapped from now on]";
+}
+
 static bool annotateEtbPayOrTapMenu(vector<string>& opts, const string& landName,
-                                    bool alreadyTapped = false)
+                                    bool alreadyTapped = false,
+                                    bool canTapForMana = true,
+                                    bool canAttackEver = true)
 {
     bool hasPayLife = false, hasTap = false;
     for (size_t i = 0; i < opts.size(); i++)
@@ -42442,8 +42792,8 @@ static bool annotateEtbPayOrTapMenu(vector<string>& opts, const string& landName
                            " tapped - paying life will NOT untap it. The payment"
                            " buys nothing; decline it]";
             else
-                opts[i] += " - " + who + " enters UNTAPPED [usable (tap for"
-                           " mana / attack) this turn]";
+                opts[i] += " - " + who + " enters UNTAPPED"
+                           + etbUsableClause(canTapForMana, canAttackEver); //#W76-CP (Q14)
         }
         else if (isTapOption(opts[i]))
         {
@@ -44227,7 +44577,19 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             else
                 etbAlreadyTapped = ctx && ctx->isTapped();
         }
-        etbPayOrTap = annotateEtbPayOrTapMenu(opts, etbLandName, etbAlreadyTapped);
+        //#W76-CP (Q14): the two board facts the usable bracket is allowed to
+        //claim, read off the permanent that armed the menu. When the land could
+        //not be recovered the wave-58 wording stands (both true), which is the
+        //same conservative fallback the NAME already uses.
+        bool etbCanTapForMana = true, etbCanAttackEver = true;
+        if (MTGCardInstance * arrived = etbPayOrTapLand(this))
+        {
+            etbCanTapForMana = arrived->data
+                               && !landTapMana(arrived->data->text).empty();
+            etbCanAttackEver = arrived->isCreature() != 0 || permanentCanAnimate(arrived);
+        }
+        etbPayOrTap = annotateEtbPayOrTapMenu(opts, etbLandName, etbAlreadyTapped,
+                                              etbCanTapForMana, etbCanAttackEver);
         if (etbPayOrTap && etbAlreadyTapped)
             for (size_t i = 0; i < req.optionTexts.size(); i++)
                 if (isTapOption(req.optionTexts[i]))
@@ -83014,9 +83376,12 @@ static const char * kW50Y_r94 =
         CHECK(t.find("your Staff of Nin #1-#2 deal 2 damage a turn between them") != string::npos
                   && t.find("reaches 0 in 3 more turns") != string::npos,
               "#W74-CE O9 REPRO the clause divides the live life total by the live rate");
-        CHECK(ownClockTag("Staff of Nin", 1, 1, 2).find("your Staff of Nin deal 1 damage") != string::npos
+        //#W76-CP (Q15): SUPERSEDED - the wave-74 pin asserted the plural verb
+        //("deal 1 damage") for a single source, which is the deck125 B-5 /
+        //deck126 LOW-8 defect. Same assertion, corrected wording.
+        CHECK(ownClockTag("Staff of Nin", 1, 1, 2).find("your Staff of Nin deals 1 damage") != string::npos
                   && ownClockTag("Staff of Nin", 1, 1, 2).find("#1-#") == string::npos,
-              "#W74-CE O9 a single copy names no ordinal range");
+              "#W74-CE O9 a single copy names no ordinal range (#W76-CP Q15: and no plural verb)");
         CHECK(ownClockTag("Staff of Nin", 1, 1, 1).find("reaches 0 in 1 more turn, with no card spent}") != string::npos,
               "#W74-CE O9 the singular turn is spelled singular");
         CHECK(ownClockTag("", 1, 1, 5).empty() && ownClockTag("x", 1, 0, 5).empty()
@@ -84539,6 +84904,498 @@ static const char * kW50Y_r94 =
             }
         }
 
+
+        cout << "\n[#W76-CP] Q2 row and prompt truth: the roster cap, the copy-row"
+                " fold, the closing-row order, the usable tag, the loyalty target"
+                " forms, the ghostform tail and the clock's grammar\n";
+        {
+            // ================= Q2 (HIGH) - engine-seat HIGH-2, `125v123` deck125 seq 394.
+            // The 100-body board that produced the 80,805-byte prompt, rebuilt here
+            // the way sweeperClause builds it (sweeperVictimName strings).
+            std::vector<std::string> theirs100;
+            theirs100.push_back("Lord of Lineage #1 (5/5) [flying, haste, shroud,"
+                                " doesn't untap during its controller's untap step]");
+            for (int v = 1; v <= 99; v++)
+            {
+                std::ostringstream b;
+                b << "Vampire #" << v << " (4/4) (printed 2/2) [flying, doesn't untap"
+                     " during its controller's untap step]";
+                theirs100.push_back(b.str());
+            }
+            const std::string roster = sweeperRosterTail(theirs100, std::vector<std::string>());
+            CHECK(roster.find(" - THEIRS: 100 bodies: ") == 0,
+                  "#W76-CP Q2 GREEN the roster leads with the COUNT of the whole population"
+                  " - RED on base, which printed 100 bodies one at a time");
+            CHECK(roster.find("Vampire #1-#99 (4/4) (printed 2/2) [flying, doesn't untap"
+                              " during its controller's untap step] x99") != std::string::npos,
+                  "#W76-CP Q2 GREEN the 99 identical bodies print ONCE, as the handle range"
+                  " the battlefield line two lines above already prints them as");
+            CHECK(roster.find("Lord of Lineage #1 (5/5)") != std::string::npos,
+                  "#W76-CP Q2 GREEN the distinct shape is still named in full - the collapse"
+                  " groups, it never drops");
+            CHECK(roster.size() < 300,
+                  "#W76-CP Q2 GREEN 9,450 bytes of enumeration become one short clause");
+            {
+                // NEGATIVE: below the collapse floor nothing is added at all -
+                // the wave-60 string, byte for byte.
+                std::vector<std::string> two;
+                two.push_back("Goblin #1 (1/1)");
+                two.push_back("Sigarda #1 (5/5) [flying]");
+                CHECK(sweeperRosterTail(two, std::vector<std::string>())
+                          == " - THEIRS: Goblin #1 (1/1), Sigarda #1 (5/5) [flying]",
+                      "#W76-CP Q2 NEGATIVE a short roster is byte-identical to before -"
+                      " no count, no range, no x-tail");
+                CHECK(sweeperRosterTail(std::vector<std::string>(), std::vector<std::string>())
+                          .empty(),
+                      "#W76-CP Q2 NEGATIVE an empty roster still renders nothing");
+            }
+            {
+                // NEGATIVE: non-consecutive handles are never described by a range.
+                std::vector<std::string> gap;
+                gap.push_back("Vampire #1 (2/2)");
+                gap.push_back("Vampire #3 (2/2)");
+                gap.push_back("Vampire #5 (2/2)");
+                const std::string g = sweeperRosterTail(gap, std::vector<std::string>());
+                CHECK(g.find("#1-#") == std::string::npos
+                          && g.find("Vampire #1 (2/2), Vampire #3 (2/2), Vampire #5 (2/2)")
+                                 != std::string::npos,
+                      "#W76-CP Q2 NEGATIVE a gap in the ranks prints every body - a range"
+                      " must name exactly its members");
+            }
+            {
+                // The group CAP names its residue rather than trimming it away.
+                std::vector<std::string> wide;
+                for (int k = 1; k <= 20; k++)
+                {
+                    std::ostringstream b;
+                    b << "Shape" << k << " #1 (1/1)";
+                    wide.push_back(b.str());
+                }
+                const std::string w = sweeperRosterTail(wide, std::vector<std::string>());
+                CHECK(w.find(" - THEIRS: 20 bodies: ") == 0
+                          && w.find("+ 8 more bodies in 8 further shapes not listed here"
+                                    " (the count above covers them)") != std::string::npos,
+                      "#W76-CP Q2 GREEN past the group cap the residue is COUNTED AND NAMED,"
+                      " never silently dropped (the trust doctrine's omission rule)");
+                CHECK(w.find("Shape12 #1 (1/1)") != std::string::npos
+                          && w.find("Shape13 #1") == std::string::npos,
+                      "#W76-CP Q2 the cap is exactly the first kVictimRosterGroupCap shapes");
+            }
+
+            // ---- Q2, the SECOND defect: WHICH INSTANCE GRAMMAR OWNS THE ROW.
+            // The three `Supreme Verdict (copy N of 3 in your hand)` rows of seq
+            // 394 are byte-identical apart from the copy ordinal, and they did
+            // not fold, because their own `{right now: ...}` roster names
+            // `Vampire #1` - so splitRowHandle keyed every row on THAT handle and
+            // the copy ordinal landed in the head, making all three heads differ.
+            {
+                std::string uncapped = " - THEIRS: ";
+                for (size_t k = 0; k < theirs100.size(); k++)
+                    uncapped += (k ? ", " : "") + theirs100[k];
+                const std::string sv =
+                    " {1}{u}{w}{w} (sorcery) {card text: Supreme Verdict can't be countered."
+                    " -- Destroy all creatures.} {right now: destroys 100 of their creatures"
+                    " (100 without a restriction against attacking), 0 of yours" + uncapped
+                    + "} {NOT spare: a real card, not a surplus land}";
+                std::vector<std::string> rows;
+                for (int c = 1; c <= 3; c++)
+                {
+                    std::ostringstream r;
+                    r << "Supreme Verdict" << copyOfTag(c, 3, "your hand") << sv;
+                    rows.push_back(r.str());
+                }
+                bool ranged = false;
+                const std::string joined = joinNumberedRows(rows, &ranged);
+                CHECK(ranged && joined.compare(0, 5, "1-3. ") == 0,
+                      "#W76-CP Q2 REPRO/GREEN 125v123 seq 394: three copy rows whose own"
+                      " annotation names a battlefield `#N` now fold to ONE range row -"
+                      " RED on base, where all three printed in full (9,497 B each)");
+                CHECK(joined.find(" (copies 1-3 of 3 in your hand)") != std::string::npos
+                          && joined.find(" x3") != std::string::npos,
+                      "#W76-CP Q2 GREEN the range names the copies it covers and its count,"
+                      " in the scope the uncollapsed rows named");
+                CHECK(joined.find("Vampire #1-#3") == std::string::npos,
+                      "#W76-CP Q2 NEGATIVE the fold never rewrites the BOARD handles inside"
+                      " the annotation into a range of its own");
+                {
+                    // MUST-NOT-MATCH: the other order. A row whose "#N" comes
+                    // BEFORE any copy tag is still a "#N" row, so the wave-48
+                    // handle collapse is what runs on it - the precedence test is
+                    // positional, not "a copy tag anywhere wins".
+                    std::vector<std::string> reveal;
+                    for (int c = 1; c <= 3; c++)
+                    {
+                        std::ostringstream r;
+                        r << "Vampire #" << c << " (2/2) [flying]";
+                        reveal.push_back(r.str());
+                    }
+                    bool rr = false;
+                    const std::string rj = joinNumberedRows(reveal, &rr);
+                    CHECK(rr && rj.find("Vampire #1-#3 (2/2) [flying] x3") != std::string::npos,
+                          "#W76-CP Q2 MUST-NOT-MATCH the handle grammar is untouched where the"
+                          " row carries no copy tag at all");
+                    std::vector<std::string> after;
+                    for (int c = 1; c <= 3; c++)
+                    {
+                        std::ostringstream r;
+                        r << "Vampire #" << c << copyOfTag(c, 3, "this list") << " (2/2)";
+                        after.push_back(r.str());
+                    }
+                    bool ar = false;
+                    const std::string aj = joinNumberedRows(after, &ar);
+                    CHECK(aj.find("(copies 1-3 of 3 in this list)") == std::string::npos,
+                          "#W76-CP Q2 MUST-NOT-MATCH a handle-led row is never re-read as a"
+                          " copy run - its tails differ and it stays three rows, as on base");
+                }
+                {
+                    // The gather half of the same rule (groupNumberedRows), on a
+                    // discard list whose copies are NOT adjacent - the shape the
+                    // disposability sort produces.
+                    std::vector<std::string> mixed;
+                    mixed.push_back(rows[0]);
+                    mixed.push_back("Emrakul, the Aeons Torn {15} (15/15 creature)");
+                    mixed.push_back(rows[1]);
+                    mixed.push_back("Island (land) {card text: U}");
+                    mixed.push_back(rows[2]);
+                    std::vector<size_t> order;
+                    groupNumberedRows(mixed, order);
+                    CHECK(order.size() == mixed.size(),
+                          "#W76-CP Q2 the gather is a PERMUTATION - every row keeps a slot");
+                    std::set<size_t> seen(order.begin(), order.end());
+                    CHECK(seen.size() == mixed.size(),
+                          "#W76-CP Q2 ...and a bijection, so the answer index still resolves"
+                          " to exactly one hand card (the wave-72 finding-6 hazard: a menu"
+                          " permutation applied twice, or to a half of the list)");
+                    std::vector<std::string> shown;
+                    for (size_t k = 0; k < order.size(); k++)
+                        shown.push_back(mixed[order[k]]);
+                    bool gr = false;
+                    const std::string gj = joinNumberedRows(shown, &gr);
+                    CHECK(gr && gj.find(". Supreme Verdict (copies 1-3 of 3 in your hand)")
+                                    != std::string::npos,
+                          "#W76-CP Q2 GREEN scattered copies are gathered and then folded -"
+                          " RED on base, where the gather never keyed them as copies at all");
+                }
+            }
+
+            // ---- Q2, the two fixes together: the seq-394 SHAPE under 12 KB with
+            // every one of its 28 rows answerable.
+            {
+                std::vector<std::string> menu;
+                const std::string spare =
+                    " {spare: you control 24 lands already; the most expensive card in your"
+                    " hand you could still reach costs 15}";
+                const std::string notSpare = " {NOT spare: a real card, not a surplus land}";
+                menu.push_back("Island (land) {card text: U}" + spare);
+                menu.push_back("Seachrome Coast (land) {card text: Seachrome Coast enters"
+                               " tapped unless you control two or fewer other lands. --"
+                               " {T}: Add {W} or {U}.}" + spare);
+                const char * quads[3] = { "Path to Exile", "Essence Scatter", "Cancel" };
+                const int quadN[3] = { 4, 4, 3 };
+                for (int q = 0; q < 3; q++)
+                    for (int c = 1; c <= quadN[q]; c++)
+                        menu.push_back(std::string(quads[q]) + copyOfTag(c, quadN[q], "your hand")
+                                       + " {1}{u} (instant) {card text: ...}" + notSpare);
+                for (int c = 1; c <= 2; c++)
+                    menu.push_back(std::string("Elixir of Immortality")
+                                   + copyOfTag(c, 2, "your hand") + " {1} (artifact)"
+                                     " {card text: ...}" + notSpare);
+                for (int c = 1; c <= 3; c++)
+                    menu.push_back(std::string("Dream Fracture") + copyOfTag(c, 3, "your hand")
+                                   + " {1}{u}{u} (instant) {card text: ...}" + notSpare);
+                for (int c = 1; c <= 2; c++)
+                    menu.push_back(std::string("Fall of the Gavel") + copyOfTag(c, 2, "your hand")
+                                   + " {3}{u}{w} (instant) {card text: ...}" + notSpare);
+                for (int c = 1; c <= 2; c++)
+                    menu.push_back(std::string("Sphinx's Revelation") + copyOfTag(c, 2, "your hand")
+                                   + " {u}{u}{w}{x} (instant) {card text: ...}" + notSpare);
+                menu.push_back("Emrakul, the Aeons Torn {15} (15/15 creature)"
+                               " {card text: ...}" + notSpare);
+                const std::string capped = sweeperRosterTail(theirs100,
+                                                             std::vector<std::string>());
+                for (int c = 1; c <= 2; c++)
+                    menu.push_back(std::string("Final Judgment") + copyOfTag(c, 2, "your hand")
+                                   + " {4}{w}{w} (sorcery) {card text: Exile all creatures.}"
+                                     " {right now: exiles 100 of their creatures (100 without a"
+                                     " restriction against attacking), 0 of yours" + capped + "}"
+                                   + notSpare);
+                for (int c = 1; c <= 3; c++)
+                    menu.push_back(std::string("Supreme Verdict") + copyOfTag(c, 3, "your hand")
+                                   + " {1}{u}{w}{w} (sorcery) {card text: ...}"
+                                     " {right now: destroys 100 of their creatures (100 without a"
+                                     " restriction against attacking), 0 of yours" + capped + "}"
+                                   + notSpare);
+                CHECK(menu.size() == 28,
+                      "#W76-CP Q2 the seq-394 hand is 28 cards, so the menu is 28 rows");
+                std::vector<size_t> order;
+                groupNumberedRows(menu, order);
+                std::vector<std::string> shown;
+                for (size_t k = 0; k < order.size(); k++)
+                    shown.push_back(menu[order[k]]);
+                bool ranged = false;
+                const std::string joined = joinNumberedRows(shown, &ranged);
+                CHECK(joined.size() < 12288,
+                      "#W76-CP Q2 REPRO/GREEN the seq-394 shape renders under 12 KB - RED on"
+                      " base at 47.4 KB for its five sweeper rows alone inside an 80,805-byte"
+                      " prompt");
+                // Every one of the 28 options is still answerable: the printed
+                // labels, ranges expanded, are exactly 1..28 with no gap and no
+                // repeat. This is the option-set half of the fold - it is DISPLAY.
+                std::set<int> answerable;
+                {
+                    std::istringstream ls(joined);
+                    std::string line;
+                    while (std::getline(ls, line))
+                    {
+                        size_t dot = line.find(". ");
+                        if (dot == std::string::npos)
+                            continue;
+                        const std::string label = line.substr(0, dot);
+                        size_t dash = label.find('-');
+                        int a = atoi(label.c_str());
+                        int b = (dash == std::string::npos) ? a
+                                                            : atoi(label.c_str() + dash + 1);
+                        for (int n = a; n <= b; n++)
+                            answerable.insert(n);
+                    }
+                }
+                CHECK(answerable.size() == 28 && *answerable.begin() == 1
+                          && *answerable.rbegin() == 28,
+                      "#W76-CP Q2 GREEN all 28 option numbers stay answerable across the fold -"
+                      " nothing is removed, capped or auto-answered");
+                CHECK(order.size() == 28,
+                      "#W76-CP Q2 GREEN ...and the display order still carries 28 slots, so the"
+                      " answer -> engine index map has one entry per printed number");
+                {
+                    // The answer -> engine index mapping for a FOLDED row, proven
+                    // through the seam's own composition (wave-72 finding 6: a
+                    // mapping applied to an index already in engine space).
+                    std::vector<size_t> disp(28), composed;
+                    for (size_t k = 0; k < 28; k++)
+                        disp[k] = 27 - k; //any non-identity outer permutation
+                    composeRowOrder(disp, order, composed);
+                    CHECK(composed.size() == 28,
+                          "#W76-CP Q2 the composed order has one slot per printed row");
+                    std::set<size_t> once(composed.begin(), composed.end());
+                    CHECK(once.size() == 28,
+                          "#W76-CP Q2 KEY PIN the composition is applied ONCE and is a"
+                          " bijection - two answers can never resolve to one card, and no"
+                          " card can be unreachable (wave-72 codex finding 6)");
+                    bool oneToOne = true;
+                    for (size_t k = 0; k < 28; k++)
+                        if (composed[k] != disp[order[k]])
+                            oneToOne = false;
+                    CHECK(oneToOne,
+                          "#W76-CP Q2 KEY PIN printed position k is engine position"
+                          " disp[order[k]] for every k, folded rows included");
+                }
+                {
+                    // KEY STABILITY: the roster's own COUNT is a board-derived
+                    // number inside a brace group, so it must be invisible to the
+                    // hold key, the option-set key and the ask key.
+                    std::vector<std::string> theirs99(theirs100.begin(), theirs100.end() - 1);
+                    const std::string capped99 = sweeperRosterTail(theirs99,
+                                                                   std::vector<std::string>());
+                    CHECK(capped != capped99,
+                          "#W76-CP Q2 the two windows really do differ in the printed number");
+                    const std::string rowA = "Cast Supreme Verdict {1}{u}{w}{w} {right now:"
+                                             " destroys 100 of their creatures" + capped + "}";
+                    const std::string rowB = "Cast Supreme Verdict {1}{u}{w}{w} {right now:"
+                                             " destroys 99 of their creatures" + capped99 + "}";
+                    CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(rowB),
+                          "#W76-CP Q2 KEY PIN two windows differing ONLY in the roster's count"
+                          " and shapes key identically at the hold latch");
+                    std::vector<std::string> setA, setB;
+                    setA.push_back(rowA);
+                    setB.push_back(rowB);
+                    CHECK(optionSetKeyOf(setA) == optionSetKeyOf(setB),
+                          "#W76-CP Q2 KEY PIN ...and at the option-set key the declined count"
+                          " and the ask cache read");
+                }
+            }
+        }
+
+        cout << "\n[#W76-CP] Q10 / Q11 / Q12 / Q14 / Q15 row truth\n";
+        {
+            // ================= Q12 - deck126 MED-3: one closing-row order.
+            CHECK(w76ClosingRowInsertAt(3, 5) == 3,
+                  "#W76-CP Q12 GREEN the hold is inserted AT the decline row, so the plain"
+                  " decline stays LAST and the boilerplate's \"the LAST row declines\" is"
+                  " true - RED on base, where a seat with no instant-speed answer got the"
+                  " hold appended AFTER the decline (32 of this seat's 159 menus)");
+            CHECK(w76ClosingRowInsertAt(-1, 5) == 5,
+                  "#W76-CP Q12 NEGATIVE a menu with no decline row appends the hold");
+            CHECK(w76ClosingRowInsertAt(0, 4) == 0,
+                  "#W76-CP Q12 a decline that is already row 0 still takes the hold above it");
+            CHECK(w76ClosingRowInsertAt(9, 4) == 4,
+                  "#W76-CP Q12 NEGATIVE an out-of-range decline index never writes past the"
+                  " end of the menu");
+
+            // ================= Q14 - deck146 MED-3: the usable tag by permanent type.
+            CHECK(etbUsableClause(true, false) == " [usable (tap for mana) this turn]",
+                  "#W76-CP Q14 REPRO/GREEN Emeria / Agadeem are ordinary lands: the bracket"
+                  " no longer offers `attack` - RED on base, 8 of 8 pay-3-life rows in the"
+                  " wave-75 corpus said `usable (tap for mana / attack) this turn`");
+            CHECK(etbUsableClause(true, true) == " [usable (tap for mana / attack) this turn]",
+                  "#W76-CP Q14 a creature-land keeps both verbs, byte-identical to wave 58");
+            CHECK(etbUsableClause(false, true) == " [usable (attack) this turn]",
+                  "#W76-CP Q14 a permanent that can attack but makes no mana says so");
+            CHECK(etbUsableClause(false, false)
+                      == " [it is on the battlefield untapped from now on]",
+                  "#W76-CP Q14 NEGATIVE a permanent that can do neither gets the arrival fact"
+                  " and NO usability claim - and never a silent omission");
+            {
+                std::vector<std::string> row;
+                row.push_back("pay 3 life");
+                row.push_back("tap");
+                CHECK(annotateEtbPayOrTapMenu(row, "Emeria, Shattered Skyclave", false,
+                                              true, false),
+                      "#W76-CP Q14 the pay-or-tap shape still arms the arrival clause");
+                CHECK(row[0] == "pay 3 life - Emeria, Shattered Skyclave enters UNTAPPED"
+                                " [usable (tap for mana) this turn]",
+                      "#W76-CP Q14 GREEN the whole row, as `146v162` seq 22 would render it now");
+                CHECK(row[0].compare(0, 10, "pay 3 life") == 0,
+                      "#W76-CP Q14 the option SHORT NAME is untouched - the echo anchor leads");
+                CHECK(stripNarrationDecoration(row[0])
+                          == "pay 3 life - Emeria, Shattered Skyclave enters UNTAPPED",
+                      "#W76-CP Q14 KEY PIN the bracket is decision-time only: it leaves no"
+                      " trace in the narration echo");
+                std::vector<std::string> a, b;
+                a.push_back(row[0]);
+                std::vector<std::string> row2;
+                row2.push_back("pay 3 life");
+                row2.push_back("tap");
+                annotateEtbPayOrTapMenu(row2, "Emeria, Shattered Skyclave", false, true, true);
+                b.push_back(row2[0]);
+                CHECK(a[0] != b[0] && optionSetKeyOf(a) == optionSetKeyOf(b)
+                          && holdActionKeyRow(a[0]) == holdActionKeyRow(b[0]),
+                      "#W76-CP Q14 KEY PIN two windows differing only in the usable bracket"
+                      " key identically at BOTH the option-set key and the hold latch");
+            }
+
+            // ================= Q11 - deck126 MED-2 and LOW-7: the loyalty target forms.
+            {
+                int n = -1;
+                CHECK(w76LoyaltyRowTargetForm("-6: destroy up to three and reanimate with"
+                                              " Sorin, Lord of Innistrad", n) == 2 && n == 3,
+                      "#W76-CP Q11 REPRO/GREEN 126v146 seq 39: the `<upto:3>` ultimate is a"
+                      " CHOOSER - RED on base, which printed one `targeting Silverquill"
+                      " Silencer` and then resolved against three other permanents");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("-2: emblem: \"creatures get +1/+0\" with Sorin,"
+                                              " Lord of Innistrad", n) == 1 && n == 0,
+                      "#W76-CP Q11 REPRO/GREEN 126 seq 39 row 2: the emblem ability targets"
+                      " NOTHING - RED on base, which named Sorin itself (13 windows)");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("+1: target creature gets ghostform with Kaya"
+                                              " the Inexorable", n) == 0,
+                      "#W76-CP Q11 MUST-NOT-MATCH a loyalty ability with ONE real target keeps"
+                      " its name, unchanged");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("-3: exile up to one target permanent with Kaya",
+                                              n) == 0,
+                      "#W76-CP Q11 MUST-NOT-MATCH `up to one` is a single-target chooser and"
+                      " the row names it truly");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("Cast Sorin, Lord of Innistrad {2}{w}{b}", n) == 0,
+                      "#W76-CP Q11 MUST-NOT-MATCH a row with no loyalty prefix is never"
+                      " re-routed by this rule");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("-7: You get an emblem with \"target creature"
+                                              " gets +1/+1\"", n) == 0,
+                      "#W76-CP Q11 MUST-NOT-MATCH an emblem ability whose own text targets"
+                      " keeps its target name");
+                n = -1;
+                CHECK(w76LoyaltyRowTargetForm("-6: destroy up to 3 permanents", n) == 2 && n == 3,
+                      "#W76-CP Q11 the digit spelling of the same arity");
+                const std::string clause = w76UpToNTargetClause(3);
+                CHECK(clause.find("chooses up to 3 targets as it resolves") != std::string::npos
+                          && clause.find("targeting") == std::string::npos,
+                      "#W76-CP Q11 GREEN the chooser row states its arity and names nothing");
+                CHECK(clause[1] == '[' && clause[clause.size() - 1] == ']',
+                      "#W76-CP Q11 the clause is a BRACKET group - the annotation channel");
+                std::vector<std::string> a, b;
+                a.push_back("-6: destroy up to three and reanimate with Sorin" + clause);
+                b.push_back("-6: destroy up to three and reanimate with Sorin"
+                            + w76UpToNTargetClause(2));
+                CHECK(a[0] != b[0] && optionSetKeyOf(a) == optionSetKeyOf(b)
+                          && holdActionKeyRow(a[0]) == holdActionKeyRow(b[0]),
+                      "#W76-CP Q11 KEY PIN the arity clause is outside the option-set key and"
+                      " the hold key, like every other bracket");
+                CHECK(stripNarrationDecoration(a[0])
+                          == "-6: destroy up to three and reanimate with Sorin",
+                      "#W76-CP Q11 KEY PIN and outside the narration echo");
+            }
+
+            // ================= Q10 - deck125 B-1: a ghostform body is not removed.
+            {
+                std::vector<std::string> victims, immune;
+                victims.push_back("Goblin #1");
+                victims.push_back(std::string("Nadaar, Selfless Paladin #1")
+                                  + kGhostformNotRemovalTail);
+                const std::string tag = removalVictimTag("removes", victims, immune);
+                CHECK(tag.find("Nadaar, Selfless Paladin #1 (NOT removal: it returns to its"
+                               " owner's hand and leaves a 1/1 white flying Spirit)")
+                          != std::string::npos,
+                      "#W76-CP Q10 REPRO/GREEN 125v146 seq 71: the removal roster now says what"
+                      " the battlefield line in the same prompt says - RED on base, which"
+                      " listed the body as removed and the seat spent its only removal on it");
+                CHECK(tag.find("Goblin #1,") != std::string::npos
+                          || tag.find(", Goblin #1") != std::string::npos,
+                      "#W76-CP Q10 the body stays ON the list - it is a legal target and the"
+                      " spell does resolve against it; nothing is removed from the option set");
+                std::vector<std::string> plain;
+                plain.push_back("Goblin #1");
+                CHECK(removalVictimTag("removes", plain, immune) == " {removes: Goblin #1}",
+                      "#W76-CP Q10 NEGATIVE a board with no ghostform counter renders byte"
+                      " for byte as before");
+                std::vector<std::string> a, b;
+                a.push_back("Cast Path to Exile {w}" + tag);
+                b.push_back("Cast Path to Exile {w}" + removalVictimTag("removes", plain, immune));
+                CHECK(a[0] != b[0] && optionSetKeyOf(a) == optionSetKeyOf(b)
+                          && holdActionKeyRow(a[0]) == holdActionKeyRow(b[0]),
+                      "#W76-CP Q10 KEY PIN the tail rides the `{removes: }` brace group, so it"
+                      " is outside every key");
+            }
+
+            // ================= Q15 - the cosmetics and the deviation class.
+            CHECK(ownClockTag("Staff of Nin", 1, 1, 21)
+                      == " {the clock you already control: your Staff of Nin deals 1 damage a"
+                         " turn - at that rate alone the opponent reaches 0 in 21 more turns,"
+                         " with no card spent}",
+                  "#W76-CP Q15 REPRO/GREEN 126v146 seq 27: ONE source is not `them` - RED on"
+                  " base, which printed `your Staff of Nin deal 1 damage a turn between them`"
+                  " (third wave: deck125 B-5, deck126 LOW-8)");
+            CHECK(ownClockTag("Staff of Nin", 2, 2, 8)
+                      == " {the clock you already control: your Staff of Nin #1-#2 deal 2"
+                         " damage a turn between them - at that rate alone the opponent reaches"
+                         " 0 in 4 more turns, with no card spent}",
+                  "#W76-CP Q15 NEGATIVE two or more sources keep the wave-63 wording byte for"
+                  " byte");
+            {
+                std::vector<std::string> a, b;
+                a.push_back("Cast nothing right now" + ownClockTag("Staff of Nin", 1, 1, 21));
+                b.push_back("Cast nothing right now" + ownClockTag("Staff of Nin", 1, 1, 20));
+                CHECK(a[0] != b[0] && optionSetKeyOf(a) == optionSetKeyOf(b)
+                          && holdActionKeyRow(a[0]) == holdActionKeyRow(b[0]),
+                      "#W76-CP Q15 KEY PIN the singular clause is still invisible to both keys"
+                      " (the #W74-CH countdown that re-opened 240 holds)");
+            }
+            CHECK(std::string(w75ProtocolDeviationClass(false, 823, true))
+                      == "forced_close_prefill_echo",
+                  "#W76-CP Q15 REPRO/GREEN 126v146 seq 22: the rescue's own prefill echo is"
+                  " named for what it is - RED on base, which counted it as"
+                  " `prose_outside_two_lines` and made that class read 3 of 3, not 2 of 3");
+            CHECK(std::string(w75ProtocolDeviationClass(false, 823, false))
+                      == "prose_outside_two_lines",
+                  "#W76-CP Q15 NEGATIVE a reply that wrote prose of its own is unchanged");
+            CHECK(std::string(w75ProtocolDeviationClass(true, 92, true)) == "unlabelled_plan"
+                      && std::string(w75ProtocolDeviationClass(true, 0, true)) == "plan_absent",
+                  "#W76-CP Q15 NEGATIVE a forced close that ALSO lost its plan line is still"
+                  " reported as the plan defect it is - the exemption is bytes-only");
+            CHECK(std::string(w75ProtocolDeviationClass(false, 0, true)) == "compliant",
+                  "#W76-CP Q15 NEGATIVE a clean forced close is compliant, as before");
+        }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
