@@ -1403,6 +1403,8 @@ w72bw_puzzle_box_hand_replacer.txt
 w73cb_f1_petal_response.txt
 w73cb_f1_upkeep_activation.txt
 w74cc_ghostform_grant_live.txt
+w76cq_crack_victim_survives.txt
+w76cq_lifegain_prohibited.txt
 w74cc_edict_chooser_untargeted.txt
 w75ck_payable_foreach_battlement_blood.txt
 w75ck_sorin_minus6_not_self_target.txt

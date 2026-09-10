@@ -1569,6 +1569,54 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertcrackremoved ") == 0)
+    {
+        //#W76-CQ (F5, Astra wave-76 finding 5): the Q5 crack-back cover clause
+        //promises the seat survives next turn because this row kills the
+        //attackers, and the walk that summed it counted every creature the
+        //sweeper may legally hit - with no survival test. A regenerating 3/3
+        //under Day of Judgment survives, untaps and attacks. The clause is a GPT
+        //render string, so this command asks the victim classification itself.
+        //Syntax: assertcrackremoved <0|1> <destroyKind> <card name>
+        string rest = action.substr(19);
+        int expect = atoi(rest.c_str());
+        size_t sp = rest.find(' ');
+        int kind = (sp == string::npos) ? 0 : atoi(rest.c_str() + sp + 1);
+        size_t sp2 = (sp == string::npos) ? string::npos : rest.find(' ', sp + 1);
+        string cname = (sp2 == string::npos) ? "" : rest.substr(sp2 + 1);
+        MTGCardInstance * vc = getCard(cname);
+        int got = vc ? (gptCrackVictimTrulyRemoved(vc, kind) ? 1 : 0) : -1;
+        if (!vc || got != expect)
+        {
+            std::cerr << "TESTSUITE assertcrackremoved: '" << cname << "' (destroyKind "
+                      << kind << ") expected " << expect << " got " << got
+                      << (vc ? "" : " (no such card)")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
+    else if (action.find("assertcangainlife ") == 0)
+    {
+        //#W76-CQ (F6, Astra wave-76 finding 6): the forced-sacrifice row prices
+        //what THEIR Sanguine Bond turns their toughness-life-gain into, from the
+        //script alone. With Erebos (`nolifegainopponent`) on the seat's side
+        //there is no gain event and no Bond trigger, and the row invented the
+        //loss. Same instrument shape: ask the prohibition predicate directly.
+        //Syntax: assertcangainlife <0|1> <1|2>
+        string rest = action.substr(18);
+        int expect = atoi(rest.c_str());
+        size_t sp = rest.find(' ');
+        int who = (sp == string::npos) ? 1 : atoi(rest.c_str() + sp + 1);
+        Player * pl = (who == 2) ? observer->players[1] : observer->players[0];
+        int got = pl ? (gptPlayerCanGainLife(pl) ? 1 : 0) : -1;
+        if (!pl || got != expect)
+        {
+            std::cerr << "TESTSUITE assertcangainlife: player " << who << " expected "
+                      << expect << " got " << got
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertabilitycount ") == 0)
     {
         //#W54-I: pin HOW MANY entries a click on this card puts in its ability

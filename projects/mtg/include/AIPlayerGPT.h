@@ -130,6 +130,12 @@ int gptDisplayToggleSuppressed(MTGCardInstance * c, ActionLayer * al);
 //on this creature? The board render's counter gloss is conditional on it, and
 //the suite's `assertghostformlive <0|1> <card>` asks it directly.
 bool gptGhostformGrantLive(MTGCardInstance * card);
+//#W76-CQ (F5/F6): the two wave-76 board predicates behind render strings the
+//suite cannot otherwise see - the crack-back victim classification and the
+//life-gain prohibition. Asked directly by `assertcrackremoved` /
+//`assertcangainlife`.
+bool gptCrackVictimTrulyRemoved(MTGCardInstance * card, int destroyKind);
+bool gptPlayerCanGainLife(Player * gainer);
 
 struct NarrationCycleHolder
 {
@@ -250,9 +256,19 @@ inline void w76MainSkipArm(W76MainPhaseSkipState& s, int t, int ph, const char *
 struct W76CrossPhaseAsk
 {
     std::string phaseName;
+    //#W76-CQ (F4, Astra wave-76 finding 4): the BOARD this window was asked
+    //over, phase line stripped. The bracket used to assert "nothing on the board
+    //has changed" from turn + question + rows alone, which is a claim about
+    //three things and a promise about a fourth. Compared before the clause is
+    //printed; unequal boards get the re-put COUNT and no board claim.
+    std::string boardKey;
     int windowSeq;
+    //...and which window already counted this re-put. The prompt is rebuilt on
+    //every polling tick, so the counter used to tick with the poll rather than
+    //with the ask.
+    int countedSeq;
     bool declined;
-    W76CrossPhaseAsk() : windowSeq(0), declined(false) {}
+    W76CrossPhaseAsk() : windowSeq(0), countedSeq(-1), declined(false) {}
 };
 
 struct W76HoldMemory
@@ -263,6 +279,11 @@ struct W76HoldMemory
     std::map<std::string, int> pendingRun;
     std::map<std::string, int> run;
     std::map<std::string, int> measuredSeq;
+    //#W76-CQ (F1, Astra wave-76 finding 1): the run the note at `measuredSeq`
+    //was written with, kept beyond the staging entry so a RE-STAGE of the same
+    //window (the note is reused, the rows may have shrunk) commits the same run
+    //the printed bracket claimed.
+    std::map<std::string, int> measuredRun;
     std::map<std::string, std::string> lastNote;
 };
 
@@ -286,8 +307,17 @@ struct GptRetrySlot
     //the OTHER arm had safely parked was counted "unrecorded" the moment this arm
     //armed one, and recording either close cleared the flag for both.
     bool forceCloseArmed;
+    //#W76-CQ (F2, Astra wave-76 finding 2): a close this arm EARNED and has not
+    //bought yet because the other arm's close is still parked. The slot is
+    //fully built (base, prefill, phase-1 finish) and the decision is PENDING:
+    //nothing falls through to the heuristic, and nothing is decoded until the
+    //park clears or the tick bound expires. Rides the slot like every other
+    //per-arm fact so an arm cannot wait on a deferral that is not its own.
+    bool forceCloseDeferred;
+    int forceCloseDeferTicks;
     GptRetrySlot() : firstLatencyMs(-1), budgetMs(0), armLand(false), phase1Length(false),
-                     forceCloseArmed(false) {}
+                     forceCloseArmed(false), forceCloseDeferred(false),
+                     forceCloseDeferTicks(0) {}
 };
 
 //#W74-CF (F1): the swap itself, pure over two slots so PARSETEST can replay the
@@ -2221,6 +2251,16 @@ private:
     //#W76-CN (Q8): arms refused because the OTHER arm's close was still
     //outstanding - the decodes this bound did not buy. Gameend field.
     int mForceCloseArmsRefused;
+    //#W76-CQ (F2): THIS ARM's deferral, swapped with the rest of the slot. A
+    //refused arm no longer falls through to the heuristic: the decision is held
+    //PENDING here and the close is bought the moment the other arm's close
+    //clears, or at the tick bound - whichever comes first.
+    bool mForceCloseDeferred;
+    int mForceCloseDeferTicks;
+    //Deferrals that reached the bound and armed anyway - the deadlock guard's
+    //own meter, so a permanently-parked other arm is visible in the gameend
+    //census rather than silently paid for.
+    int mForceCloseDeferBoundHits;
     //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
     //byte-identical re-put later in the same turn at another phase can be
     //counted and named. Measure + annotation only; no window is collapsed.
@@ -2296,6 +2336,10 @@ private:
     //The truncated thinking handed back to the model on the forced close, with
     //its "</think>" injected by the request builder.
     string mForceClosePrefill;
+    //#W76-CQ (F9): the prefill the LAST consumed forced close supplied, kept
+    //past mForceClosePrefill's clear so the record that classifies the reply's
+    //off-protocol bytes can byte-match them against it. Consumed by that record.
+    string mLastForceClosePrefill;
     //Thinking-window budget in TOKENS, thinking mode only (config
     //reasoning_budget / WAGIC_GPT_REASONING_BUDGET; 0 or less = unbounded).
     long mReasoningBudget;
