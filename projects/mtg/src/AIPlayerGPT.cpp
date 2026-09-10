@@ -15221,6 +15221,63 @@ static double reasoningRepetitionRatio(const string& s)
     return (double) best / (double) total;
 }
 
+//#W75-CJ (P20, deck146 HIGH 2 - MEASURE ONLY). NEAR-DUPLICATE DEGENERACY.
+//`reasoning_degenerate` above is a BYTE-EXACT 40-char window ratio, and it reads
+//clean on every record of the wave-74 corpus (deck146 median 0.0034, max 0.0112,
+//nothing above 0.5) while 319 of that seat's 322 traces re-quote the reply
+//protocol and loop self-verification boilerplate with small edits. The loops are
+//near-duplicates, so no exact window ever repeats and the meter is blind BY
+//CONSTRUCTION. This is the shingled companion: whitespace-token 8-grams,
+//lowercased and stripped of surrounding punctuation so an edited rerun of the
+//same paragraph still collides, reported as the share of 8-grams that are not
+//first occurrences (0 = every shingle new, ->1 = the trace is one loop).
+//It REPLACES nothing and gates nothing: both numbers ride the record, and the
+//wave that has two corpora with both can retire whichever is blind.
+static double reasoningNgramRepeatRatio(const string& s)
+{
+    const size_t kN = 8, kMinTokens = 64;
+    std::vector<string> toks;
+    string cur;
+    for (size_t i = 0; i <= s.size(); i++)
+    {
+        const char c = (i < s.size()) ? s[i] : ' ';
+        if (isspace((unsigned char) c))
+        {
+            if (!cur.empty())
+            {
+                size_t a = 0, b = cur.size();
+                while (a < b && !isalnum((unsigned char) cur[a])) a++;
+                while (b > a && !isalnum((unsigned char) cur[b - 1])) b--;
+                if (b > a)
+                    toks.push_back(cur.substr(a, b - a));
+                cur.clear();
+            }
+        }
+        else
+            cur += (char) tolower((unsigned char) c);
+    }
+    if (toks.size() < kMinTokens || toks.size() < kN)
+        return 0.0; //too short for the shape to mean anything
+    std::set<string> seen;
+    size_t total = 0, repeats = 0;
+    for (size_t i = 0; i + kN <= toks.size(); i++)
+    {
+        string g;
+        for (size_t k = 0; k < kN; k++)
+        {
+            if (k)
+                g += ' ';
+            g += toks[i + k];
+        }
+        total++;
+        if (!seen.insert(g).second)
+            repeats++;
+    }
+    if (!total)
+        return 0.0;
+    return (double) repeats / (double) total;
+}
+
 //The answer reserve, in tokens: everything the reply itself needs once the
 //thinking window is spent. Derived from this corpus, not guessed - p95 PLAN
 //line 592 chars (~200 tokens) + p95 coded choice line 74 chars (~30 tokens),
@@ -15266,6 +15323,85 @@ static bool gptForceCloseSupported(const string& endpoint)
         return false;
     return endpoint.find("api.openai.com") == string::npos
         && endpoint.find("openrouter.ai") == string::npos;
+}
+
+//#W75-CJ (P2). THE PHASE-2 PREFILL MUST SURVIVE THE CHAT TEMPLATE UNCHANGED.
+//vLLM's `continue_final_message` renders the whole conversation and then
+//truncates the rendered prompt at `rindex(final message content)`; if the
+//template did not reproduce that content BYTE FOR BYTE the request is a 400
+//("continue_final_message is set but the final message does not appear in the
+//chat after applying the chat template"). The pilot's Qwen template renders an
+//assistant turn as `<think>\n` + reasoning|trim + `\n</think>\n\n` + content,
+//and it derives `reasoning` from our own content by
+//`split('</think>')[0].rstrip('\n').split('<think>')[-1].lstrip('\n')` and then
+//`|trim`. So the ONE thing that breaks the round trip is a prefill with LEADING
+//OR TRAILING WHITESPACE (or an embedded think marker, which moves the split):
+//the template trims it away, the rendered text no longer contains what we sent,
+//and the decision is lost to the heuristic.
+//Wave-74 corpus: 2 of 12 forced closes 400'd, and one of them was an ATTACK
+//DECLARATION (`126v152` seq 48 - three lifelink Vampires and Sanguine Bond
+//against 9 life). Both prefills ended in whitespace (`...\n   ` and `...\n`);
+//the ten that succeeded did not. Live-probed against the pilot 2026-09-09, one
+//request per shape: trailing-newline prefill -> 400 with that exact message,
+//the same prefill trimmed -> 200 with a clean answer.
+//Pure, so PARSETEST pins the shape without a round trip.
+static string gptForceClosePrefillBody(const string& prefill)
+{
+    string inner = prefill;
+    //An embedded marker would move the template's own split and desynchronise
+    //the round trip; the trace is the model's thinking, not a nested block.
+    for (;;)
+    {
+        size_t m = inner.find("</think>");
+        if (m == string::npos)
+            break;
+        inner.erase(m, 8);
+    }
+    for (;;)
+    {
+        size_t m = inner.find("<think>");
+        if (m == string::npos)
+            break;
+        inner.erase(m, 7);
+    }
+    //Jinja's `|trim` is str.strip(): the same whitespace set, both ends.
+    size_t a = inner.find_first_not_of(" \t\r\n\f\v");
+    //A whitespace-only trace still has to produce a NON-EMPTY final message: an
+    //empty one makes `rindex("")` the end of the render, which would continue
+    //the prompt AFTER `<|im_end|>` and open a fresh turn. The empty think block
+    //is what the template itself renders for an empty reasoning field, so it
+    //round-trips exactly.
+    if (a == string::npos)
+        return "<think>\n\n</think>\n\n";
+    size_t b = inner.find_last_not_of(" \t\r\n\f\v");
+    inner = inner.substr(a, b - a + 1);
+    return "<think>\n" + inner + "\n</think>\n\n";
+}
+
+//#W75-CJ (P21, deck130 MED). WHY A REPLY WAS CUT AT 64 CHARACTERS.
+//`130v146` seq 16: `max_tokens` 6288 (6000 reasoning + a 288-token answer
+//reserve), `reasoning_chars` 23,318 - about 6,270 tokens at this model's
+//measured ~3.7 B/token - and a reply of 65 characters ending mid-word,
+//`finish_reason: length`. The 64 is not a transport read and not a buffer: the
+//ANSWER RESERVE IS NOT RESERVED. `max_tokens` bounds the WHOLE decode, the
+//server spends it on reasoning first, and what is left over is the answer. The
+//think block closed with ~17 tokens to spare, so phase 2's arm - which requires
+//an UNCLOSED think and an EMPTY reply - never fired, and a decision with a
+//complete 23 KB trace behind it fell to the heuristic (it cast Starstorm against
+//a plan that said hold).
+//A reply that stopped AT THE CAP with no coded answer line is the same failure
+//the forced close exists for and the same rescue works: hand the model its own
+//thinking back and ask only for the answer. Pure, so PARSETEST pins the arm.
+static int codedAnswerCount(const string& reply);
+static bool gptForceCloseEarned(bool reasoningOnly, bool contentEmpty,
+                                bool finishLength, bool haveReasoning,
+                                int codedAnswers)
+{
+    if (!haveReasoning)
+        return false;                       //nothing to prefill back
+    if (reasoningOnly && contentEmpty)
+        return true;                        //the wave-34 arm, unchanged
+    return finishLength && codedAnswers == 0; //#W75-CJ (P21): the cap ate the answer
 }
 
 static bool splitReasoningBlock(string& content, string& reasoning)
@@ -16023,6 +16159,19 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                         transportOutcomeStamp(mLastCurlResult, mLastHttpStatus, body.empty(),
                                               gptConnectTimeoutMs(mTimeoutMs), //#W61-U (C13)
                                               mLastLatencyMs, mTimeoutMs));
+                //#W75-CJ (P2a, engine-seat HIGH-2): THE ERROR BODY IS THE
+                //DIAGNOSIS. Wave 74 lost two decisions (one an attack
+                //declaration) to a 400 whose message named the exact defect,
+                //and the message went nowhere - not stderr, not the record.
+                //Bounded, because a server may answer with a page.
+                if (mLastHttpStatus != 0 && mLastHttpStatus != 200 && !body.empty())
+                {
+                    mLastHttpErrorBody = body.substr(0, 600);
+                    const string line = "HTTP " + std::to_string(mLastHttpStatus)
+                                      + " from the endpoint: " + mLastHttpErrorBody;
+                    gptLogLine(line);
+                    DebugTrace("AIPlayerGPT: " << line);
+                }
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -16182,6 +16331,9 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     //Measured HERE, on the trace as it arrived, because the
                     //record path consumes (and clears) mLastReasoning.
                     mLastReasoningDegenerate = reasoningRepetitionRatio(fieldReasoning);
+                    //#W75-CJ (P20): the shingled companion, measured on the same
+                    //trace and reported beside it.
+                    mLastReasoningNgramRepeat = reasoningNgramRepeatRatio(fieldReasoning);
                 }
                 //Reasoning was asked for and the provider kept it. Recorded,
                 //never treated as a failure: the answer is right there in
@@ -16828,6 +16980,13 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
             return 0;
         }
         //Decision changed under a pending retry: drop it, poll the new decision.
+        //#W75-CJ (P2c): if that retry was a forced close, this is exactly the
+        //arm that leaves no record - count it where it is dropped.
+        if (mForceCloseArmed)
+        {
+            mForceCloseUnrecorded++;
+            mForceCloseArmed = false;
+        }
         mRetryActivePrompt.clear();
         mRetryBase.clear();
         mForceClosePrefill.clear();
@@ -16862,11 +17021,19 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     //content-bearing reply needs no rescue in the first place. Belt and
     //braces with gptForceCloseSupported(), which already excludes the
     //hidden-trace endpoints by name.
-    if (mLastReasoningOnly && content.empty() && !mLastReasoning.empty()
+    if (gptForceCloseEarned(mLastReasoningOnly, content.empty(), mLastFinishLength,
+                            !mLastReasoning.empty(), codedAnswerCount(content))
         && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint))
     {
         mRetryFirstLatencyMs = mLastLatencyMs;
         mRetryBase = userMsg;
+        //#W75-CJ (P2c): an arm that never reached a record is the "third path".
+        //A fresh arm while the previous one is still outstanding proves the
+        //previous close was lost, so it is counted here rather than guessed
+        //from a stderr/record diff after the fact.
+        if (mForceCloseArmed)
+            mForceCloseUnrecorded++;
+        mForceCloseArmed = true;
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
@@ -17006,11 +17173,11 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mMainHoldHeldTurn(-1), mMainHoldHeldPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mMainHoldHeldTurn(-1), mMainHoldHeldPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mForceCloseUnrecorded(0), mForceCloseArmed(false), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
-      mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
+      mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mLastReasoningNgramRepeat(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false), mRevealStallDriverTicks(0), mRevealStallDriverSecs(0),
@@ -18031,6 +18198,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //it (a 200 says nothing new and is not written; 0 = no status came back).
     if (mLastHttpStatus != 0 && mLastHttpStatus != 200)
         rec["http_status"] = mLastHttpStatus;
+    //#W75-CJ (P2a): and what it said. Present only when a non-200 carried a body.
+    if (!mLastHttpErrorBody.empty())
+    {
+        rec["http_error_body"] = mLastHttpErrorBody;
+        mLastHttpErrorBody.clear();
+    }
     //#W59-H (K1): every non-200/empty attempt, not merely the final attempt.
     //A scalar keeps the schema simple; `;` separates the bounded retry pair.
     //#W69-BI (K7): ...and the ordinary round trip's own stamp, so the field is
@@ -18185,6 +18358,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reasoning_forced_close"] = true;
         mLastForcedClose = false;
+        mForceCloseArmed = false; //#W75-CJ (P2c): this close reached a record
+
     }
     //Both markers are PRESENT-ONLY-WHEN-TRUE, like retry/reasoning_hidden:
     //absence means false, not "unimplemented". An analysis that needs a
@@ -18193,6 +18368,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reasoning_degenerate"] = mLastReasoningDegenerate;
         mLastReasoningDegenerate = -1.0;
+    }
+    //#W75-CJ (P20): the near-duplicate meter, measure only.
+    if (mLastReasoningNgramRepeat >= 0.0)
+    {
+        rec["reasoning_ngram_repeat"] = mLastReasoningNgramRepeat;
+        mLastReasoningNgramRepeat = -1.0;
     }
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
@@ -18686,6 +18867,8 @@ void AIPlayerGPT::logGameEnd()
         {"action_before_plan_replies", mActionBeforePlanReplies},
         {"phase2_answer_recovered", mPhase2AnswerRecovered},
         {"phase2_answer_missing", mPhase2AnswerMissing},
+        //#W75-CJ (P2c): closes that armed and never reached any record.
+        {"forced_close_unrecorded", mForceCloseUnrecorded + (mForceCloseArmed ? 1 : 0)},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -20364,6 +20547,75 @@ static int gptSelectAnswerIndex(const std::vector<bool>& usable,
     return -1;
 }
 
+//#W75-CJ (P9, deck126 MED-3, engine-seat MED-1). A PRESENT LABEL IS READ WHERE
+//IT IS. `125v126` seq 154 answered
+//`PLAN: Play a land to expand mana base and prepare to cast Chromatic Lantern. CHOICE: 1 (Play Sunpetal Grove)`
+//- both labelled parts, in order, one CHOICE, a legal number and its short name
+//- and the decision went to the heuristic because the label did not start a
+//line. This is NOT prose tolerance (invariant 000): nothing here reads an
+//unlabelled sentence, weighs a verdict out of the reply's words, or licenses a
+//correction paragraph; it reads a label the model wrote, inside the two
+//labelled parts the protocol asks for. The golden protocol text is unchanged -
+//the reply shape asked for is still PLAN line, then the CHOICE on its own line.
+//The gate is deliberately narrow, and every clause is a MUST-NOT-MATCH:
+//  - only the CHOICE label (combat labels inside a CHOICE deliberation are CoT);
+//  - the line must START with the PLAN marker, so this can only ever fire inside
+//    the plan part, never in free prose;
+//  - the label must occur EXACTLY ONCE in the whole reply - a second CHOICE
+//    anywhere is the multi-answer violation and is left to the line scan;
+//  - it must be whitespace-anchored, so "...MYCHOICE: 2" is not a label;
+//  - the tail after the answer must be CLEAN (choiceLineIsClean) - prose after
+//    the answer is refused exactly as it is on a line-leading label.
+static bool gptInlineChoiceOnPlanLine(const string& text, size_t& segStart,
+                                      size_t& segEnd, size_t& lineStart)
+{
+    static const char kLabel[] = "CHOICE:";
+    const size_t len = sizeof(kLabel) - 1;
+    //Exactly one label in the whole reply.
+    size_t only = string::npos, count = 0;
+    for (size_t i = 0; i + len <= text.size(); i++)
+    {
+        bool m = true;
+        for (size_t k = 0; k < len && m; k++)
+            m = (toupper((unsigned char) text[i + k]) == kLabel[k]);
+        if (!m)
+            continue;
+        count++;
+        only = i;
+        if (count > 1)
+            return false;
+    }
+    if (count != 1)
+        return false;
+    //Whitespace-anchored (or at the very start of the reply).
+    if (only > 0 && text[only - 1] != ' ' && text[only - 1] != '\t')
+        return false;
+    //Its physical line must begin with the line-leading PLAN marker, and the
+    //label must come after it.
+    const size_t planPos = firstLineLeadingPlanPos(text);
+    if (planPos == string::npos || planPos >= only)
+        return false;
+    size_t ls = text.rfind('\n', only);
+    ls = (ls == string::npos) ? 0 : ls + 1;
+    if (planPos < ls)
+        return false; //the PLAN marker is on an earlier line
+    size_t lineEnd = text.find('\n', only);
+    const size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+    const string payload = text.substr(only + len, end - (only + len));
+    if (isTemplatePlaceholderLine(payload) || isExampleEchoLine(payload))
+        return false;
+    if (AIPlayerGPT::choiceLineIsRejection(payload) || !AIPlayerGPT::choiceLineIsClean(payload))
+        return false;
+    segStart = only + len;
+    segEnd = end;
+    //The LABEL'S OWN OFFSET, not the line's start: the caller uses this both to
+    //pick the plan marker that belongs to the answer's block and to bound the
+    //carried plan. Handing back the line start would put the answer INSIDE the
+    //plan text and carry it to the next window.
+    lineStart = only;
+    return true;
+}
+
 static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                                 size_t& segStart, size_t& segEnd, size_t& labelLineStart,
                                 int * extraAnswerLines = NULL, int * rejectedLines = NULL,
@@ -20426,7 +20678,20 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     if (lastHeadLineStart)
         *lastHeadLineStart = heads.empty() ? string::npos : heads.back().lineStart;
     if (heads.empty())
+    {
+        //#W75-CJ (P9): no line-leading label, and no rejection line either -
+        //the last place a PRESENT label can be is the PLAN's own line.
+        if (rejected == 0 && expectedLabel && strcmp(expectedLabel, "CHOICE:") == 0
+            && gptInlineChoiceOnPlanLine(text, segStart, segEnd, labelLineStart))
+        {
+            if (extraAnswerLines)
+                *extraAnswerLines = 0;
+            if (lastHeadLineStart)
+                *lastHeadLineStart = labelLineStart;
+            return true;
+        }
         return found; //only rejection lines (or nothing at all)
+    }
     std::vector<bool> vUsable(heads.size(), true), vClean;
     bool anyClean = false;
     for (size_t i = 0; i < heads.size(); i++)
@@ -29413,6 +29678,23 @@ static string repeatShortName(const string& line)
 //number and was taken verbatim (deck123 vs125: x50 with no arithmetic).
 //"x<N>" parses as NO count (the count scanner needs a digit after the x), so
 //a pilot that echoes the placeholder gets the repeat-count re-ask, not 50.
+//#W75-CJ (P14): the short name back out of a rendered repeat row, so the
+//re-ask can quote the exact string the model is asked to copy. Pure.
+static string repeatRowShortName(const string& row)
+{
+    static const char kSuffix[] = ", repeated then stop";
+    size_t cut = row.find(kSuffix);
+    if (cut == string::npos)
+    {
+        cut = row.find(" [");
+        if (cut == string::npos)
+            cut = row.size();
+    }
+    string name = row.substr(0, cut);
+    size_t e = name.find_last_not_of(" \t\r\n");
+    return (e == string::npos) ? string() : name.substr(0, e + 1);
+}
+
 static string repeatRowLine(const string& shortName, int rowIndex, int creatureCount = -1)
 {
     std::ostringstream o;
@@ -34134,8 +34416,11 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
         //re-deliberation, no fresh prompt to spiral on. add_generation_prompt
         //must be false alongside continue_final_message or the template opens
         //a second assistant turn and the prefill becomes context, not prefix.
+        //#W75-CJ (P2): the body is built by a pure, template-round-tripping
+        //helper - a prefill with leading/trailing whitespace is what 400'd two
+        //of wave 74's twelve forced closes.
         messages.push_back({{"role", "assistant"},
-                            {"content", "<think>\n" + mForceClosePrefill + "\n</think>\n\n"}});
+                            {"content", gptForceClosePrefillBody(mForceClosePrefill)}});
     }
 
     //Room for scratch reasoning + the complete PLAN + the trailing answer
@@ -37342,6 +37627,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
+        //#W75-CJ (P14, engine-seat MED-7). THE ROW'S OWN PROMISE, KEPT. The
+        //repeat row's bracket says in as many words that "copying this row's name
+        //alone, with no x<count> after it, names no count and is refused and
+        //re-asked" - and since #W71-BO (R6) deleted the repeat-count arm (it read
+        //0 in the wave-70 corpus) the engine has instead run the action ONCE and
+        //said nothing to the model. O17 then removed the "N" placeholder from the
+        //row's short name, which made the bare copy the natural thing to write:
+        //`123v125` seq 58 answered `CHOICE: 3 (Create vampire with Bloodline
+        //Keeper, repeated then stop)` over a PLAN that said "this window 21", and
+        //got one token. Under the trust doctrine a rendered statement is an
+        //instruction: either the engine refuses and re-asks, or the row must stop
+        //claiming it does. This is the refusal, and it guesses NOTHING - no count
+        //is invented, no row is withheld, the ceiling is unchanged, and the second
+        //answer executes as given (including a bare copy again, which then runs
+        //once exactly as it does today).
+        bool repeatCountMissing = (repeatRowTaken && namedCount < 0);
         //#W66-AS (H3, deck162 HIGH-1): the PLAN the row demands, READ BACK. A
         //count taken over a plan whose own numbers say the stop is already
         //reached is refused exactly as a count with no plan is - ONE re-ask,
@@ -37439,7 +37740,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //#W71-BO (R3/R5/R6/R9): the truncation, index/name, repeat-stop,
             //repeat-count and label-missing arms are all DELETED - each fired 0
             //times in 2,119 decisions. Three triggers are left.
-            && (namedRowFail || planMissing || noopRowZero)) //#W66-AR (H8) #W69-BH (K4c)
+            && (namedRowFail || planMissing || repeatCountMissing || noopRowZero)) //#W66-AR (H8) #W69-BH (K4c) #W75-CJ (P14)
         {
             std::ostringstream corr;
             const char * fb;
@@ -37466,6 +37767,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "plan_missing";
                 mPriorityReaskKind = "plan_missing";
             }
+            else if (repeatCountMissing) //#W75-CJ (P14)
+            {
+                corr << "[RE-ASK] \"" << quotedChoiceLine << "\" names no count."
+                        " That row repeats an action and needs one: answer again with"
+                        " the same row number and \"x<count>\" after the name - e.g."
+                        " \"CHOICE: " << choice << " (" << repeatRowShortName(shownLines[choice - 1])
+                     << " x3)\" - where the count is a DIGIT you choose, at most "
+                     << kRepeatRowMax << ", together with a PLAN line carrying"
+                        " \"stop=<N>; M=<N>\"; or 0 (pass).";
+                fb = "repeat_count_reask";
+                mPriorityReaskKind = "repeat_count";
+            }
             else //#W66-AR (H8) #W69-BH (K4c): noopRowZero, the last trigger left
             {
                 corr << noopReaskLine(choice, shownLines[choice - 1], //#W72-BT (M2)
@@ -37487,6 +37800,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             writeTransLog("priority", userMsg, content, choice, index, "", fb, &renderRows); //#W57-A (D4)
             setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
+                      : repeatCountMissing ? "the repeat row was taken with no count - asking again"
                                     : "the chosen row's own note says it does nothing - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
@@ -82260,6 +82574,194 @@ static const char * kW50Y_r94 =
                       == holdActionKeyRow("Pass priority"),
                   "#W74-CH #W56-A (D1) survives: the combat-next clause is erased by name,"
                   " not by the stripper (it is a plain parenthetical)");
+        }
+
+        {
+            // ---- #W75-CJ (P2): THE PHASE-2 PREFILL ROUND-TRIPS THE CHAT TEMPLATE.
+            // The pilot's Qwen template rebuilds the assistant turn as
+            //   '<think>\n' + reasoning|trim + '\n</think>\n\n' + content
+            // and derives `reasoning` from our own content by
+            //   split('</think>')[0].rstrip('\n').split('<think>')[-1].lstrip('\n')
+            // then `|trim`. vLLM's continue_final_message then requires the
+            // rendered prompt to CONTAIN the message we sent, byte for byte.
+            // This models that transform exactly and asserts the fixed point.
+            struct QwenTpl
+            {
+                static string trim(const string& in)
+                {
+                    size_t a = in.find_first_not_of(" \t\r\n\f\v");
+                    if (a == string::npos)
+                        return string();
+                    size_t b = in.find_last_not_of(" \t\r\n\f\v");
+                    return in.substr(a, b - a + 1);
+                }
+                static string rstripNl(const string& in)
+                {
+                    size_t b = in.find_last_not_of('\n');
+                    return (b == string::npos) ? string() : in.substr(0, b + 1);
+                }
+                static string lstripNl(const string& in)
+                {
+                    size_t a = in.find_first_not_of('\n');
+                    return (a == string::npos) ? string() : in.substr(a);
+                }
+                //Renders the assistant turn the way the template does.
+                static string render(const string& msg)
+                {
+                    string content = trim(msg);
+                    string reasoning;
+                    size_t cut = content.find("</think>");
+                    if (cut != string::npos)
+                    {
+                        string head = rstripNl(content.substr(0, cut));
+                        size_t open = head.rfind("<think>");
+                        reasoning = lstripNl(open == string::npos ? head
+                                                                  : head.substr(open + 7));
+                        content = lstripNl(content.substr(content.rfind("</think>") + 8));
+                    }
+                    reasoning = trim(reasoning);
+                    return "<think>\n" + reasoning + "\n</think>\n\n" + content;
+                }
+            };
+            // The two wave-74 prefills that 400'd: one ends in a newline plus
+            // spaces, one ends in a newline. Both are fixed points now.
+            const char * prefills[] = {
+                "I weigh row 1 against row 3.\n   ",
+                "So I will attack.\n\n**One detail:**\n",
+                "   leading and trailing   ",
+                "no whitespace at either end",
+                "\n\n\n",
+                "a trace that already carries </think> in its words"
+            };
+            for (size_t i = 0; i < sizeof(prefills) / sizeof(prefills[0]); i++)
+            {
+                const string body = gptForceClosePrefillBody(prefills[i]);
+                CHECK(!body.empty(),
+                      "#W75-CJ P2 the prefill body is never empty (an empty final message"
+                      " makes rindex() the end of the render and opens a new turn)");
+                CHECK(QwenTpl::render(body) == body,
+                      "#W75-CJ P2 REPRO the template's own transform is a FIXED POINT on the"
+                      " built body - this is the byte identity continue_final_message needs");
+            }
+            // RED-on-base: the shape the engine used to send is NOT a fixed point.
+            const string oldShape = "<think>\n" + string("So I will attack.\n") + "\n</think>\n\n";
+            CHECK(QwenTpl::render(oldShape) != oldShape,
+                  "#W75-CJ P2 RED the pre-fix shape (raw prefill, trailing whitespace) is"
+                  " rewritten by the template - live-probed 2026-09-09: HTTP 400"
+                  " \"continue_final_message is set but the final message does not appear\"");
+            CHECK(gptForceClosePrefillBody("a\n") == "<think>\na\n</think>\n\n",
+                  "#W75-CJ P2 the body is exactly the three-part shape with the trace trimmed");
+            CHECK(gptForceClosePrefillBody("   ") == "<think>\n\n</think>\n\n",
+                  "#W75-CJ P2 a whitespace-only trace still sends the empty think block");
+        }
+        {
+            // ---- #W75-CJ (P21): the forced-close arm covers a reply the CAP cut
+            // before it wrote an answer, not only an unclosed <think>.
+            CHECK(gptForceCloseEarned(true, true, false, true, 0),
+                  "#W75-CJ P21 the wave-34 arm is unchanged: reasoning-only + empty reply");
+            CHECK(gptForceCloseEarned(false, false, true, true, 0),
+                  "#W75-CJ P21 REPRO 130v146 seq 16: think closed, 65 chars of PLAN, cut at"
+                  " the cap with no coded answer - the same rescue applies");
+            CHECK(!gptForceCloseEarned(false, false, true, true, 1),
+                  "#W75-CJ P21 MUST-NOT-MATCH a truncated reply that DID write its answer"
+                  " line is answered, not rescued");
+            CHECK(!gptForceCloseEarned(false, false, false, true, 0),
+                  "#W75-CJ P21 MUST-NOT-MATCH a reply that stopped naturally with no answer"
+                  " keeps its own classes (it is not a cap failure)");
+            CHECK(!gptForceCloseEarned(true, true, true, false, 0),
+                  "#W75-CJ P21 MUST-NOT-MATCH no trace to prefill back, no forced close");
+        }
+        {
+            // ---- #W75-CJ (P9): a present, unique, anchored CHOICE label on the
+            // PLAN's own physical line is read where it is.
+            size_t ss = 0, se = 0, ls = 0;
+            const string one = "\n\nPLAN: Play a land to expand mana base and prepare to cast"
+                               " Chromatic Lantern. CHOICE: 1 (Play Sunpetal Grove)";
+            CHECK(findAnswerLabelLine(one, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 REPRO 125v126 seq 154 parses instead of falling to the heuristic");
+            CHECK(one.substr(ss, se - ss) == " 1 (Play Sunpetal Grove)",
+                  "#W75-CJ P9 the answer segment is the label's own tail");
+            // ...and the label offset it hands back is the LABEL'S OWN offset, so
+            // the plan marker that belongs to the answer is still found and the
+            // carried plan is bounded BEFORE the answer (a line-start here would
+            // carry "CHOICE: 1 (Play Sunpetal Grove)" into the next window's plan).
+            size_t firstPos = string::npos;
+            const size_t planPos = findPlanMarker(one, ls, &firstPos);
+            CHECK(planPos != string::npos && planPos < ls,
+                  "#W75-CJ P9 the plan marker on that same line is still the current plan");
+            CHECK(one.substr(planPos + 5, ls - (planPos + 5)).find("CHOICE:") == string::npos,
+                  "#W75-CJ P9 and the carried plan span stops before the answer");
+            // MUST-NOT-MATCH, one clause at a time.
+            const string two = "PLAN: do a thing. CHOICE: 1 (A) then CHOICE: 2 (B)";
+            CHECK(!findAnswerLabelLine(two, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH two CHOICE labels inline is the multi-answer"
+                  " violation, not an answer");
+            const string prose = "PLAN: do a thing. CHOICE: 1 (A) is wrong, I will think more";
+            CHECK(!findAnswerLabelLine(prose, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH a rejection tail is not an answer");
+            const string dirty = "PLAN: do a thing. CHOICE: 1 (A) since the board is empty and"
+                                 " I would rather wait for a better window next turn";
+            CHECK(!findAnswerLabelLine(dirty, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH prose after the answer is refused inline exactly"
+                  " as it is on a line-leading label");
+            const string noPlan = "I will just take the first one. CHOICE: 1 (A)";
+            CHECK(!findAnswerLabelLine(noPlan, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH the label must sit on a line that STARTS with"
+                  " the PLAN marker - free prose is never read");
+            const string glued = "PLAN: do a thing. MYCHOICE: 1 (A)";
+            CHECK(!findAnswerLabelLine(glued, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH the label must be whitespace-anchored");
+            const string combat = "PLAN: swing wide. ATTACK: A1, A2";
+            CHECK(!findAnswerLabelLine(combat, "CHOICE:", ss, se, ls),
+                  "#W75-CJ P9 MUST-NOT-MATCH only the CHOICE label is read inline");
+            const string proper = "PLAN: do a thing.\nCHOICE: 1 (A)";
+            CHECK(findAnswerLabelLine(proper, "CHOICE:", ss, se, ls) && ls > 0,
+                  "#W75-CJ P9 the protocol's own two-line shape is unchanged and still wins");
+        }
+        {
+            // ---- #W75-CJ (P14): the repeat row's short name, back out of the row.
+            const string row = repeatRowLine("Create vampire with Bloodline Keeper", 3, 25);
+            CHECK(repeatRowShortName(row) == "Create vampire with Bloodline Keeper",
+                  "#W75-CJ P14 REPRO 123v125 seq 58: the re-ask quotes the exact string the"
+                  " footer tells the model to copy");
+            CHECK(repeatRowShortName("Ping for 1, repeated then stop [you name N]")
+                      == "Ping for 1",
+                  "#W75-CJ P14 the suffix is what is cut, not the bracket");
+            CHECK(repeatRowShortName("Cast Sanguine Bond {3}{b}{b}")
+                      == "Cast Sanguine Bond {3}{b}{b}",
+                  "#W75-CJ P14 MUST-NOT-MATCH a non-repeat row is returned whole");
+        }
+        {
+            // ---- #W75-CJ (P20): the near-duplicate meter sees what the exact
+            // meter cannot. INSTRUMENT ONLY - nothing gates on it.
+            string loop;
+            for (int i = 0; i < 14; i++)
+            {
+                std::ostringstream o;
+                //Near-duplicates: the same sentence with one edited token, which is
+                //exactly the shape deck146's 319 traces carry.
+                o << "final check option " << (i % 3) << " is chosen format matches no extra"
+                     " text correct done output generation proceeds self correction note"
+                     " during generation prep the prompt says write your plan line first. ";
+                loop += o.str();
+            }
+            CHECK(reasoningRepetitionRatio(loop) < 0.10,
+                  "#W75-CJ P20 REPRO the exact 40-char meter reads this loop as CLEAN");
+            CHECK(reasoningNgramRepeatRatio(loop) > 0.60,
+                  "#W75-CJ P20 ...and the 8-gram meter reads it as the loop it is");
+            string varied;
+            for (int i = 0; i < 40; i++)
+            {
+                std::ostringstream o;
+                o << "turn " << i << " the opponent has " << (i * 3 + 1) << " power on board"
+                     " and my life total is " << (40 - i) << " so blocking with the wall"
+                     " numbered " << (i * 7) << " keeps me alive through combat step. ";
+                varied += o.str();
+            }
+            CHECK(reasoningNgramRepeatRatio(varied) < 0.35,
+                  "#W75-CJ P20 MUST-NOT-MATCH a trace whose sentences differ is not degenerate");
+            CHECK(reasoningNgramRepeatRatio("too short to mean anything") == 0.0,
+                  "#W75-CJ P20 below the token floor the meter reports 0, not noise");
         }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

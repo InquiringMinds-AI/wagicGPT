@@ -2021,6 +2021,16 @@ private:
     int mPlanLineMissing;          //#W71-BO (L10): replies with NO PLAN: line
     int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
     int mPhase2AnswerMissing;      //B1.5: ...and did not
+    //#W75-CJ (P2c, engine-seat HIGH-3 "the third path"): a forced close that was
+    //ARMED and then left no decision record at all - the wave-74 corpus issued 17
+    //closes and only 12 reached a record. The identity the corpus can now check is
+    //`recovered + missing + unrecorded == closes`.
+    int mForceCloseUnrecorded;
+    bool mForceCloseArmed;         //a close is armed and has not reached a record
+    //#W75-CJ (P2a): the body of the last non-200 response, so a 400 is
+    //diagnosable from the corpus instead of only from a live probe. Consumed
+    //with the record that carries it.
+    std::string mLastHttpErrorBody;
     int mPutGlossStripped;         //B4.6: a PUT line carried a trailing gloss
     //#W71-BO (L9): phase 1's finish_reason, carried to the phase-2 record so
     //`reasoning_budget_hit` is stamped on the decision that actually hit the cap.
@@ -2081,6 +2091,8 @@ private:
     //metric because the reply itself parsed fine) sits near 1. -1 = no
     //reasoning to measure.
     double mLastReasoningDegenerate;
+    //#W75-CJ (P20): token 8-gram repetition of the same trace; -1 = not measured.
+    double mLastReasoningNgramRepeat;
     //The truncated thinking handed back to the model on the forced close, with
     //its "</think>" injected by the request builder.
     string mForceClosePrefill;
