@@ -235,6 +235,34 @@ for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
 #a young run that must live, and case (c), an old record that must not veto.
 allHaveEvidence = bool(live) and all(recs for _, recs in live)
 
+##W75-CM (F9, Astra wave-75 review finding 9). ...AND EVERY LIVE SEAT MUST BE
+#FAILING. Bounding each seat's CONTRIBUTION (below) stops one wedged seat from
+#supplying all K, but it does not make the pool cover every seat: with 4 live
+#seats and K=6 the cap is 2, so three timing-out seats fill the pool while the
+#fourth is being answered normally, and the banner - which says "the last records
+#of every live seat are timeout fallbacks" - was false. Executed by Astra at K=6:
+#4 live seats (3 x two timeouts + 1 succeeding) -> STALL 6, and 21 live seats
+#(6 failing, 15 succeeding) -> STALL 6. A seat whose NEWEST record is a decision
+#the model answered is evidence AGAINST an endpoint stall, and one such seat is
+#enough: the endpoint is generating. So the verdict now requires it of every live
+#seat, which is exactly what the banner claims. The single-live-seat case (one
+#unfinished seat with twenty consecutive timeouts, every other game finished) is
+#unchanged - its newest record is a failure.
+#
+#RECENCY, which is what reconciles this with #W74-CF's own case (j): an
+#ARBITRARILY OLD success must not veto a live failure streak. A seat's newest
+#record is counter-evidence only while that seat is still WRITING - a log whose
+#mtime trails the newest live log by more than the grace window is a seat nothing
+#has happened on for longer than any decision takes, and its last answer says
+#nothing about whether the endpoint is generating NOW. Grace is deliberately
+#generous (10 min against a 120 s HTTP deadline): the cost of being wrong here is
+#a corpus that keeps running, which the game watchdogs still bound.
+STALL_EVIDENCE_GRACE = 600
+newestLive = max([mt for mt, _ in live]) if live else 0
+allNewestSilent = bool(live) and all(
+    recs and (silent(recs[0]) or mt < newestLive - STALL_EVIDENCE_GRACE)
+    for mt, recs in live)
+
 #the newest K decisions ACROSS seats: newest log first, its newest record first.
 ##W75-CI (P24, wave-74 known-bugs): BOUNDED PER SEAT. The pool was filled seat by
 #seat, so ONE seat's silent tail could supply all K while twenty other seats were
@@ -257,7 +285,7 @@ for _, recs in sorted(live, key=lambda lr: -lr[0]):
         break
 
 timeouts = [r for r in pool if silent(r)]
-if allHaveEvidence and len(pool) >= k and len(timeouts) == len(pool):
+if allHaveEvidence and allNewestSilent and len(pool) >= k and len(timeouts) == len(pool):
     print("STALL %d" % len(timeouts))
 else:
     print("OK %d" % len(timeouts))
@@ -590,6 +618,38 @@ pilot_stall_selftest() {
     case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: 15 seats still on their first ask gave '$v', want OK (a seat with no decision record is no evidence of a wedge)" >&2; fails=1;; esac
     rm -f "$tmp"/*.jsonl
 
+    ##W75-CM (F9): Astra's two HEALTHY shapes. In both the pool reaches K from a
+    # SUBSET of the live seats while another seat is being answered normally, so
+    # the old verdict contradicted its own banner.
+    #j: four live seats - three carry two timeouts each, the fourth's newest
+    #   record is a decision the model answered. K=6, per-seat cap 2 -> the three
+    #   failing seats fill the pool exactly.
+    for i in 1 2 3; do
+        printf '%s\n' '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+            '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+            > "$tmp/9999999999-ai_baka_deck$i-j$i.jsonl"
+    done
+    printf '%s\n' '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+        '{"kind":"ask","seq":2,"choice":1}' > "$tmp/9999999999-ai_baka_deck4-j4.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: 4 live seats with one being answered gave '$v', want OK (a seat whose NEWEST record is a model answer is evidence against a stall)" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
+    #k: twenty-one live seats - six failing, fifteen answering.
+    for i in 1 2 3 4 5 6; do
+        printf '%s\n' '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+            '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+            > "$tmp/9999999999-ai_baka_deck$i-k$i.jsonl"
+    done
+    for i in 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21; do
+        printf '%s\n' '{"kind":"ask","seq":1,"choice":1}' \
+            '{"kind":"ask","seq":2,"choice":2}' \
+            > "$tmp/9999999999-ai_baka_deck$i-k$i.jsonl"
+    done
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: 21 live seats with 15 answering gave '$v', want OK" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
     #i: A STALLED TAIL MUST BE CAUGHT. One unfinished seat with twenty consecutive
     #   timeouts; every other seat finished. The old three-per-log pool could never
     #   reach K from one log, so it read OK 3 for ever.
@@ -668,7 +728,7 @@ pilot_stall_selftest() {
     case "$v" in 0) ;; *) echo "pilot-stall-selftest FAIL: unparsed_reply counted as silence ('$v'), want '0'" >&2; fails=1;; esac
 
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 15 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 17 checks, 0 failed"
     return "$fails"
 }
 

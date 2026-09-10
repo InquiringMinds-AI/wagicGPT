@@ -1,0 +1,42 @@
+#NAME: An ANIMATED Sorin is a legal creature target of his own -6 (#W75-CM F1)
+#DESC: Astra wave-75 adversarial review, finding 1 (HIGH), against wave-75 lane
+#DESC: CK's P4 fix. Oracle: "-6: Destroy up to three target creatures and/or
+#DESC: OTHER planeswalkers." The word `other` restricts ONE alternative - the
+#DESC: planeswalker one. Lane CK expressed it as `other *[creature;planeswalker]`,
+#DESC: and TargetChooser::other is a CHOOSER-level flag checked in canTarget
+#DESC: BEFORE any type is evaluated, so it excluded Sorin from the CREATURE
+#DESC: alternative too. With Sarkhan the Masterless's +1 in effect ("each
+#DESC: planeswalker you control becomes a 4/4 Dragon creature") Sorin IS a
+#DESC: creature, and a creature is a legal target of his own -6.
+#DESC: The target DSL cannot scope `other` per alternative: the whole spec builds
+#DESC: ONE chooser (TargetChooser.cpp createTargetChooser: the comma loop folds
+#DESC: every typeName into a single tc, and a second bracketed descriptor returns
+#DESC: NULL), and `other ` is parsed off the whole string into one bool. So the
+#DESC: engine gained the scoped form `other!<type>[;<type>] ` (#W75-CM F1) and
+#DESC: Sorin's -6 now reads `other!creature *[creature;planeswalker]`: the
+#DESC: source stays a legal target while it is a creature, and is refused while
+#DESC: it is only a planeswalker. No legal target is lost either way.
+#DESC: RED on base 301a30a37 (the shipped `other ` form):
+#DESC:   TESTSUITE assertcantarget: 'sorin, lord of innistrad' expected 1 got 0
+#DESC: The companion fixture w75ck_sorin_minus6_not_self_target.txt pins the
+#DESC: UNANIMATED case (expected 0) and still passes.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Sorin^ Lord of Innistrad,Sarkhan the Masterless
+life:20
+[PLAYER2]
+inplay:Serra Angel
+life:20
+[DO]
+Sarkhan the Masterless
+choice 0
+assertcantarget 1 sorin, lord of innistrad via Sorin, Lord of Innistrad
+assertcantarget 1 serra angel via Sorin, Lord of Innistrad
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Sorin^ Lord of Innistrad,Sarkhan the Masterless
+[PLAYER2]
+inplay:Serra Angel
+[END]

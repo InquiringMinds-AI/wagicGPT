@@ -1406,4 +1406,5 @@ w74cc_ghostform_grant_live.txt
 w74cc_edict_chooser_untargeted.txt
 w75ck_payable_foreach_battlement_blood.txt
 w75ck_sorin_minus6_not_self_target.txt
+w75cm_sorin_minus6_animated_self_is_legal.txt
 w75ck_pathway_anyzone_parse_quiet.txt

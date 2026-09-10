@@ -181,13 +181,33 @@ struct GptRetrySlot
     long budgetMs;
     bool armLand;
     bool phase1Length;
-    GptRetrySlot() : firstLatencyMs(-1), budgetMs(0), armLand(false), phase1Length(false) {}
+    //#W75-CM (F5): a forced close is ARMED PER ARM, like everything else in this
+    //slot. It used to be one seat-global bool beside per-arm storage, so a close
+    //the OTHER arm had safely parked was counted "unrecorded" the moment this arm
+    //armed one, and recording either close cleared the flag for both.
+    bool forceCloseArmed;
+    GptRetrySlot() : firstLatencyMs(-1), budgetMs(0), armLand(false), phase1Length(false),
+                     forceCloseArmed(false) {}
 };
 
 //#W74-CF (F1): the swap itself, pure over two slots so PARSETEST can replay the
 //exact interleaving the review names. After it returns, `live` is either empty or
 //owned by `landArm`, and whatever belonged to the other arm is in `park`.
 void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm);
+
+//#W75-CM (F5): the same swap with the seat's live armed flag carried through the
+//slot, so the arming/recording accounting is per arm and PARSETEST can replay the
+//exact interleaving (land arms and is parked; casting arms; both complete).
+void gptRetrySelectArmClose(GptRetrySlot& live, GptRetrySlot& park, bool landArm,
+                            bool& liveForceCloseArmed);
+
+//#W75-CM (F5): arming a close on the LIVE arm. Returns what the seat's
+//"unrecorded" counter must gain: a second arm on the SAME arm while the first is
+//still outstanding proves that first close was lost; an arm on the OTHER arm
+//proves nothing at all.
+int gptForceCloseArm(bool& liveArmed);
+//Closes still outstanding across both arms - what the record adds to the counter.
+int gptForceCloseOutstanding(bool liveArmed, bool parkArmed);
 
 class AIPlayerGPT : public AIPlayerBaka
 {
@@ -2108,6 +2128,8 @@ private:
     //closes and only 12 reached a record. The identity the corpus can now check is
     //`recovered + missing + unrecorded == closes`.
     int mForceCloseUnrecorded;
+    //#W75-CM (F5): THIS ARM's armed flag. Swapped in and out with the rest of the
+    //slot by selectRetryArm(); the other arm's lives in mRetryPark.
     bool mForceCloseArmed;         //a close is armed and has not reached a record
     //#W75-CJ (P2a): the body of the last non-200 response, so a 400 is
     //diagnosable from the corpus instead of only from a live probe. Consumed
