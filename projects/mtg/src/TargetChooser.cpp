@@ -114,6 +114,30 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
         return NEW PlayerTargetChooser(observer, card, maxtargets, controller);
     };
 
+    //#W75-CM (F1): `other!<types> ` - the restriction scoped to the alternatives
+    //it belongs to. Parsed BEFORE the plain `other ` form so the longer token
+    //wins, and the whole token is erased either way, so the type list can never
+    //reach the type parser below.
+    vector<string> otherUnless;
+    found = s.find("other!");
+    if (found != string::npos)
+    {
+        size_t stop = s.find(' ', found);
+        if (stop == string::npos)
+            stop = s.size();
+        string list = s.substr(found + 6, stop - (found + 6));
+        while (list.size())
+        {
+            size_t semi = list.find(';');
+            string one = (semi == string::npos) ? list : list.substr(0, semi);
+            list = (semi == string::npos) ? string() : list.substr(semi + 1);
+            if (one.size())
+                otherUnless.push_back(one);
+        }
+        other = true;
+        s = s.erase(found, (stop < s.size() ? stop + 1 : stop) - found);
+    }
+
     found = s.find("other ");
     if (found != string::npos)
     {
@@ -1510,6 +1534,9 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
             }
         }
     }
+    //#W75-CM (F1): the scoped-`other` list rides the chooser this spec built.
+    if (tc && otherUnless.size())
+        tc->otherUnless = otherUnless;
     return tc;
 }
 
@@ -1577,6 +1604,7 @@ TargetChooser::TargetChooser(GameObserver *observer, MTGCardInstance * card, int
     targetter = card;
     maxtargets = _maxtargets;
     other = _other;
+    otherUnless.clear(); //#W75-CM (F1): set by the factory, empty = plain `other`
     targetMin = _targetMin;
     done = false;
     autoChoice = false;
@@ -1585,6 +1613,30 @@ TargetChooser::TargetChooser(GameObserver *observer, MTGCardInstance * card, int
         Owner = source->controller();
     else
         Owner = 0;
+}
+
+//#W75-CM (F1): is this candidate exempt from the `other` restriction? Oracle
+//"destroy up to three target creatures and/or OTHER planeswalkers" restricts one
+//alternative; the engine's flag restricted the whole chooser, so an animated
+//Sorin - a legal CREATURE target of his own -6 - was refused before the
+//distinction was ever evaluated. A candidate holding one of the unrestricted
+//types is exempt; with no list the answer is always false and `other` behaves
+//exactly as it did.
+bool TargetChooser::otherAllowsSource(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    for (size_t i = 0; i < otherUnless.size(); i++)
+    {
+        //`creature` asks the INSTANCE, not the printed card: an animated
+        //planeswalker is a creature only while the effect stands, and that is
+        //exactly the case this exists for.
+        if (otherUnless[i] == "creature" && card->isCreature())
+            return true;
+        if (card->hasType(otherUnless[i]))
+            return true;
+    }
+    return false;
 }
 
 //Default targetter : every card can be targetted, unless it is protected from the targetter card
@@ -1613,7 +1665,7 @@ bool TargetChooser::canTarget(Targetable * target, bool withoutProtections)
         //explicitly names the Emblem type still finds it.
         if (card->hasType(Subtypes::TYPE_EMBLEM) && !acceptsDesignationMarkers())
             return false;
-        if (other)
+        if (other && !otherAllowsSource(card)) //#W75-CM (F1)
         {
             MTGCardInstance * tempcard = card;
             while (tempcard)

@@ -37,6 +37,15 @@ public:
         TARGETED_PLAYER = 4
     };
     bool other;
+    //#W75-CM (F1, Astra wave-75 review finding 1): `other` is a CHOOSER-level
+    //flag, so on a spec with two alternatives ("creatures and/or OTHER
+    //planeswalkers") it excluded the source from BOTH. `otherUnless` names the
+    //types the restriction does NOT reach: the source stays a legal target while
+    //it has one of them. Empty (the default) is `other` exactly as before.
+    //Written in a target spec as `other!<type>[;<type>...] ` - e.g. Sorin, Lord
+    //of Innistrad's -6, `other!creature *[creature;planeswalker]`.
+    vector<string> otherUnless;
+    bool otherAllowsSource(MTGCardInstance * card);
     TargetChooser(GameObserver *observer, MTGCardInstance * card = NULL, int _maxtargets = UNLITMITED_TARGETS, bool other = false, bool targetMin = false);
     Player * Owner;
     GameObserver *observer;

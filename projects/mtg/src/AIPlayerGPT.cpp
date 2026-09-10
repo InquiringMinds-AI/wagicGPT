@@ -15427,6 +15427,82 @@ static bool gptForceCloseSupported(const string& endpoint)
 //the ten that succeeded did not. Live-probed against the pilot 2026-09-09, one
 //request per shape: trailing-newline prefill -> 400 with that exact message,
 //the same prefill trimmed -> 200 with a clean answer.
+//#W75-CM (F6): Python's `str.strip()` whitespace set, UTF-8 encoded - every
+//code point for which `str.isspace()` is true, which is what Jinja's `|trim`
+//removes. Returns the byte length of the whitespace character at `i`, or 0.
+static size_t gptPyWsLenAt(const string& s, size_t i)
+{
+    const unsigned char c = (unsigned char) s[i];
+    if (c == ' ' || (c >= 0x09 && c <= 0x0D) || (c >= 0x1C && c <= 0x1F))
+        return 1;
+    if (c == 0xC2 && i + 1 < s.size())
+    {
+        const unsigned char d = (unsigned char) s[i + 1];
+        if (d == 0x85 || d == 0xA0) //U+0085 NEL, U+00A0 NBSP
+            return 2;
+        return 0;
+    }
+    if (c == 0xE1 && i + 2 < s.size()
+        && (unsigned char) s[i + 1] == 0x9A && (unsigned char) s[i + 2] == 0x80)
+        return 3; //U+1680 OGHAM SPACE MARK
+    if (c == 0xE2 && i + 2 < s.size())
+    {
+        const unsigned char d = (unsigned char) s[i + 1], e = (unsigned char) s[i + 2];
+        if (d == 0x80 && ((e >= 0x80 && e <= 0x8A) //U+2000..U+200A
+                          || e == 0xA8 || e == 0xA9 || e == 0xAF)) //U+2028/9, U+202F
+            return 3;
+        if (d == 0x81 && e == 0x9F) //U+205F MEDIUM MATHEMATICAL SPACE
+            return 3;
+        return 0;
+    }
+    if (c == 0xE3 && i + 2 < s.size()
+        && (unsigned char) s[i + 1] == 0x80 && (unsigned char) s[i + 2] == 0x80)
+        return 3; //U+3000 IDEOGRAPHIC SPACE
+    return 0;
+}
+
+//First byte that is not whitespace, or npos when the whole string is.
+static size_t gptPyStripFrom(const string& s)
+{
+    size_t i = 0;
+    while (i < s.size())
+    {
+        const size_t w = gptPyWsLenAt(s, i);
+        if (!w)
+            return i;
+        i += w;
+    }
+    return string::npos;
+}
+
+//One PAST the last byte that is not whitespace (0 when the whole string is).
+static size_t gptPyStripTo(const string& s)
+{
+    size_t i = 0, end = 0;
+    while (i < s.size())
+    {
+        const size_t w = gptPyWsLenAt(s, i);
+        if (w)
+        {
+            i += w;
+            continue;
+        }
+        const unsigned char c = (unsigned char) s[i];
+        size_t adv = 1;
+        if (c >= 0xF0)
+            adv = 4;
+        else if (c >= 0xE0)
+            adv = 3;
+        else if (c >= 0xC0)
+            adv = 2;
+        if (i + adv > s.size())
+            adv = s.size() - i;
+        i += adv;
+        end = i;
+    }
+    return end;
+}
+
 //Pure, so PARSETEST pins the shape without a round trip.
 static string gptForceClosePrefillBody(const string& prefill)
 {
@@ -15448,7 +15524,12 @@ static string gptForceClosePrefillBody(const string& prefill)
         inner.erase(m, 7);
     }
     //Jinja's `|trim` is str.strip(): the same whitespace set, both ends.
-    size_t a = inner.find_first_not_of(" \t\r\n\f\v");
+    //#W75-CM (F6, Astra wave-75 review finding 6): and str.strip() is UNICODE-
+    //aware. A trace ending in U+00A0 (or U+3000, U+2028, U+0085 ...) survived
+    //this ASCII-only trim, the template removed it, and the rendered prompt no
+    //longer contained the final message byte for byte - the same 400 this helper
+    //exists to prevent. The set below is exactly Python's str.isspace().
+    size_t a = gptPyStripFrom(inner);
     //A whitespace-only trace still has to produce a NON-EMPTY final message: an
     //empty one makes `rindex("")` the end of the render, which would continue
     //the prompt AFTER `<|im_end|>` and open a fresh turn. The empty think block
@@ -15456,8 +15537,8 @@ static string gptForceClosePrefillBody(const string& prefill)
     //round-trips exactly.
     if (a == string::npos)
         return "<think>\n\n</think>\n\n";
-    size_t b = inner.find_last_not_of(" \t\r\n\f\v");
-    inner = inner.substr(a, b - a + 1);
+    const size_t b = gptPyStripTo(inner);
+    inner = inner.substr(a, b - a);
     return "<think>\n" + inner + "\n</think>\n\n";
 }
 
@@ -16966,6 +17047,27 @@ void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm)
         std::swap(live, park); //theirs is live and ours is empty: park theirs
 }
 
+//#W75-CM (F5): the flag rides the slot, so nothing else has to remember it.
+void gptRetrySelectArmClose(GptRetrySlot& live, GptRetrySlot& park, bool landArm,
+                            bool& liveForceCloseArmed)
+{
+    live.forceCloseArmed = liveForceCloseArmed;
+    gptRetrySelectArm(live, park, landArm);
+    liveForceCloseArmed = live.forceCloseArmed;
+}
+
+int gptForceCloseArm(bool& liveArmed)
+{
+    const int inc = liveArmed ? 1 : 0;
+    liveArmed = true;
+    return inc;
+}
+
+int gptForceCloseOutstanding(bool liveArmed, bool parkArmed)
+{
+    return (liveArmed ? 1 : 0) + (parkArmed ? 1 : 0);
+}
+
 void AIPlayerGPT::selectRetryArm(bool landArm)
 {
     GptRetrySlot live;
@@ -16978,7 +17080,7 @@ void AIPlayerGPT::selectRetryArm(bool landArm)
     live.budgetMs = mRetryBudgetMs;
     live.armLand = mRetryArmLand;
     live.phase1Length = mForceClosePhase1Length;
-    gptRetrySelectArm(live, mRetryPark, landArm);
+    gptRetrySelectArmClose(live, mRetryPark, landArm, mForceCloseArmed); //#W75-CM (F5)
     mRetryActivePrompt = live.activePrompt;
     mRetryBase = live.base;
     mRetryDoneBase = live.doneBase;
@@ -17067,7 +17169,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         //arm that leaves no record - count it where it is dropped.
         if (mForceCloseArmed)
         {
-            mForceCloseUnrecorded++;
+            mForceCloseUnrecorded++; //#W75-CM (F5): THIS arm's close, dropped here
             mForceCloseArmed = false;
         }
         mRetryActivePrompt.clear();
@@ -17114,9 +17216,9 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         //A fresh arm while the previous one is still outstanding proves the
         //previous close was lost, so it is counted here rather than guessed
         //from a stderr/record diff after the fact.
-        if (mForceCloseArmed)
-            mForceCloseUnrecorded++;
-        mForceCloseArmed = true;
+        //#W75-CM (F5): only a second arm on THIS arm proves a lost close; the
+        //other arm's outstanding close is parked, not lost.
+        mForceCloseUnrecorded += gptForceCloseArm(mForceCloseArmed);
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
@@ -17833,9 +17935,23 @@ static bool answerReplaced(const string& reply)
 //coded_answers: how many line-leading coded answer lines the reply carried.
 //The denominator answer_replaced needs, and on its own the cheapest read of
 //whether the one-line protocol is being followed at all.
+//#W75-CM (F4, Astra wave-75 review finding 4). ONE DEFINITION OF "CODED
+//ANSWER". `gptForceCloseEarned` (#W75-CJ P21) force-closes a cap-stopped reply
+//that wrote no coded answer, and it asked THIS counter - a strictly LINE-LEADING
+//scan - while the answer parser had just learned (#W75-CJ P9) to read a CHOICE
+//label written on the PLAN's own physical line. A complete reply of exactly that
+//shape (`PLAN: Play the land. CHOICE: 1 (Play Sunpetal Grove)`) therefore counted
+//ZERO answers and was discarded for a second decode that can choose differently
+//or fail. The two now share one reader: the line scan, plus the P9 inline form.
+static bool gptInlineChoiceOnPlanLine(const string& text, size_t& segStart,
+                                      size_t& segEnd, size_t& lineStart);
 static int codedAnswerCount(const string& reply)
 {
-    return scanCodedAnswerLines(reply, NULL, NULL, NULL);
+    const int n = scanCodedAnswerLines(reply, NULL, NULL, NULL);
+    if (n > 0)
+        return n;
+    size_t a = 0, b = 0, c = 0;
+    return gptInlineChoiceOnPlanLine(reply, a, b, c) ? 1 : 0;
 }
 
 //#W63-AD (E11, engine HIGH-6). WHAT `choice` MEANS IS NOT THE SAME AT EVERY
@@ -18984,7 +19100,8 @@ void AIPlayerGPT::logGameEnd()
         {"phase2_answer_recovered", mPhase2AnswerRecovered},
         {"phase2_answer_missing", mPhase2AnswerMissing},
         //#W75-CJ (P2c): closes that armed and never reached any record.
-        {"forced_close_unrecorded", mForceCloseUnrecorded + (mForceCloseArmed ? 1 : 0)},
+        {"forced_close_unrecorded", mForceCloseUnrecorded
+             + gptForceCloseOutstanding(mForceCloseArmed, mRetryPark.forceCloseArmed)}, //#W75-CM (F5)
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -20722,6 +20839,21 @@ static bool gptInlineChoiceOnPlanLine(const string& text, size_t& segStart,
     const string payload = text.substr(only + len, end - (only + len));
     if (isTemplatePlaceholderLine(payload) || isExampleEchoLine(payload))
         return false;
+    //#W75-CM (F3, Astra wave-75 review finding 3). A LABEL WITH NO CODED HEAD IS
+    //NOT AN ANSWER. `choiceLineIsClean` and `choiceLineIsRejection` both DECLINE
+    //TO JUDGE a payload with no digit head (`codedHeadEnd` -> npos returns
+    //"clean"/"not a rejection"), so `PLAN: Do not take CHOICE: not 2 (Cast Rorix
+    //Bladewing)` passed both gates and the downstream parser could bind the
+    //parenthetical name or rescue the embedded 2 - executing the cast the reply
+    //explicitly refused. On a LINE-LEADING label that risk is the legacy
+    //name-form reply this project still accepts; INSIDE the plan line it is
+    //prose, and prose is what this gate exists to refuse. So the inline form
+    //requires the coded head the protocol asks for: whitespace, then a digit run.
+    {
+        const size_t h = payload.find_first_not_of(" \t");
+        if (h == string::npos || !isdigit((unsigned char) payload[h]))
+            return false;
+    }
     if (AIPlayerGPT::choiceLineIsRejection(payload) || !AIPlayerGPT::choiceLineIsClean(payload))
         return false;
     segStart = only + len;
@@ -24653,6 +24785,31 @@ static int castBodiesAdded(MTGCardInstance * card)
 //crackBackBlockerRowTag return "" - the row then prices nothing, which is the
 //truthful answer, and the legend-rule bracket still states the whole fact.
 //Pure over its three inputs, so the table is provable without a board.
+//#W75-CM (F8, Astra wave-75 review finding 8). THE LEGEND RULE DOES NOT CARE
+//ABOUT TOKENS. The battlefield walk that decides `legendTwinControlled` skipped
+//`isToken` permanents, so a legendary Rorix TOKEN (a Cackling Counterpart copy
+//kept through an earlier legend choice) plus a cast Rorix priced TWO bodies and
+//the crack-back row printed a false SURVIVE at 3 life. CR 704.5j is about
+//legendary permanents, and a token permanent is one. Extracted as a pure
+//function over the walk's own inputs so PARSETEST pins the WALK, not a
+//hand-supplied flag.
+struct W75LegendBoardCard
+{
+    std::string name;
+    bool isToken;
+    bool isCastCard;
+    W75LegendBoardCard() : isToken(false), isCastCard(false) {}
+};
+
+static bool w75LegendTwinControlled(const std::vector<W75LegendBoardCard>& board,
+                                    const std::string& castName)
+{
+    for (size_t i = 0; i < board.size(); i++)
+        if (!board[i].isCastCard && board[i].name == castName)
+            return true;
+    return false;
+}
+
 static int castBodiesNetOfOwnText(int bodies, bool cardIsCreature,
                                   bool legendTwinControlled)
 {
@@ -28835,6 +28992,52 @@ static bool w74HoldVerdictMarker(const string& row)
     return false;
 }
 
+//#W75-CM (F2, Astra wave-75 review finding 2). THE COST IS ACTION IDENTITY,
+//NOT A BOARD FORECAST. #W74-CH keyed a hold on the row with EVERY `[...]` group
+//stripped, and the renderer prints an activated ability's cost inside one:
+//`Draw with Tome [cost: {3}]` and a second `name(Draw)` activation costing
+//`[cost: Tap]` key IDENTICALLY, so a genuinely new legal activation reads as a
+//row the model has already seen and the hold covers it. What a hold is a
+//decision about is "this card, at THIS COST, against these objects" - the cost
+//is part of that set, while the forecasts/prices/clocks around it are the
+//render's commentary on a board the hold never claimed was frozen. So the cost
+//groups are lifted out (lower-cased, whitespace-collapsed) and appended to the
+//key; every other bracket and brace group is stripped exactly as before, and a
+//row whose only delta is an annotation still keys identically (pinned).
+static string w75CostGroupsKey(const string& row)
+{
+    static const char kOpen[] = "[cost: ";
+    const size_t olen = sizeof(kOpen) - 1;
+    string out;
+    size_t i = 0;
+    while ((i = row.find(kOpen, i)) != string::npos)
+    {
+        const size_t e = row.find(']', i + olen);
+        if (e == string::npos)
+            break;
+        out += " [cost: ";
+        bool sp = false;
+        bool any = false;
+        for (size_t k = i + olen; k < e; k++)
+        {
+            const char ch = row[k];
+            if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
+            {
+                sp = true;
+                continue;
+            }
+            if (sp && any)
+                out += ' ';
+            sp = false;
+            any = true;
+            out += (char) tolower((unsigned char) ch);
+        }
+        out += ']';
+        i = e + 1;
+    }
+    return out;
+}
+
 static string holdActionKeyRow(const string& row)
 {
     if (w74HoldVerdictMarker(row))
@@ -28848,7 +29051,9 @@ static string holdActionKeyRow(const string& row)
         core.erase(c, strlen(kCombatNextClause));
     //Belt and braces: a life total printed OUTSIDE any annotation (none is known
     //today) still normalises, so #W66-AS (H7) cannot regress through a gap.
-    return holdKeyLifeProjectionsNormalised(stripRenderAnnotationsLc(core));
+    //#W75-CM (F2): the ACTION's cost survives the strip; nothing else does.
+    return holdKeyLifeProjectionsNormalised(stripRenderAnnotationsLc(core))
+           + w75CostGroupsKey(core);
 }
 
 //#W74-CH: the stack's death verdict as a MARKER ROW, the exact shape #W68-BB
@@ -30878,11 +31083,57 @@ static string winFoldBlockedTail(int myLife, int lifeLossFirst)
 //aimed the spell at a planeswalker and died 0 to 1 four records later. Same
 //register as damageTargetVerdict; a player's answer is their life total.
 //Pure over (magnitude, life, whose row it is).
+//#W75-CM (F7, Astra wave-75 review finding 7). A DAMAGE SUBTRACTION IS NOT
+//ALWAYS LIFE LOSS. Damage.cpp:192-199 REPLACES damage dealt to a PLAYER by an
+//INFECT / POISONDAMAGER source with poison counters: the life total never moves.
+//This verdict subtracted it from life anyway, so a Prodigal Pyromancer wearing
+//Glistening Oil pinging its own controller printed `takes 1 damage - you would
+//be at 19` at 20 life - and #W75-CL (P5) then upgraded that false arithmetic,
+//under a proven opposing Sanguine Bond + Exquisite Blood loop, into the
+//categorical `you would be at 0 - this row feeds their chain`. Neither loop
+//intake is fed by a poison counter. The narration seam already draws exactly
+//this distinction (`dealt as POISON COUNTERS, not life loss`); the decision-time
+//verdict now draws it too, at the SOURCE, so the P5 rewrite has no false life
+//subtraction to find (its trigger phrase `you would be at ` is not printed on a
+//poison row at all) and no symptom-level gate is needed.
+//Pure over (magnitude, life, whose row it is, poison replacement, poison count).
 string damagePlayerVerdict(int dmg, int life, bool isMe,
                           int myLife = -1, int lifeLossFirst = 0, //#W60-L (B1)
-                          bool myLifeLoop = false) //#W62-X (D8)
+                          bool myLifeLoop = false, //#W62-X (D8)
+                          bool poisonInstead = false, int poison = -1) //#W75-CM (F7)
 {
     std::ostringstream o;
+    if (poisonInstead)
+    {
+        o << " {right now: takes " << dmg << " infect damage - dealt as POISON"
+             " COUNTERS, not life loss: " << (isMe ? "your" : "their")
+          << " life total does not move and stays at " << life;
+        if (poison >= 0)
+        {
+            const int after = poison + dmg;
+            o << ". " << (isMe ? "Your" : "Their") << " poison would be " << after
+              << " of " << kPoisonLoseAt;
+            if (after >= kPoisonLoseAt)
+            {
+                if (isMe)
+                    o << " - at " << kPoisonLoseAt << " poison counters YOU LOSE THE GAME"
+                         " whatever your life total is";
+                else
+                {
+                    const string blocked = winFoldBlockedTail(myLife, lifeLossFirst);
+                    if (blocked.empty())
+                        o << " - at " << kPoisonLoseAt << " poison counters THEY LOSE"
+                             " THE GAME whatever their life total is";
+                    else
+                        o << " - " << blocked;
+                }
+            }
+            else
+                o << " - poison counters never reset, so this is permanent progress";
+        }
+        o << "}";
+        return o.str();
+    }
     o << " {right now: takes " << dmg << " damage - ";
     if (isMe)
     {
@@ -34190,7 +34441,11 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (pt && action.ability)
             if (AADamager * adp = unwrapDamagerAbility(action.ability, 0))
                 if (adp->d.find("rand") == string::npos && adp->getDamage() > 0)
-                    out << damagePlayerVerdict(adp->getDamage(), pt->life, pt == this);
+                    //#W75-CM (F7): an INFECT source deals poison, not life loss.
+                    out << damagePlayerVerdict(adp->getDamage(), pt->life, pt == this,
+                                               -1, 0, false,
+                                               sourceDealsPoisonInsteadOfDamage(adp->source),
+                                               pt->poisonCount);
     }
 
     //#W69-BH (K4b): the library this row rebuilds, and (K6c) whether the life
@@ -40336,10 +40591,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 for (int bi = 0; bf && bi < bf->nb_cards; bi++)
                 {
                     MTGCardInstance * bc = bf->cards[bi];
-                    if (!bc || bc->isToken)
+                    if (!bc)
                         continue;
-                    if ((legendary || stackClass) && !twin && bc->name == card->name)
+                    //#W75-CM (F8): the LEGEND-RULE mark counts a TOKEN copy - the
+                    //legend rule does not care about tokens (CR 704.5j), and this
+                    //bracket must state the same board fact the crack-back cover
+                    //nets out (w75LegendTwinControlled). The non-legendary
+                    //"second copy" mark keeps its own token exclusion.
+                    if ((legendary || stackClass) && !twin && bc->name == card->name
+                        && (legendary || !bc->isToken))
                         twin = bc;
+                    if (bc->isToken)
+                        continue;
                     if (!want.empty() && bc->hasType(want))
                         heldOfType.insert(bc->getDisplayName());
                 }
@@ -41169,12 +41432,21 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //legend rule on a second copy of a legendary creature.
             bool cbLegendTwin = false;
             if (card->isCreature() && card->hasType(Subtypes::TYPE_LEGENDARY) && game && game->inPlay)
-                for (int bi = 0; bi < game->inPlay->nb_cards && !cbLegendTwin; bi++)
+            {
+                std::vector<W75LegendBoardCard> w75board;
+                for (int bi = 0; bi < game->inPlay->nb_cards; bi++)
                 {
                     MTGCardInstance * bc = game->inPlay->cards[bi];
-                    if (bc && !bc->isToken && bc != card && bc->name == card->name)
-                        cbLegendTwin = true;
+                    if (!bc)
+                        continue;
+                    W75LegendBoardCard e;
+                    e.name = bc->name;
+                    e.isToken = (bc->isToken != 0);
+                    e.isCastCard = (bc == card);
+                    w75board.push_back(e);
                 }
+                cbLegendTwin = w75LegendTwinControlled(w75board, card->name);
+            }
             const int bodies = castBodiesNetOfOwnText(castBodiesAdded(card),
                                                       card->isCreature() != 0, cbLegendTwin);
             int cbTotal = 0;
@@ -44983,7 +45255,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     if (Player * dtp = dynamic_cast<Player *>(t))
                         tdesc += damagePlayerVerdict(dmgAmount, dtp->life, dtp == this,
                                                      this->life, perilBeforeResolve, //#W60-L (B1)
-                                                     lifeLoopProvenWin(this)); //#W62-AA (R6)
+                                                     lifeLoopProvenWin(this), //#W62-AA (R6)
+                                                     //#W75-CM (F7)
+                                                     sourceDealsPoisonInsteadOfDamage(tc->source),
+                                                     dtp->poisonCount);
                 //#W54-C (D4): and a planeswalker's answer is its loyalty - the
                 //helper existed and only the ability path was calling it, so
                 //`130v162` seq 63's Ob Nixilis row was bare too.
@@ -83875,6 +84150,393 @@ static const char * kW50Y_r94 =
                   "#W75-CL P23 a labelled plan plus real prose is the third class");
             CHECK(string(w75ProtocolDeviationClass(false, 0)) == "compliant",
                   "#W75-CL P23 MUST-NOT-MATCH a compliant reply is not a deviation");
+        }
+
+        // ---- #W75-CM (Astra wave-75 adversarial review, wave75/codex-review.md).
+        // Nine findings; each is CONFIRM (a pin that was RED on the seeded tree
+        // 301a30a37, then the fix) or REFUTE. F1 is card data + a suite fixture and
+        // F9 is the harness's own --selftest, so seven of the nine pin here.
+        {
+            cout << "\n[#W75-CM] the Astra review fixes\n";
+
+            // ---------------- F2 (HIGH, P1b): the COST is action identity.
+            {
+                const string a = "Draw with Thought Vessel [cost: {3}]";
+                const string b = "Draw with Thought Vessel [cost: Tap]";
+                CHECK(holdActionKeyRow(a) != holdActionKeyRow(b),
+                      "#W75-CM F2 REPRO/GREEN two `name(Draw)` activations of one permanent at"
+                      " DIFFERENT costs are two actions - RED on base 301a30a37, where"
+                      " holdActionKeyRow stripped every [...] group and both keyed"
+                      " `draw with thought vessel`");
+                CHECK(holdActionKeyRow(a).find("[cost: {3}]") != string::npos
+                          && holdActionKeyRow(b).find("[cost: tap]") != string::npos,
+                      "#W75-CM F2 the cost rides the key, normalised (lower-case,"
+                      " whitespace-collapsed)");
+                // the hold-check census sees it as ONE unseen row - the promise the
+                // #W75-CI bracket makes ("a row naming a different cost re-opens a hold").
+                {
+                    std::set<string> held;
+                    held.insert(holdActionKeyRow(a));
+                    std::vector<string> now;
+                    now.push_back(a);
+                    now.push_back(b);
+                    CHECK(w74HoldUnseenRows(held, now) == 1,
+                          "#W75-CM F2 GREEN the newly legal second activation is 1 unseen row"
+                          " (0 on base: the hold covered a play the model had never been"
+                          " offered)");
+                    const char * why = NULL;
+                    CHECK(!holdStillStands(held, now, &why, holdActionKeyRow),
+                          "#W75-CM F2 ...and the hold is retired, not silently extended");
+                }
+                // MUST-NOT-MATCH: the #W74-CH carve-out is intact. Two windows whose
+                // rows differ ONLY in render annotations still key identically - that
+                // is the regression the action key exists to prevent, and it is now
+                // pinned WITH a [cost: ...] group on the row.
+                const string w1 = "Draw with Thought Vessel [cost: {3}]"
+                                  " {leaves 2 of your 5 untapped mana sources}"
+                                  " [declined this exact list 1 time this turn]";
+                const string w2 = "Draw with Thought Vessel [cost: {3}]"
+                                  " {leaves 1 of your 4 untapped mana sources}"
+                                  " [declined this exact list 40 times this turn]";
+                CHECK(holdActionKeyRow(w1) == holdActionKeyRow(w2),
+                      "#W75-CM F2 MUST-NOT-MATCH a row that changes only in its ANNOTATIONS is"
+                      " the SAME row - #W74-CH's carve-out survives the cost being kept");
+                // ...and the wave-74 `146v125` seq 65/66/70 shape: a three-row menu
+                // whose only delta is one row's untapped-source count reads 0 new rows.
+                {
+                    std::vector<string> rows65, rows70;
+                    rows65.push_back("Cast Sol Ring {1} {right now: adds 2}");
+                    rows65.push_back(w1);
+                    rows65.push_back("Hold priority");
+                    rows70.push_back("Cast Sol Ring {1} {right now: adds 2}");
+                    rows70.push_back(w2);
+                    rows70.push_back("Hold priority");
+                    std::set<string> held65;
+                    for (size_t i = 0; i < rows65.size(); i++)
+                        held65.insert(holdActionKeyRow(rows65[i])); //the LIVE seam's own build
+                    CHECK(w74HoldUnseenRows(held65, rows70) == 0,
+                          "#W75-CM F2 KEY PIN the wave-74 146v125 seq 65/66/70 shape still reads"
+                          " 0 new rows under the cost-bearing key");
+                    const char * why70 = NULL;
+                    CHECK(holdStillStands(held65, rows70, &why70, holdActionKeyRow),
+                          "#W75-CM F2 KEY PIN hold-latch key: the hold still stands across those"
+                          " two windows");
+                    CHECK(optionSetKeyOf(rows65) == optionSetKeyOf(rows70),
+                          "#W75-CM F2 KEY PIN option-set key identical");
+                    const string t65 = stripDeclineReaskTags(joinNumberedRows(rows65, NULL));
+                    const string t70 = stripDeclineReaskTags(joinNumberedRows(rows70, NULL));
+                    CHECK(asyncSlotKeyOf(false, 12, 3, t65, "BOARD")
+                              == asyncSlotKeyOf(false, 12, 3, t70, "BOARD")
+                              || t65 != t70,
+                          "#W75-CM F2 KEY PIN async slot key is a pure function of the rendered"
+                          " tail - unchanged by this fix");
+                }
+            }
+
+            // ---------------- F3 (HIGH, P9): a label with no coded head is not an answer.
+            {
+                size_t a = 0, b = 0, c = 0;
+                CHECK(!findAnswerLabelLine("PLAN: Do not take CHOICE: not 2 (Cast Rorix"
+                                           " Bladewing)", "CHOICE:", a, b, c),
+                      "#W75-CM F3 REPRO/GREEN an explicitly NEGATED inline payload is not an"
+                      " answer - RED on base, where codedHeadEnd -> npos made"
+                      " choiceLineIsClean say `clean` and the parser could bind the name or"
+                      " rescue the 2");
+                CHECK(!findAnswerLabelLine("PLAN: hold CHOICE: Rorix Bladewing",
+                                           "CHOICE:", a, b, c),
+                      "#W75-CM F3 MUST-NOT-MATCH a bare-NAME inline payload is not an answer"
+                      " either (the legacy name form is accepted only on a line-leading label)");
+                CHECK(findAnswerLabelLine("PLAN: Play a land to expand mana base. CHOICE: 1"
+                                          " (Play Sunpetal Grove)", "CHOICE:", a, b, c),
+                      "#W75-CM F3 MUST-NOT-MATCH #W75-CJ (P9)'s own repro still parses - the"
+                      " gate narrows to the coded head, it does not close the seam");
+                CHECK(findAnswerLabelLine("PLAN: hold. CHOICE:   3", "CHOICE:", a, b, c),
+                      "#W75-CM F3 whitespace then a bare index is still the coded head");
+                CHECK(!findAnswerLabelLine("PLAN: think CHOICE: maybe 2 later",
+                                           "CHOICE:", a, b, c),
+                      "#W75-CM F3 MUST-NOT-MATCH a digit buried in prose is not a head");
+            }
+
+            // ---------------- F4 (MED, P21): one definition of "coded answer".
+            {
+                const string inl = "PLAN: Play the land. CHOICE: 1 (Play Sunpetal Grove)";
+                CHECK(codedAnswerCount(inl) == 1,
+                      "#W75-CM F4 REPRO/GREEN a complete cap-stopped reply whose answer is the"
+                      " P9 inline form counts as ONE coded answer - RED on base (0), where the"
+                      " line-leading scanner and the answer parser disagreed");
+                CHECK(!gptForceCloseEarned(false, false, true, true, codedAnswerCount(inl)),
+                      "#W75-CM F4 GREEN ...so P21 no longer force-closes an answer P9 accepts");
+                CHECK(gptForceCloseEarned(false, false, true, true,
+                                          codedAnswerCount("PLAN: I am still weighing rows")),
+                      "#W75-CM F4 MUST-NOT-MATCH a cap-stopped reply with NO answer of either"
+                      " shape is still rescued");
+                CHECK(codedAnswerCount("ANSWER: CHOICE: 3 (Cast nothing)") == 0,
+                      "#W75-CM F4 MUST-NOT-MATCH the inline reader still requires the"
+                      " line-leading PLAN marker");
+                CHECK(codedAnswerCount("CHOICE: 2 (x)\nCHOICE: 3 (y)") == 2,
+                      "#W75-CM F4 MUST-NOT-MATCH the line scan still owns every reply that has"
+                      " line-leading answers (the multi-answer violation is unchanged)");
+            }
+
+            // ---------------- F5 (MED, P2): the armed flag is PER ARM.
+            {
+                // Astra's interleaving, replayed through the production swap:
+                // land arms a close; casting polls (land's leg parks); casting arms
+                // its own; both complete and are recorded.
+                GptRetrySlot live, park;
+                bool armed = false;
+                int unrecorded = 0;
+                gptRetrySelectArmClose(live, park, true, armed);   //land's window
+                live.armLand = true;                               //selectRetryArm's stamp
+                live.activePrompt = "FCland";
+                live.base = "land";
+                unrecorded += gptForceCloseArm(armed);
+                CHECK(unrecorded == 0 && armed,
+                      "#W75-CM F5 the land arm's close is armed and nothing is unrecorded");
+                gptRetrySelectArmClose(live, park, false, armed);  //casting's window
+                live.armLand = false;                              //selectRetryArm's stamp
+                CHECK(!armed && park.forceCloseArmed,
+                      "#W75-CM F5 GREEN the land close PARKS with its arm - the casting arm"
+                      " starts from a clean flag (on base one seat-global bool was shared)");
+                live.activePrompt = "FCcast";
+                live.base = "cast";
+                unrecorded += gptForceCloseArm(armed);
+                CHECK(unrecorded == 0,
+                      "#W75-CM F5 REPRO/GREEN two arms, two outstanding closes, ZERO"
+                      " unrecorded - RED on base, where the second arming read the FIRST"
+                      " arm's flag and counted a safely parked close as lost");
+                // both complete and are recorded: the identity closes.
+                armed = false;                                     //casting's record
+                gptRetrySelectArmClose(live, park, true, armed);    //back to land
+                live.armLand = true;                               //selectRetryArm's stamp
+                CHECK(armed, "#W75-CM F5 the land arm's close comes back with its own slot");
+                armed = false;                                     //land's record
+                CHECK(unrecorded + gptForceCloseOutstanding(armed, park.forceCloseArmed) == 0,
+                      "#W75-CM F5 GREEN recovered 2 + missing 0 + unrecorded 0 == 2 closes");
+                // MUST-NOT-MATCH: a second arm on the SAME arm still counts a lost close -
+                // that is the real "third path" #W75-CJ (P2c) was built to see.
+                {
+                    bool a2 = true;
+                    int u2 = 0;
+                    u2 += gptForceCloseArm(a2);
+                    CHECK(u2 == 1,
+                          "#W75-CM F5 MUST-NOT-MATCH re-arming the SAME arm while its close is"
+                          " outstanding still counts one unrecorded");
+                }
+            }
+
+            // ---------------- F6 (MED, P2): Python's str.strip() is Unicode-aware.
+            {
+                struct PyWs //an INDEPENDENT model of str.strip(), not the helper
+                {
+                    static bool isSpaceAt(const string& s, size_t i, size_t& len)
+                    {
+                        static const char * kWide[] = {
+                            "\xc2\x85", "\xc2\xa0", "\xe1\x9a\x80",
+                            "\xe2\x80\x80", "\xe2\x80\x81", "\xe2\x80\x82", "\xe2\x80\x83",
+                            "\xe2\x80\x84", "\xe2\x80\x85", "\xe2\x80\x86", "\xe2\x80\x87",
+                            "\xe2\x80\x88", "\xe2\x80\x89", "\xe2\x80\x8a",
+                            "\xe2\x80\xa8", "\xe2\x80\xa9", "\xe2\x80\xaf",
+                            "\xe2\x81\x9f", "\xe3\x80\x80"
+                        };
+                        const unsigned char c = (unsigned char) s[i];
+                        if (c == ' ' || (c >= 0x09 && c <= 0x0D) || (c >= 0x1C && c <= 0x1F))
+                        {
+                            len = 1;
+                            return true;
+                        }
+                        for (size_t k = 0; k < sizeof(kWide) / sizeof(kWide[0]); k++)
+                        {
+                            const size_t n = strlen(kWide[k]);
+                            if (s.compare(i, n, kWide[k]) == 0)
+                            {
+                                len = n;
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                    static string trim(const string& in)
+                    {
+                        size_t a = 0, len = 0;
+                        while (a < in.size() && isSpaceAt(in, a, len))
+                            a += len;
+                        size_t b = in.size();
+                        while (b > a)
+                        {
+                            size_t back = 1;
+                            bool cut = false;
+                            for (size_t w = 1; w <= 3 && w <= b - a; w++)
+                                if (isSpaceAt(in, b - w, len) && len == w)
+                                {
+                                    back = w;
+                                    cut = true;
+                                    break;
+                                }
+                            if (!cut)
+                                break;
+                            b -= back;
+                        }
+                        return in.substr(a, b - a);
+                    }
+                    //The template's assistant turn, with the Unicode-aware trim.
+                    static string render(const string& msg)
+                    {
+                        string content = trim(msg);
+                        string reasoning;
+                        const size_t cut = content.find("</think>");
+                        if (cut != string::npos)
+                        {
+                            string head = content.substr(0, cut);
+                            size_t hb = head.find_last_not_of('\n');
+                            head = (hb == string::npos) ? string() : head.substr(0, hb + 1);
+                            const size_t open = head.rfind("<think>");
+                            string r = (open == string::npos) ? head : head.substr(open + 7);
+                            const size_t ra = r.find_first_not_of('\n');
+                            reasoning = (ra == string::npos) ? string() : r.substr(ra);
+                            string tail = content.substr(content.rfind("</think>") + 8);
+                            const size_t ta = tail.find_first_not_of('\n');
+                            content = (ta == string::npos) ? string() : tail.substr(ta);
+                        }
+                        reasoning = trim(reasoning);
+                        return "<think>\n" + reasoning + "\n</think>\n\n" + content;
+                    }
+                };
+                const char * tails[] = {
+                    "Choose row 1.\xc2\xa0",              //U+00A0 NO-BREAK SPACE
+                    "Choose row 1.\xe3\x80\x80",          //U+3000 IDEOGRAPHIC SPACE
+                    "Choose row 1.\xe2\x80\xa8",          //U+2028 LINE SEPARATOR
+                    "Choose row 1.\xc2\x85",              //U+0085 NEXT LINE
+                    "\xc2\xa0Choose row 1.\xe2\x80\x89",  //both ends
+                    "Choose row 1.\n   ",                 //the wave-74 ASCII shapes
+                    "no whitespace at either end"
+                };
+                for (size_t i = 0; i < sizeof(tails) / sizeof(tails[0]); i++)
+                {
+                    const string body = gptForceClosePrefillBody(tails[i]);
+                    CHECK(PyWs::render(body) == body,
+                          "#W75-CM F6 REPRO/GREEN the template's UNICODE-aware transform is a"
+                          " fixed point on the built body - RED on base for every non-ASCII"
+                          " tail, which is the same HTTP 400 the ASCII trim was written to"
+                          " prevent");
+                }
+                CHECK(gptForceClosePrefillBody("Choose row 1.\xc2\xa0")
+                          == "<think>\nChoose row 1.\n</think>\n\n",
+                      "#W75-CM F6 the U+00A0 tail is gone from the prefill body");
+                CHECK(gptForceClosePrefillBody("\xe3\x80\x80\xc2\xa0 \t")
+                          == "<think>\n\n</think>\n\n",
+                      "#W75-CM F6 a wholly-whitespace Unicode trace still sends the empty think"
+                      " block (an empty final message would make rindex() the end of the"
+                      " render)");
+                CHECK(gptForceClosePrefillBody("Row \xc2\xa0 one").find("\xc2\xa0")
+                          != string::npos,
+                      "#W75-CM F6 MUST-NOT-MATCH an INTERIOR U+00A0 is content, not trim - the"
+                      " template keeps it and so must we");
+            }
+
+            // ---------------- F7 (HIGH, P5): infect damage is poison, not life loss.
+            {
+                // The Glistening Oil self-ping Astra names: 20 life, 0 poison, an
+                // opponent whose Sanguine Bond + Exquisite Blood loop is PROVEN live.
+                const string poisonRow = "Deal 1 damage with Prodigal Pyromancer targeting you"
+                                         + damagePlayerVerdict(1, 20, true, -1, 0, false,
+                                                               true, 0);
+                CHECK(poisonRow.find("you would be at") == string::npos,
+                      "#W75-CM F7 REPRO/GREEN an INFECT source's self-ping prints NO life"
+                      " subtraction - RED on base, which printed `you would be at 19`"
+                      " (Damage.cpp:192-199 replaces the damage with poison counters)");
+                CHECK(poisonRow.find("dealt as POISON COUNTERS, not life loss") != string::npos
+                          && poisonRow.find("stays at 20") != string::npos
+                          && poisonRow.find("poison would be 1 of 10") != string::npos,
+                      "#W75-CM F7 GREEN ...and says what DOES happen, in the narration seam's"
+                      " own words - a silent omission is the gap a model confabulates into");
+                CHECK(w75ChainFeedRow(poisonRow, true) == poisonRow,
+                      "#W75-CM F7 GREEN under a PROVEN opposing life loop the row is byte-"
+                      "identical: no `you would be at 0 - this row feeds their chain`. The"
+                      " source was fixed, so the P5 rewrite has nothing false to find");
+                // MUST-NOT-MATCH: an ORDINARY damage source is untouched, both alone
+                // and under the loop - #W75-CL (P5) keeps every byte it earned.
+                const string lifeRow = "Deal 1 damage with Staff of Nin targeting you"
+                                       + damagePlayerVerdict(1, 20, true);
+                CHECK(lifeRow.find("you would be at 19") != string::npos,
+                      "#W75-CM F7 MUST-NOT-MATCH a non-infect source still subtracts life");
+                CHECK(w75ChainFeedRow(lifeRow, true).find(kChainFeedTail) != string::npos,
+                      "#W75-CM F7 MUST-NOT-MATCH ...and still feeds the chain under a live loop"
+                      " (the 125v126 seq 267 row that lost a 42-7 game)");
+                // The threshold, and the opponent's side.
+                CHECK(damagePlayerVerdict(1, 20, true, -1, 0, false, true, 9)
+                          .find("YOU LOSE THE GAME") != string::npos,
+                      "#W75-CM F7 the tenth counter is stated as the loss it is");
+                CHECK(damagePlayerVerdict(2, 20, false, -1, 0, false, true, 8)
+                          .find("THEY LOSE THE GAME") != string::npos,
+                      "#W75-CM F7 ...and so is the opponent's tenth");
+                CHECK(damagePlayerVerdict(2, 20, false, 1, 3, false, true, 8)
+                          .find("YOU LOSE BEFORE THIS RESOLVES") != string::npos,
+                      "#W75-CM F7 #W60-L (B1)'s survival guard holds on the poison claim too");
+                CHECK(damagePlayerVerdict(1, 20, true, -1, 0, false, true, -1)
+                          .find("poison would be") == string::npos,
+                      "#W75-CM F7 an unsupplied poison count claims no number at all");
+                // KEY PIN SET (wave-74 lesson): the poison row's board-derived numbers
+                // live inside the `{right now: ...}` group, so every key that strips
+                // render annotations is blind to them.
+                {
+                    const string p1 = "Deal 1 damage with Prodigal Pyromancer targeting you"
+                                      + damagePlayerVerdict(1, 20, true, -1, 0, false, true, 0);
+                    const string p2 = "Deal 1 damage with Prodigal Pyromancer targeting you"
+                                      + damagePlayerVerdict(1, 17, true, -1, 0, false, true, 3);
+                    CHECK(holdActionKeyRow(p1) == holdActionKeyRow(p2),
+                          "#W75-CM F7 KEY PIN hold-latch key identical across two windows that"
+                          " differ only in the life and poison numbers");
+                    std::vector<string> r1, r2;
+                    r1.push_back(p1); r1.push_back("Hold priority");
+                    r2.push_back(p2); r2.push_back("Hold priority");
+                    std::set<string> held;
+                    for (size_t i = 0; i < r1.size(); i++)
+                        held.insert(holdActionKeyRow(r1[i])); //the LIVE seam's own build
+                    CHECK(w74HoldUnseenRows(held, r2) == 0,
+                          "#W75-CM F7 KEY PIN hold-check census reads 0 new rows");
+                    const char * whyP = NULL;
+                    CHECK(holdStillStands(held, r2, &whyP, holdActionKeyRow),
+                          "#W75-CM F7 KEY PIN the hold stands");
+                    CHECK(optionSetKeyOf(r1) == optionSetKeyOf(r2),
+                          "#W75-CM F7 KEY PIN option-set key identical");
+                    // The ask key and the async slot key are the RENDERED tail, and a
+                    // `{right now: ...}` magnitude has ridden them for every damage row
+                    // since wave 54: the poison form is byte-for-byte in that same
+                    // pre-existing class and adds no new exposure. Pinned as it is.
+                    const string ta = stripDeclineReaskTags(joinNumberedRows(r1, NULL));
+                    const string tb = stripDeclineReaskTags(joinNumberedRows(r2, NULL));
+                    CHECK((ta == tb)
+                              == (asyncSlotKeyOf(false, 9, 1, ta, "BOARD")
+                                  == asyncSlotKeyOf(false, 9, 1, tb, "BOARD")),
+                          "#W75-CM F7 KEY PIN the async slot key is a pure function of the ask"
+                          " tail - the poison numbers move it exactly as the life form's did");
+                }
+            }
+
+            // ---------------- F8 (HIGH, P7): the legend rule does not care about tokens.
+            {
+                std::vector<W75LegendBoardCard> board(2);
+                board[0].name = "Rorix Bladewing"; board[0].isToken = true;  board[0].isCastCard = false;
+                board[1].name = "Rorix Bladewing"; board[1].isToken = false; board[1].isCastCard = true;
+                CHECK(w75LegendTwinControlled(board, "Rorix Bladewing"),
+                      "#W75-CM F8 REPRO/GREEN a legendary TOKEN copy on the battlefield IS a"
+                      " legend twin - RED on base, whose walk skipped isToken and priced a"
+                      " body the rule takes back (a false SURVIVE at 3 life)");
+                CHECK(castBodiesNetOfOwnText(1, true, w75LegendTwinControlled(board,
+                                                                             "Rorix Bladewing"))
+                          == 0,
+                      "#W75-CM F8 GREEN ...so the cast nets no body and"
+                      " crackBackBlockerRowTag prices nothing at all");
+                std::vector<W75LegendBoardCard> alone(1);
+                alone[0].name = "Rorix Bladewing"; alone[0].isCastCard = true;
+                CHECK(!w75LegendTwinControlled(alone, "Rorix Bladewing"),
+                      "#W75-CM F8 MUST-NOT-MATCH the card being cast is not its own twin");
+                std::vector<W75LegendBoardCard> other(1);
+                other[0].name = "Bloodline Keeper"; other[0].isToken = true;
+                CHECK(!w75LegendTwinControlled(other, "Rorix Bladewing"),
+                      "#W75-CM F8 MUST-NOT-MATCH a token with a DIFFERENT name is not a twin");
+            }
         }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

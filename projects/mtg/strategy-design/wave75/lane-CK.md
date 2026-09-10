@@ -128,14 +128,23 @@ removed again:
 with `assertcantarget 1 serra angel` passing in both states — the fix must not shrink the
 legal set. With `other ` restored: 1 test, 0 failed.
 
-**NOT fixed, reported.** The once-per-turn loyalty latch
-(`MTGAbility::isReactingToClick`: refuse when an `ActivatedAbility` whose `source == card`
-already has `counters`) is keyed on the ability objects of a card INSTANCE. Any planeswalker
-that leaves and re-enters the battlefield in its own turn gets fresh ability objects and can
-activate again. Sorin's second activation is a consequence of the self-target, and the
-card-data fix closes THIS instance, but the general hole stands; closing it needs per-turn
-state on the player (or on the card's oracle identity), which is an engine change with a
-wider blast radius than this lane's evidence supports. Route to a later wave.
+**SUPERSEDED (wave-75 lane CM, Astra review finding 1).** This paragraph read the
+once-per-turn loyalty latch (`MTGAbility::isReactingToClick`: refuse when an
+`ActivatedAbility` whose `source == card` already has `counters`) as a "general hole"
+because a planeswalker that leaves and re-enters the battlefield gets fresh ability
+objects and can activate again. **That is not a hole - it is the rule.** CR 400.7: an
+object that changes zones becomes a NEW OBJECT with no memory of its previous existence,
+and CR 606.3 restricts a loyalty ability to "any time he or she has priority ... and no
+loyalty ability of that permanent has been activated this turn" - *that permanent*, i.e.
+that object. A Sorin that died and returned is a different permanent and may activate a
+loyalty ability again; so may one flickered by Conjurer's Closet, or one bounced and
+replayed. An identity latch keyed on the player or on the card's oracle name would
+REMOVE LEGAL ACTIVATIONS, which this project does not do. **Nothing is to be built here.**
+What the wave-74 `126v152` narration actually shows is one defect, not two: Sorin was a
+legal target of his own `-6`, died to the cost, and `and!(moveto(mybattlefield))!`
+returned him - the second loyalty ability that turn is the CORRECT behaviour of the new
+object, and it disappears when the self-target does. The `other` fix closes it; see
+wave75/lane-CM.md F1 for the scoping correction that fix itself needed.
 
 **Also not done, with the reason.** P4 asked for a `{right now:}` clause on the `-6` row
 (the O15 gap). The `-6`'s effect has no evaluable magnitude — it is `destroy` +
