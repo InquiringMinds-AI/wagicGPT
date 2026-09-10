@@ -24243,6 +24243,33 @@ static int castBodiesAdded(MTGCardInstance * card)
     return bodies;
 }
 
+//#W75-CK (P7, wave-74 deck130 HIGH). THE COVER COUNTED A BODY THE ROW'S OWN
+//TEXT TAKES BACK. `130v162` deck130 seqs 44/45 (t14, 3 life): row 1 read
+//`Cast Rorix Bladewing (6/5) [legendary: you already control Rorix Bladewing -
+//legend rule: casting this sends one copy to your graveyard (you choose which)]`
+//and, two brackets later, `{crack-back cover: ... This adds 1 body ... you
+//cover 5 of 5, leaving 0 -> you would be at 3, which you SURVIVE - and more
+//blockers can only lower that, so nothing uncounted here overturns it}`.
+//CR 704.5j: after that cast the seat controls ONE Rorix, exactly as before it,
+//so the cast adds no blocker at all - and the clause that says otherwise ends
+//in a survival verdict, which under the trust doctrine is an instruction.
+//The condition is the SAME board fact the legend-rule bracket above it is
+//emitted from (a non-token same-name copy on the seat's own battlefield), so
+//the two cannot disagree; only a CREATURE card loses a body to the rule (a
+//legendary artifact's tokens are not the legend). Netting to 0 makes
+//crackBackBlockerRowTag return "" - the row then prices nothing, which is the
+//truthful answer, and the legend-rule bracket still states the whole fact.
+//Pure over its three inputs, so the table is provable without a board.
+static int castBodiesNetOfOwnText(int bodies, bool cardIsCreature,
+                                  bool legendTwinControlled)
+{
+    if (bodies <= 0)
+        return bodies;
+    if (cardIsCreature && legendTwinControlled)
+        return bodies - 1;
+    return bodies;
+}
+
 //#W64-AH (F11): the row's own clause. Emitted ONLY where the review's defect
 //lives - a crack-back the same screen has already called lethal - because a
 //clause on every cast row is a clause nobody reads (the D9 discipline). Each
@@ -40505,7 +40532,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //crackBackScreenTotal, so a row can never point at a line that is not
         //above it, and on the lethal case only.
         {
-            const int bodies = castBodiesAdded(card);
+            //#W75-CK (P7): net of what this row's own text takes back - the
+            //legend rule on a second copy of a legendary creature.
+            bool cbLegendTwin = false;
+            if (card->isCreature() && card->hasType(Subtypes::TYPE_LEGENDARY) && game && game->inPlay)
+                for (int bi = 0; bi < game->inPlay->nb_cards && !cbLegendTwin; bi++)
+                {
+                    MTGCardInstance * bc = game->inPlay->cards[bi];
+                    if (bc && !bc->isToken && bc != card && bc->name == card->name)
+                        cbLegendTwin = true;
+                }
+            const int bodies = castBodiesNetOfOwnText(castBodiesAdded(card),
+                                                      card->isCreature() != 0, cbLegendTwin);
             int cbTotal = 0;
             bool cbFloor = false;
             if (bodies > 0
@@ -82717,6 +82755,41 @@ static const char * kW50Y_r94 =
                       == holdActionKeyRow("Pass priority"),
                   "#W74-CH #W56-A (D1) survives: the combat-next clause is erased by name,"
                   " not by the stripper (it is a plain parenthetical)");
+        }
+        {
+            // ---- #W75-CK (P7): the crack-back cover nets out the body the row's
+            // own text takes back. `130v162` deck130 seqs 44/45 (t14, 3 life):
+            // a second Rorix Bladewing carried the legend-rule bracket AND
+            // "This adds 1 body ... you cover 5 of 5 ... which you SURVIVE".
+            cout << "\n[#W75-CK] P7 the legend-rule duplicate is not a new body\n";
+            CHECK(castBodiesNetOfOwnText(1, true, true) == 0,
+                  "#W75-CK a second copy of a legendary CREATURE nets no body (CR 704.5j)");
+            CHECK(castBodiesNetOfOwnText(1, true, false) == 1,
+                  "#W75-CK MUST-NOT-MATCH the FIRST copy still adds its body");
+            CHECK(castBodiesNetOfOwnText(3, true, true) == 2,
+                  "#W75-CK a legendary creature that also makes two tokens keeps the tokens");
+            CHECK(castBodiesNetOfOwnText(2, false, true) == 2,
+                  "#W75-CK MUST-NOT-MATCH a NON-creature legendary loses no body - the"
+                  " legend rule takes the artifact, not the tokens it made");
+            CHECK(castBodiesNetOfOwnText(0, true, true) == 0
+                      && castBodiesNetOfOwnText(-1, true, true) == -1,
+                  "#W75-CK a row with no bodies is untouched either way");
+            {
+                // the whole point: at 0 net bodies the clause is not printed at
+                // all, so no survival verdict can rest on a body that dies to
+                // the rule. The Rorix board, exactly: 5 from one attacker, 3 life.
+                std::vector<CrackBackAttackerFact> rorix(1);
+                rorix[0].power = 5;
+                rorix[0].blockersNeeded = 1;
+                rorix[0].coverable = true;
+                const string withBody = crackBackBlockerRowTag(5, 3, 1, 0, rorix, false, 0);
+                CHECK(withBody.find("This adds 1 body") != string::npos
+                          && withBody.find("which you SURVIVE") != string::npos,
+                      "#W75-CK REPRO the shipped clause on the Rorix board (1 body -> SURVIVE)");
+                CHECK(crackBackBlockerRowTag(5, 3, 0, 0, rorix, false, 0).empty(),
+                      "#W75-CK ...and with the legend-rule body netted out the row prices"
+                      " nothing at all");
+            }
         }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

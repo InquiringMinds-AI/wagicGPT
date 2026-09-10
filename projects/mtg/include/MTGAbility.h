@@ -35,6 +35,13 @@ using std::map;
 typedef void (*AbilityParseFailFn)(MTGCardInstance * card, const std::string & line, MTGGameZone * dest, bool byDesign);
 extern AbilityParseFailFn gAbilityParseFailCallback;
 extern bool gAbilityParseAltCostUnpaid;
+// #W75-CK (P22): the same idea for a ZONE-GATED line - a line whose parser
+// legitimately refuses in the zone the card is currently in. A modal-DFC land's
+// `anyzone={0}:doubleside(<back face>)` is parsed in EVERY zone, and the
+// doubleside parser refuses on the battlefield by design (you cannot turn a
+// permanent's face there), so every pathway on the table logged two ERROR lines
+// per parse. Set by parseMagicLine, consumed exactly like the alt-cost flag.
+extern bool gAbilityParseZoneGatedNull;
 extern long gAbilityParseLineCount;
 
 //stupid variables used to give a hint to the AI:

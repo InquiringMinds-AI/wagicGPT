@@ -1,0 +1,39 @@
+#NAME: A pathway's battlefield parse is clean, and its mana ability is usable (#W75-CK P22)
+#DESC: Wave-74 known-bugs P22 / deck123 LOW-4. Every modal-DFC pathway on the
+#DESC: table logged, per parse:
+#DESC:   ABILITYFACTORY Error parsing: {0}:doubleside(grimclimb pathway)
+#DESC:   ABILITYFACTORY ERROR: Parser returned NULL {t}:add{w}
+#DESC: Both were false alarms, and the second one indicted an innocent line. The
+#DESC: first: `anyzone={0}:doubleside(<back face>)` is parsed in EVERY zone and
+#DESC: the doubleside parser refuses on the battlefield BY DESIGN ("It's not
+#DESC: allowed to turn side on battlefield") - a permanent's face is not turned
+#DESC: there. The second: getAbilities CONSUMES `magicText` as it walks the
+#DESC: card's lines, so the failure report printed the REMAINING text, i.e. the
+#DESC: line AFTER the one that failed - which is how one by-design refusal per
+#DESC: pathway was filed as six broken `{t}:add{g}` / `{t}:add{w}` mana
+#DESC: abilities. Those lines parse and work, which is what this fixture pins;
+#DESC: the message changes themselves are pinned by the scoped run's stderr
+#DESC: (3 lines, 2 of them ERROR, before; 2 lines, 0 ERROR, after - see
+#DESC: strategy-design/wave75/lane-CK.md).
+[INIT]
+firstmain
+[PLAYER1]
+hand:Branchloft Pathway,Savannah Lions
+inplay:Brightclimb Pathway
+life:20
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+goto firstmain
+autotap Savannah Lions
+[ASSERT]
+firstmain
+[PLAYER1]
+hand:Branchloft Pathway,Savannah Lions
+inplay:Brightclimb Pathway
+tappedinplay:1
+manapool:{W}
+[PLAYER2]
+[END]
