@@ -85,6 +85,12 @@ static int blockerLifelinkGain(int blkPower, int blkToughness, bool blkLifelink,
 //below and OUTSIDE the anonymous namespace, while its first caller (the sweeper
 //roster walk) is inside it, so the declaration lives at file scope.
 static const char * engineKindForScript(const string& magicText);
+//#W76-CO (Q5): same reason once more - the crack-back walk's per-body half is
+//defined with the CRACK-BACK NEXT TURN line, far below and OUTSIDE the
+//anonymous namespace, while the sweeper roster that prices its victims against
+//the SAME walk is inside it. A declaration in there would name a different
+//function, and the two walks would silently disagree.
+static int crackBackBodyContribution(MTGCardInstance * ac);
 
 namespace
 {
@@ -2366,9 +2372,18 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
                                 std::vector<WipeVictim> * theirAttackers = NULL,
                                 //#W66-AQ (H10): which of THEIRS are engines
                                 //rather than bodies, from the same walk.
-                                std::vector<std::string> * theirEngines = NULL)
+                                std::vector<std::string> * theirEngines = NULL,
+                                //#W76-CO (Q5): how much of the CRACK-BACK NEXT
+                                //TURN total this sweeper's victims carry, and
+                                //from how many bodies. Same walk as the line.
+                                int * theirCrackPower = NULL,
+                                int * theirCrackBodies = NULL)
 {
     theirs = theirsAttack = mine = 0;
+    if (theirCrackPower) //#W76-CO (Q5)
+        *theirCrackPower = 0;
+    if (theirCrackBodies)
+        *theirCrackBodies = 0;
     if (theirOnly)
         *theirOnly = NULL;
     Player * me = card ? card->controller() : NULL;
@@ -2402,6 +2417,17 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
             if (const char * ek = engineKindForScript(c->magicText))
                 theirEngines->push_back(c->getDisplayName() + instanceHandle(c)
                                         + " - a " + ek);
+        if (theirCrackPower || theirCrackBodies) //#W76-CO (Q5)
+        {
+            const int cbp = crackBackBodyContribution(c);
+            if (cbp > 0)
+            {
+                if (theirCrackPower)
+                    *theirCrackPower += cbp;
+                if (theirCrackBodies)
+                    (*theirCrackBodies)++;
+            }
+        }
         if (boardCreatureCanAttackNow(c, live))
         {
             theirsAttack++;
@@ -2519,7 +2545,14 @@ struct CastRowBoardAnswer
     //picks. It takes no part in the sweep ranking; it is read by the
     //crack-back cover block only.
     int edictKind;
-    CastRowBoardAnswer() : theirs(-1), mine(-1), edictKind(0) {}
+    //#W76-CO (Q5): the crack-back total this row REMOVES, and from how many
+    //bodies - summed with crackBackBodyContribution, the same walk the
+    //CRACK-BACK NEXT TURN line itself is built from, over the victims this row
+    //already names. 0 = this row removes nothing that was going to attack.
+    int crackRemoved;
+    int crackRemovedBodies;
+    CastRowBoardAnswer() : theirs(-1), mine(-1), edictKind(0),
+                           crackRemoved(0), crackRemovedBodies(0) {}
 };
 
 static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
@@ -2576,6 +2609,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
     std::vector<std::string> theirSurvivors, mySurvivors;
     std::vector<WipeVictim> theirAttackers; //#W61-U (C10)
     std::vector<std::string> theirEngines; //#W66-AQ (H10)
+    int sweepCrackPower = 0, sweepCrackBodies = 0; //#W76-CO (Q5)
     int destroyKind = 0;
     if (sweepVerb && strcmp(sweepVerb, "destroys") == 0)
         destroyKind = lowText.find("bury all(creature)") != string::npos ? 2 : 1;
@@ -2585,7 +2619,9 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
                              sweepVerb ? &theirSurvivors : NULL,
                              sweepVerb ? &mySurvivors : NULL,
                              attackPunisher ? &theirAttackers : NULL,
-                             sweepVerb ? &theirEngines : NULL)) //#W61-U (C10) / #W66-AQ (H10)
+                             sweepVerb ? &theirEngines : NULL,
+                             sweepVerb ? &sweepCrackPower : NULL, //#W76-CO (Q5)
+                             sweepVerb ? &sweepCrackBodies : NULL)) //#W61-U (C10) / #W66-AQ (H10)
         return "";
     if (edict)
     {
@@ -2680,6 +2716,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
         {
             ans->theirs = theirs;
             ans->mine = mine;
+            ans->crackRemoved = sweepCrackPower;      //#W76-CO (Q5)
+            ans->crackRemovedBodies = sweepCrackBodies;
             //#W66-AQ (H10): and which of those bodies are engines.
             std::ostringstream eng;
             for (size_t ei = 0; ei < theirEngines.size(); ei++)
@@ -5880,6 +5918,48 @@ static string attackDeclarationPunishers(Player * opp)
     return o.str();
 }
 
+//#W76-CO (Q4a, wave-75 deck126 HIGH-1). THE AGGREGATE COVER COUNTED A MENACE
+//ATTACKER AS ONE BODY. `126v146` deck126 seq 45 (t20, under a live LOOP
+//COMPLETE): four attackers of which TWO have menace, against four untapped
+//blockers, and the line read "Their 4 untapped blockers can cover every
+//attacker you could send, so none of that damage is guaranteed." CR 509.1c
+//says a menace attacker is blocked only by two or more creatures, so covering
+//all four costs 1+1+2+2 = 6 bodies and they have 4: at least one attacker was
+//guaranteed through, which on that board was the game. The per-attacker tags
+//in the SAME prompt already model menace ("cannot be blocked by fewer than
+//two creatures"); only the aggregate did not, and the aggregate is the line
+//the model reads first.
+//The floor is `total - (the most power they can legally block)`, and with
+//per-attacker block requirements that maximum is a knapsack over the blockable
+//attackers: capacity = their untapped blocker count, each attacker's weight is
+//`minBlockersRequired()`, its value is its power. Solved exactly (their board
+//is small and the DP is count x capacity), and the direction is the safe one -
+//maximising what they block MINIMISES what is guaranteed. With every weight 1
+//the DP picks the `blockerCount` largest powers, which is byte-for-byte the
+//sum-of-the-smallest-remaining the shipped code computed, so no non-menace
+//window moves. Pure over its three inputs.
+static int w76BlockableCoveredPower(const std::vector<int>& powers,
+                                    const std::vector<int>& blockersNeeded,
+                                    int blockerCount)
+{
+    if (blockerCount <= 0 || powers.empty())
+        return 0;
+    const size_t n = powers.size();
+    std::vector<int> best((size_t) blockerCount + 1, 0);
+    for (size_t i = 0; i < n; i++)
+    {
+        int w = (i < blockersNeeded.size() && blockersNeeded[i] > 0)
+                ? blockersNeeded[i] : 1;
+        const int v = powers[i] > 0 ? powers[i] : 0;
+        if (w > blockerCount)
+            continue; //no legal block of this attacker exists on their board
+        for (int c = blockerCount; c >= w; c--)
+            if (best[(size_t) (c - w)] + v > best[(size_t) c])
+                best[(size_t) c] = best[(size_t) (c - w)] + v;
+    }
+    return best[(size_t) blockerCount];
+}
+
 //#W61-R (C1, wave-60 deck152 HIGH-1 + deck126 HIGH-2): the floor stated a
 //RESULTING LIFE TOTAL, and two classes of visible trigger move that total in
 //the opposite direction from the damage.
@@ -5985,7 +6065,24 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             //a live probe printed "at most 3 of them can be blocked at all" over
             //ONE unblockable attacker, where the count was true and not the
             //reason. The blocker-count line directly above already states the cap.
-            o << " At least " << guaranteed << " damage lands whatever they block -";
+            //#W76-CO (Q4b, wave-75 deck123 MED-1). THE FLOOR WAS ASSERTED OVER
+            //A DECLARATION TRIGGER. `125v123` deck123 seq 1208: 100 attackers,
+            //"At least 401 damage lands whatever they block - they would be at
+            //-304", with TWO Lightmine Fields on their battlefield. The seat
+            //declared all, the trigger killed the whole board before damage,
+            //and their life did not move from 97. C1b's tail sentence already
+            //named the punisher - AFTER the claim - and #W64-AK settled that a
+            //true footnote does not repair a false verdict. The floor is a
+            //floor over their BLOCKS ONLY, and the sentence now says so where
+            //a punisher is on the board, in the same clause as the number.
+            if (!attackPunishers.empty())
+                o << " At least " << guaranteed << " damage lands whatever they BLOCK,"
+                     " but that floor is over their BLOCKS ONLY: " << attackPunishers
+                  << " fires on your declaration, before any combat damage, and can"
+                     " remove attackers from that total - so it is NOT a floor on what"
+                     " lands -";
+            else
+                o << " At least " << guaranteed << " damage lands whatever they block -";
             //#W61-R (C1a): the damage is a floor; the LIFE it leaves is not,
             //because the blocks that let it through are the same blocks that
             //pay them. Both numbers, in the order the combat produces them.
@@ -11099,8 +11196,24 @@ static bool sourceDealsPoisonInsteadOfDamage(MTGCardInstance * c)
 //is level or behind (the guide owns what to do then). oppLife is a required
 //argument, not a defaulted one: a forecast that cannot see the opponent's
 //life must not be able to fall back into printing the claim.
+//#W76-CO (Q3 a, wave-75 deck146 HIGH-1 + MED-2): AND THE VERDICT'S OWN
+//PREMISE. `146v126` deck146 seq 70 (T22 Blockers, 20 life): this line read
+//"Unblocked, these attackers deal up to 1 - you would be at 19 - NOT lethal:
+//block only where the trade favors you", six lines under an INCOMING block
+//that had just refused to make ANY survival claim - both halves of the
+//opponent's life LOOP were on their battlefield, so the 1 unblocked damage is
+//an entry into a chain that does not stop until the seat is at 0, and every
+//block gains them lifelink life that enters the same chain from the other end.
+//Two statements on one screen and one of them false; the seat blocked nothing
+//and lost the game. `oppLoopLive` is `lifeLoopProvenWin(opponent())`, the same
+//predicate the INCOMING block is rendered from, so the two cannot disagree.
+//Nothing is deleted - the subtraction still prints, in full - and no verdict is
+//invented: the SURVIVAL CLAIM is withdrawn, and the withdrawal is said, which
+//is the same shape #W63-AB (E1) uses on the INCOMING line itself. The
+//take-the-damage-while-ahead hint goes with it (it is the inverse of correct
+//play against a chain; #W54-E D21's own reasoning, applied to the loop).
 static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming,
-                                   int oppLife)
+                                   int oppLife, bool oppLoopLive = false) //#W76-CO (Q3 a)
 {
     std::ostringstream o;
     o << "Your life: " << life << ".";
@@ -11115,9 +11228,11 @@ static string combatDamageForecast(int life, int poison, int lifeIncoming, int p
           << " - you would be at " << (life - lifeIncoming)
           << (life - lifeIncoming <= 0
               ? " - LETHAL if it all connects (at 0 life you LOSE - 0 is not survival): block enough to survive."
-              : (life > oppLife
-                  ? " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint)."
-                  : " - NOT lethal: block only where the trade favors you."))
+              : (oppLoopLive && lifeIncoming > 0
+                  ? " - and NO survival verdict is given from that figure: both halves of their life LOOP are on their battlefield, so any life you lose in this combat, and any life a block gains them, both enter a chain that does not stop until you are at 0. This subtraction is not a claim that you survive the swing, and taking the damage is not a trade."
+                  : (life > oppLife
+                      ? " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint)."
+                      : " - NOT lethal: block only where the trade favors you.")))
           << "\n";
         return o.str();
     }
@@ -11323,7 +11438,12 @@ struct XDamVictim
     //belongs on neither side's kill list, so xVictimList skips it and the
     //player-lethality clause states it in its own words instead.
     bool isPlayer;
-    XDamVictim() : lethalX(0), mine(false), pluralVerb(false), isPlayer(false) {}
+    //#W76-CO (Q5): the instance this victim IS, so a row that kills it can be
+    //priced against the crack-back walk with no second identification pass (a
+    //name match would be a second walk, and two walks drift). NULL on every
+    //non-board row (the player rows) and on any branch that does not set it.
+    MTGCardInstance * inst;
+    XDamVictim() : lethalX(0), mine(false), pluralVerb(false), isPlayer(false), inst(NULL) {}
 };
 
 //Five identical 1/1 Elves are five rows saying the same thing. A board wipe's
@@ -11729,6 +11849,7 @@ static bool xSurveyBoard(MTGCardInstance * card, Player * me, XVictimSurvey & sv
                         v.mine = (c->controller() == me);
                         v.lethalX = c->basicAbilities[Constants::INDESTRUCTIBLE]
                                     ? 0 : (c->life > 0 ? c->life : 1);
+                        v.inst = c; //#W76-CO (Q5)
                         victims.push_back(v);
                     }
                 if (tc->canTarget(pp, true))
@@ -14244,6 +14365,23 @@ string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * a
         xTradeCountsAt(sv.victims, mx, t, m);
         ans->theirs = t;
         ans->mine = m;
+        //#W76-CO (Q5): and what those same victims were going to swing back
+        //for. Priced at the X this row's OWN marker names, so the cover clause
+        //and the marker cannot name different casts, and summed with
+        //crackBackBodyContribution - the walk the CRACK-BACK line above is
+        //built from - over the victim INSTANCES, not their names.
+        for (size_t vi = 0; vi < sv.victims.size(); vi++)
+        {
+            const XDamVictim & v = sv.victims[vi];
+            if (v.mine || v.isPlayer || !v.inst || v.lethalX <= 0 || v.lethalX > mx)
+                continue;
+            const int cbp = crackBackBodyContribution(v.inst);
+            if (cbp > 0)
+            {
+                ans->crackRemoved += cbp;
+                ans->crackRemovedBodies++;
+            }
+        }
     }
     if (!sv.priceable)
     {
@@ -24800,6 +24938,23 @@ static bool crackBackScreenTotal(Player * me, Player * opp, GameObserver * obs,
     return true;
 }
 
+//#W76-CO (Q3 b): the loss the CRACK-BACK NEXT TURN line on THIS screen states,
+//or 0 when no such line is printed. It is the same total the line prints PLUS
+//the floor's own ADD-THOSE-UP figure, because the line prints "that would KILL
+//you" off both of them - so a consumer testing `myLife - this <= 0` is testing
+//exactly the sentence the reader can see, and nothing else.
+static int statedCrackBackLossToSeat(Player * me, Player * opp, GameObserver * obs)
+{
+    int total = 0;
+    bool isFloor = false;
+    if (!crackBackScreenTotal(me, opp, obs, total, isFloor))
+        return 0;
+    int floorExtra = 0;
+    bool floorUnsized = false;
+    crackBackFloorSources(opp, &floorExtra, &floorUnsized);
+    return total + (floorExtra > 0 ? floorExtra : 0);
+}
+
 
 //#W64-AH (F11, deck130 HIGH-2): the crack-back line states ONE number and the
 //cast rows under it were priced against MANA alone. `162` seq 43, at 1 life:
@@ -25150,6 +25305,62 @@ static string crackBackBlockerRowTag(int total, int myLife,
     {
         o << ", which still KILLS you";
     }
+    o << ". Removal or a trick they draw is excluded either way - read the"
+         " per-attacker tags above for the rest.}";
+    return o.str();
+}
+
+//#W76-CO (Q5, wave-75 deck130 HIGH-1). THE COVER FAMILY WAS ASYMMETRIC.
+//`130v152` deck130 seq 23 (t10, 9 life) printed a CRACK-BACK NEXT TURN of 6
+//from 2 of their creatures, "5 from 1 attacker nothing you control can legally
+//block". Row 3 (Siege-Gang Commander) ADDED bodies and got a full
+//`{crack-back cover: ...}` paragraph; row 2 (Starstorm, whose own X pricing
+//named Elite Spellbinder and Luminarch Aspirant - BOTH crack-back attackers -
+//as its kills at X=3) and row 4 (Hammer of Bogardan, same two named) got
+//nothing at all. The seat took the bodies and lost. Removing an attacker and
+//blocking one are the same arithmetic on the same line, so they are the same
+//clause family: what the row takes OFF the total, and where that leaves the
+//seat. The removal is CERTAIN in the sense the blocker cover's bodies are not
+//(no block has to be legal for a dead attacker to stop attacking), so this
+//clause carries no CHECKED/unchecked split - but it obeys #W65-AL (G4)'s rule
+//without exception: NO survival verdict is printed against a total the line
+//above calls a FLOOR, because a larger crack-back is on the table. Pure over
+//its five numbers, so every branch is provable without a board.
+static string crackBackKillRowTag(int total, int myLife, bool totalIsFloor,
+                                  int removedPower, int removedBodies,
+                                  int attackerBodies)
+{
+    if (total <= 0 || removedPower <= 0 || removedBodies <= 0 || attackerBodies <= 0)
+        return "";
+    if (removedBodies > attackerBodies)
+        return ""; //the two walks disagree: claim nothing
+    const int left = removedPower >= total ? 0 : total - removedPower;
+    std::ostringstream o;
+    o << " {crack-back cover: the CRACK-BACK NEXT TURN line above is " << total
+      << " from " << attackerBodies << " of their creatures and puts you at "
+      << (myLife - total);
+    if (totalIsFloor)
+        o << " OR LOWER - that line says the total is a FLOOR, not a ceiling"
+             " (triggers, animated permanents and ability damage on their board"
+             " add to it before damage), so every figure in this clause is"
+             " computed against a number that can only go UP";
+    o << ". This row REMOVES " << removedBodies << " of those " << attackerBodies
+      << " attacker" << (removedBodies == 1 ? "" : "s")
+      << " - a dead creature does not attack, so that takes " << removedPower
+      << " off the total, leaving " << left << " -> you would be at "
+      << (myLife - left);
+    if (totalIsFloor)
+        o << ". THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from"
+             " is a FLOOR, so a larger crack-back than " << total << " is on the"
+             " table and this row does not say whether you survive - the "
+          << (myLife - left) << " above is what you would be at ONLY if that"
+             " total does not grow. What this row DOES establish is that it"
+             " takes " << removedPower << " of it away";
+    else if (myLife - left > 0)
+        o << ", which you SURVIVE - and any blocker you still control can only"
+             " lower that, so nothing uncounted here overturns it";
+    else
+        o << ", which still KILLS you";
     o << ". Removal or a trick they draw is excluded either way - read the"
          " per-attacker tags above for the rest.}";
     return o.str();
@@ -33004,13 +33215,41 @@ static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent,
 
 //The per-row price. `gain` 0 names no beneficiary (the script did not say who),
 //1 the other player, 2 the deciding seat. Pure.
+//#W76-CO (Q6, wave-75 deck162 HIGH). THE ROW STATED HALF THE PRICE.
+//`162v126` deck162 seq 10 (t11, 18 life vs 21) offered two Shield Spheres
+//("they gain 6 life (its toughness)") and a Fog Bank ("they gain 2") under a
+//header whose tie-break is "the one that pays the least" - with Sanguine Bond
+//on THEIR battlefield, and the prompt's own LIFE-TO-DAMAGE CONVERTER paragraph
+//twenty lines above saying so. The 6 life they gain is 6 off the SEAT's total,
+//and no row said it: the seat was ranking a price whose larger half was not
+//printed. Same construction #W53-O (D13) already uses on the edict row - the
+//converter is already scanned, the gain is already on the row, so the row
+//states the whole trade rather than the half it can compute alone. `convTakes`
+//is `lifeToDamageConverterTake`'s answer for THIS toughness (0 = no converter
+//of theirs, or one whose amount is not knowable here), so nothing is guessed.
 static string forcedSacrificeRowTag(int gain, int toughness,
-                                    const char * engineKind = NULL) //#W66-AQ (H10)
+                                    const char * engineKind = NULL, //#W66-AQ (H10)
+                                    const string& convName = "", //#W76-CO (Q6)
+                                    int convTakes = 0)
 {
     std::ostringstream o;
     o << " [you SACRIFICE this";
     if (gain == 1)
+    {
         o << "; they gain " << toughness << " life (its toughness)";
+        if (!convName.empty() && convTakes > 0)
+        {
+            //The ONLY number this adds is a function of the toughness already
+            //printed on this row (`lifeToDamageConverterTake`), never of the
+            //seat's life total: the row is inside a `[...]` bracket, which the
+            //ask key does NOT strip, and a life-derived number in there would
+            //mint a fresh key every time the same forced choice is re-put at a
+            //different life. The consequence for the seat's total is what the
+            //LIFE-TO-DAMAGE CONVERTER paragraph on the same screen is for.
+            o << " - and with their " << convName << " that is " << convTakes
+              << " off YOUR life";
+        }
+    }
     else if (gain == 2)
         o << "; you gain " << toughness << " life (its toughness)";
     //#W66-AQ (H10): the row's own half of the header's scope clause.
@@ -33827,30 +34066,70 @@ static bool w74ClockSourceRecurs(MTGCardInstance * c)
 //suppresses nothing: with no loss landing on the seat this window the clock is
 //a true fact, and the trust doctrine forbids deleting a true token. Pure over
 //its inputs, so PARSETEST walks every branch.
+//#W76-CO (Q3, wave-75 deck146 HIGH-1 + MED-2, deck125 B-2). ONE PREDICATE FOR
+//"THIS SCREEN ALREADY STATES A LETHAL", because two computations of the same
+//question are two chances to disagree with each other on one prompt - which is
+//exactly what happened twice in the wave-75 corpus:
+// (a) the blockers header printed `NOT lethal: block only where the trade
+//     favors you` on three windows (`146v126` seqs 64 and 70, `162v126` seq
+//     13) whose own INCOMING block, six lines above, refused to make ANY
+//     survival claim because both halves of the opponent's life LOOP were in
+//     play. Under that loop the seat's own unblocked damage is an entry into a
+//     chain that does not stop at 0, so "NOT lethal" is false and the
+//     take-the-damage-while-ahead hint that rides it is the inverse of correct
+//     play. deck146 lost that game from 20 life.
+// (b) the own-clock tag promised `the opponent reaches 0 in N more turns` on
+//     eight windows (`125v123` seqs 381-395, t77) six lines under a
+//     `CRACK-BACK NEXT TURN: ... you would be at -84; that would KILL you`.
+//     #W75-CL (P10) took the stack and the combat declaration; the crack-back
+//     line was the one stated lethal it did not read.
+//The sources are STATED ones only - a surface on this screen said it, so the
+//predicate can never disagree with the screen. The crack-back arm keys on
+//exactly the arithmetic the line prints its own "that would KILL you" from
+//(`myLife - stated <= 0`), so the two cannot drift.
+//THE LOOP ALONE SUPPRESSES NOTHING (#W75-CL P10's rule, kept verbatim): with
+//no loss landing on the seat this window the clock is a true fact and the
+//trust doctrine forbids deleting a true token - the engine seat's 57 loop
+//renders at 28-38 life are all TRUE and all kept. Pure over its inputs.
+bool w76StatedLethalOnScreen(int myLife, int incomingCombat, int stackDamage,
+                             int crackBackDamage, bool oppLoopLive)
+{
+    const int worstNow = stackDamage > incomingCombat ? stackDamage : incomingCombat;
+    //Under a PROVEN opponent loop the prompt's own LOOP COMPLETE header states
+    //the rule: "every life payment on this screen is fatal rather than
+    //expensive". So a stated loss of ANY size is the lethal, whatever the life
+    //total. A crack-back is a WHOLE TURN CYCLE away and the seat untaps first,
+    //so it does not arm this arm - only the arithmetic arm below.
+    if (oppLoopLive && worstNow > 0)
+        return true;
+    if (myLife < 0)
+        return false;
+    if (worstNow > 0 && myLife - worstNow <= 0)
+        return true;
+    if (crackBackDamage > 0 && myLife - crackBackDamage <= 0)
+        return true;
+    return false;
+}
+
 //The gate itself, lifted out so PARSETEST can walk every branch without a
 //board. TRUE = the sentence is suppressed. #W75-CL (P10).
+//#W76-CO (Q3 b): the four-argument form is the wave-75 gate, unchanged and
+//byte-identical - it is w76StatedLethalOnScreen with no crack-back stated.
 bool w75OwnClockSuppressed(int myLife, int incomingDamage, int stackDamage, bool oppLoopLive)
 {
-    const int worst = stackDamage > incomingDamage ? stackDamage : incomingDamage;
-    //Under a PROVEN opponent loop the prompt's own LOOP COMPLETE header states
-    //the rule: "ANY nonzero payment on a tag above is fatal, not merely
-    //expensive". So a stated loss of ANY size is the lethal, whatever the life
-    //total. The loop alone is NOT a suppressor: with nothing landing on the
-    //seat this window the clock is a true fact and the trust doctrine forbids
-    //deleting a true token (silent omissions are worse than wrong text).
-    if (oppLoopLive && worst > 0)
-        return true;
-    return myLife >= 0 && worst > 0 && myLife - worst <= 0;
+    return w76StatedLethalOnScreen(myLife, incomingDamage, stackDamage, 0, oppLoopLive);
 }
 
 static string ownClockTagFor(Player * seat, Player * opp, int myLife = -1,
                              int incomingDamage = 0,
-                             int stackDamage = 0, bool oppLoopLive = false) //#W75-CL (P10)
+                             int stackDamage = 0, bool oppLoopLive = false, //#W75-CL (P10)
+                             int crackBackDamage = 0) //#W76-CO (Q3 b)
 {
     if (!seat || !seat->game || !seat->game->inPlay || !opp)
         return string();
-    if (w75OwnClockSuppressed(myLife, incomingDamage, stackDamage, oppLoopLive))
-        return string(); //#W74-CF (F7) widened by #W75-CL (P10)
+    if (w76StatedLethalOnScreen(myLife, incomingDamage, stackDamage,
+                                crackBackDamage, oppLoopLive))
+        return string(); //#W74-CF (F7), #W75-CL (P10), widened by #W76-CO (Q3 b)
     string bestName;
     int copies = 0, perTurn = 0;
     std::map<string, int> byName;
@@ -38100,7 +38379,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
          << ownClockTagFor(this, opponent(), life, //#W74-CF (F7)
                            (mIncomingCombatTurn == observer->turn) ? mIncomingCombatDamage : 0,
                            pendingStackLifeLossToSeat(observer, this), //#W75-CL (P10)
-                           lifeLoopProvenWin(opponent()))
+                           lifeLoopProvenWin(opponent()),
+                           statedCrackBackLossToSeat(this, opponent(), observer)) //#W76-CO (Q3 b)
          << "\n"; //#W75-CI (P1a): no in-row decline tag - the fact rides the prompt-only note below
     //#W53-N (D2): where the option list ends and the per-ask facts begin. The
     //prompt-only decline annotation is spliced in here, so it reads with the
@@ -41764,6 +42044,29 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << crackBackRemovalRowTag(cbTotal2, life, cbFloor2, edT, bodies2, minPow);
             }
         }
+        //#W76-CO (Q5, wave-75 deck130 HIGH-1): and, on a row that KILLS one of
+        //their crack-back attackers outright, the same clause from the bodies
+        //it removes. Gated through the SAME crackBackScreenTotal as the two
+        //blocks above, so this row can never point at a line that is not above
+        //it; `rowSweep.crackRemoved` was summed with crackBackBodyContribution
+        //at the row's own kill walk, which is the walk the line is built from.
+        if (rowSweep.crackRemoved > 0 && rowSweep.edictKind != 1)
+        {
+            int cbTotal3 = 0;
+            bool cbFloor3 = false;
+            if (crackBackScreenTotal(this, opponent(), getObserver(), cbTotal3, cbFloor3))
+            {
+                int bodies3 = 0;
+                MTGGameZone * obf3 = (opponent() && opponent()->game)
+                                     ? opponent()->game->inPlay : NULL;
+                for (int bi = 0; obf3 && bi < obf3->nb_cards; bi++)
+                    if (crackBackBodyContribution(obf3->cards[bi]) > 0)
+                        bodies3++;
+                o << crackBackKillRowTag(cbTotal3, life, cbFloor3,
+                                         rowSweep.crackRemoved,
+                                         rowSweep.crackRemovedBodies, bodies3);
+            }
+        }
         if (mStuckCastLines.count(listKeyHash(o.str()))) //#W54-M (L6)
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -41890,7 +42193,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                          (mIncomingCombatTurn == observer->turn)
                                              ? mIncomingCombatDamage : 0,
                                          pendingStackLifeLossToSeat(observer, this), //#W75-CL (P10)
-                                         lifeLoopProvenWin(opponent()));
+                                         lifeLoopProvenWin(opponent()),
+                                         statedCrackBackLossToSeat(this, opponent(),
+                                                                   observer)); //#W76-CO (Q3 b)
             declineRowIdx = (int) menu.size();
             menu.push_back(declineRow); //the decline goes LAST among the cast rows
         }
@@ -45762,7 +46067,31 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 if (MTGCardInstance * vc = dynamic_cast<MTGCardInstance *>(targets[ti]))
                 {
                     const char * ek = engineKindForScript(vc->magicText); //#W66-AQ (H10)
-                    opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness, ek);
+                    //#W76-CO (Q6): what a converter of THEIRS turns their gain
+                    //into. Same scan and same helper the edict row's converter
+                    //clause uses (#W53-O D13), so the two surfaces cannot
+                    //disagree about the same board.
+                    string sacConvName;
+                    int sacConvTakes = 0;
+                    if (sacGain == 1 && opponent() && opponent()->game)
+                    {
+                        MTGGameZone * cbf = opponent()->game->inPlay;
+                        for (int cvi = 0; cbf && cvi < cbf->nb_cards && !sacConvTakes; cvi++)
+                        {
+                            MTGCardInstance * cvc = cbf->cards[cvi];
+                            if (!cvc)
+                                continue;
+                            const int tk = lifeToDamageConverterTake(cvc->magicText,
+                                                                    vc->toughness);
+                            if (tk > 0)
+                            {
+                                sacConvName = cvc->name + instanceHandle(cvc);
+                                sacConvTakes = tk;
+                            }
+                        }
+                    }
+                    opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness, ek,
+                                                      sacConvName, sacConvTakes);
                     if (ek)
                     {
                         if (!sacEngineRows.empty())
@@ -48502,6 +48831,7 @@ int AIPlayerGPT::chooseAttackers()
     std::vector<int> rowPower;
     std::vector<bool> rowInfect; //#W60-Q (R4): damage that is poison, not life
     std::vector<bool> rowNoLegalBlock;
+    std::vector<int> rowBlockersNeeded; //#W76-CO (Q4a): CR 509.1c, per attacker
     std::vector<int> aRowLoopAt; //#W65-AN (G6): reserved byte position per row
     for (size_t j = 0; j < attackers.size(); j++)
     {
@@ -48844,6 +49174,13 @@ int AIPlayerGPT::chooseAttackers()
             }
             rowPower.push_back(rp); //#W60-L (B11)
         }
+        //#W76-CO (Q4a): how many bodies a LEGAL block of this attacker needs -
+        //the ENGINE's own answer (menace 2, "three or more" 3), the same one
+        //the per-attacker menace tag above is rendered from.
+        {
+            const int need = attackers[j]->minBlockersRequired();
+            rowBlockersNeeded.push_back(need > 0 ? need : 1);
+        }
         rowNoLegalBlock.push_back(noLegalBlockForThisRow);
     }
     //#W65-AN (G6, deck123 HIGH-1). The totals are built FIRST, into their own
@@ -48923,6 +49260,8 @@ int AIPlayerGPT::chooseAttackers()
         {
             int totalPower = 0, guaranteed = 0, infectExcluded = 0;
             std::vector<int> blockablePowers;
+            std::vector<int> blockableNeeds; //#W76-CO (Q4a)
+            int blockableTotal = 0;
             for (size_t j = 0; j < rowPower.size(); j++)
             {
                 if (j < rowInfect.size() && rowInfect[j])
@@ -48934,12 +49273,20 @@ int AIPlayerGPT::chooseAttackers()
                 if (j < rowNoLegalBlock.size() && rowNoLegalBlock[j])
                     guaranteed += rowPower[j];
                 else
+                {
                     blockablePowers.push_back(rowPower[j]);
+                    blockableNeeds.push_back(j < rowBlockersNeeded.size()
+                                             ? rowBlockersNeeded[j] : 1);
+                    blockableTotal += rowPower[j];
+                }
             }
-            std::sort(blockablePowers.begin(), blockablePowers.end());
-            const int freeCount = (int) blockablePowers.size() - blockerCount;
-            for (int k = 0; k < freeCount && k < (int) blockablePowers.size(); k++)
-                guaranteed += blockablePowers[k];
+            //#W76-CO (Q4a): what is left after they block as much power as
+            //their bodies legally CAN - each attacker costing the bodies CR
+            //509.1c makes it cost. With every requirement 1 this is the old
+            //sum-of-the-smallest-remaining, byte for byte.
+            guaranteed += blockableTotal
+                        - w76BlockableCoveredPower(blockablePowers, blockableNeeds,
+                                                   blockerCount);
             Player * oppL = opponent();
             //#W60-Q (R4): a player who cannot lose life gets no life claim.
             bool suppressed = false;
@@ -49813,7 +50160,8 @@ int AIPlayerGPT::chooseBlockers()
         }
         //#W54-E (D21): the opponent's life is what makes "ahead" a fact.
         tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming,
-                                     opponent() ? opponent()->life : life);
+                                     opponent() ? opponent()->life : life,
+                                     lifeLoopProvenWin(opponent())); //#W76-CO (Q3 a)
     }
     //#W57-B (D22): and the OTHER total this window turns on - what the seat
     //gains, and (under a converter of its own) takes off them, simply for
@@ -84807,6 +85155,270 @@ static const char * kW50Y_r94 =
                 other[0].name = "Bloodline Keeper"; other[0].isToken = true;
                 CHECK(!w75LegendTwinControlled(other, "Rorix Bladewing"),
                       "#W75-CM F8 MUST-NOT-MATCH a token with a DIFFERENT name is not a twin");
+            }
+
+            // ================= wave 76, lane CO: combat and loop truth =========
+            // ---------------- Q3 (HIGH): ONE "this screen already states a lethal".
+            {
+                // (a) the blockers header, on the `146v126` deck146 seq 70 board:
+                // 20 life, one 1/1 lifelink attacker, both halves of THEIR loop live.
+                // RED ON BASE, replayed through the branch pinned byte-identical to
+                // it below: the seeded tree has no loop argument at all, so seq 70's
+                // board rendered THIS - the sentence the INCOMING block on the same
+                // screen had already refused to stand behind.
+                CHECK(combatDamageForecast(20, 0, 1, 0, 32)
+                          .find("you would be at 19 - NOT lethal: block only where the trade"
+                                " favors you") != string::npos,
+                      "#W76-CO Q3a RED-ON-BASE the wave-75 line (this call IS the base's, and"
+                      " is pinned byte-identical below) prints the false verdict on the"
+                      " `146v126` deck146 seq 70 board - 3 of the corpus's 25 renders of it"
+                      " sit under a live opponent LOOP (seqs 64 and 70, and `162v126` seq 13)");
+                const string loopHdr = combatDamageForecast(20, 0, 1, 0, 32, true);
+                CHECK(loopHdr.find("NOT lethal") == string::npos,
+                      "#W76-CO Q3a REPRO/GREEN the blockers header makes NO not-lethal claim"
+                      " under a proven opponent life LOOP - RED on base, where `146v126` seq"
+                      " 70 read \"you would be at 19 - NOT lethal: block only where the trade"
+                      " favors you\" six lines under an INCOMING block that had just refused"
+                      " every survival claim on that exact board");
+                CHECK(loopHdr.find("you would be at 19") != string::npos
+                      && loopHdr.find("both halves of their life LOOP") != string::npos,
+                      "#W76-CO Q3a GREEN nothing is deleted: the subtraction still prints and"
+                      " the reason the verdict is withheld is NAMED (the trust doctrine's"
+                      " no-silent-omission rule)");
+                CHECK(loopHdr.find("taking damage while ahead") == string::npos,
+                      "#W76-CO Q3a GREEN the take-the-damage-while-ahead hint goes with the"
+                      " verdict - against a chain it is the inverse of correct play");
+                CHECK(combatDamageForecast(20, 0, 1, 0, 32, false)
+                          == combatDamageForecast(20, 0, 1, 0, 32),
+                      "#W76-CO Q3a MUST-NOT-MATCH with no loop the line is byte-identical to"
+                      " the wave-75 five-argument call - no non-loop window moves");
+                CHECK(combatDamageForecast(4, 0, 5, 0, 20, true).find("LETHAL if it all connects")
+                          != string::npos,
+                      "#W76-CO Q3a MUST-NOT-MATCH an ordinary lethal swing still says LETHAL"
+                      " under a loop - the loop arm never displaces a stated kill");
+                CHECK(combatDamageForecast(20, 0, 0, 5, 20, true)
+                          == combatDamageForecast(20, 0, 0, 5, 20),
+                      "#W76-CO Q3a MUST-NOT-MATCH a pure POISON swing is untouched: no life"
+                      " is lost, so nothing enters the chain from this line");
+
+                // (b) the own-clock gate now reads the CRACK-BACK line too.
+                // `125v123` deck125 seq 384: 97 life, crack-back 181 -> -84, KILL.
+                CHECK(w76StatedLethalOnScreen(97, 0, 0, 181, false),
+                      "#W76-CO Q3b REPRO a stated CRACK-BACK KILL is a stated lethal - RED on"
+                      " base, where w75OwnClockSuppressed had no crack-back argument and the"
+                      " tag promised \"the opponent reaches 0 in N more turns\" six lines under"
+                      " \"you would be at -84; that would KILL you\"");
+                CHECK(!w76StatedLethalOnScreen(97, 0, 0, 96, false),
+                      "#W76-CO Q3b MUST-NOT-MATCH a SURVIVABLE crack-back states no lethal:"
+                      " the arm keys on exactly the arithmetic the line prints its own"
+                      " \"that would KILL you\" from");
+                CHECK(!w76StatedLethalOnScreen(30, 0, 0, 0, true),
+                      "#W76-CO Q3b MUST-NOT-MATCH the loop ALONE suppresses nothing - with no"
+                      " stated loss landing on the seat the clock is TRUE (the engine seat's"
+                      " 57 loop renders at 28-38 life are all kept)");
+                CHECK(w76StatedLethalOnScreen(42, 1, 0, 0, true)
+                      && w76StatedLethalOnScreen(42, 0, 1, 0, true),
+                      "#W76-CO Q3b GREEN under a proven loop a stated loss of ANY size is the"
+                      " lethal, from either surface - #W75-CL (P10)'s rule, kept verbatim");
+                CHECK(!w76StatedLethalOnScreen(-1, 0, 0, 181, false),
+                      "#W76-CO Q3b MUST-NOT-MATCH an unknown life total claims nothing");
+                CHECK(w75OwnClockSuppressed(2, 0, 3, false)
+                          == w76StatedLethalOnScreen(2, 0, 3, 0, false)
+                      && !w75OwnClockSuppressed(5, 0, 4, false),
+                      "#W76-CO Q3b KEY the four-argument wave-75 gate is the new predicate"
+                      " with no crack-back stated - #W75-CL (P10)'s pins are unmoved");
+            }
+
+            // ---------------- Q4 (HIGH): the aggregate cover and the floor.
+            {
+                // (a) `126v146` deck126 seq 45: 4 attackers (3,3,2,2), the last two
+                // with MENACE, against 4 untapped blockers.
+                std::vector<int> pw, need;
+                pw.push_back(3); need.push_back(1);
+                pw.push_back(3); need.push_back(1);
+                pw.push_back(2); need.push_back(2);
+                pw.push_back(2); need.push_back(2);
+                const int coveredMenace = w76BlockableCoveredPower(pw, need, 4);
+                CHECK(coveredMenace == 8,
+                      "#W76-CO Q4a REPRO/GREEN four bodies cover 3+3 and ONE of the two menace"
+                      " attackers (1+1+2 = 4 bodies), never all four - RED on base, where the"
+                      " count cap said 4 attackers vs 4 blockers and the line read \"Their 4"
+                      " untapped blockers can cover every attacker you could send\"");
+                CHECK(10 - coveredMenace == 2,
+                      "#W76-CO Q4a GREEN ...so at least 2 damage is guaranteed through, and"
+                      " the aggregate stops contradicting the per-attacker menace tags on the"
+                      " same screen");
+                std::vector<int> allOne(need.size(), 1);
+                CHECK(w76BlockableCoveredPower(pw, allOne, 4) == 10,
+                      "#W76-CO Q4a MUST-NOT-MATCH with every requirement 1 the cover is the"
+                      " whole board again - the shipped no-menace arithmetic is unmoved");
+                {
+                    std::vector<int> p2, n2;
+                    p2.push_back(5); n2.push_back(1);
+                    p2.push_back(4); n2.push_back(1);
+                    p2.push_back(1); n2.push_back(1);
+                    CHECK(10 - w76BlockableCoveredPower(p2, n2, 2) == 1,
+                          "#W76-CO Q4a KEY the all-ones case is byte-for-byte the wave-60"
+                          " sum-of-the-smallest-remaining: two blockers take the 5 and the 4,"
+                          " and the 1 is the floor");
+                }
+                CHECK(w76BlockableCoveredPower(pw, need, 0) == 0
+                      && w76BlockableCoveredPower(std::vector<int>(), need, 4) == 0,
+                      "#W76-CO Q4a MUST-NOT-MATCH no blockers, or no blockable attacker,"
+                      " covers nothing");
+                {
+                    std::vector<int> p3, n3;
+                    p3.push_back(9); n3.push_back(3); //"can't be blocked except by three"
+                    CHECK(w76BlockableCoveredPower(p3, n3, 2) == 0,
+                          "#W76-CO Q4a GREEN an attacker needing THREE bodies against two is"
+                          " not covered at all - CR 509.1c, from minBlockersRequired()");
+                }
+
+                // (b) `125v123` deck123 seq 1208: the floor over a Lightmine Field.
+                // RED ON BASE: the seeded tree prints the categorical floor whatever
+                // is on their board - the punisher clause only ever followed it.
+                CHECK(attackTotalLine(100, 401, 97, 0, 401)
+                          .find("At least 401 damage lands whatever they block - they would"
+                                " be at -304") != string::npos,
+                      "#W76-CO Q4b RED-ON-BASE the sentence deck123 seq 1208 read, verbatim,"
+                      " over two Lightmine Fields - and their life did not move from 97");
+                const string pun = attackTotalLine(100, 401, 97, 0, 401, 0, false, 0,
+                                                   "Lightmine Field, Lightmine Field");
+                CHECK(pun.find("At least 401 damage lands whatever they block -") == string::npos,
+                      "#W76-CO Q4b REPRO/GREEN the categorical floor sentence is GONE where an"
+                      " attack trigger of theirs sits on the board - RED on base, where deck123"
+                      " seq 1208 read it over two Lightmine Fields, declared all 100, lost the"
+                      " whole board to the declaration trigger and moved their life 0 points");
+                CHECK(pun.find("that floor is over their BLOCKS ONLY") != string::npos
+                      && pun.find("Lightmine Field") != string::npos,
+                      "#W76-CO Q4b GREEN the number still prints and the punisher is NAMED in"
+                      " the same clause as the claim it qualifies, not in a footnote under it"
+                      " (#W64-AK: a true footnote does not repair a false verdict)");
+                CHECK(pun.find("KILLS them") == string::npos,
+                      "#W76-CO Q4b MUST-NOT-MATCH #W61-R (C1b) still stands: no kill claim"
+                      " survives an unpriced punisher");
+                CHECK(attackTotalLine(5, 20, 22, 3, 6)
+                          .find("At least 6 damage lands whatever they block -") != string::npos,
+                      "#W76-CO Q4b MUST-NOT-MATCH with NO punisher the floor sentence is the"
+                      " wave-60 wording, byte for byte");
+            }
+
+            // ---------------- Q5 (HIGH): the removal row joins the cover family.
+            {
+                // `130v152` deck130 seq 23: 9 life, crack-back 6 from 2 bodies, a FLOOR
+                // (Luminarch Aspirant). Starstorm at X=3 kills BOTH of them.
+                const string floorKill = crackBackKillRowTag(6, 9, true, 6, 2, 2);
+                CHECK(floorKill.find("This row REMOVES 2 of those 2 attackers") != string::npos
+                      && floorKill.find("takes 6 off the total, leaving 0") != string::npos,
+                      "#W76-CO Q5 REPRO/GREEN the row that KILLS the crack-back attackers now"
+                      " prices itself against the same line - RED on base, where only the row"
+                      " that ADDED bodies (Siege-Gang) carried a cover clause and the two"
+                      " sweeper rows that emptied the attack carried nothing at all");
+                CHECK(floorKill.find("THIS IS NOT A SURVIVAL VERDICT") != string::npos
+                      && floorKill.find("which you SURVIVE") == string::npos,
+                      "#W76-CO Q5 GREEN #W65-AL (G4) holds without exception: no survival"
+                      " verdict against a total the line above calls a FLOOR");
+                const string ceilKill = crackBackKillRowTag(6, 9, false, 5, 1, 2);
+                CHECK(ceilKill.find("leaving 1 -> you would be at 8") != string::npos
+                      && ceilKill.find("which you SURVIVE") != string::npos,
+                      "#W76-CO Q5 GREEN on a CEILING the arithmetic completes and the verdict"
+                      " is the subtraction it just printed");
+                CHECK(crackBackKillRowTag(18, 4, false, 2, 1, 4).find("which still KILLS you")
+                          != string::npos,
+                      "#W76-CO Q5 GREEN a removal that does not go far enough says so");
+                CHECK(crackBackKillRowTag(6, 9, false, 0, 0, 2).empty()
+                      && crackBackKillRowTag(0, 9, false, 6, 2, 2).empty()
+                      && crackBackKillRowTag(6, 9, false, 6, 2, 0).empty(),
+                      "#W76-CO Q5 MUST-NOT-MATCH a row that removes no crack-back body, and a"
+                      " screen with no crack-back line, print NOTHING");
+                CHECK(crackBackKillRowTag(6, 9, false, 6, 3, 2).empty(),
+                      "#W76-CO Q5 MUST-NOT-MATCH removing more bodies than the total names"
+                      " means the two walks disagree: the clause claims nothing");
+                // KEY-STABILITY PIN SET. The clause is one `{...}` group opening
+                // `{crack-back cover: `, which is on the #W64-AH (F11) strip list and
+                // inside the group stripRenderAnnotationsLc removes whole - so every
+                // board number in it (the total, the life totals) is outside every key.
+                {
+                    const string base = "Cast Starstorm {r}{r}{x} [cost: {r}{r}{x}]";
+                    const string rowA = base + crackBackKillRowTag(6, 9, false, 5, 1, 2);
+                    const string rowB = base + crackBackKillRowTag(8, 3, false, 5, 1, 2);
+                    CHECK(rowA != rowB,
+                          "#W76-CO Q5 KEY the two rendered rows really do differ (a pin over"
+                          " identical inputs would prove nothing)");
+                    CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(rowB),
+                          "#W76-CO Q5 KEY hold-latch: two windows differing ONLY in the"
+                          " clause's board numbers give the same action key");
+                    std::vector<string> rowsA, rowsB;
+                    rowsA.push_back(rowA);
+                    rowsB.push_back(rowB);
+                    CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB),
+                          "#W76-CO Q5 KEY option-set: the declined-list count cannot be split"
+                          " by the clause's numbers");
+                    // ASK KEY / ASYNC SLOT KEY: both are the RENDERED tail, which
+                    // strips only the decline-reask tag - so a `{...}` price group's
+                    // board numbers ride them, and have since wave 54 (#W75-CM F7
+                    // states the same fact for the poison row). That is the key's
+                    // intended semantics (BOARD STATE + QUESTION): a different board
+                    // IS a different question, and only an answer-driven byte would
+                    // be the wave-49 CG regression. The pin is that this clause adds
+                    // NO exposure its sibling in the same family does not already
+                    // have - the two are byte-for-byte in one class.
+                    const string sibA = base + crackBackBlockerRowTag(6, 9, 1, 0,
+                                                                     std::vector<CrackBackAttackerFact>(1));
+                    CHECK(stripDeclineReaskTags(joinNumberedRows(rowsA, NULL))
+                              == joinNumberedRows(rowsA, NULL)
+                          && stripDeclineReaskTags(base) == base,
+                          "#W76-CO Q5 KEY ask key AND async slot key: both are the rendered"
+                          " tail and the strip touches only the decline-reask tag - the clause"
+                          " enters no key path the sibling cover clause does not already enter");
+                    CHECK(sibA == base || holdActionKeyRow(sibA) == holdActionKeyRow(base),
+                          "#W76-CO Q5 KEY the sibling `{crack-back cover: ...}` clause behaves"
+                          " identically under holdActionKeyRow - one class, one exposure");
+                    // hold-check: the held set is built the way the LIVE seam builds it.
+                    std::set<string> heldA, heldB;
+                    heldA.insert(holdActionKeyRow(rowA));
+                    heldB.insert(holdActionKeyRow(rowB));
+                    CHECK(heldA == heldB,
+                          "#W76-CO Q5 KEY hold-check: the held set (mLastMenuRows via"
+                          " holdActionKeyRow, the live seam's own construction) is identical"
+                          " across the two windows - 0 unseen rows, the hold stands");
+                }
+            }
+
+            // ---------------- Q6 (HIGH): the forced-sacrifice row's whole price.
+            {
+                // `162v126` deck162 seq 10: Shield Sphere (0/6) under THEIR Sanguine Bond.
+                const string bond = "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent";
+                const int takes = lifeToDamageConverterTake(bond, 6);
+                CHECK(takes == 6,
+                      "#W76-CO Q6 the O5/D13 converter helper reads Sanguine Bond's real"
+                      " primitive line: their gain of 6 is 6 off the seat");
+                const string row = forcedSacrificeRowTag(1, 6, NULL, "Sanguine Bond", takes);
+                CHECK(row == " [you SACRIFICE this; they gain 6 life (its toughness)"
+                             " - and with their Sanguine Bond that is 6 off YOUR life]",
+                      "#W76-CO Q6 REPRO/GREEN the row states the WHOLE price - RED on base,"
+                      " where seq 10 printed \"they gain 6 life (its toughness)\" and the six"
+                      " off the seat's own total appeared nowhere on the row the header's"
+                      " \"the one that pays the least\" tie-break ranks");
+                CHECK(forcedSacrificeRowTag(1, 6)
+                          == " [you SACRIFICE this; they gain 6 life (its toughness)]",
+                      "#W76-CO Q6 MUST-NOT-MATCH with NO converter of theirs the row is the"
+                      " wave-59 wording, byte for byte");
+                CHECK(forcedSacrificeRowTag(2, 3, NULL, "Sanguine Bond", 3)
+                          == " [you SACRIFICE this; you gain 3 life (its toughness)]",
+                      "#W76-CO Q6 MUST-NOT-MATCH the gain-2 branch (the SEAT is paid) is"
+                      " untouched: a converter of THEIRS does not convert the seat's gains");
+                CHECK(forcedSacrificeRowTag(1, 6, NULL, "Sanguine Bond", 0)
+                          == forcedSacrificeRowTag(1, 6),
+                      "#W76-CO Q6 MUST-NOT-MATCH a converter whose amount is not knowable here"
+                      " (take 0) prints nothing rather than a guess");
+                // KEY: the only number added is a function of the toughness already on the
+                // row, never of the seat's life - the bracket is NOT stripped from the ask
+                // key, and a life-derived number in there would re-ask on every life change.
+                CHECK(forcedSacrificeRowTag(1, 6, NULL, "Sanguine Bond", takes)
+                          .find("you would be at") == string::npos,
+                      "#W76-CO Q6 KEY no life-derived number enters the `[...]` bracket: the"
+                      " ask key is a pure function of the row's own toughness, as on base");
             }
         }
 
