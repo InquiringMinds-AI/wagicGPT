@@ -1738,6 +1738,10 @@ private:
     //#W74-CE (O25): PLAN lines naming a card the taken row's reserve verdict
     //strands this turn. Instrument only - nothing in the engine reads it.
     int mPlanNamesStrandedCard;
+    //#W75-CL (P17): the widened population - a PLAN naming a card that sits in
+    //the seat's own graveyard or exile with no copy in hand or in play.
+    //Instrument only.
+    int mPlanNamesUncastableZoneCard;
     int mEngineRevealFloorPicks; //#W67-AZ (R7): gameend report field
 public:
     void noteEngineRevealFloor(const string& card); //#W67-AZ (R7)
@@ -2094,6 +2098,9 @@ private:
     //`mPlanChoiceConflictSeen` and `mPlanArguesAgainstRowSeen` are DELETED - each
     //read 0 across 40 games and the mechanisms they counted are gone.
     int mPlanLineMissing;          //#W71-BO (L10): replies with NO PLAN: line
+    //#W75-CL (P23 d): replies deviating from the two-line protocol AT ALL -
+    //`off_protocol_bytes` and `plan_line_missing` counted as ONE event.
+    int mProtocolDeviationReplies;
     int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
     int mPhase2AnswerMissing;      //B1.5: ...and did not
     //#W75-CJ (P2c, engine-seat HIGH-3 "the third path"): a forced close that was
