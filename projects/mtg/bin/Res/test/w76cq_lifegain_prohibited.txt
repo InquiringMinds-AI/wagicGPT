@@ -1,0 +1,33 @@
+# W76-CQ (F6, Astra wave-76 review finding 6). THE CONVERTER CLAUSE PRICED A
+# GAIN THE BOARD FORBIDS. The Q6 clause on a forced-sacrifice row reads "they
+# gain N life (its toughness) - and with their Sanguine Bond that is N off YOUR
+# life" off the scripts alone. With Erebos, God of the Dead on the SEAT's side
+# (`nolifegainopponent`) Player::gainOrLoseLife returns before it generates a
+# life event, so there is no gain, no Bond trigger and no damage.
+#
+# Same instrument shape as F5: the clause is a render string, so the fixture
+# asks the prohibition predicate - the one wave-72 finding 9 made LOOP COMPLETE
+# consult. RED on the seeded tree (the command did not exist and no converter
+# clause consulted any prohibition).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grima Wormtongue
+life:20
+[PLAYER2]
+inplay:Sanguine Bond
+life:20
+[DO]
+# player 1 controls Erebos, so player 2 - its opponent - cannot gain life...
+assertcangainlife 0 2
+# ...and player 1's own gain is untouched: the prohibition is one-directional
+assertcangainlife 1 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grima Wormtongue
+life:20
+[PLAYER2]
+inplay:Sanguine Bond
+life:20
+[END]

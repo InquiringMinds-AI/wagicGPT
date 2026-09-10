@@ -1,0 +1,39 @@
+# W76-CQ (F5, Astra wave-76 review finding 5). THE CRACK-BACK COVER SUBTRACTED
+# BODIES THAT SURVIVE THE REMOVAL. The Q5 clause states how much of next turn's
+# crack-back this row removes, and the walk that summed it counted every
+# creature the sweeper is legally allowed to hit - regeneration, ghostform,
+# persist/undying and indestructibility were never consulted. Astra's shape: at
+# two life with no blockers, the opponent's only attacker is a regenerating body
+# under a Day of Judgment row; the row promised survival, the engine consumed
+# the shield and the creature untapped and attacked.
+#
+# The clause is a GPT render string, which no zone or P/T assertion can see, so
+# this fixture asks the victim classification itself (the #W74-CC O1 instrument
+# shape). RED on the seeded tree at the FIRST assert - `assertcrackremoved` did
+# not exist and the walk subtracted the regenerator's whole contribution.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+[PLAYER2]
+inplay:Drudge Skeletons,Grizzly Bears,Darksteel Myr
+life:20
+[DO]
+# a body that can regenerate is NOT removed by a destroy...
+assertcrackremoved 0 1 Drudge Skeletons
+# ...but a bury (destroyKind 2) gives it no regeneration window at all
+assertcrackremoved 1 2 Drudge Skeletons
+# indestructible survives a destroy and a bury...
+assertcrackremoved 0 1 Darksteel Myr
+# ...and an EXILE sweeper (destroyKind 0) takes it like any other body
+assertcrackremoved 1 0 Darksteel Myr
+# the plain body is removed, and the clause may still count it
+assertcrackremoved 1 1 Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+[PLAYER2]
+inplay:Drudge Skeletons,Grizzly Bears,Darksteel Myr
+life:20
+[END]
