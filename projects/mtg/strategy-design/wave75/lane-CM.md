@@ -210,8 +210,21 @@ its close is outstanding still counts one unrecorded — the real "third path" #
 was built to see.
 
 **Prediction.** In the next corpus `forced_close_unrecorded` is 0 in every game where
-`phase2_answer_recovered + phase2_answer_missing` equals the stderr close count; a non-zero
-value now means a genuinely lost close, on one named arm.
+`phase2_answer_recovered + phase2_answer_missing` equals the stderr close count; ~~a non-zero
+value now means a genuinely lost close, on one named arm.~~
+
+> **SUPERSEDED (wave-76 lane CN, Q8; wave-75 engine-seat §2(c) + MED-2).** The second clause
+> is WRONG and is retained only as history. The wave-75 corpus ran the identity
+> `recovered + missing + unrecorded == closes` and it held in **21 of 21 games** *with*
+> `forced_close_unrecorded` = 9 (15 + 0 + 9 = 24) — so the first clause PASSED and the
+> non-zero value did **not** mean a lost close. All nine are closes that were armed,
+> SUPERSEDED by a question that moved, and re-asked: every one is followed by
+> `dropping stale async answer ... [outcome: re-asked]` or the seat's own re-serve, the
+> corpus carries 0 fallbacks of any kind and 0 `phase2_answer_missing`. The correct reading:
+> **a non-zero `forced_close_unrecorded` is a WASTED phase-2 decode (~80 s each, ≈12 min
+> across the corpus), not a lost decision.** A lost decision would show as a fallback or as
+> `phase2_answer_missing`, and both were 0. Wave-76 Q8 adds `force_close_arms_refused` as
+> the bound on the waste; the identity itself is untouched.
 
 ---
 
