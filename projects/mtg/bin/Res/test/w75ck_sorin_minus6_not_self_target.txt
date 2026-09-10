@@ -1,0 +1,49 @@
+#NAME: Sorin, Lord of Innistrad's -6 cannot take SORIN as one of its targets (#W75-CK P4)
+#DESC: Wave-74 known-bugs P4 / deck126 HIGH-2, `126v152` deck126 seqs 38-40 (t18).
+#DESC: The report read the board deltas as "the -6 charged THREE loyalty". The
+#DESC: seat's own NARRATION is the ground truth and says otherwise:
+#DESC:   "You used: -6: destroy up to three and reanimate with Sorin, Lord of
+#DESC:    Innistrad targeting Sigarda, Champion of Light"
+#DESC:   "Your Sorin, Lord of Innistrad lost 6 loyalty counters (now 0)"
+#DESC:   "Your Sorin, Lord of Innistrad was put into your graveyard from the battlefield"
+#DESC:   "Your Sorin, Lord of Innistrad entered the battlefield from your graveyard"
+#DESC:   "Your Sorin, Lord of Innistrad got 3 loyalty counters (now 3)"
+#DESC: The loyalty COST parse is therefore CORRECT - six charged, and the walker
+#DESC: died as a state-based action. What produced the 6 -> 3 board reading, and
+#DESC: the second loyalty ability the same turn, is that SORIN WAS ONE OF ITS
+#DESC: OWN TARGETS: the script's `target(<upto:3>*[creature;planeswalker]|
+#DESC: battlefield)` does not exclude the source, targets are chosen BEFORE the
+#DESC: cost is paid, and `destroy and!(moveto(mybattlefield))!` then returned
+#DESC: the dead walker as a FRESH card instance carrying its printed 3 loyalty.
+#DESC: That also explains the -2 that followed: the once-per-turn latch
+#DESC: (MTGAbility::isReactingToClick, which refuses when an ActivatedAbility
+#DESC: whose `source == card` already has counters) is keyed on the OLD
+#DESC: instance's ability objects, and the returned Sorin is a new object with
+#DESC: fresh ones. That latch hole is general to any walker that returns itself
+#DESC: and is NOT fixed here - see strategy-design/wave75/lane-CK.md.
+#DESC: Oracle (Scryfall + the card's own text= line): "-6: Destroy up to three
+#DESC: target creatures and/or OTHER planeswalkers." The missing word is `other`
+#DESC: - card data, no engine change.
+#DESC: The option SET a target spec produces is invisible to every zone
+#DESC: assertion, so this pins it directly (assertcantarget, #W75-CK): Serra
+#DESC: Angel must stay targetable - the fix must not shrink the legal set - and
+#DESC: Sorin must not. RED on the same binary with the word removed again:
+#DESC: "assertcantarget: 'sorin, lord of innistrad' expected 0 got 1".
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Sorin^ Lord of Innistrad
+life:20
+[PLAYER2]
+inplay:Serra Angel
+life:20
+[DO]
+assertcantarget 1 serra angel via Sorin, Lord of Innistrad
+assertcantarget 0 sorin, lord of innistrad via Sorin, Lord of Innistrad
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Sorin^ Lord of Innistrad
+[PLAYER2]
+inplay:Serra Angel
+[END]

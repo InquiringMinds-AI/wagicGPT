@@ -1472,6 +1472,78 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertcantarget ") == 0)
+    {
+        //#W75-CK (P4): can the target chooser the engine is CURRENTLY waiting on
+        //legally take this card? The option SET is what a card script's target
+        //spec decides, and no zone assertion can see it - a wrong spec only
+        //shows up as a wrong board several resolutions later (Sorin, Lord of
+        //Innistrad's -6 could take SORIN ITSELF, and the ability's
+        //`and!(moveto(mybattlefield))!` then returned it with fresh loyalty).
+        //Syntax: assertcantarget <0|1> <card name>
+        //A live chooser exists only inside the tick window between the menu
+        //answer and the pick, which a script cannot reliably land on, so the
+        //`via <source card>` form asks the same question of the target choosers
+        //the source's OWN abilities carry on the action layer (the templates
+        //every arming builds from). Answer = can ANY of them take the target.
+        string rest = action.substr(16);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        string cname = rest.size() > 2 ? rest.substr(2) : "";
+        string viaName;
+        size_t viaAt = cname.find(" via ");
+        if (viaAt != string::npos)
+        {
+            viaName = cname.substr(viaAt + 5);
+            cname = cname.substr(0, viaAt);
+        }
+        MTGCardInstance * tgt = getCard(cname);
+        int got = -1;
+        int choosers = 0;
+        if (tgt && !viaName.empty())
+        {
+            MTGCardInstance * src = getCard(viaName);
+            if (src)
+            {
+                ActionLayer * al = observer->mLayers->actionLayer();
+                for (size_t i = 0; i < al->mObjects.size(); i++)
+                {
+                    MTGAbility * ab = dynamic_cast<MTGAbility *>((MTGAbility *) al->mObjects[i]);
+                    //Pointer identity only: mObjects outlives its cards and a
+                    //dead entry's `source` can dangle, so walking `previous`
+                    //here reads freed memory (SIGSEGV, measured).
+                    if (!ab || ab->source != src)
+                        continue;
+                    TargetChooser * atc = ab->getActionTc();
+                    if (!atc)
+                        continue;
+                    choosers++;
+                    if (atc->canTarget(tgt))
+                    {
+                        got = 1;
+                        break;
+                    }
+                    got = 0;
+                }
+            }
+        }
+        else if (tgt)
+        {
+            TargetChooser * ctc = observer->getCurrentTargetChooser();
+            if (ctc)
+            {
+                choosers = 1;
+                got = ctc->canTarget(tgt) ? 1 : 0;
+            }
+        }
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertcantarget: '" << cname << "' expected " << expect
+                      << " got " << got << " (choosers seen: " << choosers << ")"
+                      << (tgt ? "" : " (no such card)")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertghostformlive ") == 0)
     {
         //#W74-CC (O1, wave-73 engine-seat HIGH-1): the ghostform counter gloss

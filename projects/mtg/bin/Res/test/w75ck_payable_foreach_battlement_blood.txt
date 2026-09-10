@@ -1,0 +1,33 @@
+#NAME: A foreach-wrapped VARIABLE producer makes {4}{B} payable, not just {3}{B}{B} (#W75-CK P3)
+#DESC: Wave-74 known-bugs P3 / deck126 HIGH-1. `126v162` deck126 seq 22 (t15):
+#DESC: Exquisite Blood {4}{b} carried `[cannot pay now: needs 5 mana, you have 4
+#DESC: untapped sources]` and NO cast row, while Sanguine Bond {3}{b}{b} - the
+#DESC: strictly harder cost off the same four sources - was offered as row 1 and
+#DESC: resolved. The board was two Overgrown Battlements ("{T}: Add {G} for each
+#DESC: creature with defender you control", so each ONE source taps for {G}{G}
+#DESC: with two defenders out), a Chromatic Lantern and an Isolated Chapel: six
+#DESC: mana of real payment capacity behind a four-source count.
+#DESC: The seat's win-condition half was never cast and it lost that game.
+#DESC: This fixture reproduces the board exactly and pins BOTH verdicts, so the
+#DESC: asymmetry is what fails, not a blanket "everything is castable".
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Chromatic Lantern,Overgrown Battlement,Overgrown Battlement,Isolated Chapel
+hand:Exquisite Blood,Sanguine Bond
+life:20
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+goto firstmain
+assertcastable 1 sanguine bond
+assertcastable 1 exquisite blood
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Chromatic Lantern,Overgrown Battlement,Overgrown Battlement,Isolated Chapel
+hand:Exquisite Blood,Sanguine Bond
+[PLAYER2]
+[END]

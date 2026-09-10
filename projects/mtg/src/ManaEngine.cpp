@@ -911,6 +911,33 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
         AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
         if(amp && (amp->getCost() && amp->getCost()->extraCosts && !amp->getCost()->extraCosts->canPay()))
             continue;
+        //#W75-CK (P3, wave-74 deck126 HIGH-1). A foreach-wrapped VARIABLE
+        //producer (Overgrown Battlement, "{T}: Add {G} for each creature with
+        //defender you control") is a GenericActivatedAbility, NOT an
+        //AManaProducer, so `amp` is NULL for it and the generic-fill block
+        //below - which ends in an unconditional `continue` - swallowed it
+        //whenever the coloured pips were already covered. genericFillOrder
+        //(passes 1-2) filters to AManaProducer too, so such a source could
+        //contribute to a cost's GENERIC portion in no pass at all. The result
+        //was a payability oracle that answered by LAYER ORDER: on
+        //`126v162` deck126 seq 22 (t15) Chromatic Lantern paid the single {B}
+        //pip of Exquisite Blood {4}{b} in pass 0, coloredSatisfied went true at
+        //the very next entry, and the two Overgrown Battlements - four real
+        //mana - were never reached; Blood got `[cannot pay now: needs 5 mana,
+        //you have 4 untapped sources]` and no cast row, while Sanguine Bond
+        //{3}{b}{b} (a strictly HARDER cost off the same board) stayed payable
+        //precisely because its second {b} pip kept coloredSatisfied false and
+        //the foreach branch reachable. The seat never cast its win-condition
+        //half and lost the game.
+        //Fix: a foreach-wrapped producer falls THROUGH the generic-fill gate to
+        //its own branch below, which already carries the right test (`helps`:
+        //take it only while the total is still short or a needed colour is).
+        //Everything else keeps the old control flow byte for byte.
+        bool foreachProducer = false;
+        if (!amp)
+            if (GenericActivatedAbility * fgw = dynamic_cast<GenericActivatedAbility*>(a))
+                if (AForeach * ffe = dynamic_cast<AForeach*>(fgw->ability))
+                    foreachProducer = (dynamic_cast<AManaProducer*>(ffe->ability) != NULL);
         //COLOURED PIPS FIRST (N-152c). The generic-fill branch below used to
         //open on `cost->hasColor(0) || cost->hasColor(7)` alone, i.e. for ANY
         //cost carrying a generic component - and it `continue`s past the
@@ -997,7 +1024,8 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     }
                 }
             }
-            continue;
+            if (!foreachProducer) //#W75-CK (P3): the variable producer falls through
+                continue;
         }
         GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a);
         if(gmp && policy.canHandle(gmp))

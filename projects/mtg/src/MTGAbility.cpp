@@ -50,6 +50,7 @@ const string kAlternateCostKeywords[] =
 // "alternative not paid" NULL stops wearing the ERROR costume that mis-triaged.
 AbilityParseFailFn gAbilityParseFailCallback = NULL;
 bool gAbilityParseAltCostUnpaid = false;
+bool gAbilityParseZoneGatedNull = false; //#W75-CK (P22)
 long gAbilityParseLineCount = 0;
 
 const int kAlternateCostIds[] =
@@ -2810,7 +2811,8 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             MTGAbility * a = parseMagicLine(s1, id, spell, card, 1);
             if (!a)
             {
-                DebugTrace("ABILITYFACTORY Error parsing: " << sWithoutTc);
+                if (!gAbilityParseZoneGatedNull) //#W75-CK (P22)
+                    DebugTrace("ABILITYFACTORY Error parsing: " << sWithoutTc);
                 return NULL;
             }
             string limit = "";
@@ -5727,6 +5729,11 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
 
     //doubleside
     vector<string> splitSide = parseBetween(s, "doubleside(", ")", true);
+    //#W75-CK (P22): the refusal below is BY DESIGN, not a script defect - an
+    //`anyzone=` line is parsed in every zone and a permanent's face cannot be
+    //turned on the battlefield. Mark it so the callers log INFO, not ERROR.
+    if (splitSide.size() && card->currentZone == card->controller()->game->battlefield)
+        gAbilityParseZoneGatedNull = true;
     if (splitSide.size() && card->currentZone != card->controller()->game->battlefield) // It's not allowed to turn side on battlefield.
     {
         string splitSideName = "";
@@ -6227,7 +6234,16 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         return a;
     }
 
-    DebugTrace(" no matching ability found. " << s);
+    //#W75-CK (P22): a zone-gated refusal reached the tail because no OTHER
+    //parser matched either; it is by design, so say so rather than crying wolf.
+    if (gAbilityParseZoneGatedNull)
+    {
+        DebugTrace(" not available in this zone (by design). " << s);
+    }
+    else
+    {
+        DebugTrace(" no matching ability found. " << s);
+    }
     return NULL;
 }
 
@@ -6852,6 +6868,7 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
             magicText = "";
         }
         gAbilityParseAltCostUnpaid = false; //reset before each top-level line parse
+        gAbilityParseZoneGatedNull = false;  //#W75-CK (P22): same lifetime
         //Reset the cross-line parse stashes before each top-level line. Both are set
         //mid-line (storedAndAbility from and!(...)! extraction ~L2541; storedPayString
         //from pay[[ ]] extraction ~L2497) and are meant to be consumed WITHIN the same
@@ -6876,7 +6893,7 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
         {
             //Validation pass: report every NULL to the sink; it decides whether the
             //by-design unpaid-alternative NULL is a SKIP or a real failure.
-            gAbilityParseFailCallback(card, line, dest, gAbilityParseAltCostUnpaid);
+            gAbilityParseFailCallback(card, line, dest, gAbilityParseAltCostUnpaid || gAbilityParseZoneGatedNull); //#W75-CK (P22)
         }
         else if (gAbilityParseAltCostUnpaid)
         {
@@ -6884,9 +6901,18 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
             //old "ABILITYFACTORY ERROR: Parser returned NULL" costume that mis-triaged.
             DebugTrace("INFO ABILITYFACTORY: alternative not paid (by design): " + line);
         }
+        else if (gAbilityParseZoneGatedNull) //#W75-CK (P22)
+        {
+            DebugTrace("INFO ABILITYFACTORY: line not available in this zone (by design): " + line);
+        }
         else
         {
-            DebugTrace("ABILITYFACTORY ERROR: Parser returned NULL " + magicText);
+            //#W75-CK (P22): print the LINE that failed. `magicText` is consumed as
+            //this loop walks it, so it held the REMAINING lines - every failure was
+            //reported against the innocent line that came after it (which is how the
+            //pathway `anyzone` refusal came to be filed as six broken `{t}:add{g}` /
+            //`{t}:add{w}` mana abilities: those lines parse fine).
+            DebugTrace("ABILITYFACTORY ERROR: Parser returned NULL " + line);
         }
     }
     return result;
