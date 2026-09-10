@@ -26,7 +26,7 @@ revised guide, start from the live one) and list each edit before->after with th
 paid for it IN review.md — the guide itself carries NO citation, count, or history (Amendment 332); hard ceiling 20,000 bytes, and an EDIT that grows the guide must say which rule earned its bytes; (4) OPTIONAL proposals, only when
 your evidence supports them: general-guide changes (wave74/deck<N>/general-proposals.md) and
 strategy-writing-skill changes (wave74/deck<N>/skill-proposals.md; current skill edition =
-wave68/strategy-writing-skill-v2.md (the ~40 KB distillation, owner-installed 2026-09-06 after six Astra adversarial rounds; read it in full — it is short; the 1.3 MB wave73/strategy-writing-skill.md is lineage only) — read it before proposing; a proposal that
+wave68/strategy-writing-skill-v2.md (the ~40 KB distillation, owner-installed 2026-09-06 after six Astra adversarial rounds; read it in full — it is short; the 1.3 MB wave68/strategy-writing-skill.md is lineage only) — read it before proposing; a proposal that
 restates an existing amendment is noise). No prediction tables, no rotation evidence, no
 docket bookkeeping. Final message: <= 10 lines.
 
