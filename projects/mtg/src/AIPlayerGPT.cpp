@@ -6697,10 +6697,21 @@ static string foldManaBillClauses(const string& row)
 //totalMana - baseCMC - keepNeed). `totalMana` < 0 means "the X is not colour
 //limited", i.e. the whole remainder is X's, which is the pre-existing arithmetic
 //byte for byte.
+//#W75-CL (P11, engine-seat MED-3): THE KEEP CANDIDATE IS A SECOND COPY OF THE
+//ROW'S OWN CARD on 27 of the corpus's 238 renders, and the clause named it as
+//though it were a different card - `Cast Sphinx's Revelation ... {... Sphinx's
+//Revelation {u}{u}{w}{x} in your hand needs 3: no X on this row leaves it
+//payable}`. The scan already excludes the row's own INSTANCE (`hc == card`), so
+//what it finds is a genuine second copy in hand and the arithmetic is right; the
+//NAME is what reads as a contradiction ("this row is Sphinx's Revelation and it
+//says Sphinx's Revelation is not payable"). Say which copy it means. The keep
+//candidate is not changed: it is still the cheapest castable card in hand, and
+//a second copy of the row's own card is a real thing an X can strand.
 static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
                                      const string& keepName = string(),
                                      const string& keepCost = string(), int keepNeed = -1,
-                                     int totalMana = -1)
+                                     int totalMana = -1,
+                                     bool keepIsAnotherCopy = false)
 {
     if (maxX < 0)
         return "";
@@ -6717,7 +6728,7 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
           << " untapped";
     if (!keepName.empty() && keepNeed >= 0)
     {
-        o << ". " << keepName;
+        o << ". " << (keepIsAnotherCopy ? "another copy of " : "") << keepName; //#W75-CL (P11)
         if (!keepCost.empty())
             o << " " << keepCost;
         o << " in your hand needs " << keepNeed << ": ";
@@ -6985,6 +6996,65 @@ static bool planNamesStrandedCard(const string& plan, const string& cardName)
     for (size_t i = 0; i < cardName.size(); i++)
         c += (char) tolower((unsigned char) cardName[i]);
     return p.find(c) != string::npos;
+}
+
+//#W75-CL (P17, deck125 A-4 - MEASURE ONLY, no behaviour rides this).
+//`plan_names_stranded_card` only fires when the TAKEN row carries a reserve
+//VERDICT naming the card, which needs the row to have priced the strand. The
+//population it misses is larger and simpler: a plan that names a card the seat
+//cannot cast from ANY zone it can cast from. `125v152` seqs 28-29 are the
+//repro - the plan reads "Cast Sphinx's Revelation for X=5 to stabilize and draw
+//cards" over `Your hand (4 cards): Cancel; Plains; Island; Tundra` and
+//`Your graveyard (6 cards): ... Sphinx's Revelation {u}{u}{w}{x}`; the seat then
+//wrote the SAME plan again one window later. No verdict, no counter, no record.
+//This is the widened detector: a card in the seat's own GRAVEYARD or EXILE whose
+//name the plan names, while no card of that name is in hand or on the
+//battlefield. Both zones are PUBLIC (the seat can see them), so the measure
+//reads only what the seat could have read. Deliberately NOT claimed: whether the
+//card is castable FROM that zone - flashback, retrace and cast-from-exile are
+//real, so this counter is an UPPER bound on genuinely stranded plans and the
+//review must sample it. Nothing is refused, re-asked or rendered.
+//#W75-CL (P23 d): which of the three deviations this reply was. Pure over the
+//two measures it is computed from, so PARSETEST walks all four states.
+const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolBytes)
+{
+    if (planLineMissing && offProtocolBytes > 0)
+        return "unlabelled_plan";
+    if (planLineMissing)
+        return "plan_absent";
+    if (offProtocolBytes > 0)
+        return "prose_outside_two_lines";
+    return "compliant";
+}
+
+static string w75PlanNamesUncastableZoneCard(const string& plan, MTGPlayerCards * game)
+{
+    if (plan.empty() || !game)
+        return string();
+    std::set<string> live;
+    MTGGameZone * zones[2] = { game->hand, game->inPlay };
+    for (int z = 0; z < 2; z++)
+        if (zones[z])
+            for (int i = 0; i < zones[z]->nb_cards; i++)
+                if (zones[z]->cards[i])
+                    live.insert(zones[z]->cards[i]->name);
+    MTGGameZone * dead[2] = { game->graveyard, game->exile };
+    for (int z = 0; z < 2; z++)
+    {
+        if (!dead[z])
+            continue;
+        for (int i = 0; i < dead[z]->nb_cards; i++)
+        {
+            MTGCardInstance * c = dead[z]->cards[i];
+            if (!c || c->hasType(Subtypes::TYPE_LAND))
+                continue;
+            if (live.count(c->name))
+                continue;
+            if (planNamesStrandedCard(plan, c->name)) //the same name test, same floor
+                return c->name;
+        }
+    }
+    return string();
 }
 
 static string paymentNoLifeCostClause(bool boardHasHarmSource, int totalDamage, int used)
@@ -8472,10 +8542,23 @@ const char * kOptionRangeNote =
     " on - the only difference is which copy of the source does it. Nothing is"
     " hidden: read the option you want off the range it names."
     //#W56-C (D7 c): the monotone X form's own decode.
+    //#W75-CL (P15, deck125 A-3): ...IN BOTH DIRECTIONS. `#W74-CC` (O19) made the
+    //X ladder ASCENDING, and the ranged row now says so ("X = 2 up to X = 8 -
+    //one option per X in that range, smallest X first"), but this decode still
+    //taught the descending walk only: 14 of the wave-74 corpus's 28 X menus
+    //carried a paragraph that counted DOWN over a list that counts UP
+    //(`125v162` seq 148). Two statements on one screen, one of them false - and
+    //this is the one a pilot decoding an option NUMBER out of a range reads. Both
+    //walks are now stated, keyed on the words the row itself prints, so the
+    //paragraph can only be read against the row it is about. The descending
+    //sentence is byte-identical to wave 56's, so every existing pin holds.
     " A row reading \"X = 12 down to X = 2\" is one option per X in that range,"
     " largest X first: its first number is X = 12, the next X = 11, and so on to"
-    " X = 2. The two options it quotes in full are the two ENDS of that run, and"
-    " every option between them reads the same line with its own X."
+    " X = 2. A row reading \"X = 2 up to X = 12\" is the same run the other way,"
+    " smallest X first: its first number is X = 2, the next X = 3, and so on to"
+    " X = 12. Read which of the two the row says - \"down to\" counts down and"
+    " \"up to\" counts up. The two options it quotes in full are the two ENDS of"
+    " that run, and every option between them reads the same line with its own X."
     " Answer with ONE number from inside the range"
     " exactly as you would any other option number.\n";
 
@@ -17006,7 +17089,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mMainHoldHeldTurn(-1), mMainHoldHeldPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mMainPhaseWindowsSkipped(0), mMainSkipPendTurn(-1), mMainSkipPendPhase(-1), mMainCastOfferedTurn(-1), mMainCastOfferedPhase(-1), mMainHoldHeldTurn(-1), mMainHoldHeldPhase(-1), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -18240,6 +18323,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
                 rec["plan_names_stranded_card"] = stranded;
                 mPlanNamesStrandedCard++;
             }
+            //#W75-CL (P17): the widened population, on its own field so the two
+            //are never summed by accident. Measure only.
+            else
+            {
+                const string dead = w75PlanNamesUncastableZoneCard(mCurrentPlan, game);
+                if (!dead.empty())
+                {
+                    rec["plan_names_uncastable_zone_card"] = dead;
+                    mPlanNamesUncastableZoneCard++;
+                }
+            }
         }
     }
     else //#W57-A (D4): never ABSENT either. Wave 56 filled the field only while
@@ -18312,6 +18406,23 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["plan_line_missing"] = planLineMissing;
         if (planLineMissing)
             mPlanLineMissing++;
+        //#W75-CL (P23 d, deck162 HIGH). `off_protocol_bytes` and
+        //`plan_line_missing` were reported as two findings and are ONE EVENT: the
+        //reply wrote its plan as an unlabelled sentence, so the label is missing
+        //(plan_line_missing) and the sentence is bytes outside the two permitted
+        //lines (off_protocol_bytes) - 12 of deck162's 16 records carry both, and a
+        //review that counts them separately double-counts one defect and cannot
+        //tell it from the two OTHER shapes that live in the same fields (a reply
+        //with a labelled plan plus real prose; a reply with an answer and no plan
+        //at all, which reads 0 bytes off-protocol). One CLASS field says which of
+        //the three this reply was, and one counter says how many replies deviated
+        //at all. The two underlying fields are kept: they are what the class is
+        //computed from and deleting a measure to add one is how instruments lose
+        //their audit trail.
+        const char * devClass = w75ProtocolDeviationClass(planLineMissing, (int) replyOffProtocol);
+        rec["protocol_deviation"] = string(devClass);
+        if (planLineMissing || replyOffProtocol > 0)
+            mProtocolDeviationReplies++;
         mProtocolReplies++; //#W70-BM (E2): the census denominator
         //#W71-BO (L10 sibling, wave-70 P): `plan_steps_done` was absent from every
         //record, so lane BN's F10 step-advance claim was unmeasurable. The pointer
@@ -18690,6 +18801,8 @@ void AIPlayerGPT::logGameEnd()
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
         {"plan_line_missing", mPlanLineMissing},
+        {"protocol_deviation_replies", mProtocolDeviationReplies}, //#W75-CL (P23 d)
+        {"plan_names_uncastable_zone_card", mPlanNamesUncastableZoneCard}, //#W75-CL (P17)
     };
     transLogWrite(rec.dump()); //audit-L (L4)
     //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
@@ -24021,13 +24134,28 @@ static string crackBackNextTurnLine(int ableAttackers, int maxDamage, int myLife
 //still spendable about it). The seat's untap, upkeep, draw, the rest of its
 //combat and its end steps stay silent - D9's discipline: a line on every window
 //is a line nobody reads. Pure, so the whole turn is walkable in PARSETEST.
+//#W75-CL (P6, deck125 A-2 HIGH). THE PHASE GATE WAS BUILT FOR A DECK THAT
+//SPENDS ITS MANA IN A MAIN PHASE. Measured over the wave-74 corpus the line
+//rendered on 40 of 40 own-turn Main 1 / Main 2 windows and on 0 of 173 own-turn
+//Upkeep windows and 0 of 38 own-turn Draw windows - and deck125 is a draw-go
+//control deck that commits its mana in its OWN upkeep, holding instants for the
+//window the gate keeps silent. `125v123` seqs 68-73 are six turn-23 Upkeep asks
+//at 37 life with FORTY able attackers on the other side of the table and not one
+//word about them; seq 79, the Main 1 window six asks later, prints
+//`CRACK-BACK NEXT TURN: 40 of their creatures will be able to attack ... for up
+//to 41 - you would be at -1; that would KILL you`. The seat is owed that figure
+//at every window where it can still answer it, and on its own turn every window
+//is such a window (instants, activations and the mana that pays for them are
+//live in upkeep, draw, combat and the end step alike). D9's "a line on every
+//window is a line nobody reads" discipline is kept where it earns its keep: on
+//the OPPONENT's turn the line is still silent, because the crack-back it prices
+//is a whole turn cycle away and the seat's own untap comes first.
 static bool crackBackNextTurnDue(bool selfActive, int phase, int ableAttackers, int maxDamage)
 {
+    (void) phase;
     if (!selfActive || ableAttackers <= 0 || maxDamage <= 0)
         return false;
-    return phase == (int) MTG_PHASE_FIRSTMAIN
-           || phase == (int) MTG_PHASE_COMBATATTACKERS
-           || phase == (int) MTG_PHASE_SECONDMAIN;
+    return true;
 }
 
 //#W62-X (D19, deck130 HIGH-2): the crack-back total and a removal row are on
@@ -27901,6 +28029,124 @@ static bool w73RowTouchesLife(const string& row)
     return false;
 }
 
+//#W75-CL (P5, deck125 A-1 HIGH - the decision that lost a 42-7 game). UNDER A
+//LIVE LOOP PARAGRAPH THE ROW'S OWN SUBTRACTION IS A FALSE SURFACE. `125v126`
+//seq 267 (turn 53, life 42, opponent 7) printed
+//  `2. Deal 1 damage with Staff of Nin targeting you {right now: takes 1 damage
+//   - you would be at 41}`
+//over a prompt whose LOOP COMPLETE header and LOOP RUNNING bracket both said,
+//correctly, that both halves of the opponent's Sanguine Bond + Exquisite Blood
+//loop were on the battlefield and that ANY life the seat loses chains until it
+//is at 0. The seat took row 2 ("Ping myself to avoid triggering the ... loop")
+//and died from 42. Two statements on one screen, one of them false: the
+//paragraph states the rule, the row states the arithmetic, and the arithmetic
+//is what the guides teach the pilot to read off a `{right now: ...}` verdict.
+//The trust doctrine says the surface owes the model truth, so the ROW is made
+//to say what the paragraph says - the `[NAMED BY THEIR ...]` override pattern,
+//which prices a row by a fact stated elsewhere on the same screen.
+//SCOPE, deliberately narrow so nothing here can claim more than it can prove:
+//only inside a ` {right now: ...}` group (the decision-time verdict), only
+//while the OPPONENT's loop is PROVEN live (`lifeLoopProvenWin(opponent())`,
+//the same predicate the LOOP RUNNING bracket is rendered from, so the row and
+//the paragraph cannot disagree), and only on the two shapes whose DIRECTION is
+//unambiguous:
+//  * `you would be at N` with N > 0 - the seat's life going DOWN. Every emitter
+//    of that phrase inside a `{right now: ...}` group prints `life - <positive
+//    amount>`; at N <= 0 the row already says `this KILLS you` and is true, so
+//    it is left byte-identical.
+//  * `they gain N` with N > 0 - the opponent's life going UP, the loop's other
+//    intake ("life THEY gain is what the chain eats").
+//A row whose `{right now:}` moves life the OTHER way (`they would be at N` off
+//damage) does not feed the chain and is untouched - the header already says so
+//("life THEY lose does not enter it").
+//Pure over (row, live), so PARSETEST proves every branch without a board. Note
+//the direction of the key effect: the rewrite REMOVES a board-derived number
+//from the rendered row, so every key that carries the rendered row - the ask
+//key, the async slot key, the hold latch key, the hold-check key, the
+//option-set key - becomes strictly MORE stable under a live loop, which is the
+//lesson of wave 74 read the right way round.
+const char * kChainFeedTail = "you would be at 0 - this row feeds their chain";
+
+//One `{right now: ...}` group, rewritten. Pure.
+static string w75ChainFeedGroup(const string& g)
+{
+    string s = g;
+    static const char * kAt = "you would be at ";
+    size_t p = 0;
+    while ((p = s.find(kAt, p)) != string::npos)
+    {
+        const size_t d0 = p + strlen(kAt);
+        size_t d = d0;
+        while (d < s.size() && isdigit((unsigned char) s[d]))
+            d++;
+        //No digit (a `-1` leads with a minus) or 0: the row already states a death.
+        if (d == d0 || atoi(s.c_str() + d0) <= 0)
+        {
+            p = d0;
+            continue;
+        }
+        s = s.substr(0, p) + kChainFeedTail + s.substr(d);
+        p = p + strlen(kChainFeedTail);
+    }
+    static const char * kGain = "they gain ";
+    p = 0;
+    while ((p = s.find(kGain, p)) != string::npos)
+    {
+        const size_t d0 = p + strlen(kGain);
+        size_t d = d0;
+        while (d < s.size() && isdigit((unsigned char) s[d]))
+            d++;
+        if (d == d0 || atoi(s.c_str() + d0) <= 0)
+        {
+            p = d0;
+            continue;
+        }
+        const string ins = s.substr(p, d - p) + " - " + kChainFeedTail;
+        s = s.substr(0, p) + ins + s.substr(d);
+        p = p + ins.size();
+    }
+    return s;
+}
+
+//The whole row. Every ` {right now: ...}` group on it (a row may carry more
+//than one), each ended at the first `}` after the open - the same convention
+//`stripRenderAnnotationsLc` and `optionSetKeyOf` already use. Byte-identical
+//when the loop is not live, or when the row carries no such group.
+string w75ChainFeedRow(const string& row, bool oppLoopLive)
+{
+    if (!oppLoopLive)
+        return row;
+    static const char * kOpen = " {right now: ";
+    string out;
+    size_t i = 0;
+    while (i < row.size())
+    {
+        const size_t a = row.find(kOpen, i);
+        if (a == string::npos)
+            break;
+        const size_t e = row.find('}', a);
+        if (e == string::npos)
+            break;
+        out += row.substr(i, a - i);
+        out += w75ChainFeedGroup(row.substr(a, e - a + 1));
+        i = e + 1;
+    }
+    out += row.substr(i);
+    return out;
+}
+
+//Applied to a whole rendered menu, in place, BEFORE any key is taken off it
+//and before any collapse reads it, so the rows the model reads, the rows the
+//hold latch remembers and the rows the ask key is built from are one set of
+//bytes.
+void w75ApplyChainFeed(std::vector<string>& rows, bool oppLoopLive)
+{
+    if (!oppLoopLive)
+        return;
+    for (size_t i = 0; i < rows.size(); i++)
+        rows[i] = w75ChainFeedRow(rows[i], true);
+}
+
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
 //one menu and a REAL COST on another. `152v162` seqs 32-42 are eleven priority
 //windows inside one Draw phase, 163.3 s of inference for no board effect, while
@@ -29396,8 +29642,38 @@ static string repeatShortName(const string& line)
         core = core.substr(0, cut);
     while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
         core.erase(core.size() - 1);
+    //#W75-CL (P16, deck123 MED-2). THE 60-BYTE CUT LANDS MID-WORD AND MOVES WITH
+    //THE ORDINAL'S DIGIT COUNT. `123v125` seq 186 is an 81-row menu whose repeat
+    //block printed FOUR rows where two would do - `42. ... targeting Human #1
+    //(Lightning G`, `43-50. the same shortcut ...`, `51. ... targeting Human #10
+    //(Lightning `, `52-80. the same shortcut ...` - because O18's fold key erases
+    //digits and then compares, and "Human #1 (Lightning G" erases to
+    //"Human # (Lightning G" while "Human #10 (Lightning " erases to
+    //"Human # (Lightning ": one trailing byte apart, so the run splits at the
+    //#9 -> #10 boundary and splits again at #99 -> #100. The same cut is why the
+    //name the footer tells the model to COPY is a truncated fragment ending in a
+    //dangling "(Lightning G" - a name no answer can be built from (P14's shape).
+    //Both are one defect: cut on a WORD boundary, and never inside an unclosed
+    //parenthetical. The cut point is then a property of the words, not of how
+    //many digits the ordinal happens to have, so every copy of a repeated row
+    //truncates at the same place and the fold sees one run. Nothing is removed:
+    //every repeat row is still in `shown`/`shownLines`, still numbered, still
+    //separately answerable.
     if (core.size() > 60)
+    {
         core = core.substr(0, 60);
+        const size_t par = core.rfind(" (");
+        if (par != string::npos && core.find(')', par) == string::npos)
+            core = core.substr(0, par); //an unclosed parenthetical names nothing
+        else
+        {
+            const size_t sp = core.rfind(' ');
+            if (sp != string::npos && sp > 0)
+                core = core.substr(0, sp);
+        }
+        while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
+            core.erase(core.size() - 1);
+    }
     return core;
 }
 
@@ -32705,13 +32981,46 @@ static bool w74ClockSourceRecurs(MTGCardInstance * c)
 //skipped - a rate the seat does not live to spend is not a clock it owns, so a
 //known incoming hit that reaches 0 suppresses the sentence entirely rather than
 //inviting the seat to race a race it has already lost. Negative = nothing known.
+//#W75-CL (P10, engine-seat MED-2). ANY LETHAL THE PROMPT ALREADY STATES, not
+//just the combat one. F7 gated the sentence on `mIncomingCombatTurn` alone, and
+//`125v162` seqs 169-175 are seven own-clock renders at 5 life or less on a
+//prompt whose OWN `ON THE STACK` block reads `4 damage to you - you would be at
+//-1; that would KILL you` (seqs 172, 173, 175): the screen promised
+//`the opponent reaches 0 in 18 more turns` to a seat that would not survive the
+//next resolution. 112 of the corpus's 325 own-clock renders sat in games the
+//seat then lost. A rate the seat does not live to spend is not a clock it owns,
+//whichever surface states the death - so the gate takes the WORST stated
+//incoming loss (combat declaration, the pending stack), and under a PROVEN
+//opponent life LOOP a stated loss of ANY size is that death, because the
+//prompt's own LOOP COMPLETE header says so in as many words ("ANY nonzero
+//payment on a tag above is fatal, not merely expensive"). The loop ALONE
+//suppresses nothing: with no loss landing on the seat this window the clock is
+//a true fact, and the trust doctrine forbids deleting a true token. Pure over
+//its inputs, so PARSETEST walks every branch.
+//The gate itself, lifted out so PARSETEST can walk every branch without a
+//board. TRUE = the sentence is suppressed. #W75-CL (P10).
+bool w75OwnClockSuppressed(int myLife, int incomingDamage, int stackDamage, bool oppLoopLive)
+{
+    const int worst = stackDamage > incomingDamage ? stackDamage : incomingDamage;
+    //Under a PROVEN opponent loop the prompt's own LOOP COMPLETE header states
+    //the rule: "ANY nonzero payment on a tag above is fatal, not merely
+    //expensive". So a stated loss of ANY size is the lethal, whatever the life
+    //total. The loop alone is NOT a suppressor: with nothing landing on the
+    //seat this window the clock is a true fact and the trust doctrine forbids
+    //deleting a true token (silent omissions are worse than wrong text).
+    if (oppLoopLive && worst > 0)
+        return true;
+    return myLife >= 0 && worst > 0 && myLife - worst <= 0;
+}
+
 static string ownClockTagFor(Player * seat, Player * opp, int myLife = -1,
-                             int incomingDamage = 0)
+                             int incomingDamage = 0,
+                             int stackDamage = 0, bool oppLoopLive = false) //#W75-CL (P10)
 {
     if (!seat || !seat->game || !seat->game->inPlay || !opp)
         return string();
-    if (myLife >= 0 && incomingDamage > 0 && myLife - incomingDamage <= 0)
-        return string(); //#W74-CF (F7): the seat dies first; there is no clock to own
+    if (w75OwnClockSuppressed(myLife, incomingDamage, stackDamage, oppLoopLive))
+        return string(); //#W74-CF (F7) widened by #W75-CL (P10)
     string bestName;
     int copies = 0, perTurn = 0;
     std::map<string, int> byName;
@@ -36699,6 +37008,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             renderRows[rr0] += repeatRowStopClause(creatureCountOnBattlefield(rsrc0->controller()),
                                                    carriedStop, carriedStopOppLife, oppLifeNow);
         }
+    //#W75-CL (P5): the loop override, applied to BOTH the pure key list and the
+    //rendered list before anything reads either - the collapse below, the
+    //option-set key, the hold latch, the ask key and the translog all see one
+    //set of bytes.
+    w75ApplyChainFeed(shownLines, lifeLoopProvenWin(opponent()));
+    w75ApplyChainFeed(renderRows, lifeLoopProvenWin(opponent()));
     {
         //#W48 (D2): gather repeated rows before collapsing, permuting the action
         //list and the translog's option list with them so option N still names
@@ -36936,7 +37251,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //key are about the ACTING rows, and a decline is not a play.
     tail << "0. " << kPassPriorityRowText
          << ownClockTagFor(this, opponent(), life, //#W74-CF (F7)
-                           (mIncomingCombatTurn == observer->turn) ? mIncomingCombatDamage : 0)
+                           (mIncomingCombatTurn == observer->turn) ? mIncomingCombatDamage : 0,
+                           pendingStackLifeLossToSeat(observer, this), //#W75-CL (P10)
+                           lifeLoopProvenWin(opponent()))
          << declineRowReaskTag(declinedN) << "\n"; //#W74-CE (O9, O11)
     //#W53-N (D2): where the option list ends and the per-ask facts begin. The
     //prompt-only decline annotation is spliced in here, so it reads with the
@@ -39700,7 +40017,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                 keep ? keep->getDisplayName() : string(),
                                                 keep ? keep->getManaCost()->toString() : string(),
                                                 keep ? keepNeed : -1,
-                                                untappedSources); //#W74-CF (F6)
+                                                untappedSources, //#W74-CF (F6)
+                                                keep && card //#W75-CL (P11)
+                                                    && keep->getDisplayName() == card->getDisplayName());
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             }
             int used = 0;
@@ -40468,6 +40787,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     for (int attempt = 0; ; attempt++)
     {
         vector<string> menu(opts);
+        //#W75-CL (P5): the loop override, before every tag and every key.
+        w75ApplyChainFeed(menu, lifeLoopProvenWin(opponent()));
         //#W54-C (D18, wave-53 ledger MED = R178): the MENU pass. Every row
         //priced itself ALONE, so nothing said which rows fit TOGETHER in this
         //window - `162v152` s11 had two blockers affordable together against
@@ -40522,7 +40843,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                  life, cuStacked);
             declineRow += ownClockTagFor(this, opponent(), life, //#W74-CE (O9) / #W74-CF (F7)
                                          (mIncomingCombatTurn == observer->turn)
-                                             ? mIncomingCombatDamage : 0);
+                                             ? mIncomingCombatDamage : 0,
+                                         pendingStackLifeLossToSeat(observer, this), //#W75-CL (P10)
+                                         lifeLoopProvenWin(opponent()));
             declineRowIdx = (int) menu.size();
             menu.push_back(declineRow); //the decline goes LAST among the cast rows
         }
@@ -44108,6 +44431,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             break;
         if (mayStop)
             opts.push_back("Done - no further targets");
+        //#W75-CL (P5): the loop override, on the target rows too - the
+        //`{right now: takes N damage - you would be at M}` verdict is built by
+        //the same helper here as on the priority rows.
+        w75ApplyChainFeed(opts, lifeLoopProvenWin(opponent()));
 
         //Granted/inner abilities ride a nameless fake card - Liliana's "+1:
         //each player discards" chooser rendered 'Choose the target for '
@@ -68108,12 +68435,25 @@ static const char * kW50Y_r94 =
               " the casting decisions are made in");
         CHECK(!crackBackNextTurnDue(false, (int) MTG_PHASE_FIRSTMAIN, 2, 8),
               "#W59-J K8 NEGATIVE the OPPONENT's turn is D9's, and D9's forms are not touched");
-        CHECK(!crackBackNextTurnDue(true, (int) MTG_PHASE_UNTAP, 2, 8)
-              && !crackBackNextTurnDue(true, (int) MTG_PHASE_UPKEEP, 2, 8)
-              && !crackBackNextTurnDue(true, (int) MTG_PHASE_COMBATBLOCKERS, 2, 8)
-              && !crackBackNextTurnDue(true, (int) MTG_PHASE_ENDOFTURN, 2, 8)
-              && !crackBackNextTurnDue(true, (int) MTG_PHASE_CLEANUP, 2, 8),
-              "#W59-J K8 NEGATIVE the seat's other windows stay silent");
+        //#W75-CL (P6): SUPERSEDED. Wave 59 pinned the seat's other own-turn
+        //windows SILENT, and that silence is what cost `125v123` turn 23 (six
+        //Upkeep asks at 37 life against 40 able attackers, no line). The pin is
+        //rewritten to the rule that replaces it - every own-turn window - and
+        //this comment is the history the old assertion used to carry.
+        CHECK(crackBackNextTurnDue(true, (int) MTG_PHASE_UNTAP, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_UPKEEP, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_DRAW, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_COMBATBLOCKERS, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_ENDOFTURN, 2, 8)
+              && crackBackNextTurnDue(true, (int) MTG_PHASE_CLEANUP, 2, 8),
+              "#W75-CL P6 REPRO/GREEN every OWN-TURN window is due - the upkeep and draw"
+              " windows a draw-go deck spends its mana in were the two the wave-59 gate"
+              " kept silent (0 of 173 and 0 of 38 in the wave-74 corpus)");
+        CHECK(!crackBackNextTurnDue(false, (int) MTG_PHASE_UPKEEP, 2, 8)
+              && !crackBackNextTurnDue(false, (int) MTG_PHASE_ENDOFTURN, 2, 8)
+              && !crackBackNextTurnDue(false, (int) MTG_PHASE_COMBATATTACKERS, 2, 8),
+              "#W75-CL P6 MUST-NOT-MATCH the OPPONENT's turn is still silent on every"
+              " window - D9's discipline is kept where the crack-back is a turn cycle away");
         CHECK(!crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 0, 0)
               && !crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 2, 0),
               "#W59-J K8 NEGATIVE a creatureless or powerless board claims nothing");
@@ -71840,9 +72180,13 @@ static const char * kW50Y_r94 =
         // SAME predicate the render uses, on the repro's own phase and seat.
         CHECK(crackBackNextTurnDue(true, (int) MTG_PHASE_FIRSTMAIN, 3, 9),
               "#W63-AC E9 the repro window (own turn, main 1, 3 attackers, 9 damage) IS due");
+        //#W75-CL (P6): the own-turn UPKEEP half of this pin is SUPERSEDED - that
+        //window now prints the line, so it now earns the relief clause too. The
+        //opponent-turn half is untouched and is still what the pin is about.
         CHECK(!crackBackNextTurnDue(false, (int) MTG_PHASE_FIRSTMAIN, 3, 9)
-                  && !crackBackNextTurnDue(true, (int) MTG_PHASE_UPKEEP, 3, 9),
-              "#W63-AC E9 MUST-NOT-MATCH no clause where no CRACK-BACK line is printed");
+                  && !crackBackNextTurnDue(false, (int) MTG_PHASE_UPKEEP, 3, 9),
+              "#W63-AC E9 / #W75-CL P6 MUST-NOT-MATCH no clause where no CRACK-BACK line is"
+              " printed - the opponent's turn, on every phase");
         CHECK(crackBackReliefClause(0, 1, 15, true).empty(),
               "#W63-AC E9 MUST-NOT-MATCH a screen with no total prints no relief clause");
         // REGRESSION: the wave-54 victim list, which the widened drop must not
@@ -82260,6 +82604,245 @@ static const char * kW50Y_r94 =
                       == holdActionKeyRow("Pass priority"),
                   "#W74-CH #W56-A (D1) survives: the combat-next clause is erased by name,"
                   " not by the stripper (it is a plain parenthetical)");
+        }
+
+        //================= #W75-CL (wave-75 lane CL, render truth) =================
+        // P5 - the loop override on the rows that feed the chain.
+        {
+            // The verbatim rows of `125v126` seq 267 (turn 53, life 42 vs 7 -
+            // the decision that lost the game), off the record's own
+            // `options_text`.
+            const string oppRow = "Deal 1 damage with Staff of Nin targeting the opponent {right now: takes 1 damage - they would be at 6} [cost: Tap] {card text: \"At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target.\"}";
+            const string meRow  = "Deal 1 damage with Staff of Nin targeting you {right now: takes 1 damage - you would be at 41} [cost: Tap] {card text: \"At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target.\"}";
+            const string meRow2 = "Deal 1 damage with Staff of Nin targeting you {right now: takes 1 damage - you would be at 40} [cost: Tap] {card text: \"At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target.\"}"; // the SAME window one link later
+            CHECK(w75ChainFeedRow(meRow, false) == meRow
+                  && w75ChainFeedRow(oppRow, false) == oppRow,
+                  "#W75-CL P5 no loop, no change - every byte of both rows is as shipped");
+            const string meFed = w75ChainFeedRow(meRow, true);
+            CHECK(meFed.find("{right now: takes 1 damage - you would be at 0 - this row"
+                             " feeds their chain}") != string::npos,
+                  "#W75-CL P5 REPRO/GREEN the self-ping row's `you would be at 41` becomes the"
+                  " truth the LOOP COMPLETE paragraph on the same screen already states");
+            CHECK(meFed.find("you would be at 41") == string::npos,
+                  "#W75-CL P5 RED-ON-BASE the shipped bytes said 41 - that number is what the"
+                  " seat read and answered, and it is gone");
+            CHECK(meFed.find("[cost: Tap]") != string::npos
+                  && meFed.find("Staff of Nin deals 1 damage to any target.") != string::npos,
+                  "#W75-CL P5 nothing else on the row moves - the cost and the card text are"
+                  " byte-identical, and the `{card text: ... {T} ...}` group's own braces are"
+                  " not entered");
+            CHECK(w75ChainFeedRow(oppRow, true) == oppRow,
+                  "#W75-CL P5 MUST-NOT-MATCH a row that moves THEIR life DOWN does not feed"
+                  " the chain - `life THEY lose does not enter it`, and the row is untouched");
+            // KEY STABILITY (the lesson of wave 74): two windows differing ONLY
+            // in the life total this row projects are ONE question on all five
+            // keys once the override has run.
+            {
+                vector<string> a, b;
+                a.push_back(oppRow); a.push_back(w75ChainFeedRow(meRow, true));
+                b.push_back(oppRow); b.push_back(w75ChainFeedRow(meRow2, true));
+                CHECK(a[1] == b[1],
+                      "#W75-CL P5 KEY PIN the two rendered rows are byte-identical");
+                CHECK(optionSetKeyOf(a) == optionSetKeyOf(b),
+                      "#W75-CL P5 KEY PIN option-set key identical");
+                CHECK(holdActionKeyRow(a[1]) == holdActionKeyRow(b[1]),
+                      "#W75-CL P5 KEY PIN hold latch key identical");
+                CHECK(holdKeyRow(a[1]) == holdKeyRow(b[1]),
+                      "#W75-CL P5 KEY PIN hold-check key identical");
+                std::set<string> held;
+                held.insert(holdKeyRow(a[0])); held.insert(holdKeyRow(a[1]));
+                CHECK(w74HoldUnseenRows(held, b) == 0,
+                      "#W75-CL P5 KEY PIN the hold-check bracket sees 0 new rows");
+                const string tailA = joinNumberedRows(a, NULL);
+                const string tailB = joinNumberedRows(b, NULL);
+                CHECK(stripDeclineReaskTags(tailA) == stripDeclineReaskTags(tailB),
+                      "#W75-CL P5 KEY PIN ask key identical (the rendered tail is the ask key)");
+                CHECK(asyncSlotKeyOf(false, 53, 1, stripDeclineReaskTags(tailA), "BOARD")
+                          == asyncSlotKeyOf(false, 53, 1, stripDeclineReaskTags(tailB), "BOARD"),
+                      "#W75-CL P5 KEY PIN async slot key identical");
+                // ...and the RED half: on the SHIPPED bytes those two windows are
+                // two different questions on the ask key and the slot key.
+                vector<string> ra, rb;
+                ra.push_back(oppRow); ra.push_back(meRow);
+                rb.push_back(oppRow); rb.push_back(meRow2);
+                CHECK(stripDeclineReaskTags(joinNumberedRows(ra, NULL))
+                          != stripDeclineReaskTags(joinNumberedRows(rb, NULL)),
+                      "#W75-CL P5 RED-ON-BASE the untouched rows key DIFFERENTLY - a life total"
+                      " inside `{right now: ...}` rides the ask key, which is the wave-74 shape");
+            }
+            // The other intake: the opponent GAINING life.
+            {
+                const string gain = "Cast Tribute to Hunger {2}{b} {right now: they control 3"
+                                    " creatures - they choose which one, they gain 5 - the"
+                                    " sacrificing player gains, not you}";
+                const string fed = w75ChainFeedRow(gain, true);
+                CHECK(fed.find("they gain 5 - you would be at 0 - this row feeds their chain")
+                          != string::npos,
+                      "#W75-CL P5 the opponent GAINING life is the loop's other intake and the"
+                      " row says so");
+                CHECK(w75ChainFeedRow(gain, false) == gain,
+                      "#W75-CL P5 MUST-NOT-MATCH ...and only while the loop is live");
+            }
+            // A row that already states a death is already true.
+            {
+                const string dead = "Pay 4 life {right now: takes 4 damage - you would be at 0;"
+                                    " this KILLS you}";
+                CHECK(w75ChainFeedRow(dead, true) == dead,
+                      "#W75-CL P5 MUST-NOT-MATCH `you would be at 0` is left byte-identical -"
+                      " the row already says it kills the seat");
+                const string neg = "Pay 4 life {right now: takes 4 damage - you would be at -1;"
+                                   " this KILLS you}";
+                CHECK(w75ChainFeedRow(neg, true) == neg,
+                      "#W75-CL P5 MUST-NOT-MATCH ...and so is a negative projection");
+            }
+            // Outside a `{right now: ...}` group nothing is rewritten: the
+            // CRACK-BACK line and the DRAW PRICE bracket are other surfaces with
+            // their own scopes, and this override claims neither.
+            {
+                const string other = "Cast Sphinx's Revelation [DRAW PRICE: this draws 3 cards"
+                                     " ... - you would be at 12]";
+                CHECK(w75ChainFeedRow(other, true) == other,
+                      "#W75-CL P5 MUST-NOT-MATCH a `you would be at` OUTSIDE a `{right now: ...}`"
+                      " group is not this override's scope");
+            }
+            // An unterminated group truncates nothing.
+            {
+                const string trunc = "Row {right now: takes 1 damage - you would be at 41";
+                CHECK(w75ChainFeedRow(trunc, true) == trunc,
+                      "#W75-CL P5 an unterminated `{right now:` group is returned whole");
+            }
+        }
+        // P10 - the own-clock gate takes ANY lethal the prompt already states.
+        {
+            CHECK(!w75OwnClockSuppressed(20, 0, 0, false),
+                  "#W75-CL P10 a healthy seat with nothing stated keeps its clock");
+            CHECK(w75OwnClockSuppressed(3, 4, 0, false),
+                  "#W75-CL P10 #W74-CF (F7)'s combat gate is unchanged");
+            CHECK(w75OwnClockSuppressed(3, 0, 4, false),
+                  "#W75-CL P10 REPRO/GREEN `125v162` seq 172 - life 3 with `4 damage ALREADY ON"
+                  " THE STACK ... KILLS you` on the same screen suppresses the clock");
+            CHECK(w75OwnClockSuppressed(2, 0, 3, false),
+                  "#W75-CL P10 REPRO/GREEN seqs 173/175 - life 2, 3 on the stack");
+            CHECK(w75OwnClockSuppressed(5, 2, 6, false)
+                  && w75OwnClockSuppressed(5, 6, 2, false),
+                  "#W75-CL P10 the WORST of the two stated losses decides, whichever surface"
+                  " states it");
+            CHECK(w75OwnClockSuppressed(40, 0, 1, true),
+                  "#W75-CL P10 under a PROVEN opponent loop a stated loss of ANY size is the"
+                  " lethal at ANY life total - the prompt's own LOOP COMPLETE header says"
+                  " `ANY nonzero payment on a tag above is fatal, not merely expensive`");
+            CHECK(!w75OwnClockSuppressed(40, 0, 0, true),
+                  "#W75-CL P10 MUST-NOT-MATCH the loop ALONE deletes nothing - with nothing"
+                  " landing on the seat this window the clock is a true fact, and a true token"
+                  " is never deleted (the trust doctrine's silent-omission rule)");
+            CHECK(!w75OwnClockSuppressed(5, 0, 4, false)
+                  && !w75OwnClockSuppressed(-1, 0, 40, false),
+                  "#W75-CL P10 MUST-NOT-MATCH a SURVIVABLE stack (5 life, 4 damage) keeps the"
+                  " clock, and an unknown life total claims nothing - a true clock is never"
+                  " deleted");
+        }
+        // P11 - the keep-X candidate is another COPY of the row's own card.
+        {
+            const string own = xCastRemainderScopeTag(11, 3, false, "Sphinx's Revelation",
+                                                      "{u}{u}{w}{x}", 3, 17, true);
+            CHECK(own.find("another copy of Sphinx's Revelation {u}{u}{w}{x} in your hand needs 3")
+                      != string::npos,
+                  "#W75-CL P11 REPRO/GREEN the engine-seat MED-3 row now says WHICH copy it"
+                  " means (27 of 238 renders named the row's own card)");
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17)
+                      .find("another copy of") == string::npos,
+                  "#W75-CL P11 MUST-NOT-MATCH a different card is named as before, byte for"
+                  " byte");
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17)
+                      == xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17, false),
+                  "#W75-CL P11 the default is the shipped string");
+        }
+        // P15 - the range note decodes an ASCENDING X ladder too (O19).
+        {
+            const string note(kOptionRangeNote);
+            CHECK(note.find("A row reading \"X = 2 up to X = 12\" is the same run the other way,"
+                            " smallest X first") != string::npos,
+                  "#W75-CL P15 REPRO/GREEN `125v162` seq 148 prints `X = 2 up to X = 8 ..."
+                  " smallest X first` and the paragraph now decodes that walk");
+            CHECK(note.find("A row reading \"X = 12 down to X = 2\" is one option per X in that"
+                            " range, largest X first") != string::npos,
+                  "#W75-CL P15 the wave-56 descending sentence is byte-identical");
+            CHECK(monotoneXRangeRow(2, 8, 2, 8, "X = 2", "X = 8").find("up to X = 8") != string::npos
+                  && monotoneXRangeRow(2, 8, 8, 2, "X = 8", "X = 2").find("down to X = 2")
+                         != string::npos,
+                  "#W75-CL P15 both row wordings still exist, so both halves of the decode are"
+                  " reachable");
+        }
+        // P16 - the repeat row's short name cuts on a word, not on a byte count.
+        {
+            const string base = "Equip with Lightning Greaves targeting Human #%d [your"
+                                " battlefield] (Lightning Greaves is ALREADY attached to Thraben"
+                                " Doomsayer - this MOVES it to Human #%d, and Thraben Doomsayer"
+                                " loses what it grants) {card text: \"Equipped creature has"
+                                " haste and shroud.\"}";
+            string r1 = base, r10 = base, r100 = base;
+            for (size_t q = r1.find("#%d"); q != string::npos; q = r1.find("#%d"))
+                r1 = r1.substr(0, q) + "#1" + r1.substr(q + 4);
+            for (size_t q = r10.find("#%d"); q != string::npos; q = r10.find("#%d"))
+                r10 = r10.substr(0, q) + "#10" + r10.substr(q + 4);
+            for (size_t q = r100.find("#%d"); q != string::npos; q = r100.find("#%d"))
+                r100 = r100.substr(0, q) + "#100" + r100.substr(q + 4);
+            const string n1 = repeatShortName(r1), n10 = repeatShortName(r10),
+                         n100 = repeatShortName(r100);
+            CHECK(n1 == "Equip with Lightning Greaves targeting Human #1"
+                  && n10 == "Equip with Lightning Greaves targeting Human #10"
+                  && n100 == "Equip with Lightning Greaves targeting Human #100",
+                  "#W75-CL P16 REPRO/GREEN the name is a whole name, not the `... Human #1"
+                  " (Lightning G` fragment `123v125` seq 186 printed and told the model to copy");
+            CHECK(n1.find("(") == string::npos,
+                  "#W75-CL P16 an unclosed parenthetical never survives the cut");
+            CHECK(repeatRowFoldKey(repeatRowLine(n1, 42))
+                      == repeatRowFoldKey(repeatRowLine(n10, 51))
+                  && repeatRowFoldKey(repeatRowLine(n10, 51))
+                      == repeatRowFoldKey(repeatRowLine(n100, 141)),
+                  "#W75-CL P16 REPRO/GREEN O18's fold key now agrees across the #9 -> #10 and"
+                  " #99 -> #100 boundaries, so the 39-row block is ONE run (seq 186 printed"
+                  " four rows: 42, 43-50, 51, 52-80)");
+            CHECK(repeatRowFoldKey(repeatRowLine("Equip with Lightning Greaves targeting Human #1"
+                                                " (Lightning G", 42))
+                      != repeatRowFoldKey(repeatRowLine("Equip with Lightning Greaves targeting"
+                                                        " Human #10 (Lightning ", 51)),
+                  "#W75-CL P16 RED-ON-BASE the SHIPPED 60-byte cut produces two fold keys for"
+                  " the same action - that is the split");
+            CHECK(repeatShortName("Create human with Thraben Doomsayer [cost: Tap]")
+                      == "Create human with Thraben Doomsayer",
+                  "#W75-CL P16 MUST-NOT-MATCH a short name under the cut is untouched");
+            CHECK(repeatRowFoldKey(repeatRowLine("Equip with Lightning Greaves targeting Human #1",
+                                                42))
+                      != repeatRowFoldKey(repeatRowLine("Equip with Lightning Greaves targeting"
+                                                        " Bloodline Keeper", 43)),
+                  "#W75-CL P16 MUST-NOT-MATCH a DIFFERENT target is still its own run - the fold"
+                  " erases digits, never names");
+        }
+        // P17 - the widened stranded-plan measure (instrument only).
+        {
+            CHECK(planNamesStrandedCard("Cast Sphinx's Revelation for X=5 to stabilize and draw"
+                                        " cards.", "Sphinx's Revelation"),
+                  "#W75-CL P17 REPRO `125v152` seqs 28-29 - the plan names a card whose only"
+                  " copy is in the GRAVEYARD");
+            CHECK(!planNamesStrandedCard("Play Plains to balance mana base.",
+                                         "Sphinx's Revelation"),
+                  "#W75-CL P17 MUST-NOT-MATCH a plan that does not name it");
+            CHECK(!planNamesStrandedCard("Cast Sphinx's Revelation", "Bog"),
+                  "#W75-CL P17 the four-character name floor is unchanged");
+        }
+        // P23 (d) - one protocol event, not two.
+        {
+            CHECK(string(w75ProtocolDeviationClass(true, 92)) == "unlabelled_plan",
+                  "#W75-CL P23 REPRO deck162's 12-of-16 shape is ONE event: the plan is there,"
+                  " the label is not");
+            CHECK(string(w75ProtocolDeviationClass(true, 0)) == "plan_absent",
+                  "#W75-CL P23 an answer and no plan at all reads 0 bytes off-protocol and is"
+                  " its own class");
+            CHECK(string(w75ProtocolDeviationClass(false, 40)) == "prose_outside_two_lines",
+                  "#W75-CL P23 a labelled plan plus real prose is the third class");
+            CHECK(string(w75ProtocolDeviationClass(false, 0)) == "compliant",
+                  "#W75-CL P23 MUST-NOT-MATCH a compliant reply is not a deviation");
         }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
