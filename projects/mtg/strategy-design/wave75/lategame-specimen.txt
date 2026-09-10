@@ -1,0 +1,83 @@
+# Wave-75 lategame specimen (standing rule, alert-only). Corpus matchups-20260910-003556-final, seat log
+# 1789018561-ai_baka_deck123-0x560a35b4ce40-vs-ai_baka_deck125.jsonl, kind=ask seq=1252 turn=82, rendered header 'Casting decision (Main phase 1, YOUR turn)', life 1 vs 97,
+# 7 options, prompt 10669 bytes, latency 43.5 s, reasoning 7960 chars. The `prompt` field verbatim follows.
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Marsh Flats x3, Thraben Doomsayer x4, Bloodline Keeper x2, Idyllic Tutor x2, Tragic Slip x3, Devour Flesh x2, Vision Skeins x3, Damnation x3, Lightning Greaves, Intruder Alarm; opponent - empty; exiled at trim: you - Bloodline Keeper; opponent - none)
+- Opponent's Lightmine Field dealt 1 damage to Vampire [x94 - this exact line 94 times in this batch]
+- Your Vampire died (that Vampire was 1 of 94 copies on your battlefield; the other 93 are still there) [x92 - 92 lines of this shape in this batch; only the numbers in them differ]
+- Your Vampire (token) ceased to exist and left your graveyard [x94 - this exact line 94 times in this batch]
+- Your Vampire died (that Vampire was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Vampire died
+- Opponent's Lightmine Field dealt 1 damage to Lord of Lineage
+- Your Lord of Lineage died
+=== Turn 79 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin #1 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 4)
+- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 3)
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Path to Exile (x3)
+=== Turn 80 - YOUR turn ===
+- Phase: Draw
+- You drew Intruder Alarm
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Idyllic Tutor
+- You discarded Idyllic Tutor (that Idyllic Tutor was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 81 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin #1 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 2)
+- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 1)
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: Cleanup
+- Opponent discarded Supreme Verdict (x2)
+=== Turn 82 - YOUR turn ===
+- Phase: Draw
+- You drew Marsh Flats
+- Phase: Main phase 1
+- You played Marsh Flats
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 1 | Opponent life: 97
+Opponent life trend: unchanged at 97 since turn 80.
+Mana available: 17 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 13, {U} 8, {B} 13 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Underground Sea #1 {u} or {b}; Isolated Chapel #1 {w} or {b}; Plains {w}; Tundra #1 {w} or {u}; Swamp {b}; Arcane Sanctum #1 {w} or {u} or {b}; Underground Sea #2 {u} or {b}; Scrubland #1 {w} or {b}; Arcane Sanctum #2 {w} or {u} or {b}; Isolated Chapel #2 {w} or {b}; Scrubland #2 {w} or {b}; Underground Sea #3 {u} or {b}; Tundra #2 {w} or {u}; Scrubland #3 {w} or {b}; Scrubland #4 {w} or {b}; Tundra #3 {w} or {u}; Isolated Chapel #3 {w} or {b}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (7 cards): Idyllic Tutor {2}{w} [sorcery] [castable now]; Lightning Greaves {2} [artifact] [castable now]; Intruder Alarm (copy 1 of 2 in your hand) {2}{u} [enchantment] [castable now]; Damnation {2}{b}{b} [sorcery] [castable now]; Tragic Slip {b} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Tribute to Hunger {2}{b} [instant] [castable now]; Intruder Alarm (copy 2 of 2 in your hand) {2}{u} [enchantment] [castable now]
+Your battlefield (20 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 18 are lands): Arcane Sanctum #1; Arcane Sanctum #2; Intruder Alarm {2}{u} [enchantment]; Isolated Chapel #1-#3 x3; Lightning Greaves {2} [artifact]; Marsh Flats; Plains; Scrubland #1-#4 x4; Swamp; Tundra #1-#3 x3; Underground Sea #1-#3 x3
+Your graveyard (26 cards): Marsh Flats x3; Thraben Doomsayer {1}{w}{w} (creature 2/2) x4; Bloodline Keeper {2}{b}{b} (creature 3/3) x3; Idyllic Tutor {2}{w} x3; Tragic Slip {b} x3; Devour Flesh {1}{b} x2; Vision Skeins {1}{u} x3; Damnation {2}{b}{b} x3; Lightning Greaves {2}; Intruder Alarm {2}{u}
+Opponent battlefield (29 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 25 are lands): Glacial Fortress #1-#4 x4; Island #1-#8 x8; Lightmine Field #2 {2}{w}{w} [enchantment]; Lightmine Field #1 {2}{w}{w} [enchantment] {effect (each copy of this card does this): "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1-#6 x6; Seachrome Coast #1-#3 x3; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this) (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#4 x4
+Their graveyard (5 cards): Path to Exile {w} x3; Supreme Verdict {1}{u}{w}{w} x2
+Their untapped sources: 25 (colours they could make: {u}{w})
+Opponent hand size: 7 | Opponent library: 19 cards
+Artifacts in play: you 1 | opponent 2
+Your library: 6 cards
+
+THE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 82; "Marsh Flats" is no longer on your menu) reads "then pass main phase 1."
+(note: this decision's list does not contain the actions your plan names. That is about this menu, not about what is legal for you - pick the best option below, and re-state your plan if it has gone out of date.)
+
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+This menu has no row 0: to decline, take the numbered "Cast nothing right now" row on the list below. (A priority menu does have a row 0; this one does not.)
+1. Cast Idyllic Tutor {2}{w} [finds only an enchantment card - none left in your library] {leaves 14 of your 17 untapped mana sources untapped} {card text: "Search your library for an enchantment card, reveal it, and put it into your hand. Then shuffle."} {leaves 14 sources - no other row on this menu needs more than 14}
+2. Cast Lightning Greaves {2} [second copy: you already control Lightning Greaves; both stay on the battlefield - no legend rule, and this copy is one more of the same effect - each line it repeats happens again; the price is a card and this window's cast spent DOUBLING an effect you already have on the battlefield, not adding one you do not] {right now: you control 0 creatures - this equips nothing} {leaves 15 of your 17 untapped mana sources untapped} {card text: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if the creature leaves.)"} {leaves 15 sources - no other row on this menu needs more than 15}
+3. Cast Intruder Alarm {2}{u} [second copy: you already control Intruder Alarm; both stay on the battlefield - no legend rule, but its effect is already on the battlefield and a second copy changes nothing] {leaves 14 of your 17 untapped mana sources untapped} {card text: "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."} {leaves 14 sources - no other row on this menu needs more than 14}
+4. Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 13 of your 17 untapped mana sources untapped} {card text: "Destroy all creatures. They can't be regenerated."} {leaves 13 sources - no other row on this menu needs more than 13}
+5. Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 14 of your 17 untapped mana sources untapped} - legal targets right now: the opponent {card text: "Target opponent sacrifices a creature of their choice. You gain life equal to that creature's toughness."} {leaves 14 sources - no other row on this menu needs more than 14}
+6. Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}
+7. Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}
+
+[hold check: every row above was also on the menu at the last window at this seam (1 window in a row now) - a hold taken here holds until one of them appears, disappears, or names a different card, cost or target; a row that changes only in its annotations is the same row]
+[HOW A HOLD ENDS: taking the hold row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked, and the hold is released at the start of your next turn whatever the rows do. Rows are compared by what they DO. A row that changes only INSIDE its brackets or braces - a price, a forecast, a clock, a count, a life total, a kill count, a survivor count, a note that it cannot reach a spell on the stack - is the SAME row, and so is a pass row that differs only by naming which step comes next. What re-opens the window: a row appearing, a row disappearing, a row naming a different card, cost or target, and a change in whether the board now kills you.]
+Write your PLAN: line first, then on a line of its own CHOICE: followed by the number of your choice (the LAST row of this menu declines: it is a real answer, not a fallback) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Idyllic Tutor)" (a worked example of the format, written out from row 1 of this list - choose the option YOU want) Write nothing else.
