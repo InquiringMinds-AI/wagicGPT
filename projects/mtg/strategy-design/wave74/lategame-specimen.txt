@@ -1,0 +1,493 @@
+# wave-74 lategame specimen - 1788968865-ai_baka_deck126-0x558242cd6390-vs-ai_baka_deck152.jsonl seq 67 (kind=priority, turn 26, deck126 life 24 vs 3, 39 options, prompt 34315 B - the LARGEST prompt in the corpus)
+# corpus matchups-20260909-104713-final, CG binary (archives/wagic-60e9fe2ad-w74step1b); chosen: Deal 1 damage with Staff of Nin #1 targeting the opponent {right now: takes 1 damage - they would be at 2} [cost: Tap] {
+# reasoning_chars 5493, latency 66.0 s, deadline_pct 7.3, thinking on. Full `prompt` field verbatim below, nothing elided.
+GAME LOG (everything that has happened so far):
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Sunpetal Grove; Pride Guardian; Urborg, Tomb of Yawgmoth; Woodland Cemetery; Woodland Cemetery; Forest; Tribute to Hunger
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Branchloft Pathway
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Perimeter Captain
+- Phase: Main phase 1
+- You played Urborg, Tomb of Yawgmoth
+=== Turn 3 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: Boulderloft Pathway with Branchloft Pathway
+- Opponent played Boulderloft Pathway
+=== Turn 4 - YOUR turn ===
+- Phase: Draw
+- You drew Bayou
+- Phase: Main phase 1
+- You played Woodland Cemetery
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Deserted Beach
+- Opponent cast Brutal Cathar
+- Opponent's Brutal Cathar resolved and entered the battlefield
+- It became Day
+=== Turn 6 - YOUR turn ===
+- Phase: Draw
+- You drew Bayou
+- Phase: Main phase 1
+- You played Woodland Cemetery
+- Paid {2}{b} for Tribute to Hunger (3 sources)
+- You cast Tribute to Hunger
+- Your Tribute to Hunger resolved and went to your graveyard
+- You used: Gain life equal to its toughness with Tribute to Hunger targeting Brutal Cathar
+- Opponent's Brutal Cathar died
+- You gained 2 life (now 22)
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Overgrown Farmland
+- Opponent cast Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light resolved and entered the battlefield
+=== Turn 8 - YOUR turn ===
+- Phase: Draw
+- You drew Pride Guardian
+- Phase: Main phase 1
+- You played Forest
+=== Turn 9 - opponent's turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Deserted Beach
+- Opponent cast Augur of Autumn
+- Opponent's Augur of Autumn resolved and entered the battlefield
+- Phase: Combat damage
+- Opponent's Sigarda, Champion of Light dealt 4 damage to you (now 18)
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Sorin, Lord of Innistrad
+- Phase: Main phase 1
+- You played Sunpetal Grove
+- Paid {w} for Perimeter Captain (1 source)
+- You cast Perimeter Captain
+- Your Perimeter Captain resolved and entered the battlefield
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Branchloft Pathway
+- Phase: Blockers
+- You declared blockers: Perimeter Captain blocks Augur of Autumn
+- You chose Gain 2 life with Perimeter Captain for Perimeter Captain
+- You used: Life with Perimeter Captain
+- You gained 2 life (now 20)
+- Phase: Combat damage
+- Opponent's Augur of Autumn dealt 3 damage to Perimeter Captain
+- Opponent's Sigarda, Champion of Light dealt 4 damage to you (now 16)
+=== Turn 12 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You played Bayou
+- Paid {2}{b}{w} for Sorin, Lord of Innistrad (4 sources)
+- You cast Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad resolved and entered the battlefield
+- Your Sorin, Lord of Innistrad got 3 loyalty counters (now 3)
+- You used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad got a loyalty counter
+- Your Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Overgrown Farmland
+- Phase: Blockers
+- You declared blockers: Perimeter Captain blocks Augur of Autumn
+- You chose Gain 2 life with Perimeter Captain for Perimeter Captain
+- You used: Life with Perimeter Captain
+- You gained 2 life (now 18)
+- Phase: Combat damage
+- Opponent's Augur of Autumn dealt 3 damage to Perimeter Captain
+- Opponent's Sigarda, Champion of Light dealt 4 damage to you (now 14)
+=== Turn 14 - YOUR turn ===
+- Phase: Draw
+- You drew Savannah
+- Phase: Main phase 1
+- You played Savannah
+- Paid {6} for Staff of Nin (6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- Paid {w} for Pride Guardian (1 source)
+- You cast Pride Guardian (that Pride Guardian was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Pride Guardian resolved and entered the battlefield
+- You used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad got a loyalty counter
+- Your Sorin, Lord of Innistrad created a 1/1 Vampire token
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+- Phase: Attackers
+- You declared attackers: Vampire
+- Phase: Combat damage
+- Your Vampire dealt 1 damage to the opponent (now 18)
+- You gained 1 life (now 15)
+=== Turn 15 - opponent's turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Branchloft Pathway
+- Phase: Blockers
+- You declared blockers: Perimeter Captain blocks Augur of Autumn
+- You chose Gain 2 life with Perimeter Captain for Perimeter Captain
+- You used: Life with Perimeter Captain
+- You gained 2 life (now 17)
+- Phase: Combat damage
+- Opponent's Augur of Autumn dealt 3 damage to Perimeter Captain
+- Opponent's Sigarda, Champion of Light dealt 4 damage to you (now 13)
+=== Turn 16 - YOUR turn ===
+- Phase: Untap
+- It became Night
+- Phase: Upkeep
+- You drew Perimeter Captain
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Bayou
+- Phase: Main phase 1
+- You played Bayou
+- Paid {w} for Perimeter Captain (1 source)
+- You cast Perimeter Captain
+- Your Perimeter Captain resolved and entered the battlefield
+- Paid {w} for Pride Guardian (1 source)
+- You cast Pride Guardian
+- Your Pride Guardian resolved and entered the battlefield
+- You used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad got a loyalty counter
+- Your Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Attackers
+- You declared attackers: Vampire, Vampire
+- Phase: Combat damage
+- Your Vampire dealt 1 damage to the opponent (now 16)
+- Your Vampire dealt 1 damage to the opponent (now 15)
+- You gained 1 life (now 14)
+- You gained 1 life (now 15)
+=== Turn 17 - opponent's turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light resolved and entered the battlefield
+- Opponent used: Put a card into the graveyard with Sigarda, Champion of Light targeting Sigarda, Champion of Light #2
+- Opponent's Sigarda, Champion of Light died (that Sigarda, Champion of Light was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Blockers
+- You declared blockers: Perimeter Captain blocks Augur of Autumn; Perimeter Captain blocks Augur of Autumn; Pride Guardian blocks Augur of Autumn; Pride Guardian blocks Augur of Autumn; Vampire blocks Augur of Autumn
+- You gained 3 life (now 18) [x11 - 11 lines of this shape in this batch; only the numbers in them differ]
+- You accepted Gain 2 life for all 8 triggers of Perimeter Captain
+- You used: Life with Perimeter Captain #2 [x8 - 8 lines of this shape in this batch; only the numbers in them differ]
+- Phase: Combat damage
+- Your Vampire dealt 1 damage to Augur of Autumn
+- Opponent's Augur of Autumn dealt 3 damage to Perimeter Captain
+- Opponent's Sigarda, Champion of Light dealt 4 damage to you (now 33)
+=== Turn 18 - YOUR turn ===
+- Phase: Upkeep
+- You drew Scrubland
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Wall of Omens
+- Phase: Main phase 1
+- You played Bayou
+- Paid {1}{w} for Wall of Omens (2 sources)
+- You cast Wall of Omens
+- Your Wall of Omens resolved and entered the battlefield
+- You drew Staff of Nin
+- Paid {6} for Staff of Nin (6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- You used: -6: destroy up to three and reanimate with Sorin, Lord of Innistrad targeting Sigarda, Champion of Light
+- Your Sorin, Lord of Innistrad lost 6 loyalty counters (now 0)
+- Your Sorin, Lord of Innistrad was put into your graveyard from the battlefield
+- Your Sorin, Lord of Innistrad entered the battlefield from your graveyard
+- Your Sorin, Lord of Innistrad got 3 loyalty counters (now 3)
+- Your Pride Guardian died (that Pride Guardian was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Pride Guardian entered the battlefield from your graveyard
+- Your Vampire died (that Vampire was 1 of 3 copies on your battlefield; the other 2 are still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+- Your Vampire entered the battlefield from your zone
+- You used: -2: emblem: "creatures get +1/+0" with Sorin, Lord of Innistrad targeting Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad lost 2 loyalty counters
+- Phase: Attackers
+- You declared attackers: Vampire, Vampire
+- Phase: Combat damage
+- Your Vampire dealt 1 damage to the opponent (now 12)
+- Your Vampire dealt 1 damage to the opponent (now 11)
+- You gained 1 life (now 35)
+- You gained 1 life (now 36)
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hengegate Pathway
+- Opponent cast Brutal Cathar
+- Opponent's Brutal Cathar resolved and entered the battlefield
+- Opponent used: exile a creature with Brutal Cathar targeting Wall of Omens
+- Your Wall of Omens was exiled from the battlefield
+- Phase: Blockers
+- You declared blockers: Perimeter Captain blocks Augur of Autumn; Perimeter Captain blocks Augur of Autumn; Pride Guardian blocks Augur of Autumn; Pride Guardian blocks Augur of Autumn
+- You gained 3 life (now 39) [x10 - 10 lines of this shape in this batch; only the numbers in them differ]
+- You accepted Gain 2 life for all 8 triggers of Perimeter Captain
+- You used: Life with Perimeter Captain #2 [x8 - 8 lines of this shape in this batch; only the numbers in them differ]
+- Phase: Combat damage
+- Opponent's Augur of Autumn dealt 1 damage to Perimeter Captain
+- Opponent's Augur of Autumn dealt 3 damage to Pride Guardian
+- Opponent's Sigarda, Champion of Light dealt 5 damage to you (now 53)
+- Your Pride Guardian died (that Pride Guardian was 1 of 2 copies on your battlefield; the other 1 is still there)
+=== Turn 20 - YOUR turn ===
+- Phase: Upkeep
+- You drew Scrubland
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You drew Wall of Omens
+- Phase: Draw
+- You drew Savannah
+- Phase: Main phase 1
+- You played Scrubland
+- Paid {1}{w} for Wall of Omens (2 sources)
+- You cast Wall of Omens
+- Your Wall of Omens resolved and entered the battlefield
+- You drew Savannah
+- You used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad got a loyalty counter
+- Your Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 21 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Barkchannel Pathway
+- Opponent cast Ranger Class
+- Opponent's Ranger Class resolved and entered the battlefield
+- Opponent's Ranger Class got a level counter
+- Opponent's Ranger Class created a 2/2 Wolf token
+- Opponent used: Put a level counter with Ranger Class
+- Opponent's Ranger Class got a level counter
+- Opponent used: Put a level counter with Ranger Class
+- Opponent's Ranger Class got a level counter
+- Phase: Blockers
+- Opponent used: Put a +1/+1 counter with Ranger Class targeting Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light got a +1/+1 counter from Ranger Class (now 6/5)
+- Opponent revealed their Luminarch Aspirant from their library
+- Opponent revealed their Katilda, Dawnhart Prime from their library
+- Opponent revealed their Sigarda, Champion of Light from their library
+- Opponent revealed their Katilda, Dawnhart Prime from their library
+- Opponent revealed their Barkchannel Pathway from their library
+- Opponent used: get a human with Sigarda, Champion of Light targeting Luminarch Aspirant
+- Opponent put the revealed Luminarch Aspirant into their hand
+- Opponent used: put on bottom with Sigarda, Champion of Light targeting Katilda, Dawnhart Prime
+- Opponent put the revealed Katilda, Dawnhart Prime into their library
+- Opponent put the revealed Sigarda, Champion of Light into their library
+- Opponent put the revealed Barkchannel Pathway into their library
+- Opponent put the revealed Katilda, Dawnhart Prime into their library
+- Phase: Combat damage
+- Opponent's Sigarda, Champion of Light dealt 6 damage to you (now 47)
+- Phase: Main phase 2
+- Opponent cast Luminarch Aspirant
+- Opponent's Luminarch Aspirant resolved and entered the battlefield
+=== Turn 22 - YOUR turn ===
+- Phase: Upkeep
+- You drew Isolated Chapel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- You drew Perimeter Captain
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- Phase: Draw
+- You drew Overgrown Battlement
+- Phase: Main phase 1
+- You played Isolated Chapel
+- Paid {w} for Perimeter Captain (1 source)
+- You cast Perimeter Captain
+- Your Perimeter Captain resolved and entered the battlefield
+- Paid {1}{g} for Overgrown Battlement (2 sources)
+- You cast Overgrown Battlement
+- Your Overgrown Battlement resolved and entered the battlefield
+- You used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Your Sorin, Lord of Innistrad got a loyalty counter
+- Your Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Attackers
+- You declared attackers: Vampire, Vampire, Vampire, Vampire
+- Phase: Combat damage
+- Opponent's Luminarch Aspirant dealt 3 damage to Vampire
+- Your Vampire dealt 1 damage to Luminarch Aspirant
+- Opponent's Wolf dealt 3 damage to Vampire
+- Your Vampire dealt 1 damage to Wolf
+- Opponent's Brutal Cathar dealt 4 damage to Vampire
+- Your Vampire dealt 1 damage to Brutal Cathar
+- Opponent's Augur of Autumn dealt 4 damage to Vampire
+- Your Vampire dealt 1 damage to Augur of Autumn
+- You gained 1 life (now 48) [x4 - 4 lines of this shape in this batch; only the numbers in them differ]
+- Your Vampire died (that Vampire was 1 of 2 copies on your battlefield; the other 1 is still there) (x4)
+- Your Vampire (token) ceased to exist and left your graveyard (x4)
+=== Turn 23 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elite Spellbinder
+- Opponent's Elite Spellbinder resolved and entered the battlefield
+- You revealed your Savannah from your hand [x4 - this exact line 4 times in this batch]
+- Your revealed Savannah went to your hand [x4 - this exact line 4 times in this batch]
+- You revealed your Scrubland from your hand
+- Your revealed Scrubland went to your hand
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light got a +1/+1 counter from Luminarch Aspirant (now 7/6)
+- Phase: Blockers
+- Opponent used: Put a +1/+1 counter with Ranger Class targeting Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light got a +1/+1 counter from Ranger Class (now 8/7)
+- Opponent revealed their Brutal Cathar from their library
+- Opponent revealed their Hengegate Pathway from their library (x2)
+- Opponent revealed their Elite Spellbinder from their library
+- Opponent revealed their Teferi, Who Slows the Sunset from their library
+- Opponent used: get a human with Sigarda, Champion of Light targeting Elite Spellbinder
+- Opponent put the revealed Elite Spellbinder into their hand
+- Opponent used: put on bottom with Sigarda, Champion of Light targeting Brutal Cathar
+- Opponent put the revealed Brutal Cathar into their library
+- Opponent put the revealed Teferi, Who Slows the Sunset into their library
+- Opponent put the revealed Hengegate Pathway into their library (x2)
+- Phase: Combat damage
+- Opponent's Sigarda, Champion of Light dealt 8 damage to you (now 43)
+- Phase: Main phase 2
+- Opponent cast Elite Spellbinder
+- Opponent's Elite Spellbinder resolved and entered the battlefield
+- You revealed your Scrubland from your hand
+- Your revealed Scrubland went to your hand
+=== Turn 24 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 5)
+- You drew Sanguine Bond
+- Phase: Draw
+- You drew Pride Guardian
+- Phase: Main phase 1
+- You played Savannah
+- Paid {3}{b}{b} for Sanguine Bond (5 sources)
+- You cast Sanguine Bond
+- Your Sanguine Bond resolved and entered the battlefield
+- Paid {w} for Pride Guardian (1 source)
+- You cast Pride Guardian
+- Your Pride Guardian resolved and entered the battlefield
+- Phase: Attackers
+- You declared attackers: Vampire
+- Phase: Combat damage
+- Your Vampire dealt 1 damage to the opponent (now 4)
+- You gained 1 life (now 44)
+- Opponent lost 1 life (now 3)
+=== Turn 25 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Fateful Absence
+- Opponent's Fateful Absence resolved and went to the opponent's graveyard
+- Your Sorin, Lord of Innistrad was put into your graveyard from the battlefield
+- Your Sorin, Lord of Innistrad created a Clue token
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Elite Spellbinder #1
+- Opponent's Elite Spellbinder #1 got a +1/+1 counter from Luminarch Aspirant (now 6/3)
+- Phase: Blockers
+- Opponent used: Put a +1/+1 counter with Ranger Class targeting Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light got a +1/+1 counter from Ranger Class (now 9/8)
+- Opponent revealed their Lair of the Hydra from their library
+- Opponent revealed their Elite Spellbinder from their library
+- Opponent revealed their Overgrown Farmland from their library
+- Opponent revealed their Sigarda, Champion of Light from their library
+- Opponent revealed their Teferi, Who Slows the Sunset from their library
+- Opponent used: get a human with Sigarda, Champion of Light targeting Elite Spellbinder
+- Opponent put the revealed Elite Spellbinder into their hand
+- Opponent used: put on bottom with Sigarda, Champion of Light targeting Lair of the Hydra
+- Opponent put the revealed Lair of the Hydra into their library
+- Opponent put the revealed Sigarda, Champion of Light into their library
+- Opponent put the revealed Overgrown Farmland into their library
+- Opponent put the revealed Teferi, Who Slows the Sunset into their library
+- Phase: Combat damage
+- Opponent's Elite Spellbinder dealt 5 damage to you (now 39)
+- Opponent's Elite Spellbinder dealt 6 damage to you (now 33)
+- Opponent's Sigarda, Champion of Light dealt 9 damage to you (now 24)
+- Phase: Main phase 2
+- Opponent cast Elite Spellbinder
+- Opponent's Elite Spellbinder resolved and entered the battlefield
+- You revealed your Plains from your hand
+- Your revealed Plains went to your hand
+- You revealed your Scrubland from your hand
+- Your revealed Scrubland went to your hand
+- You revealed your Savannah from your hand
+- Your revealed Savannah went to your hand
+=== Turn 26 - YOUR turn ===
+- Phase: Upkeep
+- You drew Idyllic Tutor
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+It is currently Day.
+Your life: 24 | Opponent life: 3
+Opponent life trend: turn 24: 7, turn 25: 3, turn 26: 3, now 3 (-4 since turn 24).
+ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):
+  1 (top): ability: Staff of Nin's Draw 1 [from your Staff of Nin] [triggered/activated ability]
+Mana available: 13 total (untapped sources, tapped automatically when you cast; colours you can make: {g}{b}{w} (sources that can make each: {W} 5, {B} 12, {G} 10 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Urborg, Tomb of Yawgmoth {b}; Woodland Cemetery #1 {b} or {g}; Woodland Cemetery #2 {b} or {g}; Forest {g} or {b}; Sunpetal Grove {g} or {w} or {b}; Bayou #1 {b} or {g}; Savannah #1 {w} or {g} or {b}; Bayou #2 {b} or {g}; Bayou #3 {b} or {g}; Scrubland {w} or {b}; Isolated Chapel {w} or {b}; Overgrown Battlement {g} (VARIABLE output: this ONE source adds more than one mana - its amount is a count, read its own rules text; the total above counts it as one source, not as its mana); Savannah #2 {w} or {g} or {b}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options), so the absence of a land from the choices below does not mean the drop is gone. ONE exception: a modal double-faced card whose back face is a land is offered in the casting menu on its own row, marked PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends this same drop.
+Your hand (4 cards): Plains (land: taps for {W}); Scrubland (land: taps for {W}{B}); Savannah (land: taps for {W}{G}); Idyllic Tutor {2}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]
+Your battlefield (24 permanents listed, of which 8 are creatures, 1 of them able to attack right now, and 12 are lands): Bayou #1-#3 x3; Clue [artifact]; Forest; Isolated Chapel; Overgrown Battlement {1}{g} (0/4) [defender]; Perimeter Captain #1-#3 {w} (0/4) [defender] x3; Pride Guardian #1 {w} (0/3) [defender]; Pride Guardian #2 {w} (0/3) [defender]; Sanguine Bond {3}{b}{b} [enchantment] {effect: "Whenever you gain life, target opponent loses that much life."}; Savannah #1; Savannah #2; Scrubland; Staff of Nin #1 {6} [artifact]; Staff of Nin #2 {6} [artifact]; Sunpetal Grove; Urborg, Tomb of Yawgmoth; Vampire (1/1) [lifelink]; Wall of Omens {1}{w} (0/4) [defender]; Woodland Cemetery #1; Woodland Cemetery #2
+Your graveyard (3 cards): Tribute to Hunger {2}{b}; Pride Guardian {w} (creature 0/3); Sorin, Lord of Innistrad {2}{b}{w}
+Opponent battlefield (20 permanents listed, of which 8 are creatures, 8 of them without a restriction against attacking, and 11 are lands): Branchloft Pathway #1 [tapped]; Boulderloft Pathway [tapped]; Deserted Beach #1 [tapped]; Overgrown Farmland #1; Sigarda, Champion of Light {1}{g}{w}{w} (9/8) (printed 4/4) [trample, flying] [counters: 4x +1/+1] [tapped - cannot attack or block this turn]; Deserted Beach #2; Augur of Autumn {1}{g}{g} (4/4) (printed 2/3) [canplaylandlibrarytop, canplaycreaturelibrarytop, showfromtoplibrary]; Branchloft Pathway #2; Overgrown Farmland #2; Branchloft Pathway #3; Plains [tapped]; Hengegate Pathway [tapped]; Brutal Cathar {2}{w} (4/3) (printed 2/2) [daybound]; Barkchannel Pathway; Ranger Class {1}{g} [enchantment] [counters: 3x level] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "(Gain the next level as a sorcery to add... -- When Ranger Class enters, create a 2/2... -- {1}{G}: Level 2 -- Whenever you attack, put a +1/+1 counter... -- {3}{G}: Level 3 -- You may look at the top card of your library... -- You may cast creature spells from the top of your library."}; Wolf (3/2) (printed 2/2); Luminarch Aspirant {1}{w} (3/2) (printed 1/1); Elite Spellbinder #1 {2}{w} (6/3) (printed 3/1) [flying] [counters: 1x +1/+1] [tapped - cannot attack or block this turn]; Elite Spellbinder #2 {2}{w} (5/2) (printed 3/1) [flying] [tapped - cannot attack or block this turn]; Elite Spellbinder #3 {2}{w} (5/2) (printed 3/1) [flying]
+Their graveyard (3 cards): Brutal Cathar {2}{w} (creature 2/2); Sigarda, Champion of Light {1}{g}{w}{w} (creature 4/4); Fateful Absence {1}{w}
+Their untapped sources: 6 (colours they could make: {g}{u}{b}{w})
+Opponent hand size: 0 | Opponent library: 38 cards
+Artifacts in play: you 3 | opponent 0
+LIFE-TO-DAMAGE CONVERTER on the battlefield: yours - Sanguine Bond. While it is in play, life ITS CONTROLLER gains also makes the other player lose that much life. A converter of THEIRS turns every life THEY gain - lifelink, blocking triggers, drains, any of it - into that much life off YOUR total as well; a converter of YOURS does the same to life YOU gain, and leaves their gains alone. This is not a trade: when you gain N, your total goes UP by N and theirs goes DOWN by N in the same event.
+Your library: 30 cards
+
+THE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 25; "Idyllic Tutor" is no longer on your menu) reads "then on my turn untap, play a land, activate Overgrown Battlement for mana, cast Idyllic Tutor to find Exquisite Blood, and win next turn."
+(note: your plan names "Exquisite Blood", and no "Exquisite Blood" is in your hand, on either battlefield, in a graveyard, in exile or on the stack right now - a copy is still in your LIBRARY, so you would have to draw or search it out before you can act on it. Re-state your plan if it has gone out of date.)
+
+Your legal actions (Upkeep, YOUR turn):
+1. Add 7 green mana with Overgrown Battlement [cost: Tap] {card text: "Defender -- {T}: Add {G} for each creature with defender you control."}
+2. Deal 1 damage with Staff of Nin #1 targeting Augur of Autumn [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+3. Deal 1 damage with Staff of Nin #1 targeting Brutal Cathar [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+4. Deal 1 damage with Staff of Nin #1 targeting Elite Spellbinder #1 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+5. Deal 1 damage with Staff of Nin #1 targeting Elite Spellbinder #2 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 2)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+6. Deal 1 damage with Staff of Nin #1 targeting Elite Spellbinder #3 [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 2)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+7. Deal 1 damage with Staff of Nin #1 targeting Luminarch Aspirant [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 2)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+8. Deal 1 damage with Staff of Nin #1 targeting Overgrown Battlement [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+9-11. Deal 1 damage with Staff of Nin #1 targeting Perimeter Captain #1-#3 [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."} x3
+12. Deal 1 damage with Staff of Nin #1 targeting Pride Guardian #1 [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+13. Deal 1 damage with Staff of Nin #1 targeting Pride Guardian #2 [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - SURVIVES (toughness 3)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+14. Deal 1 damage with Staff of Nin #1 targeting Sigarda, Champion of Light [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 8)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+15. Deal 1 damage with Staff of Nin #1 targeting Vampire [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - DIES} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+16. Deal 1 damage with Staff of Nin #1 targeting Wall of Omens [your battlefield] {this hits YOUR permanent} {right now: takes 1 damage - SURVIVES (toughness 4)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+17. Deal 1 damage with Staff of Nin #1 targeting Wolf [opponent's battlefield] {right now: takes 1 damage - SURVIVES (toughness 2)} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+18. Deal 1 damage with Staff of Nin #1 targeting the opponent {right now: takes 1 damage - they would be at 2} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+19. Deal 1 damage with Staff of Nin #1 targeting you {right now: takes 1 damage - you would be at 23} [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+20-37. The same 18 options as 2-19, with Staff of Nin #2 as the source instead of #1 (20 is the same choice as 2, 21 as 3, and so on to 37 as 19) x18
+38. Draw 1 with Clue [cost: {2}, Sacrifice]
+An option whose number is a RANGE ("5-430.") is that many SEPARATE options whose text was identical apart from the instance ordinal, printed once. Every number in the range is a real, separately choosable option: 5 is the option for the first instance of the printed #N range, 6 the next, and so on to the last. When the collapsed row carries NO #N ordinal, the options in the range are interchangeable copies of the same thing and any number in the range picks one of them. A range whose row reads "(copies 3-6 of 6 in this list)" is the same thing in that list's own copy notation: each number in the range is one of those copies, in order. A line reading "The same 4 options as 8-11, with <source> #2 as the source instead of #1" is that many SEPARATE options that pair up ONE FOR ONE with the options in the range it names: its first number is the same choice as the first number of that range, its second the same as the second, and so on - the only difference is which copy of the source does it. Nothing is hidden: read the option you want off the range it names. A row reading "X = 12 down to X = 2" is one option per X in that range, largest X first: its first number is X = 12, the next X = 11, and so on to X = 2. The two options it quotes in full are the two ENDS of that run, and every option between them reads the same line with its own X. Answer with ONE number from inside the range exactly as you would any other option number.
+39. Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; the rows above include ACTIVATED abilities that are usable RIGHT NOW, and taking this row gives every one of them up for as long as these rows stand) {it is released at the start of your next turn whatever the rows do; until then, taking this row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked. A pass row that differs only by naming which step comes next is the same row, so a hold taken in your first main phase also covers your second main phase while these rows do not change; so is a row that differs only by a bracket saying it cannot reach a spell on the stack; and so is a row that differs only by a LIFE TOTAL it projects - what you or they would be at - because that number moves with the board and not with the row. Any OTHER change re-opens this window, including a kill count, a damage figure, a survivor count, a price, and a row that begins saying it kills you}
+0. Pass priority (take no action this window) {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 2 more turns, with no card spent}
+
+[hold check: 36 rows above are new since the last window at this seam - a row moving is what re-opens a hold, so a hold taken here lasts only until one moves again]
+Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other main-phase cards are NOT castable in this window - your main phase's own Casting decision is where you cast them, later this same turn.
+You will have priority again later this turn, so instants and activated abilities you hold stay castable this turn.
+
+Which action do you take? Write your PLAN: line first, then on a line of its own CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list) or "CHOICE: 0 (pass)". Write nothing else.
