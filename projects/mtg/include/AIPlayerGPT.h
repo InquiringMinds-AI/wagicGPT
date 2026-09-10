@@ -166,6 +166,106 @@ inline bool w75MainPhaseSkipArms(int t, int ph, int offeredTurn, int offeredPhas
 inline bool w75MainPhaseSkipCancels(int t, int ph, int pendTurn, int pendPhase)
 { return t == pendTurn && ph == pendPhase; }
 
+//#W76-CN (Q7, wave-75 engine-seat MED-1). THE PLUMBING, AS A UNIT A TEST CAN
+//DRIVE. The two wave-75 predicates were pure and pinned; the six lines of
+//member code that call them read `observer->turn` directly, so the SEQUENCE
+//(main 1 arms, main 1 offers, main 2 arms, main 2 offers, the turn ends) had no
+//surface a fixture could reach and the corpus was the only instrument. It is
+//lifted whole here: identical logic, (turn, phase) passed in. `flush` returns
+//whether it counted, so the caller keeps the trace and the counter.
+struct W76MainPhaseSkipState
+{
+    int pendTurn, pendPhase;
+    std::string pendWhy;
+    int offeredTurn, offeredPhase;
+    int heldTurn, heldPhase;
+    W76MainPhaseSkipState()
+        : pendTurn(-1), pendPhase(-1), offeredTurn(-1), offeredPhase(-1),
+          heldTurn(-1), heldPhase(-1) {}
+};
+
+//#W73-CB (F6): close the pending phase. At most once per phase, and only when
+//that phase never reached the casting window. True = this phase counts.
+inline bool w76MainSkipFlush(W76MainPhaseSkipState& s)
+{
+    if (s.pendTurn < 0)
+        return false;
+    const bool castingWasOffered = (s.offeredTurn == s.pendTurn
+                                    && s.offeredPhase == s.pendPhase);
+    //#W74-CD (O10): ...or the seat held this very phase shut itself.
+    const bool heldByOwnLatch = (s.heldTurn == s.pendTurn && s.heldPhase == s.pendPhase);
+    return w74MainPhaseSkipCounts(castingWasOffered, heldByOwnLatch);
+}
+inline void w76MainSkipClearPending(W76MainPhaseSkipState& s)
+{
+    s.pendTurn = -1;
+    s.pendPhase = -1;
+    s.pendWhy.clear();
+}
+inline void w76MainSkipCancelPending(W76MainPhaseSkipState& s, int t, int ph)
+{
+    if (w75MainPhaseSkipCancels(t, ph, s.pendTurn, s.pendPhase))
+        w76MainSkipClearPending(s);
+}
+inline void w76MainSkipCastingOffered(W76MainPhaseSkipState& s, int t, int ph)
+{
+    s.offeredTurn = t;
+    s.offeredPhase = ph;
+    w76MainSkipCancelPending(s, t, ph); //#W75-CI (P13)
+}
+inline void w76MainSkipHoldSuppressed(W76MainPhaseSkipState& s, int t, int ph)
+{
+    s.heldTurn = t;
+    s.heldPhase = ph;
+    w76MainSkipCancelPending(s, t, ph); //#W75-CI (P13)
+}
+//The instant-speed arm's own two steps, split so a fixture can drive exactly
+//what the member drives: does an OLDER pending phase have to be closed first,
+//and then is a pending skip armed for THIS phase at all (a phase that already
+//offered casting, or that the seat's own hold latch closed, arms nothing).
+inline bool w76MainSkipNeedsFlush(const W76MainPhaseSkipState& s, int t, int ph)
+{
+    if (!w75MainPhaseSkipArms(t, ph, s.offeredTurn, s.offeredPhase, s.heldTurn, s.heldPhase))
+        return true;
+    return (t != s.pendTurn || ph != s.pendPhase);
+}
+inline void w76MainSkipArm(W76MainPhaseSkipState& s, int t, int ph, const char * why)
+{
+    if (!w75MainPhaseSkipArms(t, ph, s.offeredTurn, s.offeredPhase, s.heldTurn, s.heldPhase))
+        return; //#W75-CI (P13): this phase is exempt and arms nothing
+    s.pendTurn = t;
+    s.pendPhase = ph;
+    s.pendWhy = why ? why : "?";
+}
+
+//#W76-CN (Q1). THE HOLD-CHECK BRACKET'S MEMORY, AS A UNIT THAT CAN BE DRIVEN
+//WITHOUT A GAME. Four maps used to sit loose on the seat and were mutated
+//inside the note builder, so the ONE thing the wave-75 corpus indicted - WHEN
+//the memory is updated - had no surface a test could reach. `last` is the last
+//window at each seam the model was ASKED; `pending` is the window built at that
+//seam whose fate is not yet known. `commitAtBuild` reproduces the wave-75
+//policy verbatim so PARSETEST pins both readings of the same window sequence
+//side by side (the #W75-CI HoldRowKeyFn idiom).
+//#W76-CN (Q13): one asked window's identity for the cross-phase re-put measure.
+struct W76CrossPhaseAsk
+{
+    std::string phaseName;
+    int windowSeq;
+    bool declined;
+    W76CrossPhaseAsk() : windowSeq(0), declined(false) {}
+};
+
+struct W76HoldMemory
+{
+    std::map<std::string, std::set<std::string> > last;
+    std::map<std::string, std::set<std::string> > pending;
+    std::map<std::string, int> pendingSeq;
+    std::map<std::string, int> pendingRun;
+    std::map<std::string, int> run;
+    std::map<std::string, int> measuredSeq;
+    std::map<std::string, std::string> lastNote;
+};
+
 //#W74-CF (F1, Astra review finding 1): ONE ARM'S SECOND LEG, WHOLE. Every field
 //the three retry-arming branches write, kept together so an arm's leg can be
 //parked and restored as a unit rather than half-overwritten by the other arm.
@@ -534,40 +634,24 @@ private:
             return;
         const int t = observer->turn;
         const int ph = (int) observer->getCurrentGamePhase();
-        //#W75-CI (P13): this phase already offered casting, or the seat's own
-        //hold latch closed it - it is not a swallowed phase and must not arm one.
-        if (!w75MainPhaseSkipArms(t, ph, mMainCastOfferedTurn, mMainCastOfferedPhase,
-                                  mMainHoldHeldTurn, mMainHoldHeldPhase))
-        {
+        //#W76-CN (Q7): the two steps, both of them free functions a fixture can
+        //drive. The behaviour is #W75-CI (P13)'s, unchanged.
+        if (w76MainSkipNeedsFlush(mMainSkip, t, ph))
             flushMainPhaseSkip(); //close any OLDER pending phase first
-            return;
-        }
-        if (t != mMainSkipPendTurn || ph != mMainSkipPendPhase)
-        {
-            flushMainPhaseSkip();
-            mMainSkipPendTurn = t;
-            mMainSkipPendPhase = ph;
-            mMainSkipPendWhy = why ? why : "?";
-        }
+        w76MainSkipArm(mMainSkip, t, ph, why);
     }
     //#W75-CI (P13): cancel a pending skip armed for THIS phase, now, while the
     //two (turn, phase) facts are both current.
     void cancelMainPhaseSkipPending(int t, int ph)
     {
-        if (w75MainPhaseSkipCancels(t, ph, mMainSkipPendTurn, mMainSkipPendPhase))
-        {
-            mMainSkipPendTurn = -1;
-            mMainSkipPendPhase = -1;
-            mMainSkipPendWhy.clear();
-        }
+        w76MainSkipCancelPending(mMainSkip, t, ph);
     }
     virtual void noteMainPhaseCastingOffered()
     {
         if (!observer)
             return;
-        mMainCastOfferedTurn = observer->turn;
-        mMainCastOfferedPhase = (int) observer->getCurrentGamePhase();
-        cancelMainPhaseSkipPending(mMainCastOfferedTurn, mMainCastOfferedPhase); //#W75-CI (P13)
+        w76MainSkipCastingOffered(mMainSkip, observer->turn,
+                                  (int) observer->getCurrentGamePhase()); //#W76-CN (Q7)
     }
     //#W74-CD (O10, wave-73 engine-seat HIGH-2 + deck126 MED-3): a phase whose
     //window was closed by THIS SEAT'S OWN HOLD LATCH is not a phase the engine
@@ -578,32 +662,31 @@ private:
     {
         if (!observer)
             return;
-        mMainHoldHeldTurn = observer->turn;
-        mMainHoldHeldPhase = (int) observer->getCurrentGamePhase();
-        cancelMainPhaseSkipPending(mMainHoldHeldTurn, mMainHoldHeldPhase); //#W75-CI (P13)
+        w76MainSkipHoldSuppressed(mMainSkip, observer->turn,
+                                  (int) observer->getCurrentGamePhase()); //#W76-CN (Q7)
     }
     //#W73-CB (F6): close the pending phase. Counts at most once per phase, and
     //only when that phase never reached the casting window.
     void flushMainPhaseSkip()
     {
-        if (mMainSkipPendTurn < 0)
-            return;
-        const bool castingWasOffered = (mMainCastOfferedTurn == mMainSkipPendTurn
-                                        && mMainCastOfferedPhase == mMainSkipPendPhase);
-        //#W74-CD (O10): ...or the seat held this very phase shut itself.
-        const bool heldByOwnLatch = (mMainHoldHeldTurn == mMainSkipPendTurn
-                                     && mMainHoldHeldPhase == mMainSkipPendPhase);
-        if (w74MainPhaseSkipCounts(castingWasOffered, heldByOwnLatch))
+        if (w76MainSkipFlush(mMainSkip))
         {
             mMainPhaseWindowsSkipped++;
+            //#W76-CN (Q7): THE TRACE SPEAKS THE RECORDS' TURN. It printed
+            //`observer->turn` while every translog record prints
+            //translogTurn(observer->turn) = observer->turn + 1, so a reviewer
+            //cross-referencing the two is one turn out - which is exactly how
+            //wave 75 read this meter as "36% false" (34 of 94). Re-run against
+            //the corrected mapping the false count is 0 of 94. The raw value
+            //rides beside it so an older note still resolves.
             DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: own main phase (turn "
-                       << mMainSkipPendTurn << ", phase " << mMainSkipPendPhase
-                       << ") ENDED with NO casting window - " << mMainSkipPendWhy
+                       << AIPlayerGPT::translogTurn(mMainSkip.pendTurn)
+                       << " as the records number it; observer turn "
+                       << mMainSkip.pendTurn << ", phase " << mMainSkip.pendPhase
+                       << ") ENDED with NO casting window - " << mMainSkip.pendWhy
                        << " (" << mMainPhaseWindowsSkipped << " this game)");
         }
-        mMainSkipPendTurn = -1;
-        mMainSkipPendPhase = -1;
-        mMainSkipPendWhy.clear();
+        w76MainSkipClearPending(mMainSkip);
     }
     //The compact L2 record: kind, seq, replayed_from, the answer, and the run.
     //#W71-BS (F5): the answer floor the CURRENT seam's legal answer needs, and the
@@ -1158,6 +1241,12 @@ private:
     //and, accumulated, training data for a small shippable policy model.
     string mTransLogPath; //empty = disabled
     int mTransSeq;
+    //#W76-CN (Q1): the RECORD counter, incremented for every decision record
+    //this seat writes whether or not a translog path is configured. `mTransSeq`
+    //only moves when the log is on, so with logging off (the shipped default)
+    //the hold-check bracket's own same-window guard could never see a new
+    //window. Window identity must not depend on whether anyone is watching.
+    int mWindowSeq;
     //Every record carries game context (turn/phase/life), the last round
     //trip's latency, the chosen option as TEXT (indexes rot, text does
     //not), and - when the heuristic answered instead - the fallback reason
@@ -1699,16 +1788,10 @@ private:
     //scoped to the non-main instant-speed phases), which is why `152v146` t18
     //was invisible. Report-only.
     int mMainPhaseWindowsSkipped; //gameend report field
-    //#W73-CB (F6): the pending phase candidate and the casting-offered stamp.
-    int mMainSkipPendTurn;
-    int mMainSkipPendPhase;
-    string mMainSkipPendWhy;
-    int mMainCastOfferedTurn;
-    int mMainCastOfferedPhase;
-    //#W74-CD (O10): the (turn, phase) whose window this seat's own hold latch
-    //closed. Not a skipped phase - a held one.
-    int mMainHoldHeldTurn;
-    int mMainHoldHeldPhase;
+    //#W73-CB (F6) / #W74-CD (O10) / #W76-CN (Q7): the pending phase candidate,
+    //the casting-offered stamp and the hold-suppressed stamp, as one drivable
+    //unit (W76MainPhaseSkipState) rather than six loose ints.
+    W76MainPhaseSkipState mMainSkip;
     //#W68-BB (J5): the card the last payment receipt was written for, and the
     //step it was written in. A post-announcement decline consumes it and says
     //in the narration that the cast did NOT happen - the receipt alone reads as
@@ -1830,13 +1913,17 @@ private:
     //#W61-U (C14): the prompt-only note stating which of the two hold regimes
     //this menu is in, measured against the previous window's rows at this seam.
     string holdReopenNote(const char * seam, const std::vector<string>& rows);
-    std::map<string, std::set<string> > mLastMenuRows; //per seam, previous window
-    std::map<string, int> mMenuRepeatRun;              //consecutive unchanged windows
-    //#W62-fix: the translog seq at which each seam's note was last MEASURED. A
-    //prompt is rebuilt every tick while an answer is in flight; the same window
-    //re-rendered (same seq, same rows) must return the same note, not count.
-    std::map<string, int> mMenuRepeatSeq;
-    std::map<string, string> mMenuRepeatNote;
+    //#W76-CN (Q1, wave-75 engine-seat HIGH-1 + deck123 MED-3): THE MEMORY IS
+    //KEYED ON WINDOWS THAT WERE ASKED. `mLastMenuRows` was updated at every
+    //window whose prompt was BUILT, and the wave-75 corpus built 3,402 windows
+    //the model never received (1,601 suppressed by the hold latch, 1,801 served
+    //from the two replay caches), so the bracket's subject - "the last window at
+    //this seam" - was frequently a menu the reader has no memory of (214 of
+    //2,000 record-adjacent windows). The rows a window is built with are now
+    //STAGED; they are committed only when that window earns a record, which is
+    //exactly the set of windows the model was asked. `mMenuRepeatRun` counts
+    //asked windows in a row for the same reason.
+    W76HoldMemory mHoldMemory;
     string mCastHoldNote;                              //measured once per cast window
     //#W53-N (D2): record the model's hold answer at this seam.
     void takeHold(const char * seam, const std::vector<string>& rows);
@@ -2131,6 +2218,15 @@ private:
     //#W75-CM (F5): THIS ARM's armed flag. Swapped in and out with the rest of the
     //slot by selectRetryArm(); the other arm's lives in mRetryPark.
     bool mForceCloseArmed;         //a close is armed and has not reached a record
+    //#W76-CN (Q8): arms refused because the OTHER arm's close was still
+    //outstanding - the decodes this bound did not buy. Gameend field.
+    int mForceCloseArmsRefused;
+    //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
+    //byte-identical re-put later in the same turn at another phase can be
+    //counted and named. Measure + annotation only; no window is collapsed.
+    std::map<string, W76CrossPhaseAsk> mCrossPhaseAsks;
+    int mCrossPhaseRePuts;
+    int mCrossPhaseTurn;           //the turn mCrossPhaseAsks holds; older turns drop
     //#W75-CJ (P2a): the body of the last non-200 response, so a 400 is
     //diagnosable from the corpus instead of only from a live probe. Consumed
     //with the record that carries it.
