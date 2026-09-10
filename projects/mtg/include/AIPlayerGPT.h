@@ -153,6 +153,18 @@ inline bool w73MainPhaseSkipCounts(bool castingWasOffered) { return !castingWasO
 //swallowed. Pure, so both exemptions are pinned in PARSETEST.
 inline bool w74MainPhaseSkipCounts(bool castingWasOffered, bool heldByOwnLatch)
 { return w73MainPhaseSkipCounts(castingWasOffered || heldByOwnLatch); }
+//#W75-CI (P13): the two (turn, phase) decisions the meter has to take WHILE
+//both facts are current. `offered` and `held` are single slots holding only the
+//LAST phase each was noted for, and the pending skip was compared against them
+//one or more phases later - so turn T main 1's pending was flushed against an
+//offered mark that main 2 had already overwritten. Both mains of that turn were
+//then counted, which is exactly the corpus's signature (28 of the 72 traces are
+//(turn,4)/(turn,10) PAIRS). Pure, so the sequence is pinned in PARSETEST.
+inline bool w75MainPhaseSkipArms(int t, int ph, int offeredTurn, int offeredPhase,
+                                 int heldTurn, int heldPhase)
+{ return !((t == offeredTurn && ph == offeredPhase) || (t == heldTurn && ph == heldPhase)); }
+inline bool w75MainPhaseSkipCancels(int t, int ph, int pendTurn, int pendPhase)
+{ return t == pendTurn && ph == pendPhase; }
 
 //#W74-CF (F1, Astra review finding 1): ONE ARM'S SECOND LEG, WHOLE. Every field
 //the three retry-arming branches write, kept together so an arm's leg can be
@@ -481,12 +493,35 @@ private:
     //ordinary stack processing. The note is now a PENDING candidate for
     //(turn, phase); noteMainPhaseCastingOffered cancels it, and the count is
     //taken once when that phase ENDS having offered nothing.
+    //#W75-CI (P13, wave-74 engine-seat MED-6 / deck152 MED-3 / deck146 LOW 7):
+    //WHY THE METER WAS 39% FALSE, AND IT WAS NEVER A THIRD ARM. `offered` and
+    //`held` are SINGLE SLOTS holding the last (turn, phase) each was noted for,
+    //and the pending skip is only compared against them at FLUSH time - which is
+    //one or more phases later. So the wave-74 shape is: turn T main 1 offers
+    //casting (offered = (T,4)); the instant arm later arms a pending skip for
+    //(T,4); turn T MAIN 2 then offers casting and overwrites offered = (T,10);
+    //the main-2 arm flushes (T,4) against an offered mark that now names main 2,
+    //the exemption misses, and BOTH main phases of that turn are counted. That
+    //is exactly the corpus's signature: all 72 traces come from one arm, and 28
+    //of them are (turn, 4) and (turn, 10) PAIRS on the seat's own turns
+    //(deck152 16, deck146 9, deck123 2, deck162 1). The fix is to decide while
+    //both facts are current: an offer CANCELS a pending skip for its own phase,
+    //and a phase that already offered can never arm one. `flushMainPhaseSkip`
+    //keeps its comparison as belt and braces.
     virtual void noteMainPhaseWindowSkipped(const char * why)
     {
         if (!observer)
             return;
         const int t = observer->turn;
         const int ph = (int) observer->getCurrentGamePhase();
+        //#W75-CI (P13): this phase already offered casting, or the seat's own
+        //hold latch closed it - it is not a swallowed phase and must not arm one.
+        if (!w75MainPhaseSkipArms(t, ph, mMainCastOfferedTurn, mMainCastOfferedPhase,
+                                  mMainHoldHeldTurn, mMainHoldHeldPhase))
+        {
+            flushMainPhaseSkip(); //close any OLDER pending phase first
+            return;
+        }
         if (t != mMainSkipPendTurn || ph != mMainSkipPendPhase)
         {
             flushMainPhaseSkip();
@@ -495,12 +530,24 @@ private:
             mMainSkipPendWhy = why ? why : "?";
         }
     }
+    //#W75-CI (P13): cancel a pending skip armed for THIS phase, now, while the
+    //two (turn, phase) facts are both current.
+    void cancelMainPhaseSkipPending(int t, int ph)
+    {
+        if (w75MainPhaseSkipCancels(t, ph, mMainSkipPendTurn, mMainSkipPendPhase))
+        {
+            mMainSkipPendTurn = -1;
+            mMainSkipPendPhase = -1;
+            mMainSkipPendWhy.clear();
+        }
+    }
     virtual void noteMainPhaseCastingOffered()
     {
         if (!observer)
             return;
         mMainCastOfferedTurn = observer->turn;
         mMainCastOfferedPhase = (int) observer->getCurrentGamePhase();
+        cancelMainPhaseSkipPending(mMainCastOfferedTurn, mMainCastOfferedPhase); //#W75-CI (P13)
     }
     //#W74-CD (O10, wave-73 engine-seat HIGH-2 + deck126 MED-3): a phase whose
     //window was closed by THIS SEAT'S OWN HOLD LATCH is not a phase the engine
@@ -513,6 +560,7 @@ private:
             return;
         mMainHoldHeldTurn = observer->turn;
         mMainHoldHeldPhase = (int) observer->getCurrentGamePhase();
+        cancelMainPhaseSkipPending(mMainHoldHeldTurn, mMainHoldHeldPhase); //#W75-CI (P13)
     }
     //#W73-CB (F6): close the pending phase. Counts at most once per phase, and
     //only when that phase never reached the casting window.
@@ -1544,6 +1592,22 @@ private:
     //seat's Casting decision was actually put to the model, so the priority
     //ask that follows it in the same phase can say the casting question is
     //already answered (the off-menu "CHOICE: 8 (Cast Acererak)" shape).
+    //#W75-CI (P18, wave-74 deck146 MED 3): THE FACE THE MODEL ALREADY CHOSE.
+    //The land drop was decided at TWO windows - the `Land drop:` menu named the
+    //card, and a SECOND menu one record later asked which face - 18 of one
+    //seat's 322 decisions, 9 repro pairs on deck146 alone, and the second
+    //window's own `Decline - do nothing` row could un-make a drop the first had
+    //committed. Each face is now its own ROW on the first menu (nothing is
+    //removed: both faces still reach the battlefield, and the decline row is
+    //still there), and the answer is carried into the face menu instead of
+    //being asked again. This is the wave-71 L5 "carry the committed intent"
+    //pattern, not an auto-answer: the pick IS the model's own, made one window
+    //earlier over rows that named both faces. Scoped to the card and the turn,
+    //consumed once, and if the menu does not match it is asked as before.
+    MTGCardInstance * mLandFacePreCard;
+    int mLandFacePreTurn;
+    bool mLandFacePreBack;      //true = the model picked the BACK face
+    string mLandFacePreBackName;
     int mCastAskTurn;
     int mCastAskPhase;
     //#W53-N (D2): the model-owned HOLD. mHoldTurn is the turn it was taken on;
@@ -1599,6 +1663,17 @@ private:
     int mChainWindowsOnlySelfharm;
     int mChainSelfharmRows;
     int mChainActingRows;
+    //#W75-CI (P12, wave-74 engine-seat MED-5): the same census at the CASTING
+    //seam. Wave 74's O13 instrument runs over the priority seam's `shownLines`
+    //only, so the 41-window deck126 Bond/Blood chain - paid entirely at the cast
+    //seam - contributed NOTHING to the counters above while the honest corpus
+    //figure, measured off the records' own `options_text`, was 174 / 2,396 = 7%
+    //(deck126 85, deck123 58, deck146 31) and 113 windows on the CH binary
+    //alone. Kept as its own triple so the wave-74 numbers stay comparable.
+    //MEASURE ONLY: no row is withheld, no window is collapsed.
+    int mChainWindowsOnlySelfharmCast;
+    int mChainSelfharmRowsCast;
+    int mChainActingRowsCast;
     //#W73-BY (N16): a MAIN PHASE of this seat's own turn that produced no
     //casting window. `own_turn_windows_skipped` cannot see this class (it is
     //scoped to the non-main instant-speed phases), which is why `152v146` t18

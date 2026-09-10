@@ -236,12 +236,23 @@ for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
 allHaveEvidence = bool(live) and all(recs for _, recs in live)
 
 #the newest K decisions ACROSS seats: newest log first, its newest record first.
+##W75-CI (P24, wave-74 known-bugs): BOUNDED PER SEAT. The pool was filled seat by
+#seat, so ONE seat's silent tail could supply all K while twenty other seats were
+#answering normally - the tripwire would then stop a healthy corpus on the evidence
+#of a single wedged game. ACROSS SEATS is the predicate's own word: no seat may
+#contribute more than ceil(K / live seats). The cap is strict, so a lone silent seat
+#leaves the pool short of K and the verdict is OK (that seat is the game watchdog's
+#business, not the endpoint tripwire's). With one live seat the cap is K and the
+#behaviour is exactly as before.
+per = -(-k // max(1, len(live)))
 pool = []
 for _, recs in sorted(live, key=lambda lr: -lr[0]):
+    taken = 0
     for r in recs:
-        pool.append(r)
-        if len(pool) >= k:
+        if taken >= per or len(pool) >= k:
             break
+        pool.append(r)
+        taken += 1
     if len(pool) >= k:
         break
 
@@ -593,6 +604,32 @@ pilot_stall_selftest() {
     case "$v" in STALL\ 6) ;; *) echo "pilot-stall-selftest FAIL: a 20-timeout live tail gave '$v', want 'STALL 6'" >&2; fails=1;; esac
     rm -f "$tmp"/*.jsonl
 
+    ##W75-CI (P24): THE K-POOL MAY NOT FILL FROM ONE SEAT.
+    #l: one wedged seat (its log the NEWEST, twenty consecutive timeouts) beside
+    #   five seats the pilot is answering normally. The pool used to be filled
+    #   seat by seat from the newest log, so that one seat supplied all six
+    #   records and the tripwire stopped a corpus whose other twenty seats were
+    #   fine. RED on base: this shape reads STALL 6 there.
+    : > "$tmp/9999999999-ai_baka_deck1-l.jsonl"
+    for i in $(seq 1 20); do
+        printf '%s\n' "{\"kind\":\"ask\",\"seq\":$i,\"fallback\":\"timeout\"}" \
+            >> "$tmp/9999999999-ai_baka_deck1-l.jsonl"
+    done
+    touch -d "@2000000000" "$tmp/9999999999-ai_baka_deck1-l.jsonl"
+    for i in 2 3 4 5 6; do
+        printf '%s\n' '{"kind":"ask","seq":1}' '{"kind":"ask","seq":2}' '{"kind":"ask","seq":3}' \
+            > "$tmp/9999999999-ai_baka_deck$i-l.jsonl"
+        touch -d "@1900000000" "$tmp/9999999999-ai_baka_deck$i-l.jsonl"
+    done
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in OK\ 1) ;; *) echo "pilot-stall-selftest FAIL: one wedged seat among five answering seats gave '$v', want 'OK 1' - no seat may contribute more than ceil(K/live) to the pool" >&2; fails=1;; esac
+    #m: and with ONE live seat the cap IS K, so case (i)'s stalled tail is
+    #   unchanged - the bound adds breadth, it does not weaken the tripwire.
+    rm -f "$tmp"/9999999999-ai_baka_deck[23456]-l.jsonl
+    v=$(pilot_stall_verdict "$tmp" 1 6)
+    case "$v" in STALL\ 6) ;; *) echo "pilot-stall-selftest FAIL: a lone live seat with a 20-timeout tail gave '$v', want 'STALL 6' (with one live seat the per-seat cap is K)" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
     #j: AN ARBITRARILY OLD RECORD MUST NOT VETO THE NEWEST STREAK. One unfinished
     #   log holds a single stale success; six newer failures sit in other live
     #   logs. The old predicate pooled the stale record beside them and read OK 6.
@@ -631,7 +668,7 @@ pilot_stall_selftest() {
     case "$v" in 0) ;; *) echo "pilot-stall-selftest FAIL: unparsed_reply counted as silence ('$v'), want '0'" >&2; fails=1;; esac
 
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 13 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 15 checks, 0 failed"
     return "$fails"
 }
 
