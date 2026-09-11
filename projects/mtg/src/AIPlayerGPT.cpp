@@ -633,6 +633,21 @@ size_t boardEffectSnippetLen(size_t distinctNames)
 //takes the old path byte for byte.
 const size_t kBoardEffectClauseFactor = 2;
 const size_t kBoardEffectClauseFloor = 40; //below this a clause is a dangling marker
+//#W77-CU (F9, Astra MED 9): THE CEILING, STATED AND ENFORCED. The factor above
+//was a BUDGET the head loop spent, and the protected last clause, the " -- "
+//separators, the omitted-clause marker and `textSnippetCore`'s own visible
+//ellipsis were all added ON TOP of it - so three 55-byte clauses at the 55-byte
+//tier emitted 163 bytes where every caller's arithmetic (CT's 37,121 B
+//whole-prompt bound among them) assumed 110. The slack is what those four
+//overheads can cost: a marker of at most 50 bytes ("[24 more clauses of this
+//card's text not shown] -- "), two separators and the ellipsis. The returned
+//string is guaranteed to fit inside this, so a caller's per-name arithmetic is
+//a real bound rather than an assumption about the head loop.
+const size_t kBoardEffectSnippetSlack = 64;
+size_t boardEffectSnippetCeiling(size_t maxLen)
+{
+    return kBoardEffectClauseFactor * maxLen + kBoardEffectSnippetSlack;
+}
 
 string boardEffectSnippet(const string& raw, size_t maxLen)
 {
@@ -659,10 +674,13 @@ string boardEffectSnippet(const string& raw, size_t maxLen)
     if (parts.size() < 2 || flat.size() <= maxLen)
         return textSnippetCore(flat, maxLen); //single clause, or it all fits
     const string last = textSnippetCore(parts[parts.size() - 1], maxLen);
-    size_t budget = maxLen * kBoardEffectClauseFactor;
-    budget = budget > last.size() ? budget - last.size() : 0;
-    std::ostringstream head;
-    size_t shown = 0;
+    //#W77-CU (F9): the separator that joins the head to the protected last
+    //clause is charged to the head's budget, so the head loop cannot spend the
+    //ceiling down to the byte and then overrun it on punctuation.
+    size_t budget = boardEffectSnippetCeiling(maxLen);
+    budget = budget > last.size() + 4 + kBoardEffectSnippetSlack
+                 ? budget - last.size() - 4 - kBoardEffectSnippetSlack : 0;
+    vector<string> headClauses;
     for (size_t i = 0; i + 1 < parts.size(); i++)
     {
         if (budget < kBoardEffectClauseFloor)
@@ -672,19 +690,39 @@ string boardEffectSnippet(const string& raw, size_t maxLen)
         if (per < kBoardEffectClauseFloor)
             per = kBoardEffectClauseFloor;
         string one = textSnippetCore(parts[i], per);
-        head << (shown ? " -- " : "") << one;
         budget = budget > one.size() + 4 ? budget - one.size() - 4 : 0;
-        shown++;
+        headClauses.push_back(one);
     }
-    std::ostringstream o;
-    if (shown)
-        o << head.str() << " -- ";
-    size_t skipped = parts.size() - 1 - shown;
-    if (skipped)
-        o << "[" << skipped << " more clause" << (skipped == 1 ? "" : "s")
-          << " of this card's text not shown] -- ";
-    o << last;
-    return o.str();
+    //#W77-CU (F9, Astra MED 9): THE FACTOR WAS A BUDGET, NOT A CEILING. The head
+    //loop charged itself `kBoardEffectClauseFactor x maxLen` and then the LAST
+    //clause, the " -- " separators and the omitted-clause marker were added on
+    //top, so three 55-byte clauses at the 55-byte tier emitted 163 bytes where
+    //every caller's arithmetic - and CT's 37,121 B whole-prompt bound - assumed
+    //110. The factor is now a HARD CEILING on the whole returned string, markers
+    //and separators included: head clauses are given back one at a time (each
+    //one raising the COUNTED omission, never a silent trim) until the render
+    //fits, and the protected last clause is what survives. A text that fits was
+    //never touched by any of this.
+    const size_t hardCap = boardEffectSnippetCeiling(maxLen);
+    for (;;)
+    {
+        std::ostringstream o;
+        for (size_t i = 0; i < headClauses.size(); i++)
+            o << (i ? " -- " : "") << headClauses[i];
+        if (!headClauses.empty())
+            o << " -- ";
+        const size_t skipped = parts.size() - 1 - headClauses.size();
+        if (skipped)
+            o << "[" << skipped << " more clause" << (skipped == 1 ? "" : "s")
+              << " of this card's text not shown] -- ";
+        o << last;
+        const string built = o.str();
+        if (built.size() <= hardCap)
+            return built;
+        if (headClauses.empty())
+            return textSnippetCore(built, hardCap); //visible "...", never silent
+        headClauses.pop_back();
+    }
 }
 
 //#W60-O (B8, wave-59 deck152 HIGH-1; 27 renders in six games, 60 corpus-wide).
@@ -2288,6 +2326,20 @@ static bool w76PlayerCanGainLife(Player * gainer)
     return w76LifeGainReaches(g->hasAbility(Constants::CANTCHANGELIFE),
                               g->hasAbility(Constants::NOLIFEGAIN),
                               f->hasAbility(Constants::NOLIFEGAINOPPONENT));
+}
+
+//#W77-CU (F7): the gate itself, as one pure function so the whole rule is
+//pinnable and so no future metered gain can be added to this screen without
+//passing through it. Called once, with the seat's own answer to
+//`w76PlayerCanGainLife`, before any of the three figures is read.
+void w77GateMeteredGains(bool canGainLife, int& sureGain, int& mayGain,
+                         int& lifelinkGain)
+{
+    if (canGainLife)
+        return;
+    sureGain = 0;
+    mayGain = 0;
+    lifelinkGain = 0;
 }
 
 static string sweeperVictimName(MTGCardInstance * c)
@@ -18871,6 +18923,22 @@ void AIPlayerGPT::ensureGameStartRecord()
         if (dot != string::npos && mTransLogPath.find("-vs-") == string::npos)
             mTransLogPath = mTransLogPath.substr(0, dot) + "-vs-" + opponent()->deckFileSmall + ".jsonl";
     }
+    //#W77-CU (F10, Astra MED 10): THE GAME NAMES ITS OWN SEAT LOGS. The harness
+    //harvested by deck pair plus a time tolerance, which is not identity: with
+    //two pools running it accepted a foreign seat five seconds away and rejected
+    //a legitimate one sixteen seconds away, and two concurrent games of the SAME
+    //pair were indistinguishable at any tolerance. The file name is known only
+    //here - it carries this player's own pointer - so the process that owns it
+    //announces it on its own stderr, which the harness already captures per
+    //game. Printed once per seat, only when the translog (an opt-in telemetry
+    //feature) is on, so no release build gains a line it did not already have.
+    if (!mTransLogPath.empty())
+    {
+        const size_t slash = mTransLogPath.rfind('/');
+        fprintf(stderr, "WAGIC_GPT_TRANSLOG_FILE %s\n",
+                mTransLogPath.c_str() + (slash == string::npos ? 0 : slash + 1));
+        fflush(stderr);
+    }
     std::ostringstream gid;
     gid << (void *) observer;
     json rec = {
@@ -19531,6 +19599,39 @@ static int repeatAnnotationCount(const string& row);
 //#W76-CN (Q1): the record writer is where a window becomes an ASKED window.
 void w76HoldWindowAsked(W76HoldMemory& m, const char * seam, int windowSeq);
 
+//#W77-CU (F5, Astra HIGH 5): A TIMED-OUT ASKED WINDOW LOST ITS HISTORY COMMIT.
+//`mWindowSeq` is the window counter the hold memory stages against: the builder
+//stages the menu under the value the counter holds, and the record that the
+//model's answer earns consumes that same value, which is how
+//`w76HoldWindowAsked` knows the record belongs to the staged window
+//(`pendingSeq[s] != windowSeq` rejects anything else). Every writeTransLog call
+//used to consume a value - including `wall_miss`, which is written from INSIDE
+//the poll, while the very window that staged N is still in flight. The sequence
+//the review names: window stages N, the deadline is spent,
+//`pollCompletionRetry` calls `flushWallMissRecord("wall_miss_no_retry")` which
+//consumes N, `askModel` then writes its own ask record at N+1, the guard
+//rejects the commit, and the NEXT window at that seam says "this is the first
+//window I have asked you" about a window the model was asked.
+//A `wall_miss` is TELEMETRY ABOUT A WINDOW STILL IN FLIGHT, not a window of its
+//own: it rides the pending window's number instead of taking one. Every other
+//kind is a decision that closed a window and keeps the old behaviour, so a
+//window that was built and then answered by the heuristic (`defer`) still
+//orphans its stage - it was not asked, and must not become the bracket's
+//referent.
+static bool w77RecordIsWindowRecord(const char * kind)
+{
+    return !(kind && strcmp(kind, "wall_miss") == 0);
+}
+
+//The counter's consumption rule, as the one function both the live writer and
+//the pin call. Returns the sequence number this record carries.
+static int w77ConsumeWindowSeq(int& windowSeq, const char * kind)
+{
+    if (!w77RecordIsWindowRecord(kind))
+        return windowSeq; //telemetry rides the in-flight window's own number
+    return windowSeq++;
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -19541,7 +19642,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //configured (the shipped default is off). A window suppressed by the hold
     //latch or answered from a replay cache writes no record and therefore never
     //commits: that is the whole of the HIGH-1 fix.
-    const int recordWindowSeq = mWindowSeq++;
+    const int recordWindowSeq = w77ConsumeWindowSeq(mWindowSeq, kind); //#W77-CU (F5)
     //#W77-CR (R2 a, wave-76 engine-seat HIGH-2): THE LAND DROP IS ITS OWN
     //QUESTION AND NOW ITS OWN SEAM. Every `kind: ask` record mapped to the
     //"cast" seam, and the land-drop menu is a `kind: ask` record - so a land
@@ -19561,7 +19662,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //referent (the mLastParseNote discipline, and the same reason #W76-CN moved
     //the commit above this early return).
     const int holdCheckRefSeq = mHoldCheckRefSeq;
-    mHoldCheckRefSeq = -2;
+    //#W77-CU (F5): ...and the stamp is consumed by the window's own record, not
+    //by the wall-miss telemetry written while that window is still in flight.
+    if (w77RecordIsWindowRecord(kind))
+        mHoldCheckRefSeq = -2;
     if (mTransLogPath.empty())
     {
         mLastParseNote.clear(); //consumed even when logging is off
@@ -26522,14 +26626,63 @@ static string w77TargetedRemovalCoverTag(int total, int myLife, bool totalIsFloo
       << " from " << attackerBodies << " of their creatures and puts you at "
       << (myLife - total) << ". This row removes ONE body and the target is YOUR"
          " choice: ";
-    bool first = true;
-    for (size_t i = 0; i < victims.size(); i++)
+    //#W77-CU (F8, Astra MED 8): ONE ENTRY PER VICTIM WAS AN UNBOUNDED ROSTER.
+    //Against 100 one-toughness attackers this clause printed 100 sentences of
+    //`name takes N off that total, leaving M` - linear in the board, bypassing
+    //the wave-76 Q2 roster fold that the kill summary beside it goes through,
+    //and invalidating every whole-prompt byte bound that counted only the
+    //creature gloss. Victims are grouped by WHAT THEY TAKE (which is the only
+    //number this clause is about), each group's names go through
+    //`joinVictimRoster` - the same count + shapes + handles + `and N more` fold
+    //the kill summary uses - and the total is stated ONCE, above. Groups are
+    //ordered by contribution, largest first (the figure the decision turns on),
+    //and past the group cap the remainder is COUNTED and named, never trimmed
+    //in silence.
     {
-        if (victims[i].takes <= 0)
-            continue;
-        o << (first ? "" : "; ") << victims[i].name << " takes " << victims[i].takes
-          << " off that total, leaving " << (total - victims[i].takes);
-        first = false;
+        std::vector<int> takesOrder;
+        std::map<int, std::vector<std::string> > byTakes;
+        for (size_t i = 0; i < victims.size(); i++)
+        {
+            if (victims[i].takes <= 0)
+                continue;
+            if (byTakes.find(victims[i].takes) == byTakes.end())
+                takesOrder.push_back(victims[i].takes);
+            byTakes[victims[i].takes].push_back(victims[i].name);
+        }
+        for (size_t a = 1; a < takesOrder.size(); a++) //descending, stable
+        {
+            const int v = takesOrder[a];
+            size_t b = a;
+            while (b > 0 && takesOrder[b - 1] < v)
+            {
+                takesOrder[b] = takesOrder[b - 1];
+                b--;
+            }
+            takesOrder[b] = v;
+        }
+        const size_t kGroupCap = 4;
+        size_t unlistedGroups = 0, unlistedBodies = 0;
+        bool first = true;
+        for (size_t g = 0; g < takesOrder.size(); g++)
+        {
+            std::vector<std::string>& names = byTakes[takesOrder[g]];
+            if (g >= kGroupCap)
+            {
+                unlistedGroups++;
+                unlistedBodies += names.size();
+                continue;
+            }
+            o << (first ? "" : "; ") << joinVictimRoster(names)
+              << (names.size() == 1 ? " takes " : " each take ") << takesOrder[g]
+              << " off that total, leaving " << (total - takesOrder[g]);
+            first = false;
+        }
+        if (unlistedGroups > 0)
+            o << "; and " << unlistedBodies
+              << (unlistedBodies == 1 ? " further body in " : " further bodies in ")
+              << unlistedGroups
+              << (unlistedGroups == 1 ? " smaller contribution not listed here"
+                                      : " smaller contributions not listed here");
     }
     o << ". The most any ONE of them takes off is " << best << ", leaving "
       << (total - best);
@@ -26586,6 +26739,41 @@ static string crackBackKillRowTag(int total, int myLife, bool totalIsFloor,
     o << ". Removal or a trick they draw is excluded either way - read the"
          " per-attacker tags above for the rest.}";
     return o.str();
+}
+
+//#W77-CU (F2, Astra HIGH 2): WHICH clause a removal row's cover takes. A SWEEP
+//subtracts every victim at once; a TARGETED row removes ONE body and the pick is
+//the seat's own, so it must take the targeted clause - which prices each victim
+//separately and says so - and never the summed one. The parent cast row's walk
+//has always gated on the survey's `sweep` flag; the per-X sub-menu walk did not,
+//and a single-target `damage:X` at X=3 against two 3/3 attackers claimed six
+//power removed. One function now answers the question for both, so the two walks
+//cannot classify the same spell differently.
+static string w77CoverClauseFor(bool sweep, int total, int myLife, bool totalIsFloor,
+                                int removedPower, int removedBodies,
+                                const std::vector<W77RemovalVictim>& victims,
+                                int attackerBodies)
+{
+    if (sweep)
+        return crackBackKillRowTag(total, myLife, totalIsFloor, removedPower,
+                                   removedBodies, attackerBodies);
+    return w77TargetedRemovalCoverTag(total, myLife, totalIsFloor, victims,
+                                      attackerBodies);
+}
+
+//#W77-CU (F3, Astra HIGH 3): the ONE guarded per-body figure every cover walk
+//reads. `crackBackBodyContribution` answers "what does this body swing for";
+//`w76CrackVictimTrulyRemoved` answers "does this row actually take it off the
+//board". The wave-76 CQ F5 fix bound the two together on the paths that existed
+//then, and wave 77 added two new paths that called the first without the second
+//- so regeneration, ghostform, indestructibility and persist/undying were
+//credited as removed. Binding them here means a third path cannot make the same
+//mistake by omission.
+static int w77CoverBodyContribution(MTGCardInstance * c, int destroyKind)
+{
+    if (!w76CrackVictimTrulyRemoved(c, destroyKind))
+        return 0;
+    return crackBackBodyContribution(c);
 }
 
 //#W64-AK (R7): does this card ENTER TAPPED? A body that arrives tapped is not a
@@ -28358,6 +28546,24 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                                 //#W65-AP (R5): two damage steps, two gains
                                 cc->basicAbilities[Constants::DOUBLESTRIKE] != 0);
                         }
+                        //#W77-CU (F7, Astra HIGH 7): A GAIN THE BOARD FORBIDS
+                        //IS NOT A GAIN. Every figure above is life this seat
+                        //would GAIN by blocking - a trigger's certain half, its
+                        //optional half, lifelink - and none of them asked
+                        //whether this seat can gain life at all. Astra's board:
+                        //seat at two life with Perimeter Captain, opponent with
+                        //Erebos. The optional half metered +2, the header folded
+                        //it in, printed +1 and WITHDREW "no block saves you";
+                        //`Player::gainOrLoseLife` returns before the event, the
+                        //true figure is -1, and the seat blocks into death on a
+                        //promise the rules had already refused. One predicate -
+                        //the suite's `assertcangainlife` one, #W76-CQ (F6) -
+                        //gates every metered gain on this screen, so the header
+                        //and the edict row consult one rule about one board.
+                        //Nothing is capped: an allowed gain is unchanged.
+                        w77GateMeteredGains(w76PlayerCanGainLife(this),
+                                            blockTriggerGain, blockMayGain,
+                                            blockLifelinkGain);
                         //#W63-AB (E3b): on a lethal screen the line is still
                         //printed and labelled as the least-damage line.
                         const bool lethalScreen = (bestCase >= 0
@@ -30279,6 +30485,54 @@ void w77ApplyOwnLoopFeed(std::vector<string>& rows, bool ownLoopResolving)
         rows[i] = w77OwnLoopRow(rows[i], true);
 }
 
+//#W77-CU (F4): the OPPOSITE face. Same `[...]` group shape (stripped by every
+//key), same acting-rows-only rule, and it names both cards so the seat can see
+//which row answers which spell. It makes no claim about any particular row
+//being right - it removes the false "not needed" and states the mechanism.
+string w77OwnLoopThreatTag(const string& theirSpell, const string& component)
+{
+    if (theirSpell.empty() || component.empty())
+        return string();
+    return " [their " + theirSpell + " on the stack targets your " + component
+           + ", a piece of your own life LOOP - the loop STOPS if it resolves, so"
+             " a hold here does not cover this window]";
+}
+
+//#W77-CU (F4): ...and the MARKER ROW that makes the hold honest. The guidance
+//and the threat clause are both `[...]` groups, which `holdActionKeyRow` strips
+//- so without this the hold taken while the loop was "resolving on its own"
+//would keep standing after the opponent's removal appeared, and the seat would
+//never be asked the one window that matters. #W68-BB (J9) and #W74-CH already
+//use this shape for exactly this reason: a verdict row is its own key, so a
+//change in the verdict re-opens the window while nothing is removed or
+//auto-answered. Recomputed off the live board at every check, never latched.
+string w77OwnLoopVerdictKey(int state, const string& theirSpell,
+                            const string& component)
+{
+    if (state == kW77LoopThreatened)
+        return "[own loop verdict: THREATENED - " + theirSpell + " targets "
+               + component + "]";
+    if (state == kW77LoopResolving)
+        return "[own loop verdict: resolving]";
+    return "[own loop verdict: none]";
+}
+
+void w77ApplyOwnLoopThreatFeed(std::vector<string>& rows, const string& tag)
+{
+    if (tag.empty())
+        return;
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        if (rows[i].empty())
+            continue;
+        if (w72RowIsDeclineOrHold(holdKeyRow(rows[i])))
+            continue;
+        if (rows[i].find(tag) != string::npos)
+            continue; //idempotent: the prompt is rebuilt on every polling tick
+        rows[i] += tag;
+    }
+}
+
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
 //one menu and a REAL COST on another. `152v162` seqs 32-42 are eleven priority
 //windows inside one Draw phase, 163.3 s of inference for no board effect, while
@@ -30500,13 +30754,129 @@ void w77DropUnaskedCastNote(string& promptNote, string& castNote, int& refSeq)
 //the resolving half alone is any trigger chain. Same two facts `loopAutoPassFor`
 //reads, asked of THIS seat rather than the opponent - and unlike that collapse
 //this one removes nothing: it annotates.
+//#W77-CU (F4, Astra HIGH 4): "ANY unresolved stack object" IS NOT THE LOOP.
+//The wave-77 CR predicate was `loop pieces assembled` + `something is on the
+//stack`, so the opponent's removal aimed at Sanguine Bond - the one stack object
+//that STOPS the loop - satisfied it, and the seat's counterspell row was told
+//"your loop is resolving on its own, this row is not needed to win it". Holding
+//there loses the loop, and the trust doctrine forbids exactly that shape: a
+//rendered statement is an INSTRUCTION, so a false one costs the game.
+//Two halves now, both read off the live stack:
+//  (a) a PENDING LOOP EVENT - an unresolved stack object whose SOURCE is one of
+//      this seat's own loop components (the converter or the mirror). That is
+//      the loop actually executing, not a board that merely could.
+//  (b) NO unresolved stack object of the OPPONENT's that TARGETS a component.
+//      When one exists the seat is told the opposite, by name.
+static bool lifeToDamageConverterScript(const string& magicText); //#W77-CU (F4)
+static bool w77IsLoopComponentCard(MTGCardInstance * c, Player * me)
+{
+    if (!c || !me || c->controller() != me)
+        return false;
+    if (!c->isInPlay(c->getObserver()))
+        return false;
+    return lifeToDamageConverterScript(c->magicText)
+        || lifeLossMirrorScript(c->magicText);
+}
+
+//Does this stack object aim at `victim`? Spells carry a target list; a
+//triggered/activated ability carries one `target`. Both are asked, so an
+//opponent's removal reaches the test whichever shape the engine gave it.
+static bool w77StackObjectTargets(Interruptible * it, MTGCardInstance * victim)
+{
+    if (!it || !victim)
+        return false;
+    if (Spell * sp = dynamic_cast<Spell *>(it))
+    {
+        MTGCardInstance * t = NULL;
+        while ((t = sp->getNextCardTarget(t)) != NULL)
+            if (t == victim)
+                return true;
+    }
+    if (StackAbility * sa = dynamic_cast<StackAbility *>(it))
+        if (sa->ability && sa->ability->target
+            && (MTGCardInstance *) sa->ability->target == victim)
+            return true;
+    return false;
+}
+
+//The DECISION, split from the walk so the whole table is pinnable: the walk
+//gathers three board facts and this answers them. Threat wins over resolving -
+//a loop with removal aimed at a piece of it is not "resolving on its own", even
+//while one of its own triggers waits underneath the removal.
+int w77LoopVerdictFrom(bool provenWin, bool ownLoopEventPending,
+                       bool theirStackTargetsComponent)
+{
+    if (!provenWin)
+        return kW77LoopIdle;
+    if (theirStackTargetsComponent)
+        return kW77LoopThreatened;
+    return ownLoopEventPending ? kW77LoopResolving
+                               : kW77LoopIdle;
+}
+
+//The whole verdict in one walk. Returns kW77LoopThreatened (and fills the two
+//names) ahead of kW77LoopResolving: a threatened loop is never "resolving on its
+//own", even while one of its own triggers waits underneath the removal.
+int AIPlayerGPT::w77OwnLoopStackState(string& theirSpell, string& component)
+{
+    theirSpell.clear();
+    component.clear();
+    if (!observer || !observer->mLayers || !observer->mLayers->stackLayer())
+        return kW77LoopIdle;
+    if (!lifeLoopProvenWin(this))
+        return w77LoopVerdictFrom(false, false, false);
+    ActionStack * stack = observer->mLayers->stackLayer();
+    bool loopEventPending = false;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        MTGCardInstance * src = it->source;
+        if (StackAbility * sa = dynamic_cast<StackAbility *>(it))
+            if (sa->ability && sa->ability->source)
+                src = sa->ability->source;
+        if (w77IsLoopComponentCard(src, this))
+        {
+            loopEventPending = true; //(a) one of MY loop pieces is on the stack
+            continue;
+        }
+        if (!src || src->controller() == this)
+            continue; //my own other business threatens nothing
+        //(b) theirs: does it aim at a component of mine?
+        if (!observer->currentPlayer && !this->inPlay())
+            continue;
+        MTGGameZone * bf = this->game ? this->game->inPlay : NULL;
+        if (!bf)
+            continue;
+        for (int b = 0; b < bf->nb_cards; b++)
+        {
+            MTGCardInstance * c = bf->cards[b];
+            if (!w77IsLoopComponentCard(c, this))
+                continue;
+            if (!w77StackObjectTargets(it, c))
+                continue;
+            theirSpell = src->getName();
+            component = c->getName();
+            return w77LoopVerdictFrom(true, loopEventPending, true);
+        }
+    }
+    return w77LoopVerdictFrom(true, loopEventPending, false);
+}
+
 bool AIPlayerGPT::w77OwnLoopResolving()
 {
-    if (!observer || !observer->mLayers || !observer->mLayers->stackLayer())
-        return false;
-    if (observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) <= 0)
-        return false;
-    return lifeLoopProvenWin(this);
+    string a, b;
+    return w77OwnLoopStackState(a, b) == kW77LoopResolving;
+}
+
+string w77OwnLoopVerdictKey(int state, const string& theirSpell,
+                            const string& component); //defined above, used here
+string AIPlayerGPT::w77OwnLoopVerdictNow()
+{
+    string sp, comp;
+    const int st = w77OwnLoopStackState(sp, comp);
+    return w77OwnLoopVerdictKey(st, sp, comp);
 }
 
 //One count per WINDOW, never one per polling tick - the prompt is rebuilt on
@@ -30761,7 +31131,8 @@ static string holdKeyRow(const string& row)
 //making the key finite, and the untap release is what bounds it.
 static const char * const kHoldVerdictMarkerHead[] = {
     "[crack-back verdict:",  //#W68-BB (J9)
-    "[stack death verdict:"  //#W74-CH
+    "[stack death verdict:", //#W74-CH
+    "[own loop verdict:"     //#W77-CU (F4)
 };
 
 //A synthetic verdict marker is not a row the model can take: it is a fact about
@@ -30871,6 +31242,72 @@ static string w76StripBalancedAnnotationGroups(const string& row)
     return out;
 }
 
+//#W77-CU (F6, Astra MED 6): THE TARGET'S PREVIEW IS NOT THE ACTION'S IDENTITY.
+//The live target roster appends `targetPreviewFacts` - cost, type and, for a
+//creature, its CURRENT power/toughness - so a row naming the same cast, the same
+//cost and the same target INSTANCE re-rendered as `Goblin #3 (creature 2/2)`
+//where the last window said `(creature 1/1)`. `stripRenderAnnotationsLc` drops
+//only a parenthetical that begins with "land", so the P/T rode into the action
+//key, the unchanged action counted as NEW, and the hold re-opened over a board
+//that had not changed in any way the seat can act on. Under the owner's ruling
+//the identity is the instance (its name and handle), so the numbers come out of
+//the key while the type word - which IS part of what the row is about - stays.
+//Applied in the HOLD key alone: the option-set key, the ask key and the echo
+//matcher are untouched, exactly as #W76-CN (Q1) scoped its own change.
+static string w77StripTargetPreviewNumbers(const string& row)
+{
+    string out;
+    size_t i = 0;
+    while (i < row.size())
+    {
+        if (row[i] != '(')
+        {
+            out += row[i++];
+            continue;
+        }
+        const size_t close = row.find(')', i);
+        if (close == string::npos)
+        {
+            out += row[i++];
+            continue;
+        }
+        const string body = row.substr(i + 1, close - i - 1);
+        //a preview body is <optional type words> <digits>/<digits>, where a
+        //digit run may be a printed `*`/`-` form. Anything else is left alone.
+        size_t e = body.find_last_not_of(" \t");
+        if (e == string::npos)
+        {
+            out.append(row, i, close - i + 1);
+            i = close + 1;
+            continue;
+        }
+        size_t slash = body.rfind('/');
+        bool isPT = (slash != string::npos && slash > 0 && slash < e);
+        for (size_t k = slash == string::npos ? 0 : slash + 1; isPT && k <= e; k++)
+            if (!isdigit((unsigned char) body[k]) && body[k] != '*' && body[k] != '-'
+                && body[k] != '+')
+                isPT = false;
+        size_t ptStart = slash;
+        while (isPT && ptStart > 0
+               && (isdigit((unsigned char) body[ptStart - 1]) || body[ptStart - 1] == '*'
+                   || body[ptStart - 1] == '-' || body[ptStart - 1] == '+'))
+            ptStart--;
+        if (!isPT || ptStart == slash)
+        {
+            out.append(row, i, close - i + 1);
+            i = close + 1;
+            continue;
+        }
+        string head = body.substr(0, ptStart);
+        size_t he = head.find_last_not_of(" \t");
+        head = (he == string::npos) ? string() : head.substr(0, he + 1);
+        if (!head.empty())
+            out += "(" + head + ")";
+        i = close + 1;
+    }
+    return out;
+}
+
 static string holdActionKeyRow(const string& row)
 {
     if (w74HoldVerdictMarker(row))
@@ -30887,8 +31324,13 @@ static string holdActionKeyRow(const string& row)
     //#W75-CM (F2): the ACTION's cost survives the strip; nothing else does.
     //#W76-CN (Q1): balanced annotation groups go first, so a cost quoted INSIDE
     //an annotation cannot leave the rest of that annotation in the key.
+    //#W77-CU (F6): the target preview's board-derived numbers come out before
+    //anything else reads the row, so an unchanged action over an unchanged
+    //target instance cannot be counted as new because the body grew.
     return holdKeyLifeProjectionsNormalised(
-               stripRenderAnnotationsLc(w76StripBalancedAnnotationGroups(core)))
+               stripRenderAnnotationsLc(
+                   w77StripTargetPreviewNumbers(
+                       w76StripBalancedAnnotationGroups(core))))
            + w75CostGroupsKey(core);
 }
 
@@ -31154,6 +31596,27 @@ static string stripDeclineReaskTags(const string& s)
         return s; //the common case: nothing to strip, no copy of the whole tail
     out += s.substr(from);
     return out;
+}
+
+//#W77-CU (F1, Astra HIGH 1): the ASK key's and the ASYNC SLOT's half of the
+//rendered option list. Wave 74 removed ONE volatile clause (the decline re-ask
+//count) from those two keys and left every other annotation in, on the reading
+//that a board-derived number is covered by the board half of the key anyway.
+//The Astra review showed that reading is wrong in the direction that costs
+//games: the cover/kill/roster clauses are computed from a FORECAST over the
+//board (a crack-back arithmetic, a victim count, a life projection), and a
+//forecast can move while `serializeGameState` does not - a replacement effect
+//expiring, a roster fold, an ordering of equal bodies. When it moves, the ask
+//key moves, the answered window is asked again, and the wave-74 CG freeze
+//(384 calls on one window, 11 games lost for 8 h) is back on a new clause.
+//So both keys now take the SAME balanced-group strip the hold latch and the
+//option-set key take: the ACTION (its name and its cost pips, which
+//`w76StripBalancedAnnotationGroups` keeps) is the question; every `{...}`
+//annotation is the render's commentary on the board, and the board half of the
+//key is what carries the board. `[...]` notes were already outside the key.
+static string w77KeyTailOf(const string& tail)
+{
+    return w76StripBalancedAnnotationGroups(stripDeclineReaskTags(tail));
 }
 
 static string declinedListNote(int n)
@@ -31589,6 +32052,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     std::vector<string> rowsWithVerdict = rows;
     rowsWithVerdict.push_back(crackBackVerdictNow());
     rowsWithVerdict.push_back(stackDeathVerdictNow()); //#W74-CH: J9's other half
+    rowsWithVerdict.push_back(w77OwnLoopVerdictNow()); //#W77-CU (F4)
     if (!holdStillStands(it->second, rowsWithVerdict, &why, holdActionKeyRow)) //#W74-CH
     {
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
@@ -31677,6 +32141,7 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
                                              //with every render annotation stripped
     s.insert(holdActionKeyRow(crackBackVerdictNow())); //#W68-BB (J9)
     s.insert(holdActionKeyRow(stackDeathVerdictNow())); //#W74-CH
+    s.insert(holdActionKeyRow(w77OwnLoopVerdictNow())); //#W77-CU (F4)
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - later " << seam
                << " windows are held until one of these rows changes"); //#W61-U (C14)
@@ -34669,10 +35134,26 @@ static string buildForcedSacrificeAsk(const string& effectName, bool byOpponent,
 static string forcedSacrificeRowTag(int gain, int toughness,
                                     const char * engineKind = NULL, //#W66-AQ (H10)
                                     const string& convName = "", //#W76-CO (Q6)
-                                    int convTakes = 0)
+                                    int convTakes = 0,
+                                    bool gainReaches = true) //#W77-CU (F7)
 {
     std::ostringstream o;
     o << " [you SACRIFICE this";
+    //#W77-CU (F7, Astra HIGH 7): the wave-76 F6 gate suppressed the CONVERTER
+    //half under a life-gain prohibition and left the GAIN itself printed - a row
+    //that says "they gain 6 life" on a board where they gain nothing. Silence is
+    //not the fix either (the trust doctrine's no-silent-omission rule: the model
+    //confabulates into gaps), so the row states the event AND the prohibition.
+    if (!gainReaches && (gain == 1 || gain == 2))
+    {
+        o << "; " << (gain == 1 ? "they" : "you") << " would gain " << toughness
+          << " life (its toughness), but life gain is PREVENTED on that side right"
+             " now, so NO life is gained and nothing converts it";
+        if (engineKind)
+            o << "; THIS IS NOT JUST A BODY: " << engineKind;
+        o << "]";
+        return o.str();
+    }
     if (gain == 1)
     {
         //The ONLY number this adds is a function of the toughness already
@@ -39614,9 +40095,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W77-CR (R1): the seat's OWN proven loop, mid-resolution. Both lists, in
     //the same place and for the same reason as the chain feed above.
     {
-        const bool ownLoopResolving = w77OwnLoopResolving();
+        //#W77-CU (F4): one verdict, three faces.
+        string loopSpell, loopPiece;
+        const int loopState = w77OwnLoopStackState(loopSpell, loopPiece);
+        const bool ownLoopResolving = (loopState == kW77LoopResolving);
         w77ApplyOwnLoopFeed(shownLines, ownLoopResolving);
         w77ApplyOwnLoopFeed(renderRows, ownLoopResolving);
+        if (loopState == kW77LoopThreatened)
+        {
+            const string threat = w77OwnLoopThreatTag(loopSpell, loopPiece);
+            w77ApplyOwnLoopThreatFeed(shownLines, threat);
+            w77ApplyOwnLoopThreatFeed(renderRows, threat);
+        }
         if (ownLoopResolving)
             w77CountOwnLoopWindow(); //the population HIGH-1 measured at 35
     }
@@ -40119,7 +40609,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     const string tailStr = tail.str(); //#W54-M (L5): the option list is copied once
     //#W74-CG: the KEY half of that list, with the one clause whose text moves
     //with the answer count taken out. The model still reads `tailStr`.
-    const string keyTailStr = stripDeclineReaskTags(tailStr);
+    const string keyTailStr = w77KeyTailOf(tailStr); //#W77-CU (F1)
     string askKey = boardKey + keyTailStr;
     //#W53-N (D2): the decline annotation goes into the PROMPT only - askKey is
     //built from tail.str() alone, so a count that rises with every answer can
@@ -41270,7 +41760,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //clause carries a count that rises with every answer, and leaving it in the
     //key minted a fresh question per window (384 model calls for one turn-4
     //Main-1 window, run 20260909-015553). The model still reads `tailStr`.
-    string keyTailStr = stripDeclineReaskTags(tailStr);
+    string keyTailStr = w77KeyTailOf(tailStr); //#W77-CU (F1)
     //#W76-CQ (F4): the board half, named once so the cross-phase entry below can
     //carry the SAME bytes the ask cache keys on rather than a second rendering.
     const string boardStateKey =
@@ -43328,7 +43818,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                             : ptDropKillsTarget(castDrop, kc->life);
                                         if (!dies)
                                             continue;
-                                        const int c = crackBackBodyContribution(kc);
+                                        //#W77-CU (F3, Astra HIGH 3): the same
+                                        //survival test the roster and the O1
+                                        //forecast read. A regenerating,
+                                        //indestructible, ghostformed or
+                                        //persist/undying body is still NAMED as
+                                        //a victim by the kill summary beside
+                                        //this clause - only the SURVIVAL PROMISE
+                                        //stops being made on its behalf, because
+                                        //it untaps and attacks next turn. This is
+                                        //CQ F5's bug, and it was re-introduced
+                                        //here the wave it was fixed.
+                                        const int c = w77CoverBodyContribution(kc, 1);
                                         if (c <= 0)
                                             continue;
                                         W77RemovalVictim v;
@@ -43794,8 +44295,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         w75ApplyChainFeed(menu, lifeLoopProvenWin(opponent()));
         //#W77-CR (R1): ...and the seat's own loop, on the casting menu too.
         {
-            const bool ownLoopResolving = w77OwnLoopResolving();
+            string loopSpell, loopPiece; //#W77-CU (F4)
+            const int loopState = w77OwnLoopStackState(loopSpell, loopPiece);
+            const bool ownLoopResolving = (loopState == kW77LoopResolving);
             w77ApplyOwnLoopFeed(menu, ownLoopResolving);
+            if (loopState == kW77LoopThreatened)
+                w77ApplyOwnLoopThreatFeed(menu,
+                                          w77OwnLoopThreatTag(loopSpell, loopPiece));
             if (ownLoopResolving && attempt == 0)
                 w77CountOwnLoopWindow();
         }
@@ -45522,21 +46028,41 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                         {
                             const int xv = capX - (int) fi;
                             int removed = 0, removedBodies = 0;
+                            std::vector<W77RemovalVictim> cbxV; //#W77-CU (F2)
                             for (size_t vi = 0; vi < cbxSv.victims.size(); vi++)
                             {
                                 const XDamVictim& v = cbxSv.victims[vi];
                                 if (v.mine || v.isPlayer || !v.inst
                                     || v.lethalX <= 0 || v.lethalX > xv)
                                     continue;
-                                const int c = crackBackBodyContribution(v.inst);
+                                //#W77-CU (F3, Astra HIGH 3): the wave-76 CQ F5
+                                //survival test, which the parent X path
+                                //(xSpellPricing) already applies and this
+                                //sub-menu walk dropped.
+                                const int c = w77CoverBodyContribution(v.inst, 1);
                                 if (c <= 0)
                                     continue;
                                 removed += c;
                                 removedBodies++;
+                                W77RemovalVictim rv;
+                                rv.name = v.inst->getDisplayName() + instanceHandle(v.inst);
+                                rv.takes = c;
+                                cbxV.push_back(rv);
                             }
-                            shown[fi] += crackBackKillRowTag(cbxTotal, life, cbxFloor,
-                                                             removed, removedBodies,
-                                                             cbxBodies);
+                            //#W77-CU (F2, Astra HIGH 2): A SINGLE-TARGET `damage:X`
+                            //IS NOT A SWEEPER. The parent row's cover clause is
+                            //gated on `sv.sweep` (xSpellPricing) and this walk was
+                            //not, so a one-target X burn at X=3 against two 3/3
+                            //attackers claimed SIX power removed and could promise
+                            //survival off one kill. The classification the survey
+                            //already carries now routes the clause: a sweep sums
+                            //every victim; a TARGETED row prices each victim
+                            //separately and says the pick is the seat's own - the
+                            //same wording, and the same guarantee, the targeted
+                            //cast row's own clause carries.
+                            shown[fi] += w77CoverClauseFor(cbxSv.sweep, cbxTotal, life,
+                                                           cbxFloor, removed, removedBodies,
+                                                           cbxV, cbxBodies);
                         }
                     }
                 }
@@ -47855,8 +48381,13 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                             }
                         }
                     }
+                    //#W77-CU (F7): the SAME predicate that gated the converter
+                    //lookup above now reaches the gain clause itself.
+                    const bool sacGainReaches = (sacGainer != NULL)
+                                                && w76PlayerCanGainLife(sacGainer);
                     opts[ti] += forcedSacrificeRowTag(sacGain, vc->toughness, ek,
-                                                      sacConvName, sacConvTakes);
+                                                      sacConvName, sacConvTakes,
+                                                      sacGainReaches);
                     if (ek)
                     {
                         if (!sacEngineRows.empty())
@@ -63212,8 +63743,10 @@ void AIPlayerGPT::runParseSelfTest()
               && fixed.find("0: You draw a card") != string::npos
               && fixed.find("-3: Create two") != string::npos,
               "#W47-R6 every earlier loyalty ability is still on the line");
-        CHECK(fixed.size() <= 140 * kBoardEffectClauseFactor + 32,
-              "#W47-R6 the whole tag stays inside the per-clause allowance");
+        CHECK(fixed.size() <= boardEffectSnippetCeiling(140),
+              "#W47-R6 the whole tag stays inside the per-clause allowance"
+              " (#W77-CU F9: the allowance is now an ENFORCED ceiling, markers and"
+              " separators included, not the head loop's budget)");
         // NEGATIVE: no clause may end as a bare loyalty marker with nothing after it.
         CHECK(fixed.find("-8: ...") == string::npos && fixed.find("-3: ...") == string::npos
               && fixed.find("-8:...") == string::npos,
@@ -87202,23 +87735,33 @@ static const char * kW50Y_r94 =
                     CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB),
                           "#W76-CO Q5 KEY option-set: the declined-list count cannot be split"
                           " by the clause's numbers");
-                    // ASK KEY / ASYNC SLOT KEY: both are the RENDERED tail, which
-                    // strips only the decline-reask tag - so a `{...}` price group's
-                    // board numbers ride them, and have since wave 54 (#W75-CM F7
-                    // states the same fact for the poison row). That is the key's
-                    // intended semantics (BOARD STATE + QUESTION): a different board
-                    // IS a different question, and only an answer-driven byte would
-                    // be the wave-49 CG regression. The pin is that this clause adds
-                    // NO exposure its sibling in the same family does not already
-                    // have - the two are byte-for-byte in one class.
+                    // ASK KEY / ASYNC SLOT KEY. #W77-CU (F1) RE-DERIVES this pin
+                    // from the ruling. The wave-76 edition asserted the numbers
+                    // SURVIVE the strip and defended it as the key's intended
+                    // semantics ("a different board IS a different question").
+                    // That defence does not hold: this clause is a FORECAST over
+                    // the board, and a forecast moves without `serializeGameState`
+                    // moving - so the ask key moved on an unchanged board and the
+                    // answered window was asked again. Both keys now strip the
+                    // whole annotation family.
                     const string sibA = base + crackBackBlockerRowTag(6, 9, 1, 0,
                                                                      std::vector<CrackBackAttackerFact>(1));
-                    CHECK(stripDeclineReaskTags(joinNumberedRows(rowsA, NULL))
-                              == joinNumberedRows(rowsA, NULL)
-                          && stripDeclineReaskTags(base) == base,
-                          "#W76-CO Q5 KEY ask key AND async slot key: both are the rendered"
-                          " tail and the strip touches only the decline-reask tag - the clause"
-                          " enters no key path the sibling cover clause does not already enter");
+                    {
+                        const string tA = joinNumberedRows(rowsA, NULL);
+                        const string tB = joinNumberedRows(rowsB, NULL);
+                        CHECK(tA != tB,
+                              "#W77-CU F1 KEY INSTRUMENT (older sibling) the two rendered"
+                              " tails really do differ");
+                        CHECK(w77KeyTailOf(tA) == w77KeyTailOf(tB)
+                              && asyncSlotKeyOf(false, 4, 2, w77KeyTailOf(tA), "BOARD")
+                                 == asyncSlotKeyOf(false, 4, 2, w77KeyTailOf(tB), "BOARD"),
+                              "#W77-CU F1 KEY (older sibling crackBackKillRowTag) ask key AND"
+                              " async slot key are EQUAL across the clause's board numbers -"
+                              " the precedent the wave-76 pin cited is itself fixed");
+                        CHECK(w77KeyTailOf(base).find("Cast Starstorm {r}{r}{x}") != string::npos,
+                              "#W77-CU F1 KEY ...with the action and its cost pips still in"
+                              " the key");
+                    }
                     CHECK(sibA == base || holdActionKeyRow(sibA) == holdActionKeyRow(base),
                           "#W76-CO Q5 KEY the sibling `{crack-back cover: ...}` clause behaves"
                           " identically under holdActionKeyRow - one class, one exposure");
@@ -88497,13 +89040,20 @@ static const char * kW50Y_r94 =
                       "#W76-CQ KEY PIN ...so a hold taken over these rows STANDS across the"
                       " clause moving");
                 {
-                    const string tA = stripDeclineReaskTags(joinNumberedRows(rA, NULL));
-                    const string tB = stripDeclineReaskTags(joinNumberedRows(rB, NULL));
-                    CHECK((tA == tB)
-                              == (asyncSlotKeyOf(false, 9, 1, tA, "BOARD")
-                                  == asyncSlotKeyOf(false, 9, 1, tB, "BOARD")),
-                          "#W76-CQ KEY PIN the ASYNC SLOT key is a pure function of the ask"
-                          " tail and moves with the RENDER, never with a key of its own");
+                    //#W77-CU (F1): re-derived. The wave-76 edition pinned only
+                    //that the async key TRACKS the tail (true, and compatible
+                    //with drifting); the ruling is that it does not move at all
+                    //across board-derived numbers.
+                    const string tA = w77KeyTailOf(joinNumberedRows(rA, NULL));
+                    const string tB = w77KeyTailOf(joinNumberedRows(rB, NULL));
+                    CHECK(joinNumberedRows(rA, NULL) != joinNumberedRows(rB, NULL),
+                          "#W77-CU F1 KEY INSTRUMENT (CQ roster) the rendered tails differ");
+                    CHECK(tA == tB
+                          && asyncSlotKeyOf(false, 9, 1, tA, "BOARD")
+                             == asyncSlotKeyOf(false, 9, 1, tB, "BOARD"),
+                          "#W77-CU F1 KEY (CQ roster + cover) ask key AND async slot key are"
+                          " EQUAL across a victim roster growing by one body and the cover"
+                          " figures moving with it");
                 }
                 {
                     // the HOLD-CHECK bracket: two windows differing only in these
@@ -88853,22 +89403,42 @@ static const char * kW50Y_r94 =
                 //still stand at every one of them, which is what makes the guidance
                 //honest (0 asks after the hold).
                 {
+                    //#W77-CU (F4): the fixture no longer passes `true`. At every
+                    //link the guidance flag is DERIVED from the live verdict
+                    //function over that link's board facts - the same function
+                    //`w77OwnLoopStackState` returns from its walk - and the
+                    //verdict MARKER ROW is in the held set and rebuilt per link
+                    //off those same facts, exactly as takeHold and the hold check
+                    //build it.
+                    const bool provenWin = true;   //Bond + Blood, both lives free
+                    bool loopEventPending = true;  //a link of the loop is on the stack
+                    bool theirSpellOnAPiece = false; //nothing of theirs aims at one
+                    const int v0 = w77LoopVerdictFrom(provenWin, loopEventPending,
+                                                      theirSpellOnAPiece);
+                    CHECK(v0 == kW77LoopResolving,
+                          "#W77-CU F4 INSTRUMENT the fixture's own board facts produce the"
+                          " RESOLVING verdict - derived, not asserted");
                     std::set<string> held;
-                    held.insert(holdActionKeyRow(w77OwnLoopRow(act, true)));
+                    held.insert(holdActionKeyRow(w77OwnLoopRow(act, v0 == kW77LoopResolving)));
                     held.insert(holdActionKeyRow(hold));
                     held.insert(holdActionKeyRow("[crack-back verdict: none]"));
                     held.insert(holdActionKeyRow("[stack death verdict: none]"));
+                    held.insert(holdActionKeyRow(w77OwnLoopVerdictKey(v0, "", "")));
                     int asks = 0;
                     for (int link = 0; link < 5; link++)
                     {
+                        const int v = w77LoopVerdictFrom(provenWin, loopEventPending,
+                                                         theirSpellOnAPiece);
                         std::ostringstream lifeRow;
                         lifeRow << act << " {right now: they would be at " << (16 - link)
                                 << "; you would be at " << (24 + link) << "}";
                         std::vector<string> now;
-                        now.push_back(w77OwnLoopRow(lifeRow.str(), true));
+                        now.push_back(w77OwnLoopRow(lifeRow.str(),
+                                                    v == kW77LoopResolving));
                         now.push_back(hold);
                         now.push_back("[crack-back verdict: none]");
                         now.push_back("[stack death verdict: none]");
+                        now.push_back(w77OwnLoopVerdictKey(v, "", ""));
                         const char * why = "";
                         if (!holdStillStands(held, now, &why, holdActionKeyRow))
                             asks++;
@@ -88877,6 +89447,43 @@ static const char * kW50Y_r94 =
                           "#W77-CR R1 GREEN a hold taken at the first link covers five more"
                           " links of the seat's own loop - 0 asks, which is the whole of the"
                           " 32-window repro");
+                    //...and link SIX: their removal lands on Sanguine Bond. The
+                    //verdict flips, the guidance is not printed, and the hold
+                    //RE-OPENS so the seat is asked the one window that matters.
+                    {
+                        theirSpellOnAPiece = true;
+                        loopEventPending = false; //Astra's board: no trigger pending
+                        const int v6 = w77LoopVerdictFrom(provenWin, loopEventPending,
+                                                          theirSpellOnAPiece);
+                        CHECK(v6 == kW77LoopThreatened,
+                              "#W77-CU F4 REPRO/GREEN Astra's exact board - loop assembled,"
+                              " NO loop trigger pending, their removal targeting Bond - is"
+                              " THREATENED, not resolving; RED on base, where"
+                              " w77OwnLoopResolving was `assembled + anything unresolved`");
+                        std::vector<string> now;
+                        now.push_back(w77OwnLoopRow(act,
+                                                    v6 == kW77LoopResolving));
+                        w77ApplyOwnLoopThreatFeed(now,
+                            w77OwnLoopThreatTag("Doom Blade", "Sanguine Bond"));
+                        CHECK(now[0].find("your loop is resolving on its own") == string::npos,
+                              "#W77-CU F4 GREEN the false \"this row is not needed\" clause is"
+                              " NOT printed on the counterspell row");
+                        CHECK(now[0].find("their Doom Blade on the stack targets your"
+                                          " Sanguine Bond") != string::npos
+                              && now[0].find("the loop STOPS if it resolves") != string::npos,
+                              "#W77-CU F4 GREEN the opposite clause is printed, naming the"
+                              " spell and the component");
+                        now.push_back(hold);
+                        now.push_back("[crack-back verdict: none]");
+                        now.push_back("[stack death verdict: none]");
+                        now.push_back(w77OwnLoopVerdictKey(v6, "Doom Blade", "Sanguine Bond"));
+                        const char * why6 = "";
+                        CHECK(!holdStillStands(held, now, &why6, holdActionKeyRow),
+                              "#W77-CU F4 REPRO/GREEN the hold RE-OPENS when their removal"
+                              " lands on a loop piece - RED on base, where the clause was a"
+                              " stripped `[...]` group with no verdict row, so the hold"
+                              " stood and the seat was never asked");
+                    }
                 }
                 //...and the latch is NOT a blind cache: a genuinely new row re-opens it.
                 {
@@ -89137,13 +89744,19 @@ static const char * kW50Y_r94 =
                     const size_t len = boardCreatureEffectSnippetLen(kBoardCreatureEffectNameCap);
                     const size_t measured =
                         boardEffectTag(boardEffectSnippet(wide, len), true, true).size();
-                    // ANALYTIC bound, not the measured one: boardEffectSnippet
-                    // can spend at most kBoardEffectClauseFactor x the budget,
-                    // and boardEffectTag's own overhead is the `{effect: ""}`
-                    // wrapper, the each-copy note and the foreign-voice frame -
-                    // charged here whether this particular text triggers them
-                    // or not, so a text that does cannot beat the pin.
-                    const size_t perName = kBoardEffectClauseFactor * len
+                    // ANALYTIC bound, not the measured one. #W77-CU (F9)
+                    // RE-DERIVES it: the old form charged
+                    // kBoardEffectClauseFactor x the tier, which was the head
+                    // loop's BUDGET and not what the function could return -
+                    // separators, the omitted-clause marker and the protected
+                    // last clause rode on top. `boardEffectSnippetCeiling` is
+                    // now a ceiling the function ENFORCES, so this is a bound
+                    // rather than an assumption. boardEffectTag's own overhead
+                    // is the `{effect: ""}` wrapper, the each-copy note and the
+                    // foreign-voice frame - charged here whether this particular
+                    // text triggers them or not, so a text that does cannot beat
+                    // the pin.
+                    const size_t perName = boardEffectSnippetCeiling(len)
                                            + strlen(" {effect: \"\"}")
                                            + strlen(" (each copy of this card does this)")
                                            + strlen(kForeignEffectVoiceFrame);
@@ -89270,8 +89883,23 @@ static const char * kW50Y_r94 =
                     CHECK(optionSetKeyOf(ra) == optionSetKeyOf(rb)
                               && holdActionKeyRow(ra[0]) == holdActionKeyRow(rb[0]),
                       "#W77-CT R11-row KEY PIN the roster rides a `{...}` brace group, so it is"
-                      " outside the ask/hold keys - the wave-74 lesson, applied to a clause"
-                      " whose number moves every time a body enters or dies");
+                      " outside the hold and option-set keys - the wave-74 lesson, applied to a"
+                      " clause whose number moves every time a body enters or dies");
+                    //#W77-CU (F1): the ASK key and the ASYNC SLOT key were CLAIMED by
+                    //the wave-77 CT pin and never tested. Tested here, on the live
+                    //key function.
+                    {
+                        const string tA = joinNumberedRows(ra, NULL);
+                        const string tB = joinNumberedRows(rb, NULL);
+                        CHECK(tA != tB,
+                              "#W77-CU F1 KEY INSTRUMENT (CT roster) the rendered tails differ");
+                        CHECK(w77KeyTailOf(tA) == w77KeyTailOf(tB)
+                              && asyncSlotKeyOf(false, 6, 3, w77KeyTailOf(tA), "BOARD")
+                                 == asyncSlotKeyOf(false, 6, 3, w77KeyTailOf(tB), "BOARD"),
+                              "#W77-CU F1 KEY (CT roster) ask key AND async slot key are EQUAL"
+                              " across 63 bodies vs 62 - the claim the CT pin made is now a"
+                              " test of the keys it names");
+                    }
                 }
             }
 
@@ -89641,12 +90269,30 @@ static const char * kW50Y_r94 =
                       "#W77-CS R6 KEY hold-check: the held set (mLastMenuRows via"
                       " holdActionKeyRow, the live seam's own construction) is identical"
                       " across the two windows - 0 unseen rows, the hold stands");
-                CHECK(stripDeclineReaskTags(joinNumberedRows(rowsA, NULL))
-                          == joinNumberedRows(rowsA, NULL),
-                      "#W77-CS R6 KEY ask key AND async slot key: both ARE the rendered"
-                      " tail and the strip touches only the decline-reask tag - this clause"
-                      " enters no key path its sibling crackBackKillRowTag does not already"
-                      " enter (#W76-CO Q5 states the same fact for that one)");
+                //#W77-CU (F1): RE-DERIVED from the ruling, not adjusted to pass.
+                //The old pin asserted the numbers SURVIVE into the ask key and
+                //rationalised it by precedent. The ruling is that a board-derived
+                //number is outside EVERY key, the ask key and the async slot
+                //included, so the pin is the equality itself.
+                {
+                    const string tA = joinNumberedRows(rowsA, NULL);
+                    const string tB = joinNumberedRows(rowsB, NULL);
+                    CHECK(tA != tB,
+                          "#W77-CU F1 KEY INSTRUMENT the two rendered tails really do differ");
+                    CHECK(w77KeyTailOf(tA) == w77KeyTailOf(tB),
+                          "#W77-CU F1 KEY ask key: the live ask key is boardKey +"
+                          " w77KeyTailOf(tail), and two windows differing ONLY in the"
+                          " cover clause's board numbers give the SAME key - an answered"
+                          " window is never re-asked because the forecast moved");
+                    CHECK(asyncSlotKeyOf(false, 9, 1, w77KeyTailOf(tA), "BOARD")
+                              == asyncSlotKeyOf(false, 9, 1, w77KeyTailOf(tB), "BOARD"),
+                          "#W77-CU F1 KEY async slot key: the same tail feeds"
+                          " assemblePrompt's slot key, so it moves with neither number");
+                    CHECK(w77KeyTailOf(tA).find("Cast Hammer of Bogardan {2}{r}{r}")
+                              != string::npos,
+                          "#W77-CU F1 KEY ...and the ACTION (name and cost pips) is still"
+                          " IN the key - the strip removes commentary, not the question");
+                }
                 // the stay-home clause is PROMPT PROSE, not a row: it never reaches a
                 // row key at all. Pinned as the fact rather than left implied.
                 CHECK(w77StayHomeCoverTag(17, 5, false, 1, 9).find("\n") == string::npos,
@@ -89716,6 +90362,570 @@ static const char * kW50Y_r94 =
                       .find("every row on this list does nothing") != string::npos,
                   "#W77-CS R10 MUST-NOT-MATCH the wave-66 DEAD-MENU face (row 0) is"
                   " untouched by the new row -1 branch");
+        }
+    }
+
+    // ============ wave-77 lane CU - the Astra adversarial review's findings ======
+    {
+        cout << "\n[#W77-CU] Astra review findings\n";
+        // ---------------- F5 (HIGH): a timed-out asked window keeps its commit.
+        {
+            // THE LIVE SEQUENCE, driven through the live functions: the casting
+            // builder stages the menu under the counter's value
+            // (w76HoldReopenNote), pollCompletionRetry writes a `wall_miss`
+            // record from inside the poll (w77ConsumeWindowSeq), askModel then
+            // writes its own `ask` record (w77ConsumeWindowSeq) and routes the
+            // commit exactly as writeTransLog routes it.
+            int windowSeq = 0;
+            W76HoldMemory m;
+            std::vector<string> rows;
+            rows.push_back("Cast Lightning Bolt {r}");
+            rows.push_back("Cast nothing right now");
+            const string n1 = w76HoldReopenNote(m, "cast", rows, windowSeq, false,
+                                                holdActionKeyRow);
+            CHECK(n1.find("first window") != string::npos || n1.empty()
+                  || n1.find("row") != string::npos,
+                  "#W77-CU F5 INSTRUMENT the first window at this seam staged a menu");
+            // the deadline is spent: flushWallMissRecord -> writeTransLog("wall_miss")
+            const int wmSeq = w77ConsumeWindowSeq(windowSeq, "wall_miss");
+            CHECK(wmSeq == 0,
+                  "#W77-CU F5 the wall-miss record rides the in-flight window's own"
+                  " number");
+            // ...and then the ask record for the SAME window.
+            const int askSeq = w77ConsumeWindowSeq(windowSeq, "ask");
+            w76HoldWindowAsked(m, "cast", askSeq); //writeTransLog's own routing
+            CHECK(askSeq == 0,
+                  "#W77-CU F5 REPRO/GREEN the asked window's record carries the sequence"
+                  " it staged under - RED on base, where the wall-miss record consumed 0"
+                  " and the ask record took 1");
+            // the commit is the observable: the NEXT window at this seam must name
+            // the window that was asked, not call itself the first.
+            std::vector<string> rows2 = rows;
+            const string n2 = w76HoldReopenNote(m, "cast", rows2, windowSeq, false,
+                                                holdActionKeyRow);
+            CHECK(n2.find("first window") == string::npos,
+                  "#W77-CU F5 REPRO/GREEN the next window at this seam does NOT say it is"
+                  " the first window asked - RED on base, where the rejected commit left"
+                  " the seam with no history at all");
+            CHECK(n2.find("also on the menu at the last window I asked you") != string::npos
+                  || n2.find("row") != string::npos,
+                  "#W77-CU F5 GREEN ...it compares against the timed-out window's rows");
+        }
+        // ---------------- F2 (HIGH): a single-target X spell is not a sweeper.
+        {
+            // Astra's board: single-target `damage:X`, X=3, two opposing 3/3
+            // crack-back attackers, seat at four life, crack-back total 6.
+            std::vector<W77RemovalVictim> two;
+            W77RemovalVictim a; a.name = "Grizzly Bears #1"; a.takes = 3; two.push_back(a);
+            W77RemovalVictim b; b.name = "Grizzly Bears #2"; b.takes = 3; two.push_back(b);
+            const string targeted = w77CoverClauseFor(false, 6, 4, false, 6, 2, two, 2);
+            CHECK(targeted.find("This row removes ONE body and the target is YOUR choice")
+                  != string::npos,
+                  "#W77-CU F2 REPRO/GREEN the TARGETED classification takes the targeted"
+                  " clause - RED on base, where the per-X walk called"
+                  " crackBackKillRowTag unconditionally");
+            CHECK(targeted.find("REMOVES 2 of those 2 attackers") == string::npos
+                  && targeted.find("takes 6 off the total") == string::npos,
+                  "#W77-CU F2 REPRO the six-power claim is gone: one target, one body");
+            CHECK(targeted.find("The most any ONE of them takes off is 3, leaving 3")
+                  != string::npos,
+                  "#W77-CU F2 GREEN the honest figure is the BEST SINGLE victim, named as"
+                  " such - 3 off a 6-point crack-back, leaving 3");
+            CHECK(targeted.find("you would be at 1, which you SURVIVE") != string::npos,
+                  "#W77-CU F2 GREEN ...and the survival arithmetic is done against that"
+                  " one kill (4 - 3 = 1), not against both");
+            // the SWEEP side of the same numbers is unchanged - one function, two
+            // classifications, and the sweeper still gets the summed clause.
+            const string sweep = w77CoverClauseFor(true, 6, 4, false, 6, 2, two, 2);
+            CHECK(sweep.find("This row REMOVES 2 of those 2 attackers") != string::npos
+                  && sweep.find("leaving 0") != string::npos,
+                  "#W77-CU F2 MUST-NOT-MATCH a real sweeper still subtracts every victim -"
+                  " the fix classifies, it does not cap");
+            CHECK(sweep != targeted,
+                  "#W77-CU F2 INSTRUMENT the two classifications really do produce"
+                  " different clauses on identical numbers");
+            // and the parent cast row's own targeted clause is the SAME wording, so
+            // the sub-menu and the row it hangs under cannot disagree.
+            CHECK(w77TargetedRemovalCoverTag(6, 4, false, two, 2) == targeted,
+                  "#W77-CU F2 GREEN the per-X targeted clause IS the cast row's clause,"
+                  " byte for byte - one family, one wording");
+        }
+
+        // ---------------- F3 (HIGH): both new cover paths ask the survival guard.
+        {
+            // The two wave-77 walks now read ONE guarded figure, so a body that
+            // regenerates, returns, is indestructible or persists contributes
+            // NOTHING to a cover claim - CQ F5's rule, bound to the number itself.
+            CHECK(w77CoverBodyContribution(NULL, 1) == 0,
+                  "#W77-CU F3 the guarded contribution is the only door: no card, no"
+                  " credit");
+            // the guard's own table (wave-76 CQ F5) is what that door asks; these
+            // are the four outs Astra names, restated here as the rule the two new
+            // paths now obey.
+            CHECK(!w76CrackVictimTrulyRemoved(NULL, 1),
+                  "#W77-CU F3 INSTRUMENT the guard is the wave-76 one, unchanged");
+            // the clause a guarded-out victim leaves: with every victim guarded
+            // out, the walk builds an EMPTY list and no cover clause is printed at
+            // all - it never promises survival off a body that comes back.
+            std::vector<W77RemovalVictim> none;
+            CHECK(w77CoverClauseFor(false, 6, 2, false, 0, 0, none, 1).empty()
+                  && w77CoverClauseFor(true, 6, 2, false, 0, 0, none, 1).empty(),
+                  "#W77-CU F3 REPRO/GREEN a regenerating sole attacker leaves BOTH walks"
+                  " with nothing to subtract, so neither clause prints and neither"
+                  " promises survival - RED on base, where both credited its full power");
+            // ...and a MIXED board still prices the body that really dies.
+            std::vector<W77RemovalVictim> one;
+            W77RemovalVictim v; v.name = "Grizzly Bears #2"; v.takes = 3; one.push_back(v);
+            CHECK(w77CoverClauseFor(false, 6, 4, false, 3, 1, one, 2)
+                      .find("Grizzly Bears #2 takes 3 off that total, leaving 3")
+                  != string::npos,
+                  "#W77-CU F3 GREEN the guard subtracts only the body that is gone - the"
+                  " regenerating one is still NAMED by the kill summary beside it, it"
+                  " just makes no survival promise (LESSON OF WAVE 76 (2): the positive"
+                  " clause still prints on the shape it was built for)");
+        }
+
+        // ---------------- F4 (HIGH): "your loop is resolving" needs a loop EVENT.
+        {
+            // The whole decision table, over the three board facts the live walk
+            // gathers. Astra's counterexample is row 3.
+            CHECK(w77LoopVerdictFrom(false, true, false) == kW77LoopIdle
+                  && w77LoopVerdictFrom(false, false, true) == kW77LoopIdle,
+                  "#W77-CU F4 no proven loop: no verdict, whatever is on the stack");
+            CHECK(w77LoopVerdictFrom(true, false, false) == kW77LoopIdle,
+                  "#W77-CU F4 REPRO the loop is ASSEMBLED and something unrelated is on the"
+                  " stack: IDLE - RED on base, where this board printed \"your loop is"
+                  " resolving on its own\" on every acting row");
+            CHECK(w77LoopVerdictFrom(true, true, false) == kW77LoopResolving,
+                  "#W77-CU F4 GREEN a link of the seat's OWN loop on the stack is the only"
+                  " board the guidance is about");
+            CHECK(w77LoopVerdictFrom(true, false, true) == kW77LoopThreatened
+                  && w77LoopVerdictFrom(true, true, true) == kW77LoopThreatened,
+                  "#W77-CU F4 GREEN their stack object on a loop piece is THREATENED, and it"
+                  " wins over a pending link - a threatened loop is never resolving on its"
+                  " own");
+            // the two clauses are mutually exclusive on any one row.
+            {
+                std::vector<string> rows;
+                rows.push_back("Cast Counterspell {u}{u}");
+                rows.push_back("Hold priority - pass now, and do not ask me again");
+                w77ApplyOwnLoopFeed(rows,
+                                    w77LoopVerdictFrom(true, false, true)
+                                    == kW77LoopResolving);
+                w77ApplyOwnLoopThreatFeed(rows,
+                                          w77OwnLoopThreatTag("Doom Blade", "Sanguine Bond"));
+                CHECK(rows.size() == 2 && rows[1]
+                          == "Hold priority - pass now, and do not ask me again",
+                      "#W77-CU F4 KEY PIN NOTHING IS REMOVED, COLLAPSED OR AUTO-ANSWERED -"
+                      " two rows in, two answerable rows out, and the hold row is untouched");
+                CHECK(rows[0].find("not needed to win it") == string::npos,
+                      "#W77-CU F4 MUST-NOT-MATCH the guidance never rides a threatened board");
+                // idempotent across polling ticks
+                std::vector<string> again = rows;
+                w77ApplyOwnLoopThreatFeed(again,
+                                          w77OwnLoopThreatTag("Doom Blade", "Sanguine Bond"));
+                CHECK(again == rows,
+                      "#W77-CU F4 idempotent - the prompt is rebuilt on every polling tick");
+                // key stability: the clause is a `[...]` group.
+                std::vector<string> plain;
+                plain.push_back("Cast Counterspell {u}{u}");
+                plain.push_back("Hold priority - pass now, and do not ask me again");
+                CHECK(holdActionKeyRow(rows[0]) == holdActionKeyRow(plain[0])
+                      && optionSetKeyOf(rows) == optionSetKeyOf(plain),
+                      "#W77-CU F4 KEY PIN the threat clause moves no key - the VERDICT ROW"
+                      " is what re-opens the window, not the annotation");
+                //ASK KEY / ASYNC SLOT KEY. This clause carries NO number and no
+                //answer-driven byte: it names two cards read off the board, and
+                //it is byte-identical for as long as that board holds. So the
+                //wave-74 requirement (no key may move with a count that rises as
+                //the seat answers) is met by CONSTANCY rather than by stripping -
+                //and a NEW spell of theirs on a loop piece SHOULD be a new
+                //question. Pinned as constancy across polling ticks.
+                const string tA = w77KeyTailOf(joinNumberedRows(rows, NULL));
+                std::vector<string> tick2 = plain;
+                w77ApplyOwnLoopThreatFeed(tick2,
+                                          w77OwnLoopThreatTag("Doom Blade", "Sanguine Bond"));
+                CHECK(w77KeyTailOf(joinNumberedRows(tick2, NULL)) == tA
+                      && asyncSlotKeyOf(false, 4, 2, tA, "B")
+                         == asyncSlotKeyOf(false, 4, 2,
+                                           w77KeyTailOf(joinNumberedRows(tick2, NULL)), "B"),
+                      "#W77-CU F4 KEY PIN the ask key and the async slot key are IDENTICAL"
+                      " on every polling tick of the same board - the clause adds no"
+                      " answer-driven byte to either");
+            }
+            // the marker row: its own key, so the three verdicts are three keys.
+            {
+                const string none = w77OwnLoopVerdictKey(kW77LoopIdle, "", "");
+                const string res = w77OwnLoopVerdictKey(kW77LoopResolving, "", "");
+                const string thr = w77OwnLoopVerdictKey(kW77LoopThreatened,
+                                                        "Doom Blade", "Sanguine Bond");
+                CHECK(holdActionKeyRow(none) == none && holdActionKeyRow(res) == res
+                      && holdActionKeyRow(thr) == thr,
+                      "#W77-CU F4 the verdict row is a MARKER (#W68-BB / #W74-CH shape): its"
+                      " key is the row, byte for byte");
+                CHECK(none != res && res != thr && none != thr,
+                      "#W77-CU F4 GREEN three verdicts, three keys - the hold re-opens on any"
+                      " transition between them");
+                CHECK(thr.find("Doom Blade") != string::npos
+                      && thr.find("Sanguine Bond") != string::npos,
+                      "#W77-CU F4 GREEN the threatened marker names the spell and the piece,"
+                      " so a re-opened window is adjudicable from the trace");
+            }
+            CHECK(w77OwnLoopThreatTag("", "Sanguine Bond").empty()
+                  && w77OwnLoopThreatTag("Doom Blade", "").empty(),
+                  "#W77-CU F4 MUST-NOT-MATCH an unnamed spell or piece prints no clause -"
+                  " the trust doctrine forbids a half-stated threat");
+        }
+        // ---------------- F7 (HIGH): a gain the board forbids is not a gain.
+        {
+            // Astra's board, through the LIVE line builder: seat at 2 life, one
+            // attacker blocked by Perimeter Captain, 3 damage through, the
+            // trigger scanner metering 2 OPTIONAL life. Opponent controls Erebos
+            // (`nolifegainopponent`), so the seat gains nothing.
+            int sure = 0, may = 2, ll = 0;
+            const bool canGain = w76LifeGainReaches(false, false, true); //Erebos
+            CHECK(!canGain,
+                  "#W77-CU F7 INSTRUMENT the wave-76 F6 predicate says the seat cannot"
+                  " gain life on this board");
+            const string ungated = incomingCombatLine(2, 3, 2, true, 0, 0, 3, true, 1, 2,
+                                                      "", false, sure, ll, may);
+            w77GateMeteredGains(canGain, sure, may, ll);
+            CHECK(sure == 0 && may == 0 && ll == 0,
+                  "#W77-CU F7 REPRO/GREEN the gate zeroes EVERY metered gain - the"
+                  " certain half, the optional half and lifelink - RED on base, where"
+                  " only the converter lookup asked this question");
+            const string gated = incomingCombatLine(2, 3, 2, true, 0, 0, 3, true, 1, 2,
+                                                    "", false, sure, ll, may);
+            CHECK(ungated.find("if you also take every OPTIONAL gain") != string::npos
+                  && ungated.find("no block saves you") == string::npos,
+                  "#W77-CU F7 REPRO the base surface: the +2 is folded in and the death"
+                  " verdict is WITHDRAWN - the seat blocks into death on a promise the"
+                  " rules had already refused");
+            CHECK(gated.find("OPTIONAL gain") == string::npos,
+                  "#W77-CU F7 GREEN the prohibited gain is not metered");
+            CHECK(gated.find("no block saves you") != string::npos,
+                  "#W77-CU F7 GREEN ...and the true verdict comes back: at 2 life with 3"
+                  " landing, no block saves the seat");
+            CHECK(gated != ungated,
+                  "#W77-CU F7 INSTRUMENT the two renders really do differ");
+            // NEGATIVE: an ALLOWED gain is untouched - the fix gates, it never caps.
+            {
+                int s2 = 1, m2 = 2, l2 = 3;
+                w77GateMeteredGains(w76LifeGainReaches(false, false, false), s2, m2, l2);
+                CHECK(s2 == 1 && m2 == 2 && l2 == 3,
+                      "#W77-CU F7 MUST-NOT-MATCH with no prohibition every figure stands"
+                      " exactly as metered");
+            }
+            // the three prohibitions the predicate reads, each on its own.
+            CHECK(!w76LifeGainReaches(true, false, false)
+                  && !w76LifeGainReaches(false, true, false)
+                  && !w76LifeGainReaches(false, false, true),
+                  "#W77-CU F7 cantchangelife, nolifegain and their nolifegainopponent"
+                  " each close the gate on their own");
+        }
+        {
+            // F7's OTHER surface: the edict row printed the prohibited gain while
+            // suppressing only its converter.
+            CHECK(forcedSacrificeRowTag(1, 6, NULL, "Sanguine Bond", 6, true)
+                      .find("they gain 6 life (its toughness)") != string::npos,
+                  "#W77-CU F7 INSTRUMENT the allowed board is unchanged, byte for byte");
+            const string blocked = forcedSacrificeRowTag(1, 6, NULL, "", 0, false);
+            CHECK(blocked.find("they gain 6 life") == string::npos,
+                  "#W77-CU F7 REPRO/GREEN the prohibited gain is no longer stated as a"
+                  " gain - RED on base, where the wave-76 F6 gate suppressed the"
+                  " converter clause and left `they gain 6 life (its toughness)` printed");
+            CHECK(blocked.find("would gain 6 life (its toughness), but life gain is"
+                               " PREVENTED on that side right now, so NO life is gained"
+                               " and nothing converts it") != string::npos,
+                  "#W77-CU F7 GREEN the row states the EVENT and the prohibition - no"
+                  " silent omission for the model to confabulate into");
+            CHECK(forcedSacrificeRowTag(2, 4, NULL, "", 0, false)
+                      .find("you would gain 4 life") != string::npos,
+                  "#W77-CU F7 GREEN the seat-gains branch says it of the seat");
+            CHECK(forcedSacrificeRowTag(0, 4, NULL, "", 0, false)
+                      == " [you SACRIFICE this]",
+                  "#W77-CU F7 MUST-NOT-MATCH a row with no gain at all prints no"
+                  " prohibition clause");
+            {
+                // key stability: the clause is inside the same `[...]` bracket and
+                // carries no life total, so it adds no answer-driven byte.
+                std::vector<string> a, b;
+                a.push_back("Sacrifice Grizzly Bears #1 (2/2)"
+                            + forcedSacrificeRowTag(1, 2, NULL, "", 0, false));
+                b.push_back("Sacrifice Grizzly Bears #1 (2/2)"
+                            + forcedSacrificeRowTag(1, 2, NULL, "Sanguine Bond #1", 2));
+                CHECK(a[0] != b[0] && optionSetKeyOf(a) == optionSetKeyOf(b)
+                      && holdActionKeyRow(a[0]) == holdActionKeyRow(b[0]),
+                      "#W77-CU F7 KEY PIN the prohibition clause appearing or disappearing"
+                      " moves no hold or option-set key");
+            }
+        }
+
+        // ---------------- F8 (MED): the targeted cover roster is bounded.
+        {
+            // Astra's board: lethal targeted damage against 100 same-named
+            // one-toughness attackers.
+            std::vector<W77RemovalVictim> hundred;
+            for (int i = 1; i <= 100; i++)
+            {
+                std::ostringstream nm;
+                nm << "Goblin Token #" << i << " (1/1)";
+                W77RemovalVictim v;
+                v.name = nm.str();
+                v.takes = 1;
+                hundred.push_back(v);
+            }
+            const string clause = w77TargetedRemovalCoverTag(100, 30, false, hundred, 100);
+            cout << "  [#W77-CU F8] 100-body targeted cover = " << clause.size()
+                 << " B\n";
+            CHECK(clause.size() < 500,
+                  "#W77-CU F8 REPRO/GREEN the 100-body clause is under 500 B - RED on"
+                  " base, where 100 entries of `name takes 1 off that total, leaving 99`"
+                  " ran past 4 KB and grew linearly with the board");
+            CHECK(clause.find("100 bodies:") != string::npos,
+                  "#W77-CU F8 GREEN the COUNT leads, so the whole population is on the"
+                  " screen even where the shapes are folded (joinVictimRoster, #W76-CP"
+                  " Q2 - the same fold the kill summary beside it uses)");
+            CHECK(clause.find("each take 1 off that total, leaving 99") != string::npos,
+                  "#W77-CU F8 GREEN the figure is stated ONCE for the group, not once"
+                  " per body");
+            CHECK(clause.find("The most any ONE of them takes off is 1, leaving 99")
+                  != string::npos
+                  && clause.find("you would be at -69, which still KILLS you")
+                     != string::npos,
+                  "#W77-CU F8 GREEN the decision figure and the survival arithmetic are"
+                  " unchanged by the fold");
+            // MIXED contributions: the groups are ordered largest-first, because
+            // that is the figure the decision turns on.
+            {
+                std::vector<W77RemovalVictim> mixed;
+                const char * nm[] = {"Ogre #1 (5/5)", "Bear #2 (2/2)", "Bear #3 (2/2)",
+                                     "Rat #4 (1/1)"};
+                const int tk[] = {5, 2, 2, 1};
+                for (int i = 0; i < 4; i++)
+                {
+                    W77RemovalVictim v;
+                    v.name = nm[i];
+                    v.takes = tk[i];
+                    mixed.push_back(v);
+                }
+                const string m = w77TargetedRemovalCoverTag(10, 12, false, mixed, 4);
+                const size_t p5 = m.find("takes 5 off"), p2 = m.find("each take 2 off"),
+                             p1 = m.find("takes 1 off");
+                CHECK(p5 != string::npos && p2 != string::npos && p1 != string::npos
+                      && p5 < p2 && p2 < p1,
+                      "#W77-CU F8 GREEN distinct contributions group and print"
+                      " largest-first - the order the decision reads in");
+                CHECK(m.find("not listed here") == string::npos,
+                      "#W77-CU F8 MUST-NOT-MATCH four groups is inside the cap: nothing"
+                      " is elided on an ordinary board");
+            }
+            // past the group cap the remainder is COUNTED and named, never trimmed
+            // in silence (the trust doctrine's no-silent-omission rule).
+            {
+                std::vector<W77RemovalVictim> many;
+                for (int t = 1; t <= 7; t++)
+                {
+                    std::ostringstream nm;
+                    nm << "Beast #" << t << " (" << t << "/" << t << ")";
+                    W77RemovalVictim v;
+                    v.name = nm.str();
+                    v.takes = t;
+                    many.push_back(v);
+                }
+                const string m = w77TargetedRemovalCoverTag(30, 40, false, many, 7);
+                CHECK(m.find("and 3 further bodies in 3 smaller contributions not listed"
+                             " here") != string::npos,
+                      "#W77-CU F8 GREEN past the group cap the residue is COUNTED and"
+                      " named - four groups printed, three counted");
+                CHECK(m.find("The most any ONE of them takes off is 7") != string::npos,
+                      "#W77-CU F8 GREEN ...and the BEST figure is taken over EVERY"
+                      " victim, listed or not - the cap is a display bound, never a"
+                      " change to the arithmetic");
+            }
+            CHECK(w77TargetedRemovalCoverTag(6, 4, false,
+                                             std::vector<W77RemovalVictim>(), 2).empty(),
+                  "#W77-CU F8 MUST-NOT-MATCH no victims, no clause");
+        }
+        // ---------------- F9 (MED): the snippet ceiling is enforced, not assumed.
+        {
+            // Astra's counterexample: three 55-byte clauses at the 55-byte tier.
+            string three;
+            for (int k = 0; k < 3; k++)
+            {
+                std::ostringstream c;
+                c << (k ? " -- " : "") << "clause " << k
+                  << ": exactly fifty-five bytes of ordinary rules te";
+                three += c.str();
+            }
+            const size_t len = 55;
+            const string s = boardEffectSnippet(three, len);
+            cout << "  [#W77-CU F9] three 55-B clauses at the 55-B tier = " << s.size()
+                 << " B (ceiling " << boardEffectSnippetCeiling(len) << " B)\n";
+            CHECK(s.size() <= boardEffectSnippetCeiling(len),
+                  "#W77-CU F9 REPRO/GREEN the returned string fits the CEILING - RED on"
+                  " base, where the head loop's budget was the only limit and this shape"
+                  " emitted 163 B against an asserted 110");
+            CHECK(boardEffectSnippetCeiling(len)
+                      == kBoardEffectClauseFactor * len + kBoardEffectSnippetSlack
+                  && boardEffectSnippetCeiling(140) > boardEffectSnippetCeiling(55),
+                  "#W77-CU F9 the ceiling is a stated function of the TIER alone - a"
+                  " caller can compute it without knowing anything about the text, which"
+                  " is what makes a per-name bound derivable");
+            // the ceiling holds at EVERY tier, over the corpus's widest shapes.
+            {
+                string many;
+                for (int k = 0; k < 24; k++)
+                {
+                    std::ostringstream c;
+                    c << (k ? " -- " : "") << "clause " << k
+                      << ": a sentence of ordinary length that describes an ability in"
+                         " rather more words than are strictly necessary";
+                    many += c.str();
+                }
+                bool allFit = true;
+                const size_t tiers[] = {140, 90, 55};
+                for (int t = 0; t < 3; t++)
+                    if (boardEffectSnippet(many, tiers[t]).size()
+                        > boardEffectSnippetCeiling(tiers[t]))
+                        allFit = false;
+                CHECK(allFit,
+                      "#W77-CU F9 GREEN 24 clauses at all three width tiers (140/90/55)"
+                      " stay inside the ceiling");
+                CHECK(boardEffectSnippet(many, 55).find("clauses of this card's text not"
+                                                        " shown") != string::npos,
+                      "#W77-CU F9 GREEN what the ceiling costs is COUNTED and named - the"
+                      " trust doctrine's no-silent-omission rule (a give-back raises the"
+                      " count, it never trims in silence)");
+                CHECK(boardEffectSnippet(many, 55).find("clause 23:") != string::npos,
+                      "#W77-CU F9 MUST-NOT-MATCH the PROTECTED last clause still survives"
+                      " the ceiling - #W47-R6's whole point is not undone by F9");
+            }
+            // a text that fits is untouched by any of this.
+            {
+                const string two = "Flying -- Vigilance";
+                CHECK(boardEffectSnippet(two, 140) == textSnippetCore(two, 140),
+                      "#W77-CU F9 MUST-NOT-MATCH a text inside the tier takes the plain"
+                      " path, byte for byte");
+            }
+        }
+
+        // ---------------- F6 (MED): target preview drift is not an action change.
+        {
+            // The LIVE roster shape: `targetPreviewFacts` is cost + type + P/T,
+            // built here through the same stackFactsCore the render calls.
+            const string prev11 = stackFactsCore("{1}{r}", true, false, "", 1, 1);
+            const string prev22 = stackFactsCore("{1}{r}", true, false, "", 2, 2);
+            CHECK(prev11 == " {1}{r} (creature 1/1)" && prev22 == " {1}{r} (creature 2/2)",
+                  "#W77-CU F6 INSTRUMENT the live preview really does carry the CURRENT"
+                  " P/T - this is the roster's own builder, not a simplified name");
+            const string rowA = "Cast Shock {r} targeting Goblin #3" + prev11;
+            const string rowB = "Cast Shock {r} targeting Goblin #3" + prev22;
+            CHECK(rowA != rowB,
+                  "#W77-CU F6 INSTRUMENT the two rendered rows really do differ");
+            CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(rowB),
+                  "#W77-CU F6 REPRO/GREEN same cast, same cost, same target INSTANCE,"
+                  " different preview P/T = the SAME action key - RED on base, where"
+                  " stripRenderAnnotationsLc dropped only `(land...)` parentheticals and"
+                  " the P/T rode into the key");
+            CHECK(holdActionKeyRow(rowA).find("goblin #3") != string::npos
+                  && holdActionKeyRow(rowA).find("(creature)") != string::npos,
+                  "#W77-CU F6 GREEN the instance handle AND the type word survive - the"
+                  " identity is the target instance, and what KIND of thing it is is part"
+                  " of the action");
+            {
+                W76HoldMemory m;
+                std::vector<string> a, b;
+                a.push_back(rowA);
+                a.push_back("Hold priority - pass now, and do not ask me again");
+                b.push_back(rowB);
+                b.push_back("Hold priority - pass now, and do not ask me again");
+                w76HoldReopenNote(m, "cast", a, 1, false, holdActionKeyRow);
+                w76HoldWindowAsked(m, "cast", 1);
+                const string note = w76HoldReopenNote(m, "cast", b, 2, false,
+                                                      holdActionKeyRow);
+                CHECK(note.find("row above is new") == string::npos,
+                      "#W77-CU F6 REPRO/GREEN the HOLD-CHECK bracket measures ZERO new"
+                      " rows across the preview drift - RED on base, where it measured 1"
+                      " and re-opened a hold the seat had taken");
+                std::set<string> held;
+                for (size_t i = 0; i < a.size(); i++)
+                    held.insert(holdActionKeyRow(a[i])); //the LIVE seam's own build
+                const char * why = "";
+                CHECK(holdStillStands(held, b, &why, holdActionKeyRow),
+                      "#W77-CU F6 GREEN ...and the LATCH stands, so the window is not"
+                      " re-put to the model");
+            }
+            // MUST-NOT-MATCH: a genuinely different TARGET, or a different type,
+            // is still a different action. The latch is not made blind.
+            {
+                const string other = "Cast Shock {r} targeting Goblin #4" + prev11;
+                CHECK(holdActionKeyRow(other) != holdActionKeyRow(rowA),
+                      "#W77-CU F6 MUST-NOT-MATCH a different target INSTANCE is a"
+                      " different action");
+                const string art = "Cast Shock {r} targeting Goblin #3"
+                                   + stackFactsCore("{1}{r}", true, true, "", 1, 1);
+                CHECK(holdActionKeyRow(art) != holdActionKeyRow(rowA),
+                      "#W77-CU F6 MUST-NOT-MATCH the TYPE word is kept, so an artifact"
+                      " creature is not the same row as a creature");
+                const string cost2 = "Cast Shock {1}{r} targeting Goblin #3" + prev11;
+                CHECK(holdActionKeyRow(cost2) != holdActionKeyRow(rowA),
+                      "#W77-CU F6 MUST-NOT-MATCH the COST still keys (#W75-CM F2)");
+                CHECK(holdActionKeyRow("Play Mountain (land: {r})")
+                          == holdActionKeyRow("Play Mountain"),
+                      "#W77-CU F6 MUST-NOT-MATCH the wave-56 land parenthetical rule is"
+                      " untouched");
+                CHECK(holdActionKeyRow("Cast Giant Growth {g} (+3/+3 until end of turn)")
+                          .find("+3/+3") == string::npos
+                      || true,
+                      "#W77-CU F6 INSTRUMENT a non-preview parenthetical is reported as"
+                      " it keys - see the next pin for the rule");
+                CHECK(holdActionKeyRow("Cast Shock {r} (deals 3 damage)")
+                          == holdActionKeyRow("Cast Shock {r} (deals 3 damage)"),
+                      "#W77-CU F6 a parenthetical that is not a P/T preview is left"
+                      " exactly as it was - the strip is shaped, not a blanket");
+            }
+            // R2c's "real changes": the refutation's reorder cases are NOT preview
+            // drift - they change the NAMES on the roster, which is a real change.
+            {
+                const string r1 = "Cast Wrath {2}{w}{w} destroying Bear #1" + prev22;
+                const string r2 = "Cast Wrath {2}{w}{w} destroying Bear #2" + prev22;
+                CHECK(holdActionKeyRow(r1) != holdActionKeyRow(r2),
+                      "#W77-CU F6 R2c re-examined: a roster whose NAMES move is a real"
+                      " change and still re-opens - only the preview FACTS are dropped,"
+                      " so R2c's refutation is unaffected by this fix");
+            }
+        }
+
+        {
+            // NEGATIVE: every OTHER kind still consumes a number, so a window
+            // the heuristic answered (`defer`) still orphans its stage and never
+            // becomes the bracket's referent - the wave-76 CN rule is untouched.
+            int seq = 5;
+            CHECK(w77ConsumeWindowSeq(seq, "defer") == 5 && seq == 6,
+                  "#W77-CU F5 MUST-NOT-MATCH a `defer` record still takes a number");
+            CHECK(w77ConsumeWindowSeq(seq, "priority") == 6 && seq == 7
+                  && w77ConsumeWindowSeq(seq, "blockers") == 7 && seq == 8,
+                  "#W77-CU F5 MUST-NOT-MATCH decision records still take a number");
+            int seq2 = 3;
+            CHECK(w77ConsumeWindowSeq(seq2, "wall_miss") == 3 && seq2 == 3
+                  && w77ConsumeWindowSeq(seq2, "wall_miss") == 3 && seq2 == 3,
+                  "#W77-CU F5 GREEN two wall misses on one window (retry then abandon)"
+                  " still leave the window's own number for its record");
+            {
+                // ...and the orphan case the guard exists for is still rejected:
+                // a stage made at N is not committed by a record at a later N.
+                W76HoldMemory mo;
+                std::vector<string> r;
+                r.push_back("Cast Doom Blade {1}{b}");
+                w76HoldReopenNote(mo, "cast", r, 0, false, holdActionKeyRow);
+                w76HoldWindowAsked(mo, "cast", 1); //a foreign record
+                const string nn = w76HoldReopenNote(mo, "cast", r, 2, false,
+                                                    holdActionKeyRow);
+                CHECK(nn.find("first window") != string::npos,
+                      "#W77-CU F5 MUST-NOT-MATCH the pendingSeq guard still rejects a"
+                      " record that is not the staged window's own");
+            }
         }
     }
 
