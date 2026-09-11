@@ -103,11 +103,52 @@ THINKING=""      #W70-BK (C1): no default. on|off, stated at launch.
 FASTCLOCK=0.1   # game-seconds per engine tick; 0 = real-time pacing
 FAIRHAND=1      # engine default; 0 = --riggedhand legacy-forensics escape
 
+#W77-CR (R11 b, wave-76 engine-seat LOW-3): THE HARVEST BELONGS TO THIS RUN'S
+# GAMES, NOT TO EVERYTHING NEWER THAN ITS START. `comm -13 $BEFORE_LIST` means
+# "any seat log that did not exist when I started" - and every pool shares one
+# $LOGDIR, so the wave-76 reruns (19 one-game pools, launched concurrently)
+# harvested 38, 37, 36 ... 17 logs, descending with completion order: each pool
+# swept up the other pools' IN-FLIGHT, gameend-less logs and the `-final` corpus
+# had to be rebuilt by hand. Nothing in that corpus was tainted, but an
+# aggregation that trusted a harvest count would have been. The outdir already
+# IS a manifest - the harness creates `game-<d0>v<d1>-<gstart>.stderr` live, as
+# each game starts - so the predicate `tools/corpus-early-check.py` uses (#W75-CI
+# P24) is used here too: a log belongs when its FILENAME epoch (written once,
+# never rewritten) is within 15 s of one of this outdir's game starts AND its
+# deck is one of that game's two decks. With no manifest at all (a probe outdir,
+# an old layout) it degrades to the set difference, which is the old behaviour.
+harvest_belongs() {
+    local outdir="$1" base="$2"
+    python3 - "$outdir" "$base" <<'PYHARVEST'
+import glob, os, re, sys
+outdir, base = sys.argv[1], sys.argv[2]
+GAME_RE = re.compile(r'^game-(\w+?)v(\w+?)-(\d+)\.stderr$')
+SEAT_RE = re.compile(r'^(\d+)-ai_baka_(\w+?)-')
+man = []
+for g in glob.glob(os.path.join(outdir, 'game-*.stderr')):
+    m = GAME_RE.match(os.path.basename(g))
+    if m:
+        man.append((int(m.group(3)), {m.group(1), m.group(2)}))
+if not man:
+    sys.exit(0)          # no manifest: the caller keeps the set difference
+m = SEAT_RE.match(base)
+if not m:
+    sys.exit(0)          # not a seat log we can read: do not drop it
+ep = int(m.group(1))
+deck = m.group(2)[4:] if m.group(2).startswith('deck') else m.group(2)
+for gstart, decks in man:
+    if abs(ep - gstart) <= 15 and deck in decks:
+        sys.exit(0)
+sys.exit(1)              # a log of somebody else's game
+PYHARVEST
+}
+
 harvest_translogs() {
     local logdir="$1" outdir="$2" before="$3" f base
     comm -13 "$before" <(ls "$logdir"/*.jsonl 2>/dev/null | sort) | while read -r f; do
-        cp "$f" "$outdir/"
         base="$(basename "$f")"
+        harvest_belongs "$outdir" "$base" || continue
+        cp "$f" "$outdir/"
         if [ -f "$logdir/askreplay/$base" ]; then
             mkdir -p "$outdir/askreplay"
             cp "$logdir/askreplay/$base" "$outdir/askreplay/"
@@ -137,7 +178,33 @@ harvest_selftest() {
     [ -f "$tmp/out/old-seat.jsonl" ] && { echo "harvest-selftest FAIL: a pre-existing translog was harvested" >&2; fails=1; }
     [ -f "$tmp/out/askreplay/stale-seat.jsonl" ] && { echo "harvest-selftest FAIL: a sidecar with no translog of this run was harvested" >&2; fails=1; }
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "harvest-selftest: 4 checks, 0 failed"
+    #W77-CR (R11 b): the MANIFEST case - the shape that cost the wave-76 reruns.
+    # One outdir whose manifest holds a single game (125 vs 123), one new seat log
+    # belonging to it, and one new seat log from a CONCURRENT pool's game (deck162,
+    # a deck this outdir never started). Both are newer than $BEFORE_LIST, so the
+    # set difference alone harvests both; the manifest must keep the second out.
+    # The last two checks pin the FALLBACK: with the manifest removed, the old
+    # behaviour returns and both are harvested (a probe outdir must not go empty).
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/log" "$tmp/out"
+    : > "$tmp/log/old-seat.jsonl"
+    ls "$tmp/log"/*.jsonl 2>/dev/null | sort > "$tmp/before"
+    : > "$tmp/out/game-125v123-1789074080.stderr"
+    : > "$tmp/log/1789074083-ai_baka_deck125-0xaa-vs-ai_baka_deck123.jsonl"
+    : > "$tmp/log/1789074098-ai_baka_deck162-0xbb-vs-ai_baka_deck125.jsonl"
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/1789074083-ai_baka_deck125-0xaa-vs-ai_baka_deck123.jsonl" ] \
+        || { echo "harvest-selftest FAIL: this run's own game log was not harvested under the manifest" >&2; fails=1; }
+    [ -f "$tmp/out/1789074098-ai_baka_deck162-0xbb-vs-ai_baka_deck125.jsonl" ] \
+        && { echo "harvest-selftest FAIL: a concurrent pool's in-flight log was harvested (wave-76 LOW-3)" >&2; fails=1; }
+    rm -f "$tmp/out"/game-*.stderr
+    rm -f "$tmp/out"/*.jsonl
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/1789074083-ai_baka_deck125-0xaa-vs-ai_baka_deck123.jsonl" ] \
+        && [ -f "$tmp/out/1789074098-ai_baka_deck162-0xbb-vs-ai_baka_deck125.jsonl" ] \
+        || { echo "harvest-selftest FAIL: with no manifest the harvest must fall back to the set difference" >&2; fails=1; }
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "harvest-selftest: 8 checks, 0 failed"
     return "$fails"
 }
 
