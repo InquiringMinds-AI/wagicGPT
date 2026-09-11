@@ -10,6 +10,7 @@ sums EVERY record kind - including the ones later waves added (`recovery`,
 (wave-77 engine-seat L4: 2,740 vs the true 2,746).
 
   usage:  python3 tools/corpus-stats.py <run-dir> [<run-dir> ...]
+          python3 tools/corpus-stats.py --selftest
 
 A seat log is EXCLUDED when it has no `gameend` record (the game did not finish)
 or when any record carries `fallback: timeout` (a timeout-tainted seat); both
@@ -24,6 +25,71 @@ import statistics
 import sys
 
 NON_DECISION_KINDS = ("gamestart", "system", "gameend")
+#W78-CY (F12): the kinds the gameend counter `protocol_replies` DOES see - the
+#records that cost a round trip. Everything else that is a decision record is, by
+#construction, a kind that carries no round trip, so the CENSUS CHECK's explanatory
+#list is computed from the census itself and cannot go stale when a wave adds a kind
+#(wave 78 added `forced_close`, and the hard-coded list printed a difference of one
+#with an empty explanation).
+#The decision seams that ASK the model: every one of these increments the seat's
+#`mProtocolReplies` when its record is written. A kind that is NOT here carries no
+#round trip, whether this tool has heard of it or not - which is the point: the
+#wave-78 `forced_close` needed no edit to be explained, and neither will the next one.
+ROUNDTRIP_KINDS = ("ask", "priority", "attackers", "blockers", "discard",
+                   "reveal", "bottom")
+
+
+def no_roundtrip_kinds(kinds):
+    """Every kind in the census that protocol_replies does not count."""
+    return sorted(k for k in kinds
+                  if k and k not in NON_DECISION_KINDS and k not in ROUNDTRIP_KINDS)
+
+
+def census_kind_sum(kinds):
+    """...and its total, so a mis-classified kind is LOUD, not silent."""
+    return sum(kinds[k] for k in no_roundtrip_kinds(kinds))
+
+
+def census_kind_list(kinds):
+    """The CENSUS CHECK's explanatory list, as printed."""
+    return ", ".join("%s %d" % (k, kinds[k]) for k in no_roundtrip_kinds(kinds)
+                     if kinds.get(k))
+
+
+def selftest():
+    """#W78-CY (F12): the reconciliation, on mocked input. One ask, one
+    forced_close, gameend protocol_replies 1 -> difference 1, explained."""
+    import collections as _c
+    ok = True
+    kinds = _c.Counter({"gamestart": 1, "ask": 1, "forced_close": 1, "gameend": 1})
+    decision_records = sum(v for k, v in kinds.items() if k not in NON_DECISION_KINDS)
+    listed = census_kind_list(kinds)
+    if decision_records - 1 != 1 or listed != "forced_close 1":
+        print("SELFTEST FAIL: difference %d list %r" % (decision_records - 1, listed))
+        ok = False
+    # every future kind is explained the same way, with no edit to this tool
+    k2 = _c.Counter({"ask": 2, "recovery": 1, "defer": 1, "wall_miss": 1,
+                     "forced_close": 1, "some_future_kind": 3, "gameend": 2})
+    if census_kind_list(k2) != ("defer 1, forced_close 1, recovery 1, "
+                                "some_future_kind 3, wall_miss 1"):
+        print("SELFTEST FAIL: generic list %r" % census_kind_list(k2))
+        ok = False
+    # ...and a census with nothing but round-trip kinds explains nothing, because
+    # there is nothing to explain.
+    if census_kind_list(_c.Counter({"ask": 5, "priority": 2, "gameend": 1})) != "":
+        print("SELFTEST FAIL: round-trip-only census listed something")
+        ok = False
+    # the wave-78 corpus's own reconciliation: 2,746 - 2,740 = recovery 5 + defer 1
+    k3 = _c.Counter({"gamestart": 42, "system": 42, "ask": 1999, "reveal": 21,
+                     "discard": 51, "gameend": 42, "attackers": 82, "priority": 567,
+                     "recovery": 5, "blockers": 18, "bottom": 2, "defer": 1})
+    d3 = sum(v for k, v in k3.items() if k not in NON_DECISION_KINDS)
+    if d3 != 2746 or census_kind_list(k3) != "defer 1, recovery 5" \
+            or census_kind_sum(k3) != d3 - 2740:
+        print("SELFTEST FAIL: wave-78 corpus %d %r" % (d3, census_kind_list(k3)))
+        ok = False
+    print("corpus-stats selftest: %s" % ("OK" if ok else "FAILED"))
+    return 0 if ok else 1
 
 
 def load(dirs):
@@ -63,6 +129,8 @@ def pct(values, p):
 
 
 def main(argv):
+    if len(argv) == 2 and argv[1] == "--selftest":
+        return selftest()  #W78-CY (F12)
     if len(argv) < 2:
         print(__doc__)
         return 2
@@ -80,8 +148,8 @@ def main(argv):
     print("ALL KINDS %s" % dict(kinds))
     print("RECORD KINDS SUM (all kinds except %s) %d"
           % ("/".join(NON_DECISION_KINDS), decision_records))
-    for k in ("recovery", "defer", "wall_miss"):
-        print("  ...of which %-9s %d" % (k, kinds.get(k, 0)))
+    for k in no_roundtrip_kinds(kinds):  #W78-CY (F12): generic, never a fixed list
+        print("  ...of which %-13s %d" % (k, kinds.get(k, 0)))
 
     # ---- fallbacks, by kind and flat.
     fbk = collections.Counter((r.get("kind"), r.get("fallback"))
@@ -154,8 +222,11 @@ def main(argv):
         print("CENSUS CHECK: gameend protocol_replies %d vs record-kind sum %d "
               "(difference %d = the kinds that carry no round trip: %s)"
               % (pr, decision_records, decision_records - pr,
-                 ", ".join("%s %d" % (k, kinds.get(k, 0))
-                           for k in ("recovery", "defer", "wall_miss") if kinds.get(k))))
+                 census_kind_list(kinds) or "(none)"))  #W78-CY (F12)
+        if census_kind_sum(kinds) != decision_records - pr:
+            print("CENSUS CHECK MISMATCH: the listed kinds sum to %d but the difference"
+                  " is %d - a record kind is on the wrong side of ROUNDTRIP_KINDS"
+                  % (census_kind_sum(kinds), decision_records - pr))
 
     print("askreplay files: %d"
           % sum(len(glob.glob(os.path.join(d, "askreplay", "*.jsonl"))) for d in dirs))
