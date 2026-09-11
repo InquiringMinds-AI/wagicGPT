@@ -2284,6 +2284,11 @@ private:
     //#W75-CL (P23 d): replies deviating from the two-line protocol AT ALL -
     //`off_protocol_bytes` and `plan_line_missing` counted as ONE event.
     int mProtocolDeviationReplies;
+    //#W78-CX (S1): of the replies classed `answer_label_absent`, how many the
+    //HEURISTIC then played because the parser refused them. MEASURE ONLY - the
+    //parser is unchanged and this number is the size of what the pending owner
+    //ruling would recover (wave 77: 5, all one seat).
+    int mAnswerLabelAbsentHeuristicPlayed;
     int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
     int mPhase2AnswerMissing;      //B1.5: ...and did not
     //#W75-CJ (P2c, engine-seat HIGH-3 "the third path"): a forced close that was
