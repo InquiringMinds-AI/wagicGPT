@@ -1,0 +1,543 @@
+# Wave-77 lategame specimen (standing rule, alert-only)
+# Seat 1789114834-ai_baka_deck125-0x562523fd1ba0-vs-ai_baka_deck162.jsonl, record seq 214, kind ask, turn 33 (Upkeep), life 14 vs 10.
+# Largest prompt at any turn >= 25: 34,324 B. Answer: row 3 (Hold priority). Verbatim `prompt` below, nothing elided.
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Fall of the Gavel; Cancel; Supreme Verdict; Staff of Nin; Island; Glacial Fortress; Island
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Island
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Howling Mine
+- Opponent's Howling Mine resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You played Plains
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Swamp
+- Phase: Main phase 2
+- Opponent cast Master of the Feast
+- Paid {1}{u} for Essence Scatter (2 sources)
+- You cast Essence Scatter
+- Opponent's Master of the Feast was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Island
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Underground Sea
+- Opponent cast Underworld Dreams
+- Paid {1}{u}{u} for Cancel (3 sources)
+- You cast Cancel
+- Opponent's Underworld Dreams was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Island
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Ob Nixilis, the Hate-Twisted
+- Paid {3}{u}{w} for Fall of the Gavel (5 sources)
+- You cast Fall of the Gavel
+- Opponent's Ob Nixilis, the Hate-Twisted was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 25)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Lightmine Field (x2)
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Drowned Catacomb
+- Opponent cast Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted resolved and entered the battlefield
+- Opponent's Ob Nixilis, the Hate-Twisted got 5 loyalty counters (now 5)
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Plains (x2)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 24)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 23)
+- Phase: Main phase 1
+- You played Plains
+- Paid {6} for Staff of Nin (6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Fate Unraveler
+- Opponent's Fate Unraveler resolved and entered the battlefield
+- Paid {w} for Path to Exile (1 source)
+- You cast Path to Exile
+- Opponent's Fate Unraveler was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Opponent's Swamp entered the battlefield from the opponent's library
+=== Turn 15 - YOUR turn ===
+- Phase: Upkeep
+- You drew Final Judgment
+- You used: Deal 1 damage with Staff of Nin targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 22)
+- Phase: Draw
+- You drew Dream Fracture
+- You drew Tundra
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 21)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 20)
+- Phase: Main phase 1
+- You played Plains
+- Paid {2}{w}{w} for Lightmine Field (4 sources)
+- You cast Lightmine Field (that Lightmine Field was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Lightmine Field resolved and entered the battlefield
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Underground Sea
+=== Turn 17 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+- You used: Deal 1 damage with Staff of Nin targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 19)
+- Phase: Draw
+- You drew Cancel
+- You drew Path to Exile
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 18)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 17)
+- Phase: Main phase 1
+- You played Tundra
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Lightmine Field, Seachrome Coast
+- You discarded Lightmine Field
+- You discarded Seachrome Coast
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Swamp
+- Opponent cast Teferi's Puzzle Box
+- Paid {1}{u}{u} for Cancel (3 sources)
+- You cast Cancel
+- Opponent's Teferi's Puzzle Box was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 19 - YOUR turn ===
+- Phase: Upkeep
+- You drew Staff of Nin
+- You used: Deal 1 damage with Staff of Nin targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 16)
+- Phase: Draw
+- You drew Fall of the Gavel
+- You drew Glacial Fortress
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 15)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 14)
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {6} for Staff of Nin (6 sources)
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Underground Sea
+- Opponent cast Liliana's Caress
+- Paid {1}{u}{u} for Dream Fracture (3 sources)
+- You cast Dream Fracture
+- Opponent's Liliana's Caress was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Seachrome Coast
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 13)
+- Opponent cast Fate Unraveler
+- Opponent's Fate Unraveler resolved and entered the battlefield
+- Paid {w} for Path to Exile (1 source)
+- You cast Path to Exile
+- Opponent's Fate Unraveler was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Opponent's Swamp entered the battlefield from the opponent's library
+=== Turn 21 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin #1 targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent's Ob Nixilis, the Hate-Twisted was put into the opponent's graveyard from the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 12)
+- You drew Seachrome Coast
+- Phase: Draw
+- You drew Tundra
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (11 sources)
+- You announced X = 8 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 8 life (now 20)
+- You drew Fall of the Gavel
+- You drew Island
+- You drew Tundra
+- You drew Plains
+- You drew Elixir of Immortality
+- You drew Supreme Verdict
+- You drew Island
+- You drew Essence Scatter
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 16, limit 7): you chose Seachrome Coast, Seachrome Coast, Tundra, Fall of the Gavel, Island, Tundra, Plains, Supreme Verdict, Island
+- You discarded Seachrome Coast (that Seachrome Coast was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Seachrome Coast
+- You discarded Tundra (that Tundra was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Tundra
+- You discarded Plains
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Peer into the Abyss
+- Opponent's Peer into the Abyss resolved and went to the opponent's graveyard
+- Opponent used: target opponent with Peer into the Abyss
+- You drew Path to Exile (x2)
+- You drew Plains
+- You drew Elixir of Immortality
+- You drew Emrakul, the Aeons Torn
+- You drew Sphinx's Revelation
+- You drew Dream Fracture (x2)
+- You drew Cancel
+- You drew Tundra
+- You lost 10 life (now 10)
+=== Turn 23 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (11 sources)
+- You announced X = 6 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 6 life (now 16)
+- You drew Final Judgment
+- You drew Supreme Verdict
+- You drew Plains
+- You drew Glacial Fortress (x2)
+- You drew Sphinx's Revelation
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- You drew Sphinx's Revelation
+- Phase: Draw
+- You drew Supreme Verdict
+- You drew Island
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {1} for Elixir of Immortality (1 source)
+- You cast Elixir of Immortality (that Elixir of Immortality was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 24, limit 7): you chose Supreme Verdict, Final Judgment, Fall of the Gavel, Plains, Emrakul, the Aeons Torn, Dream Fracture, Cancel, Tundra, Island, Final Judgment, Supreme Verdict, Plains, Glacial Fortress, Sphinx's Revelation, Sphinx's Revelation, Supreme Verdict, Island
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Final Judgment (that Final Judgment was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Fall of the Gavel
+- You discarded Plains (that Plains was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Emrakul, the Aeons Torn
+- You discarded Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Cancel
+- You discarded Tundra
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Final Judgment
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Plains
+- You discarded Glacial Fortress
+- You discarded Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Sphinx's Revelation
+- You discarded Supreme Verdict
+- You discarded Island
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (37 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Shield Sphere
+- Opponent's Shield Sphere resolved and entered the battlefield
+=== Turn 25 - YOUR turn ===
+- Phase: Upkeep
+- You drew Final Judgment
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Supreme Verdict
+- You drew Path to Exile
+- Phase: Main phase 2
+- Paid {1} for Elixir of Immortality (1 source)
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Cleanup
+- Cleanup discard (hand 10, limit 7): you chose Essence Scatter, Essence Scatter, Essence Scatter
+- You discarded Essence Scatter (that Essence Scatter was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Essence Scatter
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Swamp
+- Phase: Cleanup
+- Opponent discarded Island
+=== Turn 27 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- You drew Cancel
+- Phase: Draw
+- You drew Tundra (x2)
+- Phase: Main phase 1
+- You played Island
+- Phase: Cleanup
+- Cleanup discard (hand 10, limit 7): you chose Supreme Verdict, Tundra, Tundra
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Tundra (that Tundra was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Tundra
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Dismal Backwater
+- Opponent gained 1 life (now 13)
+- Opponent cast Liliana's Caress
+- Paid {1}{u}{u} for Dream Fracture (3 sources)
+- You cast Dream Fracture
+- Opponent's Liliana's Caress was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Sphinx's Revelation
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Master of the Feast
+- Paid {1}{u}{u} for Cancel (3 sources)
+- You cast Cancel
+- Opponent's Master of the Feast was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 29 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+- You used: Life with Elixir of Immortality #1
+- Paid {2} for Elixir of Immortality (2 sources)
+- You gained 5 life (now 21)
+- Your Elixir of Immortality was put into your library from the battlefield (that Elixir of Immortality was 1 of 2 copies on your battlefield; the other 1 is still there)
+- You shuffled your graveyard (8 cards) into your library with Elixir of Immortality
+- You drew Island
+- Phase: Draw
+- You drew Essence Scatter
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Island
+- Paid {u}{u}{w}{x} for Sphinx's Revelation (12 sources)
+- You announced X = 9 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 9 life (now 30)
+- You drew Supreme Verdict
+- You drew Sphinx's Revelation
+- You drew Glacial Fortress
+- You drew Sphinx's Revelation
+- You drew Emrakul, the Aeons Torn
+- You drew Tundra
+- You drew Plains
+- You drew Fall of the Gavel
+- You drew Plains
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 17, limit 7): you chose Final Judgment, Supreme Verdict, Island, Sphinx's Revelation, Glacial Fortress, Sphinx's Revelation, Emrakul, the Aeons Torn, Tundra, Plains, Plains
+- You discarded Final Judgment
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+- You discarded Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Glacial Fortress
+- You discarded Sphinx's Revelation
+- You discarded Emrakul, the Aeons Torn
+- You discarded Tundra
+- You discarded Plains (that Plains was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Plains
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (11 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 2 cards
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted resolved and entered the battlefield
+- Opponent's Ob Nixilis, the Hate-Twisted got 5 loyalty counters (now 5)
+- Opponent cast Dictate of Kruphix
+- Opponent's Dictate of Kruphix resolved and entered the battlefield
+- Opponent cast Howling Mine
+- Opponent's Howling Mine resolved and entered the battlefield
+- Opponent cast Forced Fruition
+- Opponent's Forced Fruition resolved and entered the battlefield
+=== Turn 31 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- You used: Deal 1 damage with Staff of Nin #2 targeting Ob Nixilis, the Hate-Twisted
+- Your Staff of Nin dealt 1 damage to Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality (2 sources)
+- You gained 5 life (now 35)
+- Your Elixir of Immortality was put into your library from the battlefield
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 34) [x6 - 6 lines of this shape in this batch; only the numbers in them differ]
+- You drew Dream Fracture
+- Phase: Draw
+- You drew Cancel
+- You drew Glacial Fortress
+- You drew Cancel
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Cleanup
+- Cleanup discard (hand 12, limit 7): you chose Fall of the Gavel, Fall of the Gavel, Cancel, Cancel, Supreme Verdict
+- You discarded Fall of the Gavel (that Fall of the Gavel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Fall of the Gavel
+- You discarded Cancel (that Cancel was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Cancel
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew 4 cards
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Fate Unraveler
+- Paid {1}{u} for Essence Scatter (2 sources)
+- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- You drew Sphinx's Revelation
+- You drew Supreme Verdict
+- You drew Plains
+- You drew Essence Scatter
+- You drew Sphinx's Revelation (x2)
+- You drew Dream Fracture
+- Opponent's Fate Unraveler was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 28) [x15 - 15 lines of this shape in this batch; only the numbers in them differ]
+- Opponent cast Shield Sphere
+- Opponent's Shield Sphere resolved and entered the battlefield
+- Opponent cast Shield Sphere
+- Opponent's Shield Sphere resolved and entered the battlefield
+- Opponent cast Howling Mine
+- Opponent's Howling Mine resolved and entered the battlefield
+- Opponent cast Forced Fruition
+- Paid {1}{u}{u} for Dream Fracture (3 sources)
+- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- You drew Cancel
+- You drew Island
+- You drew Elixir of Immortality
+- You drew Final Judgment
+- You drew Seachrome Coast (x2)
+- You drew Plains
+- Opponent's Forced Fruition was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Supreme Verdict
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+=== Turn 33 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+Your life: 14 | Opponent life: 10
+Opponent life trend: turn 31: 11, turn 32: 10, turn 33: 10, now 10 (-1 since turn 31).
+ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):
+  1 (top): ability: Ob Nixilis, the Hate-Twisted's triggered ability (deals 1 damage to you) [from their Ob Nixilis, the Hate-Twisted] [triggered/activated ability]
+  2: ability: Staff of Nin's Draw 1 [from your Staff of Nin] [triggered/activated ability]
+ON THE STACK: 1 damage to you - you would be at 13
+Mana available: 15 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 9, {U} 12 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Island #1 {u}; Glacial Fortress #1 {w} or {u}; Plains #1 {w}; Island #2 {u}; Island #3 {u}; Seachrome Coast {w} or {u}; Plains #2 {w}; Plains #3 {w}; Tundra {w} or {u}; Glacial Fortress #2 {w} or {u}; Island #4 {u}; Glacial Fortress #3 {w} or {u}; Island #5 {u}; Island #6 {u}; Glacial Fortress #4 {w} or {u}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options), so the absence of a land from the choices below does not mean the drop is gone. ONE exception: a modal double-faced card whose back face is a land is offered in the casting menu on its own row, marked PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends this same drop.
+Your hand (21 cards): Path to Exile (copy 1 of 4 in your hand) {w} [instant] [castable now]; Path to Exile (copy 2 of 4 in your hand) {w} [instant] [castable now]; Path to Exile (copy 3 of 4 in your hand) {w} [instant] [castable now]; Path to Exile (copy 4 of 4 in your hand) {w} [instant] [castable now]; Supreme Verdict (copy 1 of 3 in your hand) {1}{u}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]; Sphinx's Revelation (copy 1 of 3 in your hand) {u}{u}{w}{x} [instant] [castable now]; Supreme Verdict (copy 2 of 3 in your hand) {1}{u}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]; Plains (copy 1 of 2 in your hand) (land: taps for {W}); Essence Scatter {1}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Sphinx's Revelation (copy 2 of 3 in your hand) {u}{u}{w}{x} [instant] [castable now]; Sphinx's Revelation (copy 3 of 3 in your hand) {u}{u}{w}{x} [instant] [castable now]; Dream Fracture {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Cancel {1}{u}{u} [instant] [no cast row now: it must have a target and there is no legal target on the board]; Island (land: taps for {U}); Elixir of Immortality {1} [artifact] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]; Final Judgment {4}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]; Seachrome Coast (copy 1 of 3 in your hand) (land: taps for {W}{U}); Seachrome Coast (copy 2 of 3 in your hand) (land: taps for {W}{U}); Plains (copy 2 of 2 in your hand) (land: taps for {W}); Supreme Verdict (copy 3 of 3 in your hand) {1}{u}{w}{w} [sorcery] [no cast row now: sorcery speed - only in your own main phase with an empty stack; right now the phase is Upkeep, not a main phase and the stack is not empty (see ON THE STACK above)]; Seachrome Coast (copy 3 of 3 in your hand) (land: taps for {W}{U})
+Your battlefield (18 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 15 are lands): Glacial Fortress #1-#4 x4; Island #1-#6 x6; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1-#3 x3; Seachrome Coast; Staff of Nin #1 {6} [artifact]; Staff of Nin #2 {6} [artifact]; Tundra
+Your graveyard (7 cards): Fall of the Gavel {3}{u}{w} x2; Cancel {1}{u}{u} x2; Supreme Verdict {1}{u}{w}{w}; Essence Scatter {1}{u}; Dream Fracture {1}{u}{u}
+Opponent battlefield (27 permanents listed, of which 3 are creatures, 0 of them without a restriction against attacking, and 18 are lands): Dictate of Kruphix {1}{u}{u} [enchantment] {effect: "Flash -- At the beginning of each player's draw step, that player draws an additional card."}; Dismal Backwater; Drowned Catacomb; Forced Fruition {4}{u}{u} [enchantment] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "Whenever an opponent casts a spell, that player draws seven cards."}; Howling Mine #2 {2} [artifact]; Howling Mine #3 {2} [artifact]; Howling Mine #1 {2} [artifact] {effect (each copy of this card does this): "At the beginning of each player's draw step, if Howling Mine is untapped, that player..."}; Island #1-#5 [tapped] x5; Ob Nixilis, the Hate-Twisted {3}{b}{b} [planeswalker] [counters: 4x loyalty] {effect (THEIR card, written from THEIR seat: "you"/"your" in this text means THEM, and "opponent" in it means YOU): "Whenever an opponent draws a card, Ob Nixilis, the Hate-Twisted deals 1 damage to that player. -- -2: Destroy target creature. Its controller draws two cards."}; Shield Sphere #2 {0} (0/6) [artifact] [defender]; Shield Sphere #3 {0} (0/6) [artifact] [defender]; Shield Sphere #1 {0} (0/6) [artifact] [defender] {effect (each copy of this card does this): "Whenever Shield Sphere blocks, put a -0/-1 counter on it."}; Swamp #8; Swamp #1-#7 [tapped] x7; Underground Sea #1-#3 x3
+Their graveyard (12 cards): Master of the Feast {1}{b}{b} (creature 5/5) x2; Underworld Dreams {b}{b}{b}; Ob Nixilis, the Hate-Twisted {3}{b}{b} x2; Teferi's Puzzle Box {4}; Liliana's Caress {1}{b} x2; Peer into the Abyss {4}{b}{b}{b}; Island; Fate Unraveler {3}{b} (creature 3/4); Forced Fruition {4}{u}{u}
+Their untapped sources: 6 (colours they could make: {u}{b})
+Opponent hand size: 3 | Opponent library: 16 cards
+Artifacts in play: you 2 | opponent 6
+DRAW PUNISHERS on the battlefield: theirs - Ob Nixilis, the Hate-Twisted. Every card YOU draw costs you 1 life to theirs. They fire on EVERY draw - the draw step, a cycling ability, a draw spell, any extra draw - and the loss lands as the card is drawn, before anything can be done with it. Your DRAW STEP is COMPULSORY: no row on this or any other menu declines it, and holding priority does not prevent it - the cost above is charged whether you act or not. Count that cost before choosing an OPTIONAL draw (a cycling ability, a draw spell, any extra draw), which are the only draws a choice of yours controls.
+DRAW FORECAST: your next draw step draws 5 cards (1 + Howling Mine #1 1 + Dictate of Kruphix 1 + Howling Mine #2 1 + Howling Mine #3 1) = 5 x 1 = 5 life LOST BY YOU to their punishers above - if it resolves as forecast you would be at 9. This draw step is COMPULSORY - no row on any menu declines it.
+Your library: 14 cards
+
+THE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 33; "Elixir of Immortality" is no longer on your menu) reads "In main phase, activate Elixir of Immortality. Ping opponent with both Staffs. Play land. Advance board toward lethal."
+
+Casting decision (Upkeep, YOUR turn): which card do you cast now, if any?
+This menu has no row 0: to decline, take the numbered "Cast nothing right now" row on the list below. (A priority menu does have a row 0; this one does not.)
+1. Cast Path to Exile {w} {leaves 14 of your 15 untapped mana sources untapped} {removes: 3 bodies: Shield Sphere #1-#3 x3} - legal targets right now: Shield Sphere #1-#3 (artifact creature 0/6) [defender] x3 {target text: "Defender -- Whenever Shield Sphere blocks, put a -0/-1 counter on it."} {card text: "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Ob Nixilis, the Hate-Twisted deal you 7 - you would be at 7]
+2. Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=12 (15 mana total); each point of X gains you 1 life and draws you 1 card; DRAW PRICE: every card X draws costs you 1 life to their Ob Nixilis, the Hate-Twisted (at X=12: 12 cards = 12 life)} [<- best X for this cast: X=8 - largest affordable X - X=12 gains 12 life and draws 12 cards; no listed X does more - but LIBRARY CEILING: X=12 draws 12 from a library of 14 cards: it leaves 2 cards, and your next draw step, which you cannot decline and draws 5, plus the 1 draw already on the stack, which you cannot decline either, then draws you out. X=8 is the largest listed X the library pays for (14 cards, holding 6 back for your next draw step, which you cannot decline and draws 5, plus the 1 draw already on the stack, which you cannot decline either)] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=12, 15 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Path to Exile {w} in your hand needs 1: the largest X that still leaves it payable this turn is X=11} {card text: "You gain X life and draw X cards."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Ob Nixilis, the Hate-Twisted deal you 7 - you would be at 7]
+3. Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}
+4. Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 5 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}
+
+[you declined this exact list 1 time already this turn - counted over every window this turn, not only the ones asked at this same seam]
+[hold check: every row above was also on the menu at the last window I asked you at this seam (5 windows in a row now) - a hold taken here holds until one of them appears, disappears, or names a different card, cost or target; a row that changes only in its annotations is the same row]
+[HOW A HOLD ENDS: taking the hold row skips every later window that asks THIS SAME question with rows identical to these; a different question is still asked, and the hold is released at the start of your next turn whatever the rows do. Rows are compared by what they DO. A row that changes only INSIDE its brackets or braces - a price, a forecast, a clock, a count, a life total, a kill count, a survivor count, a note that it cannot reach a spell on the stack - is the SAME row, and so is a pass row that differs only by naming which step comes next. What re-opens the window: a row appearing, a row disappearing, a row naming a different card, cost or target, and a change in whether the board now kills you.]
+Write your PLAN: line first, then on a line of its own CHOICE: followed by the number of your choice (the LAST row of this menu declines: it is a real answer, not a fallback) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Path to Exile)" (a worked example of the format, written out from row 1 of this list - choose the option YOU want) Write nothing else.
