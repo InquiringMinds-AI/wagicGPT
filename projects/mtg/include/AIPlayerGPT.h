@@ -349,6 +349,13 @@ int gptForceCloseArm(bool& liveArmed);
 //Closes still outstanding across both arms - what the record adds to the counter.
 int gptForceCloseOutstanding(bool liveArmed, bool parkArmed);
 
+//#W77-CU (F4): the three-way verdict the own-loop bracket is built from.
+//IDLE = the loop is not executing; RESOLVING = one of the seat's own loop pieces
+//is on the stack and nothing of theirs threatens a component; THREATENED = an
+//unresolved stack object of the opponent's targets a component, which is the one
+//board where holding LOSES the loop.
+enum W77LoopVerdict { kW77LoopIdle = 0, kW77LoopResolving = 1, kW77LoopThreatened = 2 };
+
 class AIPlayerGPT : public AIPlayerBaka
 {
 public:
@@ -1975,6 +1982,9 @@ private:
     int mOwnLoopWindowsAsked;
     int mOwnLoopCountedSeq;
     bool w77OwnLoopResolving();
+    int w77OwnLoopStackState(std::string& theirSpell, std::string& component);
+    //#W77-CU (F4): the verdict as a hold MARKER ROW, the #W68-BB / #W74-CH shape.
+    std::string w77OwnLoopVerdictNow();
     void w77CountOwnLoopWindow();
     //#W77-CR (R8): cross-phase re-puts whose ask-cache board key matched, i.e.
     //the ones whose positive clause printed. Never summed with the total.

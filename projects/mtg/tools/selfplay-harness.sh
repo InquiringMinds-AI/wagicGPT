@@ -117,11 +117,31 @@ FAIRHAND=1      # engine default; 0 = --riggedhand legacy-forensics escape
 # never rewritten) is within 15 s of one of this outdir's game starts AND its
 # deck is one of that game's two decks. With no manifest at all (a probe outdir,
 # an old layout) it degrades to the set difference, which is the old behaviour.
+#W77-CU (F10, Astra MED 10): DECK PAIR + A TOLERANCE IS NOT GAME IDENTITY.
+# Astra executed the wave-77 predicate: with the manifest `125v123` at epoch
+# 1000 it ACCEPTED foreign logs at 1005 for both `125v123` and `125v162`, and
+# REJECTED the legitimate seat initialised at 1016 - and two concurrent games of
+# the SAME pair were indistinguishable at any tolerance, which is the very shape
+# the wave-76 reruns hit. The game itself is the only thing that knows which two
+# files are its own (the name carries the seat's pointer), so each game now
+# ANNOUNCES its two seat-log basenames on its own stderr
+# (`WAGIC_GPT_TRANSLOG_FILE <base>`, printed by AIPlayerGPT when the translog is
+# on) and the harness records them, per game, in `$OUTDIR/.seatlogs` as it
+# reaps. Membership is then exact-name. The deck+tolerance predicate remains
+# ONLY as the fallback for an outdir that has no `.seatlogs` at all (an old
+# corpus, a probe outdir, a build whose engine does not announce), and it says so
+# on stderr the first time it is used, so a silent degrade cannot be mistaken for
+# identity.
 harvest_belongs() {
     local outdir="$1" base="$2"
     python3 - "$outdir" "$base" <<'PYHARVEST'
 import glob, os, re, sys
 outdir, base = sys.argv[1], sys.argv[2]
+named = os.path.join(outdir, '.seatlogs')
+if os.path.exists(named) and os.path.getsize(named) > 0:
+    with open(named) as fh:
+        own = set(l.strip() for l in fh if l.strip())
+    sys.exit(0 if base in own else 1)   # EXACT identity: the game named its own
 GAME_RE = re.compile(r'^game-(\w+?)v(\w+?)-(\d+)\.stderr$')
 SEAT_RE = re.compile(r'^(\d+)-ai_baka_(\w+?)-')
 man = []
@@ -131,6 +151,9 @@ for g in glob.glob(os.path.join(outdir, 'game-*.stderr')):
         man.append((int(m.group(3)), {m.group(1), m.group(2)}))
 if not man:
     sys.exit(0)          # no manifest: the caller keeps the set difference
+sys.stderr.write("!! harvest: no .seatlogs manifest in %s - falling back to deck+time"
+                 " membership, which CANNOT separate concurrent pools of the same"
+                 " deck pair (#W77-CU F10)\n" % outdir)
 m = SEAT_RE.match(base)
 if not m:
     sys.exit(0)          # not a seat log we can read: do not drop it
@@ -204,7 +227,44 @@ harvest_selftest() {
         && [ -f "$tmp/out/1789074098-ai_baka_deck162-0xbb-vs-ai_baka_deck125.jsonl" ] \
         || { echo "harvest-selftest FAIL: with no manifest the harvest must fall back to the set difference" >&2; fails=1; }
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "harvest-selftest: 8 checks, 0 failed"
+    #W77-CU (F10): the THREE SHAPES Astra executed against the deck+tolerance
+    # predicate, now against exact-name membership. Manifest game 125v123 at
+    # epoch 1000; its two seat logs are named by the game itself.
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/log" "$tmp/out"
+    ls "$tmp/log"/*.jsonl 2>/dev/null | sort > "$tmp/before"
+    : > "$tmp/out/game-125v123-1000.stderr"
+    #  (1) a foreign log of the SAME pair, five seconds away - accepted before.
+    : > "$tmp/log/1005-ai_baka_deck125-0xff-vs-ai_baka_deck123.jsonl"
+    #  (2) a foreign log of a DIFFERENT pair sharing one deck - accepted before.
+    : > "$tmp/log/1005-ai_baka_deck125-0xee-vs-ai_baka_deck162.jsonl"
+    #  (3) THIS game's own seat, initialised sixteen seconds in - rejected before.
+    : > "$tmp/log/1016-ai_baka_deck123-0xaa-vs-ai_baka_deck125.jsonl"
+    printf '%s\n' '1016-ai_baka_deck123-0xaa-vs-ai_baka_deck125.jsonl' > "$tmp/out/.seatlogs"
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/1016-ai_baka_deck123-0xaa-vs-ai_baka_deck125.jsonl" ] \
+        || { echo "harvest-selftest FAIL: a NAMED seat log 16 s from the game start was dropped (#W77-CU F10 shape 3)" >&2; fails=1; }
+    [ -f "$tmp/out/1005-ai_baka_deck125-0xff-vs-ai_baka_deck123.jsonl" ] \
+        && { echo "harvest-selftest FAIL: a foreign log of the SAME deck pair was harvested (#W77-CU F10 shape 1)" >&2; fails=1; }
+    [ -f "$tmp/out/1005-ai_baka_deck125-0xee-vs-ai_baka_deck162.jsonl" ] \
+        && { echo "harvest-selftest FAIL: a foreign log sharing one deck was harvested (#W77-CU F10 shape 2)" >&2; fails=1; }
+    #  ...and two CONCURRENT games of the SAME pair are separable, which no
+    #  tolerance could do: only the one this outdir named is taken.
+    rm -f "$tmp/out"/*.jsonl
+    : > "$tmp/log/1007-ai_baka_deck125-0x11-vs-ai_baka_deck123.jsonl"
+    : > "$tmp/log/1007-ai_baka_deck125-0x22-vs-ai_baka_deck123.jsonl"
+    printf '%s\n' '1007-ai_baka_deck125-0x11-vs-ai_baka_deck123.jsonl' >> "$tmp/out/.seatlogs"
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/1007-ai_baka_deck125-0x11-vs-ai_baka_deck123.jsonl" ] \
+        && [ ! -f "$tmp/out/1007-ai_baka_deck125-0x22-vs-ai_baka_deck123.jsonl" ] \
+        || { echo "harvest-selftest FAIL: two concurrent games of the same pair were not separated (#W77-CU F10)" >&2; fails=1; }
+    #  FALLBACK: with no .seatlogs the old deck+time predicate returns (warned).
+    rm -f "$tmp/out/.seatlogs" "$tmp/out"/*.jsonl
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before" 2>/dev/null
+    [ -f "$tmp/out/1005-ai_baka_deck125-0xff-vs-ai_baka_deck123.jsonl" ] \
+        || { echo "harvest-selftest FAIL: with no .seatlogs the fallback predicate must still harvest (#W77-CU F10)" >&2; fails=1; }
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "harvest-selftest: 14 checks, 0 failed"
     return "$fails"
 }
 
@@ -980,6 +1040,10 @@ run_one_game() {
     local hung=0
     [ -f "$marker.hung" ] && hung=1
     rm -f "$marker" "$marker.hung" "$marker.sz"
+    #W77-CU (F10): this game's OWN seat-log basenames, straight off its own
+    # stderr, appended to the outdir's exact-identity manifest.
+    grep -oE 'WAGIC_GPT_TRANSLOG_FILE [^ ]+$' "$elog" 2>/dev/null \
+        | awk '{print $2}' >> "$OUTDIR/.seatlogs"
     local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
     local winner life0 life1 turn
     winner=$(echo "$resline" | grep -oE 'winner=-?[0-9]+' | cut -d= -f2)
