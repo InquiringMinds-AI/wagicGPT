@@ -506,13 +506,126 @@ static string planAssertedAbsentBlock(const string& assertedName)
     return o.str();
 }
 
+string textSnippetCore(const string& raw, size_t maxLen, bool completeClause = true);
+
+//#W78-CW (S8, wave-77 engine-seat MED + deck123 MED-5 + deck162 §5): THE GLOSS
+//CUT MID-CLAUSE AND THE FRAGMENT READ AS A COMPLETE STATEMENT. Measured on the
+//wave-77 corpus: `Howling Mine #1 ... {effect ...: "At the beginning of each
+//player's draw step, if Howling Mine is untapped, that player..."}` 55 times -
+//a conditional with its consequent cut off; `Brutal Cathar ... "exile target
+//creature an..."` 31 times, which drops the "until this creature leaves the
+//battlefield" return clause and turns a temporary exile into a permanent one;
+//`Lightning Greaves ... "stays on the battlefield if..."` on 35 renders. The
+//wave-48 D5 rule already refuses to invent a WORD (it cuts at a word boundary);
+//this refuses to invent a CLAUSE. A clause ends at a sentence stop followed by
+//a capital or an opening parenthesis, or at the " -- " the primitives use as
+//their clause separator - both are byte tests over the text itself, so the
+//boundary is provable without a board.
+//Returns the cut position (the number of bytes to KEEP) or 0 when there is no
+//clause boundary in [1, limit].
+static size_t w78ClauseCutAtOrBefore(const string& text, size_t limit)
+{
+    size_t best = 0;
+    if (limit > text.size())
+        limit = text.size();
+    for (size_t i = 0; i + 1 < text.size(); i++)
+    {
+        size_t keep = 0;
+        if (text.compare(i, 4, " -- ") == 0)
+            keep = i;                       //the separator itself is not kept
+        else if (text[i] == '.' && text[i + 1] == ' ' && i + 2 < text.size()
+                 && (isupper((unsigned char) text[i + 2]) || text[i + 2] == '('))
+            keep = i + 1;                   //the full stop belongs to the clause
+        if (keep == 0 || keep > limit)
+            continue;
+        if (keep > best)
+            best = keep;
+    }
+    return best;
+}
+
+//The FIRST clause boundary at any position - the one a bounded stretch may
+//reach for when nothing fits inside the budget. Without it the single-clause
+//shapes (Howling Mine's 111-byte sentence against an 85-byte tier) have no
+//boundary to cut at and fall back to the dangling fragment this exists to stop.
+static size_t w78FirstClauseCut(const string& text)
+{
+    return w78ClauseCutAtOrBefore(text, text.size());
+}
+
+//How far past its budget a snippet may run to FINISH the clause it started.
+//Bounded in absolute bytes, not as a multiple, so a wide board line cannot pay
+//for the stretch out of a tier it never measured (the wave-46..77 width tiers
+//each have a repro behind them and none of them moves).
+static const size_t kClauseCompleteStretch = 80;
+
+//#W78-CW (S14, wave-77 deck146): A LOYALTY ROW PRICED ITSELF AS "Counters".
+//`CounterCost`'s render string is the bare word for every counter cost in the
+//engine, so every planeswalker row in the corpus reads `[cost: Counters]` - the
+//one number a loyalty decision turns on (what it spends, and what the walker has
+//to spend it from) is nowhere on the row, nowhere in the brackets, and nowhere
+//on the board line either. The walker's own text= lists "+1"/"-3"/"-7" but says
+//nothing about the CURRENT loyalty, so "can I afford the ultimate" was arithmetic
+//the pilot could not do. Pure over the four facts the caller reads off the cost
+//and the source, so the shape is provable without a board.
+static string w78CounterCostBody(const string& counterName, int nb, int have,
+                                 const string& sourceName)
+{
+    if (nb == 0)
+        return "";
+    string label = counterName;
+    for (size_t i = 0; i < label.size(); i++)
+        label[i] = (char) tolower((unsigned char) label[i]);
+    if (label.empty())
+        return "";
+    const int spend = (nb < 0) ? -nb : nb;
+    std::ostringstream o;
+    o << "counter cost: " << (nb < 0 ? "spends " : "adds ") << spend << " " << label
+      << " counter" << (spend == 1 ? "" : "s");
+    if (have >= 0 && !sourceName.empty())
+        o << " - " << sourceName << " has " << have << " now, "
+          << (nb < 0 ? "leaving " : "going to ") << (have + nb);
+    return o.str();
+}
+
+//#W78-CW: trailing-whitespace trim. Every annotation group in this file leaves
+//the space that preceded it behind when a key stripper removes the group, so a
+//present-vs-absent key comparison is about that one space and nothing else.
+//The pins below trim it so they test what they claim to test.
+static string w78TrimTail(const string& s)
+{
+    const size_t e = s.find_last_not_of(" \t");
+    return (e == string::npos) ? string() : s.substr(0, e + 1);
+}
+
+//#W78-CW (S5, wave-77 deck125 HIGH B-1): A COUNTERSPELL ROW OFFERED A SPELL THE
+//SEAT'S OWN COUNTER ALREADY TARGETS. `125v146` seq 125: both counterspell rows
+//printed `can target on the stack: Silverquill Silencer` while the seat's own
+//Essence Scatter sat ABOVE it on the stack aimed at that very spell. Nothing on
+//either surface said so - the stack line names the objects and the row names
+//what it can hit, and the pilot has to cross-reference two lists to see that the
+//question is already answered. It did not: it burned its second Scatter at 8
+//life, took 7 and lost the game. The fact is a JOIN the engine can do and the
+//model cannot, so the engine states it: on the row, beside the name it repeats.
+//Annotation only - the row is still offered and still answerable, because a
+//second counter is genuinely right when theirs resolves first or is itself
+//countered. Pure over the two names, so PARSETEST proves the shape.
+static string w78RedundantCounterTag(const string& myCounterName)
+{
+    if (myCounterName.empty())
+        return "";
+    return " {your " + myCounterName + " already targets this on the stack -"
+           " a second counter on the same spell is spent for nothing unless"
+           " yours is itself countered or removed first}";
+}
+
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
 //model picked discard/removal targets near-arbitrarily from bare names).
 //Pure core (W41-4 factored it out so the mutate-pile concatenation below builds
 //from the SAME one-line/truncate rule the single-card snippet uses, and PARSETEST
 //can prove it without a board).
-string textSnippetCore(const string& raw, size_t maxLen)
+string textSnippetCore(const string& raw, size_t maxLen, bool completeClause /* = true */)
 {
     string text = raw;
     for (size_t i = 0; i < text.size(); i++)
@@ -520,6 +633,34 @@ string textSnippetCore(const string& raw, size_t maxLen)
             text[i] = ' ';
     if (text.size() > maxLen)
     {
+        //#W78-CW (S8): a whole clause first. The largest boundary inside the
+        //budget, or - when the first clause is wider than the budget - that
+        //clause's own end, at most kClauseCompleteStretch bytes past it. The
+        //omission is MARKED, so the reader is never handed a fragment that
+        //reads as the card's whole text.
+        const size_t cc = w78ClauseCutAtOrBefore(text, maxLen);
+        if (cc > 0 && cc < text.size())
+            return text.substr(0, cc) + " (...more)";
+        //A text with no INTERIOR boundary that ENDS at one is a single clause,
+        //end to end - Howling Mine's 111-byte sentence against an 85-byte tier,
+        //55 renders in the wave-77 corpus. Its only truthful renders are the
+        //whole thing or a fragment, so inside the stretch it prints whole and
+        //past it the wave-48 word cut stands. The stretch is bounded BOTH in
+        //absolute bytes and by the budget itself, so a narrow tier (the
+        //per-clause budgets `boardEffectSnippet` computes) can never pay for a
+        //doubling it did not measure.
+        if (completeClause && cc == 0 && w78FirstClauseCut(text) == 0)
+        {
+            const char last = text[text.size() - 1];
+            //A tier NARROWER than the stretch itself cannot pay for it: the
+            //per-clause budgets `boardEffectSnippet` shares out are small by
+            //construction, and every byte of that arithmetic has a wave-46..77
+            //repro behind it. Only the whole-text tiers stretch.
+            if ((last == '.' || last == ')' || last == '"' || last == '!')
+                && maxLen >= kClauseCompleteStretch
+                && text.size() <= maxLen + kClauseCompleteStretch)
+                return text;
+        }
         //#W48 D5 (wave-47 D5 = R6): the old rule cut at exactly maxLen whenever
         //the last space sat in the FRONT half of the budget - a mid-word cut,
         //which renders a token the card does not contain ("...battlefiel..." is
@@ -673,7 +814,12 @@ string boardEffectSnippet(const string& raw, size_t maxLen)
     }
     if (parts.size() < 2 || flat.size() <= maxLen)
         return textSnippetCore(flat, maxLen); //single clause, or it all fits
-    const string last = textSnippetCore(parts[parts.size() - 1], maxLen);
+    //#W78-CW (S8): the PROTECTED last clause keeps the wave-47 R6 arithmetic
+    //byte for byte - it is the clause the whole budget is shared around, and a
+    //stretch there costs the earlier loyalty abilities their place on the line
+    //(pinned: #W47-R6). The clause CUT still applies to it; only the
+    //single-clause stretch is withheld.
+    const string last = textSnippetCore(parts[parts.size() - 1], maxLen, false);
     //#W77-CU (F9): the separator that joins the head to the protected last
     //clause is charged to the head's budget, so the head loop cannot spend the
     //ceiling down to the byte and then overrun it on punctuation.
@@ -720,7 +866,7 @@ string boardEffectSnippet(const string& raw, size_t maxLen)
         if (built.size() <= hardCap)
             return built;
         if (headClauses.empty())
-            return textSnippetCore(built, hardCap); //visible "...", never silent
+            return textSnippetCore(built, hardCap, false); //visible "...", never silent
         headClauses.pop_back();
     }
 }
@@ -7402,7 +7548,9 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
                                      const string& keepName = string(),
                                      const string& keepCost = string(), int keepNeed = -1,
                                      int totalMana = -1,
-                                     bool keepIsAnotherCopy = false)
+                                     bool keepIsAnotherCopy = false,
+                                     const string& instName = string(),  //#W78-CW (S14)
+                                     const string& instCost = string(), int instNeed = -1)
 {
     if (maxX < 0)
         return "";
@@ -7435,6 +7583,27 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
               << keepX;
         else
             o << "no X on this row leaves it payable this turn, not even X=0";
+    }
+    //#W78-CW (S14): the same subtraction for the cheapest INSTANT in hand - the
+    //answer a control seat holds mana up FOR, which the cheapest-card figure
+    //above does not name whenever a cheaper sorcery-speed card sits beside it.
+    //Printed only when it IS a different card; when the cheapest card already is
+    //the instant the clause above has already said it, and saying it twice would
+    //read as two separate holds.
+    if (!instName.empty() && instNeed >= 0)
+    {
+        o << ". Holding up an instant: " << instName;
+        if (!instCost.empty())
+            o << " " << instCost;
+        o << " needs " << instNeed << ": ";
+        const int pool2 = (totalMana >= 0) ? totalMana : (maxX + baseCMC);
+        int instX = pool2 - baseCMC - instNeed;
+        if (instX > maxX)
+            instX = maxX;
+        if (instX >= 0)
+            o << "the largest X that still leaves it castable this turn is X=" << instX;
+        else
+            o << "no X on this row leaves it castable this turn, not even X=0";
     }
     o << "}";
     return o.str();
@@ -9723,29 +9892,198 @@ static string monotoneXRangeRow(size_t firstLabel, size_t lastLabel, int xFirst,
     return o.str();
 }
 
+//#W78-CW (S15, wave-77 deck123 seq 7 on the deck152 seat): NINETEEN ROWS THAT
+//SAY THE SAME THING. The wave-67 AZ R4 band keeps every repeat-pay rung on the
+//list (a rung the render hides is a legal choice the render removed) and wave
+//68's BD shortened each rung to its engine label plus the one clause that
+//distinguishes it - which, when every rung is a no-op, is the clause saying it
+//does not differ. What is left is 19 consecutive lines reading `add N counters
+//{same effect right now: adds 0 counters}`, one per N, on a 21-row menu. This
+//is the DISPLAY collapse the `#N` and monotone-X runs already have, applied to
+//that shape: the run prints as one labelled RANGE naming both ends verbatim,
+//the count, and the fact that every number inside it is still a legal answer.
+//Nothing is removed, capped or auto-answered - `shown`, the option vector and
+//the answer INDEX are untouched (this function only prints), so the model can
+//still name any rung and it lands on that rung. The plural is normalised out of
+//the shape test so `add 1 counter` joins the run its neighbours are in.
+static bool splitNoOpBandRow(const string& row, string& erased, int& nval)
+{
+    erased.clear();
+    nval = -1;
+    static const char kBandMark[] = " {same effect right now: adds ";
+    const size_t m = row.find(kBandMark);
+    if (m == string::npos || row[row.size() - 1] != '}')
+        return false;
+    size_t p = 0;
+    while (p < m && !isdigit((unsigned char) row[p]))
+        p++;
+    if (p >= m)
+        return false;                    //no count in the label: not this shape
+    int v = 0;
+    while (p < row.size() && isdigit((unsigned char) row[p]))
+        v = v * 10 + (row[p++] - '0');
+    nval = v;
+    for (size_t i = 0; i < row.size(); i++)
+    {
+        if (isdigit((unsigned char) row[i]))
+        {
+            erased += '#';
+            while (i + 1 < row.size() && isdigit((unsigned char) row[i + 1]))
+                i++;
+        }
+        else
+            erased += row[i];
+    }
+    //"counter"/"counters" is one shape, not two.
+    for (size_t i = erased.find("counters"); i != string::npos;
+         i = erased.find("counters", i))
+        erased.erase(i + 7, 1);
+    return true;
+}
+
+//The printed form. Both ENDS verbatim, the count, and the legality sentence the
+//wave-67 AZ R4 ruling requires on any collapse: every row inside the range is
+//still on this list and still answerable by its own number.
+static string noOpBandRangeRow(size_t firstLabel, size_t lastLabel, int nFirst, int nLast,
+                               const string& firstRow, const string& lastRow)
+{
+    std::ostringstream o;
+    o << firstLabel << "-" << lastLabel << ". " << firstRow << " ... " << lastRow
+      << " - one option per number from " << nFirst << " to " << nLast
+      << ", each reading the same line with its own number and each doing exactly"
+         " what the two ends above say: option " << firstLabel << " is \"" << firstRow
+      << "\" and option " << lastLabel << " is \"" << lastRow
+      << "\". Every number in that range is still on this list and any of them is a"
+         " legal answer - name the one you want. x" << (lastLabel - firstLabel + 1);
+    return o.str();
+}
+
+//#W78-CW (S13, wave-77 deck130 MED-2 / deck125 B-5 / deck162 5): ONE CARD'S
+//TEXT, PRINTED ONCE PER ROW. A menu whose rows all act with the SAME source -
+//a planeswalker's loyalty rows, one per legal target - repeats that source's
+//whole `{card text: "..."}` blob on every row. `146v162` deck146 seq 27 carries
+//Kaya the Inexorable's 450-byte text FIFTEEN times inside one 25,218 B prompt:
+//6,750 bytes of the prompt is one paragraph the model has already read. The
+//text is not dropped and no row loses a fact - it is HOISTED: printed once
+//above the list, with the row numbers it belongs to named so the referent is
+//something the reader can see (the wave-75 lesson). Every row keeps its number,
+//its label, its cost and every other annotation, so the option set, the answer
+//index and `stripRenderAnnotationsLc`'s key are all untouched - the blob is a
+//`{...}` group and was already stripped from every key before this.
+static const size_t kSharedCardTextRowFloor = 2;   //below this there is nothing shared
+static const size_t kSharedCardTextMinLen = 100;   //below this the hoist costs more than it saves
+static const char kCardTextOpen[] = " {card text: \"";
+static const char kCardTextClose[] = "\"}";
+
+//The printed list of row numbers, consecutive runs collapsed. Pure over the
+//indices; pinned at one row, at a run, and at a scattered set.
+static string w78RowNumberList(const vector<size_t>& idx)
+{
+    std::ostringstream o;
+    size_t i = 0;
+    bool first = true;
+    while (i < idx.size())
+    {
+        size_t j = i + 1;
+        while (j < idx.size() && idx[j] == idx[j - 1] + 1)
+            j++;
+        o << (first ? "" : ", ") << (idx[i] + 1);
+        if (j - i >= 2)
+            o << "-" << (idx[j - 1] + 1);
+        first = false;
+        i = j;
+    }
+    return o.str();
+}
+
+//Edits `rows` and returns the header block ("" when nothing was hoisted).
+static string w78HoistSharedCardText(vector<string>& rows)
+{
+    vector<string> bodies;
+    vector<vector<size_t> > where;
+    const size_t openLen = strlen(kCardTextOpen);
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        const size_t a = rows[i].find(kCardTextOpen);
+        if (a == string::npos)
+            continue;
+        const size_t b = rows[i].find(kCardTextClose, a + openLen);
+        if (b == string::npos)
+            continue;
+        const string body = rows[i].substr(a + openLen, b - (a + openLen));
+        if (body.size() < kSharedCardTextMinLen)
+            continue;
+        size_t k = 0;
+        for (; k < bodies.size(); k++)
+            if (bodies[k] == body)
+                break;
+        if (k == bodies.size())
+        {
+            bodies.push_back(body);
+            where.push_back(vector<size_t>());
+        }
+        where[k].push_back(i);
+    }
+    std::ostringstream head;
+    for (size_t k = 0; k < bodies.size(); k++)
+    {
+        if (where[k].size() < kSharedCardTextRowFloor)
+            continue;
+        for (size_t j = 0; j < where[k].size(); j++)
+        {
+            string& r = rows[where[k][j]];
+            const size_t a = r.find(kCardTextOpen);
+            if (a == string::npos)
+                continue;
+            const size_t b = r.find(kCardTextClose, a + openLen);
+            if (b == string::npos)
+                continue;
+            r.erase(a, b + strlen(kCardTextClose) - a);
+        }
+        head << "Card text shared by option" << (where[k].size() == 1 ? " " : "s ")
+             << w78RowNumberList(where[k])
+             << " (they all act with the one card this text belongs to, so it is"
+                " printed once here instead of on each of them): \"" << bodies[k]
+             << "\"\n";
+    }
+    return head.str();
+}
+
 string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
 {
     if (rangeUsed)
         *rangeUsed = false;
+    //#W78-CW (S13): the shared blob comes out first, so the numbers the header
+    //names are the numbers this function is about to print.
+    vector<string> hoisted(rows.begin(), rows.end());
+    const string sharedHead = w78HoistSharedCardText(hoisted);
     std::ostringstream o;
-    size_t n = rows.size();
+    if (!sharedHead.empty())
+        o << sharedHead;
+    size_t n = hoisted.size();
     vector<string> head(n), tail(n), scope(n);
     vector<int> rank(n, -1), total(n, 0), form(n, 0);
     for (size_t i = 0; i < n; i++)
     {
         //#W76-CP (Q2): same precedence test as groupNumberedRows, so the gather
         //and the print cannot disagree about which grammar a row is in.
-        if (splitRowHandle(rows[i], head[i], tail[i], rank[i])
-            && !copyTagOwnsRow(rows[i], head[i]))
+        if (splitRowHandle(hoisted[i], head[i], tail[i], rank[i])
+            && !copyTagOwnsRow(hoisted[i], head[i]))
             form[i] = 1;
         //#W55-D (D18): the copy-tag grammar, tried second so nothing about the
         //"#N" collapse changes.
-        else if (splitCopyRowHandle(rows[i], head[i], tail[i], rank[i], total[i], scope[i]))
+        else if (splitCopyRowHandle(hoisted[i], head[i], tail[i], rank[i], total[i], scope[i]))
             form[i] = 2;
         //#W56-C (D7 c): tried LAST, so nothing about the two ordinal forms
         //above changes; the anchors are unique to the ANNOUNCE_X menu.
-        else if (splitMonotoneXRow(rows[i], head[i], rank[i]))
+        else if (splitMonotoneXRow(hoisted[i], head[i], rank[i]))
             form[i] = 3;
+        //#W78-CW (S15): tried LAST of all, so none of the three forms above
+        //changes; the anchor (a count in the label plus the band's own
+        //"{same effect right now: adds ...}" clause) is unique to the
+        //repeat-pay band.
+        else if (splitNoOpBandRow(hoisted[i], head[i], rank[i]))
+            form[i] = 4;
         else
         {
             form[i] = 0;
@@ -9764,7 +10102,7 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
     vector<string> smask(n), sname(n);
     vector<int> srank(n, 0);
     for (size_t i = 0; i < n; i++)
-        if (!splitSourceOrdinal(rows[i], smask[i], srank[i], sname[i]))
+        if (!splitSourceOrdinal(hoisted[i], smask[i], srank[i], sname[i]))
             srank[i] = 0;
     vector<int> blockRef(n, -1), blockLen(n, 0);
     {
@@ -9858,18 +10196,25 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
                    && head[j] == head[i])
                 j++;
         }
+        else if (form[i] == 4)
+            //#W78-CW (S15): the band climbs by exactly one and the digit-erased
+            //text is identical - the monotone-X test, over the band's shape.
+            while (j < n && blockRef[j] < 0 && form[j] == 4
+                   && rank[j] == rank[i] + (int) (j - i)
+                   && head[j] == head[i])
+                j++;
         else
             //#W54-D (D8a): a run of BYTE-IDENTICAL rows carrying no instance
             //ordinal. The 17 library Mountains had nothing to collapse on and
             //printed 17 times.
-            while (j < n && blockRef[j] < 0 && form[j] == 0 && rows[j] == rows[i])
+            while (j < n && blockRef[j] < 0 && form[j] == 0 && hoisted[j] == hoisted[i])
                 j++;
         size_t run = j - i;
         if (form[i] == 0 && run >= kBattlefieldCollapseFloor)
         {
             //#W54-D (D8a): the label range only - no "#a-#b", because these
             //rows carry no ordinal; kOptionRangeNote says what such a range is.
-            o << (i + 1) << "-" << j << ". " << rows[i] << " x" << run << "\n";
+            o << (i + 1) << "-" << j << ". " << hoisted[i] << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
             i = j;
@@ -9885,7 +10230,14 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
         }
         else if (form[i] == 3 && run >= kMonotoneXCollapseFloor)
         {
-            o << monotoneXRangeRow(i + 1, j, rank[i], rank[j - 1], rows[i], rows[j - 1]) << "\n";
+            o << monotoneXRangeRow(i + 1, j, rank[i], rank[j - 1], hoisted[i], hoisted[j - 1]) << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else if (form[i] == 4 && run >= kMonotoneXCollapseFloor)
+        {
+            o << noOpBandRangeRow(i + 1, j, rank[i], rank[j - 1], hoisted[i], hoisted[j - 1]) << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
             i = j;
@@ -9901,7 +10253,7 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
         }
         else
         {
-            o << (i + 1) << ". " << rows[i] << "\n";
+            o << (i + 1) << ". " << hoisted[i] << "\n";
             i++;
         }
     }
@@ -27539,8 +27891,41 @@ static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3]
     for (int i = 0; i < samples; i++)
         o << "turn " << turnNo[i] << ": " << lifeByTurn[i] << ", ";
     int delta = nowLife - lifeByTurn[0];
+    //#W78-CW (S12, wave-77 deck130 MED-1): THE NET HID THE GAIN. A deck gaining
+    //7 a turn while taking 12 from this seat printed `-5`, and every "are they
+    //gaining life" rule in deck130's guide keys on that figure - so the one deck
+    //built to answer a lifegain engine read the engine as absent, and the figure
+    //flickered sign as the race turned. The net is still printed (it is the
+    //figure that says who is winning the race), and the two halves that make it
+    //now print beside it: the sum of the RISES and the sum of the FALLS between
+    //the samples on this same line. Both are arithmetic over numbers already
+    //printed here, so no new claim about the board is made and the three figures
+    //cannot disagree. A trend that only ever moved one way prints no split -
+    //there is no second half to name, and the net already says which way.
+    int gained = 0, taken = 0;
+    {
+        int prev = lifeByTurn[0];
+        for (int i = 1; i < samples; i++)
+        {
+            const int step = lifeByTurn[i] - prev;
+            if (step > 0)
+                gained += step;
+            else
+                taken += -step;
+            prev = lifeByTurn[i];
+        }
+        const int last = nowLife - prev;
+        if (last > 0)
+            gained += last;
+        else
+            taken += -last;
+    }
     o << "now " << nowLife << " (" << (delta > 0 ? "+" : "") << delta
-      << " since turn " << turnNo[0] << ").\n";
+      << " since turn " << turnNo[0];
+    if (gained > 0 && taken > 0)
+        o << "; they GAINED +" << gained << " and LOST -" << taken
+          << " across those turns - the figure before this is the two netted";
+    o << ").\n";
     return o.str();
 }
 
@@ -29565,6 +29950,15 @@ static string stripNarrationDecoration(const string& in)
                 //moment either moves - decision-time pricing, never history.
                 || (in.compare(i, 27, "{you already have this card") == 0)
                 || (in.compare(i, 14, "{visible now: ") == 0)
+                //#W78-CW (S5 / S14): the redundant-counter join and the counter
+                //cost's figure are the same species as every entry here - each
+                //is true of THIS window's stack or counter pile and false the
+                //moment either moves, and each rides a RENDERED row the model
+                //may echo back, so neither may enter history.
+                || (in.compare(i, 6, "{your ") == 0
+                    && in.find(" already targets this on the stack", i) != string::npos
+                    && in.find(" already targets this on the stack", i) < i + 200)
+                || (in.compare(i, 15, "{counter cost: ") == 0)
                 //#W72-BV (M7): the remaining-copy count is the same species as
                 //the visibility tag beside it - true of THIS window's zones.
                 || (in.compare(i, 33, "{copies not yet in a public zone:") == 0)
@@ -32932,6 +33326,50 @@ static string repeatRowShortName(const string& row)
     return (e == string::npos) ? string() : name.substr(0, e + 1);
 }
 
+//#W78-CW (S2, wave-77 deck123 HIGH-1): THE TWO SURFACES CONTRADICTED EACH OTHER.
+//The repeat row's bracket demands `CHOICE: 2 (<short name> x<N>)` and refuses the
+//bare name; the sentence that closes the SAME prompt said the short name is "the
+//action and card name only - copy nothing from the {...} annotations". `123v126`
+//deck123 seq 38 is the corpus's only `repeat_count_reask`: the model looped on
+//the contradiction for 339 s (`reasoning_ngram_repeat` 0.626, reasoning budget
+//hit). Two instructions pointing opposite ways on one row is the wave-74 O17
+//defect one surface over, and the fix is the same shape: ONE instruction. The
+//closing sentence carves the repeat row out by name, in the row's own literal
+//form, and does it only on a window that CARRIES such a row - so a menu with no
+//repeat row is byte-identical to wave 77. The golden protocol text (invariant
+//000) is untouched: this is render text, and it narrows a render sentence to
+//match the row it was contradicting.
+static const char kRepeatRowMark[] = ", repeated then stop";
+static bool w78RowIsRepeatRow(const string& row)
+{
+    return row.find(kRepeatRowMark) != string::npos;
+}
+static bool w78AnyRepeatRow(const vector<string>& rows)
+{
+    for (size_t i = 0; i < rows.size(); i++)
+        if (w78RowIsRepeatRow(rows[i]))
+            return true;
+    return false;
+}
+//The parenthetical the closing sentence carries. Pure over the one fact.
+static string w78ShortNameParenthetical(bool hasRepeatRow)
+{
+    if (!hasRepeatRow)
+        return "(the action and card name only - copy nothing from the {...} annotations)";
+    return "(the action and card name only - copy nothing from the {...} annotations;"
+           " the ONE exception is a row whose name ends \", repeated then stop\": on that"
+           " row you also write the count, as \"<short name> x<N>\" with N a digit you"
+           " choose, exactly as that row's own bracket shows)";
+}
+//The pin's predicate: do the row surface and the closing sentence agree about
+//the count? True when neither speaks of a count, and when both do.
+static bool w78RepeatSurfacesAgree(const vector<string>& rows, const string& tail)
+{
+    const bool rowAsksCount = w78AnyRepeatRow(rows);
+    const bool tailAllowsCount = (tail.find("<short name> x<N>") != string::npos);
+    return rowAsksCount == tailAllowsCount;
+}
+
 static string repeatRowLine(const string& shortName, int rowIndex, int creatureCount = -1)
 {
     std::ostringstream o;
@@ -34482,10 +34920,20 @@ static string secondCopyTag(const string& name, const string& magicText = string
     //seat already has on the battlefield, not a new one. Named, so the row
     //prices both sides; the seat declined all 55, so nothing here is a fix for
     //a taken row - it is the missing half of a priced one.
-    return head + ", and this copy is one more of the same effect - each line it"
-                  " repeats happens again; the price is a card and this window's"
-                  " cast spent DOUBLING an effect you already have on the"
-                  " battlefield, not adding one you do not]";
+    //#W78-CW (S14, wave-77 deck126 seq 51): O21's cost half was WORDED AS AN
+    //UPSIDE and taken as one. "each line it repeats happens again" and the
+    //capitalised "DOUBLING" are the vocabulary of a payoff, and the pilot wrote
+    //its plan back in exactly those words - "Cast Exquisite Blood to double the
+    //life gain trigger, maximizing future Sanguine Bond damage" - on a board
+    //that already held one. The clause is a PRICE and must read as one: no
+    //capitalised verb of increase, the spend named first, and the fact that a
+    //second instance is not a new effect stated plainly. The legality half and
+    //the stacking fact are unchanged; only the emphasis the model read is.
+    return head + ", and this copy is a second instance of an effect you already"
+                  " have: each line it repeats happens a second time. The price is"
+                  " a card and this window's cast, spent on repeating an effect"
+                  " that is already on your battlefield rather than on one that is"
+                  " not]";
 }
 static void appendCappedNames(std::ostringstream& o, const vector<string>& names, size_t cap)
 {
@@ -37288,6 +37736,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         ManaCost * c = action.ability->getCost();
         std::ostringstream cost;
         bool any = false;
+        string counterFigure; //#W78-CW (S14)
         //N-36b sweep (same falsy-zero shape): gate on the rendered STRING, not on
         //the converted cost. An {X}-only activation cost also converts to 0, so
         //the old guard dropped it silently; a genuinely free ability still renders
@@ -37311,10 +37760,43 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     cost << ", ";
                 cost << ec->mCostRenderString;
                 any = true;
+                //#W78-CW (S14, wave-77 deck146): a counter cost states its
+                //FIGURE. `CounterCost`'s render string is the bare word
+                //"Counters" for every counter cost in the engine, so every
+                //loyalty row in the corpus read `[cost: Counters]` and the two
+                //numbers a loyalty decision turns on - what this row spends and
+                //what the walker has to spend it from - were on no surface at
+                //all. The figure rides its OWN annotation group and NOT the
+                //`[cost: ...]` body, because `w75CostGroupsKey` puts cost groups
+                //back into the hold key byte for byte: a loyalty total inside
+                //`[cost:]` would make every row of the walker read as NEW on
+                //every activation. Read off the cost's Counter and the source's
+                //own counter pile - engine state at render time, not a forecast.
+                if (CounterCost * cc = dynamic_cast<CounterCost *>(ec))
+                {
+                    MTGCardInstance * csrc = action.click ? action.click
+                                                          : action.ability->source;
+                    int have = -1;
+                    if (cc->counter && csrc && csrc->counters)
+                    {
+                        Counter * held = csrc->counters->hasCounter(cc->counter->name.c_str(),
+                                                                    cc->counter->power,
+                                                                    cc->counter->toughness);
+                        have = held ? held->nb : 0;
+                    }
+                    if (cc->counter)
+                        counterFigure = w78CounterCostBody(cc->counter->name, cc->counter->nb,
+                                                           have,
+                                                           csrc ? csrc->getDisplayName()
+                                                                : string());
+                }
             }
         }
         if (any)
             out << " [cost: " << cost.str() << "]";
+        //#W78-CW (S14): the counter figure, in the annotation channel.
+        if (!counterFigure.empty())
+            out << " {" << counterFigure << "}";
         //#W49-D11: what paying THIS row taps. (a) A `becomes` row on a source
         //that is already tapped animates a body that cannot attack. (b) The
         //payment plan for the mana part draws on creatures or on the row's own
@@ -40976,7 +41458,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         tail << (sofar.empty() || sofar[sofar.size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
     }
     //#W70-BL (E2): PLAN first, then the one action line for this window.
-    tail << "\nWhich action do you take? " << kPlanFirstLead << "on a line of its own CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\". Write nothing else.";
+    //#W78-CW (S2): the short-name sentence, carved out for the repeat row on
+    //exactly the windows that carry one - read off the rows the model is
+    //looking at, so the two surfaces cannot disagree.
+    tail << "\nWhich action do you take? " << kPlanFirstLead << "on a line of its own CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses "
+         << w78ShortNameParenthetical(w78AnyRepeatRow(shownLines))
+         << ", e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\". Write nothing else.";
 
     //#W53-N (D2): the model's own hold, honoured. No model call, no window
     //removed from the record - the row the model took said this.
@@ -43848,6 +44335,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 //numbers for the same card.
                 MTGCardInstance * keep = NULL;
                 int keepNeed = 0;
+                //#W78-CW (S14, wave-77 deck125 seq 180): ...and the cheapest
+                //INSTANT, separately. The tap-out gate a counterspell deck plays
+                //by is "can I still hold up my cheapest ANSWER", and the O8
+                //clause answers a different question: it names the cheapest
+                //castable CARD in hand, which on a control seat is routinely a
+                //sorcery-speed body that the seat had no intention of holding.
+                //`162` deck125 seq 180 announced X=9, tapped out, and the
+                //opponent resolved four permanents on the following turn with
+                //two Essence Scatters stranded in hand. Same counting rule as
+                //the keep candidate beside it (converted cost against sources)
+                //so the two figures on one row cannot disagree.
+                MTGCardInstance * keepInstant = NULL;
+                int keepInstantNeed = 0;
                 for (int hi = 0; hi < game->hand->nb_cards; hi++)
                 {
                     MTGCardInstance * hc = game->hand->cards[hi];
@@ -43861,6 +44361,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         keep = hc;
                         keepNeed = need;
                     }
+                    if (hc->hasType(Subtypes::TYPE_INSTANT)
+                        && (!keepInstant || need < keepInstantNeed))
+                    {
+                        keepInstant = hc;
+                        keepInstantNeed = need;
+                    }
                 }
                 if (untappedSources > 0)
                     o << xCastRemainderScopeTag(mx, payCost->getConvertedCost(),
@@ -43871,7 +44377,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                 keep ? keepNeed : -1,
                                                 untappedSources, //#W74-CF (F6)
                                                 keep && card //#W75-CL (P11)
-                                                    && keep->getDisplayName() == card->getDisplayName());
+                                                    && keep->getDisplayName() == card->getDisplayName(),
+                                                //#W78-CW (S14): the instant half
+                                                keepInstant && keepInstant != keep
+                                                    ? keepInstant->getDisplayName() : string(),
+                                                keepInstant && keepInstant != keep
+                                                    ? keepInstant->getManaCost()->toString() : string(),
+                                                keepInstant && keepInstant != keep
+                                                    ? keepInstantNeed : -1);
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             }
             int used = 0;
@@ -44072,6 +44585,36 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName()
                                  << targetPreviewFacts(sz->cards[zi])
                                  << stackTargetTextNote(sz->cards[zi]);
+                            //#W78-CW (S5): does one of THIS seat's own pending
+                            //counters already aim at this object? The join is
+                            //over the live stack: an unresolved spell of ours,
+                            //not this row's own card, whose script fizzles a
+                            //spell and whose target list holds this object.
+                            {
+                                string mine;
+                                ActionStack * astk = observer->mLayers->stackLayer();
+                                for (size_t ai = 0; astk && ai < astk->mObjects.size() && mine.empty(); ai++)
+                                {
+                                    Interruptible * ait = (Interruptible *) astk->mObjects[ai];
+                                    if (!ait || ait->type != ACTION_SPELL || ait->state != NOT_RESOLVED)
+                                        continue;
+                                    if (!ait->source || ait->source == card
+                                        || ait->source->controller() != this)
+                                        continue;
+                                    if (ait->source->magicText.find("fizzle") == string::npos)
+                                        continue;
+                                    Spell * asp = (Spell *) ait;
+                                    for (Targetable * t = asp->getNextTarget(); t;
+                                         t = asp->getNextTarget(t))
+                                        if ((MTGCardInstance *) dynamic_cast<MTGCardInstance *>(t)
+                                            == sz->cards[zi])
+                                        {
+                                            mine = ait->source->getDisplayName();
+                                            break;
+                                        }
+                                }
+                                hits << w78RedundantCounterTag(mine);
+                            }
                             firstHit = false;
                         }
                 }
@@ -68092,13 +68635,24 @@ static const char * kW50Y_r94 =
         //stacking clause is APPENDED, exactly as verdicts 1 and 2 already are.
         //#W74-CC (O21): SUPERSEDED - the same tag, with the cost side the
         //wave-73 review found missing. The wave-52 HEAD is still byte-identical.
+        //#W78-CW (S14, wave-77 deck126 seq 51): SUPERSEDED again - same tag,
+        //same two halves, the EMPHASIS neutralised. O21's cost half was written
+        //in the vocabulary of a payoff ("DOUBLING", "each line it repeats
+        //happens again" leading) and the pilot wrote its plan back in those
+        //words on a board that already held the permanent. The stacking FACT is
+        //unchanged and still stated - verdict 0 still says a second instance
+        //repeats the lines, which is true of Sanguine Bond and Staff of Nin -
+        //but the price leads and no verb of increase is capitalised.
         CHECK(secondCopyTag("Howling Mine", mine9)
               == " [second copy: you already control Howling Mine; both stay on the battlefield"
-                 " - no legend rule, and this copy is one more of the same effect - each line it"
-                 " repeats happens again; the price is a card and this window's cast spent"
-                 " DOUBLING an effect you already have on the battlefield, not adding one you"
-                 " do not]",
+                 " - no legend rule, and this copy is a second instance of an effect you already"
+                 " have: each line it repeats happens a second time. The price is a card and this"
+                 " window's cast, spent on repeating an effect that is already on your"
+                 " battlefield rather than on one that is not]",
               "#W69-BG K8 POSITIVE a stacking card's tag says the copy is one more of the effect");
+        CHECK(secondCopyTag("Howling Mine", mine9).find("DOUBLING") == string::npos
+              && secondCopyTag("Howling Mine", mine9).find("doubl") == string::npos,
+              "#W78-CW S14 MUST-NOT-MATCH the cost half carries no capitalised verb of increase");
         CHECK(secondCopyTag("Howling Mine", mine9)
               .compare(0, strlen(" [second copy: you already control Howling Mine; both stay on"
                                  " the battlefield - no legend rule"),
@@ -68110,13 +68664,13 @@ static const char * kW50Y_r94 =
         //The corpus's own two cards, read straight off mtg.txt.
         CHECK(secondCopyTag("Sanguine Bond",
                             "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent")
-              .find("one more of the same effect") != string::npos,
+              .find("a second instance of an effect you already have") != string::npos,
               "#W69-BG K8 POSITIVE mtg.txt:99004 - a second Sanguine Bond drains again (125 s42)");
         CHECK(secondCopyTag("Staff of Nin", "@each my upkeep:draw:1\n{T}:damage:1 target(anytarget)")
-              .find("one more of the same effect") != string::npos,
+              .find("a second instance of an effect you already have") != string::npos,
               "#W69-BG K8 POSITIVE mtg.txt:112425 - a second Staff of Nin draws and pings again (125 s35)");
-        CHECK(secondCopyTag("Intruder Alarm", alarm).find("one more of the same effect") == string::npos
-              && secondCopyTag("Chromatic Lantern", lantern).find("one more of the same effect") == string::npos,
+        CHECK(secondCopyTag("Intruder Alarm", alarm).find("a second instance of an effect you already have") == string::npos
+              && secondCopyTag("Chromatic Lantern", lantern).find("a second instance of an effect you already have") == string::npos,
               "#W69-BG K8 MUST-NOT-MATCH the dead and partial verdicts never gain the stacking clause");
         CHECK(secondCopyTag("Howling Mine")
               == " [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule]",
@@ -91821,6 +92375,386 @@ static const char * kW50Y_r94 =
                   " counter - the bound was not broken, it was looking elsewhere. RED on base"
                   " for attribution: the base build writes no record here, so the ten are"
                   " unnameable from a corpus (three waves of briefs have asked)");
+        }
+    }
+
+    //====================================================================
+    //#W78-CW — render truth and pricing (wave-77 known-bugs S2, S5, S8,
+    //S12, S13, S14, S15). Every clause below is pure over its arguments, so
+    //each defect is reproduced and each fix proved without a board.
+    //====================================================================
+    {
+        cout << "\n[#W78-CW] S2 the repeat row and the closing sentence are ONE instruction\n";
+        {
+            const string rr = repeatRowLine("Create human with Thraben Doomsayer", 2, 66);
+            vector<string> withRepeat;
+            withRepeat.push_back("Cast Doom Blade {1}{b}");
+            withRepeat.push_back(rr);
+            vector<string> noRepeat;
+            noRepeat.push_back("Cast Doom Blade {1}{b}");
+            noRepeat.push_back("Hold priority - pass now, and do not ask me again");
+
+            CHECK(w78AnyRepeatRow(withRepeat) && !w78AnyRepeatRow(noRepeat),
+                  "#W78-CW S2 a repeat row is recognised by the row text the engine prints");
+            //RED on base: the wave-77 pairing was a repeat row beside the
+            //UNCARVED sentence - the contradiction `123v126` deck123 seq 38
+            //looped on for 339 s.
+            CHECK(!w78RepeatSurfacesAgree(withRepeat, w78ShortNameParenthetical(false)),
+                  "#W78-CW S2 RED the wave-77 pairing (repeat row + 'card name only') DISAGREES");
+            CHECK(w78RepeatSurfacesAgree(withRepeat, w78ShortNameParenthetical(true))
+                  && w78RepeatSurfacesAgree(noRepeat, w78ShortNameParenthetical(false)),
+                  "#W78-CW S2 GREEN both surfaces agree on a menu that carries a repeat row,"
+                  " and on one that does not");
+            CHECK(!w78RepeatSurfacesAgree(noRepeat, w78ShortNameParenthetical(true)),
+                  "#W78-CW S2 MUST-NOT-MATCH a menu with no repeat row never licenses a count");
+            //The carve-out quotes the row's own literal form, once.
+            CHECK(w78ShortNameParenthetical(true).find("<short name> x<N>") != string::npos
+                  && w78ShortNameParenthetical(true).find(", repeated then stop") != string::npos
+                  && rr.find("x<N>)\"") != string::npos,
+                  "#W78-CW S2 the sentence quotes the row's own literal form and names the row");
+            //A window with no repeat row is byte-identical to wave 77.
+            CHECK(w78ShortNameParenthetical(false)
+                  == "(the action and card name only - copy nothing from the {...} annotations)",
+                  "#W78-CW S2 MUST-NOT-MATCH the ordinary sentence is unchanged, byte for byte");
+            //Echo shape: the answer the carve-out asks for still parses, and the
+            //placeholder still names no count (the wave-50 Z rule).
+            {
+                vector<string> opts;
+                opts.push_back("Cast Doom Blade");
+                opts.push_back("Create human with Thraben Doomsayer, repeated then stop");
+                CHECK(parseChoice("CHOICE: 2 (Create human with Thraben Doomsayer x3)",
+                                  (int) opts.size(), &opts) == 2
+                      && parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x3)") == 3,
+                      "#W78-CW S2 echo: the carved-out answer resolves to its row and its count");
+                CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x<N>)") == -1,
+                      "#W78-CW S2 MUST-NOT-MATCH the placeholder still names no count");
+            }
+        }
+
+        cout << "\n[#W78-CW] S5 a counter row says when the seat's own counter already answers it\n";
+        {
+            const string tag = w78RedundantCounterTag("Essence Scatter");
+            CHECK(tag == " {your Essence Scatter already targets this on the stack - a second"
+                         " counter on the same spell is spent for nothing unless yours is itself"
+                         " countered or removed first}",
+                  "#W78-CW S5 POSITIVE the redundant-counter join names the seat's own counter");
+            CHECK(w78RedundantCounterTag("").empty(),
+                  "#W78-CW S5 MUST-NOT-MATCH no pending counter of ours, no clause");
+            //Key stability: the clause is an annotation group, so it moves none
+            //of the four keys a row feeds (the wave-74 lesson's pin set).
+            const string bare = "Cast Cancel {1}{u}{u} - can target on the stack: Silverquill Silencer";
+            const string with = bare + tag;
+            CHECK(holdActionKeyRow(bare) == holdActionKeyRow(with),
+                  "#W78-CW S5 key stability: the hold/action key is unmoved");
+            CHECK(optionSetKeyLine(bare) == optionSetKeyLine(with),
+                  "#W78-CW S5 key stability: the option-set key is unmoved");
+            CHECK(w78TrimTail(w77KeyTailOf(bare)) == w78TrimTail(w77KeyTailOf(with)),
+                  "#W78-CW S5 key stability: the ASK key tail is unmoved");
+            {
+                const string board = "board";
+                CHECK(asyncSlotKeyOf(false, 7, 3, w78TrimTail(w77KeyTailOf(bare)), board)
+                      == asyncSlotKeyOf(false, 7, 3, w78TrimTail(w77KeyTailOf(with)), board),
+                      "#W78-CW S5 key stability: the async slot key is unmoved");
+            }
+            CHECK(stripNarrationDecoration(with).find("already targets this") == string::npos,
+                  "#W78-CW S5 echo: the clause is stripped from the narrated record");
+        }
+
+        cout << "\n[#W78-CW] S8 the gloss cuts at clause boundaries and MARKS what it dropped\n";
+        {
+            //The three cards the wave-77 corpus names, read off mtg.txt.
+            const string howling = "At the beginning of each player's draw step, if Howling Mine"
+                                   " is untapped, that player draws an additional card.";
+            const string cathar = "When this creature enters or transforms into Brutal Cathar,"
+                                  " exile target creature an opponent controls until this creature"
+                                  " leaves the battlefield. -- Daybound (If a player casts no"
+                                  " spells during their own turn, it becomes night next turn.)";
+            const string greaves = "Equipped creature has haste and shroud. (It can't be the"
+                                   " target of spells or abilities.) -- Equip {0} ({0}: Attach to"
+                                   " target creature you control. Equip only as a sorcery. This"
+                                   " card enters unattached and stays on the battlefield if the"
+                                   " creature leaves.)";
+            //RED on base: each of these was the rendered string in the corpus.
+            CHECK(textSnippetCore(howling, 85).find("that player...") == string::npos,
+                  "#W78-CW S8 RED->GREEN Howling Mine no longer ends 'that player...' (55 renders)");
+            CHECK(textSnippetCore(howling, 85) == howling,
+                  "#W78-CW S8 GREEN a single-clause text inside the stretch prints whole");
+            //The BOARD path (the 31 renders): `boardEffectSnippet` splits the
+            //card at " -- " first, so the ETB clause meets textSnippetCore on
+            //its own and the stretch completes it.
+            CHECK(boardEffectSnippet(cathar, 100).find("creature an...") == string::npos
+                  && boardEffectSnippet(cathar, 100).find("leaves the battlefield.") != string::npos,
+                  "#W78-CW S8 RED->GREEN Brutal Cathar keeps its return clause (31 renders)");
+            //The OPTION path (the `{card text:}` renders at 140): the interior
+            //" -- " boundary is inside the budget, so the cut lands there.
+            CHECK(textSnippetCore(cathar, 160).find("leaves the battlefield. (...more)") != string::npos
+                  && textSnippetCore(cathar, 160).find("Daybound (If a player casts no spells"
+                                                       " during their own tur") == string::npos,
+                  "#W78-CW S8 the dropped clause is MARKED, never silently absent");
+            //The whole-text stretch is withheld where a shared budget pays for
+            //it: `boardEffectSnippet`'s protected last clause keeps the wave-47
+            //R6 arithmetic, so every loyalty ability still reaches the line.
+            CHECK(textSnippetCore(cathar, 160, false).find("(...more)") != string::npos,
+                  "#W78-CW S8 the clause CUT applies with or without the stretch");
+            CHECK(textSnippetCore(greaves, 120).find("(...more)") != string::npos
+                  && textSnippetCore(greaves, 120).find("abilities.)") != string::npos,
+                  "#W78-CW S8 Lightning Greaves cuts after a whole clause, marked");
+            //The cut never lands inside a clause when a boundary is available.
+            CHECK(w78ClauseCutAtOrBefore(cathar, 100) == 0
+                  && w78FirstClauseCut(cathar) > 0,
+                  "#W78-CW S8 the first clause of Brutal Cathar is wider than the 100 B tier");
+            CHECK(w78ClauseCutAtOrBefore(greaves, 120) > 0,
+                  "#W78-CW S8 Lightning Greaves has a boundary inside its budget");
+            //MUST-NOT-MATCH: past the stretch the wave-48 word-boundary rule
+            //stands, and no word is ever invented.
+            {
+                const string wide(400, 'a');
+                const string cut = textSnippetCore(wide + " tail", 40);
+                CHECK(cut.find("(...more)") == string::npos
+                      && cut.find("...") != string::npos,
+                      "#W78-CW S8 MUST-NOT-MATCH a text with no clause end inside the stretch"
+                      " still takes the wave-48 word cut");
+            }
+            CHECK(textSnippetCore(howling, 400) == howling,
+                  "#W78-CW S8 MUST-NOT-MATCH a text that fits is returned untouched");
+        }
+
+        cout << "\n[#W78-CW] S12 the life trend prints the gain and the loss, not only the net\n";
+        {
+            int life[3] = { 20, 27, 15 };
+            int turn[3] = { 4, 5, 6 };
+            const string r = opponentLifeTrendLine(life, turn, 3, 22);
+            //RED on base: this shape printed `now 22 (+2 since turn 4)` and a
+            //deck gaining 7 a turn read as flat.
+            CHECK(r.find("they GAINED +14 and LOST -12") != string::npos,
+                  "#W78-CW S12 GREEN both halves are named (7 up, 12 down, 7 up)");
+            CHECK(r.find("now 22 (+2 since turn 4") != string::npos,
+                  "#W78-CW S12 the net is unchanged - the split is beside it, not instead of it");
+            //MUST-NOT-MATCH: a one-way trend has no second half to name.
+            int up[3] = { 20, 25, 30 };
+            CHECK(opponentLifeTrendLine(up, turn, 3, 30)
+                  == "Opponent life trend: turn 4: 20, turn 5: 25, turn 6: 30, now 30 (+10 since turn 4).\n",
+                  "#W78-CW S12 MUST-NOT-MATCH a monotone rise is byte-identical to wave 77");
+            int down[3] = { 20, 18, 15 };
+            CHECK(opponentLifeTrendLine(down, turn, 3, 12)
+                  == "Opponent life trend: turn 4: 20, turn 5: 18, turn 6: 15, now 12 (-8 since turn 4).\n",
+                  "#W78-CW S12 MUST-NOT-MATCH a monotone fall is byte-identical to wave 77");
+            int flat[3] = { 30, 30, 30 };
+            CHECK(opponentLifeTrendLine(flat, turn, 3, 30)
+                  == "Opponent life trend: unchanged at 30 since turn 4.\n",
+                  "#W78-CW S12 MUST-NOT-MATCH the flat face is byte-identical to wave 77");
+        }
+
+        cout << "\n[#W78-CW] S13 one card's text is printed once above the rows that share it\n";
+        {
+            const string kaya = "+1: Put a ghostform counter on up to one target nontoken"
+                                " creature. -- -3: Exile target nonland permanent. -- -7: You get"
+                                " an emblem with a legendary-spell recursion trigger for upkeep.";
+            const char * tgt[4] = { "Fate Unraveler", "Nadaar, Selfless Paladin",
+                                    "Triumphant Adventurer", "Katilda, Dawnhart Prime" };
+            vector<string> rows;
+            for (int i = 0; i < 4; i++)
+            {
+                std::ostringstream r;
+                r << "-3: exile non-land permanent with Kaya the Inexorable targeting " << tgt[i]
+                  << " [opponent's battlefield] [cost: Counters] {card text: \""
+                  << kaya << "\"}";
+                rows.push_back(r.str());
+            }
+            const size_t before = rows[0].size() * 4;
+            vector<string> edited(rows.begin(), rows.end());
+            const string head = w78HoistSharedCardText(edited);
+            CHECK(!head.empty() && head.find(kaya) != string::npos,
+                  "#W78-CW S13 GREEN the shared text is printed once, in the header");
+            CHECK(head.find("Card text shared by options 1-4") != string::npos,
+                  "#W78-CW S13 the header names the option numbers it belongs to");
+            size_t after = head.size();
+            for (size_t i = 0; i < edited.size(); i++)
+            {
+                after += edited[i].size();
+                CHECK(edited[i].find("{card text: ") == string::npos,
+                      "#W78-CW S13 the blob is gone from every row that shared it");
+                CHECK(edited[i].find("[cost: Counters]") != string::npos
+                      && edited[i].find("targeting ") != string::npos,
+                      "#W78-CW S13 every row keeps its label, its cost and its target");
+            }
+            CHECK(after < before,
+                  "#W78-CW S13 the hoist is a net saving on the shape it fires for");
+            //MUST-NOT-MATCH: one row, or texts that differ, hoist nothing.
+            {
+                vector<string> one(rows.begin(), rows.begin() + 1);
+                CHECK(w78HoistSharedCardText(one).empty() && one[0] == rows[0],
+                      "#W78-CW S13 MUST-NOT-MATCH a single row is never hoisted");
+                vector<string> diff(rows.begin(), rows.begin() + 2);
+                diff[1] = "Cast Doom Blade {1}{b} {card text: \"" + kaya + " Extra.\"}";
+                const string h2 = w78HoistSharedCardText(diff);
+                CHECK(h2.empty(),
+                      "#W78-CW S13 MUST-NOT-MATCH two DIFFERENT texts are not one shared text");
+                vector<string> shortTxt;
+                shortTxt.push_back("Cast A {card text: \"Flying, haste\"}");
+                shortTxt.push_back("Cast B {card text: \"Flying, haste\"}");
+                CHECK(w78HoistSharedCardText(shortTxt).empty(),
+                      "#W78-CW S13 MUST-NOT-MATCH a text under the length floor stays on its rows");
+            }
+            //THROUGH THE LIVE CALLER: joinNumberedRows is what every option seam
+            //renders its list with, so the hoist is proved where it fires.
+            {
+                bool rg = false;
+                const string j = joinNumberedRows(rows, &rg);
+                size_t hits = 0;
+                for (size_t i = j.find(kaya); i != string::npos; i = j.find(kaya, i + 1))
+                    hits++;
+                CHECK(hits == 1,
+                      "#W78-CW S13 GREEN through joinNumberedRows the shared text appears ONCE");
+                CHECK(j.find("1. -3: exile non-land permanent with Kaya the Inexorable targeting"
+                             " Fate Unraveler") != string::npos
+                      && j.find("4. -3: exile non-land permanent with Kaya the Inexorable"
+                                " targeting Katilda, Dawnhart Prime") != string::npos,
+                      "#W78-CW S13 every row still prints, with its own number and its own target");
+            }
+            //Key stability: the blob was already stripped from every key, so
+            //removing it moves none of them.
+            CHECK(w78TrimTail(holdActionKeyRow(rows[0])) == w78TrimTail(holdActionKeyRow(edited[0]))
+                  && w78TrimTail(optionSetKeyLine(rows[0])) == w78TrimTail(optionSetKeyLine(edited[0]))
+                  && w78TrimTail(w77KeyTailOf(rows[0])) == w78TrimTail(w77KeyTailOf(edited[0])),
+                  "#W78-CW S13 key stability: hoisting the blob moves no row key");
+            //The row-number list, at one, at a run and scattered.
+            {
+                vector<size_t> a; a.push_back(0);
+                vector<size_t> b; b.push_back(2); b.push_back(3); b.push_back(4);
+                vector<size_t> c; c.push_back(0); c.push_back(4); c.push_back(5);
+                CHECK(w78RowNumberList(a) == "1" && w78RowNumberList(b) == "3-5"
+                      && w78RowNumberList(c) == "1, 5-6",
+                      "#W78-CW S13 the number list collapses runs and keeps the scattered ones");
+            }
+        }
+
+        cout << "\n[#W78-CW] S14 pricing: the instant half, the second-copy price, the loyalty figure\n";
+        {
+            //(a) the keep-X clause names the cheapest INSTANT as well as the
+            //cheapest card. `162` deck125 seq 180 tapped out at X=9 with two
+            //Essence Scatters in hand.
+            const string r = xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17,
+                                                    false, "Essence Scatter", "{1}{u}", 2);
+            CHECK(r.find("the largest X that still leaves it payable this turn is X=8") != string::npos,
+                  "#W78-CW S14 the wave-74 O8 figure is unchanged");
+            CHECK(r.find("Holding up an instant: Essence Scatter {1}{u} needs 2: the largest X"
+                         " that still leaves it castable this turn is X=11") != string::npos,
+                  "#W78-CW S14 GREEN the instant half is priced in the same currency (capped at maxX)");
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17, false)
+                      .find("Holding up an instant") == string::npos,
+                  "#W78-CW S14 MUST-NOT-MATCH no instant in hand, no instant clause");
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Essence Scatter", "{1}{u}", 2, 17, false)
+                      .find("Holding up an instant") == string::npos,
+                  "#W78-CW S14 MUST-NOT-MATCH the clause is silent when the cheapest CARD already"
+                  " is the instant - one hold, named once");
+            //the negative arm has its own pin
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 5,
+                                         false, "Cancel", "{1}{u}{u}", 3)
+                      .find("no X on this row leaves it castable this turn, not even X=0") != string::npos,
+                  "#W78-CW S14 the instant half's NEGATIVE clause has its own pin");
+
+            //(c) the loyalty figure.
+            CHECK(w78CounterCostBody("Loyalty", -3, 5, "Kaya the Inexorable")
+                  == "counter cost: spends 3 loyalty counters - Kaya the Inexorable has 5 now,"
+                     " leaving 2",
+                  "#W78-CW S14 GREEN a minus loyalty row prints what it spends and what is left");
+            CHECK(w78CounterCostBody("Loyalty", 1, 5, "Kaya the Inexorable")
+                  == "counter cost: adds 1 loyalty counter - Kaya the Inexorable has 5 now,"
+                     " going to 6",
+                  "#W78-CW S14 a plus loyalty row prints the same two figures, the other way");
+            CHECK(w78CounterCostBody("Loyalty", -3, -1, "Kaya").find(" has ") == string::npos
+                  && w78CounterCostBody("Loyalty", -3, -1, "Kaya")
+                     == "counter cost: spends 3 loyalty counters",
+                  "#W78-CW S14 MUST-NOT-MATCH an unreadable counter pile claims no total");
+            CHECK(w78CounterCostBody("Loyalty", 0, 5, "Kaya").empty()
+                  && w78CounterCostBody("", -3, 5, "Kaya").empty(),
+                  "#W78-CW S14 MUST-NOT-MATCH a zero or nameless counter cost prints nothing");
+            //Key stability: the figure rides its own annotation group, so a
+            //walker whose loyalty moved is not a NEW row to the hold check.
+            {
+                const string row5 = "+1: target creature gets ghostform with Kaya [cost: Counters]"
+                                    " {counter cost: adds 1 loyalty counter - Kaya has 5 now, going to 6}";
+                const string row2 = "+1: target creature gets ghostform with Kaya [cost: Counters]"
+                                    " {counter cost: adds 1 loyalty counter - Kaya has 2 now, going to 3}";
+                CHECK(holdActionKeyRow(row5) == holdActionKeyRow(row2)
+                      && optionSetKeyLine(row5) == optionSetKeyLine(row2)
+                      && w77KeyTailOf(row5) == w77KeyTailOf(row2),
+                      "#W78-CW S14 key stability: two loyalty totals, one key");
+                CHECK(asyncSlotKeyOf(false, 9, 2, w77KeyTailOf(row5), "b")
+                      == asyncSlotKeyOf(false, 9, 2, w77KeyTailOf(row2), "b"),
+                      "#W78-CW S14 key stability: the async slot key is unmoved by the figure");
+                CHECK(stripNarrationDecoration(row5).find("counter cost:") == string::npos,
+                      "#W78-CW S14 echo: the figure is stripped from the narrated record");
+            }
+        }
+
+        cout << "\n[#W78-CW] S15 the no-op band folds on DISPLAY, with every rung still answerable\n";
+        {
+            vector<string> opts;
+            opts.push_back("don't add any counter {this mode right now: it changes no life total}");
+            for (int n = 1; n <= 19; n++)
+            {
+                std::ostringstream r;
+                r << "add " << n << " counter" << (n == 1 ? "" : "s")
+                  << " {same effect right now: adds 0 counters}";
+                opts.push_back(r.str());
+            }
+            opts.push_back("add 20 counters {this mode right now: it changes no life total}"
+                           " {repeat cost: 20 x {1}{w} = 40 mana for all 20}");
+            bool ranged = false;
+            const string joined = joinNumberedRows(opts, &ranged);
+            //RED on base: nineteen consecutive lines, one per rung.
+            {
+                size_t lines = 0;
+                for (size_t i = 0; i < joined.size(); i++)
+                    if (joined[i] == '\n')
+                        lines++;
+                CHECK(lines < 21 && ranged,
+                      "#W78-CW S15 GREEN the 21-row menu prints fewer than 21 lines");
+            }
+            CHECK(joined.find("2-20. add 1 counter") != string::npos,
+                  "#W78-CW S15 the band prints as one labelled range starting at its own row");
+            CHECK(joined.find("Every number in that range is still on this list and any of them"
+                              " is a legal answer") != string::npos,
+                  "#W78-CW S15 the collapse states that every rung is still answerable");
+            CHECK(joined.compare(0, 25, "1. don't add any counter ") == 0
+                  && joined.find("\n21. add 20 counters") != string::npos,
+                  "#W78-CW S15 the rows OUTSIDE the band keep their own numbers and their text");
+            //The ANSWER->ENGINE INDEX mapping: the fold is print-only, so the
+            //option vector is untouched and a number inside the range still
+            //resolves to its own rung (wave-72 codex finding 6's hazard - a
+            //display permutation applied twice - cannot arise: nothing moved).
+            {
+                CHECK(parseChoice("CHOICE: 7 (add 6 counters)", (int) opts.size(), &opts) == 7,
+                      "#W78-CW S15 answer->index: a number INSIDE the folded range resolves to"
+                      " its own engine row (row 7 = the 6-counter rung, engine index 6)");
+                CHECK(parseChoice("CHOICE: 1 (don't add any counter)", (int) opts.size(), &opts) == 1
+                      && parseChoice("CHOICE: 21 (add 20 counters)", (int) opts.size(), &opts) == 21,
+                      "#W78-CW S15 answer->index: the rows either side of the band are unmoved");
+            }
+            //MUST-NOT-MATCH: the shape is recognised only where it exists.
+            {
+                string er;
+                int nv = -1;
+                CHECK(splitNoOpBandRow("add 3 counters {same effect right now: adds 0 counters}",
+                                       er, nv) && nv == 3,
+                      "#W78-CW S15 POSITIVE the band row is recognised by its own two anchors");
+                CHECK(!splitNoOpBandRow("add 3 counters {right now: adds 3 counters}", er, nv),
+                      "#W78-CW S15 MUST-NOT-MATCH a LIVE rung is never folded");
+                CHECK(!splitNoOpBandRow("don't add any counter {same effect right now: adds 0 counters}",
+                                        er, nv),
+                      "#W78-CW S15 MUST-NOT-MATCH a row with no count in its label is not a rung");
+            }
+            //A band shorter than the collapse floor prints row by row.
+            {
+                vector<string> few;
+                few.push_back("add 1 counter {same effect right now: adds 0 counters}");
+                few.push_back("add 2 counters {same effect right now: adds 0 counters}");
+                bool rg = false;
+                CHECK(joinNumberedRows(few, &rg) == "1. " + few[0] + "\n2. " + few[1] + "\n" && !rg,
+                      "#W78-CW S15 MUST-NOT-MATCH a band under the floor is printed in full");
+            }
         }
     }
 
