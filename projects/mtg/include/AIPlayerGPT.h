@@ -373,7 +373,11 @@ int gptForceCloseOutstanding(bool liveArmed, bool parkArmed);
 //is on the stack and nothing of theirs threatens a component; THREATENED = an
 //unresolved stack object of the opponent's targets a component, which is the one
 //board where holding LOSES the loop.
-enum W77LoopVerdict { kW77LoopIdle = 0, kW77LoopResolving = 1, kW77LoopThreatened = 2 };
+//#W78-CY (F4): a FOURTH face. An opposing stack object that resolves BEFORE the
+//seat's own loop trigger and cannot be classified as harmless makes the loop
+//unproven - it is not "resolving on its own" and it is not a named threat either.
+enum W77LoopVerdict { kW77LoopIdle = 0, kW77LoopResolving = 1, kW77LoopThreatened = 2,
+                      kW78LoopUnproven = 3 };
 
 class AIPlayerGPT : public AIPlayerBaka
 {
@@ -1558,6 +1562,14 @@ private:
     int mOppLifeTurnNo[3];
     int mOppLifeSamples;
     int mOppLifeLastTurn;
+    //#W78-CY (F7): the opponent's life EVENTS, summed from WEventLife as the seat
+    //receives them - running totals since the game began, plus the value each of
+    //the three samples was taken at, so the split over the sampled SPAN is a
+    //subtraction of two event totals and never a difference of snapshots.
+    int mOppLifeEventGained;
+    int mOppLifeEventLost;
+    int mOppLifeGainedAt[3];
+    int mOppLifeLostAt[3];
     //#W72-BW (M11): the same samples, read as a RISE - the opponent's life now
     //minus the oldest sample, and the turns between. Returns false (and leaves
     //both outputs 0) unless there are at least two samples spanning at least one
@@ -1800,6 +1812,9 @@ private:
     //happens to be asking during the holder's own turn.
     bool mHoldOwnTurnAtTake;
     std::map<string, std::set<string> > mHoldRows;
+    //#W78-CY (F5 b): the same rows under the BRACKET's key (ordinal stripped,
+    //occurrence indexed), as a list - so bracket-unchanged <=> no hold re-open.
+    std::map<string, std::vector<std::string> > mHoldLatchRows;
     //#W72-BU (M4): THE HOLD IS A WINDOW HOLD, NOT A SEAM HOLD. The row says
     //"pass now, and do not ask me again - this turn or later - until one of the
     //rows above changes"; that is a promise about being ASKED, and it named no
@@ -1944,6 +1959,12 @@ private:
     //keyed by the joined rows. Rendered as a PROMPT-ONLY annotation (never
     //part of an ask key - see declinedListNote).
     std::map<size_t, int> mListDeclineCount; //#W54-M (L6): keyed by std::hash of the joined rows
+    //#W78-CY (F1): the COLLAPSE identity this list was declined under - the action
+    //identity of every acting row (cost groups kept), the board the decline was
+    //given on, and the stop statement it was given against. Same key as
+    //mListDeclineCount; a miss or a mismatch means the decline is not an answer to
+    //THIS window and the window is asked.
+    std::map<size_t, std::string> mListDeclineIdent;
     int mListDeclineTurn;
     //#W57-B (D6): the opponent's declared attack, latched for the combat it
     //belongs to. The engine's `attacker` flag is false before the declaration
