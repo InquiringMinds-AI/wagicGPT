@@ -25,6 +25,7 @@
 #include "ExtraCost.h"
 #include "Counters.h"
 #include "ActionLayer.h"
+#include "SimpleMenuItem.h" //#W78-CX (S10): the deferred menu's own row text
 #include "AllAbilities.h"
 #include "ActionStack.h"
 #include "WFont.h"
@@ -7893,15 +7894,108 @@ static bool planNamesStrandedCard(const string& plan, const string& cardName)
 //class then concealed. It is now the BYTE VERDICT: the off-protocol lines were
 //found in the prefill that was handed back to the model. A forced close that
 //wrote prose of its own is reported as prose.
+//#W78-CX (S1, wave-77 engine-seat HIGH-2 / deck125 B-2): THE ANSWER LINE MINUS
+//ITS LABEL IS NOT PROSE. All five of the wave-77 corpus's `unparsed_reply`
+//heuristic answers are two lines - a line-leading `PLAN:` line and then
+//`<n> (<short name>)` with the six characters `CHOICE: ` absent - and every one
+//of them was stamped `prose_outside_two_lines`, which is FALSE on all five:
+//there is no prose anywhere in any of them. A reviewer or a future gate reading
+//that stamp is told the model rambled, and the next wave chases a rambling that
+//never happened.
+//This is the SHAPE TEST, and it is MEASURE ONLY: the parser is untouched, the
+//reply is still refused, the heuristic still answers the window. It names what
+//the record actually was. The gates are deliberately narrow, because the class
+//must not absorb a reply that really did write prose:
+//  - the reply carried NO coded answer line at all (`hadLabelledAnswer` false),
+//    so this cannot fire on an extra bare row number written BESIDE a real
+//    `CHOICE:` line - that reply is prose and stays prose;
+//  - there is EXACTLY ONE off-protocol line (a second one is prose);
+//  - that line is `<digits>` then `(` ... `)` and ends at the `)`, with a
+//    non-empty name inside - the protocol's own answer line with the label
+//    elided, and nothing else.
+//Whether the PARSER may read this line is the owner's call and is NOT taken
+//here (invariant 000: no tolerance for an unlabelled answer line without his
+//ruling). Pure over the two inputs; PARSETEST walks it.
+bool w78AnswerLabelAbsentShape(const std::vector<string>& offLines, bool hadLabelledAnswer)
+{
+    if (hadLabelledAnswer || offLines.size() != 1)
+        return false;
+    const string& s = offLines[0];
+    size_t i = 0;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9')
+        i++;
+    if (i == 0)
+        return false; //no row number
+    size_t j = i;
+    while (j < s.size() && (s[j] == ' ' || s[j] == '\t'))
+        j++;
+    if (j >= s.size() || s[j] != '(')
+        return false;
+    if (s[s.size() - 1] != ')')
+        return false; //anything after the closing paren is prose
+    return (s.size() - 1) > (j + 1); //a non-empty short name between the parens
+}
+//#W78-CX (S10, wave-77 deck152 HIGH-1 / engine-seat M4): A `defer` RECORD THAT
+//CANNOT SAY WHAT WAS DEFERRED, IN THE WRONG SEAT'S LOG. The corpus's one
+//`defer` (`152v130` seq 21) is the OPPONENT's Starstorm X-announcement: it was
+//written into the deck152 seat's file with `options: 0` and an empty
+//`options_text`, so the only X-announcement payment loss in the corpus is
+//attributed to the wrong deck AND its rows are unrecoverable. Two pure pieces
+//below; the site wiring is in computeActions.
+//
+//(a) WHOSE LOG. `computeActions` runs on the seat that currently holds the
+//action, but the ActionLayer's menu belongs to the card that armed it - an
+//instant cast by the OTHER seat arms a menu while this seat is the acting
+//player, which is exactly the Starstorm shape. The record belongs to the seat
+//whose decision it was. It moves only when that seat is a GPT seat with a live
+//translog; with no menu card, a heuristic opponent, or a logless one, the
+//record stays here rather than vanishing (a record in the wrong file is a
+//misattribution; a record nowhere is a silent defer, which #W41-1 forbids).
+bool w78DeferRecordMoves(bool haveMenuController, bool controllerIsSelf,
+                         bool controllerIsGptSeat, bool controllerHasTransLog)
+{
+    return haveMenuController && !controllerIsSelf && controllerIsGptSeat
+           && controllerHasTransLog;
+}
+//(b) THE ROWS. Whatever the menu was about to be clicked on, in menu order,
+//trimmed - the same rows the heuristic chose among. Empty rows are dropped
+//(a spacer is not an option); everything else is kept verbatim, because the
+//reviewer's question is "what was the seat not asked", and an edited row
+//cannot answer it.
+std::vector<string> w78DeferOptionTexts(const std::vector<string>& rawRows)
+{
+    std::vector<string> out;
+    for (size_t i = 0; i < rawRows.size(); i++)
+    {
+        const string& r = rawRows[i];
+        const size_t a = r.find_first_not_of(" \t\r\n");
+        if (a == string::npos)
+            continue;
+        const size_t b = r.find_last_not_of(" \t\r\n");
+        out.push_back(r.substr(a, b - a + 1));
+    }
+    return out;
+}
+//#W78-CX (S1): ...and the class, with the new arm ahead of the prose arm. The
+//echo arm keeps its place: a rescued reply whose off-protocol bytes are its own
+//prefill handed back is an echo whatever those bytes look like, and the shape
+//test above cannot fire on it anyway (an echoed trace is never a lone answer
+//line). `answerLabelAbsent` defaults false, so every existing caller and every
+//shipped PARSETEST case reads exactly as before.
 const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolBytes,
-                                       bool forcedCloseEcho = false)
+                                       bool forcedCloseEcho = false,
+                                       bool answerLabelAbsent = false)
 {
     if (planLineMissing && offProtocolBytes > 0)
         return "unlabelled_plan";
     if (planLineMissing)
         return "plan_absent";
     if (offProtocolBytes > 0)
-        return forcedCloseEcho ? "forced_close_prefill_echo" : "prose_outside_two_lines";
+    {
+        if (forcedCloseEcho)
+            return "forced_close_prefill_echo";
+        return answerLabelAbsent ? "answer_label_absent" : "prose_outside_two_lines";
+    }
     return "compliant";
 }
 
@@ -18982,7 +19076,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
        mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
-        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentHeuristicPlayed(0), //#W78-CX (S1) //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -20527,12 +20621,24 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         const bool w76PrefillEcho = rec.count("reasoning_forced_close") > 0
                                     && w76OffProtocolIsPrefillEcho(replyOffLines,
                                                                    mLastForceClosePrefill);
+        //#W78-CX (S1): the shape test needs to know whether the reply carried a
+        //coded answer line AT ALL - the same count the record publishes as
+        //`coded_answers` a few lines below, read from the same reply.
+        const bool w78LabelAbsent = w78AnswerLabelAbsentShape(replyOffLines,
+                                                              codedAnswerCount(reply) > 0);
         const char * devClass = w75ProtocolDeviationClass(planLineMissing, (int) replyOffProtocol,
-                                                         w76PrefillEcho);
+                                                         w76PrefillEcho, w78LabelAbsent);
         mLastForceClosePrefill.clear(); //#W76-CQ (F9): consumed with this record
         rec["protocol_deviation"] = string(devClass);
         if (planLineMissing || replyOffProtocol > 0)
             mProtocolDeviationReplies++;
+        //#W78-CX (S1): ...and the MEASURE the ruling asks for - of the records
+        //that carried an answer line with its label elided, how many were then
+        //played by the HEURISTIC because the parser refused them. Counted on
+        //the same predicate the recovery handoff latches on, so the count and
+        //the `recovery` records it will be joined against cannot disagree.
+        if (w78LabelAbsent && handedToHeuristic(choice, fallback))
+            mAnswerLabelAbsentHeuristicPlayed++;
         mProtocolReplies++; //#W70-BM (E2): the census denominator
         //#W71-BO (L10 sibling, wave-70 P): `plan_steps_done` was absent from every
         //record, so lane BN's F10 step-advance claim was unmeasurable. The pointer
@@ -20936,6 +21042,10 @@ void AIPlayerGPT::logGameEnd()
         //denominator - the class `off_protocol_bytes` cannot see.
         {"plan_line_missing", mPlanLineMissing},
         {"protocol_deviation_replies", mProtocolDeviationReplies}, //#W75-CL (P23 d)
+        //#W78-CX (S1): the `answer_label_absent` class's cost - replies that
+        //gave a legible answer without its label and were played by the
+        //heuristic anyway. MEASURE ONLY; the parser is unchanged.
+        {"answer_label_absent_heuristic_played", mAnswerLabelAbsentHeuristicPlayed},
         {"plan_names_uncastable_zone_card", mPlanNamesUncastableZoneCard}, //#W75-CL (P17)
     };
     transLogWrite(rec.dump()); //audit-L (L4)
@@ -45790,6 +45900,32 @@ int AIPlayerGPT::computeActions()
             //option it took for it and on which menu, so a reviewer reading
             //the stderr can tell "not asked" from "asked and answered".
             int doThis = AIPlayerBaka::selectMenuOption();
+            //#W78-CX (S10): the seat the deferred menu BELONGS to, and the rows
+            //it was never shown. `currentlyActing()` is this seat (the guard
+            //above), but an instant cast by the opponent arms its menu here -
+            //the Starstorm X-announcement of `152v130` seq 21 - and the record
+            //must land in that seat's file or the corpus's per-seat census is
+            //off by one in BOTH directions.
+            AIPlayerGPT * deferSeat = this;
+            {
+                Player * menuController = object->currentActionCard
+                                          ? object->currentActionCard->controller() : NULL;
+                AIPlayerGPT * asGpt = dynamic_cast<AIPlayerGPT *>(menuController);
+                if (w78DeferRecordMoves(menuController != NULL, menuController == this,
+                                        asGpt != NULL,
+                                        asGpt && !asGpt->mTransLogPath.empty()))
+                    deferSeat = asGpt;
+            }
+            std::vector<string> deferRowsRaw;
+            if (object->abilitiesMenu)
+            {
+                for (size_t mi = 0; mi < object->abilitiesMenu->mObjects.size(); mi++)
+                {
+                    SimpleButton * b = dynamic_cast<SimpleButton *>(object->abilitiesMenu->mObjects[mi]);
+                    deferRowsRaw.push_back(b ? b->getText() : string());
+                }
+            }
+            const std::vector<string> deferRows = w78DeferOptionTexts(deferRowsRaw);
             //#W54-M (A33): the release channel for "not asked" is the translog
             //(the corpus reviewer's surface - a `defer` record with its own
             //class); the stderr line is a development diagnostic and compiles
@@ -45801,7 +45937,8 @@ int AIPlayerGPT::computeActions()
                 why << "menu on " << menuCard << " could not be put to the model (no answerable"
                        " shape - e.g. the announced X is no longer affordable); the heuristic"
                        " took option " << doThis;
-                writeTransLog("defer", "", why.str(), doThis, 0, menuCard, "menu_not_askable");
+                deferSeat->writeTransLog("defer", "", why.str(), doThis, (int) deferRows.size(),
+                                         menuCard, "menu_not_askable", &deferRows);
 #if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
                 fprintf(stderr, "AIPlayerGPT: %s\n", why.str().c_str());
 #endif
@@ -92378,8 +92515,7 @@ static const char * kW50Y_r94 =
         }
     }
 
-    //====================================================================
-    //#W78-CW — render truth and pricing (wave-77 known-bugs S2, S5, S8,
+    //=============================================================    //#W78-CW — render truth and pricing (wave-77 known-bugs S2, S5, S8,
     //S12, S13, S14, S15). Every clause below is pure over its arguments, so
     //each defect is reproduced and each fix proved without a board.
     //====================================================================
@@ -92755,6 +92891,221 @@ static const char * kW50Y_r94 =
                 CHECK(joinNumberedRows(few, &rg) == "1. " + few[0] + "\n2. " + few[1] + "\n" && !rg,
                       "#W78-CW S15 MUST-NOT-MATCH a band under the floor is printed in full");
             }
+        }
+    }
+    // ---------------- #W78-CX (S1, MEASURE ONLY): the answer line minus its
+    // label is not prose. The five wave-77 heuristic answers, their class, the
+    // measure's predicate, and the pin that THE PARSER IS UNCHANGED.
+    {
+        cout << "\n[W78-CX S1] answer_label_absent (measure only; parser untouched)\n";
+        // `125v126` deck125 seq 140, verbatim off the record - the reply that
+        // cost a Path to Exile the model was explicitly holding.
+        const string s1Repro =
+            "\n\nPLAN: Let Staff pings resolve and hold priority to stop the menu loop.\n"
+            "2 (Hold priority)";
+        bool af = false;
+        std::vector<string> off;
+        const long offB = offProtocolBytes(s1Repro, &af, &off);
+        CHECK(offB == 17 && off.size() == 1 && off[0] == "2 (Hold priority)",
+              "#W78-CX S1 INSTRUMENT the record's own 17 off-protocol bytes ARE the answer"
+              " line, and it is the only line outside the plan");
+        CHECK(codedAnswerCount(s1Repro) == 0,
+              "#W78-CX S1 INSTRUMENT no coded answer line - `coded_answers: 0` on the record");
+        CHECK(w78AnswerLabelAbsentShape(off, codedAnswerCount(s1Repro) > 0),
+              "#W78-CX S1 GREEN the shape test names it: a lone `<n> (<short name>)` line"
+              " and no labelled answer anywhere in the reply");
+        CHECK(std::string(w75ProtocolDeviationClass(false, (int) offB, false,
+                          w78AnswerLabelAbsentShape(off, codedAnswerCount(s1Repro) > 0)))
+                  == "answer_label_absent",
+              "#W78-CX S1 RED-ON-BASE the class is `answer_label_absent` - on base this"
+              " record read `prose_outside_two_lines`, which is FALSE on all five: there is"
+              " no prose anywhere in any of them");
+        CHECK(std::string(w75ProtocolDeviationClass(false, (int) offB, false,
+                          w78AnswerLabelAbsentShape(off, codedAnswerCount(s1Repro) > 0)))
+                  != "prose_outside_two_lines",
+              "#W78-CX S1 RED-ON-BASE ...stated as the negative the wave-77 engine seat"
+              " raised: the shipped stamp told a reviewer the model rambled");
+        // THE PARSER IS NOT CHANGED. The owner's ruling on whether an
+        // unlabelled answer line may be READ is pending (invariant 000), so the
+        // reply still finds no answer segment and the window still falls to the
+        // heuristic. This pin is what makes the measure honest: the class says
+        // what happened, it does not recover the decision.
+        int run = 0, rej = 0;
+        CHECK(answerSegmentStatic(s1Repro, "CHOICE:", &run, &rej).empty(),
+              "#W78-CX S1 PIN the parser is UNCHANGED - the unlabelled answer line still"
+              " yields no answer segment and the heuristic still plays the window (owner"
+              " ruling pending; no tolerance added)");
+        {
+            size_t ia = 0, ib = 0, ic = 0;
+            CHECK(!gptInlineChoiceOnPlanLine(s1Repro, ia, ib, ic),
+                  "#W78-CX S1 PIN ...and P9's inline reader does not rescue it either:"
+                  " there is no `CHOICE:` label anywhere to anchor on");
+        }
+        // the measure's predicate: classified AND handed to the heuristic.
+        CHECK(AIPlayerGPT::handedToHeuristic(-1, "unparsed_reply"),
+              "#W78-CX S1 PIN `answer_label_absent_heuristic_played` counts only the ones"
+              " the heuristic then played - the same predicate the recovery handoff latches"
+              " on, so the measure and the `recovery` records cannot disagree");
+        // ---- the other four, byte-verbatim from the corpus ----
+        const char * others[4] = {
+            "\n\nPLAN: Opponent is at 5 life, my two Staffs will deal 2 damage per turn,"
+            " securing the win in 3 turns. Stop 3 prohibits Sphinx's Revelation, and there"
+            " are no threats to answer. I will hold priority to close the turn.\n"
+            "2 (Hold priority)",
+            "\n\nPLAN: Wait for Staff of Nin to ping the opponent down to 0.\n"
+            "3 (Cast nothing right now)",
+            "\n\nPLAN: Exquisite Blood converts my damage to their life gain, so I will"
+            " avoid dealing damage and hold priority to survive.\n"
+            "5 (Cast nothing right now)",
+            "\n\nPLAN: Cast nothing right now.\n4 (Cast nothing right now)"
+        };
+        bool allFive = true;
+        for (int i = 0; i < 4; i++)
+        {
+            std::vector<string> o;
+            const long b = offProtocolBytes(others[i], &af, &o);
+            if (std::string(w75ProtocolDeviationClass(false, (int) b, false,
+                    w78AnswerLabelAbsentShape(o, codedAnswerCount(others[i]) > 0)))
+                    != "answer_label_absent")
+                allFive = false;
+        }
+        CHECK(allFive,
+              "#W78-CX S1 RED-ON-BASE all FIVE wave-77 records take the new class - the"
+              " corpus's entire `prose_outside_two_lines` population was this one shape");
+        // ---- MUST NOT MATCH ----
+        {
+            std::vector<string> o;
+            const string prose =
+                "PLAN: Cast Damnation.\nCHOICE: 1 (Cast Damnation)\n"
+                "On reflection this also answers the Fate Unraveler.";
+            offProtocolBytes(prose, &af, &o);
+            CHECK(!w78AnswerLabelAbsentShape(o, codedAnswerCount(prose) > 0),
+                  "#W78-CX S1 MUST-NOT-MATCH real prose after a valid PLAN/CHOICE pair is"
+                  " still `prose_outside_two_lines`");
+        }
+        {
+            std::vector<string> o;
+            const string second =
+                "PLAN: Cast Damnation.\nCHOICE: 1 (Cast Damnation)\n3 (Cast nothing right now)";
+            offProtocolBytes(second, &af, &o);
+            CHECK(o.size() == 1 && o[0] == "3 (Cast nothing right now)"
+                  && !w78AnswerLabelAbsentShape(o, codedAnswerCount(second) > 0),
+                  "#W78-CX S1 MUST-NOT-MATCH a bare row number written BESIDE a real"
+                  " `CHOICE:` line is a second answer, not a missing label - the reply"
+                  " carried a labelled answer, so the class does not fire");
+        }
+        {
+            std::vector<string> o;
+            const string twoLines =
+                "\n\nPLAN: Hold.\n2 (Hold priority)\nActually, I reconsider.";
+            offProtocolBytes(twoLines, &af, &o);
+            CHECK(o.size() == 2 && !w78AnswerLabelAbsentShape(o, false),
+                  "#W78-CX S1 MUST-NOT-MATCH two off-protocol lines is prose, whatever the"
+                  " first one looks like");
+        }
+        {
+            std::vector<string> o;
+            const string tail = "\n\nPLAN: Hold.\n2 (Hold priority) and then I pass.";
+            offProtocolBytes(tail, &af, &o);
+            CHECK(o.size() == 1 && !w78AnswerLabelAbsentShape(o, false),
+                  "#W78-CX S1 MUST-NOT-MATCH bytes AFTER the closing paren are prose - the"
+                  " line must end at the `)`");
+        }
+        {
+            std::vector<string> o;
+            const string sentence = "\n\nPLAN: Hold.\nI will hold priority this turn.";
+            offProtocolBytes(sentence, &af, &o);
+            CHECK(o.size() == 1 && !w78AnswerLabelAbsentShape(o, false),
+                  "#W78-CX S1 MUST-NOT-MATCH an unlabelled SENTENCE is prose - nothing here"
+                  " reads an answer out of words (invariant 000)");
+        }
+        {
+            std::vector<string> o;
+            const string empty = "\n\nPLAN: Hold.\n2 ()";
+            offProtocolBytes(empty, &af, &o);
+            CHECK(o.size() == 1 && !w78AnswerLabelAbsentShape(o, false),
+                  "#W78-CX S1 MUST-NOT-MATCH an empty short name is not the protocol's"
+                  " answer line");
+        }
+        {
+            std::vector<string> o;
+            const string unlabelledPlan =
+                "I will hold priority.\n2 (Hold priority)";
+            const long b = offProtocolBytes(unlabelledPlan, &af, &o);
+            CHECK(std::string(w75ProtocolDeviationClass(true, (int) b, false,
+                      w78AnswerLabelAbsentShape(o, codedAnswerCount(unlabelledPlan) > 0)))
+                      == "unlabelled_plan",
+                  "#W78-CX S1 MUST-NOT-MATCH a MISSING PLAN LINE still wins the class - the"
+                  " plan defect is the bigger one and its arm is untouched");
+        }
+        {
+            // the echo arm keeps its place ahead of the new one.
+            std::vector<string> o;
+            o.push_back("2 (Hold priority)");
+            CHECK(std::string(w75ProtocolDeviationClass(false, 17, true, true))
+                      == "forced_close_prefill_echo",
+                  "#W78-CX S1 MUST-NOT-MATCH a rescued reply whose off-protocol bytes are"
+                  " its own prefill handed back stays an echo (#W76-CQ F9 arm unchanged)");
+        }
+        CHECK(std::string(w75ProtocolDeviationClass(false, 0, false, true)) == "compliant"
+              && std::string(w75ProtocolDeviationClass(false, 40, false, false))
+                     == "prose_outside_two_lines"
+              && std::string(w75ProtocolDeviationClass(true, 0, false, true)) == "plan_absent",
+              "#W78-CX S1 PIN the other three arms are byte-unchanged with the new"
+              " parameter defaulted or set");
+    }
+
+
+    // ---------------- #W78-CX (S10): the defer record - whose log, and what
+    // was deferred.
+    {
+        cout << "\n[W78-CX S10] defer record: acting seat + options_text\n";
+        // (a) WHOSE LOG. The wave-77 shape: the menu's card is controlled by
+        // the OTHER seat, which is a GPT seat with a live translog.
+        CHECK(w78DeferRecordMoves(true, false, true, true),
+              "#W78-CX S10 RED-ON-BASE the `152v130` seq 21 shape - the Starstorm menu is"
+              " the OPPONENT's and its record moves to that seat's log; on base every defer"
+              " was written by whichever seat happened to be acting");
+        CHECK(!w78DeferRecordMoves(true, true, true, true),
+              "#W78-CX S10 MUST-NOT-MATCH this seat's OWN menu stays in this seat's log");
+        CHECK(!w78DeferRecordMoves(false, false, false, false),
+              "#W78-CX S10 MUST-NOT-MATCH no menu card, no controller - the record stays"
+              " here rather than vanishing (a silent defer is what #W41-1 forbids)");
+        CHECK(!w78DeferRecordMoves(true, false, false, false),
+              "#W78-CX S10 MUST-NOT-MATCH a heuristic opponent has no translog of its own;"
+              " the record stays here");
+        CHECK(!w78DeferRecordMoves(true, false, true, false),
+              "#W78-CX S10 MUST-NOT-MATCH a GPT opponent with logging OFF likewise - the"
+              " record is never routed into a file that does not exist");
+        // (b) THE ROWS. `options_text` was EMPTY on the corpus's only defer, so
+        // the one X-announcement payment loss in 21 games is unrecoverable.
+        {
+            std::vector<string> raw;
+            raw.push_back("X = 0");
+            raw.push_back("  X = 1  ");
+            raw.push_back("");
+            raw.push_back("   ");
+            raw.push_back("Cancel");
+            const std::vector<string> rows = w78DeferOptionTexts(raw);
+            CHECK(rows.size() == 3 && rows[0] == "X = 0" && rows[1] == "X = 1"
+                  && rows[2] == "Cancel",
+                  "#W78-CX S10 RED-ON-BASE the deferred menu's rows ride the record in menu"
+                  " order, trimmed, spacers dropped - on base `options: 0` and"
+                  " `options_text` empty, so a reviewer could see that the seat was not"
+                  " asked and never what it was not asked");
+            CHECK(w78DeferOptionTexts(std::vector<string>()).empty(),
+                  "#W78-CX S10 MUST-NOT-MATCH a menu with no readable rows yields no rows -"
+                  " the record still exists and still says the defer happened");
+        }
+        {
+            // verbatim, never edited: the reviewer's question is what the seat
+            // was NOT asked, and an edited row cannot answer it.
+            std::vector<string> raw;
+            raw.push_back("Deal 2 damage to each creature (Starstorm) {2}{r}{x}");
+            const std::vector<string> rows = w78DeferOptionTexts(raw);
+            CHECK(rows.size() == 1 && rows[0] == raw[0],
+                  "#W78-CX S10 PIN interior bytes are untouched - only leading/trailing"
+                  " whitespace is trimmed");
         }
     }
 
