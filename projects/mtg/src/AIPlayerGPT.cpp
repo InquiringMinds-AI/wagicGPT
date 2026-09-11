@@ -756,6 +756,147 @@ string firstLoyaltyClausePrefix(const string& raw)
     return string();
 }
 
+//#W77-CT (R5, wave-76 deck125 HIGH B-1). THE BATTLEFIELD LINE PRINTED NO
+//ABILITY TEXT FOR ANY CREATURE. Wave-76 corpus: 3,892 creature entries, 0
+//glossed, beside 24,083 non-creature entries of which 1,518 carried an
+//`{effect:}` clause. `125v130` deck125 seq 7 rendered
+//`Dwarven Blastminer {1}{r} (1/1) [tapped - cannot attack or block this turn]`
+//and nothing else, while the Pyrite Spellbomb ON THE SAME LINE carried its full
+//text; the seat read a 1/1 attacker and the Blastminer's `{2}{R}, {T}: Destroy
+//target nonbasic land` took it to 0 permanents by t17. The same card's Path row
+//at seq 23 printed the whole `{target text:}` - the channel existed, the board
+//simply had no glosser for a creature.
+//The wave-46 exclusion ("their line already carries live keywords, P/T, combat
+//state, and that is the budget") was right about the KEYWORDS and silent about
+//the ACTIVATED and TRIGGERED abilities, which is what a creature's `text=` line
+//holds and what four of deck125's guide rules key on. So the keyword half of
+//the exclusion stands and is enforced literally: the gloss DROPS every clause
+//this entry has ALREADY printed in its `[...]` keyword bracket, compared against
+//that rendered string itself so the two surfaces cannot disagree. A clause whose
+//keyword was NOT printed is KEPT - fail-open, because the failure mode this
+//whole family exists to stop is silence the model confabulates rules into.
+//STATIC card text, so no key-stability pin is owed: nothing here is a board
+//number. The budget is the wave-46 width tier CAPPED at 120 B, so a creature
+//clause can never cost more than a non-creature one at the same width.
+const size_t kBoardCreatureEffectLen = 120; //#W77-CT (R5)
+//...and how many distinct creature NAMES on one zone line may carry a gloss at
+//all. Without it the per-name budget floors at 55 B and the line's total grows
+//without bound in the width of the board - the Q2 defect one surface over. Same
+//value as kVictimRosterGroupCap, for the same reason, and the residue is
+//COUNTED and named rather than silently dropped: the names, P/T, keywords and
+//status of every creature are still printed in full, only the ability text of
+//the ones past the cap is not.
+const size_t kBoardCreatureEffectNameCap = 12; //#W77-CT (R5)
+
+string boardCreatureEffectResidueTail(size_t unlisted)
+{
+    if (!unlisted)
+        return "";
+    std::ostringstream o;
+    o << " (ability text not shown for " << unlisted << " further creature name"
+      << (unlisted == 1 ? "" : "s") << " on this line - the board is too wide to print it"
+      << " all; every creature's name, cost, P/T, keywords and status above is complete)";
+    return o.str();
+}
+
+size_t boardCreatureEffectSnippetLen(size_t distinctNames)
+{
+    const size_t base = boardEffectSnippetLen(distinctNames);
+    return base < kBoardCreatureEffectLen ? base : kBoardCreatureEffectLen;
+}
+
+//The head of a printed clause, up to its reminder-text parenthesis, lowercased
+//and stripped of a trailing period: `Defender (This creature can't attack.)`
+//-> `defender`. Pure.
+string w77ClauseKeywordHead(const string& clause)
+{
+    string s = clauseLeadTrim(clause);
+    const size_t p = s.find(" (");
+    if (p != string::npos)
+        s = s.substr(0, p);
+    while (!s.empty() && (s[s.size() - 1] == '.' || s[s.size() - 1] == ' '))
+        s.erase(s.size() - 1);
+    for (size_t i = 0; i < s.size(); i++)
+        s[i] = (char) tolower((unsigned char) s[i]);
+    return s;
+}
+
+//True when `keywordsPrinted` - the comma-separated list this entry has ALREADY
+//printed in its `[...]` bracket, i.e. keywordList()'s own output - carries this
+//clause's head as a WHOLE entry. Only then is the clause redundant; a partial
+//match is not one (a `Flying` entry does not cover a `Flying Men` clause).
+bool w77ClauseAlreadyPrintedAsKeyword(const string& clause, const string& keywordsPrinted)
+{
+    const string head = w77ClauseKeywordHead(clause);
+    if (head.empty())
+        return false;
+    size_t at = 0;
+    for (;;)
+    {
+        const size_t k = keywordsPrinted.find(", ", at);
+        string one = (k == string::npos) ? keywordsPrinted.substr(at)
+                                         : keywordsPrinted.substr(at, k - at);
+        for (size_t i = 0; i < one.size(); i++)
+            one[i] = (char) tolower((unsigned char) one[i]);
+        const size_t b = one.find_first_not_of(' ');
+        const size_t e = one.find_last_not_of(' ');
+        if (b != string::npos && one.substr(b, e - b + 1) == head)
+            return true;
+        if (k == string::npos)
+            break;
+        at = k + 2;
+    }
+    return false;
+}
+
+//The creature's text= with the already-printed keyword clauses removed, the
+//surviving clauses rejoined in their printed order with the same " -- "
+//separator the snippet budgeter splits on. Empty means the line already says
+//everything this card's text says, and no tag is emitted at all.
+string boardCreatureEffectText(const string& raw, const string& keywordsPrinted)
+{
+    string flat = raw;
+    for (size_t i = 0; i < flat.size(); i++)
+        if (flat[i] == '\n')
+            flat[i] = ' ';
+    const string sep = " -- ";
+    std::ostringstream o;
+    bool first = true;
+    size_t at = 0;
+    for (;;)
+    {
+        const size_t k = flat.find(sep, at);
+        const string part = (k == string::npos) ? flat.substr(at) : flat.substr(at, k - at);
+        if (!clauseLeadTrim(part).empty()
+            && !w77ClauseAlreadyPrintedAsKeyword(part, keywordsPrinted))
+        {
+            o << (first ? "" : sep) << part;
+            first = false;
+        }
+        if (k == string::npos)
+            break;
+        at = k + sep.size();
+    }
+    return o.str();
+}
+
+//Same class test boardEffectTextEligible applies to the non-creature half, with
+//the sides swapped: a CREATURE (never a land - an animated land is still read
+//through the manland tag) that has an `auto=` script and printed rules text
+//which is not engine token bookkeeping, and whose text still says something
+//after the keyword clauses the line already printed are taken out.
+bool boardCreatureEffectEligible(bool isCreature, bool isLand, const string& magicText,
+                                 const string& text, const string& keywordsPrinted)
+{
+    if (!isCreature || isLand)
+        return false;
+    if (magicText.empty()) //no auto= script: nothing the P/T and keywords do not say
+        return false;
+    if (text.empty() || isEngineTokenText(text)) //W43-LOW: token bookkeeping is not rules text
+        return false;
+    return !boardCreatureEffectText(text, keywordsPrinted).empty();
+}
+
 string boardEffectSnippetFocus(const string& raw, size_t maxLen, const string& focusPrefix)
 {
     if (focusPrefix.empty())
@@ -10100,6 +10241,39 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         }
     const size_t effectLen = boardEffectSnippetLen(effectCopies.size());
     std::map<string, int> effectDone;
+    //#W77-CT (R5): the CREATURE half of the same pre-pass, counted and budgeted
+    //SEPARATELY on purpose - folding creatures into effectCopies would shrink
+    //every existing non-creature clause on wide boards, and every wave-46..76
+    //byte on this line has a repro behind it. Same skip list (a permanent whose
+    //ability is offered as a choice this window carries its text on that row).
+    std::map<string, int> creatureEffectCopies;
+    std::vector<string> creatureEffectOrder;
+    if (effectText && withStatus)
+        for (int i = 0; i < zone->nb_cards; i++)
+        {
+            MTGCardInstance * c = zone->cards[i];
+            if (!c || (c->mutation && !c->parentCards.empty()))
+                continue;
+            if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM)))
+                continue;
+            if (!boardCreatureEffectEligible(c->isCreature() != 0, c->isLand() != 0,
+                                             c->magicText, c->text, keywordList(c)))
+                continue;
+            if (effectSkip && effectSkip->find(c->getDisplayName()) != effectSkip->end())
+                continue;
+            if (creatureEffectCopies.find(c->getDisplayName()) == creatureEffectCopies.end())
+                creatureEffectOrder.push_back(c->getDisplayName());
+            creatureEffectCopies[c->getDisplayName()]++;
+        }
+    //#W77-CT (R5): the width cap, taken in BOARD order so the names that print
+    //are the ones the reader meets first, and the rest are counted.
+    std::set<string> creatureEffectShown;
+    for (size_t ci = 0; ci < creatureEffectOrder.size()
+                        && creatureEffectShown.size() < kBoardCreatureEffectNameCap; ci++)
+        creatureEffectShown.insert(creatureEffectOrder[ci]);
+    const size_t creatureEffectUnlisted = creatureEffectOrder.size() - creatureEffectShown.size();
+    const size_t creatureEffectLen = boardCreatureEffectSnippetLen(creatureEffectShown.size());
+    std::map<string, int> creatureEffectDone;
     for (int i = 0; i < zone->nb_cards; i++)
     {
         MTGCardInstance * card = zone->cards[i];
@@ -10227,11 +10401,14 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             }
             //the LIVE keyword set - granted/lost abilities the decklist
             //text cannot show (Bloodghast "can't block", taught flying...)
+            //#W77-CT (R5): held, because the creature gloss below drops exactly
+            //the clauses this bracket has already printed.
+            string liveKeywords;
             if (card->isCreature())
             {
-                string kw = keywordList(card);
-                if (!kw.empty())
-                    out << " [" << kw << "]";
+                liveKeywords = keywordList(card);
+                if (!liveKeywords.empty())
+                    out << " [" << liveKeywords << "]";
             }
             //Only open the bracket when a counter is actually present: a
             //list whose entries all reached 0 rendered an empty
@@ -10375,6 +10552,22 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                                                        firstLoyaltyClausePrefix(card->text)),
                                ec->second > 1, opponentsZone); //#W72-BV (M8)
             }
+            //#W77-CT (R5): and the creature half, on its own budget, in the
+            //same place on the line and through the same tag builder (so the
+            //foreign-voice frame and the each-copy note are identical).
+            if (effectText && card->isCreature() && !creatureEffectCopies.empty())
+            {
+                string cnm = card->getDisplayName();
+                std::map<string, int>::iterator cec = creatureEffectCopies.find(cnm);
+                if (cec != creatureEffectCopies.end()
+                    && creatureEffectShown.find(cnm) != creatureEffectShown.end()
+                    && creatureEffectDone[cnm]++ == 0)
+                    out << boardEffectTag(
+                               boardEffectSnippet(
+                                   boardCreatureEffectText(card->text, liveKeywords),
+                                   creatureEffectLen),
+                               cec->second > 1, opponentsZone);
+            }
         }
         //#W61-T (C7): the castability verdict, LAST on the entry so a card's
         //identifying facts are unchanged and two copies of one card still carry
@@ -10389,6 +10582,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         entTails.push_back(out.str());
     }
     out << joinZoneEntries(entNames, entHandles, entTails, withStatus);
+    out << boardCreatureEffectResidueTail(creatureEffectUnlisted); //#W77-CT (R5)
 }
 
 bool envFlag(const char * name)
@@ -32471,14 +32665,22 @@ static string castKillSummaryTag(const std::vector<std::string>& killed, int cre
     std::ostringstream o;
     if (!killedMine.empty())
     {
+        //#W77-CT (R11-row): the same uncapped join #W76-CP Q2 pulled out of the
+        //sweeper roster, one emitter over. `152v126` deck152 seq 63 printed a
+        //2,377 B option row and `123v125` deck123 seq 420 a 735 B roster clause
+        //naming `Human #1 ... Human #63` one body at a time. Q2's
+        //joinVictimRoster: the COUNT leads, distinct shapes group in
+        //first-appearance order, a consecutive rank run collapses to one handle
+        //range, and the only lossy edge NAMES its residue. Below the collapse
+        //floor the string is byte-identical to the wave-55 wording, so every
+        //existing pin holds. THE OPTION SET IS UNTOUCHED - this is one
+        //annotation clause on one row; no target leaves the list.
         o << " {kills whichever you target: THEIRS - ";
         if (killed.empty())
             o << "none";
-        for (size_t i = 0; i < killed.size(); i++)
-            o << (i ? ", " : "") << killed[i];
+        o << joinVictimRoster(killed);
         o << "; YOURS - ";
-        for (size_t i = 0; i < killedMine.size(); i++)
-            o << (i ? ", " : "") << killedMine[i];
+        o << joinVictimRoster(killedMine);
         o << playerTail << "}";
         return o.str();
     }
@@ -33691,19 +33893,23 @@ static string removalVictimTag(const string& verb, const std::vector<std::string
     std::ostringstream o;
     if (!mine.empty())
     {
+        //#W77-CT (R11-row): every roster this tag prints goes through Q2's
+        //bounded join. The `{removes: ...}` branch is the same shape and the
+        //same corpus carried it at 712 B (`146v152` Thraben Doomsayer +
+        //Human #1..#N), so it is capped in the same edit rather than left to
+        //come back as a third wave of the identical defect. Nothing is removed
+        //from any option set: these are annotation clauses inside a brace
+        //group, and the target list beside them is untouched.
         o << " {" << verb << " whichever you target: THEIRS - ";
         if (victims.empty())
             o << "none";
-        for (size_t i = 0; i < victims.size(); i++)
-            o << (i ? ", " : "") << victims[i];
+        o << joinVictimRoster(victims);
         o << "; YOURS - ";
-        for (size_t i = 0; i < mine.size(); i++)
-            o << (i ? ", " : "") << mine[i];
+        o << joinVictimRoster(mine);
         if (!immune.empty())
         {
             o << " - INDESTRUCTIBLE, destroy does nothing: ";
-            for (size_t i = 0; i < immune.size(); i++)
-                o << (i ? ", " : "") << immune[i];
+            o << joinVictimRoster(immune);
         }
         o << "}";
         return o.str();
@@ -33711,19 +33917,16 @@ static string removalVictimTag(const string& verb, const std::vector<std::string
     if (victims.empty())
     {
         o << " {kills nothing: every legal target is INDESTRUCTIBLE (";
-        for (size_t i = 0; i < immune.size(); i++)
-            o << (i ? ", " : "") << immune[i];
+        o << joinVictimRoster(immune);
         o << ")}";
         return o.str();
     }
     o << " {" << verb << ": ";
-    for (size_t i = 0; i < victims.size(); i++)
-        o << (i ? ", " : "") << victims[i];
+    o << joinVictimRoster(victims);
     if (!immune.empty())
     {
         o << " - INDESTRUCTIBLE, destroy does nothing: ";
-        for (size_t i = 0; i < immune.size(); i++)
-            o << (i ? ", " : "") << immune[i];
+        o << joinVictimRoster(immune);
     }
     o << "}";
     return o.str();
@@ -87539,6 +87742,284 @@ static const char * kW50Y_r94 =
                 CHECK(w76SelfRecursiveZoneScript("moveto(hand)")
                           && !w76SelfRecursiveZoneScript("moveto(graveyard)"),
                       "#W76-CQ F8 NEGATIVE the ZONE-script reader is unchanged");
+            }
+
+            // ================= LANE CT - the battlefield gloss (R5) and the
+            // roster row size (R11-row).
+
+            // ---------------- R5 (HIGH): a creature entry carried no ability
+            // text at all. Every string below is the card's REAL `text=` line,
+            // byte for byte, read off Res/sets/primitives (mtg.txt for the
+            // Blastminer, the Captain and the Wall; borderline.txt for the
+            // Tracker), and checked against the same card's `auto=`: the
+            // Blastminer's `auto={2}{R}{T}:destroy target(land[-basic])` IS the
+            // activated ability its text= names, so the text= line the model
+            // reads and the script the engine runs agree.
+            {
+                cout << "\n[#W77-CT R5] the creature battlefield gloss\n";
+                const string blastminer =
+                    "{2}{R}, {T}: Destroy target nonbasic land. -- Morph {R} (You may cast this"
+                    " face down as a 2/2 creature for {3}. Turn it face up any time for its"
+                    " morph cost.)";
+                const string blastminerAuto = "{2}{R}{T}:destroy target(land[-basic])";
+                // RED: the wave-46 class test excludes every creature, so this
+                // is what the seq-7 line had to say about the card that then
+                // destroyed the seat's whole mana base.
+                CHECK(!boardEffectTextEligible(true, false, blastminerAuto, blastminer),
+                      "#W77-CT R5 REPRO 125v130 deck125 seq 7: the wave-46 eligibility test"
+                      " answers NO for every creature, which is why the entry read `Dwarven"
+                      " Blastminer {1}{r} (1/1) [tapped - cannot attack or block this turn]`"
+                      " and nothing else while the Pyrite Spellbomb beside it was glossed"
+                      " in full");
+                CHECK(boardCreatureEffectEligible(true, false, blastminerAuto, blastminer, ""),
+                      "#W77-CT R5 GREEN the creature half of the same class test answers YES -"
+                      " a creature with an auto= script and printed rules text");
+                const string gloss = boardCreatureEffectText(blastminer, "");
+                CHECK(gloss.find("{2}{R}, {T}: Destroy target nonbasic land.") == 0,
+                      "#W77-CT R5 GREEN the ACTIVATED ability leads the gloss - the fact the"
+                      " seat needed and never got");
+                {
+                    // The seq-7 line has ONE distinct glossed creature name, so
+                    // the budget is the 120 B cap, and the card is the
+                    // OPPONENT's, so the tag also carries the #W72-BV voice
+                    // frame. Measured, not asserted.
+                    const size_t len = boardCreatureEffectSnippetLen(1);
+                    const string tag = boardEffectTag(boardEffectSnippet(gloss, len), false, true);
+                    cout << "  [#W77-CT R5] seq-7 gloss tag = " << tag.size()
+                         << " B; prompt 7260 B -> " << (7260 + tag.size()) << " B\n";
+                    CHECK(len == kBoardCreatureEffectLen && tag.size() < 400,
+                      "#W77-CT R5 BUDGET one distinct creature name is budgeted at the 120 B"
+                      " cap and the whole tag (voice frame included) stays under 400 B - the"
+                      " seq-7 prompt goes 7,260 B -> under 7,660 B, nowhere near 40 KB");
+                    CHECK(tag.find("Destroy target nonbasic land") != string::npos,
+                      "#W77-CT R5 GREEN ...and the ability survives the budget intact");
+                }
+                // The keyword half of the wave-46 exclusion still stands: a
+                // clause the `[...]` bracket has already printed is dropped.
+                const string captain =
+                    "Defender -- Whenever a creature you control with defender blocks, you may"
+                    " gain 2 life.";
+                CHECK(boardCreatureEffectText(captain, "defender")
+                          == "Whenever a creature you control with defender blocks, you may"
+                             " gain 2 life.",
+                      "#W77-CT R5 GREEN Perimeter Captain's `Defender` clause is dropped - the"
+                      " entry already printed `[defender]` - and the TRIGGER, which it never"
+                      " printed, is what the gloss carries");
+                const string wall =
+                    "Defender (This creature can't attack.) -- When Wall of Omens enters, draw"
+                    " a card.";
+                CHECK(boardCreatureEffectText(wall, "defender")
+                          == "When Wall of Omens enters, draw a card.",
+                      "#W77-CT R5 GREEN a keyword clause with reminder text is the same clause"
+                      " - the head is read up to the reminder parenthesis");
+                const string tracker =
+                    "Vigilance -- When Briarbridge Tracker enters, investigate. (Create a"
+                    " colorless Clue artifact token with \"{2}, Sacrifice this artifact: Draw a"
+                    " card.\") -- As long as you control a token, Briarbridge Tracker gets"
+                    " +2/+0.";
+                CHECK(boardCreatureEffectText(tracker, "vigilance").find("Vigilance") != 0
+                          && boardCreatureEffectText(tracker, "vigilance")
+                                 .find("When Briarbridge Tracker enters") == 0
+                          && boardCreatureEffectText(tracker, "vigilance")
+                                 .find(" -- As long as you control a token") != string::npos,
+                      "#W77-CT R5 GREEN the surviving clauses keep their printed ORDER and"
+                      " their ` -- ` separator, so the snippet budgeter splits them the way it"
+                      " splits every other card's text");
+                // FAIL-OPEN, the direction that cannot produce silence.
+                CHECK(boardCreatureEffectText(captain, "") == captain,
+                      "#W77-CT R5 MUST-NOT-MATCH a keyword the entry did NOT print is KEPT -"
+                      " the gloss drops what the line says, never what it might have said");
+                CHECK(boardCreatureEffectText("Flying Men can block anything. -- Flying",
+                                              "flying")
+                          == "Flying Men can block anything.",
+                      "#W77-CT R5 MUST-NOT-MATCH the printed-keyword test is a WHOLE-entry"
+                      " match: `flying` does not swallow a clause whose head is `Flying Men"
+                      " can block anything`");
+                // ...and the empty tag is never emitted.
+                CHECK(!boardCreatureEffectEligible(true, false, "flying", "Flying", "flying"),
+                      "#W77-CT R5 NEGATIVE a creature whose whole text is the keyword the line"
+                      " already printed is INELIGIBLE - no `{effect: \"\"}` glitch tag");
+                CHECK(boardEffectTag(boardEffectSnippet(boardCreatureEffectText("Flying",
+                                                                                "flying"),
+                                                        120), false).empty(),
+                      "#W77-CT R5 NEGATIVE and the tag builder agrees - an empty snippet is no"
+                      " tag at all (the #W46-3 rule, unchanged)");
+                CHECK(!boardCreatureEffectEligible(true, false, "", "Wolf", "")
+                          && !boardCreatureEffectEligible(false, false, "draw:1 controller",
+                                                          "When this enters, draw a card.", "")
+                          && !boardCreatureEffectEligible(true, true, "{T}:Add{G}",
+                                                          "{T}: Add {G}.", ""),
+                      "#W77-CT R5 NEGATIVE a scriptless token body, a NON-creature (which keeps"
+                      " the wave-46 path byte for byte) and an animated land are all out of"
+                      " this class");
+                // The budget cannot run away on a wide board, and it cannot
+                // shrink a non-creature clause either: the two are counted
+                // separately and the non-creature tier is untouched.
+                CHECK(boardCreatureEffectSnippetLen(1) == 120
+                          && boardCreatureEffectSnippetLen(3) == 120
+                          && boardCreatureEffectSnippetLen(6) == 90
+                          && boardCreatureEffectSnippetLen(10) == 55,
+                      "#W77-CT R5 BUDGET the creature tier is the wave-46 width tier capped at"
+                      " 120 B - the wave-76 corpus never put more than 10 distinct creature"
+                      " names on one prompt, which budgets at 55 B a clause");
+                CHECK(boardEffectSnippetLen(1) == 140 && boardEffectSnippetLen(6) == 90
+                          && boardEffectSnippetLen(7) == 55,
+                      "#W77-CT R5 NEGATIVE the NON-creature tier is unchanged - creatures are"
+                      " counted in their own map, so adding them shrinks no existing clause");
+                {
+                    // THE WIDTH BOUND. A prompt carries TWO zone lines and each
+                    // budgets independently, so the bound is per zone and the
+                    // name cap is what makes it a bound at all: without it the
+                    // per-name budget floors at 55 B and the line grows without
+                    // limit in the width of the board - the Q2 defect one
+                    // surface over. Worst case per name at the cap, every one an
+                    // opponent card with seat voice and a second copy, at the
+                    // widest creature text this corpus holds.
+                    const string wide =
+                        "Whenever Tovolar's Huntmaster enters, create two 2/2 green Wolf"
+                        " creature tokens. -- Daybound (If a player casts no spells during"
+                        " their own turn, it becomes night next turn.) -- {4}{G}{W}, {T}: Put"
+                        " a +1/+1 counter on each creature you control and they gain"
+                        " indestructible until end of turn.";
+                    const size_t len = boardCreatureEffectSnippetLen(kBoardCreatureEffectNameCap);
+                    const size_t measured =
+                        boardEffectTag(boardEffectSnippet(wide, len), true, true).size();
+                    // ANALYTIC bound, not the measured one: boardEffectSnippet
+                    // can spend at most kBoardEffectClauseFactor x the budget,
+                    // and boardEffectTag's own overhead is the `{effect: ""}`
+                    // wrapper, the each-copy note and the foreign-voice frame -
+                    // charged here whether this particular text triggers them
+                    // or not, so a text that does cannot beat the pin.
+                    const size_t perName = kBoardEffectClauseFactor * len
+                                           + strlen(" {effect: \"\"}")
+                                           + strlen(" (each copy of this card does this)")
+                                           + strlen(kForeignEffectVoiceFrame);
+                    const size_t residue = boardCreatureEffectResidueTail(99).size();
+                    const size_t worst =
+                        2 * kBoardCreatureEffectNameCap * perName + 2 * residue;
+                    cout << "  [#W77-CT R5] per-name analytic bound at the cap " << perName
+                         << " B (widest measured tag " << measured
+                         << " B); whole-prompt worst case " << worst
+                         << " B on top of the corpus max prompt 30375 B = "
+                         << (30375 + worst) << " B\n";
+                    CHECK(len == 55 && measured <= perName && 30375 + worst < 40000,
+                      "#W77-CT R5 BUDGET PIN the corpus's largest prompt (30,375 B, 125v146"
+                      " seq 179) plus the WORST case this render can produce - both zone lines"
+                      " at the name cap, every name an opponent copy carrying the voice frame,"
+                      " at the widest creature text in the corpus - stays under 40,000 B");
+                    CHECK(boardCreatureEffectResidueTail(0).empty()
+                              && boardCreatureEffectResidueTail(1)
+                                     .find("1 further creature name on this line") != string::npos
+                              && boardCreatureEffectResidueTail(3)
+                                     .find("3 further creature names") != string::npos,
+                      "#W77-CT R5 GREEN the cap's residue is COUNTED and named (zero, one and"
+                      " many), never a silent trim - and the wave-76 lesson's zero case is the"
+                      " one that prints nothing at all");
+                }
+            }
+
+            // ---------------- R11-row (LOW): the uncapped roster, one emitter
+            // over from the one #W76-CP Q2 bounded.
+            {
+                cout << "\n[#W77-CT R11-row] the kills/removes roster cap\n";
+                std::vector<std::string> humans;
+                for (int i = 1; i <= 63; i++)
+                {
+                    std::ostringstream h;
+                    h << "Human #" << i;
+                    humans.push_back(h.str());
+                }
+                std::vector<std::string> none, immune;
+                const string row = castKillSummaryTag(none, 63, "3 damage", "", humans);
+                cout << "  [#W77-CT R11-row] 63-body roster = " << row.size()
+                     << " B (base printed 735 B)\n";
+                CHECK(row.size() < 200,
+                      "#W77-CT R11-row REPRO/GREEN 123v125 deck123 seq 420: the 63-body"
+                      " `{kills whichever you target:}` roster printed 735 B one body at a"
+                      " time (inside a 2,377 B option row at 152v126 seq 63) - RED on base,"
+                      " where this same call joins all 63 names with commas");
+                CHECK(row.find("63 bodies: ") != string::npos
+                          && row.find("Human #1-#63") != string::npos,
+                      "#W77-CT R11-row GREEN the COUNT leads and the consecutive rank run"
+                      " collapses to one handle range - Q2's own joinVictimRoster, so the two"
+                      " rosters cannot drift apart");
+                CHECK(row.find("THEIRS - none") != string::npos,
+                      "#W77-CT R11-row GREEN the empty side still says `none` -"
+                      " joinVictimRoster of an empty list is the empty string, so that"
+                      " wording is byte-identical");
+                {
+                    // Below the collapse floor NOTHING changes: the wave-55
+                    // wording, byte for byte.
+                    std::vector<std::string> two, mineTwo;
+                    two.push_back("Plains #1");
+                    two.push_back("Plains #2");
+                    mineTwo.push_back("Mountain #1");
+                    CHECK(castKillSummaryTag(two, 2, "3 damage", "", mineTwo)
+                              == " {kills whichever you target: THEIRS - Plains #1, Plains #2;"
+                                 " YOURS - Mountain #1}",
+                      "#W77-CT R11-row NEGATIVE a roster below the collapse floor is"
+                      " byte-identical to the wave-55 string");
+                    std::vector<std::string> one;
+                    one.push_back("Goblin #1");
+                    CHECK(removalVictimTag("removes", one, immune) == " {removes: Goblin #1}",
+                      "#W77-CT R11-row NEGATIVE ...and so is the single-name `{removes: }`"
+                      " branch the #W76-CP Q10 pin above depends on");
+                }
+                {
+                    // The `{removes: }` branch carried the same defect at 712 B
+                    // in the same corpus, and is capped in the same edit.
+                    std::vector<std::string> doom;
+                    doom.push_back("Thraben Doomsayer");
+                    for (int i = 1; i <= 40; i++)
+                    {
+                        std::ostringstream h;
+                        h << "Human #" << i;
+                        doom.push_back(h.str());
+                    }
+                    const string r = removalVictimTag("removes", doom, immune);
+                    cout << "  [#W77-CT R11-row] 41-body {removes:} = " << r.size()
+                         << " B (base printed 712 B at 40 bodies)\n";
+                    CHECK(r.size() < 200 && r.find("41 bodies: ") != string::npos
+                              && r.find("Thraben Doomsayer") != string::npos,
+                      "#W77-CT R11-row GREEN the sibling `{removes: }` roster is bounded by the"
+                      " same call, and the distinct shape (the Doomsayer) is still named");
+                }
+                {
+                    // NOTHING LEAVES THE OPTION SET, and nothing is silently
+                    // trimmed: the only lossy edge names its residue.
+                    std::vector<std::string> shapes;
+                    for (int i = 1; i <= 20; i++)
+                    {
+                        std::ostringstream h;
+                        h << "Shape" << i << " #1";
+                        shapes.push_back(h.str());
+                    }
+                    const string r = removalVictimTag("removes", shapes, immune);
+                    CHECK(r.find("20 bodies: ") != string::npos
+                              && r.find("more") != string::npos,
+                      "#W77-CT R11-row GREEN past the group cap the residue is COUNTED and"
+                      " named, never trimmed away - the whole population is still stated");
+                }
+                {
+                    // KEY PIN (wave-74 lesson): the roster is a board-derived
+                    // COUNT, so two windows differing only in it must key
+                    // identically at both keys.
+                    std::vector<std::string> a63 = humans, a62 = humans;
+                    a62.pop_back();
+                    std::vector<std::string> ra, rb;
+                    ra.push_back("Cast Fateful Absence {1}{w}"
+                                 + castKillSummaryTag(none, 63, "3 damage", "", a63));
+                    rb.push_back("Cast Fateful Absence {1}{w}"
+                                 + castKillSummaryTag(none, 62, "3 damage", "", a62));
+                    CHECK(ra[0] != rb[0],
+                      "#W77-CT R11-row KEY PIN INSTRUMENT the two rows really do differ in the"
+                      " printed bytes (63 bodies vs 62)");
+                    CHECK(optionSetKeyOf(ra) == optionSetKeyOf(rb)
+                              && holdActionKeyRow(ra[0]) == holdActionKeyRow(rb[0]),
+                      "#W77-CT R11-row KEY PIN the roster rides a `{...}` brace group, so it is"
+                      " outside the ask/hold keys - the wave-74 lesson, applied to a clause"
+                      " whose number moves every time a body enters or dies");
+                }
             }
         }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
