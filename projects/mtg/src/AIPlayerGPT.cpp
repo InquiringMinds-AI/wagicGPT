@@ -7424,6 +7424,53 @@ static bool w76CastableFromDeadZone(MTGCardInstance * c, bool inExile)
     return c->has(Constants::CANPLAYFROMGRAVEYARD) || c->has(Constants::TEMPFLASHBACK);
 }
 
+//#W77-CR (R9, wave-76 deck126 MED / deck146 MED / engine-seat LOW - MEASURE
+//ONLY). THE THIRD EXEMPTION: THE PLAN NAMES THE CARD, BUT NOT AS A CAST. The
+//counter fired 102 times in the wave-76 corpus and deck126's 42 are all
+//protocol-legal TUTOR-TARGET plans ("PLAN: cast Idyllic Tutor, find Sanguine
+//Bond") - the named card is what the seat is going to FETCH, not what it means
+//to cast from the graveyard; deck146's ~15 are reanimation objects, spell
+//targets, stack objects and opponents' hand cards. A substring of the plan is
+//not an intent. The intent the measure is about is the seat CASTING or PLAYING
+//that card, and English marks it with a verb immediately ahead of the name, so
+//the name only counts when one of those verbs sits within a short window before
+//it. Deliberately narrow and deliberately checkable: the verb list is the one
+//the reply protocol and every cast row already use.
+static bool w77PlanNamesAsCastIntent(const string& planIn, const string& cardName)
+{
+    if (cardName.size() < 4 || planIn.empty())
+        return false;
+    string p, c;
+    for (size_t i = 0; i < planIn.size(); i++)
+        p += (char) tolower((unsigned char) planIn[i]);
+    for (size_t i = 0; i < cardName.size(); i++)
+        c += (char) tolower((unsigned char) cardName[i]);
+    static const char * kCast[] = { "cast ", "casting ", "play ", "playing ",
+                                    "recast ", "hardcast ", "flashback " };
+    //The verb has to be close enough to the name to be about it: one short
+    //qualifier ("cast my ...", "cast the second ...") and no more. Measured in
+    //bytes rather than words because the plan is one line of free text.
+    const size_t kReach = 24;
+    size_t at = p.find(c);
+    while (at != string::npos)
+    {
+        const size_t from = at > kReach ? at - kReach : 0;
+        for (size_t k = 0; k < sizeof(kCast) / sizeof(kCast[0]); k++)
+        {
+            const size_t v = p.rfind(kCast[k], at);
+            if (v != string::npos && v >= from && v < at)
+                return true;
+        }
+        at = p.find(c, at + 1);
+    }
+    return false;
+}
+
+//#W77-CR (R9, second half): a record with NO PLAN line names nothing at all.
+//`plan_line_missing` ran 91 corpus-wide and mCurrentPlan is the LAST plan the
+//model stated, carried forward - so a window whose own reply wrote no plan was
+//measured against a plan it did not write. A measure that attributes an older
+//window's sentence to this one cannot be sampled.
 static string w75PlanNamesUncastableZoneCard(const string& plan, MTGPlayerCards * game)
 {
     if (plan.empty() || !game)
@@ -7462,7 +7509,10 @@ static string w75PlanNamesUncastableZoneCard(const string& plan, MTGPlayerCards 
                 if (w76CastPermissionKeyword(c->magicText))
                     continue;
             }
-            if (planNamesStrandedCard(plan, c->name)) //the same name test, same floor
+            //#W77-CR (R9): the name must be named AS A CAST. `planNamesStrandedCard`
+            //is a bare substring, which is the right floor for the reserve-verdict
+            //measure (the row already priced the strand) and far too wide here.
+            if (w77PlanNamesAsCastIntent(plan, c->name))
                 return c->name;
         }
     }
@@ -17925,9 +17975,22 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         gptForceCloseEarned(mLastReasoningOnly, content.empty(), mLastFinishLength,
                             !mLastReasoning.empty(), codedAnswerCount(content))
         && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint);
-    const int w76CloseWhat = w76ForceCloseDecision(w76CloseEarned,
-                                                   !w76ForceCloseArmAllowed(mRetryPark.forceCloseArmed),
-                                                   mForceCloseDeferTicks); //#W76-CN (Q8)
+    //#W77-CR (R11 a, wave-76 engine-seat MED-3): THE SAME ARM'S OUTSTANDING
+    //CLOSE BOUNDS THE RE-ARM TOO. Wave 76's whole `forced_close_unrecorded` 5
+    //were same-arm re-arms with an EMPTY park - the Q8 bound never fired once
+    //(refused 0, deferred 0, bound-hits 0) because it only ever looked at the
+    //OTHER arm. A re-arm while this arm's close is still outstanding supersedes
+    //a phase-2 decode that was already bought: waste, not loss, and it is bounded
+    //the same way rather than forbidden. The wait is the same 8-tick ceiling, so
+    //a close that genuinely cannot resolve still arms and is still counted
+    //unrecorded exactly as before; only the decode spent while the predecessor
+    //was still in flight is saved.
+    const bool w77CloseBusy = !w76ForceCloseArmAllowed(mRetryPark.forceCloseArmed)
+                              || mForceCloseArmed;
+    const bool w77SameArmBusy = mForceCloseArmed
+                                && w76ForceCloseArmAllowed(mRetryPark.forceCloseArmed);
+    const int w76CloseWhat = w76ForceCloseDecision(w76CloseEarned, w77CloseBusy,
+                                                   mForceCloseDeferTicks); //#W76-CN (Q8), #W77-CR (R11 a)
     if (w76CloseWhat == kW76CloseDefer)
     {
         //DEFERRED: the other arm's close is still outstanding in the park. Do not
@@ -17936,7 +17999,14 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         //The slot is built exactly as the arm below builds it and the decision
         //stays PENDING until the park clears (or the tick bound arms it anyway).
         if (!mForceCloseDeferred)
-            mForceCloseArmsRefused++; //once per deferral, never once per tick
+        {
+            //#W77-CR (R11 a): the two bounds keep their OWN meters - the park's
+            //(Q8/F2) and this arm's - so a corpus can tell which one fired.
+            if (w77SameArmBusy)
+                mForceCloseSameArmDeferred++;
+            else
+                mForceCloseArmsRefused++; //once per deferral, never once per tick
+        }
         mForceCloseDeferred = true;
         mForceCloseDeferTicks++;
         mRetryFirstLatencyMs = mLastLatencyMs;
@@ -18102,7 +18172,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), //#W76-CQ (F2)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -19086,10 +19156,26 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //latch or answered from a replay cache writes no record and therefore never
     //commits: that is the whole of the HIGH-1 fix.
     const int recordWindowSeq = mWindowSeq++;
+    //#W77-CR (R2 a, wave-76 engine-seat HIGH-2): THE LAND DROP IS ITS OWN
+    //QUESTION AND NOW ITS OWN SEAM. Every `kind: ask` record mapped to the
+    //"cast" seam, and the land-drop menu is a `kind: ask` record - so a land
+    //window sat in the casting menu's hold-check history and vice versa. All 22
+    //false brackets in the wave-76 corpus are a cast-seam pair with a land drop
+    //in it; 0 of the remaining 1,011 pairs is false. The window's own class is
+    //already known here (askModel set it before the call), so the commit is
+    //routed by the builder that asked, not by the record's kind word.
     if (kind && strcmp(kind, "priority") == 0)
         w76HoldWindowAsked(mHoldMemory, "priority", recordWindowSeq);
     else if (kind && strcmp(kind, "ask") == 0)
-        w76HoldWindowAsked(mHoldMemory, "cast", recordWindowSeq);
+        w76HoldWindowAsked(mHoldMemory,
+                           mLogWindowKind == kAskWindowLandDrop ? "land" : "cast",
+                           recordWindowSeq);
+    //#W77-CR (R2 d): consumed by THIS record whether or not a log is configured,
+    //so a window that printed no bracket can never inherit an earlier one's
+    //referent (the mLastParseNote discipline, and the same reason #W76-CN moved
+    //the commit above this early return).
+    const int holdCheckRefSeq = mHoldCheckRefSeq;
+    mHoldCheckRefSeq = -2;
     if (mTransLogPath.empty())
     {
         mLastParseNote.clear(); //consumed even when logging is off
@@ -19359,6 +19445,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //whose class was never budgeted is distinguishable from one that was.
     rec["log_window"] = logWindowLabel();
     rec["log_window_kind"] = string(askWindowKindName(mLogWindowKind));
+    //#W77-CR (R2 d): the hold-check bracket's REFERENT, as an integer on the
+    //record that carries the bracket. -1 = "first window asked at this seam";
+    //absent = this window printed no bracket. Consumed here so the next record
+    //cannot inherit it (the same discipline as mLastParseNote).
+    if (holdCheckRefSeq > -2)
+        rec["hold_check_ref_seq"] = holdCheckRefSeq;
     if (mLogWindowElided > 0)
         rec["log_window_turns_elided"] = mLogWindowElided;
     if (!chosenText.empty())
@@ -19396,7 +19488,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
             //structural under-count of the second measure that no corpus could
             //see, because the two fields are read separately by construction.
             {
-                const string dead = w75PlanNamesUncastableZoneCard(mCurrentPlan, game);
+                //#W77-CR (R9): and a reply that wrote no PLAN line is skipped -
+                //mCurrentPlan is then an EARLIER window's sentence and this
+                //window said nothing about any card.
+                const bool thisReplyStatedAPlan =
+                    (firstLineLeadingPlanPos(reply) != string::npos);
+                const string dead = thisReplyStatedAPlan
+                    ? w75PlanNamesUncastableZoneCard(mCurrentPlan, game) : string();
                 if (!dead.empty())
                 {
                     rec["plan_names_uncastable_zone_card"] = dead;
@@ -19886,7 +19984,18 @@ void AIPlayerGPT::logGameEnd()
         {"force_close_arms_refused", mForceCloseArmsRefused}, //#W76-CN (Q8)
         {"force_close_arms_deferred", mForceCloseArmsRefused}, //#W76-CQ (F2)
         {"force_close_defer_bound_hits", mForceCloseDeferBoundHits}, //#W76-CQ (F2)
+        //#W77-CR (R11 a): deferrals caused by THIS arm's own outstanding close.
+        //Its own meter - the park's bound never fired in wave 76 and this one is
+        //the shape that did.
+        {"force_close_same_arm_deferred", mForceCloseSameArmDeferred},
         {"crossphase_identical_reputs", mCrossPhaseRePuts},   //#W76-CN (Q13)
+        //#W77-CR (R8): of those, the ones whose ask-cache board key MATCHED -
+        //i.e. the ones that printed `nothing on the board has changed`. Never
+        //summed with the line above; the difference is the moved-board class.
+        {"crossphase_board_unchanged", mCrossPhaseBoardUnchanged},
+        //#W77-CR (R1): windows put to the model while the SEAT'S OWN proven life
+        //loop was mid-resolution - the 32-window population of engine-seat HIGH-1.
+        {"own_loop_windows_asked", mOwnLoopWindowsAsked},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -29536,6 +29645,49 @@ void w75ApplyChainFeed(std::vector<string>& rows, bool oppLoopLive)
         rows[i] = w75ChainFeedRow(rows[i], true);
 }
 
+//#W77-CR (R1, wave-76 engine-seat HIGH-1 / deck126 HIGH-1). A WON, DETERMINISTIC
+//LOOP WAS PUT TO THE MODEL ONCE PER ITERATION. `126v123` deck126 t17 Main 1,
+//seqs 30-61: 32 consecutive priority windows while the seat's OWN proven
+//Sanguine Bond + Exquisite Blood loop resolved one point at a time (opponent
+//17 -> 1, seat 24 -> 40), the screen printing `LOOP COMPLETE` every time and the
+//model answering `pass` on all 32 - about 48 minutes of decode, ~35% of that
+//game's wall clock, on a board the rules had already decided. Nothing may be
+//removed or auto-answered: the rows are legal and the board genuinely moves
+//between links, so no latch and no cache may close the window on its own. What
+//was missing is the FACT that makes one answer serve all of them, and the row
+//that carries it - the model's own HOLD. Measured off the same rows the menu is
+//about to print, so the clause and the list cannot disagree; it names no number
+//at all (the row index the priority seam prints is not known until after its
+//rows are emitted, and a wrong row number is a false surface), and it is a
+//`[...]` group, which `holdActionKeyRow` and `optionSetKeyOf` both strip - so
+//the hold latch that must then HOLD across the links keys identically with the
+//clause and without it. Pure over the row text.
+static string holdKeyRow(const string& row);          //defined below, used here
+static bool w72RowIsDeclineOrHold(const string& row); //defined below, used here
+static const char * kW77OwnLoopRowTag =
+    " [your loop is resolving on its own - this row is not needed to win it; the"
+    " HOLD row on this menu covers every link of it until the loop ends or"
+    " something else changes]";
+
+string w77OwnLoopRow(const string& row, bool ownLoopResolving)
+{
+    if (!ownLoopResolving || row.empty())
+        return row;
+    if (w72RowIsDeclineOrHold(holdKeyRow(row)))
+        return row; //the declines and the hold row are not rows the clause is about
+    if (row.find(kW77OwnLoopRowTag) != string::npos)
+        return row; //idempotent: the prompt is rebuilt on every polling tick
+    return row + kW77OwnLoopRowTag;
+}
+
+void w77ApplyOwnLoopFeed(std::vector<string>& rows, bool ownLoopResolving)
+{
+    if (!ownLoopResolving)
+        return;
+    for (size_t i = 0; i < rows.size(); i++)
+        rows[i] = w77OwnLoopRow(rows[i], true);
+}
+
 //#W61-U (C14, deck152 I2): "any change re-opens this window" is a GUARANTEE on
 //one menu and a REAL COST on another. `152v162` seqs 32-42 are eleven priority
 //windows inside one Draw phase, 163.3 s of inference for no board effect, while
@@ -29567,10 +29719,26 @@ static bool holdNoteSameWindow(bool first, int unseenRows, int measuredSeq, int 
 //count. The guide teaches "N rows above are new -> decline this window", so the
 //false verdict bought a decline at every window: the same dead menu re-put 8
 //times in one turn. Both halves now name the carve-out the key applies.
-static string holdReopenNoteText(int unseenRows, int repeats)
+//#W77-CR (R2 b, wave-76 engine-seat HIGH-2 second residual). THE FIRST WINDOW
+//SAYS SO INSTEAD OF SAYING NOTHING. The bracket's two sentences are both
+//COMPARISONS, and at the first window the model is asked at a seam there is
+//nothing to compare with - so the note was the empty string, and the model read
+//a menu with no hold guidance at all where the very next one carries a
+//paragraph about a "last window" it has not seen. The trust doctrine's own rule
+//(#W62-AC: silent omissions are worse than wrong text - the model confabulates
+//rules into gaps) says render the true token: this window is the first at this
+//seam, and that is what it prints. `first` is a state of the MEMORY, not of the
+//counts, so it is its own parameter and defaults to false for every existing
+//caller and pin.
+static string holdReopenNoteText(int unseenRows, int repeats, bool first = false)
 {
+    if (first)
+        return "\n[hold check: this is the first window I have asked you at this seam -"
+               " there is no earlier menu here to compare it with yet; from the next one"
+               " on this bracket says which rows have moved since the last window I asked"
+               " you at this seam]";
     if (repeats < 1 && unseenRows < 1)
-        return string(); //first window at this seam: nothing measured yet
+        return string(); //nothing measured (a rebuild with no run and no new row)
     std::ostringstream o;
     o << "\n[hold check: ";
     if (unseenRows > 0)
@@ -29667,8 +29835,12 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
     }
     const int prevRun = m.run.count(s) ? m.run[s] : 0;
     const int runIfAsked = (first || unseen > 0) ? 0 : prevRun + 1;
-    const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : runIfAsked);
+    const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : runIfAsked,
+                                           first); //#W77-CR (R2 b)
     m.measuredSeq[s] = windowSeq;
+    //#W77-CR (R2 d): the referent this note names, written down rather than
+    //left to be re-derived. -1 at the first window (there is none).
+    m.measuredRef[s] = first ? -1 : (m.lastSeq.count(s) ? m.lastSeq[s] : -1);
     m.measuredRun[s] = runIfAsked; //#W76-CQ (F1): the run this note claims
     m.lastNote[s] = note;
     std::set<string> keys;
@@ -29694,6 +29866,7 @@ void w76HoldWindowAsked(W76HoldMemory& m, const char * seam, int windowSeq)
     if (m.pendingSeq.count(s) && m.pendingSeq[s] != windowSeq)
         return; //a record that is not this staged window's own
     m.last[s] = p->second;
+    m.lastSeq[s] = windowSeq; //#W77-CR (R2 d): the referent the next bracket names
     m.run[s] = m.pendingRun.count(s) ? m.pendingRun[s] : 0;
     m.pending.erase(s);
     m.pendingSeq.erase(s);
@@ -29711,9 +29884,68 @@ void w76HoldWindowNotAsked(W76HoldMemory& m, const char * seam)
     m.pendingRun.erase(s);
 }
 
+//#W77-CR (R2 a, wave-76 engine-seat HIGH-2, the leak half). ELEVEN LAND-DROP
+//WINDOWS PRINTED A BRACKET THEY NEVER MEASURED. `askModel` consumes
+//`mNextAskPromptNote` on every exit path it reaches - but the casting builder
+//WRITES that note (declined count + hold check + LOOP RUNNING) and only then
+//takes one of its three no-ask returns, so a cast note measured over a casting
+//menu rode onto whatever window asked next. In the wave-76 corpus that was the
+//land drop eleven times: `125v162` deck162 seq 20, `125v130` deck130 seq 7,
+//`146v125` deck146 seqs 59/97, `146v126` deck126 seq 11 and six more, each
+//printing `every row above was also on the menu at the last window I asked you
+//at this seam` over `Play Mountain / Play no land right now`. Pure over the
+//three fields, so the policy is pinned without a game.
+void w77DropUnaskedCastNote(string& promptNote, string& castNote, int& refSeq)
+{
+    promptNote.clear();
+    castNote.clear();
+    refSeq = -2; //no bracket reached a reader: nothing to stamp on a record
+}
+
+//#W77-CR (R1): is the seat's OWN life loop a proven win AND actually resolving?
+//Both halves are required. The proven-win half alone is a board the seat merely
+//controls, and a clause reading "your loop is resolving on its own" over a board
+//where nothing is on the stack is the false surface the trust doctrine forbids;
+//the resolving half alone is any trigger chain. Same two facts `loopAutoPassFor`
+//reads, asked of THIS seat rather than the opponent - and unlike that collapse
+//this one removes nothing: it annotates.
+bool AIPlayerGPT::w77OwnLoopResolving()
+{
+    if (!observer || !observer->mLayers || !observer->mLayers->stackLayer())
+        return false;
+    if (observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) <= 0)
+        return false;
+    return lifeLoopProvenWin(this);
+}
+
+//One count per WINDOW, never one per polling tick - the prompt is rebuilt on
+//every tick while an answer is in flight (#W76-CQ F4's defect, in its own
+//shape). mWindowSeq moves only when a record is written, so it is the window's
+//identity here exactly as it is there.
+void AIPlayerGPT::w77CountOwnLoopWindow()
+{
+    if (mOwnLoopCountedSeq == mWindowSeq)
+        return;
+    mOwnLoopCountedSeq = mWindowSeq;
+    mOwnLoopWindowsAsked++;
+}
+
+void AIPlayerGPT::w77DropUnaskedCastNote()
+{
+    ::w77DropUnaskedCastNote(mNextAskPromptNote, mCastHoldNote, mHoldCheckRefSeq);
+}
+
 string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>& rows)
 {
-    return w76HoldReopenNote(mHoldMemory, seam, rows, mWindowSeq, false, holdActionKeyRow);
+    const string note = w76HoldReopenNote(mHoldMemory, seam, rows, mWindowSeq, false,
+                                          holdActionKeyRow);
+    //#W77-CR (R2 d): stamp the referent for this window's record. -2 = no
+    //bracket; the record writer consumes it so a later window cannot inherit it.
+    const string s(seam ? seam : "");
+    mHoldCheckRefSeq = note.empty()
+        ? -2
+        : (mHoldMemory.measuredRef.count(s) ? mHoldMemory.measuredRef[s] : -1);
+    return note;
 }
 
 //#W53-N (D2): does a hold taken on <heldBoard> with <heldRows> still stand at
@@ -38778,6 +39010,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //set of bytes.
     w75ApplyChainFeed(shownLines, lifeLoopProvenWin(opponent()));
     w75ApplyChainFeed(renderRows, lifeLoopProvenWin(opponent()));
+    //#W77-CR (R1): the seat's OWN proven loop, mid-resolution. Both lists, in
+    //the same place and for the same reason as the chain feed above.
+    {
+        const bool ownLoopResolving = w77OwnLoopResolving();
+        w77ApplyOwnLoopFeed(shownLines, ownLoopResolving);
+        w77ApplyOwnLoopFeed(renderRows, ownLoopResolving);
+        if (ownLoopResolving)
+            w77CountOwnLoopWindow(); //the population HIGH-1 measured at 35
+    }
     {
         //#W48 (D2): gather repeated rows before collapsing, permuting the action
         //list and the translog's option list with them so option N still names
@@ -40224,7 +40465,21 @@ static string w76CrossPhaseRePutNote(int windowsAgo, const string& phaseName,
     if (boardUnchanged)
         o << "; nothing on the board has changed";
     else
-        o << "; the board HAS moved since then";
+        //#W77-CR (R8, wave-76 engine-seat MED-1). THE NEGATIVE SENTENCE SAID
+        //THE ONE THING THAT UNDOES THE BRACKET. 104 of the corpus's 109 printed
+        //`the board HAS moved since then` - and every one of those boards really
+        //had moved (the ask-cache board key is the whole serialised state below
+        //the phase line; between two phases of one turn a draw step, a life
+        //change or a permanent entering moves it for real, so the comparison is
+        //NOT too strict and widening it would make the positive clause a lie).
+        //What was wrong is what the seat was left with: told a list it had
+        //already declined was being re-put AND that the board had moved, the
+        //model's cheapest reading is "re-read everything", which is the opposite
+        //of the bracket's purpose. So the negative branch states the fact the
+        //key GUARANTEES - the rows are byte-identical, which is what made this a
+        //re-put at all - beside the fact that the board is not.
+        o << "; the board has moved since then, but this list has not - not one"
+             " row on it appeared, went away, or changed a card, cost or target";
     o << "]";
     return o.str();
 }
@@ -40535,15 +40790,21 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             //the increment sat above the pending-poll return, so a single
             //qualifying asynchronous ask was counted again on every tick. The
             //window's own seq is the identity of the ask.
-            if (cp->second.countedSeq != mWindowSeq)
-            {
-                cp->second.countedSeq = mWindowSeq;
-                mCrossPhaseRePuts++;
-            }
             //...and the board claim is a comparison, not an assumption.
             const bool boardUnchanged =
                 !cp->second.boardKey.empty()
                 && cp->second.boardKey == w76PhaseFreeBoardKey(boardStateKey);
+            if (cp->second.countedSeq != mWindowSeq)
+            {
+                cp->second.countedSeq = mWindowSeq;
+                mCrossPhaseRePuts++;
+                //#W77-CR (R8): and the split is MEASURED on the same
+                //one-per-window gate, so the next seat can read the positive
+                //clause's rate off the gameend record instead of grepping 109
+                //prompts for it. Never summed with the total above.
+                if (boardUnchanged)
+                    mCrossPhaseBoardUnchanged++;
+            }
             promptOnlyNote += w76CrossPhaseRePutNote(mWindowSeq - cp->second.windowSeq,
                                                      cp->second.phaseName, boardUnchanged);
         }
@@ -41679,6 +41940,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             rowBackFace.push_back(true);
         }
         opts.push_back(kLandDropDeclineRow);
+        //#W77-CR (R2 a): the land drop's own hold-check memory. It is a `kind:
+        //ask` record like the casting menu, so wave 76 filed it in the casting
+        //menu's history; it is a different question with a different row
+        //vocabulary, and a bracket that compares the two is false by
+        //construction. Measured at its own seam, printed on the same prompt-only
+        //channel as every other bracket (askModel splices and consumes it).
+        mNextAskPromptNote += holdReopenNote("land", opts);
 
         std::ostringstream q;
         q << landDropAskText(lands.size());
@@ -42858,6 +43126,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         vector<string> menu(opts);
         //#W75-CL (P5): the loop override, before every tag and every key.
         w75ApplyChainFeed(menu, lifeLoopProvenWin(opponent()));
+        //#W77-CR (R1): ...and the seat's own loop, on the casting menu too.
+        {
+            const bool ownLoopResolving = w77OwnLoopResolving();
+            w77ApplyOwnLoopFeed(menu, ownLoopResolving);
+            if (ownLoopResolving && attempt == 0)
+                w77CountOwnLoopWindow();
+        }
         //#W54-C (D18, wave-53 ledger MED = R178): the MENU pass. Every row
         //priced itself ALONE, so nothing said which rows fit TOGETHER in this
         //window - `162v152` s11 had two blockers affordable together against
@@ -43004,6 +43279,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (attempt == 0 && holdHonoured("cast", menu))
         {
             w76HoldWindowNotAsked(mHoldMemory, "cast"); //#W76-CN (Q1)
+            w77DropUnaskedCastNote(); //#W77-CR (R2 a)
             return NULL;
         }
         //#W67-AX (I7): and the reservation decline, on its own terms (the cast
@@ -43017,11 +43293,13 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (attempt == 0 && reserveDeclineHonoured(castSetKey, untappedSources, boardNow))
         {
             w76HoldWindowNotAsked(mHoldMemory, "cast"); //#W76-CN (Q1)
+            w77DropUnaskedCastNote(); //#W77-CR (R2 a)
             return NULL;
         }
         if (attempt == 0 && loopAutoPassWindow()) //#W66-AS (H3 second half)
         {
             w76HoldWindowNotAsked(mHoldMemory, "cast"); //#W76-CN (Q1)
+            w77DropUnaskedCastNote(); //#W77-CR (R2 a)
             return NULL;
         }
         //#W72-BV (M9): the turn-scoped reserve carry, on the prompt-only channel
@@ -86559,9 +86837,15 @@ static const char * kW50Y_r94 =
                               " you declined; nothing on the board has changed]",
                       "#W76-CN Q13 GREEN the bracket names an ASKED window, its phase and the"
                       " answer the model itself gave (LESSON OF WAVE 75)");
+                //#W77-CR (R8): the negative branch's WORDING is revised (the bare
+                //"the board HAS moved" invited a re-read of everything, which is the
+                //opposite of the bracket's purpose); the BRANCH and its condition are
+                //F4's, untouched, and this pin still guards both.
                 CHECK(w76CrossPhaseRePutNote(4, "Upkeep", false)
                           == "\n[this exact list was put to you 4 windows ago at Upkeep and"
-                             " you declined; the board HAS moved since then]",
+                             " you declined; the board has moved since then, but this list"
+                             " has not - not one row on it appeared, went away, or changed"
+                             " a card, cost or target]",
                       "#W76-CQ F4 REPRO/GREEN with an unrelated permanent between the two asks"
                       " the note states the re-put and NOT the board claim - RED on base, where"
                       " the sentence was unconditional and no board was ever compared");
@@ -87539,6 +87823,388 @@ static const char * kW50Y_r94 =
                 CHECK(w76SelfRecursiveZoneScript("moveto(hand)")
                           && !w76SelfRecursiveZoneScript("moveto(graveyard)"),
                       "#W76-CQ F8 NEGATIVE the ZONE-script reader is unchanged");
+            }
+            //================ #W77-CR (wave-77 lane CR) ================
+            //R2 (a) THE LAND DROP'S OWN SEAM, AND THE NOTE THAT LEAKED ONTO IT.
+            {
+                std::vector<string> castRows, landRows;
+                castRows.push_back("Cast Damnation {2}{b}{b}");
+                castRows.push_back("Hold priority - pass now, and do not ask me again");
+                landRows.push_back("Play Brightclimb Pathway");
+                landRows.push_back("Play no land right now");
+                //REPRO, executed: under the wave-76 wiring BOTH windows commit at
+                //"cast", so the casting menu's referent is a land menu.
+                {
+                    W76HoldMemory w76;
+                    w76HoldReopenNote(w76, "cast", castRows, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(w76, "cast", 1);
+                    w76HoldReopenNote(w76, "cast", landRows, 2, false, holdActionKeyRow);
+                    w76HoldWindowAsked(w76, "cast", 2);   //the land record, wave-76 routing
+                    const string note = w76HoldReopenNote(w76, "cast", castRows, 3,
+                                                          false, holdActionKeyRow);
+                    CHECK(note.find("2 rows above are new") != string::npos,
+                          "#W77-CR R2a REPRO with ONE shared seam the casting menu reads as"
+                          " wholly new because a land menu is its referent");
+                }
+                //GREEN: routed to its own seam, the land window is invisible to the
+                //casting menu's bracket and the cast referent is the last CAST window.
+                {
+                    W76HoldMemory w77;
+                    w76HoldReopenNote(w77, "cast", castRows, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(w77, "cast", 1);
+                    w76HoldReopenNote(w77, "land", landRows, 2, false, holdActionKeyRow);
+                    w76HoldWindowAsked(w77, "land", 2);
+                    const string note = w76HoldReopenNote(w77, "cast", castRows, 3,
+                                                          false, holdActionKeyRow);
+                    CHECK(note.find("every row above was also on the menu") != string::npos,
+                          "#W77-CR R2a GREEN the land drop has its own seam: the casting"
+                          " menu's referent is the last CASTING window");
+                    CHECK(note.find("rows above are new") == string::npos,
+                          "#W77-CR R2a GREEN ...and nothing on it reads as new");
+                }
+                //...and the land seam's own bracket is measured against LAND windows.
+                {
+                    W76HoldMemory w77;
+                    w76HoldReopenNote(w77, "land", landRows, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(w77, "land", 1);
+                    const string note = w76HoldReopenNote(w77, "land", landRows, 2,
+                                                          false, holdActionKeyRow);
+                    CHECK(note.find("every row above was also on the menu") != string::npos
+                              && note.find("(1 window in a row now)") != string::npos,
+                          "#W77-CR R2a GREEN the land seam keeps its own run");
+                }
+            }
+            //R2 (a) second half: the note a suppressed CASTING window measured is
+            //dropped rather than carried onto the next, unrelated ask.
+            {
+                string promptNote = "\n[you declined this exact list 3 times already"
+                                    " this turn]\n[hold check: every row above was also"
+                                    " on the menu at the last window I asked you at this"
+                                    " seam (2 windows in a row now)]";
+                string castNote = "\n[hold check: every row above was also on the menu]";
+                int refSeq = 7;
+                ::w77DropUnaskedCastNote(promptNote, castNote, refSeq);
+                CHECK(promptNote.empty() && castNote.empty() && refSeq == -2,
+                      "#W77-CR R2a GREEN a casting window closed without an ask drops the"
+                      " note it measured - eleven wave-76 land-drop windows printed a"
+                      " casting menu's hold check because askModel consumed it next");
+            }
+            //R2 (b) THE FIRST WINDOW AT A SEAM SAYS SO INSTEAD OF SAYING NOTHING.
+            {
+                CHECK(holdReopenNoteText(0, 0).empty(),
+                      "#W77-CR R2b REPRO on the base reading the first window's note is the"
+                      " empty string - no hold guidance at all on the one menu that has"
+                      " none of the bracket's history");
+                const string firstNote = holdReopenNoteText(0, 0, true);
+                CHECK(firstNote.find("this is the first window I have asked you at this seam")
+                          != string::npos,
+                      "#W77-CR R2b GREEN the first window states what it is");
+                CHECK(firstNote.find("every row above was also on the menu") == string::npos
+                          && firstNote.find("rows above are new") == string::npos
+                          && firstNote.find("window in a row") == string::npos,
+                      "#W77-CR R2b GREEN ...and makes no comparison and claims no run");
+                CHECK(firstNote.compare(0, 2, "\n[") == 0
+                          && firstNote[firstNote.size() - 1] == ']',
+                      "#W77-CR R2b KEY PIN the first-window note is a prompt-only bracket");
+                CHECK(stripNarrationDecoration("Cast Damnation {2}{b}{b}" + firstNote)
+                          .find("hold check") == string::npos,
+                      "#W77-CR R2b KEY PIN ...dropped by the narration stripper like every"
+                      " other bracket on this channel");
+                //...and it is what the LIVE memory prints at its first window.
+                {
+                    W76HoldMemory m;
+                    std::vector<string> rows;
+                    rows.push_back("Cast Damnation {2}{b}{b}");
+                    rows.push_back("Hold priority - pass now, and do not ask me again");
+                    const string live = w76HoldReopenNote(m, "cast", rows, 1, false,
+                                                          holdActionKeyRow);
+                    CHECK(live == firstNote,
+                          "#W77-CR R2b GREEN the live seam's first window prints exactly it");
+                    w76HoldWindowAsked(m, "cast", 1);
+                    const string second = w76HoldReopenNote(m, "cast", rows, 2, false,
+                                                            holdActionKeyRow);
+                    CHECK(second.find("(1 window in a row now)") != string::npos,
+                          "#W77-CR R2b GREEN ...and the SECOND window is the first"
+                          " comparison, run 1");
+                }
+            }
+            //R2 (c) THE COUNT, PINNED AT ZERO, ONE, A REORDER AND A DISAPPEARANCE.
+            //Measured through w74HoldUnseenRows over holdActionKeyRow - the live
+            //seam's own pair - so the pins cannot drift from the bracket's arithmetic.
+            {
+                std::vector<string> a, reordered, plusOne, minusOne;
+                const string rowA = "Cast Molten Rain {1}{r}{r} - legal targets right now: Plains";
+                const string rowB = "Cast Stone Rain {2}{r} - legal targets right now: Plains";
+                const string rowC = "Cast Hammer of Bogardan {1}{r}{r}";
+                const string hold = "Hold priority - pass now, and do not ask me again";
+                a.push_back(rowA); a.push_back(rowB); a.push_back(hold);
+                reordered.push_back(rowB); reordered.push_back(rowA); reordered.push_back(hold);
+                plusOne.push_back(rowA); plusOne.push_back(rowB); plusOne.push_back(rowC);
+                plusOne.push_back(hold);
+                minusOne.push_back(rowA); minusOne.push_back(hold);
+                std::set<string> held;
+                for (size_t i = 0; i < a.size(); i++)
+                    held.insert(holdActionKeyRow(a[i]));
+                CHECK(w74HoldUnseenRows(held, a, holdActionKeyRow) == 0,
+                      "#W77-CR R2c ZERO the same menu counts 0 new");
+                CHECK(w74HoldUnseenRows(held, reordered, holdActionKeyRow) == 0,
+                      "#W77-CR R2c REORDER the same rows in another order count 0 new - the"
+                      " count is over a SET of action keys, order-independent");
+                CHECK(w74HoldUnseenRows(held, plusOne, holdActionKeyRow) == 1,
+                      "#W77-CR R2c ONE one row appearing counts exactly 1");
+                CHECK(w74HoldUnseenRows(held, minusOne, holdActionKeyRow) == 0,
+                      "#W77-CR R2c DISAPPEARANCE a row that only went AWAY counts 0 new -"
+                      " the count is rows of THIS menu absent from the referent, never a"
+                      " set difference in the other direction");
+                //...and the printed sentences agree with the arithmetic.
+                {
+                    W76HoldMemory m;
+                    w76HoldReopenNote(m, "cast", a, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(m, "cast", 1);
+                    CHECK(w76HoldReopenNote(m, "cast", reordered, 2, false, holdActionKeyRow)
+                              .find("every row above was also on the menu") != string::npos,
+                          "#W77-CR R2c REORDER the bracket says SEEN, not `N rows are new`");
+                    W76HoldMemory m2;
+                    w76HoldReopenNote(m2, "cast", a, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(m2, "cast", 1);
+                    CHECK(w76HoldReopenNote(m2, "cast", minusOne, 2, false, holdActionKeyRow)
+                              .find("every row above was also on the menu") != string::npos,
+                          "#W77-CR R2c DISAPPEARANCE the bracket says SEEN");
+                    W76HoldMemory m3;
+                    w76HoldReopenNote(m3, "cast", a, 1, false, holdActionKeyRow);
+                    w76HoldWindowAsked(m3, "cast", 1);
+                    CHECK(w76HoldReopenNote(m3, "cast", plusOne, 2, false, holdActionKeyRow)
+                              .find("1 row above is new") != string::npos,
+                          "#W77-CR R2c ONE singular, and exactly 1");
+                }
+                //KEY STABILITY (LESSON OF WAVE 74): two windows differing ONLY in a
+                //life number the rows project key identically, so no count and no
+                //referent moves with the board.
+                {
+                    const string lifeA = "Cast Damnation {2}{b}{b} {right now: you would be at 12}";
+                    const string lifeB = "Cast Damnation {2}{b}{b} {right now: you would be at 3}";
+                    CHECK(holdActionKeyRow(lifeA) == holdActionKeyRow(lifeB),
+                          "#W77-CR R2c KEY PIN a moving life projection is the SAME row");
+                    std::set<string> h2;
+                    h2.insert(holdActionKeyRow(lifeA));
+                    std::vector<string> now;
+                    now.push_back(lifeB);
+                    CHECK(w74HoldUnseenRows(h2, now, holdActionKeyRow) == 0,
+                          "#W77-CR R2c KEY PIN ...so it counts 0 new");
+                }
+            }
+            //R2 (d) hold_check_ref_seq - THE REFERENT, WRITTEN DOWN.
+            {
+                std::vector<string> rows;
+                rows.push_back("Cast Damnation {2}{b}{b}");
+                rows.push_back("Hold priority - pass now, and do not ask me again");
+                W76HoldMemory m;
+                w76HoldReopenNote(m, "cast", rows, 4, false, holdActionKeyRow);
+                CHECK(m.measuredRef["cast"] == -1,
+                      "#W77-CR R2d the first window at a seam names NO referent (-1)");
+                w76HoldWindowAsked(m, "cast", 4);
+                CHECK(m.lastSeq["cast"] == 4,
+                      "#W77-CR R2d a window that earned a record becomes the referent");
+                w76HoldReopenNote(m, "cast", rows, 9, false, holdActionKeyRow);
+                CHECK(m.measuredRef["cast"] == 4,
+                      "#W77-CR R2d GREEN the bracket at seq 9 names seq 4 - the wave-76 seat"
+                      " had to re-implement holdActionKeyRow in Python to guess this");
+                //a window BUILT and not asked moves neither the referent nor its seq.
+                w76HoldReopenNote(m, "cast", rows, 10, false, holdActionKeyRow);
+                w76HoldWindowNotAsked(m, "cast");
+                w76HoldReopenNote(m, "cast", rows, 11, false, holdActionKeyRow);
+                CHECK(m.lastSeq["cast"] == 4 && m.measuredRef["cast"] == 4,
+                      "#W77-CR R2d MUST-NOT-MATCH a suppressed window is never the referent");
+            }
+            //R1 THE SEAT'S OWN PROVEN LOOP, RESOLVING: GUIDANCE, NOT A COLLAPSE.
+            {
+                const string act = "+1: create a 1/1 vampire with Sorin, Lord of Innistrad"
+                                   " [cost: Counters]";
+                const string hold = "Hold priority - pass now, and do not ask me again -"
+                                    " YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE";
+                const string decline = "Cast nothing right now";
+                CHECK(w77OwnLoopRow(act, false) == act,
+                      "#W77-CR R1 NEGATIVE with no resolving own loop nothing is added");
+                const string tagged = w77OwnLoopRow(act, true);
+                CHECK(tagged != act
+                          && tagged.find("your loop is resolving on its own") != string::npos
+                          && tagged.find("the HOLD row on this menu covers every link")
+                             != string::npos,
+                      "#W77-CR R1 GREEN the acting row carries the guidance and names the"
+                      " row that answers all 32 links");
+                CHECK(w77OwnLoopRow(tagged, true) == tagged,
+                      "#W77-CR R1 idempotent - the prompt is rebuilt on every polling tick");
+                CHECK(w77OwnLoopRow(hold, true) == hold
+                          && w77OwnLoopRow(decline, true) == decline,
+                      "#W77-CR R1 MUST-NOT-MATCH the hold row and the decline are not rows"
+                      " the clause is about");
+                {
+                    std::vector<string> rows;
+                    rows.push_back(act); rows.push_back(hold);
+                    w77ApplyOwnLoopFeed(rows, true);
+                    CHECK(rows[0] != act && rows[1] == hold,
+                          "#W77-CR R1 the feed reaches every acting row and only those");
+                    CHECK(rows.size() == 2,
+                          "#W77-CR R1 KEY PIN NOTHING IS REMOVED, COLLAPSED OR AUTO-ANSWERED -"
+                          " two rows in, two answerable rows out");
+                }
+                //KEY STABILITY: the clause is a [...] group, so every key the hold
+                //path reads is byte-identical with it and without it.
+                CHECK(holdActionKeyRow(tagged) == holdActionKeyRow(act),
+                      "#W77-CR R1 KEY PIN the hold LATCH key does not move");
+                {
+                    std::vector<string> plain, withTag;
+                    plain.push_back(act); plain.push_back(hold);
+                    withTag.push_back(tagged); withTag.push_back(hold);
+                    CHECK(optionSetKeyOf(plain) == optionSetKeyOf(withTag),
+                          "#W77-CR R1 KEY PIN the OPTION-SET key (declines/deadlock) does"
+                          " not move");
+                }
+                //THE HOLD PATH: five links of the loop after the hold is taken, with
+                //the life the chain moves ticking on every row - holdStillStands must
+                //still stand at every one of them, which is what makes the guidance
+                //honest (0 asks after the hold).
+                {
+                    std::set<string> held;
+                    held.insert(holdActionKeyRow(w77OwnLoopRow(act, true)));
+                    held.insert(holdActionKeyRow(hold));
+                    held.insert(holdActionKeyRow("[crack-back verdict: none]"));
+                    held.insert(holdActionKeyRow("[stack death verdict: none]"));
+                    int asks = 0;
+                    for (int link = 0; link < 5; link++)
+                    {
+                        std::ostringstream lifeRow;
+                        lifeRow << act << " {right now: they would be at " << (16 - link)
+                                << "; you would be at " << (24 + link) << "}";
+                        std::vector<string> now;
+                        now.push_back(w77OwnLoopRow(lifeRow.str(), true));
+                        now.push_back(hold);
+                        now.push_back("[crack-back verdict: none]");
+                        now.push_back("[stack death verdict: none]");
+                        const char * why = "";
+                        if (!holdStillStands(held, now, &why, holdActionKeyRow))
+                            asks++;
+                    }
+                    CHECK(asks == 0,
+                          "#W77-CR R1 GREEN a hold taken at the first link covers five more"
+                          " links of the seat's own loop - 0 asks, which is the whole of the"
+                          " 32-window repro");
+                }
+                //...and the latch is NOT a blind cache: a genuinely new row re-opens it.
+                {
+                    std::set<string> held;
+                    held.insert(holdActionKeyRow(w77OwnLoopRow(act, true)));
+                    held.insert(holdActionKeyRow(hold));
+                    std::vector<string> grown;
+                    grown.push_back(w77OwnLoopRow(act, true));
+                    grown.push_back(w77OwnLoopRow("-6: destroy up to three and reanimate"
+                                                  " with Sorin [cost: Counters]", true));
+                    grown.push_back(hold);
+                    const char * why = "";
+                    CHECK(!holdStillStands(held, grown, &why, holdActionKeyRow),
+                          "#W77-CR R1 MUST-NOT-MATCH a newly available row still re-opens"
+                          " the window");
+                }
+            }
+            //R8 THE CROSS-PHASE BOARD CLAUSE.
+            {
+                const string boardA = "Phase: Upkeep | It is the opponent's turn.\n"
+                                      "Your life: 20 | Opponent life: 12\n"
+                                      "Your hand (1 card): Damnation {2}{b}{b}\n";
+                const string boardB = "Phase: Draw | It is the opponent's turn.\n"
+                                      "Your life: 20 | Opponent life: 12\n"
+                                      "Your hand (1 card): Damnation {2}{b}{b}\n";
+                const string boardC = "Phase: Draw | It is the opponent's turn.\n"
+                                      "Your life: 18 | Opponent life: 12\n"
+                                      "Your hand (1 card): Damnation {2}{b}{b}\n";
+                //the 152v125 shape: the SAME board, put again at another phase.
+                CHECK(w76PhaseFreeBoardKey(boardA) == w76PhaseFreeBoardKey(boardB),
+                      "#W77-CR R8 the 152v125 shape - one board, two phases - compares EQUAL"
+                      " below the phase line");
+                const string yes = w76CrossPhaseRePutNote(4, "Upkeep", true);
+                CHECK(yes.find("nothing on the board has changed") != string::npos,
+                      "#W77-CR R8 GREEN the POSITIVE clause prints on the 152v125-class"
+                      " shape - the clause CQ F4 built and wave 76 saw print 5 times in 109");
+                CHECK(w76PhaseFreeBoardKey(boardB) != w76PhaseFreeBoardKey(boardC),
+                      "#W77-CR R8 MUST-NOT-MATCH a board that really moved is not equal -"
+                      " the comparison is not widened into a lie");
+                const string no = w76CrossPhaseRePutNote(4, "Upkeep", false);
+                CHECK(no.find("the board has moved since then, but this list has not")
+                          != string::npos
+                          && no.find("not one row on it appeared, went away, or changed")
+                             != string::npos,
+                      "#W77-CR R8 GREEN the negative clause states the fact the KEY"
+                      " guarantees instead of inviting a re-read of everything");
+                CHECK(no.find("nothing on the board has changed") == string::npos,
+                      "#W77-CR R8 MUST-NOT-MATCH the two sentences are exclusive");
+                CHECK(no.compare(0, 2, "\n[") == 0
+                          && stripNarrationDecoration("Cast Damnation {2}{b}{b}" + no)
+                                 .find("this exact list") == string::npos,
+                      "#W77-CR R8 KEY PIN both sentences stay on the prompt-only channel");
+            }
+            //R9 THE PLAN NAMES THE CARD - BUT AS A CAST? (MEASURE ONLY.)
+            {
+                CHECK(planNamesStrandedCard("cast Idyllic Tutor, find Sanguine Bond",
+                                            "Sanguine Bond"),
+                      "#W77-CR R9 REPRO the base substring test fires on deck126's 42"
+                      " protocol-legal TUTOR-TARGET plans");
+                CHECK(!w77PlanNamesAsCastIntent("cast Idyllic Tutor, find Sanguine Bond",
+                                                "Sanguine Bond"),
+                      "#W77-CR R9 GREEN a tutor TARGET is not a cast intent");
+                CHECK(w77PlanNamesAsCastIntent("cast Idyllic Tutor, find Sanguine Bond",
+                                               "Idyllic Tutor"),
+                      "#W77-CR R9 GREEN ...and the card the plan says it will CAST still is");
+                CHECK(w77PlanNamesAsCastIntent("return Hammer of Bogardan to hand, then cast"
+                                               " Hammer of Bogardan in main 1",
+                                               "Hammer of Bogardan"),
+                      "#W77-CR R9 GREEN a self-recursion plan naming the cast counts");
+                CHECK(w77PlanNamesAsCastIntent("play my second Mountain", "Mountain")
+                          && w77PlanNamesAsCastIntent("casting Damnation next", "Damnation"),
+                      "#W77-CR R9 GREEN the verb list is the one the cast rows use");
+                CHECK(!w77PlanNamesAsCastIntent("block with Sanguine Bond's body and hold up"
+                                                " removal", "Sanguine Bond")
+                          && !w77PlanNamesAsCastIntent("reanimate Bloodline Keeper",
+                                                       "Bloodline Keeper"),
+                      "#W77-CR R9 MUST-NOT-MATCH a reanimation object and a blocker are not"
+                      " cast intents - deck146's ~15 were these");
+                CHECK(!w77PlanNamesAsCastIntent("cast Damnation, then a long sentence of"
+                                                " twenty-eight further characters about"
+                                                " Bloodline Keeper", "Bloodline Keeper"),
+                      "#W77-CR R9 MUST-NOT-MATCH the verb has to be NEXT TO the name, not"
+                      " anywhere in the line");
+                CHECK(!w77PlanNamesAsCastIntent("", "Damnation")
+                          && !w77PlanNamesAsCastIntent("cast Damnation", "Ent"),
+                      "#W77-CR R9 NEGATIVE an empty plan and a too-short name name nothing");
+            }
+            //R11 (a) THE SAME ARM'S OUTSTANDING CLOSE BOUNDS THE RE-ARM.
+            {
+                //REPRO: wave 76's five unrecorded closes are same-arm re-arms with an
+                //EMPTY park, and the Q8 bound only ever looked at the other arm.
+                CHECK(w76ForceCloseDecision(true, false, 0) == kW76CloseArm,
+                      "#W77-CR R11a REPRO with an empty park the base decision arms at once,"
+                      " however many closes THIS arm already has outstanding");
+                //GREEN: the caller's own busy test now folds this arm in.
+                const bool parkArmed = false, sameArmArmed = true;
+                const bool busy = parkArmed || sameArmArmed;
+                CHECK(w76ForceCloseDecision(true, busy, 0) == kW76CloseDefer,
+                      "#W77-CR R11a GREEN a re-arm while this arm's close is outstanding"
+                      " DEFERS instead of buying a second phase-2 decode");
+                //...and it is a bound, not a cap: the ceiling arms anyway.
+                int waits = 0, arms = 0;
+                for (int t = 0; t < 64; t++)
+                {
+                    const int w = w76ForceCloseDecision(true, busy, t);
+                    if (w == kW76CloseDefer) waits++;
+                    else if (w == kW76CloseArm) arms++;
+                }
+                CHECK(waits == kW76CloseDeferMaxTicks && arms == 64 - kW76CloseDeferMaxTicks,
+                      "#W77-CR R11a GREEN the wait is BOUNDED - a close that cannot resolve"
+                      " still arms, and is still counted unrecorded exactly as before");
+                CHECK(w76ForceCloseDecision(true, false || false, 0) == kW76CloseArm,
+                      "#W77-CR R11a NEGATIVE with neither arm busy the close arms at once -"
+                      " nothing is refused on the common path");
+                CHECK(w76ForceCloseDecision(false, busy, 0) == kW76CloseFallThrough,
+                      "#W77-CR R11a NEGATIVE an unearned close is still the retry ladder's");
             }
         }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

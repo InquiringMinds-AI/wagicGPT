@@ -285,6 +285,16 @@ struct W76HoldMemory
     //the printed bracket claimed.
     std::map<std::string, int> measuredRun;
     std::map<std::string, std::string> lastNote;
+    //#W77-CR (R2 d, wave-76 engine-seat HIGH-2 + lane-CN weakest-evidence 1):
+    //WHICH WINDOW THE BRACKET IS TALKING ABOUT. The wave-76 seat had to
+    //re-implement `holdActionKeyRow` in Python to adjudicate a sentence about
+    //"the last window I asked you at this seam", and could still only guess
+    //WHICH window that was - the engine never wrote it down. `lastSeq` is the
+    //window seq `last` was committed from; `measuredRef` is the referent the
+    //note built at `measuredSeq` names (-1 = there is none yet). One integer
+    //per record makes the whole class decidable from the translog.
+    std::map<std::string, int> lastSeq;
+    std::map<std::string, int> measuredRef;
 };
 
 //#W74-CF (F1, Astra review finding 1): ONE ARM'S SECOND LEG, WHOLE. Every field
@@ -1922,6 +1932,13 @@ private:
     int mPlanSetTurn;
     //#W53-N (D2): a prompt-only note for the NEXT askModel call, spliced in
     //after its option list and deliberately kept out of its cache key.
+    //#W77-CR (R2 a): ...and CLEARED at every cast-seam exit that does not reach
+    //an askModel call. askModel consumes this on every exit path IT reaches, but
+    //the casting builder writes the note BEFORE its three no-ask returns (the
+    //hold latch, the reserve decline, the chain auto-pass), so a measured-but-
+    //never-asked cast note was carried onto whatever window asked next - eleven
+    //LAND-DROP windows in the wave-76 corpus printed a `[hold check: ...]`
+    //bracket measured over a casting menu they do not contain.
     string mNextAskPromptNote;
 
     //#W53-N (D2): honour a hold the model took, at seam <seam>, for a window
@@ -1943,6 +1960,25 @@ private:
     //#W61-U (C14): the prompt-only note stating which of the two hold regimes
     //this menu is in, measured against the previous window's rows at this seam.
     string holdReopenNote(const char * seam, const std::vector<string>& rows);
+    //#W77-CR (R2 d): the window seq of the referent the bracket just built names
+    //(-1 = the first window asked at that seam, -2 = no bracket was built for
+    //this window). Stamped on the record as `hold_check_ref_seq` and consumed
+    //there, so a reviewer never has to re-implement the key to adjudicate it.
+    int mHoldCheckRefSeq;
+    //#W77-CR (R2 a): a casting window that was built and then closed WITHOUT an
+    //ask drops everything it measured - the prompt-only note (which askModel
+    //would otherwise consume on the NEXT, unrelated window), the cached hold
+    //note, and the referent stamp.
+    void w77DropUnaskedCastNote();
+    //#W77-CR (R1): windows put to the model while the SEAT'S OWN life loop was a
+    //proven win and resolving - the population the guidance bracket is about.
+    int mOwnLoopWindowsAsked;
+    int mOwnLoopCountedSeq;
+    bool w77OwnLoopResolving();
+    void w77CountOwnLoopWindow();
+    //#W77-CR (R8): cross-phase re-puts whose ask-cache board key matched, i.e.
+    //the ones whose positive clause printed. Never summed with the total.
+    int mCrossPhaseBoardUnchanged;
     //#W76-CN (Q1, wave-75 engine-seat HIGH-1 + deck123 MED-3): THE MEMORY IS
     //KEYED ON WINDOWS THAT WERE ASKED. `mLastMenuRows` was updated at every
     //window whose prompt was BUILT, and the wave-75 corpus built 3,402 windows
@@ -2261,6 +2297,14 @@ private:
     //own meter, so a permanently-parked other arm is visible in the gameend
     //census rather than silently paid for.
     int mForceCloseDeferBoundHits;
+    //#W77-CR (R11 a, wave-76 engine-seat MED-3): the SAME-ARM re-arm, bounded the
+    //same way. Wave 76's five `forced_close_unrecorded` were all this shape (the
+    //Q8 park bound never fired once: refused / deferred / bound-hits all 0) - a
+    //second close armed on THIS arm while its predecessor was still outstanding,
+    //superseding a phase-2 decode that had already been paid for. It is waste,
+    //not loss, so the deferral is the same bounded wait and the counter is its
+    //own, never summed with the park's.
+    int mForceCloseSameArmDeferred;
     //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
     //byte-identical re-put later in the same turn at another phase can be
     //counted and named. Measure + annotation only; no window is collapsed.
