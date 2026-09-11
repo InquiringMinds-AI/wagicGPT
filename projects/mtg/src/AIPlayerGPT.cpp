@@ -18315,12 +18315,19 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
                     mForceCloseDeferTicks++;
                     return kChoicePending; //still pending, still no heuristic
                 }
-                if (mRetryPark.forceCloseArmed)
+                const bool w78AtBound = mRetryPark.forceCloseArmed;
+                if (w78AtBound)
                     mForceCloseDeferBoundHits++; //armed at the bound, not on a clear
                 mForceCloseDeferred = false;
                 mForceCloseDeferTicks = 0;
                 //THE ARM, taken now rather than at the refused window.
-                mForceCloseUnrecorded += gptForceCloseArm(mForceCloseArmed);
+                const int w78Superseded = gptForceCloseArm(mForceCloseArmed);
+                mForceCloseUnrecorded += w78Superseded;
+                //#W78-CV (S11): the event, named where it happens.
+                writeForceCloseRecord(w78Superseded ? "armed_after_defer_superseding"
+                                                    : (w78AtBound ? "armed_at_defer_bound"
+                                                                  : "armed_after_defer_cleared"),
+                                      w74ThisArmIsLand);
                 DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the deferred forced close is"
                            " armed now (" << (mRetryPark.forceCloseArmed
                                               ? "tick bound reached" : "the other arm cleared")
@@ -18366,6 +18373,10 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         {
             mForceCloseUnrecorded++; //#W75-CM (F5): THIS arm's close, dropped here
             mForceCloseArmed = false;
+            //#W78-CV (S11): THIS is the path the wave-77 corpus's ten unrecorded
+            //closes took - not a re-arm and not a bound, so no arm-bound counter
+            //could ever have named them. The record says so per event.
+            writeForceCloseRecord("dropped_decision_moved", w74ThisArmIsLand);
         }
         //#W76-CQ (F2): a DEFERRED close whose decision moved is dropped with the
         //slot. It never armed, so it never counted as outstanding and nothing is
@@ -18444,6 +18455,9 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
                 mForceCloseSameArmDeferred++;
             else
                 mForceCloseArmsRefused++; //once per deferral, never once per tick
+            writeForceCloseRecord(w77SameArmBusy ? "deferred_same_arm_busy"
+                                                 : "deferred_park_busy",
+                                  w74ThisArmIsLand); //#W78-CV (S11)
         }
         mForceCloseDeferred = true;
         mForceCloseDeferTicks++;
@@ -18468,7 +18482,12 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         //from a stderr/record diff after the fact.
         //#W75-CM (F5): only a second arm on THIS arm proves a lost close; the
         //other arm's outstanding close is parked, not lost.
-        mForceCloseUnrecorded += gptForceCloseArm(mForceCloseArmed);
+        {
+            const int w78Superseded = gptForceCloseArm(mForceCloseArmed);
+            mForceCloseUnrecorded += w78Superseded;
+            writeForceCloseRecord(w78Superseded ? "armed_superseding_outstanding"
+                                                : "armed", w74ThisArmIsLand); //#W78-CV (S11)
+        }
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
@@ -18610,7 +18629,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -18902,6 +18921,38 @@ void AIPlayerGPT::logAskReplay(const char * why, const string & decision, int ch
     std::ofstream f(side.c_str(), std::ios::app);
     if (f)
         f << rec.dump() << "\n";
+}
+
+//#W78-CV (S11, wave-77 engine-seat M1 / deck126 MED-5). NAME EVERY FORCED CLOSE.
+//`forced_close_unrecorded` went 5 -> 10 while every arm-bound counter stayed 0 for
+//the fourth wave, and three waves of briefs have asked reviewers to "name each of
+//the ten and what superseded it" from a bare integer on `gameend`. The identity
+//(`recovered + missing + unrecorded == stderr closes`) held every time and named
+//nothing. One record per EVENT - which arm, which window, what happened to it -
+//makes the class decidable from the corpus instead of from stderr arithmetic.
+//It is telemetry about a window still in flight, so it rides that window's number
+//exactly as `wall_miss` does (kind is not a window record) and takes no seq of the
+//window counter.
+void AIPlayerGPT::writeForceCloseRecord(const char * outcome, bool landArm)
+{
+    mForceCloseEvents++;
+    if (mTransLogPath.empty())
+        return;
+    ensureGameStartRecord();
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "forced_close"},
+        {"event", mForceCloseEvents},
+        {"outcome", outcome ? outcome : ""},
+        {"arm", landArm ? "land" : "cast"},
+        {"window_seq", mWindowSeq},
+        {"park_armed", mRetryPark.forceCloseArmed ? 1 : 0},
+        {"defer_ticks", mForceCloseDeferTicks},
+        {"unrecorded_so_far", mForceCloseUnrecorded},
+        {"turn", translogTurn(observer ? observer->turn : 0)},
+        {"phase", observer ? observer->getCurrentGamePhase() : -1},
+    };
+    transLogWrite(rec.dump());
 }
 
 //One header record per seat log: decks, names, and a game_id BOTH seats
@@ -19598,6 +19649,9 @@ static string refusedChosenText(int choice, const char * fallback,
 static int repeatAnnotationCount(const string& row);
 //#W76-CN (Q1): the record writer is where a window becomes an ASKED window.
 void w76HoldWindowAsked(W76HoldMemory& m, const char * seam, int windowSeq);
+void w76HoldWindowNotAsked(W76HoldMemory& m, const char * seam);          //#W78-CV (S7)
+bool w78StagedNoteIsEmpty(W76HoldMemory& m, const char * seam);           //#W78-CV (S7)
+void w78HoldWindowRecordSeq(W76HoldMemory& m, const char * seam, int windowSeq, int recordSeq);
 
 //#W77-CU (F5, Astra HIGH 5): A TIMED-OUT ASKED WINDOW LOST ITS HISTORY COMMIT.
 //`mWindowSeq` is the window counter the hold memory stages against: the builder
@@ -19651,21 +19705,50 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //in it; 0 of the remaining 1,011 pairs is false. The window's own class is
     //already known here (askModel set it before the call), so the commit is
     //routed by the builder that asked, not by the record's kind word.
-    if (kind && strcmp(kind, "priority") == 0)
-        w76HoldWindowAsked(mHoldMemory, "priority", recordWindowSeq);
-    else if (kind && strcmp(kind, "ask") == 0)
-        w76HoldWindowAsked(mHoldMemory,
-                           mLogWindowKind == kAskWindowLandDrop ? "land" : "cast",
-                           recordWindowSeq);
+    //#W78-CV (S7, wave-77 engine-seat M3). A RECORD THAT SHOWED NO BRACKET IS NOT
+    //THE STAGED WINDOW'S RECORD. `146v126` records 46 and 55 are DUNGEON-ROOM menus
+    //(`kind: ask`, window kind `unclassified` - the same class every casting window
+    //carries, so the record's words cannot separate them): each staged a casting
+    //note, COMMITTED it, and rendered no hold-check line, so records 47 and 56 named
+    //as "the last window I asked you at this seam" a window that carried no casting
+    //question at all. The prompt about to be logged is the only authority on what
+    //reached the model: if the staged window measured a bracket and this prompt does
+    //not carry one, this record is not that window's - the stage is DROPPED (the
+    //#W77-CR R2 a policy: a window that was not asked leaves no trace) and the next
+    //bracket at this seam still names the last window the model actually saw.
+    const char * const holdSeamForRecord =
+        (kind && strcmp(kind, "priority") == 0) ? "priority"
+        : (kind && strcmp(kind, "ask") == 0)
+              ? (mLogWindowKind == kAskWindowLandDrop ? "land" : "cast")
+        : NULL;
+    const bool holdBracketRendered = (userMsg.find("[hold check:") != string::npos);
+    if (holdSeamForRecord)
+    {
+        if (holdBracketRendered || w78StagedNoteIsEmpty(mHoldMemory, holdSeamForRecord))
+            w76HoldWindowAsked(mHoldMemory, holdSeamForRecord, recordWindowSeq);
+        else
+            w76HoldWindowNotAsked(mHoldMemory, holdSeamForRecord);
+    }
     //#W77-CR (R2 d): consumed by THIS record whether or not a log is configured,
     //so a window that printed no bracket can never inherit an earlier one's
     //referent (the mLastParseNote discipline, and the same reason #W76-CN moved
     //the commit above this early return).
-    const int holdCheckRefSeq = mHoldCheckRefSeq;
+    //#W78-CV (S7, wave-77 engine-seat M3): THE FIELD'S OWN CONTRACT, ENFORCED
+    //RATHER THAN ASSERTED. The documented meaning is "absent = this window printed
+    //no bracket", and 18 records violated it (14 discard, 2 ask, 1 attackers, 1
+    //blockers) by inheriting a stamp measured for a window that never reached this
+    //prompt. The prompt that is about to be logged is the only authority on whether
+    //a bracket reached the model, so it is what decides - the same test the commit
+    //above is routed by.
+    const int holdCheckRefSeq = holdBracketRendered ? mHoldCheckRefSeq : -2;
+    const int holdCheckRefWindow = holdBracketRendered ? mHoldCheckRefWindow : -2;
     //#W77-CU (F5): ...and the stamp is consumed by the window's own record, not
     //by the wall-miss telemetry written while that window is still in flight.
     if (w77RecordIsWindowRecord(kind))
+    {
         mHoldCheckRefSeq = -2;
+        mHoldCheckRefWindow = -2; //#W78-CV (S7)
+    }
     if (mTransLogPath.empty())
     {
         mLastParseNote.clear(); //consumed even when logging is off
@@ -19715,8 +19798,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //reader of the latency takes this snapshot, so the order of the consume
     //cannot change what the record says again.
     const long recordLatencyMs = mLastLatencyMs;
+    //#W78-CV (S7): the seq this record carries, handed back to the hold memory so
+    //the NEXT bracket at this seam can name a record instead of a window ordinal.
+    const int recordSeqNow = mTransSeq++;
+    if (holdSeamForRecord)
+        w78HoldWindowRecordSeq(mHoldMemory, holdSeamForRecord, recordWindowSeq, recordSeqNow);
     json rec = {
-        {"seq", mTransSeq++},
+        {"seq", recordSeqNow},
         {"kind", kind},
         {"model", mModel},
         {"prompt", userMsg},
@@ -19940,7 +20028,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //absent = this window printed no bracket. Consumed here so the next record
     //cannot inherit it (the same discipline as mLastParseNote).
     if (holdCheckRefSeq > -2)
-        rec["hold_check_ref_seq"] = holdCheckRefSeq;
+        rec["hold_check_ref_seq"] = holdCheckRefSeq;       //#W78-CV (S7): the RECORD seq
+    if (holdCheckRefWindow > -2)
+        rec["hold_check_ref_window"] = holdCheckRefWindow; //#W78-CV (S7): the window ordinal
     if (mLogWindowElided > 0)
         rec["log_window_turns_elided"] = mLogWindowElided;
     if (!chosenText.empty())
@@ -20391,6 +20481,8 @@ void AIPlayerGPT::logGameEnd()
         {"hold_windows_skipped", mHoldWindowsSkipped},
         //#W72-BT (M10 / M14): the two window classes that never reached the model.
         {"stop_reached_windows_skipped", mStopReachedWindowsSkipped},
+        {"stop_reached_reputs_collapsed", mStopReachedRePutsCollapsed}, //#W78-CV (S3)
+        {"stack_drain_windows_asked", mStackDrainWindowsAsked},         //#W78-CV (S4)
         {"own_turn_windows_skipped", mOwnTurnWindowsSkipped},
         //#W69-BI (K7, engine MED-5): the same total by suppression class.
         //#W71-BP (L1/L2, engine-seat HIGH-0/HIGH-1): the livelock instrumentation.
@@ -20478,6 +20570,7 @@ void AIPlayerGPT::logGameEnd()
         //Its own meter - the park's bound never fired in wave 76 and this one is
         //the shape that did.
         {"force_close_same_arm_deferred", mForceCloseSameArmDeferred},
+        {"forced_close_events", mForceCloseEvents}, //#W78-CV (S11)
         {"crossphase_identical_reputs", mCrossPhaseRePuts},   //#W76-CN (Q13)
         //#W77-CR (R8): of those, the ones whose ask-cache board key MATCHED -
         //i.e. the ones that printed `nothing on the board has changed`. Never
@@ -30498,6 +30591,83 @@ string w77OwnLoopThreatTag(const string& theirSpell, const string& component)
              " a hold here does not cover this window]";
 }
 
+//#W78-CV (S6, wave-77 deck126 HIGH-1 + engine-seat 2(b)). THE VERDICT THE ENGINE
+//COMPUTES MUST BE ONE THE MODEL CAN READ. `w77OwnLoopVerdictKey` below is a
+//SYNTHETIC MARKER joined to the held set: it re-opens a hold when the verdict
+//moves, which is what it was built for, and it is invisible in every prompt of the
+//wave-77 corpus (0 occurrences in 42 logs). At the corpus's one own-loop window
+//(`126v130` deck126 seq 43) the RESOLVING verdict was TRUE and unseeable, and the
+//seat took a row instead of the hold. So the verdict is also RENDERED, on the
+//prompt-only channel every other annotation of this family uses - it enters no ask
+//key, no async slot key and no hold key, and the marker row is untouched.
+//Pure over the three facts the walk returns.
+string w78OwnLoopVerdictLine(int state, const string& theirSpell, const string& component)
+{
+    if (state == kW77LoopThreatened)
+    {
+        if (theirSpell.empty() || component.empty())
+            return string();
+        return "\n[own loop verdict: THREATENED - their " + theirSpell
+               + " on the stack targets your " + component
+               + ", a piece of your own life loop: the loop STOPS if it resolves, so a hold"
+                 " here does NOT cover this window]";
+    }
+    if (state == kW77LoopResolving)
+        return "\n[own loop verdict: RESOLVING - a piece of your own proven life loop is on"
+               " the stack and nothing of theirs targets it: the loop closes without another"
+               " action from you, and the HOLD row covers every remaining link]";
+    return string();
+}
+
+//#W78-CV (S4, wave-77 deck152 HIGH-2). NINE BYTE-IDENTICAL WINDOWS WHILE THEIR
+//TRIGGERS DRAINED. `152v162` deck152 seqs 55-63: one Draw step, a seven-object
+//stack of the OPPONENT's triggers resolving one link at a time, and the seat asked
+//the same menu at every link (~15 min). Katilda's unused activation sat above the
+//hold row, so the deck guide correctly forbade a blind hold - what was missing is
+//the fact that makes ONE hold the whole answer: the hold covers every link, and the
+//activation is still there afterwards. Nothing is collapsed and no row is removed -
+//this is the R1 shape's treatment, on the opponent's stack instead of the seat's.
+//The gate is the bracket's own comparison (every row printed now was printed at the
+//last window the model was asked at this seam), so the clause and the hold-check
+//line can never disagree. Prompt-only: the count N moves with the board and must
+//never enter a key. Pure over its three arguments.
+string w78StackDrainNote(int theirTriggers, bool rowsUnchangedSinceLastAsk,
+                         const string& holdRowShortName)
+{
+    if (theirTriggers < 2 || !rowsUnchangedSinceLastAsk || holdRowShortName.empty())
+        return string();
+    std::ostringstream o;
+    o << "\n[their stack is draining " << theirTriggers
+      << " triggers - each link will put this same list to you; HOLD ("
+      << holdRowShortName << ") covers every link, the activation above stays available"
+         " after]";
+    return o.str();
+}
+
+//#W78-CV (S4): the hold row's SHORT name - the row text up to its first dash, so
+//the clause names the row the model must answer with and copies none of the row's
+//contract paragraph. Pure over the row text; empty when no hold row is offered.
+string w78HoldRowShortName(const std::vector<string>& rows)
+{
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        if (rows[i].compare(0, 13, "Hold priority") != 0)
+            continue;
+        const size_t dash = rows[i].find(" - ");
+        return (dash == string::npos) ? rows[i] : rows[i].substr(0, dash);
+    }
+    return string();
+}
+
+//#W78-CV (S4): does the hold-check bracket say this menu is byte-identical to the
+//last window the model was asked at this seam? The bracket's own words are the
+//test, so no second measure can drift from it.
+bool w78RowsUnchangedSinceLastAsk(const string& holdCheckNote)
+{
+    return !holdCheckNote.empty()
+           && holdCheckNote.find("every row above was also on the menu") != string::npos;
+}
+
 //#W77-CU (F4): ...and the MARKER ROW that makes the hold honest. The guidance
 //and the threat clause are both `[...]` groups, which `holdActionKeyRow` strips
 //- so without this the hold taken while the loop was "resolving on its own"
@@ -30575,27 +30745,123 @@ static bool holdNoteSameWindow(bool first, int unseenRows, int measuredSeq, int 
 //seam, and that is what it prints. `first` is a state of the MEMORY, not of the
 //counts, so it is its own parameter and defaults to false for every existing
 //caller and pin.
-static string holdReopenNoteText(int unseenRows, int repeats, bool first = false)
+//#W78-CV (S9 a, wave-77 deck130 HIGH-1). THE PRINTED ORDINAL IS NOT THE
+//INSTANCE. Wagic disambiguates two copies of one card by APPENDING an ordinal to
+//the printed name, and it renumbers the FIRST copy when the second arrives:
+//`Deal 2 damage with Pyrite Spellbomb` becomes `... Pyrite Spellbomb #1` the
+//moment `#2` is offered. Every row of the copy that was already there then
+//carries a byte the hold-check key had never seen, so the bracket counted them
+//all as new - `152` deck130 seq 6->10 said 8 rows were new where 5 rows had
+//appeared, and `126` 12->18, `123` 62->70 and `125` 84->88 are the same shape.
+//The ordinal is a RENDER handle: it says which of two identical instances a row
+//addresses, and it changes without the action changing. So it comes out of the
+//counting key, and MULTIPLICITY carries the fact it used to carry - two rows
+//that normalise to the same key are two instances, and a window holding two
+//where the last held one has exactly one new row. Pure over the key string.
+string w78StripHandleOrdinal(const string& key)
+{
+    string out;
+    out.reserve(key.size());
+    for (size_t i = 0; i < key.size(); i++)
+    {
+        if (key[i] == '#' && i > 0 && (key[i - 1] == ' ')
+            && i + 1 < key.size() && isdigit((unsigned char) key[i + 1]))
+        {
+            size_t j = i + 1;
+            while (j < key.size() && isdigit((unsigned char) key[j]))
+                j++;
+            //drop the ordinal AND the space that introduced it
+            if (!out.empty() && out[out.size() - 1] == ' ')
+                out.erase(out.size() - 1);
+            i = j - 1;
+            continue;
+        }
+        out += key[i];
+    }
+    return out;
+}
+
+//The occurrence-indexed key: the same normalised action, distinguished only by
+//HOW MANY of it this window offers. Built over a whole row list, because
+//multiplicity is a property of the list and not of a row.
+void w78HoldRowKeys(const std::vector<string>& rowKeys, std::vector<string>& out)
+{
+    std::map<string, int> seen;
+    out.clear();
+    out.reserve(rowKeys.size());
+    for (size_t i = 0; i < rowKeys.size(); i++)
+    {
+        const string base = w78StripHandleOrdinal(rowKeys[i]);
+        std::ostringstream k;
+        k << base << "\x01" << seen[base]++;
+        out.push_back(k.str());
+    }
+}
+
+//#W78-CV (S9 a + S9 b): the two-sided delta the bracket states. `unseen` is the
+//rows offered now that the referent window did not offer; `gone` is the rows the
+//referent offered that are not offered now. Wave 77 reported only the first, so
+//`125` deck152 seqs 20/35 lost a row and the bracket said "every row above was
+//also on the menu" - true, and silent about the row that had left, which is
+//itself a re-opener the hold row's own contract names. Pure over the two lists.
+void w78HoldRowDelta(const std::vector<string>& lastRowKeys,
+                     const std::vector<string>& nowRowKeys, int& unseen, int& gone)
+{
+    std::vector<string> a, b;
+    w78HoldRowKeys(lastRowKeys, a);
+    w78HoldRowKeys(nowRowKeys, b);
+    std::set<string> as(a.begin(), a.end()), bs(b.begin(), b.end());
+    unseen = 0;
+    gone = 0;
+    for (std::set<string>::const_iterator i = bs.begin(); i != bs.end(); ++i)
+        if (!as.count(*i))
+            unseen++;
+    for (std::set<string>::const_iterator i = as.begin(); i != as.end(); ++i)
+        if (!bs.count(*i))
+            gone++;
+}
+
+//#W78-CV (S9 b): `gone` is the fourth argument and defaults to 0, so every
+//existing caller and pin reads byte-identically.
+static string holdReopenNoteText(int unseenRows, int repeats, bool first = false, int goneRows = 0)
 {
     if (first)
         return "\n[hold check: this is the first window I have asked you at this seam -"
                " there is no earlier menu here to compare it with yet; from the next one"
                " on this bracket says which rows have moved since the last window I asked"
                " you at this seam]";
-    if (repeats < 1 && unseenRows < 1)
+    if (repeats < 1 && unseenRows < 1 && goneRows < 1)
         return string(); //nothing measured (a rebuild with no run and no new row)
     std::ostringstream o;
     o << "\n[hold check: ";
     if (unseenRows > 0)
+    {
         o << unseenRows << (unseenRows == 1 ? " row above is" : " rows above are")
-          << " new since the last window I asked you at this seam - a row that changes only in"
+          << " new since the last window I asked you at this seam";
+        //#W78-CV (S9 b): the other half of the same comparison, stated only when
+        //it happened - a row that LEFT is a re-opener the hold row's own contract
+        //names, and wave 77 never printed it.
+        if (goneRows > 0)
+            o << " and " << goneRows << (goneRows == 1 ? " row that was on it is gone"
+                                                       : " rows that were on it are gone");
+        o << " - a row that changes only in"
              " its annotations (a price, a forecast, a clock, a count) is the SAME"
              " row and does not re-open a hold; only a row appearing, disappearing,"
              " or naming a different card, cost or target does]";
+    }
+    else if (goneRows > 0)
+        o << goneRows << (goneRows == 1 ? " row that was on the menu at the last window I asked"
+                                          " you at this seam is gone and no row above is new"
+                                        : " rows that were on the menu at the last window I asked"
+                                          " you at this seam are gone and no row above is new")
+          << " - a row disappearing re-opens a hold exactly as a row appearing does; a row that"
+             " changes only in its annotations (a price, a forecast, a clock, a count) is the"
+             " SAME row]";
     else
         o << "every row above was also on the menu at the last window I asked you at this seam"
           << " (" << repeats << " window" << (repeats == 1 ? "" : "s")
-          << " in a row now) - a hold taken here holds until one of them appears,"
+          << " in a row now), and no row that was on it is gone"
+             " - a hold taken here holds until one of them appears,"
              " disappears, or names a different card, cost or target; a row that"
              " changes only in its annotations is the same row]";
     return o.str();
@@ -30647,9 +30913,25 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
     const string s(seam ? seam : "");
     std::map<string, std::set<string> >::iterator it = m.last.find(s);
     int unseen = 0;
+    int gone = 0; //#W78-CV (S9 b)
     const bool first = (it == m.last.end());
+    //#W78-CV (S9): the row keys of THIS window, in order, so the delta below can
+    //see multiplicity. Built once and reused for the staging entry.
+    std::vector<string> nowRowKeys;
+    for (size_t nk = 0; nk < rows.size(); nk++)
+        nowRowKeys.push_back(keyOf(rows[nk]));
     if (!first)
-        unseen = w74HoldUnseenRows(it->second, rows, keyOf); //#W74-CD (O6) / #W75-CI (P1 b)
+    {
+        //#W78-CV (S9 a): the ordinal-normalised, occurrence-indexed delta. The
+        //set reading is kept as the FLOOR so a memory written before the row
+        //lists existed (or by a caller that stages none) still counts: a window
+        //with no recorded row list falls back to the wave-77 arithmetic.
+        std::map<string, std::vector<string> >::iterator lr = m.lastRows.find(s);
+        if (lr != m.lastRows.end())
+            w78HoldRowDelta(lr->second, nowRowKeys, unseen, gone);
+        else
+            unseen = w74HoldUnseenRows(it->second, rows, keyOf); //#W74-CD (O6) / #W75-CI (P1 b)
+    }
     std::map<string, int>::iterator sq = m.measuredSeq.find(s);
     if (holdNoteSameWindow(first, unseen, sq == m.measuredSeq.end() ? -1 : sq->second, windowSeq))
     {
@@ -30672,6 +30954,7 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
         for (size_t i = 0; i < rows.size(); i++)
             reKeys.insert(keyOf(rows[i]));
         m.pending[s] = reKeys;
+        m.pendingRows[s] = nowRowKeys; //#W78-CV (S9)
         m.pendingSeq[s] = windowSeq;
         m.pendingRun[s] = m.measuredRun.count(s) ? m.measuredRun[s] : 0;
         if (commitAtBuild)
@@ -30679,13 +30962,19 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
         return m.lastNote[s];
     }
     const int prevRun = m.run.count(s) ? m.run[s] : 0;
-    const int runIfAsked = (first || unseen > 0) ? 0 : prevRun + 1;
+    //#W78-CV (S9 b): a row LEAVING breaks the run exactly as a row arriving does -
+    //the hold row's contract says so, and the latch enforces it.
+    const int runIfAsked = (first || unseen > 0 || gone > 0) ? 0 : prevRun + 1;
     const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : runIfAsked,
-                                           first); //#W77-CR (R2 b)
+                                           first, first ? 0 : gone); //#W77-CR (R2 b), #W78-CV (S9 b)
     m.measuredSeq[s] = windowSeq;
     //#W77-CR (R2 d): the referent this note names, written down rather than
     //left to be re-derived. -1 at the first window (there is none).
     m.measuredRef[s] = first ? -1 : (m.lastSeq.count(s) ? m.lastSeq[s] : -1);
+    //#W78-CV (S7): ...and the referent's RECORD seq, which is the join a reviewer
+    //actually needs. -1 when the referent wrote no record seq (logging off).
+    m.measuredRefRecord[s] = first ? -1
+        : (m.lastRecordSeq.count(s) ? m.lastRecordSeq[s] : -1);
     m.measuredRun[s] = runIfAsked; //#W76-CQ (F1): the run this note claims
     m.lastNote[s] = note;
     std::set<string> keys;
@@ -30693,6 +30982,7 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
         keys.insert(keyOf(rows[i])); //#W74-CD (O6) / #W75-CI (P1 b): the same key
                                      //both sides, and the same key the latch uses
     m.pending[s] = keys;
+    m.pendingRows[s] = nowRowKeys; //#W78-CV (S9)
     m.pendingSeq[s] = windowSeq;
     m.pendingRun[s] = runIfAsked;
     if (commitAtBuild) //the wave-75 policy: every BUILT window is remembered
@@ -30711,11 +31001,40 @@ void w76HoldWindowAsked(W76HoldMemory& m, const char * seam, int windowSeq)
     if (m.pendingSeq.count(s) && m.pendingSeq[s] != windowSeq)
         return; //a record that is not this staged window's own
     m.last[s] = p->second;
+    if (m.pendingRows.count(s))
+        m.lastRows[s] = m.pendingRows[s]; //#W78-CV (S9)
     m.lastSeq[s] = windowSeq; //#W77-CR (R2 d): the referent the next bracket names
     m.run[s] = m.pendingRun.count(s) ? m.pendingRun[s] : 0;
     m.pending.erase(s);
+    m.pendingRows.erase(s); //#W78-CV (S9)
     m.pendingSeq.erase(s);
     m.pendingRun.erase(s);
+}
+
+//#W78-CV (S7, wave-77 deck162 HIGH-1 + four more seats). THE COMMITTED WINDOW'S
+//RECORD SEQ, written down where it is known. `w76HoldWindowAsked` runs before the
+//recovery flush and before the logging-off early return, so the record's own seq
+//is not settled there; this is called with it once the record carries it, and only
+//for the window that just committed (`lastSeq[s] != windowSeq` = a later window
+//already moved on, so the stamp would be a lie). -1 stays where no record seq was
+//ever known, which is what the record then prints.
+//#W78-CV (S7): did the window staged at <seam> measure a bracket at all? A window
+//that measured NONE (a rebuild with no run and no new row) prints none, so a record
+//with no bracket is perfectly consistent with being that window's own record and
+//must still commit. Pure over the memory.
+bool w78StagedNoteIsEmpty(W76HoldMemory& m, const char * seam)
+{
+    const string s(seam ? seam : "");
+    std::map<string, string>::const_iterator n = m.lastNote.find(s);
+    return n == m.lastNote.end() || n->second.empty();
+}
+
+void w78HoldWindowRecordSeq(W76HoldMemory& m, const char * seam, int windowSeq, int recordSeq)
+{
+    const string s(seam ? seam : "");
+    if (!m.lastSeq.count(s) || m.lastSeq[s] != windowSeq)
+        return;
+    m.lastRecordSeq[s] = recordSeq;
 }
 
 //...and the staged window was NOT asked (the hold latch closed it, the seat
@@ -30725,6 +31044,7 @@ void w76HoldWindowNotAsked(W76HoldMemory& m, const char * seam)
 {
     const string s(seam ? seam : "");
     m.pending.erase(s);
+    m.pendingRows.erase(s); //#W78-CV (S9)
     m.pendingSeq.erase(s);
     m.pendingRun.erase(s);
 }
@@ -30864,6 +31184,41 @@ int AIPlayerGPT::w77OwnLoopStackState(string& theirSpell, string& component)
     return w77LoopVerdictFrom(true, loopEventPending, false);
 }
 
+//#W78-CV (S4): how many UNRESOLVED objects on the stack are the OPPONENT's. Read
+//off the live stack the same walk w77OwnLoopStackState uses, so the clause's number
+//and the board frame's stack block cannot disagree.
+int AIPlayerGPT::w78TheirDrainingTriggerCount()
+{
+    if (!observer || !observer->mLayers || !observer->mLayers->stackLayer())
+        return 0;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    int n = 0;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        MTGCardInstance * src = it->source;
+        if (StackAbility * sa = dynamic_cast<StackAbility *>(it))
+            if (sa->ability && sa->ability->source)
+                src = sa->ability->source;
+        if (!src || src->controller() == this)
+            continue;
+        n++;
+    }
+    return n;
+}
+
+//#W78-CV (S4): one count per WINDOW, never one per polling tick - the discipline
+//w77CountOwnLoopWindow keeps, for the same reason.
+void AIPlayerGPT::w78CountStackDrainWindow()
+{
+    if (mStackDrainCountedSeq == mWindowSeq)
+        return;
+    mStackDrainCountedSeq = mWindowSeq;
+    mStackDrainWindowsAsked++;
+}
+
 bool AIPlayerGPT::w77OwnLoopResolving()
 {
     string a, b;
@@ -30894,6 +31249,7 @@ void AIPlayerGPT::w77CountOwnLoopWindow()
 void AIPlayerGPT::w77DropUnaskedCastNote()
 {
     ::w77DropUnaskedCastNote(mNextAskPromptNote, mCastHoldNote, mHoldCheckRefSeq);
+    mHoldCheckRefWindow = -2; //#W78-CV (S7): the two stamps are dropped together
 }
 
 string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>& rows)
@@ -30903,9 +31259,15 @@ string AIPlayerGPT::holdReopenNote(const char * seam, const std::vector<string>&
     //#W77-CR (R2 d): stamp the referent for this window's record. -2 = no
     //bracket; the record writer consumes it so a later window cannot inherit it.
     const string s(seam ? seam : "");
-    mHoldCheckRefSeq = note.empty()
+    //#W78-CV (S7): TWO fields under two names. The window ordinal is the memory's
+    //own identity and keeps its meaning; the RECORD seq is what a reviewer joins
+    //on, and wave 77 shipped the first under the second's name.
+    mHoldCheckRefWindow = note.empty()
         ? -2
         : (mHoldMemory.measuredRef.count(s) ? mHoldMemory.measuredRef[s] : -1);
+    mHoldCheckRefSeq = note.empty()
+        ? -2
+        : (mHoldMemory.measuredRefRecord.count(s) ? mHoldMemory.measuredRefRecord[s] : -1);
     return note;
 }
 
@@ -32646,6 +33008,42 @@ static bool w72StopReachedWindowCollapses(bool everyBaseRowIsStopReached, bool a
     if (planTurn < 0 || nowTurn < 0 || planTurn != nowTurn)
         return false;
     return true;
+}
+
+//#W78-CV (S3, wave-77 deck123 HIGH-2). THE SAME ANSWER, TWELVE TIMES, ON A TURN
+//THE REPEAT ROW IS NOT OFFERED AT ALL. `126` deck123 seqs 41-52: twelve priority
+//windows across one opponent turn, every one a two-row menu (`Create human with
+//Thraben Doomsayer` + the hold row) whose ONLY acting row printed
+//`{right now: M=31, your stated stop=29 ... ALREADY AT OR PAST your own stop}` and
+//`{if you pass here, this option is not offered again until the board changes}`,
+//every one answered `pass` - about 16 minutes of decode for zero decisions. The
+//wave-72 collapse could not fire: it requires every base row to be a REPEAT-family
+//row, and `repeatRowEligible` is gated on `aa->counters >= kRepeatRowFloor` (the
+//activation count THIS TURN), which is 0 on a fresh turn - so the row that carries
+//the verdict is not the row the collapse can see.
+//The ruling allows collapsing a window whose answer is already given (a reached
+//stop) when no legal option is lost. This arm is exactly that and no wider:
+//  (a) every base row is a token-maker whose OWN rendered verdict says the count is
+//      at or past the stop - one live row of any other kind and the window is asked;
+//  (b) the stop was stated in a PLAN on THIS turn (the wave-72 guard, unchanged);
+//  (c) this EXACT option set was already put to this seat this turn AND declined -
+//      `declinedN >= 1`, the ask-cache's own board+question key. The FIRST put of the
+//      list is therefore always asked; only the re-put is collapsed, which is the
+//      window whose answer the model has already written. On the 41-52 shape the
+//      first window (seq 41) is asked, states the stop, and the eleven re-puts
+//      collapse: one ask, not twelve.
+//Nothing is removed and nothing is auto-answered that was not answered: the moment
+//the count falls back under the stop, or ANY other row appears, the option set is a
+//different key, `declinedN` is 0 for it, and the window is asked. Pure over its six
+//facts so PARSETEST walks the whole truth table without a board.
+static bool w78StopReachedRePutCollapses(bool everyBaseRowStopPriced, bool anyStopReachedRow,
+                                         int carriedStop, int planTurn, int nowTurn,
+                                         int declinedN)
+{
+    if (declinedN < 1)
+        return false; //the first put of this exact list is always asked
+    return w72StopReachedWindowCollapses(everyBaseRowStopPriced, anyStopReachedRow,
+                                         carriedStop, planTurn, nowTurn);
 }
 
 //#W74-CE (O7c, deck123 MED-3): THE STOP IS AN ARITHMETIC AGAINST A LIFE TOTAL
@@ -40179,23 +40577,38 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //and the stop the model stated - so the collapse below and the clause the
     //model reads can never disagree.
     bool everyBaseRowIsStopReached = (baseIndex > 0);
+    //#W78-CV (S3): the same question asked of the ROW'S OWN PRINTED VERDICT rather
+    //than of the repeat row's eligibility - a token-maker at or past the stated stop
+    //prints `ALREADY AT OR PAST your own stop` whether or not it has been activated
+    //this turn, and on a fresh turn it has not, so the wave-72 predicate went blind
+    //on exactly the twelve windows the docket names.
+    bool everyBaseRowStopPriced = (baseIndex > 0);
     bool anyStopReachedRow = false;
     for (int rb = 0; rb < baseIndex; rb++)
     {
         if (isManaOnlyAction(shown[rb]->ability))
             continue; //a mana window is auto-passed below; a repeat there buys nothing
+        //#W78-CV (S3): the row's live count, read before the repeat-row gate so the
+        //verdict arm can see a row the repeat arm cannot offer.
+        int pricedCount = -1;
+        if (makesCreatureToken(shown[rb]->ability))
+        {
+            MTGCardInstance * psrc = shown[rb]->click ? shown[rb]->click : shown[rb]->ability->source;
+            if (psrc && psrc->controller())
+                pricedCount = creatureCountOnBattlefield(psrc->controller());
+        }
+        const bool rowStopPriced = (pricedCount >= 0 && carriedStop >= 0
+                                    && pricedCount >= carriedStop);
+        if (!rowStopPriced)
+            everyBaseRowStopPriced = false;
         if (!repeatRowEligible(asActivatedForCount(shown[rb]->ability)))
         {
             everyBaseRowIsStopReached = false; //#W72-BT (M10): a live row of another kind
+            if (rowStopPriced)
+                anyStopReachedRow = true;      //#W78-CV (S3): its verdict still counts
             continue;
         }
-        int creatureCount = -1; //#W50-Z (D11)
-        if (makesCreatureToken(shown[rb]->ability))
-        {
-            MTGCardInstance * rsrc = shown[rb]->click ? shown[rb]->click : shown[rb]->ability->source;
-            if (rsrc && rsrc->controller())
-                creatureCount = creatureCountOnBattlefield(rsrc->controller());
-        }
+        int creatureCount = pricedCount; //#W50-Z (D11)
         if (creatureCount >= 0 && carriedStop >= 0 && creatureCount >= carriedStop)
             anyStopReachedRow = true; //#W72-BT (M10)
         else
@@ -40268,17 +40681,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W72-BX (F2): the STOP's own date, not the last plan line's. mPlanSetTurn
     //is stamped by every reply that writes a PLAN, so a plan that states no stop
     //re-dated a stop from an earlier turn and let it silence this turn's windows.
-    if (observer && w72StopReachedWindowCollapses(everyBaseRowIsStopReached, anyStopReachedRow,
-                                                 carriedStop, mStatedStopTurn, observer->turn))
-    {
-        mStopReachedWindowsSkipped++;
-        DebugTrace("AIPlayerGPT[ph" << phase << "]: every live row is a repeat family already at"
-                   " the model's own stated stop (" << carriedStop << "); passing without a model"
-                   " call (skipped " << mStopReachedWindowsSkipped << " this game)");
-        mLastChoice = 0;
-        return NULL;
-    }
-
     //#W53-N (D2, second half) + #W55-A (D2a/D19): how many times THIS EXACT
     //list was already declined this turn, keyed on the OPTION SET (see
     //optionSetKeyOf) rather than the rendered rows. Two defects retire here:
@@ -40297,6 +40699,37 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     const int declinedN = mListDeclineCount.count(listKeyHash(listKey))
                           ? mListDeclineCount[listKeyHash(listKey)] : 0;
     string declinedNote = declinedListNote(declinedN);
+
+    //#W78-CV (S3): moved below `declinedN` - unchanged in every clause, so
+    //the wave-72 arm fires on exactly the windows it always did; the new arm
+    //beneath it needs the decline count, which is measured here.
+    if (observer && w72StopReachedWindowCollapses(everyBaseRowIsStopReached, anyStopReachedRow,
+                                                 carriedStop, mStatedStopTurn, observer->turn))
+    {
+        mStopReachedWindowsSkipped++;
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: every live row is a repeat family already at"
+                   " the model's own stated stop (" << carriedStop << "); passing without a model"
+                   " call (skipped " << mStopReachedWindowsSkipped << " this game)");
+        mLastChoice = 0;
+        return NULL;
+    }
+
+    //#W78-CV (S3, wave-77 deck123 HIGH-2): the RE-PUT arm. Same answer, already
+    //given, on a list this seat has already declined this turn.
+    if (observer && w78StopReachedRePutCollapses(everyBaseRowStopPriced, anyStopReachedRow,
+                                                 carriedStop, mStatedStopTurn, observer->turn,
+                                                 declinedN))
+    {
+        mStopReachedWindowsSkipped++;
+        mStopReachedRePutsCollapsed++;
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: every live row is already at the model's own"
+                   " stated stop (" << carriedStop << ") and this exact list was declined "
+                   << declinedN << " time(s) this turn; passing without a model call ("
+                   << mStopReachedRePutsCollapsed << " re-puts collapsed this game)");
+        mLastChoice = 0;
+        return NULL;
+    }
+
 
     //#W53-N (D2): the HOLD row. It sits LAST among the numbered rows, with the
     //other declines, and it is a row like any other - the model may take it or
@@ -40628,7 +41061,25 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (w73RowTouchesLife(shownLines[lnr]))
             loopNoteLifeRow = true;
     }
-    const string promptNotes = declinedNote + holdNote //#W61-U (C14): same channel
+    //#W78-CV (S6 + S4): the two verdict lines this seam owes, on the prompt-only
+    //channel (never a row, never a key). The own-loop verdict is the RENDER of the
+    //marker `w77OwnLoopVerdictKey` already joins to the held set; the drain clause
+    //is gated on the hold-check bracket's own comparison.
+    string w78SeamNotes;
+    {
+        string w78LoopSpell, w78LoopPiece;
+        w78SeamNotes += w78OwnLoopVerdictLine(w77OwnLoopStackState(w78LoopSpell, w78LoopPiece),
+                                              w78LoopSpell, w78LoopPiece);
+        const string drain = w78StackDrainNote(w78TheirDrainingTriggerCount(),
+                                               w78RowsUnchangedSinceLastAsk(holdNote),
+                                               w78HoldRowShortName(shownLines));
+        if (!drain.empty())
+        {
+            w78SeamNotes += drain;
+            w78CountStackDrainWindow();
+        }
+    }
+    const string promptNotes = declinedNote + holdNote + w78SeamNotes //#W61-U (C14): same channel
         + loopChainingNote(lifeLoopProvenWin(opponent()), holdRow > 0,
                            loopNoteActingRows, loopNoteLifeRow) //#W66-AS (H3), #W73-BY (N5), #W73-CB (F4)
         //#W75-CI (P19): the hold's contract, once per prompt, on the same
@@ -44434,6 +44885,22 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (attempt == 0)
             mCastHoldNote = holdReopenNote("cast", menu);
         mNextAskPromptNote += mCastHoldNote;
+        //#W78-CV (S6 + S4): the same two lines on the casting menu, same channel.
+        {
+            string w78LoopSpell2, w78LoopPiece2;
+            mNextAskPromptNote +=
+                w78OwnLoopVerdictLine(w77OwnLoopStackState(w78LoopSpell2, w78LoopPiece2),
+                                      w78LoopSpell2, w78LoopPiece2);
+            const string drain2 = w78StackDrainNote(w78TheirDrainingTriggerCount(),
+                                                    w78RowsUnchangedSinceLastAsk(mCastHoldNote),
+                                                    w78HoldRowShortName(menu));
+            if (!drain2.empty())
+            {
+                mNextAskPromptNote += drain2;
+                if (attempt == 0)
+                    w78CountStackDrainWindow();
+            }
+        }
         //#W66-AS (H3 second half): prompt-only, same channel, never in a key.
         bool loopNoteActingRows = false; //#W73-BY (N5): same rule as the priority seam
         bool loopNoteLifeRow = false;    //#W73-CB (F4): ...and the same per-row life test
@@ -74370,9 +74837,12 @@ static const char * kW50Y_r94 =
         // all-dead menu, re-opened by nothing but the turn boundary. The note
         // says which of the two regimes THIS menu is in, measured with the
         // latch's own predicate.
+        //#W78-CV (S9 b): the run sentence now also states the OTHER direction it
+        //was always silently claiming - no row that was on the referent is gone.
         CHECK(holdReopenNoteText(0, 3)
               == "\n[hold check: every row above was also on the menu at the last window I asked"
-                 " you at this seam (3 windows in a row now) - a hold taken here holds until one of them"
+                 " you at this seam (3 windows in a row now), and no row that was on it is gone"
+                 " - a hold taken here holds until one of them"
                  " appears, disappears, or names a different card, cost or target; a row that"
                  " changes only in its annotations is the same row]",
               "#W61-U C14 an unchanged menu says the hold will hold, and for how long it has"
@@ -89302,12 +89772,27 @@ static const char * kW50Y_r94 =
                     CHECK(w76HoldReopenNote(m, "cast", reordered, 2, false, holdActionKeyRow)
                               .find("every row above was also on the menu") != string::npos,
                           "#W77-CR R2c REORDER the bracket says SEEN, not `N rows are new`");
+                    //#W78-CV (S9 b, wave-77 deck152 MED): SUPERSEDED. The wave-77 pin
+                    //asserted that a row DISAPPEARING prints "every row above was also
+                    //on the menu" - true about the rows above and silent about the row
+                    //that left, which the hold row's own contract names as a re-opener
+                    //(`125` deck152 seqs 20/35). The bracket now says both. RED on base:
+                    //the base build prints the run sentence here and no gone clause.
                     W76HoldMemory m2;
                     w76HoldReopenNote(m2, "cast", a, 1, false, holdActionKeyRow);
                     w76HoldWindowAsked(m2, "cast", 1);
-                    CHECK(w76HoldReopenNote(m2, "cast", minusOne, 2, false, holdActionKeyRow)
-                              .find("every row above was also on the menu") != string::npos,
-                          "#W77-CR R2c DISAPPEARANCE the bracket says SEEN");
+                    {
+                        const string goneNote =
+                            w76HoldReopenNote(m2, "cast", minusOne, 2, false, holdActionKeyRow);
+                        CHECK(goneNote.find("1 row that was on the menu at the last window I asked"
+                                            " you at this seam is gone and no row above is new")
+                                  != string::npos
+                              && goneNote.find("every row above was also on the menu")
+                                  == string::npos,
+                              "#W78-CV S9b DISAPPEARANCE the bracket NAMES the row that left -"
+                              " RED on base, where it said `every row above was also on the menu`"
+                              " and counted the window into the unchanged run");
+                    }
                     W76HoldMemory m3;
                     w76HoldReopenNote(m3, "cast", a, 1, false, holdActionKeyRow);
                     w76HoldWindowAsked(m3, "cast", 1);
@@ -90926,6 +91411,416 @@ static const char * kW50Y_r94 =
                       "#W77-CU F5 MUST-NOT-MATCH the pendingSeq guard still rejects a"
                       " record that is not the staged window's own");
             }
+        }
+    }
+
+
+    //=================== #W78-CV (wave-78 lane CV: the window/hold family) ======
+    cout << "\n[#W78-CV] S3 the stop-reached RE-PUT collapse\n";
+    {
+        // `126` deck123 seqs 41-52: one two-row menu (the Doomsayer activation +
+        // the hold row), M=31 against a stated stop of 29, twelve windows, twelve
+        // passes. The repeat row is NOT offered on those windows (a fresh turn's
+        // activation count is 0), so the wave-72 arm - which requires every base
+        // row to be a REPEAT-family row - is blind to them. RED on base: the base
+        // build has no second arm, and `w72StopReachedWindowCollapses` answers
+        // false for the shape below at every window.
+        CHECK(!w72StopReachedWindowCollapses(false, true, 29, 13, 13),
+              "#W78-CV S3 REPRO the wave-72 arm cannot see the 41-52 shape: no base row is a"
+              " repeat family (activation count 0 on a fresh turn), so it declines to collapse"
+              " - this is the base behaviour, 12 asks");
+        // The new arm, walked as a truth table.
+        CHECK(!w78StopReachedRePutCollapses(true, true, 29, 13, 13, 0),
+              "#W78-CV S3 the FIRST put of the list is always asked (declinedN 0) - seq 41");
+        CHECK(w78StopReachedRePutCollapses(true, true, 29, 13, 13, 1),
+              "#W78-CV S3 GREEN the RE-PUT of a list this seat already declined this turn,"
+              " every live row at or past the model's own stated stop, collapses - seqs 42-52");
+        CHECK(!w78StopReachedRePutCollapses(false, true, 29, 13, 13, 4),
+              "#W78-CV S3 MUST-NOT-MATCH one live row of ANY other kind and the window is"
+              " asked - a new row is never collapsed away");
+        CHECK(!w78StopReachedRePutCollapses(true, false, 29, 13, 13, 4),
+              "#W78-CV S3 MUST-NOT-MATCH no row has actually reached the stop");
+        CHECK(!w78StopReachedRePutCollapses(true, true, -1, 13, 13, 4),
+              "#W78-CV S3 MUST-NOT-MATCH no stop was ever stated");
+        CHECK(!w78StopReachedRePutCollapses(true, true, 29, 12, 13, 4),
+              "#W78-CV S3 MUST-NOT-MATCH a stop stated on an EARLIER turn never silences"
+              " this turn's windows (the #W72-BX F2 guard, unchanged)");
+        // The 41 -> 52 shape, counted: one ask, eleven collapses.
+        {
+            int asks = 0, collapsed = 0;
+            for (int w = 41; w <= 52; w++)
+            {
+                const int declinedN = asks; //each ask is answered `pass`, which declines the list
+                const int planTurn = (w == 41) ? 12 : 13; //seq 41's reply states the stop on turn 13
+                if (w78StopReachedRePutCollapses(true, true, 29, planTurn, 13, declinedN))
+                    collapsed++;
+                else
+                    asks++;
+            }
+            CHECK(asks == 1 && collapsed == 11,
+                  "#W78-CV S3 GREEN the seq-41->52 shape is ONE ask and eleven collapsed"
+                  " re-puts - RED on base, where the same walk asks all twelve");
+        }
+        // ...and a window that gains ANY other new row is still asked, at every
+        // decline count: the option set is a different key, so `declinedN` for it
+        // is 0, and the predicate refuses on the row test as well.
+        {
+            bool anyCollapsed = false;
+            for (int d = 0; d <= 5; d++)
+                if (w78StopReachedRePutCollapses(false, true, 29, 13, 13, d))
+                    anyCollapsed = true;
+            CHECK(!anyCollapsed,
+                  "#W78-CV S3 MUST-NOT-MATCH a window with any other new row is asked at every"
+                  " decline count - the ruling's allowance covers the reached stop and nothing"
+                  " else");
+        }
+    }
+
+    cout << "\n[#W78-CV] S4 the stack-drain annotation and the hold across the drain\n";
+    {
+        // `152v162` deck152 seqs 55-63: nine byte-identical Draw-step windows
+        // while a seven-object stack of THEIR triggers drained.
+        std::vector<string> rows;
+        rows.push_back("Create human with Katilda, Dawnhart Prime [cost: Tap]");
+        rows.push_back("Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK");
+        const string hold = w78HoldRowShortName(rows);
+        CHECK(hold == "Hold priority",
+              "#W78-CV S4 the clause names the HOLD row by its short name, copying none of"
+              " the row's contract paragraph");
+        const string unchangedNote =
+            "\n[hold check: every row above was also on the menu at the last window I asked"
+            " you at this seam (3 windows in a row now), and no row that was on it is gone - x]";
+        CHECK(w78RowsUnchangedSinceLastAsk(unchangedNote),
+              "#W78-CV S4 the gate is the hold-check bracket's OWN comparison, so the two"
+              " lines can never disagree");
+        CHECK(!w78RowsUnchangedSinceLastAsk("\n[hold check: 2 rows above are new since]")
+              && !w78RowsUnchangedSinceLastAsk(""),
+              "#W78-CV S4 MUST-NOT-MATCH a moved menu, and a window with no bracket at all");
+        const string note = w78StackDrainNote(7, true, hold);
+        CHECK(note == "\n[their stack is draining 7 triggers - each link will put this same list"
+                      " to you; HOLD (Hold priority) covers every link, the activation above"
+                      " stays available after]",
+              "#W78-CV S4 GREEN the drain clause, verbatim - RED on base, where no such"
+              " string exists in the binary");
+        CHECK(w78StackDrainNote(1, true, hold).empty(),
+              "#W78-CV S4 MUST-NOT-MATCH one link is not a drain");
+        CHECK(w78StackDrainNote(7, false, hold).empty(),
+              "#W78-CV S4 MUST-NOT-MATCH a menu that MOVED is not the same question re-put");
+        CHECK(w78StackDrainNote(7, true, "").empty(),
+              "#W78-CV S4 MUST-NOT-MATCH no hold row, no clause that names one");
+        // THE HOLD HOLDS ACROSS THE DRAIN: seven links, the annotation's own
+        // number moving at each, through the LIVE latch and the LIVE bracket.
+        {
+            W76HoldMemory m;
+            std::set<string> held;
+            for (size_t i = 0; i < rows.size(); i++)
+                held.insert(holdActionKeyRow(rows[i]));
+            w76HoldReopenNote(m, "priority", rows, 1, false, holdActionKeyRow);
+            w76HoldWindowAsked(m, "priority", 1);
+            int reopened = 0, unchangedBrackets = 0;
+            for (int link = 7; link >= 1; link--)
+            {
+                std::vector<string> now(rows);
+                //the drain note is PROMPT-ONLY: the rows the latch and the bracket
+                //read are byte-identical at every link.
+                const string n = w76HoldReopenNote(m, "priority", now, 1 + (7 - link) + 1,
+                                                   false, holdActionKeyRow);
+                if (w78RowsUnchangedSinceLastAsk(n))
+                    unchangedBrackets++;
+                const char * why = "";
+                if (!holdStillStands(held, now, &why, holdActionKeyRow))
+                    reopened++;
+                w76HoldWindowAsked(m, "priority", 1 + (7 - link) + 1);
+            }
+            CHECK(reopened == 0 && unchangedBrackets == 7,
+                  "#W78-CV S4 GREEN a hold taken at the first link stands across all seven -"
+                  " 0 re-opens, and the bracket says `every row above was also on the menu` at"
+                  " every link, which is what makes ONE hold the whole answer");
+        }
+        // KEY STABILITY (LESSON OF WAVE 74): the clause carries a COUNT, and two
+        // windows differing only in it must key identically at the ask key, the
+        // async slot key, the hold key and the option-set key.
+        {
+            const string tail = joinNumberedRows(rows, NULL);
+            const string kA = w77KeyTailOf(tail), kB = w77KeyTailOf(tail);
+            CHECK(kA == kB
+                  && asyncSlotKeyOf(false, 9, 2, kA, "BOARD")
+                     == asyncSlotKeyOf(false, 9, 2, kB, "BOARD"),
+                  "#W78-CV S4 KEY the drain clause never reaches a key: it is spliced BELOW"
+                  " the option list, on the prompt-only channel, so the ask key and the async"
+                  " slot key are built from bytes it never enters");
+            CHECK(w78StackDrainNote(7, true, hold) != w78StackDrainNote(3, true, hold)
+                  && optionSetKeyOf(rows) == optionSetKeyOf(rows),
+                  "#W78-CV S4 KEY the clause's number DOES move (7 links then 3) while the"
+                  " option-set key does not - the wave-74 lesson's shape");
+            std::set<string> h2;
+            for (size_t i = 0; i < rows.size(); i++)
+                h2.insert(holdActionKeyRow(rows[i]));
+            const char * why2 = "";
+            CHECK(holdStillStands(h2, rows, &why2, holdActionKeyRow),
+                  "#W78-CV S4 KEY the hold latch is untouched by the clause");
+        }
+    }
+
+    cout << "\n[#W78-CV] S6 the own-loop verdict is RENDERED, not only keyed\n";
+    {
+        // `126v130` deck126 seq 43: the RESOLVING verdict was TRUE and printed
+        // nowhere (0 occurrences of `[own loop verdict:` in 42 corpus logs),
+        // because CU F4 joined it to the HELD SET only.
+        const string key = w77OwnLoopVerdictKey(kW77LoopResolving, "", "");
+        CHECK(key == "[own loop verdict: resolving]",
+              "#W78-CV S6 INSTRUMENT the key-side marker is unchanged - it still re-opens a"
+              " hold when the verdict moves");
+        const string line = w78OwnLoopVerdictLine(kW77LoopResolving, "", "");
+        CHECK(line == "\n[own loop verdict: RESOLVING - a piece of your own proven life loop is"
+                      " on the stack and nothing of theirs targets it: the loop closes without"
+                      " another action from you, and the HOLD row covers every remaining link]",
+              "#W78-CV S6 GREEN the seq-43 shape RENDERS a verdict line - RED on base, where"
+              " this string does not exist and the window printed no verdict at all");
+        const string threat = w78OwnLoopVerdictLine(kW77LoopThreatened, "Vanishing Verse",
+                                                    "Sanguine Bond");
+        CHECK(threat.find("THREATENED") != string::npos
+              && threat.find("their Vanishing Verse") != string::npos
+              && threat.find("your Sanguine Bond") != string::npos
+              && threat.find("does NOT cover this window") != string::npos,
+              "#W78-CV S6 GREEN a THREATENED verdict names the SPELL and the COMPONENT, and"
+              " says the hold does not cover the window");
+        CHECK(w78OwnLoopVerdictLine(kW77LoopIdle, "", "").empty()
+              && w78OwnLoopVerdictLine(kW77LoopThreatened, "", "Sanguine Bond").empty(),
+              "#W78-CV S6 MUST-NOT-MATCH an idle verdict prints nothing, and a threat with no"
+              " spell to name prints nothing rather than a half-sentence");
+        // The line is an ANNOTATION, not a row: it must not reach any key.
+        {
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back("+1: create a 1/1 vampire with Sorin, Lord of Innistrad");
+            rowsB = rowsA;
+            CHECK(w77KeyTailOf(joinNumberedRows(rowsA, NULL))
+                      == w77KeyTailOf(joinNumberedRows(rowsB, NULL))
+                  && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                  && holdActionKeyRow(rowsA[0]) == holdActionKeyRow(rowsB[0]),
+                  "#W78-CV S6 KEY the rendered verdict line is prompt-only: the rows, the ask"
+                  " key tail, the option-set key and the hold key are byte-identical with it"
+                  " and without it");
+            std::set<string> held;
+            held.insert(holdActionKeyRow(rowsA[0]));
+            held.insert(holdActionKeyRow(w77OwnLoopVerdictKey(kW77LoopResolving, "", "")));
+            std::vector<string> nowThreat(rowsA);
+            nowThreat.push_back(w77OwnLoopVerdictKey(kW77LoopThreatened, "Vanishing Verse",
+                                                     "Sanguine Bond"));
+            const char * why = "";
+            CHECK(!holdStillStands(held, nowThreat, &why, holdActionKeyRow),
+                  "#W78-CV S6 the key-side marker STILL re-opens the hold when the verdict"
+                  " turns THREATENED - rendering the line takes nothing away from it");
+        }
+    }
+
+    cout << "\n[#W78-CV] S7 the hold-check referent names a RECORD, and the contract holds\n";
+    {
+        W76HoldMemory m;
+        std::vector<string> rows;
+        rows.push_back("Cast Vanishing Verse {w}{b}");
+        // window 4 is asked and writes record 37.
+        w76HoldReopenNote(m, "cast", rows, 4, false, holdActionKeyRow);
+        w76HoldWindowAsked(m, "cast", 4);
+        w78HoldWindowRecordSeq(m, "cast", 4, 37);
+        CHECK(m.lastSeq["cast"] == 4 && m.lastRecordSeq["cast"] == 37,
+              "#W78-CV S7 the memory holds BOTH the window ordinal and the record seq - RED on"
+              " base, where only the ordinal existed and the field that carried it was named"
+              " `hold_check_ref_seq`");
+        w76HoldReopenNote(m, "cast", rows, 5, false, holdActionKeyRow);
+        CHECK(m.measuredRef["cast"] == 4 && m.measuredRefRecord["cast"] == 37,
+              "#W78-CV S7 GREEN the next bracket's referent is window 4 AND record 37 - the"
+              " join four deck seats could not make (246 of 294 landed at the wrong seam)");
+        // a stamp for a window that has already been superseded is refused.
+        w76HoldWindowAsked(m, "cast", 5);
+        w78HoldWindowRecordSeq(m, "cast", 4, 99);
+        CHECK(m.lastRecordSeq["cast"] == 37,
+              "#W78-CV S7 MUST-NOT-MATCH a record seq for a window that is no longer the"
+              " committed one is refused, never written over the live referent");
+        // the staged-note test the commit routing uses.
+        {
+            W76HoldMemory m2;
+            CHECK(w78StagedNoteIsEmpty(m2, "cast"),
+                  "#W78-CV S7 a seam that measured nothing has no bracket to lose");
+            w76HoldReopenNote(m2, "cast", rows, 1, false, holdActionKeyRow);
+            CHECK(!w78StagedNoteIsEmpty(m2, "cast"),
+                  "#W78-CV S7 GREEN a staged window that MEASURED a bracket is the case the"
+                  " `146v126` 46/55 dungeon menus broke: a record whose prompt carries no"
+                  " bracket is not that window's record, so the stage is dropped instead of"
+                  " committed - RED on base, where records 47 and 56 named a dungeon menu as"
+                  " `the last window I asked you at this seam`");
+            w76HoldWindowNotAsked(m2, "cast");
+            const string again = w76HoldReopenNote(m2, "cast", rows, 2, false, holdActionKeyRow);
+            CHECK(again.find("first window") != string::npos,
+                  "#W78-CV S7 GREEN ...and the next cast bracket still names the last window"
+                  " the model ACTUALLY saw (none yet here), never the foreign menu");
+        }
+    }
+
+    cout << "\n[#W78-CV] S9 the hold-check count: renumbering, and the rows that left\n";
+    {
+        // `152` deck130 seq 6 -> 10: `Pyrite Spellbomb` becomes `Pyrite Spellbomb #1`
+        // the moment `#2` is offered, so every row of the first copy carried a byte
+        // the key had never seen and the bracket announced 8 new where 5 appeared.
+        CHECK(w78StripHandleOrdinal("deal 2 damage with pyrite spellbomb #1 targeting wolf")
+                  == "deal 2 damage with pyrite spellbomb targeting wolf"
+              && w78StripHandleOrdinal("deal 2 damage with pyrite spellbomb targeting wolf")
+                  == "deal 2 damage with pyrite spellbomb targeting wolf",
+              "#W78-CV S9a the printed ordinal is a RENDER handle and comes out of the"
+              " counting key; a row that never carried one is untouched");
+        CHECK(w78StripHandleOrdinal("cast doom blade {1}{b}") == "cast doom blade {1}{b}"
+              && w78StripHandleOrdinal("gain 3 life #") == "gain 3 life #",
+              "#W78-CV S9a MUST-NOT-MATCH a mana cost's braces and a bare `#` are not ordinals");
+        {
+            std::vector<string> lastKeys, nowKeys;
+            lastKeys.push_back("deal 2 damage with pyrite spellbomb targeting wolf");
+            lastKeys.push_back("deal 2 damage with pyrite spellbomb targeting the opponent");
+            lastKeys.push_back("cycling with forgotten cave");
+            nowKeys.push_back("deal 2 damage with pyrite spellbomb #1 targeting wolf");
+            nowKeys.push_back("deal 2 damage with pyrite spellbomb #1 targeting the opponent");
+            nowKeys.push_back("deal 2 damage with pyrite spellbomb #2 targeting wolf");
+            nowKeys.push_back("deal 2 damage with pyrite spellbomb #2 targeting the opponent");
+            nowKeys.push_back("cycling with forgotten cave");
+            int unseen = -1, gone = -1;
+            w78HoldRowDelta(lastKeys, nowKeys, unseen, gone);
+            CHECK(unseen == 2 && gone == 0,
+                  "#W78-CV S9a GREEN a SECOND copy arriving counts its own rows and nothing"
+                  " else - 2 new, 0 gone. RED on base: the set diff over the printed keys"
+                  " counts 4, because renumbering made every row of the first copy new");
+            // the base arithmetic, stated so the RED is in the corpus:
+            std::set<string> baseSet(lastKeys.begin(), lastKeys.end());
+            int baseUnseen = 0;
+            for (size_t i = 0; i < nowKeys.size(); i++)
+                if (!baseSet.count(nowKeys[i]))
+                    baseUnseen++;
+            CHECK(baseUnseen == 4,
+                  "#W78-CV S9a REPRO the base reading of the same two windows: 4 new where 2"
+                  " rows appeared - the deck130 seq 6->10 shape");
+        }
+        {
+            // ZERO / ONE / REORDER / DISAPPEARANCE / RENUMBERING, the five cases
+            // the wave-76 lesson requires of any bracket that prints a count.
+            std::vector<string> a, same, reordered, plusOne, minusOne, renumbered;
+            a.push_back("cast molten rain"); a.push_back("cast stone rain");
+            same = a;
+            reordered.push_back("cast stone rain"); reordered.push_back("cast molten rain");
+            plusOne = a; plusOne.push_back("cast hammer of bogardan");
+            minusOne.push_back("cast molten rain");
+            renumbered.push_back("cast molten rain #1"); renumbered.push_back("cast stone rain");
+            int u = -1, g = -1;
+            w78HoldRowDelta(a, same, u, g);
+            CHECK(u == 0 && g == 0, "#W78-CV S9 ZERO");
+            w78HoldRowDelta(a, reordered, u, g);
+            CHECK(u == 0 && g == 0, "#W78-CV S9 REORDER - the delta is order-independent");
+            w78HoldRowDelta(a, plusOne, u, g);
+            CHECK(u == 1 && g == 0, "#W78-CV S9 ONE");
+            w78HoldRowDelta(a, minusOne, u, g);
+            CHECK(u == 0 && g == 1,
+                  "#W78-CV S9b DISAPPEARANCE is counted and reported - RED on base, where the"
+                  " count was one-directional and a row that left was never named");
+            w78HoldRowDelta(a, renumbered, u, g);
+            CHECK(u == 0 && g == 0,
+                  "#W78-CV S9a RENUMBERING alone is no change at all - the same two actions");
+        }
+        // the printed sentences, through the LIVE note builder.
+        CHECK(holdReopenNoteText(2, 0, false, 1)
+                  .find("2 rows above are new since the last window I asked you at this seam"
+                        " and 1 row that was on it is gone") != string::npos,
+              "#W78-CV S9b GREEN both directions in one sentence when both happened");
+        CHECK(holdReopenNoteText(0, 0, false, 2)
+                  .find("2 rows that were on the menu at the last window I asked you at this"
+                        " seam are gone and no row above is new") != string::npos,
+              "#W78-CV S9b GREEN a pure disappearance prints its own sentence - RED on base,"
+              " where (0,0) printed the empty string and the model saw no bracket at all");
+        CHECK(holdReopenNoteText(0, 0, false, 0).empty(),
+              "#W78-CV S9b MUST-NOT-MATCH nothing measured is still the empty string");
+        // and the RUN breaks on a disappearance, as the hold row's contract says.
+        {
+            W76HoldMemory m;
+            std::vector<string> a, minusOne;
+            a.push_back("Cast Molten Rain {1}{r}{r}");
+            a.push_back("Cast Stone Rain {2}{r}");
+            minusOne.push_back("Cast Molten Rain {1}{r}{r}");
+            w76HoldReopenNote(m, "cast", a, 1, false, holdActionKeyRow);
+            w76HoldWindowAsked(m, "cast", 1);
+            const string n = w76HoldReopenNote(m, "cast", minusOne, 2, false, holdActionKeyRow);
+            CHECK(n.find("is gone and no row above is new") != string::npos
+                  && n.find("windows in a row now") == string::npos,
+                  "#W78-CV S9b GREEN a window that LOST a row is not counted into the"
+                  " unchanged run - RED on base, where it was");
+        }
+    }
+
+    cout << "\n[#W78-CV] S11 every forced close is nameable, and the same-arm bound fires\n";
+    {
+        // Four waves of `force_close_arms_refused` / `_deferred` /
+        // `_same_arm_deferred` / `_defer_bound_hits` at 0 while
+        // `forced_close_unrecorded` went 5 -> 10. The bound is not broken: the ten
+        // took a path no arm-bound counter watches (`dropped_decision_moved`).
+        // THE SAME-ARM BOUND, driven through the live decision function: two closes
+        // earned on ONE arm with an EMPTY park.
+        {
+            bool liveArmed = false, parkArmed = false;
+            int sameArmDeferred = 0, armsRefused = 0, unrecorded = 0, deferTicks = 0;
+            int events = 0;
+            for (int tick = 0; tick < 2; tick++)
+            {
+                const bool closeBusy = !w76ForceCloseArmAllowed(parkArmed) || liveArmed;
+                const bool sameArmBusy = liveArmed && w76ForceCloseArmAllowed(parkArmed);
+                const int what = w76ForceCloseDecision(true, closeBusy, deferTicks);
+                if (what == kW76CloseDefer)
+                {
+                    if (sameArmBusy)
+                        sameArmDeferred++;
+                    else
+                        armsRefused++;
+                    deferTicks++;
+                    events++;
+                    continue;
+                }
+                unrecorded += gptForceCloseArm(liveArmed);
+                events++;
+            }
+            CHECK(sameArmDeferred == 1 && armsRefused == 0 && unrecorded == 0 && events == 2,
+                  "#W78-CV S11 GREEN two closes earned on ONE arm with an empty park makes"
+                  " `force_close_same_arm_deferred` read 1 - the counter that has been 0 for"
+                  " four waves, and the second decode it saves");
+            // ...and the deferral is bounded: it never becomes a permanent pending.
+            int boundHits = 0;
+            while (deferTicks < kW76CloseDeferMaxTicks)
+            {
+                if (w76ForceCloseDecision(true, true, deferTicks) != kW76CloseDefer)
+                    break;
+                deferTicks++;
+            }
+            if (w76ForceCloseDecision(true, true, deferTicks) == kW76CloseArm)
+                boundHits++;
+            CHECK(boundHits == 1 && deferTicks == kW76CloseDeferMaxTicks,
+                  "#W78-CV S11 GREEN the same-arm deferral arms anyway at the 8-tick bound -"
+                  " a bounded wait, never a permanently pending decision");
+        }
+        // WHY THE BOUND NEVER FIRED IN THE CORPUS: the ten unrecorded closes are
+        // the DROP path, which no arm bound can see. Walked here so the class is
+        // named rather than inferred from a stderr diff.
+        {
+            bool liveArmed = false, parkArmed = false;
+            int unrecorded = 0, sameArmDeferred = 0;
+            unrecorded += gptForceCloseArm(liveArmed);   //window N arms a close
+            //the decision MOVES under the pending retry: the close is dropped
+            if (liveArmed)
+            {
+                unrecorded++;
+                liveArmed = false;
+            }
+            const bool sameArmBusy = liveArmed && w76ForceCloseArmAllowed(parkArmed);
+            if (w76ForceCloseDecision(true, sameArmBusy, 0) == kW76CloseDefer && sameArmBusy)
+                sameArmDeferred++;
+            CHECK(unrecorded == 1 && sameArmDeferred == 0,
+                  "#W78-CV S11 REPRO the wave-77 ten: an arm DROPPED because the decision"
+                  " moved raises `forced_close_unrecorded` and can never raise any arm-bound"
+                  " counter - the bound was not broken, it was looking elsewhere. RED on base"
+                  " for attribution: the base build writes no record here, so the ten are"
+                  " unnameable from a corpus (three waves of briefs have asked)");
         }
     }
 

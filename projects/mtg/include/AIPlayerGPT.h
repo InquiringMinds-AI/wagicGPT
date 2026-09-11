@@ -295,6 +295,25 @@ struct W76HoldMemory
     //per record makes the whole class decidable from the translog.
     std::map<std::string, int> lastSeq;
     std::map<std::string, int> measuredRef;
+    //#W78-CV (S7, wave-77 deck162 HIGH-1 / deck126 HIGH-2 / deck130 HIGH-2):
+    //`lastSeq`/`measuredRef` are WINDOW ordinals (mWindowSeq), not record seqs -
+    //four deck seats and the engine seat tried to join the stamped field to the
+    //record index and landed 246 of 294 at the wrong seam. The window ordinal is
+    //still the memory's own identity (the staging guard keys on it), so it stays;
+    //what is added is the RECORD seq beside it, so the translog can carry both
+    //under names that say which is which. `lastRecordSeq` is the record the
+    //committed window wrote; `measuredRefRecord` is that record's seq for the
+    //referent this note names (-1 = none yet).
+    std::map<std::string, int> lastRecordSeq;
+    std::map<std::string, int> measuredRefRecord;
+    //#W78-CV (S9 a, wave-77 deck130 HIGH-1): the committed window's row keys IN
+    //ORDER, beside the set. A set cannot carry MULTIPLICITY, and multiplicity is
+    //exactly what a second copy of a card changes: `Goblin` becomes `Goblin #1`
+    //when `#2` arrives, so every row of the first copy looks new to a set diff
+    //(`152` deck130 seq 6->10 announced 8 new where 5 rows appeared). The
+    //bracket's count is computed off these lists; the LATCH still reads `last`.
+    std::map<std::string, std::vector<std::string> > lastRows;
+    std::map<std::string, std::vector<std::string> > pendingRows;
 };
 
 //#W74-CF (F1, Astra review finding 1): ONE ARM'S SECOND LEG, WHOLE. Every field
@@ -1311,6 +1330,7 @@ private:
     //(the abandonment classes stay the default; "wall_miss_no_retry" is the
     //new one, written the moment the deadline is spent).
     void flushWallMissRecord(const char * classOverride = NULL);
+    void writeForceCloseRecord(const char * outcome, bool landArm); //#W78-CV (S11)
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
                        const std::vector<string> * optionTexts = NULL,
@@ -1972,6 +1992,7 @@ private:
     //this window). Stamped on the record as `hold_check_ref_seq` and consumed
     //there, so a reviewer never has to re-implement the key to adjudicate it.
     int mHoldCheckRefSeq;
+    int mHoldCheckRefWindow; //#W78-CV (S7): the WINDOW ordinal, under its own name
     //#W77-CR (R2 a): a casting window that was built and then closed WITHOUT an
     //ask drops everything it measured - the prompt-only note (which askModel
     //would otherwise consume on the NEXT, unrelated window), the cached hold
@@ -1982,6 +2003,8 @@ private:
     int mOwnLoopWindowsAsked;
     int mOwnLoopCountedSeq;
     bool w77OwnLoopResolving();
+    int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
+    void w78CountStackDrainWindow();     //#W78-CV (S4)
     int w77OwnLoopStackState(std::string& theirSpell, std::string& component);
     //#W77-CU (F4): the verdict as a hold MARKER ROW, the #W68-BB / #W74-CH shape.
     std::string w77OwnLoopVerdictNow();
@@ -2315,9 +2338,23 @@ private:
     //not loss, so the deferral is the same bounded wait and the counter is its
     //own, never summed with the park's.
     int mForceCloseSameArmDeferred;
+    //#W78-CV (S11, wave-77 engine-seat MED-1): the per-event record's own
+    //ordinal, so each `forced_close` record is nameable and the ten unrecorded
+    //closes of a corpus can be attributed to an arm and a window.
+    int mForceCloseEvents;
     //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
     //byte-identical re-put later in the same turn at another phase can be
     //counted and named. Measure + annotation only; no window is collapsed.
+    //#W78-CV (S3, wave-77 deck123 HIGH-2): re-puts of a window whose ONLY live
+    //rows are already at the model's own stated stop, collapsed under the
+    //ruling's allowance (a reached stop is an answer already given). Counted
+    //apart from mStopReachedWindowsSkipped so the new arm is separable.
+    int mStopReachedRePutsCollapsed;
+    //#W78-CV (S4, wave-77 deck152 HIGH-2): windows asked while a multi-link
+    //stack of THEIR triggers drained over a byte-identical menu. Annotation
+    //only - nothing is collapsed; this is the population the annotation is for.
+    int mStackDrainWindowsAsked;
+    int mStackDrainCountedSeq;
     std::map<string, W76CrossPhaseAsk> mCrossPhaseAsks;
     int mCrossPhaseRePuts;
     int mCrossPhaseTurn;           //the turn mCrossPhaseAsks holds; older turns drop
