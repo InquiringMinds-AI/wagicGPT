@@ -20,6 +20,9 @@
 # Exit status is 0 for PASS/WAIT, 1 for FAIL (and for a --selftest failure).
 import argparse, glob, json, os, re, sys, tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import runmanifest
+
 # The action labels the seams emit. The gate only asks "is this line an action
 # line"; WHICH action it is belongs to the engine's parsers, not here.
 ACTION_RE = re.compile(r'^(CHOICE|ATTACK|BLOCKS|PUT|ORDER|X|KEEP|MULLIGAN|DISCARD|REVEAL|BOTTOM)\s*:', re.I)
@@ -47,8 +50,19 @@ def reply_shape(reply):
     return 'off_protocol'
 
 
-def run_records(logdir, start, per_file):
+def run_records(logdir, start, per_file, own=None):
     """The first `per_file` GATEABLE records of each seat log this run wrote.
+
+    #W81-DJ: THIS RUN'S, BY NAME. `own` is a `runmanifest.own_seatlogs` result -
+    the seat logs the run's own games announced. $LOGDIR is SHARED, so "newer
+    than my start epoch" is not identity: on 2026-09-12 a single-game rerun
+    PASSED on its own two seats and was then killed by 20 records of another
+    lane's thinking-off suite fixture that happened to land in the same
+    directory. A foreign log is now invisible whatever its regime or age, and
+    an EMPTY `own` (nothing announced yet) yields no records, which is a WAIT -
+    the gate waits for the announcement rather than scanning the directory.
+    `own=None` means the outdir has no announcement channel at all (a probe
+    dir, a test fixture) and the old epoch rule stands.
 
     #W70-BN (F7, Astra review finding 7): a gateable record is one that carried a
     COMPLETED MODEL ROUND TRIP - a non-empty `prompt`. `writeTransLog` always
@@ -60,13 +74,14 @@ def run_records(logdir, start, per_file):
 
     Returns (per-file dict of records, unstamped count, file count)."""
     out, unstamped, files = {}, 0, 0
-    for f in sorted(glob.glob(os.path.join(logdir, '*.jsonl'))):
-        try:
-            ep = int(os.path.basename(f).split('-')[0])
-        except ValueError:
-            continue
-        if ep < start - 2:
-            continue
+    for f in runmanifest.own_logs(logdir, own):
+        if own is None:
+            try:
+                ep = int(os.path.basename(f).split('-')[0])
+            except ValueError:
+                continue
+            if ep < start - 2:
+                continue
         files += 1
         name = os.path.basename(f)
         taken = 0
@@ -329,6 +344,64 @@ def selftest():
         check(unst == 1 and v == 'FAIL' and 'rebuild' in why,
               '#W70-BN F7 ...but a record that DID call the model and carries no stamp is a stale binary')
 
+    # ---- #W81-DJ: the SHARED $LOGDIR. A FOREIGN log is not evidence. -------
+    # The 2026-09-12 kill, as a fixture: the run's own seat log (thinking on)
+    # and, in the same directory, another lane's suite-fixture seat log
+    # (deck198 vs deck199, thinking OFF, newer epoch). The run announced ONE of
+    # them on its own game stderr. Before this lane the gate read both and
+    # killed a valid corpus on the foreign one.
+    def shared_dir(td, own_thinking='on'):
+        logdir, out = os.path.join(td, 'log'), os.path.join(td, 'out')
+        os.makedirs(logdir); os.makedirs(out)
+        mine = '1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl'
+        foreign = '1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl'
+        with open(os.path.join(logdir, mine), 'w') as fh:
+            for i in range(6):
+                fh.write(json.dumps({'kind': 'ask', 'seq': i, 'thinking': own_thinking,
+                                     'prompt': 'p', 'max_tokens_reasoning': 6000,
+                                     'reasoning_chars': 900 if own_thinking == 'on' else 0,
+                                     'reply': 'PLAN: a\nCHOICE: 1 (x)'}) + '\n')
+        with open(os.path.join(logdir, foreign), 'w') as fh:
+            for i in range(6):
+                fh.write(json.dumps({'kind': 'ask', 'seq': i, 'thinking': 'off', 'prompt': 'p',
+                                     'reasoning_chars': 0,
+                                     'reply': 'PLAN: a\nCHOICE: 1 (x)'}) + '\n')
+        return logdir, out, mine, foreign
+
+    with tempfile.TemporaryDirectory() as td:
+        logdir, out, mine, foreign = shared_dir(td)
+        with open(os.path.join(out, 'game-162v123-1789238538.stderr'), 'w') as fh:
+            fh.write('loading cards\nWAGIC_GPT_TRANSLOG_FILE %s\n' % mine)
+        own = runmanifest.own_seatlogs(out)
+        recs, unst, nf = run_records(logdir, 1789238538, 5, own)
+        v, why, passed = gate(recs, unst, 'on', 5.0, 5)
+        check(nf == 1 and v == 'PASS' and passed == [mine] and foreign not in why,
+              '#W81-DJ a FOREIGN thinking-off seat log in the shared dir is invisible - PASS')
+        # MUST-NOT-MATCH: filtering by the manifest must not make the gate blind
+        # to the run's OWN regime. The same directory, the same foreign log, but
+        # this run's announced seat is itself thinking=off under --thinking on.
+    with tempfile.TemporaryDirectory() as td:
+        logdir, out, mine, foreign = shared_dir(td, own_thinking='off')
+        with open(os.path.join(out, 'game-162v123-1789238538.stderr'), 'w') as fh:
+            fh.write('WAGIC_GPT_TRANSLOG_FILE %s\n' % mine)
+        recs, unst, _ = run_records(logdir, 1789238538, 5, runmanifest.own_seatlogs(out))
+        v, why, _ = gate(recs, unst, 'on', 5.0, 5)
+        check(v == 'FAIL' and mine in why and 'did not reach the engine' in why,
+              '#W81-DJ MUST-NOT-MATCH the run\'s OWN thinking-off seat still FAILs the gate')
+        # A manifest that exists but has announced NOTHING yet is a WAIT, never a
+        # verdict read off somebody else's log.
+        os.remove(os.path.join(out, 'game-162v123-1789238538.stderr'))
+        open(os.path.join(out, 'game-162v123-1789238538.stderr'), 'w').close()
+        recs, unst, nf = run_records(logdir, 1789238538, 5, runmanifest.own_seatlogs(out))
+        check(nf == 0 and gate(recs, unst, 'on', 5.0, 5)[0] == 'WAIT',
+              '#W81-DJ a run that has announced nothing yet WAITs, it does not read the directory')
+        # And the documented degrade: an outdir with no announcement channel at
+        # all (no game stderr, no .seatlogs) keeps the old epoch rule.
+        os.remove(os.path.join(out, 'game-162v123-1789238538.stderr'))
+        check(runmanifest.own_seatlogs(out) is None
+              and run_records(logdir, 1789238538, 5, runmanifest.own_seatlogs(out))[2] == 2,
+              '#W81-DJ an outdir with NO announcement channel degrades to the old epoch scan')
+
     print('regime-gate selftest: %d checks, %d failed' % (n[0], len(fails)))
     return 1 if fails else 0
 
@@ -336,6 +409,10 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--logdir')
+    #W81-DJ: the run's OUTDIR, which is where its games announce their own seat
+    #logs. Without it the gate reads the shared directory by time and any
+    #foreign log in it is evidence against this run - the 2026-09-12 kill.
+    ap.add_argument('--outdir')
     ap.add_argument('--start', type=int)
     ap.add_argument('--regime', choices=['on', 'off'])
     ap.add_argument('--per-file', type=int, default=5)
@@ -357,7 +434,8 @@ def main():
             checked = [l.strip() for l in open(a.state) if l.strip()]
         except OSError:
             checked = []
-    recs, unstamped, _ = run_records(a.logdir, a.start, a.per_file)
+    recs, unstamped, _ = run_records(a.logdir, a.start, a.per_file,
+                                     runmanifest.own_seatlogs(a.outdir))
     verdict, why, now = gate(recs, unstamped, a.regime, a.prose_abort, a.min_records, checked)
     if verdict == 'PASS' and a.state:
         try:
