@@ -313,6 +313,24 @@ Each rule is stated once; bracketed tags name the amendments it was harvested fr
   as examples after. Class words are verified against the
   primitive's filter; a class rule names one plausible NON-member. [A39, A83, A145, A195, A293]
 
+- A heading is a SCOPE declaration and the pilot enforces it: a rule filed under a heading is applied
+  to that heading's subject and refused elsewhere, so a heading whose verb another section owns as its
+  imperative hands the rule to that section. Audit every heading against the guide's own verb
+  inventory: no heading may use a verb another section uses imperatively (`SEND`, `BLOCK`, `ATTACK`,
+  `KEEP`, `BOTTOM`, `CAST`, `PUT`). A rule that must hold across sections either names its scope in
+  its own first clause ("this paragraph is about CASTING") or is restated at the top of the
+  first-match list the window it governs is read from. A rule filed once, under a heading, is a rule
+  with a scope — including an absolute. (Not A174/A307: those restate a deciding FACT per phase;
+  this is the heading as the scope gate, with a greppable audit.) [A333, folded 2026-09-12 from
+  wave74/strategy-writing-skill-v2-amendments.md]
+- Never carry a rule's hardest case in a concessive clause. "Take A even when B" is read as "take A
+  WHEN B": on a board where B is false the pilot takes the other row and cites the guide for it.
+  State the ordering flat, then close BOTH directions of the quantity the rule refuses to trade
+  against, and name the losing trade in the pilot's own words as the thing being refused. Audit: grep
+  every guide for `even when`, `even if`, `regardless of`, `no matter`, `however <adj>` and rewrite
+  each hit flat. (Not A12 / the §5 anti-pattern: the rule IS stated; its hard case is attached
+  concessively and the concession inverts into a condition when read.) [A334, folded 2026-09-12]
+
 ### 4.2 Prompt-surface literacy — what the pilot can and cannot see
 
 - Read one late-turn prompt verbatim first; key rules to what it prints.

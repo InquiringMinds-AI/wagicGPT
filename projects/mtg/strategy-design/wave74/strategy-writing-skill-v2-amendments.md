@@ -1,5 +1,7 @@
 # Amendments to the strategy-writing skill, v2 edition — appended wave 74
 
+**FOLDED into wave68/strategy-writing-skill-v2.md §4.1 on 2026-09-12** (owner ruling the same day: the skill is loop-managed; amendments are folded by the loop the wave they are written). This file is history.
+
 Base edition: `wave68/strategy-writing-skill-v2.md` (39,998 B, owner-installed 2026-09-06). That file is
 NOT edited here. The amendments below are written ready to fold in; each names the section of v2 it
 belongs under. Highest amendment number in the base edition is A332, so numbering resumes at A333.
