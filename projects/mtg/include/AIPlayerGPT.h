@@ -268,7 +268,15 @@ struct W76CrossPhaseAsk
     //with the ask.
     int countedSeq;
     bool declined;
-    W76CrossPhaseAsk() : windowSeq(0), countedSeq(-1), declined(false) {}
+    //#W80-DE (U8): the seat's own answer to this list, the rows it was answered
+    //over and whether that window was a SORCERY-SPEED one. A cross-phase replay
+    //may only serve an answer to a byte-identical list, and it must never cross
+    //INTO the phase where sorcery-speed legality opens (Astra wave-79 F1).
+    int choice;
+    std::vector<std::string> rows;
+    bool sorcerySpeed;
+    W76CrossPhaseAsk() : windowSeq(0), countedSeq(-1), declined(false),
+                         choice(0), sorcerySpeed(false) {}
 };
 
 struct W76HoldMemory
@@ -2038,6 +2046,36 @@ private:
     //the same danger rank but named a DIFFERENT threat than the one the hold was
     //taken over - the population #W79-CZ's rank clamp silently suppressed.
     int mHoldReopenedNewThreat;
+    //#W80-DE (U2, wave-79 engine-seat HIGH-2 - THE HOLD COUNTERS ARE UNAUDITABLE).
+    //`hold_verdict_safer_ignored` 59 and `hold_reopened_new_threat` 0 carried no
+    //DebugTrace and no record field, so neither the window, nor the held face, nor
+    //the live face was recoverable from 42 seat logs - and the 0 had to be called
+    //UNTESTED by default, the exact outcome the wave-78 lesson exists to prevent.
+    //Each clamp event and each re-open now stamps the face pair / the reason on
+    //the record of the window it happened at. Consumed by the record writer.
+    std::string mHoldSaferIgnoredFace;
+    std::string mHoldReopenReason;
+    //#W80-DE (U2): the crack-back and stack-death verdicts, on the channel the
+    //model can read. Both markers rendered 0 times in all 2,203 wave-79 prompts
+    //(they were latch KEYS only - the wave-77 S6 lesson again). The rendered face
+    //is stamped on the record and the counter increments AT THE SEND (U15).
+    std::string mCrackBackVerdictFace;
+    std::string mStackDeathVerdictFace;
+    int mCrackBackVerdictLinesRendered;
+    int mCrackBackVerdictCountedSeq;
+    int mStackDeathVerdictLinesRendered;
+    int mStackDeathVerdictCountedSeq;
+    //#W80-DE (U8): cross-phase replays - a declined list re-put at another phase
+    //of the same turn over a board the bracket itself certifies unchanged, served
+    //from this seat's own answer instead of a full model call. Every replay is a
+    //line in askreplay/ naming both phases, so the counter has a per-event trace.
+    int mCrossPhaseReplayed;
+    //#W80-DE (U9): the replay population, split by PATH so the census sums.
+    //`ask_replays_reserved` counted two paths under one name and the wave-79
+    //population moved between them (953 latch / 391 cache -> 0 / 1,084), which
+    //read as a 260-replay drop that never happened.
+    int mAskReplaysCache;
+    int mAskReplaysRepeatLatch;
     //#W79-DC (F1): the legal-continuation digest of the window about to be asked -
     //the other half of the ask key's board half, beside the seam scope. Set by the
     //seam that built the menu, read by the ask key and the async slot key.
@@ -2061,6 +2099,21 @@ private:
     bool w77OwnLoopResolving();
     int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
     void w78CountStackDrainWindow();     //#W78-CV (S4)
+    //#W80-DE (U2): the two verdict lines, rendered off the live board, and the
+    //starter scan the proven-win face is gated on (U10).
+    std::string w80CrackBackVerdictLineNow();
+    std::string w80StackDeathVerdictLineNow();
+    std::string w80LiveLoopStarterName();
+    //#W80-DE (U8): is THIS window one where sorcery-speed plays are legal for me?
+    //The single fact Astra's F1 warning turns on - a decline taken outside one was
+    //taken over a strictly smaller set of plays, so crossing INTO one is asked.
+    bool w80SorcerySpeedWindowNow();
+    //#W80-DE (U15): the ONE send-time application every seam calls - it stamps the
+    //two verdict faces and counts the crack-back, stack-death and stack-drain
+    //clauses, all on the same predicate and all only when the prompt is SENT.
+    void w80ApplyVerdictFacesAtSend(bool sent, const std::string& pendingCrackBack,
+                                    const std::string& pendingStackDeath,
+                                    bool pendingDrain);
     int w77OwnLoopStackState(std::string& theirSpell, std::string& component);
     //#W77-CU (F4): the verdict as a hold MARKER ROW, the #W68-BB / #W74-CH shape.
     std::string w77OwnLoopVerdictNow();
