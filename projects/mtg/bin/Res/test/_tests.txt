@@ -1412,3 +1412,5 @@ w75cm_sorin_minus6_animated_self_is_legal.txt
 w75ck_pathway_anyzone_parse_quiet.txt
 w79da_t5_trample_soak_decline.txt
 w79da_t5_trample_soak_block.txt
+w79dc_f3_doublestrike_trample_two_steps.txt
+w79dc_f3_firststrike_blocker_kills_trampler.txt

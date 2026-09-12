@@ -2034,6 +2034,30 @@ private:
     //#W79-CZ (T3): hold-latch re-opens NOT taken because the verdict marker moved
     //to a face no more dangerous than the one the hold was taken over.
     int mHoldVerdictSaferIgnored;
+    //#W79-DC (F2): hold-latch re-opens TAKEN because the verdict marker stayed at
+    //the same danger rank but named a DIFFERENT threat than the one the hold was
+    //taken over - the population #W79-CZ's rank clamp silently suppressed.
+    int mHoldReopenedNewThreat;
+    //#W79-DC (F1): the legal-continuation digest of the window about to be asked -
+    //the other half of the ask key's board half, beside the seam scope. Set by the
+    //seam that built the menu, read by the ask key and the async slot key.
+    std::string mContinuationDigest;
+    //#W79-DC (F1): staged by a seam that builds its own menu, consumed by askModel
+    //on entry (the #W53-N D2 swap discipline) so it cannot leak onto a later ask.
+    std::string mNextContinuationDigest;
+    std::string w79ContinuationDigestPriority(const std::vector<const OrderedAIAction *>& shown);
+    std::string w79ContinuationDigestCast(const std::vector<MTGCardInstance *>& cands);
+    //#W79-DC (F1): asks that a scope-only key would have served from the cache and
+    //this key does not, because a legal continuation moved under an unchanged menu.
+    int mAskKeyContinuationDiffers;
+    //#W79-DC (F1): scope-plus-rows key -> the digest it last carried, so the
+    //counter above names exactly the windows the scope-only key aliased.
+    std::map<std::string, std::string> mAskScopeDigest;
+    //#W79-DC (F1): the board the last priority ACTION was taken over. The deadlock
+    //breaker must never read a SUCCESSFUL, board-changing activation as "no
+    //progress" - which a scope-plus-rows key cannot tell apart on its own.
+    std::string mLastProgressBoardKey;
+    int mMenuPassNoProgressSuppressed;
     bool w77OwnLoopResolving();
     int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
     void w78CountStackDrainWindow();     //#W78-CV (S4)
