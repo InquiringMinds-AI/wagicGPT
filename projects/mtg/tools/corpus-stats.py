@@ -163,8 +163,77 @@ def selftest():
     if turn_gap_note(1016, 0, 42) != "" or turn_gap_note(1016, 974, 0) != "":
         print("SELFTEST FAIL: turn gap with no results.tsv claimed something")
         ok = False
+    #W80-DG (U17): the seam-cost table and the correlation, on mocked records.
+    mock = [
+        {"kind": "ask", "latency_ms": 100, "prompt": "x" * 10, "reasoning_chars": 10},
+        {"kind": "ask", "latency_ms": 300, "prompt": "x" * 30, "reasoning_chars": 30},
+        {"kind": "ask", "latency_ms": 200, "prompt": "x" * 20, "reasoning_chars": 20},
+        {"kind": "priority", "latency_ms": 50, "prompt": "x" * 5, "reasoning_chars": 0},
+        {"kind": "ask", "latency_ms": -1, "prompt": "x" * 999, "reasoning_chars": 999},
+    ]
+    rows = w80_seam_cost_rows(mock)
+    if [r[0] for r in rows] != ["ask", "priority"] or rows[0][1] != 3 \
+            or rows[0][2] != 200 or rows[0][3] != 20 or rows[0][4] != 20 \
+            or abs(rows[0][5] - 10.0) > 1e-9:
+        print("SELFTEST FAIL: seam cost rows %r" % (rows,))
+        ok = False
+    #a cache hit (latency -1) never enters the table - it made no round trip
+    if rows[1][1] != 1 or rows[1][5] is not None:
+        print("SELFTEST FAIL: no-reasoning seam %r" % (rows[1],))
+        ok = False
+    if abs(w80_pearson([1, 2, 3], [2, 4, 6]) - 1.0) > 1e-9 \
+            or abs(w80_pearson([1, 2, 3], [6, 4, 2]) + 1.0) > 1e-9 \
+            or w80_pearson([1, 1, 1], [1, 2, 3]) is not None \
+            or w80_pearson([1], [1]) is not None:
+        print("SELFTEST FAIL: pearson")
+        ok = False
     print("corpus-stats selftest: %s" % ("OK" if ok else "FAILED"))
     return 0 if ok else 1
+
+
+#W80-DG (U17, wave-79 known-bugs MED - MEASURE ONLY, no behaviour changes):
+#latency p50 rose 78 -> 94 s on FEWER decisions (2,629 -> 2,203) with a flat
+#reasoning median (5,835), and the wave-79 seat could not say why. The three
+#quantities that could move it are the seam mix, the prompt the model reads and
+#the reasoning it writes, so they are reported TOGETHER, per seam, plus the
+#correlation of latency against each. Nothing here is a prediction: it is
+#arithmetic over records already on disk.
+def w80_pearson(xs, ys):
+    """Pearson r over two equal-length numeric lists; None when undefined."""
+    n = len(xs)
+    if n < 2 or n != len(ys):
+        return None
+    mx = sum(xs) / float(n)
+    my = sum(ys) / float(n)
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx <= 0 or syy <= 0:
+        return None
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    return sxy / ((sxx ** 0.5) * (syy ** 0.5))
+
+
+def w80_seam_cost_rows(records):
+    """One row per record KIND that cost a round trip: (kind, n, latency ms p50,
+    prompt bytes p50, reasoning_chars p50, ms per reasoning char at the medians).
+    A record with no positive latency_ms made no round trip and is not counted."""
+    by = collections.defaultdict(lambda: {"lat": [], "pb": [], "rc": []})
+    for r in records:
+        lat = r.get("latency_ms")
+        if not isinstance(lat, (int, float)) or lat <= 0:
+            continue
+        s = by[r.get("kind") or "?"]
+        s["lat"].append(float(lat))
+        s["pb"].append(len(r.get("prompt") or ""))
+        s["rc"].append(int(r.get("reasoning_chars") or 0))
+    rows = []
+    for kind in sorted(by):
+        s = by[kind]
+        lat = statistics.median(s["lat"])
+        pb = statistics.median(s["pb"])
+        rc = statistics.median(s["rc"])
+        rows.append((kind, len(s["lat"]), lat, pb, rc, (lat / rc) if rc else None))
+    return rows
 
 
 def results_turn_sum(dirs):
@@ -313,6 +382,32 @@ def main(argv):
     rc = sorted(r["reasoning_chars"] for r in model_asks if r.get("reasoning_chars"))
     if rc:
         print("reasoning_chars median %d max %d" % (rc[len(rc) // 2], rc[-1]))
+
+    #W80-DG (U17, MEASURE ONLY): per-seam latency against the two things that
+    #could be paying for it - the bytes the model READ and the reasoning it WROTE.
+    rows = w80_seam_cost_rows(allmodel)
+    if rows:
+        print("PER-SEAM COST (U17 - latency vs prompt bytes vs reasoning_chars, medians;"
+              " records with no round trip excluded):")
+        print("  %-14s %6s %10s %12s %12s %12s"
+              % ("seam", "n", "lat p50 s", "prompt B p50", "reason p50", "ms/reas ch"))
+        for (kind, n, lat, pb, rc, per) in rows:
+            print("  %-14s %6d %10.1f %12d %12d %12s"
+                  % (kind, n, lat / 1000.0, int(pb), int(rc),
+                     ("%.3f" % per) if per is not None else "n/a"))
+        pairs = [(r, len(r.get("prompt") or ""), int(r.get("reasoning_chars") or 0))
+                 for r in allmodel
+                 if isinstance(r.get("latency_ms"), (int, float)) and r["latency_ms"] > 0]
+        lats = [float(r["latency_ms"]) for (r, _pb, _rc) in pairs]
+        rpb = w80_pearson([pb for (_r, pb, _rc) in pairs], lats)
+        rrc = w80_pearson([rc for (_r, _pb, rc) in pairs], lats)
+        print("  CORRELATION with latency over %d round trips: prompt bytes r=%s,"
+              " reasoning_chars r=%s (r is not a cause; a near-zero pair means"
+              " neither quantity explains the wait and the answer is elsewhere -"
+              " server queueing, seam mix, or output tokens)"
+              % (len(pairs),
+                 ("%.3f" % rpb) if rpb is not None else "n/a",
+                 ("%.3f" % rrc) if rrc is not None else "n/a"))
 
     # ---- protocol deviation classes (the `answer_label_absent` population).
     dev = collections.Counter(r.get("protocol_deviation") for r in allmodel

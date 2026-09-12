@@ -89,6 +89,59 @@ def hoist_saving(prompt):
     return w79, w78
 
 
+#W80-DG (U16, wave-79 known-bugs MED / deck146 MED-3): THE HOLD APPARATUS,
+#MEASURED. Three surfaces state the hold contract on one prompt - the hold ROW,
+#the `[hold check:` bracket and the `[HOW A HOLD ENDS:` paragraph - and the
+#deck146 seat put the three together at ~1.4 KB of every prompt. The wave-80
+#fold takes the saving at the BRACKET only: its "what counts as the same row"
+#rule is stated in full by the paragraph one block below, on exactly the windows
+#that carry a hold row, and unlike the ROW's own re-opener clause (which #W61-U
+#C14 put there from live evidence and three pins assert) nothing claims the
+#bracket must say it. This measures both the before and the after.
+HOLD_ROW_HEAD = "Hold priority - pass now, and do not ask me again"
+HOLD_CHECK_HEAD = "[hold check: "
+HOLD_CONTRACT_HEAD = "[HOW A HOLD ENDS:"
+#the three rule tails the wave-80 fold replaces, and what it replaces them with
+W80_FOLDED_TAILS = (
+    " - a row that changes only in its annotations (a forecast, a clock, a count,"
+    " a life total) is the SAME row and does not re-open a hold; the same action at"
+    " a CHANGED COST is a different row, as is a row appearing, disappearing, or"
+    " naming a different card or target]",
+    " - a row disappearing re-opens a hold exactly as a row appearing does, and so"
+    " does the same action at a CHANGED COST; a row that changes only in its"
+    " annotations (a forecast, a clock, a count, a life total) is the SAME row]",
+    " - a hold taken here holds until one of them appears, disappears, changes its"
+    " COST, or names a different card or target; a row that changes only in its"
+    " annotations is the same row]",
+)
+W80_FOLD_POINTER = " - HOW A HOLD ENDS, below this list, says what counts as the same row]"
+
+
+def hold_bytes(prompt):
+    """(row bytes, hold-check bytes, contract bytes, bytes the w80 bracket fold
+    removes). The fold only applies where the contract paragraph is on the same
+    prompt - that is the condition the engine itself gates on."""
+    row = check = contract = 0
+    check_lines = []
+    for ln in prompt.split("\n"):
+        stripped = ln.lstrip("0123456789. ")
+        if stripped.startswith(HOLD_ROW_HEAD):
+            row += len(ln) + 1
+        elif ln.startswith(HOLD_CHECK_HEAD):
+            check += len(ln) + 1
+            check_lines.append(ln)
+        elif ln.startswith(HOLD_CONTRACT_HEAD):
+            contract += len(ln) + 1
+    saved = 0
+    if contract:
+        for ln in check_lines:
+            for tail in W80_FOLDED_TAILS:
+                if ln.endswith(tail):
+                    saved += len(tail) - len(W80_FOLD_POINTER)
+                    break
+    return row, check, contract, saved
+
+
 def deck_of(basename):
     m = re.search(r"ai_baka_deck(\d+)", basename)
     return m.group(1) if m else "?"
@@ -132,6 +185,26 @@ def selftest():
     if w78b != w79b or w78b <= 0:
         print("SELFTEST FAIL: long body %d %d" % (w79b, w78b))
         ok = False
+    #W80-DG (U16): the hold apparatus, on a mocked prompt carrying all three
+    #surfaces plus a bracket whose rule tail the wave-80 fold replaces.
+    rowline = "3. " + HOLD_ROW_HEAD + " - and so on"
+    checkline = HOLD_CHECK_HEAD + "1 row above is new" + W80_FOLDED_TAILS[0]
+    contractline = HOLD_CONTRACT_HEAD + " taking the hold row ...]"
+    mock = "\n".join(["Your life: 20", rowline, checkline, contractline, ""])
+    r, c, ct, sv = hold_bytes(mock)
+    if r != len(rowline) + 1 or c != len(checkline) + 1 or ct != len(contractline) + 1:
+        print("SELFTEST FAIL: hold bytes %d %d %d" % (r, c, ct))
+        ok = False
+    if sv != len(W80_FOLDED_TAILS[0]) - len(W80_FOLD_POINTER) or sv <= 0:
+        print("SELFTEST FAIL: hold fold saving %d" % sv)
+        ok = False
+    #...and with NO contract paragraph on the prompt the fold claims nothing
+    if hold_bytes("\n".join([checkline, ""]))[3] != 0:
+        print("SELFTEST FAIL: fold claimed a saving with no contract paragraph")
+        ok = False
+    if hold_bytes("Your life: 20") != (0, 0, 0, 0):
+        print("SELFTEST FAIL: a prompt with no hold surfaces reports none")
+        ok = False
     print("prompt-byte-census selftest: %s" % ("OK" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -147,7 +220,10 @@ def main(argv):
     per = collections.defaultdict(lambda: {"n": 0, "now": 0, "then": 0, "max_now": 0,
                                            "max_then": 0, "over20_now": 0,
                                            "over20_then": 0, "hoist": 0, "dup": 0,
-                                           "logtrim": 0})
+                                           "logtrim": 0,
+                                           #W80-DG (U16)
+                                           "hrow": 0, "hcheck": 0, "hcontract": 0,
+                                           "hsaved": 0})
     seen = set()
     for d in dirs:
         for f in sorted(glob.glob(os.path.join(d, "*.jsonl"))):
@@ -183,6 +259,11 @@ def main(argv):
                 s["hoist"] += w79
                 s["dup"] += 1 if w79 else 0
                 s["logtrim"] += trimmed
+                hr, hc, hct, hsv = hold_bytes(p)  #W80-DG (U16)
+                s["hrow"] += hr
+                s["hcheck"] += hc
+                s["hcontract"] += hct
+                s["hsaved"] += hsv
     print("PER DECK (now = the wave-78 prompts as measured; after = the same prompts"
           " under the wave-79 hoist gate and 16 KB/12 KB narration trim)")
     tot = {"n": 0, "now": 0, "then": 0, "hoist": 0, "logtrim": 0, "dup": 0,
@@ -196,6 +277,21 @@ def main(argv):
                  s["hoist"], s["dup"], s["logtrim"]))
         for k in tot:
             tot[k] += s[k]
+    #W80-DG (U16): the hold apparatus per deck, and what the wave-80 bracket fold
+    #takes off it. Means are per PROMPT, over every prompt of that deck.
+    print("HOLD APPARATUS (U16 - mean bytes per prompt; fold = the wave-80"
+          " hold-check bracket fold, applied only where HOW A HOLD ENDS is on the"
+          " same prompt)")
+    for deck in sorted(per):
+        s = per[deck]
+        n = max(1, s["n"])
+        tot = s["hrow"] + s["hcheck"] + s["hcontract"]
+        print("  deck%-4s row %5.0f  check %5.0f  contract %5.0f  TOTAL %6.0f"
+              "  -> after fold %6.0f  (fold saves %5.0f B/prompt, %.2f%% of the"
+              " mean prompt)"
+              % (deck, s["hrow"] / n, s["hcheck"] / n, s["hcontract"] / n, tot / n,
+                 (tot - s["hsaved"]) / n, s["hsaved"] / n,
+                 100.0 * s["hsaved"] / max(1, s["now"])))
     print("  TOTAL   n=%-5d mean %6d -> %6d   >20KB %4d -> %4d   hoist %7d B"
           " (%d prompts)   log trim %8d B   all prompts %d -> %d B (-%.1f%%)"
           % (tot["n"], tot["now"] // max(1, tot["n"]), tot["then"] // max(1, tot["n"]),

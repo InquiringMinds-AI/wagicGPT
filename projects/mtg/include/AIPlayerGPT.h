@@ -2423,6 +2423,18 @@ private:
     int mProtocolReplies;          //replies that carried a body (the denominator)
     int mActionBeforePlanReplies;  //...that wrote the action line above the plan
     int mPlanStepsDone;            //steps of the carried plan already executed
+    //#W80-DG (U1, wave-79 HIGH-1): a CAST is one plan step spanning TWO windows
+    //whenever the engine puts a completing menu behind it (the X ladder, the
+    //"Choose an option for <card>" cast-mode menu). The pointer advances on the
+    //cast row's record, so the completing menu echoed the plan with its own cast
+    //clause already deleted and the seat declined the cast it had just announced
+    //(`130v162` 31->32, `125v126` 44->45, `125v152` 9->10). 0 = nothing pending;
+    //1 = a cast was committed and its completing menu has not been built yet;
+    //2 = this window IS that completing menu, so the step is consumed HERE.
+    int mPlanCastCompletionState;
+    //#W80-DG (U1 second half): how many sources the queued payment tapped, so a
+    //decline row on the completing menu can say what is spent either way.
+    int mPaidPendingSources;
     //#W71-BO (R7/R8/R4): `mReasoningTailAnswers`, `mPlanParagraphBoundCuts`,
     //`mPlanChoiceConflictSeen` and `mPlanArguesAgainstRowSeen` are DELETED - each
     //read 0 across 40 games and the mechanisms they counted are gone.
