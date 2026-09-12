@@ -2023,6 +2023,17 @@ private:
     //proven win and resolving - the population the guidance bracket is about.
     int mOwnLoopWindowsAsked;
     int mOwnLoopCountedSeq;
+    //#W79-CZ (T4): the own-loop verdict lines actually SPLICED into a prompt.
+    //Wave 78 counted the windows at the row-build site and rendered 0 lines in 42
+    //logs; counting at the splice makes the two figures one fact.
+    int mOwnLoopVerdictLinesRendered;
+    int mOwnLoopVerdictCountedSeq;
+    void w79CountOwnLoopVerdictLine();
+    //#W79-CZ (T4): the face this window's prompt printed, consumed by the record.
+    std::string mOwnLoopVerdictFace;
+    //#W79-CZ (T3): hold-latch re-opens NOT taken because the verdict marker moved
+    //to a face no more dangerous than the one the hold was taken over.
+    int mHoldVerdictSaferIgnored;
     bool w77OwnLoopResolving();
     int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
     void w78CountStackDrainWindow();     //#W78-CV (S4)
