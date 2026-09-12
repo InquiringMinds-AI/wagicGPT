@@ -16246,6 +16246,55 @@ static void drawStepExtrasScan(Player * me, Player * opp,
     }
 }
 
+//#W81-DL (V5): THE COMPULSORY DRAW-STEP CHARGE, ONCE. #W80-DF (U14) built this
+//arithmetic inline in the blockers header and #W80-DH (F9) split the optional
+//draws out of it there; V5 needs the same number at the crack-back verdict, and
+//two copies of an arithmetic are two chances to disagree - the exact failure V5
+//is. So the walk lives here and both callers read it: the seat's next draw step
+//is one card plus every FORCED extra (an optional `may` draw is the seat's own
+//choice and is never summed into a lethal figure - a verdict that charged it
+//would declare a loss the seat can decline its way out of), billed at the
+//opponent's per-draw punisher rate. Returns 0 when no punisher of theirs bills
+//this seat's draws. The names and the optional count are handed back so the
+//sentence the blockers header prints is unchanged.
+static int w81CompulsoryDrawStepLoss(Player * me, Player * opp, int * cardsOut,
+                                     int * optionalCardsOut,
+                                     std::vector<std::string> * theirsOut)
+{
+    if (cardsOut)
+        *cardsOut = 0;
+    if (optionalCardsOut)
+        *optionalCardsOut = 0;
+    if (theirsOut)
+        theirsOut->clear();
+    if (!me || !opp)
+        return 0;
+    std::vector<std::pair<std::string, int> > extras;
+    std::vector<char> extraOptional;
+    drawStepExtrasScan(me, opp, extras, &extraOptional);
+    int cards = 1, optionalCards = 0;
+    for (size_t xi = 0; xi < extras.size(); xi++)
+    {
+        const bool opt = xi < extraOptional.size() && extraOptional[xi];
+        if (opt)
+            optionalCards += extras[xi].second;
+        else
+            cards += extras[xi].second;
+    }
+    std::vector<std::string> mine, theirs;
+    int minePer = 0, theirsPer = 0;
+    drawPunisherScan(me, opp, mine, minePer, theirs, theirsPer);
+    if (cardsOut)
+        *cardsOut = cards;
+    if (optionalCardsOut)
+        *optionalCardsOut = optionalCards;
+    if (theirsOut)
+        *theirsOut = theirs;
+    if (cards <= 0 || theirsPer <= 0 || theirs.empty())
+        return 0;
+    return cards * theirsPer;
+}
+
 //The `draw:N` segments of ONE already-lowercased script line, counted only when
 //the amount is a plain number and the drawer is the line's own controller. A
 //draw aimed at anyone else is not a cost the pilot pays, and pricing it against
@@ -17124,6 +17173,33 @@ string xSpellPricing(MTGCardInstance * card, Player * me, CastRowBoardAnswer * a
         xTradeCountsAt(sv.victims, mx, t, m);
         ans->theirs = t;
         ans->mine = m;
+        //#W81-DL (V8, wave-80 known-bugs V8 / engine-seat MED-4). THE MARKER
+        //PRICED THE SEAT'S OWN LOSSES AS A BARE INTEGER. #W80-DF (U7) taught the
+        //board-sweep marker to NAME what it takes of YOURS - because a comparison
+        //that names one side's contents and counts the other's is an argument,
+        //not a fact - and wired it into the fixed-effect sweeper only. The
+        //X-VARIABLE path fills the same struct and left both roster fields empty,
+        //so six markers at `130v152` seqs 49-75 read `THEIRS 4 / YOURS 5` with no
+        //roster at all. Same walk (this row's own victim list at this row's own
+        //marked X), same two predicates (`sweeperVictimName` for the name,
+        //`engineKindForScript` for the engine flag) as U7's, so the two paths
+        //cannot word the same fact differently.
+        {
+            std::ostringstream mn, men;
+            int nNames = 0, nEng = 0;
+            for (size_t vi = 0; vi < sv.victims.size(); vi++)
+            {
+                const XDamVictim & v = sv.victims[vi];
+                if (!v.mine || v.isPlayer || !v.inst || v.lethalX <= 0 || v.lethalX > mx)
+                    continue;
+                mn << (nNames++ ? ", " : "") << sweeperVictimName(v.inst);
+                if (const char * mek = engineKindForScript(v.inst->magicText))
+                    men << (nEng++ ? ", " : "") << v.inst->getDisplayName()
+                        << instanceHandle(v.inst) << " - a " << mek;
+            }
+            ans->mineNames = mn.str();
+            ans->mineEngines = men.str();
+        }
         //#W76-CO (Q5): and what those same victims were going to swing back
         //for. Priced at the X this row's OWN marker names, so the cover clause
         //and the marker cannot name different casts, and summed with
@@ -17611,7 +17687,20 @@ static string xCastRowBestXMarker(const XVictimSurvey& sv, int lifePerX, int dra
     int mx = xMenuMarkX(sv.victims, sv.maxX, mk);
     //The no-kill verdict is a fact about the whole ladder and names no X, so it
     //is carried across unchanged rather than dressed as a recommendation.
-    bool namesX = (mk != string(kXNoKillsMarker));
+    //#W81-DL (V8, wave-80 known-bugs V8 / deck130). A REFUSAL DRESSED AS A
+    //RECOMMENDATION. `162v130` seq 75 rendered `[<- best X for this cast: X=6 -
+    //the only X that kills anything of THEIRS costs you more of YOURS than it
+    //takes - THEIRS 4 / YOURS 5]`: the BODY of that marker is the X menu's
+    //LOPSIDED verdict, which exists precisely to refuse the trade, and the
+    //`best X for this cast:` prefix reopened it as the menu's answer one screen
+    //early. The seat took the prefix and swept its own Siege-Gang Commander,
+    //three Goblins and a Blastminer off a board it had exact lethal on. The
+    //no-kill verdict was already carried across bare for exactly this reason;
+    //the lopsided one is the same class of statement - a refusal - and is now
+    //carried the same way. Nothing is removed: the row still names every number
+    //it named, and the X menu one screen later is untouched.
+    bool namesX = (mk != string(kXNoKillsMarker))
+                  && mk.find("costs you more of YOURS than it takes") == string::npos;
     return xCastRowMarkerFrom(mk, mx, namesX);
 }
 
@@ -20589,7 +20678,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCachedReplayRuns(0), mCachedReplayReasked(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCachedReplayRuns(0), mCachedReplayReasked(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mSingleOutcomeMenusAnswered(0), mSingleOutcomeRowsSpared(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -22109,6 +22198,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["reask_reason"] = mReaskReasonFace;
         mReaskReasonFace.clear();
     }
+    //#W81-DL (V5/V8/V10): WHICH of this lane's render events this window carried,
+    //stamped at the send and consumed here. Every counter this lane adds joins to
+    //this field by name, so none of them can be adjudicated as UNTESTED.
+    if (!mW81EventFace.empty())
+    {
+        rec["w81_render_events"] = mW81EventFace;
+        mW81EventFace.clear();
+    }
     //#W80-DH (F11, Astra wave-80 finding 11 - MED): `hold_safer_ignored_face` and
     //`hold_reopen_reason` are DELETED from the window record. They were ONE shared
     //string each, overwritten by every clamp in the window and consumed by
@@ -22750,6 +22847,26 @@ void AIPlayerGPT::logGameEnd()
         //CASTING answer into a second time and that went back to the model instead.
         //Per-record trace: `reask_reason`. > 0 whenever a loop engine is live.
         {"cached_replay_reasked", mCachedReplayReasked},
+        //#W81-DL (V5): crack-back verdicts whose total was folded with the ADD
+        //THOSE UP addenda and/or the compulsory draw the same screen publishes -
+        //the windows where the verdict and its header used to name two figures.
+        //Per-record trace: `w81_render_events` = `crackback_one_total_folded`.
+        {"crackback_verdict_folded_total", mW81FoldedCrackBackTotals},
+        //#W81-DL (V8): cast rows whose `[<- ...]` X marker carried the X-menu's
+        //REFUSAL wording with no `best X for this cast:` recommendation prefix.
+        //Trace: `w81_render_events` = `x_cast_row_refusal_marker`.
+        {"x_cast_row_refusal_markers", mW81XCastRefusalMarkers},
+        //#W81-DL (V8): board-sweep markers on the X-VARIABLE path that named the
+        //seat's own losses instead of pricing them as a bare integer.
+        //Trace: `w81_render_events` = `x_sweep_roster_marker`.
+        {"x_sweep_roster_markers", mW81XSweepRosterMarkers},
+        //#W81-DL (V10): attackers windows that printed a crack-back header AND the
+        //cover paragraph beside it. Trace: `attackers_crackback_cover_clause`.
+        {"attackers_crackback_cover_clauses", mW81AttackCoverClauses},
+        //#W81-DL (V13): cleanup windows where a land row's `spare` VERDICT was
+        //withheld because discarding it would leave a reachable card in hand short
+        //of a colour. Trace: `w81_render_events` = `spare_colour_withheld`.
+        {"spare_colour_verdict_withheld", mW81SpareColourWithheld},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -29482,6 +29599,17 @@ static int w77StayHomeCoveredPower(const std::vector<CrackBackAttackerFact>& atk
 //The sentence. One `{...}` group in the cover family's own register, stating
 //what keeping EVERY offered body home is worth against the line above, and
 //obeying #W65-AL (G4): no survival verdict against a FLOOR.
+//#W81-DL (V10): WHEN THE COVER PARAGRAPH IS DUE. The wave-64 gate also demanded
+//`life - total <= 0`, so the paragraph reached the seat only on the windows where
+//the crack-back had already won. The fact it states is true of every attackers
+//window that PRINTS the line, so the gate is now exactly the line's own: one
+//figure for the cover-clause count and the crack-back-header count on attackers
+//prompts. Pure over the two facts.
+bool w81AttackCoverDue(bool crackBackLinePrinted, bool anyAttackerOffered)
+{
+    return crackBackLinePrinted && anyAttackerOffered;
+}
+
 static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
                                   int bodies, int covered,
                                   bool anyTrampler = false) //#W80-DH (F8)
@@ -34952,6 +35080,9 @@ void AIPlayerGPT::w80ApplyVerdictFacesAtSend(bool sent, const string& pendingCra
                                              const string& pendingStackDeath,
                                              bool pendingDrain)
 {
+    //#W81-DL (V5/V8/V10): this lane's render events ride the SAME boundary - one
+    //call site for every seam, so no new counter can drift off it.
+    w81ApplyRenderEventsAtSend(sent);
     if (!sent)
     {
         mCrackBackVerdictFace.clear();
@@ -36076,6 +36207,104 @@ string w80CrackBackVerdictLine(const string& face, int bestBlockFloor = -1, int 
            " crack-back alone does not end the game]";
 }
 
+//#W81-DL (V5, wave-80 known-bugs V5 / engine-seat HIGH-3). THE VERDICT AND ITS
+//OWN SCREEN PUBLISHED TWO DIFFERENT TOTALS. `crackBackVerdictNow()` is a
+//THRESHOLD over the RAW combat sum; the CRACK-BACK NEXT TURN line above it then
+//adds the animated creature-lands and the trigger power its own `ADD THOSE UP`
+//sentence names, and the DRAW FORECAST on the same screen charges a COMPULSORY
+//draw step on top of that - and neither addendum reached the verdict. Eleven
+//wave-80 windows said `you survive` beside a header reading `that would KILL
+//you` (`152v130` seq 17: 15 from combat, +5 from ADD THOSE UP, life 20, at 0),
+//and deck123's seat was told `passing this window does NOT hand them the game`
+//at ONE life beside `9 life LOST BY YOU ... you would be at -8; that KILLS you.
+//This draw step is COMPULSORY` (`123v162` seq 97).
+//THE LESSON OF WAVE 80 (4) IS THE RULE: a verdict uses the SAME total the screen
+//publishes. So this line is built from the published figure - raw combat plus the
+//ADD THOSE UP addenda plus the compulsory draw - and it NAMES its three parts, so
+//a reader can check the arithmetic against the two lines above it. The best-block
+//floor is raised by the same addenda: an animated land and a ping are not in the
+//DP's attacker set and a compulsory draw is not blockable at all, so the floor a
+//block can hold the seat to is the DP's floor plus every point the blocks cannot
+//touch - which is what makes "blocked away" a claim about the SCREEN'S total and
+//not about a smaller one. The MARKER (`crackBackVerdictKey`) is untouched: it is
+//the hold latch's key and no hold's behaviour changes here.
+//With no addenda at all this delegates to the wave-80 line, byte for byte.
+//Pure over its five numbers, so every branch is provable without a board.
+string w81CrackBackVerdictLine(const string& face, int rawCombat, int addUp,
+                               int compulsoryDraw, int bestBlockFloor, int myLife)
+{
+    if (face.find("[crack-back verdict:") != 0)
+        return string();
+    if (face.find("none") != string::npos)
+        return string(); //nothing can swing back: no claim is owed
+    const int addenda = (addUp > 0 ? addUp : 0) + (compulsoryDraw > 0 ? compulsoryDraw : 0);
+    if (addenda <= 0)
+        return w80CrackBackVerdictLine(face, bestBlockFloor, myLife);
+    const int combat = rawCombat > 0 ? rawCombat : 0;
+    const int published = combat + addenda;
+    const int floorNow = bestBlockFloor >= 0 ? bestBlockFloor + addenda : -1;
+    std::ostringstream parts;
+    parts << "ONE TOTAL: this verdict uses " << published << " - the " << combat
+          << " from combat";
+    if (addUp > 0)
+        parts << " plus the " << addUp << " the CRACK-BACK NEXT TURN line's own ADD"
+                 " THOSE UP sentence adds";
+    if (compulsoryDraw > 0)
+        parts << " plus the " << compulsoryDraw << " the DRAW FORECAST line above"
+                 " charges you for your COMPULSORY draw step, which no row on any"
+                 " menu declines";
+    parts << " - which is the same figure those lines publish";
+    std::ostringstream o;
+    if (myLife - published > 0)
+    {
+        o << "\n[crack-back verdict: you survive - if you pass this window and they"
+             " attack with everything that can, you are still alive afterwards: the"
+             " crack-back alone does not end the game. " << parts.str()
+          << ", and it leaves you at " << (myLife - published) << "]";
+        return o.str();
+    }
+    if (floorNow >= 0 && myLife > floorNow)
+    {
+        o << "\n[crack-back verdict: their UNBLOCKED total reaches your life total,"
+             " but a legal block prevents it - with your best block: " << floorNow
+          << " damage still gets through, leaving you at " << (myLife - floorNow)
+          << ". So passing this window does NOT hand them the game: you still get the"
+             " blockers decision on their turn, and that assignment is what this figure"
+             " is computed from. It does assume those blockers are still there and"
+             " untapped when they attack. " << parts.str()
+          << ", and " << addenda << " of it is damage no block removes]";
+        return o.str();
+    }
+    if (floorNow >= 0)
+    {
+        o << "\n[crack-back verdict: LETHAL EVEN THROUGH YOUR BEST BLOCK - if you pass"
+             " this window, the best legal assignment of your blockers still lets "
+          << floorNow << " through and you are at " << (myLife - floorNow)
+          << ": a hold here is taken over a board that kills you next turn. "
+          << parts.str() << ", and " << addenda
+          << " of it is damage no block removes]";
+        return o.str();
+    }
+    o << "\n[crack-back verdict: LETHAL if it is UNBLOCKED - if you pass this window"
+         " and they attack with everything that can, the damage they can deal reaches"
+         " your life total. This figure subtracts no blockers (the engine could not"
+         " prove a best block on this board), so a hold here is taken over a board that"
+         " kills you next turn unless your blocks stop it. " << parts.str() << "]";
+    return o.str();
+}
+
+//#W81-DL (V5): the per-record trace for the fold. The wave-80 face names WHICH of
+//the four verdict faces printed; this names whether the total behind it was the
+//folded one, so the next census can separate the windows this item changed from
+//the ones it did not touch. Appended to the face - the wave-80 prefix is
+//unchanged, so a census that joined on it still joins. Pure over the line.
+string w81CrackBackTotalFace(const string& line)
+{
+    if (line.find("ONE TOTAL: this verdict uses ") == string::npos)
+        return string();
+    return " + one total folded";
+}
+
 //#W80-DH (F4): the RECORD face, read off the LINE THAT PRINTED - the #W80-DE (U10)
 //discipline, applied to this family too. The marker is a threshold and says only
 //LETHAL/survive/none; the LINE now has four faces, and a reviewer joining the
@@ -36202,6 +36431,34 @@ static const int kW80StarterNone = 0;
 static const int kW80StarterActivated = 1;
 static const int kW80StarterEntersTrigger = 2;
 static const int kW80StarterCycleTrigger = 3;
+//#W81-DL (V7, wave-80 known-bugs V7 / engine-seat MED-1). A TRIGGER THE OPPONENT
+//HAS TO FIRE IS NOT AN ENTRY THIS SEAT CAN TAKE. #W80-DH (F6) let "any other
+//trigger" stand as live on the reasoning that its event belongs to the turn
+//cycle. A BLOCK trigger does not: `@combat(blocking)` fires only if the opponent
+//declares an attack into the body, and the opponent decides that. deck126 was
+//told `your life loop is a proven win ... It starts from Perimeter Captain` (a
+//0/4 defender, `auto=@combat(blocking) source(creature[defender]|mybattlefield):
+//may life:2 controller`) on 16 of the corpus's 18 rendered starter lines, echoed
+//the false starter into its PLAN, and lost at 0 life on turn 22; Pride Guardian
+//(`@combat(blocking) source(this):life:3 controller`) is the same shape. So an
+//opponent-dependent event is its own kind and is NEVER live.
+//An ATTACK trigger is the seat's own to fire - it declares the attack - but only
+//while the body can actually be declared, so it asks that question of the board
+//rather than assuming it (a defender can never answer it yes).
+static const int kW81StarterOpponentTrigger = 4;
+static const int kW81StarterAttackTrigger = 5;
+
+//#W81-DL (V7): does this trigger's EVENT need the opponent to act? The engine's
+//spellings for the block half are `@combat(blocking)`, `@blocking`, `@blocked`
+//and `@each ... blocks`; the attacked-into half is `@attacked`. Pure over the
+//event text, so the whole table is walkable in PARSETEST.
+bool w81StarterEventNeedsOpponent(const string& ev)
+{
+    return ev.find("blocking") != string::npos
+        || ev.find("blocked") != string::npos
+        || ev.find("blocks") != string::npos
+        || ev.find("attacked") != string::npos;
+}
 
 int w80StarterLineKind(const string& low)
 {
@@ -36217,15 +36474,24 @@ int w80StarterLineKind(const string& low)
     if (ev.find("movedto(") != string::npos
         && (ev.find("battlefield") != string::npos || ev.find("inplay") != string::npos))
         return kW80StarterEntersTrigger;
+    if (w81StarterEventNeedsOpponent(ev)) //#W81-DL (V7)
+        return kW81StarterOpponentTrigger;
+    if (ev.find("attacking") != string::npos || ev.find("attacks") != string::npos)
+        return kW81StarterAttackTrigger; //#W81-DL (V7)
     return kW80StarterCycleTrigger;
 }
 
-bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter)
+bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter,
+                      bool thisBodyCanAttackNow = false) //#W81-DL (V7)
 {
     if (kind == kW80StarterActivated)
         return abilityUsableNow;
     if (kind == kW80StarterEntersTrigger)
         return aCreatureCanEnter;
+    if (kind == kW81StarterOpponentTrigger) //#W81-DL (V7): theirs to fire, never ours
+        return false;
+    if (kind == kW81StarterAttackTrigger) //#W81-DL (V7)
+        return thisBodyCanAttackNow;
     return kind == kW80StarterCycleTrigger;
 }
 
@@ -36760,6 +37026,69 @@ string AIPlayerGPT::w80CrackBackVerdictLineNow()
                                    w80CrackBackBestBlockFloorNow(), life);
 }
 
+//#W81-DL (V5): the compulsory draw-step charge this seat is under right now,
+//read off the shared walk the blockers header prints its own sentence from.
+int AIPlayerGPT::w81CompulsoryDrawLossNow()
+{
+    return w81CompulsoryDrawStepLoss(this, opponent(), NULL, NULL, NULL);
+}
+
+//#W81-DL (V5): THE LINE THE SEAMS RENDER. Built from the SAME three numbers the
+//screen above it publishes - the crack-back walk's raw combat total, the ADD
+//THOSE UP addenda `crackBackFloorSources` hands the header, and the compulsory
+//draw the DRAW FORECAST charges - so the verdict and the header can no longer
+//name two totals. The addenda are taken from the same call the header makes
+//(`crackBackFloorSources(opponent(), &extra, &unsized)`); when the header prints
+//no FLOOR clause it publishes no addenda and the wave-80 line is returned byte
+//for byte.
+string AIPlayerGPT::w81CrackBackVerdictLineNow()
+{
+    int atk = 0;
+    const int raw = crackBackTotalOver(opponent(), &atk);
+    int floorExtra = 0;
+    bool floorUnsized = false;
+    const string floorSrc = crackBackFloorSources(opponent(), &floorExtra, &floorUnsized);
+    if (floorSrc.empty())
+        floorExtra = 0; //the header prints no ADD THOSE UP sentence, so it adds nothing
+    return w81CrackBackVerdictLine(crackBackVerdictNow(), raw, floorExtra,
+                                   w81CompulsoryDrawLossNow(),
+                                   w80CrackBackBestBlockFloorNow(), life);
+}
+
+//#W81-DL (V5/V8/V10): the send boundary for this lane's render events. Same
+//predicate and same one-per-window rule as #W80-DE (U15)'s verdict faces: a
+//window that is not SENT counts nothing and stamps nothing, so no counter can
+//ever read higher than the number of prompts the model actually saw.
+void AIPlayerGPT::w81ApplyRenderEventsAtSend(bool sent)
+{
+    const string ev = mW81PendingEventFace;
+    mW81PendingEventFace.clear();
+    if (!sent)
+    {
+        mW81EventFace.clear();
+        return;
+    }
+    if (ev.empty())
+    {
+        mW81EventFace.clear();
+        return;
+    }
+    if (mW81EventCountedSeq == mWindowSeq)
+        return; //a prompt rebuilt on a polling tick may not count twice
+    mW81EventCountedSeq = mWindowSeq;
+    mW81EventFace = ev;
+    if (ev.find("crackback_one_total_folded") != string::npos)
+        mW81FoldedCrackBackTotals++;
+    if (ev.find("x_cast_row_refusal_marker") != string::npos)
+        mW81XCastRefusalMarkers++;
+    if (ev.find("x_sweep_roster_marker") != string::npos)
+        mW81XSweepRosterMarkers++;
+    if (ev.find("attackers_crackback_cover_clause") != string::npos)
+        mW81AttackCoverClauses++;
+    if (ev.find("spare_colour_withheld") != string::npos)
+        mW81SpareColourWithheld++;
+}
+
 string AIPlayerGPT::w80StackDeathVerdictLineNow()
 {
     return w80StackDeathVerdictLine(stackDeathVerdictNow());
@@ -36821,6 +37150,10 @@ string AIPlayerGPT::w80LiveLoopStarterName()
             if (!w80LoopStarterScript(c->magicText))
                 continue;
             const bool usable = LegalActionsOracle::hasUsableAbility(c);
+            //#W81-DL (V7): an ATTACK trigger is this seat's to fire only while
+            //this body could actually be declared as an attacker right now - the
+            //engine's own verdict, so the gate and the attackers menu agree.
+            const bool canAttackNow = c->isCreature() && c->canAttack() != 0;
             bool live = false;
             const string raw = c->magicText;
             size_t lp = 0;
@@ -36832,7 +37165,8 @@ string AIPlayerGPT::w80LiveLoopStarterName()
                 if (line.find('_') != string::npos)
                     line = AutoLineMacro::Process(line);
                 live = w80StarterIsLive(w80StarterLineKind(scriptLower(line)),
-                                        usable, aCreatureCanEnter);
+                                        usable, aCreatureCanEnter,
+                                        canAttackNow); //#W81-DL (V7)
             }
             if (live)
                 return c->getDisplayName();
@@ -36842,6 +37176,16 @@ string AIPlayerGPT::w80LiveLoopStarterName()
         {
             MTGCardInstance * c = h->cards[i];
             if (!c || !w80LoopStarterScript(c->magicText))
+                continue;
+            //#W81-DL (V7): A LOOP HALF IS NEVER A STARTER. The battlefield branch
+            //above excludes the chain's own components; the hand branch did not,
+            //so a SECOND copy of Exquisite Blood sitting in hand was named as the
+            //entry to the loop it is half of (`126v123` seq 16). Casting a link of
+            //the chain moves no life, so it starts nothing. `w77IsLoopComponentCard`
+            //asks the battlefield question (it requires the card to be IN PLAY), so
+            //the same two script predicates are asked of the hand card directly.
+            if (lifeToDamageConverterScript(c->magicText)
+                || lifeLossMirrorScript(c->magicText))
                 continue;
             ManaCost * cost = c->getManaCost();
             if (!cost)
@@ -39951,6 +40295,24 @@ static string boardSweepMarker(int theirs, int mine, int measuredRows,
     }
     o << "]";
     return o.str();
+}
+
+//#W81-DL (V8): does the board-sweep marker on THIS rendered row - an X-variable
+//row, the path #W80-DF (U7) never reached - name what it takes of YOURS instead
+//of counting it? Read off the rendered bytes, so the counter that joins on it
+//cannot disagree with the literal the corpus greps for. Pure over the row.
+bool w81XSweepMarkerNamesOwnLosses(const string& row)
+{
+    const size_t sw = row.find("[<- board sweep: THEIRS ");
+    if (sw == string::npos || row.find("{X pricing:") == string::npos)
+        return false;
+    const size_t y = row.find("/ YOURS ", sw);
+    if (y == string::npos)
+        return false;
+    size_t k = y + 8;
+    while (k < row.size() && row[k] >= '0' && row[k] <= '9')
+        k++;
+    return k + 1 < row.size() && row[k] == ' ' && row[k + 1] == '(';
 }
 
 //The pass: exactly ONE row is marked - the largest sweep of THEIRS, ties broken
@@ -46420,12 +46782,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //#W80-DE (U2): the crack-back and stack-death verdicts, RENDERED. Both
         //were latch keys only and printed 0 times in 2,203 wave-79 prompts.
         {
-            const string cbLine = w80CrackBackVerdictLineNow();
+            //#W81-DL (V5): built on the ONE total the screen publishes.
+            const string cbLine = w81CrackBackVerdictLineNow();
             if (!cbLine.empty())
             {
                 w78SeamNotes += cbLine;
                 //#W80-DH (F4): the face the LINE carries, not the latch's marker.
-                w80PendingCrackBackFace = w80CrackBackFaceOfLine(cbLine);
+                w80PendingCrackBackFace = w80CrackBackFaceOfLine(cbLine)
+                                          + w81CrackBackTotalFace(cbLine); //#W81-DL (V5)
+                if (!w81CrackBackTotalFace(cbLine).empty())
+                    mW81PendingEventFace += "crackback_one_total_folded;";
             }
             const string sdLine = w80StackDeathVerdictLineNow();
             if (!sdLine.empty())
@@ -50680,12 +51046,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             }
             //#W80-DE (U2): the same two verdict lines on the casting menu.
             {
-                const string cb2 = w80CrackBackVerdictLineNow();
+                const string cb2 = w81CrackBackVerdictLineNow(); //#W81-DL (V5)
                 if (!cb2.empty())
                 {
                     mNextAskPromptNote += cb2;
                     //#W80-DH (F4): the face the LINE carries, not the latch's marker.
-                    w80PendingCastCrackBack = w80CrackBackFaceOfLine(cb2);
+                    w80PendingCastCrackBack = w80CrackBackFaceOfLine(cb2)
+                                              + w81CrackBackTotalFace(cb2); //#W81-DL (V5)
+                    if (!w81CrackBackTotalFace(cb2).empty())
+                        mW81PendingEventFace += "crackback_one_total_folded;";
                 }
                 const string sd2 = w80StackDeathVerdictLineNow();
                 if (!sd2.empty())
@@ -50804,6 +51173,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 if (emptyCast == actingCast)
                     mChainWindowsOnlySelfharmCast++;
             }
+        }
+
+        //#W81-DL (V8): the two row-marker events, staged off the MENU THAT IS
+        //ABOUT TO BE SENT. Read from the rendered bytes rather than from the
+        //emitter's own belief, so the counter and the literal are one figure by
+        //construction (the wave-80 HIGH-4 boundary), and applied at the send.
+        for (size_t w81r = 0; w81r < menu.size(); w81r++)
+        {
+            if (menu[w81r].find("[<- the only X that kills anything of THEIRS") != string::npos
+                && mW81PendingEventFace.find("x_cast_row_refusal_marker") == string::npos)
+                mW81PendingEventFace += "x_cast_row_refusal_marker;";
+            if (w81XSweepMarkerNamesOwnLosses(menu[w81r])
+                && mW81PendingEventFace.find("x_sweep_roster_marker") == string::npos)
+                mW81PendingEventFace += "x_sweep_roster_marker;";
         }
 
         std::ostringstream q;
@@ -57574,6 +57957,7 @@ int AIPlayerGPT::chooseAttackers()
     for (size_t j = 0; j < attackers.size(); j++)
     {
         bool noLegalBlockForThisRow = false; //#W60-L (B11)
+        string heldBackLine; //#W81-DL (V10): emitted on its own line below
         std::ostringstream ln;
         //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
         //emitter below can collapse a run of rows that agree in every rendered
@@ -57618,10 +58002,19 @@ int AIPlayerGPT::chooseAttackers()
                     cannot.push_back(e.str());
                 }
             }
-            string hb = heldBackBlockTag(cannot, totalOpposing);
-            if (!hb.empty())
+            //#W81-DL (V10, wave-80 known-bugs V10 / deck146 - THE RENDER
+            //PLACEMENT THAT COST A GAME). The tag sat INSIDE the offered
+            //attacker's row, between the body's keywords and the forecast of
+            //what can block it, and at `146v162` seq 52 most of two 245-byte
+            //rows was this tag - a fact about NOT attacking, wedged into the
+            //line that offers the attack, on the window deck146 lost with Ob
+            //Nixilis at 3 loyalty reachable and never mentioned. It is a true
+            //fact and nothing is deleted: it moves to a line of its own under
+            //the row it is about. Held until every in-row annotation is emitted
+            //so no bracket of the OFFER is separated from the offer.
+            heldBackLine = heldBackBlockTag(cannot, totalOpposing);
+            if (!heldBackLine.empty())
                 anyHeldBack = true;
-            ln << hb;
         }
         //W42-3: the attack half of the same fight. For every UNTAPPED creature
         //of theirs that could block this attacker, the computed 1-on-1 outcome
@@ -57899,6 +58292,9 @@ int AIPlayerGPT::chooseAttackers()
                 heldDesc.push_back(exileHostageDescriptor(heldA[hi], this));
             ln << exileHostageRowTag(heldDesc);
         }
+        //#W81-DL (V10): and now the hold-back fact, on a line of its own.
+        if (!heldBackLine.empty())
+            ln << "\n   " << heldBackLine;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
@@ -58333,9 +58729,24 @@ int AIPlayerGPT::chooseAttackers()
     {
         int cbTotal = 0;
         bool cbFloor = false;
-        if (crackBackScreenTotal(this, opponent(), observer, cbTotal, cbFloor)
-            && life - cbTotal <= 0 && !attackers.empty())
+        //#W81-DL (V10, wave-80 known-bugs V10 / deck152). THE COVER PARAGRAPH
+        //FIRED ONLY WHERE IT WAS ALREADY TOO LATE. The gate demanded the total
+        //be ALREADY LETHAL, so of eight deck152 attack prompts that printed
+        //`CRACK-BACK NEXT TURN`, exactly one carried the cover paragraph - the
+        //one where the seat was already dead to it - and `152v146` seq 19, where
+        //the choice still decided the game, got nothing. The fact the paragraph
+        //states ("declaring an attacker taps it, and a tapped creature cannot
+        //block") is true of every attackers window that prints the line, and the
+        //STAY HOME tag beneath it prints its own survival verdict from the same
+        //arithmetic, so the non-lethal face is a number, not a scare. The gate is
+        //now exactly the one the LINE itself is printed under: the cover clause
+        //count and the crack-back header count are one figure on attackers
+        //prompts.
+        if (w81AttackCoverDue(crackBackScreenTotal(this, opponent(), observer,
+                                                   cbTotal, cbFloor),
+                              !attackers.empty())) //#W81-DL (V10)
         {
+            mW81PendingEventFace += "attackers_crackback_cover_clause;"; //#W81-DL (V10)
             int vigilant = 0;
             for (size_t vi = 0; vi < attackers.size(); vi++)
                 if (attackers[vi] && attackers[vi]->has(Constants::VIGILANCE))
@@ -59004,29 +59415,14 @@ int AIPlayerGPT::chooseBlockers()
         int w80CycleLoss = 0;
         string w80CycleSrc;
         {
-            std::vector<std::pair<std::string, int> > w80Extras;
-            std::vector<char> w80ExtraOptional; //#W80-DH (F9)
-            drawStepExtrasScan(this, opponent(), w80Extras, &w80ExtraOptional);
-            //#W80-DH (F9): only the FORCED draws are a cost this verdict may
-            //charge. An optional one (Sylvan Library's `may`) is the seat's own
-            //choice, so it is named as a choice and never summed into the lethal
-            //arithmetic - a verdict that charges it declares a loss the seat can
-            //decline its way out of.
-            int w80Cards = 1, w80OptionalCards = 0;
-            for (size_t xi = 0; xi < w80Extras.size(); xi++)
+            //#W81-DL (V5): the same walk the crack-back verdict now folds, read
+            //from ONE place so the two screens cannot publish two totals.
+            int w80Cards = 0, w80OptionalCards = 0;
+            vector<string> w80Theirs;
+            w80CycleLoss = w81CompulsoryDrawStepLoss(this, opponent(), &w80Cards,
+                                                     &w80OptionalCards, &w80Theirs);
+            if (w80CycleLoss > 0)
             {
-                const bool opt = xi < w80ExtraOptional.size() && w80ExtraOptional[xi];
-                if (opt)
-                    w80OptionalCards += w80Extras[xi].second;
-                else
-                    w80Cards += w80Extras[xi].second;
-            }
-            vector<string> w80Mine, w80Theirs;
-            int w80MinePer = 0, w80TheirsPer = 0;
-            drawPunisherScan(this, opponent(), w80Mine, w80MinePer, w80Theirs, w80TheirsPer);
-            if (w80Cards > 0 && w80TheirsPer > 0 && !w80Theirs.empty())
-            {
-                w80CycleLoss = w80Cards * w80TheirsPer;
                 std::ostringstream sn;
                 sn << "your next draw step (" << w80Cards << " card"
                    << (w80Cards == 1 ? "" : "s") << " into their ";
@@ -60893,14 +61289,33 @@ int spareReachCap(int myLands, int handLandCards)
     const int h = handLandCards > 0 ? handLandCards : 0;
     return m + h;
 }
+//#W81-DL (V13, wave-80 known-bugs V13 / deck162). THE VERDICT WAS COLOUR-BLIND.
+//`162v130` seq 47: five lands down, the most expensive reachable card costing 3,
+//and the SWAMP marked `{spare: ...}` - while the hand held three Underworld
+//Dreams at `{B}{B}{B}` and the seat's only other black source was one Drowned
+//Catacomb. Discarding that Swamp leaves two black sources against a three-black
+//cost, so the land is not surplus by any reading; "spare" is a VERDICT about
+//whether the mana base still pays for the hand, and COUNT is only half of that
+//question (#W61-T C11 fixed the other half). So the word is gated on the colour
+//too: `blockColour` names the colour this land is one of the seat's sources for,
+//`blockNeed` the most of that colour a single reachable card in hand demands, and
+//`blockAfter` how many sources of it would be left if this row were discarded.
+//With `blockNeed > blockAfter` the verdict word is withheld and the two numbers
+//print as a bare FACT - nothing is hidden, no row loses its count, and the
+//comparison the reader must make is on the screen. Pure over its inputs.
 string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCost,
                               const string& beyondName = "", int beyondCost = 0,
-                              int reachCap = -1)
+                              int reachCap = -1,
+                              const string& blockColour = "", //#W81-DL (V13)
+                              int blockNeed = 0, int blockAfter = 0)
 {
     if (myLands <= 0)
         return "";
+    const bool colourBinds = !blockColour.empty() && blockNeed > 0
+                             && blockAfter < blockNeed; //#W81-DL (V13)
     bool spare = haveHandCost && highestHandCost >= 0
-                 && myLands > highestHandCost + 1;
+                 && myLands > highestHandCost + 1
+                 && !colourBinds; //#W81-DL (V13)
     std::ostringstream o;
     o << " {";
     if (spare)
@@ -60919,6 +61334,12 @@ string discardSpareLandClause(int myLands, int highestHandCost, bool haveHandCos
                  " make would pay for (this comparison counts costs up to "
               << reachCap << ")";
     }
+    if (colourBinds) //#W81-DL (V13)
+        o << "; COLOUR: a card in your hand you could still reach needs " << blockNeed
+          << " " << blockColour << " and discarding this row leaves you " << blockAfter
+          << " LAND source" << (blockAfter == 1 ? "" : "s") << " of it (lands only -"
+             " any nonland producer you control is not in this count), so this land is"
+             " not surplus however many lands you control";
     o << "}";
     return o.str();
 }
@@ -61195,6 +61616,43 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         if (hand[lc] && hand[lc]->hasType(Subtypes::TYPE_LAND))
             handLandCards++;
     const int reachCap = spareReachCap(myLands, handLandCards);
+    //#W81-DL (V13): the COLOUR half of the spare verdict. Two tallies over the
+    //same five colours: how many LAND sources of each the seat controls (read
+    //with `landColorFlags`, the engine-read the hand header and the per-card
+    //land tag are both printed from, so the three cannot disagree), and the most
+    //of each colour a single REACHABLE card in hand demands. A card past the
+    //reach cap sets no demand here for the same reason it sets none for the cost
+    //comparison above.
+    int w81ColourSources[5] = { 0, 0, 0, 0, 0 };
+    int w81ColourNeed[5] = { 0, 0, 0, 0, 0 };
+    static const char * kW81ColourSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    static const int kW81ColourIdx[5] = { Constants::MTG_COLOR_WHITE,
+                                          Constants::MTG_COLOR_BLUE,
+                                          Constants::MTG_COLOR_BLACK,
+                                          Constants::MTG_COLOR_RED,
+                                          Constants::MTG_COLOR_GREEN };
+    for (int bi2 = 0; game && game->inPlay && bi2 < game->inPlay->nb_cards; bi2++)
+    {
+        bool have[5];
+        landColorFlags(game->inPlay->cards[bi2], have);
+        for (int ci2 = 0; ci2 < 5; ci2++)
+            if (have[ci2])
+                w81ColourSources[ci2]++;
+    }
+    for (size_t hn = 0; hn < hand.size(); hn++)
+    {
+        if (!hand[hn] || hand[hn]->hasType(Subtypes::TYPE_LAND) || !hand[hn]->getManaCost())
+            continue;
+        ManaCost * hc2 = hand[hn]->getManaCost();
+        if (hc2->getConvertedCost() <= 0 || hc2->getConvertedCost() > reachCap)
+            continue;
+        for (int ci2 = 0; ci2 < 5; ci2++)
+        {
+            const int n = hc2->getCost(kW81ColourIdx[ci2]);
+            if (n > w81ColourNeed[ci2])
+                w81ColourNeed[ci2] = n;
+        }
+    }
     string beyondName;
     int beyondCost = 0;
     for (size_t hc = 0; hc < hand.size(); hc++)
@@ -61248,8 +61706,48 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         //a spell whose own target spec sees nothing on the board says that,
         //and a spell that targets the STACK is never given the clause.
         if (hand[j]->hasType(Subtypes::TYPE_LAND))
+        {
+            //#W81-DL (V13): does discarding THIS land leave a reachable card in
+            //hand short of a colour? The worst-bound colour wins the clause -
+            //one sentence, the shape the family already uses.
+            string blockColour;
+            int blockNeed = 0, blockAfter = 0;
+            {
+                bool have[5];
+                landColorFlags(hand[j], have);
+                int worst = -1;
+                for (int ci3 = 0; ci3 < 5; ci3++)
+                {
+                    if (!have[ci3] || w81ColourNeed[ci3] <= 0)
+                        continue;
+                    //this land is not on the battlefield, so the sources left if
+                    //it is discarded are the ones already down.
+                    const int after = w81ColourSources[ci3];
+                    if (after >= w81ColourNeed[ci3])
+                        continue;
+                    const int shortfall = w81ColourNeed[ci3] - after;
+                    if (worst < 0 || shortfall > w81ColourNeed[worst] - w81ColourSources[worst])
+                        worst = ci3;
+                }
+                if (worst >= 0)
+                {
+                    blockColour = kW81ColourSym[worst];
+                    blockNeed = w81ColourNeed[worst];
+                    blockAfter = w81ColourSources[worst];
+                    //#W81-DL (V13): staged only where the COUNT gate would have
+                    //printed the verdict word, so the counter names exactly the
+                    //population this item changed.
+                    if (haveHandCost && highestHandCost >= 0
+                        && myLands > highestHandCost + 1
+                        && mW81PendingEventFace.find("spare_colour_withheld")
+                           == string::npos)
+                        mW81PendingEventFace += "spare_colour_withheld;";
+                }
+            }
             row << discardSpareLandClause(myLands, highestHandCost, haveHandCost,
-                                         beyondName, beyondCost, reachCap); //#W63-AC (E16)
+                                         beyondName, beyondCost, reachCap, //#W63-AC (E16)
+                                         blockColour, blockNeed, blockAfter); //#W81-DL (V13)
+        }
         else
         {
             if (myBattlefieldNames.count(hand[j]->name))
@@ -103212,6 +103710,397 @@ static const char * kW50Y_r94 =
         CHECK(w77KeyTailOf(tailA).find("objects=") == string::npos,
               "#W81-DI KEY MUST-NOT-MATCH the object count never reaches the hold-latch or"
               " hold-check keys - it lives in the legal-continuation digest and nowhere else");
+    }
+
+    cout << "\n[#W81-DL V5] ONE TOTAL: the crack-back verdict and its own screen\n";
+    {
+        // `152v130` seq 17 (the wave-80 engine seat's HIGH-3 quote), rebuilt from
+        // the numbers the record carries: life 20, 5 able attackers for 15 from
+        // combat, and a FLOOR whose ADD THOSE UP sentence adds 5 more.
+        const string header = crackBackNextTurnLine(5, 15, 20, 0, 0, 0, 0, false,
+                                                    "noncreature permanents of theirs that"
+                                                    " can animate and attack are not in that"
+                                                    " count - Lair of the Hydra",
+                                                    5, true);
+        CHECK(header.find("the total to subtract from your life is 20") != string::npos
+                  && header.find("you would be at 0; that would KILL you") != string::npos,
+              "#W81-DL V5 the screen the seat was shown really does publish a KILL");
+        const string red = w80CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), -1, 20);
+        CHECK(red.find("you survive") != string::npos,
+              "#W81-DL V5 RED-ON-BASE the wave-80 verdict reads `you survive` on that very"
+              " screen - the 11-window contradiction of engine-seat HIGH-3");
+        const string green = w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20),
+                                                    15, 5, 0, -1, 20);
+        CHECK(green.find("you survive") == string::npos
+                  && green.find("LETHAL if it is UNBLOCKED") != string::npos,
+              "#W81-DL V5 GREEN the verdict takes the published total and no longer"
+              " contradicts the header beside it");
+        CHECK(green.find("ONE TOTAL: this verdict uses 20 - the 15 from combat plus the 5"
+                         " the CRACK-BACK NEXT TURN line's own ADD THOSE UP sentence adds")
+                  != string::npos,
+              "#W81-DL V5 GREEN the verdict NAMES the total it used and where each part"
+              " came from, so the reader can check it against the two lines above");
+        // deck123's other half: `123v162` seq 97 - life 1, 3 from combat, no floor,
+        // and a COMPULSORY draw step the same screen bills at 9.
+        const string draw = w81CrackBackVerdictLine(crackBackVerdictKey(1, 3, 1),
+                                                   3, 0, 9, 0, 1);
+        CHECK(draw.find("LETHAL EVEN THROUGH YOUR BEST BLOCK") != string::npos
+                  && draw.find("COMPULSORY draw step") != string::npos
+                  && draw.find("ONE TOTAL: this verdict uses 12") != string::npos,
+              "#W81-DL V5 GREEN the compulsory draw the DRAW FORECAST charges is inside the"
+              " verdict's total - RED on base, where a best block of 0 printed `passing this"
+              " window does NOT hand them the game` at ONE life beside `you would be at -8;"
+              " that KILLS you. This draw step is COMPULSORY`");
+        CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(1, 3, 1), 0, 1)
+                  .find("a legal block prevents it") != string::npos,
+              "#W81-DL V5 RED-ON-BASE that is exactly what the wave-80 line printed there");
+        // the blocked-away face survives where it is TRUE of the published total.
+        const string away = w81CrackBackVerdictLine(crackBackVerdictKey(2, 8, 8),
+                                                   8, 1, 0, 0, 8);
+        CHECK(away.find("a legal block prevents it") != string::npos
+                  && away.find("with your best block: 1 damage still gets through") != string::npos
+                  && away.find("1 of it is damage no block removes") != string::npos,
+              "#W81-DL V5 the floor is raised by the same addenda and the face still"
+              " withdraws a death a legal block prevents");
+        // zero / one / reorder on the number this line prints.
+        CHECK(w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), 15, 0, 0, -1, 20)
+                  == w80CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), -1, 20),
+              "#W81-DL V5 ZERO with no addenda at all the wave-80 line is returned byte for"
+              " byte - no window that was right is changed");
+        CHECK(w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), 15, 1, 0, -1, 20)
+                  .find("ONE TOTAL: this verdict uses 16") != string::npos,
+              "#W81-DL V5 ONE a single point of addendum prints its own total");
+        CHECK(w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), 15, 3, 2, -1, 20)
+                  == w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20), 15, 3, 2, -1, 20),
+              "#W81-DL V5 the line is a pure function of its five numbers");
+        CHECK(w81CrackBackVerdictLine(crackBackVerdictKey(0, 0, 20), 0, 4, 4, -1, 20).empty(),
+              "#W81-DL V5 MUST-NOT-MATCH nothing can swing back -> no verdict is owed, and"
+              " the addenda do not manufacture one");
+        CHECK(w81CrackBackTotalFace(green) == " + one total folded"
+                  && w81CrackBackTotalFace(red).empty(),
+              "#W81-DL V5 the per-record trace `w81_render_events` joins on the line that"
+              " actually folded, and on no other");
+        CHECK(w80CrackBackFaceOfLine(draw) == "[crack-back verdict: LETHAL through your"
+                                              " best block]",
+              "#W81-DL V5 the wave-80 face prefix still classifies the folded line, so a"
+              " census that joined on it still joins");
+    }
+
+    cout << "\n[#W81-DL V5] KEY the published total never enters a key\n";
+    {
+        // Two windows that differ ONLY in the ADD THOSE UP addendum: same rows,
+        // same marker, different rendered verdict.
+        const string lineA = w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20),
+                                                     15, 5, 0, -1, 20);
+        const string lineB = w81CrackBackVerdictLine(crackBackVerdictKey(5, 15, 20),
+                                                     15, 6, 0, -1, 20);
+        CHECK(lineA != lineB, "#W81-DL V5 KEY the pair really does differ in the bytes");
+        CHECK(crackBackVerdictKey(5, 15, 20) == crackBackVerdictKey(5, 15, 20),
+              "#W81-DL V5 KEY the hold latch's MARKER is computed from the raw combat"
+              " walk and is untouched by the fold");
+        const string row = "Cast Damnation {2}{b}{b} {right now: destroys 2 of their"
+                           " creatures} {leaves 1 of your 5 untapped mana sources untapped}";
+        const string hold = "Hold priority - pass now, and do not ask me again";
+        std::vector<string> menuA, menuB;
+        menuA.push_back(row); menuA.push_back(hold);
+        menuB.push_back(row); menuB.push_back(hold);
+        //the live seam hands askModel a key tail built from the OPTION LIST, and
+        //appends the verdict to the seam notes AFTER that - so the pair's tails are
+        //the rows, and the note is outside by construction.
+        const string tailA = "\n1. " + row + "\n2. " + hold + "\n";
+        const string tailB = "\n1. " + row + "\n2. " + hold + "\n";
+        CHECK(optionSetKeyOf(menuA) == optionSetKeyOf(menuB)
+                  && holdActionKeyRow(menuA[0]) == holdActionKeyRow(menuB[0])
+                  && holdActionKeyRow(menuA[1]) == holdActionKeyRow(menuB[1]),
+              "#W81-DL V5 KEY the option-set key and the hold-latch ACTION key (built the"
+              " way the live seam builds them, per row of mLastMenuRows) are identical"
+              " across the pair");
+        CHECK(w77KeyTailOf(tailA) == w77KeyTailOf(tailB)
+                  && asyncSlotKeyOf(false, 4, 2, w77KeyTailOf(tailA), "BOARD")
+                     == asyncSlotKeyOf(false, 4, 2, w77KeyTailOf(tailB), "BOARD"),
+              "#W81-DL V5 KEY the ask key's and the async slot's half of the rendered list"
+              " is identical across the pair - the verdict is appended to the SEAM NOTES,"
+              " which the live seam builds AFTER the key tail it hands askModel");
+        {
+            size_t vb = 0;
+            CHECK(!w79NumberedRowBody(lineA, &vb) && !w79NumberedRowBody(lineB, &vb),
+                  "#W81-DL V5 KEY MUST-NOT-MATCH the verdict line is not a numbered row, so"
+                  " it can never be normalised into an ACTION key even if a later change"
+                  " appended it to a tail");
+        }
+    }
+
+    cout << "\n[#W81-DL V7] a block trigger is not a loop starter, and the gap prints\n";
+    {
+        // Perimeter Captain, verbatim from Res/sets/primitives/mtg.txt:
+        // auto=@combat(blocking) source(creature[defender]|mybattlefield):may life:2 controller
+        const string captain = "@combat(blocking) source(creature[defender]|mybattlefield):"
+                               "may life:2 controller";
+        const string guardian = "@combat(blocking) source(this):life:3 controller";
+        CHECK(w80StarterLineKind(captain) == kW81StarterOpponentTrigger
+                  && w80StarterLineKind(guardian) == kW81StarterOpponentTrigger,
+              "#W81-DL V7 GREEN a `@combat(blocking)` line is an OPPONENT-dependent trigger");
+        CHECK(!w80StarterIsLive(w80StarterLineKind(captain), true, true, true)
+                  && !w80StarterIsLive(w80StarterLineKind(guardian), true, true, true),
+              "#W81-DL V7 GREEN it is never live, whatever else the board affords - RED on"
+              " base, where `any other trigger` made it a cycle trigger and always live,"
+              " and deck126 was told `It starts from Perimeter Captain` on 16 of the 18"
+              " rendered starter lines and lost at 0 life on turn 22");
+        CHECK(w80StarterIsLive(kW80StarterCycleTrigger, false, false, false),
+              "#W81-DL V7 RED-ON-BASE that is the verdict the wave-80 classifier gave it");
+        CHECK(w81StarterEventNeedsOpponent("@combat(blocking)")
+                  && w81StarterEventNeedsOpponent("@blocked(*)")
+                  && w81StarterEventNeedsOpponent("@attacked(*)"),
+              "#W81-DL V7 the three opponent-dependent event spellings the engine uses");
+        CHECK(!w81StarterEventNeedsOpponent("@each my upkeep")
+                  && !w81StarterEventNeedsOpponent("@movedto(*|mybattlefield)")
+                  && !w81StarterEventNeedsOpponent("@combat(attacking)"),
+              "#W81-DL V7 MUST-NOT-MATCH a turn-cycle event, an ETB and an ATTACK trigger"
+              " are not opponent-dependent");
+        CHECK(w80StarterLineKind("@combat(attacking) source(this):life:2 controller")
+                  == kW81StarterAttackTrigger,
+              "#W81-DL V7 an ATTACK trigger is its own kind");
+        CHECK(!w80StarterIsLive(kW81StarterAttackTrigger, true, true, false)
+                  && w80StarterIsLive(kW81StarterAttackTrigger, false, false, true),
+              "#W81-DL V7 an attack trigger is this seat's to fire only while the body can"
+              " actually be declared - a defender never can");
+        CHECK(w80StarterIsLive(kW80StarterActivated, true, false, false)
+                  && !w80StarterIsLive(kW80StarterActivated, false, true, true)
+                  && w80StarterIsLive(kW80StarterEntersTrigger, false, true, false),
+              "#W81-DL V7 the wave-80 kinds keep their wave-80 verdicts");
+    }
+
+    cout << "\n[#W81-DL V7/V17] the gap branch, on deck126's own board\n";
+    {
+        // `126v130` seq 39: Sanguine Bond + Exquisite Blood out (the loop's own
+        // halves, excluded by construction), two Perimeter Captains, a Pride
+        // Guardian, two Overgrown Battlements and a Chromatic Lantern - and in
+        // hand two Idyllic Tutors, a Wall of Omens and a SECOND Exquisite Blood.
+        // Nothing on that list moves life in a way this seat can cause.
+        CHECK(!w80LoopStarterScript("@each my upkeep:draw:1 controller")
+                  && !w80LoopStarterScript("{T}: Add one mana of any color."),
+              "#W81-DL V17 the battlements, the lantern and the tutors carry no life term"
+              " at all, so the SCRIPT test already rejects them");
+        CHECK(w80LoopStarterScript("@lifelostfoeof(player):life:thatmuch controller"),
+              "#W81-DL V17 RED-ON-BASE the second Exquisite Blood in hand DOES pass the"
+              " script test - the hand branch named it the starter at `126v123` seq 16");
+        const string gap = w80ProvenWinLoopLine("");
+        CHECK(gap.find("no live way to start it") != string::npos
+                  && gap.find("NOT yet a win") != string::npos
+                  && gap.find("proven win") == string::npos
+                  && gap.find("It starts from") == string::npos,
+              "#W81-DL V17 GREEN with every candidate on that board rejected the line prints"
+              " the GAP - the branch #W80-DH (F6) shipped and the wave-80 corpus never"
+              " printed once");
+        CHECK(w80LoopFaceOfLine(gap) == "[own loop verdict: proven but no live starter]",
+              "#W81-DL V17 and the per-record face names it, so the next census can count"
+              " the branch instead of adjudicating it UNTESTED");
+        CHECK(w80ProvenWinLoopLine("Perimeter Captain").find("It starts from Perimeter"
+                                                             " Captain") != string::npos,
+              "#W81-DL V17 RED-ON-BASE the wave-80 line, for the record");
+    }
+
+    cout << "\n[#W81-DL V8] a refused cast keeps the X menu's refusal wording\n";
+    {
+        // `162v130` seq 75: Starstorm, max affordable X=6, every X that kills
+        // anything of THEIRS also kills more of YOURS.
+        XVictimSurvey sv;
+        sv.maxX = 6;
+        sv.priceable = true;
+        sv.sweep = true;
+        sv.myLife = 10;
+        sv.oppLife = 7;
+        const char * theirs[4] = { "Shield Sphere #1", "Shield Sphere #2",
+                                   "Shield Sphere #3", "Fate Unraveler" };
+        const int theirX[4] = { 6, 6, 6, 4 };
+        for (int i = 0; i < 4; i++)
+        {
+            XDamVictim v;
+            v.name = theirs[i];
+            v.baseName = theirs[i];
+            v.lethalX = theirX[i];
+            v.mine = false;
+            v.pluralVerb = false;
+            v.isPlayer = false;
+            sv.victims.push_back(v);
+        }
+        const char * mine[5] = { "Dwarven Blastminer", "Goblin #1", "Goblin #2",
+                                 "Goblin #3", "Siege-Gang Commander" };
+        const int mineX[5] = { 1, 1, 1, 1, 2 };
+        for (int i = 0; i < 5; i++)
+        {
+            XDamVictim v;
+            v.name = mine[i];
+            v.baseName = mine[i];
+            v.lethalX = mineX[i];
+            v.mine = true;
+            v.pluralVerb = true;
+            v.isPlayer = false;
+            sv.victims.push_back(v);
+        }
+        string mk;
+        const int mx = xMenuMarkX(sv.victims, sv.maxX, mk);
+        CHECK(mk.find("costs you more of YOURS than it takes") != string::npos,
+              "#W81-DL V8 the X MENU's own verdict on that ladder is a REFUSAL");
+        const string red = xCastRowMarkerFrom(mk, mx, mk != string(kXNoKillsMarker));
+        CHECK(red.find(" [<- best X for this cast: X=") == 0,
+              "#W81-DL V8 RED-ON-BASE the wave-80 cast row reopened that refusal as a"
+              " recommendation - `[<- best X for this cast: X=6 - the only X that kills"
+              " anything of THEIRS costs you more of YOURS than it takes - THEIRS 4 /"
+              " YOURS 5]`, and the seat swept its own Siege-Gang, three Goblins and a"
+              " Blastminer off a board it had exact lethal on");
+        const string green = xCastRowBestXMarker(sv, 0, 0);
+        CHECK(green.find("best X for this cast") == string::npos,
+              "#W81-DL V8 GREEN no `best X for this cast:` prefix on a refused cast");
+        CHECK(green.find(" [<- the only X that kills anything of THEIRS costs you more"
+                         " of YOURS than it takes - THEIRS ") == 0,
+              "#W81-DL V8 GREEN the cast row carries the X menu's wording, refusal first,"
+              " with both counts intact - nothing is removed from the row");
+        CHECK(xCastRowMarkerFrom(kXNoKillsMarker, 0, false)
+                  == " [<- no X on this menu kills anything of THEIRS]",
+              "#W81-DL V8 MUST-NOT-MATCH the no-kill verdict is carried bare, as before");
+        {
+            // ...and an ENDORSED trade still names its X: the fix conditions the
+            // prefix on the refusal, not on the marker family.
+            XVictimSurvey good;
+            good.maxX = 3;
+            good.priceable = true;
+            good.sweep = true;
+            XDamVictim t;
+            t.name = "Fate Unraveler"; t.baseName = t.name; t.lethalX = 3;
+            t.mine = false; t.pluralVerb = false; t.isPlayer = false;
+            good.victims.push_back(t);
+            const string endorsed = xCastRowBestXMarker(good, 0, 0);
+            CHECK(endorsed.find("best X for this cast: X=3") != string::npos,
+                  "#W81-DL V8 a cast the ladder does NOT refuse still names its best X -"
+                  " the positive clause still prints on the shape it was built for");
+        }
+    }
+
+    cout << "\n[#W81-DL V8] the X-variable board-sweep marker names the seat's losses\n";
+    {
+        const string red = boardSweepMarker(4, 5, 1);
+        CHECK(red == " [<- board sweep: THEIRS 4 / YOURS 5 - the only row on this menu that"
+                     " prices a board sweep (it takes more of YOURS than of THEIRS)]",
+              "#W81-DL V8 RED-ON-BASE the X-variable path printed exactly this at"
+              " `130v152` seqs 49-75 - six markers, no roster");
+        const string green = boardSweepMarker(4, 5, 1, "",
+                                              "Dwarven Blastminer (1/1), Goblin #1 (1/1),"
+                                              " Goblin #2 (1/1), Goblin #3 (1/1),"
+                                              " Siege-Gang Commander (2/2)",
+                                              "Siege-Gang Commander #7 - a TOKEN ENGINE");
+        CHECK(green.find("/ YOURS 5 (Dwarven Blastminer (1/1)") != string::npos
+                  && green.find("; of those, Siege-Gang Commander #7 - a TOKEN ENGINE")
+                     != string::npos
+                  && green.find("THAT COUNT IS BODIES, NOT VALUE") != string::npos,
+              "#W81-DL V8 GREEN the same marker, with U7's roster wired into the"
+              " X-variable path");
+        CHECK(w81XSweepMarkerNamesOwnLosses("Cast Starstorm {r}{r}{x} {X pricing: max"
+                                            " affordable X=6}" + green),
+              "#W81-DL V8 the send-time predicate sees the roster on an X row");
+        CHECK(!w81XSweepMarkerNamesOwnLosses("Cast Starstorm {r}{r}{x} {X pricing: max"
+                                            " affordable X=6}" + red),
+              "#W81-DL V8 MUST-NOT-MATCH and does NOT see one on the bare wave-80 marker");
+        CHECK(!w81XSweepMarkerNamesOwnLosses("Cast Damnation {2}{b}{b}" + green),
+              "#W81-DL V8 MUST-NOT-MATCH a fixed-effect sweeper is not this counter's"
+              " population - U7 already covers it");
+        CHECK(boardSweepMarker(4, 0, 1, "", "", "")
+                  == " [<- board sweep: THEIRS 4 / YOURS 0 - the only row on this menu that"
+                     " prices a board sweep]",
+              "#W81-DL V8 ZERO with nothing of YOURS taken there is no roster and every"
+              " byte is wave 66's");
+    }
+
+    cout << "\n[#W81-DL V10] no annotation inside an offered attacker's row\n";
+    {
+        // `146v162` seq 52: two Silverquill Silencers, one Fog Bank opposite.
+        std::vector<string> cannot;
+        cannot.push_back("Fog Bank (flying)");
+        const string hb = heldBackBlockTag(cannot, 1);
+        const string offer = " (3/2) [indestructible] [their untapped blockers: Fog Bank"
+                             " (0/2) (neither dies (no combat damage is dealt either way -"
+                             " prevented))]";
+        const string redRest = " (3/2) [indestructible]" + hb
+                               + " [their untapped blockers: Fog Bank (0/2)]";
+        CHECK(redRest.find("\n") == string::npos && redRest.find("[held back") != string::npos,
+              "#W81-DL V10 RED-ON-BASE the wave-80 row is ONE line and the hold-back tag is"
+              " inside it, between the body's keywords and what can block it");
+        const string greenRest = offer + "\n   " + hb;
+        std::vector<string> names, handles, rests;
+        names.push_back("Silverquill Silencer");
+        names.push_back("Silverquill Silencer");
+        handles.push_back(" #1");
+        handles.push_back(" #2");
+        rests.push_back(greenRest);
+        rests.push_back(greenRest);
+        bool rangeRow = false;
+        const string joined = joinBlockerRows(names, handles, rests, &rangeRow, "A");
+        const size_t firstNl = joined.find('\n');
+        CHECK(firstNl != string::npos
+                  && joined.substr(0, firstNl).find("[held back") == string::npos,
+              "#W81-DL V10 GREEN the line that OFFERS the attack carries no hold-back tag");
+        CHECK(joined.find("\n    [held back, THIS creature could not block") != string::npos,
+              "#W81-DL V10 GREEN the fact is not deleted - it prints on a line of its own"
+              " under the row it is about");
+        CHECK(heldBackBlockTag(cannot, 1) == hb,
+              "#W81-DL V10 the tag itself is byte-identical - only where it sits moved");
+        CHECK(heldBackBlockTag(std::vector<string>(), 3).empty(),
+              "#W81-DL V10 ZERO nothing restricted -> no line at all");
+    }
+
+    cout << "\n[#W81-DL V10] the stay-home cover prints on every crack-back window\n";
+    {
+        CHECK(!w81AttackCoverDue(true, false) && !w81AttackCoverDue(false, true),
+              "#W81-DL V10 no crack-back line, or nothing offered -> no paragraph");
+        CHECK(w81AttackCoverDue(true, true),
+              "#W81-DL V10 GREEN every attackers window that prints the crack-back header"
+              " prints the cover paragraph - RED on base, where the gate also demanded"
+              " `life - total <= 0` and 1 of deck152's 8 crack-back attack prompts got it,"
+              " the one where the seat was already dead (`152v146` seq 19 got nothing)");
+        // and the non-lethal face is a NUMBER, not a scare: `152v146` seq 19's shape.
+        const string cover = w77StayHomeCoverTag(6, 20, false, 3, 6);
+        CHECK(cover.find("keeping all 3 of them back covers 6 of that 6, leaving 0")
+                  != string::npos
+                  && cover.find("you would be at 20, which you SURVIVE") != string::npos,
+              "#W81-DL V10 the paragraph's own arithmetic states the survival on a"
+              " non-lethal board, so nothing new is claimed by printing it there");
+        CHECK(w77StayHomeCoverTag(6, 1, false, 3, 6) == w77StayHomeCoverTag(6, 1, false, 3, 6),
+              "#W81-DL V10 the tag is unchanged by this item - only its gate moved");
+    }
+
+    cout << "\n[#W81-DL V13] the cleanup {spare:} verdict is colour-aware\n";
+    {
+        // `162v130` seq 47: five lands down, the most expensive reachable card
+        // costing 3, and THREE Underworld Dreams at {B}{B}{B} in hand against two
+        // black land sources on the battlefield.
+        const string red = discardSpareLandClause(5, 3, true);
+        CHECK(red == " {spare: you control 5 lands already; the most expensive card in your"
+                     " hand you could still reach costs 3}",
+              "#W81-DL V13 RED-ON-BASE the wave-80 clause marked that Swamp spare");
+        const string green = discardSpareLandClause(5, 3, true, "", 0, -1, "{B}", 3, 2);
+        CHECK(green.compare(0, 9, " {spare: ") != 0
+                  && green.compare(0, 2, " {") == 0,
+              "#W81-DL V13 GREEN the verdict WORD is withheld when the colour binds");
+        CHECK(green.find("you control 5 lands already") != string::npos
+                  && green.find("COLOUR: a card in your hand you could still reach needs"
+                                " 3 {B} and discarding this row leaves you 2 LAND sources"
+                                " of it") != string::npos,
+              "#W81-DL V13 GREEN nothing is hidden: the count still prints and the two"
+              " numbers the reader must compare print beside it");
+        CHECK(discardSpareLandClause(5, 3, true, "", 0, -1, "{B}", 3, 3) == red,
+              "#W81-DL V13 ZERO enough sources of the colour -> the wave-80 clause, byte"
+              " for byte");
+        CHECK(discardSpareLandClause(5, 3, true, "", 0, -1, "{B}", 0, 0) == red
+                  && discardSpareLandClause(5, 3, true, "", 0, -1, "", 3, 0) == red,
+              "#W81-DL V13 MUST-NOT-MATCH no colour demand, or a land that makes no colour"
+              " the hand needs, changes nothing");
+        CHECK(discardSpareLandClause(5, 3, true, "", 0, -1, "{B}", 2, 1)
+                  .find("needs 2 {B} and discarding this row leaves you 1 LAND source of it")
+              != string::npos,
+              "#W81-DL V13 ONE the singular is spelled");
+        CHECK(discardSpareLandClause(2, 5, true, "", 0, -1, "{B}", 3, 0).find("spare")
+                  == string::npos,
+              "#W81-DL V13 the COUNT gate (#W61-T C11) still refuses the word on its own");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
