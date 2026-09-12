@@ -1335,6 +1335,12 @@ private:
     //new one, written the moment the deadline is spent).
     void flushWallMissRecord(const char * classOverride = NULL);
     void writeForceCloseRecord(const char * outcome, bool landArm); //#W78-CV (S11)
+    //#W80-DF (U13): one record per menu the ENGINE answered because every row of
+    //it resolves to the same outcome. The counter alone is unauditable (the
+    //wave-79 lesson), so the record names the menu, the row count, the row the
+    //seat took and the identity that proved them one option.
+    void writeSingleOutcomeMenuRecord(const string& subject, int rows, int answered,
+                                      const string& answeredText, int commonPaid);
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
                        const std::vector<string> * optionTexts = NULL,
@@ -2411,6 +2417,10 @@ private:
     //ordinal, so each `forced_close` record is nameable and the ten unrecorded
     //closes of a corpus can be attributed to an arm and a window.
     int mForceCloseEvents;
+    //#W80-DF (U13): menus answered by the engine because every row resolves to
+    //one outcome, and their own record ordinal.
+    int mSingleOutcomeMenusAnswered;
+    int mSingleOutcomeRowsSpared;
     //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
     //byte-identical re-put later in the same turn at another phase can be
     //counted and named. Measure + annotation only; no window is collapsed.

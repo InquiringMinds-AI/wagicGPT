@@ -1,0 +1,33 @@
+#NAME: U6 -- a CYCLING cost is a DISCARD as well as a draw, and both punishers bill it
+#DESC: #W80-DF (U6), the `130v162` seqs 35/37 board reduced to its two facts.
+#DESC: The row the seat took read `cycling with Starstorm [cost: {3}, Cycle] [DRAW PRICE:
+#DESC: this draws 1 card ... so taking it costs you 1 life right now - you would be at 18]`
+#DESC: on a screen whose own DISCARD PUNISHERS paragraph said `Liliana's Caress. Every card
+#DESC: YOU discard costs you 2 life`. The seat went 19 -> 13 over two cycles and lost at 0.
+#DESC:
+#DESC: This is the ENGINE's answer to which halves fire: CycleCost::doPay (ExtraCost.cpp)
+#DESC: sends a WEventCardDiscard AND the card is drawn, so Liliana's Caress
+#DESC: (@discarded(*|opponenthand):life:-2 opponent) takes 2 and Underworld Dreams
+#DESC: (@drawfoeof(player):damage:1 opponent) takes 1. 20 - 2 - 1 = 17, not 19.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Akroma's Vengeance
+library:forest
+manapool:{3}
+life:20
+[PLAYER2]
+inplay:Liliana's Caress,Underworld Dreams
+life:20
+[DO]
+Akroma's Vengeance
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Akroma's Vengeance
+hand:forest
+life:17
+[PLAYER2]
+inplay:Liliana's Caress,Underworld Dreams
+life:20
+[END]
