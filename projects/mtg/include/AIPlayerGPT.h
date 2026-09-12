@@ -2158,6 +2158,19 @@ private:
     //legal block prevents it.
     int mCrackBackLethalBlockedAway;
     int mCrackBackVerdictCountedSeq;
+    //#W81-DL (V5/V8/V10): the render events this lane's fixes produce, STAGED at
+    //their render sites and applied inside askModel at the same send boundary
+    //wave 80's verdict faces use (the wave-79 lesson: a render counter that does
+    //not increment AT THE SEND counts windows the model never saw). `mW81EventFace`
+    //is the per-record trace - it names the event each counter counted.
+    std::string mW81PendingEventFace;
+    std::string mW81EventFace;
+    int mW81FoldedCrackBackTotals;
+    int mW81XCastRefusalMarkers;
+    int mW81XSweepRosterMarkers;
+    int mW81AttackCoverClauses;
+    int mW81SpareColourWithheld;
+    int mW81EventCountedSeq;
     int mStackDeathVerdictLinesRendered;
     int mStackDeathVerdictCountedSeq;
     //#W80-DE (U8): cross-phase replays - a declined list re-put at another phase
@@ -2268,6 +2281,14 @@ private:
     void w80ApplyVerdictFacesAtSend(bool sent, const std::string& pendingCrackBack,
                                     const std::string& pendingStackDeath,
                                     bool pendingDrain);
+    //#W81-DL (V5/V8/V10): the same boundary, for this lane's render events.
+    void w81ApplyRenderEventsAtSend(bool sent);
+    //#W81-DL (V5): the crack-back verdict line, built on the ONE total the
+    //CRACK-BACK NEXT TURN line above it publishes (combat + ADD THOSE UP) plus
+    //the COMPULSORY draw the DRAW FORECAST on the same screen charges.
+    std::string w81CrackBackVerdictLineNow();
+    //#W81-DL (V5): that compulsory draw-step charge, as a number.
+    int w81CompulsoryDrawLossNow();
     int w77OwnLoopStackState(std::string& theirSpell, std::string& component);
     //#W77-CU (F4): the verdict as a hold MARKER ROW, the #W68-BB / #W74-CH shape.
     std::string w77OwnLoopVerdictNow();
