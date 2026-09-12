@@ -1,0 +1,34 @@
+#NAME: F3 -- a FIRST-STRIKE blocker kills the trampler before it deals damage
+#DESC: #W79-DC (F3, Astra wave-79 review finding 3), the second direction. The
+#DESC: wave-79 DP priced a trampler's spill as `power - blocker toughness` and
+#DESC: called the result a proven maximum ("no assignment of your blockers does
+#DESC: better"), so on this board it claims 6 - 2 = 4 damage lands.
+#DESC:
+#DESC: Rootbreaker Wurm is 6/6 trample. Minotaur Aggressor is 6/2 first strike:
+#DESC: it deals its 6 in the first-strike step, which is lethal to a 6/6, so the
+#DESC: Wurm is dead before the regular step and deals NOTHING - 0 damage, not 4.
+#DESC: The lane's claim that the DP's fidelity gaps are exclusively pessimistic is
+#DESC: false in this direction: a legal block BEATS the printed ceiling.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Minotaur Aggressor
+life:20
+[DO]
+Rootbreaker Wurm
+next
+Minotaur Aggressor
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+graveyard:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Minotaur Aggressor
+life:20
+[END]

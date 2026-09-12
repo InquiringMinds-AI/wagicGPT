@@ -1,0 +1,39 @@
+#NAME: F3 -- a DOUBLE-STRIKE trampler deals in BOTH damage steps
+#DESC: #W79-DC (F3, Astra wave-79 review finding 3). The wave-79 exact search
+#DESC: w79BestBlockDamage modelled ONE damage step and was then promoted to
+#DESC: `exactAssignment = true`, so on Astra's board it computed `power - blocker
+#DESC: toughness` and the header promised survival at that figure.
+#DESC:
+#DESC: Combat damage is dealt in up to two steps (CR 510.4). A double striker
+#DESC: assigns lethal damage to its blockers in the FIRST-STRIKE step and tramples
+#DESC: the rest; the blockers are then gone, so in the REGULAR step nothing soaks
+#DESC: anything and its whole power tramples through.
+#DESC:
+#DESC: Dragon Tyrant is 6/6 flying, trample, double strike. Wall of Air is 1/5
+#DESC: defender, flying, so it is a legal blocker. One-step arithmetic says
+#DESC: 6 - 5 = 1 and life 19. The engine's own damage code is the arbiter.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Dragon Tyrant
+life:20
+[PLAYER2]
+inplay:Wall of Air
+life:20
+[DO]
+Dragon Tyrant
+next
+Wall of Air
+next
+next
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Dragon Tyrant
+life:20
+[PLAYER2]
+graveyard:Wall of Air
+life:13
+[END]
