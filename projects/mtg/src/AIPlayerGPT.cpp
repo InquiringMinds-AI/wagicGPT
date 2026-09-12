@@ -3430,6 +3430,9 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
                                 //#W66-AQ (H10): which of THEIRS are engines
                                 //rather than bodies, from the same walk.
                                 std::vector<std::string> * theirEngines = NULL,
+                                //#W80-DF (U7): and which of YOURS are, from the
+                                //same walk and the same predicate.
+                                std::vector<std::string> * myEngines = NULL,
                                 //#W76-CO (Q5): how much of the CRACK-BACK NEXT
                                 //TURN total this sweeper's victims carry, and
                                 //from how many bodies. Same walk as the line.
@@ -3523,6 +3526,10 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
         mine++;
         if (myNames) //#W60-O (B7)
             myNames->push_back(sweeperVictimName(mc) + sweeperRegenerationTail(mc, destroyKind));
+        if (myEngines) //#W80-DF (U7)
+            if (const char * mek = engineKindForScript(mc->magicText))
+                myEngines->push_back(mc->getDisplayName() + instanceHandle(mc)
+                                     + " - a " + mek);
     }
     return true;
 }
@@ -3697,6 +3704,11 @@ struct CastRowBoardAnswer
     int theirs;
     int mine;
     string engines; //#W66-AQ (H10): the ones of THEIRS that are not bodies
+    //#W80-DF (U7): the sweep's OWN-SIDE roster - every creature of the seat's
+    //that this row destroys, by name, and the engine kind of any of them that
+    //is not merely a body. Same walk, same predicate as `engines`.
+    string mineNames;
+    string mineEngines;
     //#W68-BD (J8): 1 = this row is a plain edict whose victim the OPPONENT
     //picks. It takes no part in the sweep ranking; it is read by the
     //crack-back cover block only.
@@ -3765,6 +3777,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
     std::vector<std::string> theirSurvivors, mySurvivors;
     std::vector<WipeVictim> theirAttackers; //#W61-U (C10)
     std::vector<std::string> theirEngines; //#W66-AQ (H10)
+    std::vector<std::string> myEngines; //#W80-DF (U7)
     int sweepCrackPower = 0, sweepCrackBodies = 0; //#W76-CO (Q5)
     int destroyKind = 0;
     if (sweepVerb && strcmp(sweepVerb, "destroys") == 0)
@@ -3776,6 +3789,7 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
                              sweepVerb ? &mySurvivors : NULL,
                              attackPunisher ? &theirAttackers : NULL,
                              sweepVerb ? &theirEngines : NULL,
+                             sweepVerb ? &myEngines : NULL, //#W80-DF (U7)
                              sweepVerb ? &sweepCrackPower : NULL, //#W76-CO (Q5)
                              sweepVerb ? &sweepCrackBodies : NULL)) //#W61-U (C10) / #W66-AQ (H10)
         return "";
@@ -3915,6 +3929,14 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
             for (size_t ei = 0; ei < theirEngines.size(); ei++)
                 eng << (ei ? ", " : "") << theirEngines[ei];
             ans->engines = eng.str();
+            //#W80-DF (U7): and the same two facts about the seat's OWN losses.
+            std::ostringstream mn, me;
+            for (size_t mi = 0; mi < myNames.size(); mi++)
+                mn << (mi ? ", " : "") << myNames[mi];
+            for (size_t mi = 0; mi < myEngines.size(); mi++)
+                me << (mi ? ", " : "") << myEngines[mi];
+            ans->mineNames = mn.str();
+            ans->mineEngines = me.str();
         }
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live, theirNames, myNames,
                              theirSurvivors, mySurvivors, //#W60-Q (R6)
@@ -8513,12 +8535,26 @@ static string paymentTapsClause(const std::vector<std::string>& names,
         if (r != first)
             uniform = false;
     }
+    //#W80-DF (U4): a comma-separated list one of whose NAMES contains a comma
+    //("Katilda, Dawnhart Prime") cannot be counted by reading it, and the
+    //deck-152 guide's LETHAL COUNT rule counts exactly these names. Where that
+    //happens the clause states its own count; where it does not, every byte is
+    //as wave 79 wrote it.
+    bool commaInName = false;
+    for (size_t i = 0; i < names.size(); i++)
+        if (names[i].find(',') != string::npos)
+            commaInName = true;
+    const bool statesCount = commaInName && names.size() > 1;
     std::ostringstream o;
     o << " {paying this taps: ";
     if (uniform)
     {
         for (size_t i = 0; i < names.size(); i++)
             o << (i ? ", " : "") << names[i];
+        if (statesCount) //#W80-DF (U4)
+            o << " (that is " << names.size() << " permanents of yours - one of the"
+                 " names in this list contains a comma, so count them from this"
+                 " number, not from the commas)";
         if (first != TAP_RESTRICT_NONE)
             o << " - " << paymentTapRestrictionWords(first, names.size() != 1);
     }
@@ -13651,8 +13687,25 @@ static bool sourceDealsPoisonInsteadOfDamage(MTGCardInstance * c)
 //is the same shape #W63-AB (E1) uses on the INCOMING line itself. The
 //take-the-damage-while-ahead hint goes with it (it is the inverse of correct
 //play against a chain; #W54-E D21's own reasoning, applied to the loop).
+//#W80-DF (U14, wave-79 deck146 MED). "NOT LETHAL" WAS TRUE OF THE COMBAT AND
+//FALSE OF THE TURN CYCLE. `146v162` seq 29, at 4 life: this line read `Unblocked,
+//these attackers deal up to 3 - you would be at 1 - NOT lethal: block only where
+//the trade favors you`, eleven lines under the same screen's `DRAW FORECAST:
+//your next draw step draws 1 card = 1 x 3 = 3 life LOST BY YOU to their punishers
+//above ... This draw step is COMPULSORY - no row on any menu declines it`. The
+//two numbers are on one screen, they add, and the sum is death - but the verdict
+//the model is instructed to believe is computed from one of them. The draw-step
+//loss is the one non-combat damage the seat provably CANNOT decline this cycle
+//(the forecast line says so in its own words), so it belongs inside the lethality
+//test at the seam that states the verdict. Nothing is deleted: the combat
+//subtraction still prints in full, the survival CLAIM is withdrawn and the
+//withdrawal is said, and the take-the-damage-while-ahead hint goes with it
+//(#W54-E D21's own reasoning - it is the inverse of correct play when the rest of
+//the cycle kills you). `forcedCycleLoss` 0 leaves every wave-79 byte in place.
 static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming,
-                                   int oppLife, bool oppLoopLive = false) //#W76-CO (Q3 a)
+                                   int oppLife, bool oppLoopLive = false, //#W76-CO (Q3 a)
+                                   int forcedCycleLoss = 0, //#W80-DF (U14)
+                                   const string& forcedCycleSource = "")
 {
     std::ostringstream o;
     o << "Your life: " << life << ".";
@@ -13663,16 +13716,29 @@ static string combatDamageForecast(int life, int poison, int lifeIncoming, int p
         //the boundary: reaching EXACTLY 0 is death. W36 #3 (105/152/36 collision):
         //the take-the-damage hint licensed overriding deck guides and read
         //"ahead" off the wrong resource; scope it to LIFE and make it yield.
+        //#W80-DF (U14): the compulsory non-combat loss the same screen forecasts.
+        const int w80After = life - lifeIncoming;
+        const bool w80CycleKills = forcedCycleLoss > 0 && w80After > 0
+                                   && w80After - forcedCycleLoss <= 0;
         o << " Unblocked, these attackers deal up to " << lifeIncoming
-          << " - you would be at " << (life - lifeIncoming)
-          << (life - lifeIncoming <= 0
-              ? " - LETHAL if it all connects (at 0 life you LOSE - 0 is not survival): block enough to survive."
-              : (oppLoopLive && lifeIncoming > 0
-                  ? " - and NO survival verdict is given from that figure: both halves of their life LOOP are on their battlefield, so any life you lose in this combat, and any life a block gains them, both enter a chain that does not stop until you are at 0. This subtraction is not a claim that you survive the swing, and taking the damage is not a trade."
-                  : (life > oppLife
-                      ? " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint)."
-                      : " - NOT lethal: block only where the trade favors you.")))
-          << "\n";
+          << " - you would be at " << w80After;
+        if (life - lifeIncoming <= 0)
+            o << " - LETHAL if it all connects (at 0 life you LOSE - 0 is not survival): block enough to survive.";
+        else if (w80CycleKills) //#W80-DF (U14)
+            o << " - NOT lethal FROM THE COMBAT ALONE, and that is not a survival"
+                 " verdict: " << forcedCycleSource << " costs you " << forcedCycleLoss
+              << " more life before you act again, and it is COMPULSORY - no row on"
+                 " any menu declines it. " << w80After << " - " << forcedCycleLoss
+              << " = " << (w80After - forcedCycleLoss) << ", so taking this swing in"
+                 " full LOSES THE GAME this turn cycle. Block as if the swing were"
+                 " lethal, because with that charge added it is.";
+        else if (oppLoopLive && lifeIncoming > 0)
+            o << " - and NO survival verdict is given from that figure: both halves of their life LOOP are on their battlefield, so any life you lose in this combat, and any life a block gains them, both enter a chain that does not stop until you are at 0. This subtraction is not a claim that you survive the swing, and taking the damage is not a trade.";
+        else if (life > oppLife)
+            o << " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint).";
+        else
+            o << " - NOT lethal: block only where the trade favors you.";
+        o << "\n";
         return o.str();
     }
     o << " Your poison counters: " << poison << " of " << kPoisonLoseAt << ".\n";
@@ -14657,16 +14723,54 @@ static const char * punisherVerb(const string& punishers)
 //resulting life to the clause that follows, which folds both charges once; the
 //cost this clause states is unchanged, and every single-clause row is
 //byte-identical.
+//#W80-DF (U6, wave-79 deck130 HIGH-2 - a lost game). A CYCLE IS A DISCARD AND A
+//DRAW, AND THIS TAG PRICED ONE HALF. `130v162` seqs 35 and 37 printed `cycling
+//with Starstorm [cost: {3}, Cycle] ... [DRAW PRICE: this draws 1 card, and the
+//opponent's Underworld Dreams punishes every draw, so taking it costs you 1 life
+//right now - you would be at 18]` on a screen whose own DISCARD PUNISHERS
+//paragraph read `theirs - Liliana's Caress. Every card YOU discard costs you 2
+//life`; the seat went 19 -> 13 across two cycles and lost at exactly 0. The
+//engine agrees with the rules text: `CycleCost::doPay` sends a
+//`WEventCardDiscard` before the draw (ExtraCost.cpp), which is exactly what
+//Liliana's Caress's `@discarded(*|opponenthand)` fires on. 33 rows in the corpus
+//carry this shape. The bracket keeps its one literal and its one resulting life
+//- the row's whole price, stated once - and a row with no discard in its cost is
+//byte-identical to wave 79.
 static string drawPriceRowTag(int cards, int perDraw, const string& punishers, int life = -1,
-                              bool deferTotal = false)
+                              bool deferTotal = false,
+                              int discards = 0, int perDiscard = 0, //#W80-DF (U6)
+                              const string& discardPunishers = "",
+                              bool discardIsCycleCost = false)
 {
-    if (cards <= 0 || perDraw <= 0 || punishers.empty())
+    const bool drawHalf = cards > 0 && perDraw > 0 && !punishers.empty();
+    const bool discHalf = discards > 0 && perDiscard > 0 && !discardPunishers.empty();
+    if (!drawHalf && !discHalf)
         return "";
-    int dealt = cards * perDraw;
+    const int drawDealt = drawHalf ? cards * perDraw : 0;
+    const int discDealt = discHalf ? discards * perDiscard : 0;
+    const int dealt = drawDealt + discDealt;
     std::ostringstream o;
-    o << " [DRAW PRICE: this draws " << cards << " card" << (cards == 1 ? "" : "s")
-      << ", and the opponent's " << punishers << punisherVerb(punishers)
-      << " every draw, so taking it costs you " << dealt << " life right now";
+    o << " [DRAW PRICE: ";
+    if (drawHalf)
+        o << "this draws " << cards << " card" << (cards == 1 ? "" : "s")
+          << ", and the opponent's " << punishers << punisherVerb(punishers)
+          << " every draw, so taking it costs you " << drawDealt << " life right now";
+    if (discHalf) //#W80-DF (U6)
+    {
+        if (drawHalf)
+            o << "; AND paying this row's cost DISCARDS " << discards << " card"
+              << (discards == 1 ? "" : "s");
+        else
+            o << "paying this row's cost DISCARDS " << discards << " card"
+              << (discards == 1 ? "" : "s");
+        if (discardIsCycleCost)
+            o << " (a CYCLING cost is a discard as well as a draw - the card you"
+                 " cycle is discarded to pay for it)";
+        o << ", and the opponent's " << discardPunishers << punisherVerb(discardPunishers)
+          << " every card you discard, for " << discDealt << " more";
+        if (drawHalf)
+            o << " - " << dealt << " life from this row in total";
+    }
     if (deferTotal)
         o << " (this row carries a SECOND draw price below; the two are added there"
              " and the resulting life is stated once)";
@@ -20206,7 +20310,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mSingleOutcomeMenusAnswered(0), mSingleOutcomeRowsSpared(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -20531,6 +20635,37 @@ void AIPlayerGPT::writeForceCloseRecord(const char * outcome, bool landArm)
         {"park_armed", mRetryPark.forceCloseArmed ? 1 : 0},
         {"defer_ticks", mForceCloseDeferTicks},
         {"unrecorded_so_far", mForceCloseUnrecorded},
+        {"turn", translogTurn(observer ? observer->turn : 0)},
+        {"phase", observer ? observer->getCurrentGamePhase() : -1},
+    };
+    transLogWrite(rec.dump());
+}
+
+//#W80-DF (U13): the per-event record. A counter with no per-record trace cannot
+//be adjudicated (the LESSON OF WAVE 79), so every engine-answered menu writes
+//down what it answered and the identity that made it one option - the common
+//number of repeat payments the seat's mana pays for, which is 0 exactly when
+//every rung is the same rung. Telemetry about a window that was never asked, so
+//it rides the window number the way `forced_close` does and takes no ask seq.
+void AIPlayerGPT::writeSingleOutcomeMenuRecord(const string& subject, int rows, int answered,
+                                               const string& answeredText, int commonPaid)
+{
+    mSingleOutcomeMenusAnswered++;
+    if (rows > 1)
+        mSingleOutcomeRowsSpared += rows - 1;
+    if (mTransLogPath.empty())
+        return;
+    ensureGameStartRecord();
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "menu_single_outcome"},
+        {"event", mSingleOutcomeMenusAnswered},
+        {"subject", subject},
+        {"rows", rows},
+        {"answered", answered},
+        {"answered_text", answeredText},
+        {"repeat_payments_paid", commonPaid},
+        {"window_seq", mWindowSeq},
         {"turn", translogTurn(observer ? observer->turn : 0)},
         {"phase", observer ? observer->getCurrentGamePhase() : -1},
     };
@@ -22218,6 +22353,10 @@ void AIPlayerGPT::logGameEnd()
         //the shape that did.
         {"force_close_same_arm_deferred", mForceCloseSameArmDeferred},
         {"forced_close_events", mForceCloseEvents}, //#W78-CV (S11)
+        //#W80-DF (U13): joins one-for-one with the `menu_single_outcome` records
+        //in this same file - the census reconciles or the counter is wrong.
+        {"single_outcome_menus_answered", mSingleOutcomeMenusAnswered},
+        {"single_outcome_rows_spared", mSingleOutcomeRowsSpared},
         {"crossphase_identical_reputs", mCrossPhaseRePuts},   //#W76-CN (Q13)
         //#W77-CR (R8): of those, the ones whose ask-cache board key MATCHED -
         //i.e. the ones that printed `nothing on the board has changed`. Never
@@ -28172,14 +28311,88 @@ static bool w75LegendTwinControlled(const std::vector<W75LegendBoardCard>& board
     return false;
 }
 
+//#W80-DF (U3, wave-79 deck146 HIGH-1). THE COVER CREDITED A BODY THE ROW DOES
+//NOT LEAVE. Acererak the Archlich's own untriggered enters-the-battlefield line
+//is `if <dungeon not completed> then name(Return to hand) moveTo(hand)`, and the
+//narration of the same prompt (`146v162` seq 32) already recorded the previous
+//copy arriving and being returned to hand - yet the row read `This adds 1 body`
+//and priced a crack-back cover with it, in 7 corpus windows. A cover is a claim
+//about the battlefield during THEIR attack; a card whose own resolution moves it
+//straight back off the battlefield is not there for it.
+//The predicate is the effect SHAPE, not a card name: a line with no trigger (a
+//permanent's own ETB) or an explicit `@movedto(this|battlefield):` trigger, which
+//moves to a zone that is not the battlefield or sacrifices, and which names NO
+//other object (no target/notatarget/all/foreach) - so the thing it moves is the
+//source itself, the engine's default. A conditional line (`if ... then`) counts
+//too: an UNDER-count of the cover is the conservative direction for a survival
+//verdict, which is the only direction that cannot lie. Pure over the script.
+static bool w80EtbSelfLeavesLine(const string& low)
+{
+    const size_t at = low.find('@');
+    if (at != string::npos && low.compare(at, 27, "@movedto(this|battlefield):") != 0)
+        return false; //some other trigger: not this card's own arrival
+    if (low.find("target(") != string::npos || low.find("notatarget(") != string::npos
+        || low.find("all(") != string::npos || low.find("foreach(") != string::npos)
+        return false; //it names another object; the source is not what moves
+    if (low.find("sacrifice") != string::npos)
+        return true;
+    const size_t mv = low.find("moveto(");
+    if (mv == string::npos)
+        return false;
+    const size_t close = low.find(')', mv);
+    if (close == string::npos)
+        return false;
+    const string zone = low.substr(mv + 7, close - mv - 7);
+    return zone.find("battlefield") == string::npos && zone.find("inplay") == string::npos;
+}
+
+static bool w80CastSelfLeavesOnResolution(MTGCardInstance * card)
+{
+    if (!card || !card->isCreature())
+        return false;
+    const string raw = card->magicText;
+    size_t p = 0;
+    while (p <= raw.size())
+    {
+        const size_t nl = raw.find('\n', p);
+        string line = raw.substr(p, nl == string::npos ? string::npos : nl - p);
+        p = (nl == string::npos) ? raw.size() + 1 : nl + 1;
+        if (line.find('_') != string::npos)
+            line = AutoLineMacro::Process(line);
+        if (w80EtbSelfLeavesLine(scriptLower(line)))
+            return true;
+    }
+    return false;
+}
+
 static int castBodiesNetOfOwnText(int bodies, bool cardIsCreature,
-                                  bool legendTwinControlled)
+                                  bool legendTwinControlled,
+                                  bool selfLeavesOnResolution = false) //#W80-DF (U3)
 {
     if (bodies <= 0)
         return bodies;
     if (cardIsCreature && legendTwinControlled)
-        return bodies - 1;
+        bodies--;
+    if (cardIsCreature && selfLeavesOnResolution && bodies > 0) //#W80-DF (U3)
+        bodies--;
     return bodies;
+}
+
+//#W80-DF (U3): and what the row says INSTEAD. Deleting the cover clause without
+//a word leaves the trust doctrine's worst case - a silence the model fills with
+//an invented rule - so the row states the fact that removed it, in the cover
+//family's own register, naming the card and the line that moves it.
+static string w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal)
+{
+    if (cardName.empty() || crackTotal <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {crack-back cover: NONE from this body - " << cardName
+      << "'s own enters-the-battlefield text moves it straight back off the"
+         " battlefield as it resolves (read the card text on this row), so it is"
+         " not there to block during the CRACK-BACK NEXT TURN attack above ("
+      << crackTotal << "). This row is priced as adding no blocker at all}";
+    return o.str();
 }
 
 //#W64-AH (F11): the row's own clause. Emitted ONLY where the review's defect
@@ -28339,6 +28552,60 @@ static int w79SacrificeBlockerGiveBack(Player * me, Player * opp, MTGAbility * a
     return give > 0 ? give : 0;
 }
 
+//#W80-DF (U3, wave-79 deck146 HIGH-2). THE COVER NAMED NO MECHANISM AND WAS
+//DISBELIEVED. `146v162` seq 35, at 1 life, read `keeping all 3 of them back
+//covers 6 of that 6, leaving 0 -> you would be at 1, which you SURVIVE` beside
+//two 3/4 attackers and three 1/1 bodies, and the seat spent ~2,000 reasoning
+//characters arguing with it - "If I block 2 attackers with 2 blockers, I take 6
+//damage. I die", "Maybe the covers 6 means my blockers have enough toughness or
+//something?", and finally "I'll just follow the prompt's guidance". It was right
+//to be confused: every figure in the clause is a subtraction with no stated
+//rule, and the rule is not size, it is REDIRECTION - a blocked attacker deals
+//its combat damage to the blocker instead of to the player, whatever the two
+//bodies' sizes are (CR 510.1a/c). The clause states it once. It claims nothing
+//new; it names the mechanism its own arithmetic already uses, which is what
+//turns a number the model must take on faith into one it can check.
+static const char * w80CoverMechanismSentence()
+{
+    return " HOW A BODY REMOVES POWER FROM THAT TOTAL: an attacker that is"
+           " BLOCKED deals its combat damage to the blocker, not to you - all of"
+           " it, whatever the blocker's size, and a 1/1 in front of a 5/5 stops"
+           " the whole 5. That is why each blocker subtracts its attacker's FULL"
+           " power here, and why the blocker's own toughness does not appear in"
+           " this arithmetic (it decides whether the blocker survives, not how"
+           " much reaches you).";
+}
+
+//#W80-DF (U3, wave-79 deck130 HIGH-1 residual / DC F4 FAIL, positive half).
+//THE SPENT BLOCKER WAS PRICED ONLY ON THE ROWS THAT KILL AN ATTACKER. Wave 79's
+//give-back sentence lives INSIDE `crackBackReliefClause`, which is emitted only
+//where the row's damage kills a creature the OPPONENT controls - so on
+//`130v152` seqs 52 and 54 the nine `[cost: {1}{r}, Sacrifice]` rows under a
+//printed CRACK-BACK NEXT TURN line (six of them aimed at the seat's OWN bodies,
+//two at a face) priced no blocker at all, while the one attacker-kill row would
+//have. The Sacrifice is in the COST: it is paid whatever the row targets, so the
+//body is spent on every one of them. Same model, same arithmetic, same base as
+//the relief clause's own half (#W79-DC F4): the figure is what the lost body was
+//covering, stated against the BLOCKED best case, never subtracted from a
+//no-block projection. Emitted only where the relief clause did not already say
+//it, so no row states the fact twice.
+static string w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal,
+                                              int give, int bodies)
+{
+    if (give <= 0 || bodies <= 0 || total <= 0 || myLife < 0)
+        return "";
+    std::ostringstream o;
+    o << " {this row's cost SPENDS A BLOCKER: the Sacrifice in this row's own cost"
+         " takes one of your " << bodies << " untapped blocker"
+      << (bodies == 1 ? "" : "s")
+      << " off the board before the CRACK-BACK NEXT TURN attack above (" << total
+      << (floorTotal ? ", a FLOOR" : "")
+      << "), and that body was covering " << give << " of that total. It costs you "
+      << give << " off your best case WITH blockers - the cost is paid whatever"
+         " this row targets}";
+    return o.str();
+}
+
 static string crackBackBlockerRowTag(int total, int myLife,
                                      int checkedBodies, int uncheckedBodies,
                                      const std::vector<CrackBackAttackerFact>& atk,
@@ -28444,7 +28711,7 @@ static string crackBackBlockerRowTag(int total, int myLife,
       << (bodies == 1 ? " body" : " bodies")
       << " - a creature that arrives this turn CAN block on their turn"
          " (summoning sickness stops attacking, not blocking). Each blocker"
-         " stops at most ONE attacker.";
+         " stops at most ONE attacker." << w80CoverMechanismSentence();
     o << " CHECKED: " << checkedBodies << " of them "
       << (checkedBodies == 1 ? "is a body" : "are bodies")
       << " whose block legality against these attackers this row computed";
@@ -28585,12 +28852,14 @@ static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
     if (totalIsFloor)
         o << ". THIS IS NOT A SURVIVAL VERDICT: the total above is a FLOOR, so a"
              " larger crack-back is on the table - what this establishes is what"
-             " the bodies are worth if none of them attacks}";
+             " the bodies are worth if none of them attacks."
+          << w80CoverMechanismSentence() << "}"; //#W80-DF (U3)
     else
         o << " -> you would be at " << (myLife - left)
           << (myLife - left > 0 ? ", which you SURVIVE" : ", which still KILLS you")
           << ". Every attacker you declare without vigilance removes its own body"
-             " from that cover}";
+             " from that cover."
+          << w80CoverMechanismSentence() << "}"; //#W80-DF (U3)
     return o.str();
 }
 
@@ -38419,8 +38688,23 @@ static string duplicateVerdictTag(int cheaperRow, const string& cheaperName, int
 //the "more of YOURS than of THEIRS" comparison says out loud that it is
 //comparing bodies. With no engine among THEIRS the string is byte-identical to
 //wave 65. Pure over its four inputs.
+//#W80-DF (U7, wave-79 deck123 HIGH-1). THE MARKER ARGUED ONE SIDE. `123v162`
+//seq 42: `[<- board sweep: THEIRS 2 (including Fate Unraveler - a DRAW PUNISHER
+//...)) / YOURS 1 ...]` - the row's own clause named the seat's loss (Thraben
+//Doomsayer, a token engine) three brackets earlier, and the marker, the one
+//surface the corpus shows the pilot obeys, reduced it to the integer 1. seq 74
+//is the same shape with Bloodline Keeper. The marker is a comparison, and a
+//comparison that names one side's contents and counts the other's is an
+//argument, not a fact: the seat cast Damnation into its own engine and died two
+//turns short. Same walk, same predicate, same wording - the YOURS half now
+//names its bodies and flags any engine among them, and the BODIES-NOT-VALUE
+//sentence fires when EITHER side loses an engine (it is the same caution in
+//both directions). With no engine and no roster on either side every byte is
+//wave 66's.
 static string boardSweepMarker(int theirs, int mine, int measuredRows,
-                               const string& theirEngines = "") //#W66-AQ (H10)
+                               const string& theirEngines = "", //#W66-AQ (H10)
+                               const string& myNames = "", //#W80-DF (U7)
+                               const string& myEngines = "")
 {
     if (theirs <= 0 || measuredRows < 1)
         return "";
@@ -38428,15 +38712,32 @@ static string boardSweepMarker(int theirs, int mine, int measuredRows,
     o << " [<- board sweep: THEIRS " << theirs;
     if (!theirEngines.empty())
         o << " (including " << theirEngines << ")";
-    o << " / YOURS " << mine << " - "
+    o << " / YOURS " << mine;
+    if (mine > 0 && !myNames.empty()) //#W80-DF (U7)
+    {
+        o << " (" << myNames;
+        if (!myEngines.empty())
+            o << "; of those, " << myEngines << " - losing that is not losing a body,"
+                 " it is losing what the body keeps making";
+        o << ")";
+    }
+    o << " - "
       << (measuredRows == 1 ? "the only row on this menu that prices a board sweep"
                             : "no other row on this menu prices a bigger sweep of THEIRS");
     if (mine > theirs)
         o << " (it takes more of YOURS than of THEIRS)";
-    if (!theirEngines.empty())
-        o << ". THAT COUNT IS BODIES, NOT VALUE: what it takes of THEIRS includes"
-             " the engine(s) named above, and an engine keeps producing while it"
+    if (!theirEngines.empty() || !myEngines.empty()) //#W80-DF (U7)
+    {
+        o << ". THAT COUNT IS BODIES, NOT VALUE: what it takes";
+        if (!theirEngines.empty())
+            o << " of THEIRS includes the engine(s) named above";
+        if (!theirEngines.empty() && !myEngines.empty())
+            o << ", and what it takes";
+        if (!myEngines.empty())
+            o << " of YOURS includes the engine(s) named above";
+        o << ", and an engine keeps producing while it"
              " is on the board, so a body-for-body comparison does not price it";
+    }
     o << "]";
     return o.str();
 }
@@ -38449,7 +38750,9 @@ static string boardSweepMarker(int theirs, int mine, int measuredRows,
 static void applyBoardSweepMark(std::vector<std::string>& rows,
                                 const std::vector<int>& theirs,
                                 const std::vector<int>& mine,
-                                const std::vector<std::string> * engines = NULL) //#W66-AQ (H10)
+                                const std::vector<std::string> * engines = NULL, //#W66-AQ (H10)
+                                const std::vector<std::string> * myNames = NULL, //#W80-DF (U7)
+                                const std::vector<std::string> * myEngines = NULL)
 {
     int measured = 0, best = -1;
     for (size_t i = 0; i < rows.size() && i < theirs.size() && i < mine.size(); i++)
@@ -38467,7 +38770,11 @@ static void applyBoardSweepMark(std::vector<std::string>& rows,
         return;
     const string eng = (engines && (size_t) best < engines->size())
                        ? (*engines)[best] : string(); //#W66-AQ (H10)
-    rows[best] += boardSweepMarker(theirs[best], mine[best], measured, eng);
+    const string mn = (myNames && (size_t) best < myNames->size()) //#W80-DF (U7)
+                      ? (*myNames)[best] : string();
+    const string men = (myEngines && (size_t) best < myEngines->size())
+                       ? (*myEngines)[best] : string();
+    rows[best] += boardSweepMarker(theirs[best], mine[best], measured, eng, mn, men);
 }
 
 static void applyDuplicateEffectTags(std::vector<std::string>& rows,
@@ -40923,6 +41230,21 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //#W78-CW (S14): the counter figure, in the annotation channel.
         if (!counterFigure.empty())
             out << " {" << counterFigure << "}";
+        //#W80-DF (U3): and, on EVERY row whose cost sacrifices one of the seat's
+        //own untapped blockers under a printed CRACK-BACK NEXT TURN line, what
+        //that body was covering - not only on the rows that also kill an
+        //attacker, which is all wave 79's relief clause reached.
+        if (out.str().find("the Sacrifice in this row's own cost") == string::npos)
+        {
+            int sacBodies2 = 0;
+            const int sacGive2 = w79SacrificeBlockerGiveBack(this, opponent(),
+                                                             action.ability, sacBodies2);
+            int cbT2 = 0;
+            bool cbF2 = false;
+            if (sacGive2 > 0
+                && crackBackScreenTotal(this, opponent(), getObserver(), cbT2, cbF2))
+                out << w80SacrificeSpendsBlockerClause(cbT2, life, cbF2, sacGive2, sacBodies2);
+        }
         //#W49-D11: what paying THIS row taps. (a) A `becomes` row on a source
         //that is already tapped animates a body that cannot attack. (b) The
         //payment plan for the mana part draws on creatures or on the row's own
@@ -40948,6 +41270,26 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (src && src->isTapped() && !src->isCreature()
             && out.str().find("becomes ") != string::npos)
             out << tappedSourceAnimateClause();
+        //#W80-DF (U4, wave-79 deck152 HIGH-1). THE TAP BILL SPLIT ACROSS TWO
+        //CLAUSES. `152v125` seq 38 row 8 read `{paying this taps: Brutal Cathar,
+        //Briarbridge Tracker - they cannot attack this turn} {paying this taps:
+        //Katilda, Dawnhart Prime - it cannot attack this turn}` - three attackers
+        //spent by one row, and no clause on the row stating more than two, while
+        //the deck-152 guide's LETHAL COUNT rule counts the names inside THAT
+        //clause. The two halves are one fact (this row taps these bodies), and
+        //wave 69's K7 already ruled one fact gets one clause; it de-duplicated
+        //the SOURCE and left the two emitters. The self-tap is now folded into
+        //the same name list before the single clause is built, so a row bills
+        //its whole payment once. A row with only one of the two halves keeps
+        //every wave-79 byte.
+        const bool w80SelfTapsForCost =
+            src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts
+            && [&]() -> bool {
+                   for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
+                       if (dynamic_cast<TapCost *>(c->extraCosts->costs[i]))
+                           return true;
+                   return false;
+               }();
         string paidTapsClause; //#W69-BI (K7): read by the self-tap clause below
         if (src && c->getConvertedCost() > 0 && !c->hasX()
             && !getManaPool()->canAfford(c, src->has(Constants::ANYTYPEOFMANAABILITY)))
@@ -40976,6 +41318,14 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             //include a creature or the source itself printed the guide-keyed
             //`{paying this taps: ...}` clause TWICE. The builder is the one kept -
             //the self-tap clause below reads its text to avoid a third spelling.
+            //#W80-DF (U4): the row's own {T} cost joins the SAME list, so the
+            //clause names every body this row taps.
+            if (w80SelfTapsForCost && seen.find(src) == seen.end())
+            {
+                taps.push_back(src->getDisplayName() + " (this card itself)"
+                               + animatedThisTurnNote(src));
+                tapRestrict.push_back((int) TAP_RESTRICT_NO_ATTACK);
+            }
             paidTapsClause = paymentTapsClause(taps, tapRestrict, //#W79-DA (T7)
                                                w79UntapEngineSources(this, opponent()));
             out << paidTapsClause;
@@ -40990,12 +41340,9 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 out << cannotPayNowClause(windowReach()
                                           + getManaPool()->getConvertedCost());
         }
-        if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
+        if (w80SelfTapsForCost) //#W80-DF (U4): the same predicate, hoisted
         {
-            bool tapsSelf = false;
-            for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
-                if (dynamic_cast<TapCost *>(c->extraCosts->costs[i]))
-                    tapsSelf = true;
+            const bool tapsSelf = true;
             //#W69-BI (K7): both clauses now share one spelling, so a row whose
             //payment clause ALREADY names this source would print the same
             //sentence twice (`152v162` s25 printed the two spellings on one
@@ -41174,7 +41521,29 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             //scan applies.
             if (cards <= 0)
                 cards = abilityObjectDrawCount(action.ability);
-            if (cards > 0)
+            //#W80-DF (U6): the OTHER half of the same row's price - a discard in
+            //its own cost, read off the cost object (CycleCost / DiscardCost /
+            //DiscardRandomCost), which is what the engine actually pays and what
+            //actually fires a discard punisher.
+            int discards = 0;
+            bool cycleCost = false;
+            if (ManaCost * dc = action.ability->getCost())
+                if (dc->extraCosts)
+                    for (size_t di = 0; di < dc->extraCosts->costs.size(); di++)
+                    {
+                        ExtraCost * dec = dc->extraCosts->costs[di];
+                        if (!dec)
+                            continue;
+                        if (dynamic_cast<CycleCost *>(dec))
+                        {
+                            discards++;
+                            cycleCost = true;
+                        }
+                        else if (dynamic_cast<DiscardCost *>(dec)
+                                 || dynamic_cast<DiscardRandomCost *>(dec))
+                            discards++;
+                    }
+            if (cards > 0 || discards > 0)
             {
                 vector<string> mineP, theirsP;
                 int minePer = 0, theirsPer = 0;
@@ -41182,7 +41551,18 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 std::ostringstream names;
                 for (size_t ni = 0; ni < theirsP.size(); ni++)
                     names << (ni ? ", " : "") << theirsP[ni];
-                out << drawPriceRowTag(cards, theirsPer, names.str(), life); //#W54-C (D10)
+                std::vector<std::string> mineD, theirsD; //#W80-DF (U6)
+                int minePerD = 0, theirsPerD = 0;
+                std::ostringstream dnames;
+                if (discards > 0)
+                {
+                    discardPunisherScan(this, opponent(), mineD, minePerD, theirsD, theirsPerD);
+                    for (size_t ni = 0; ni < theirsD.size(); ni++)
+                        dnames << (ni ? ", " : "") << theirsD[ni];
+                }
+                out << drawPriceRowTag(cards, theirsPer, names.str(), life, false,
+                                       discards, theirsPerD, dnames.str(),
+                                       cycleCost); //#W80-DF (U6)
             }
         }
     }
@@ -47411,6 +47791,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     vector<int> rowUses; //#W54-C (D18): sources this row spends, -1 = unpriceable
     vector<int> rowSweepTheirs, rowSweepMine; //#W61-U (C10): the board this row clears
     vector<string> rowSweepEngines; //#W66-AQ (H10): which of THEIRS are engines
+    vector<string> rowSweepMineNames, rowSweepMineEngines; //#W80-DF (U7)
     vector<string> rowNames; //#W56-B (D15): the card each row casts
     vector<int> rowCosts; //#W56-B (D15): the converted cost it would pay, -1 = unknown ({X})
     vector<string> opts; //"Cast nothing" is appended LAST (positional
@@ -48528,10 +48909,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 }
                 cbLegendTwin = w75LegendTwinControlled(w75board, card->name);
             }
-            const int bodies = castBodiesNetOfOwnText(castBodiesAdded(card),
-                                                      card->isCreature() != 0, cbLegendTwin);
+            //#W80-DF (U3): net of a body the row's OWN resolution takes off
+            //the battlefield (Acererak's ETB bounce), too.
+            const bool cbSelfLeaves = w80CastSelfLeavesOnResolution(card);
+            const int cbRawBodies = castBodiesAdded(card);
+            const int bodies = castBodiesNetOfOwnText(cbRawBodies,
+                                                      card->isCreature() != 0, cbLegendTwin,
+                                                      cbSelfLeaves); //#W80-DF (U3)
             int cbTotal = 0;
             bool cbFloor = false;
+            if (bodies <= 0 && cbRawBodies > 0 && cbSelfLeaves //#W80-DF (U3)
+                && crackBackScreenTotal(this, opponent(), getObserver(), cbTotal, cbFloor))
+                o << w80SelfLeavesNoCoverClause(card->getDisplayName(), cbTotal);
+            cbTotal = 0;
+            cbFloor = false;
             if (bodies > 0
                 && crackBackScreenTotal(this, opponent(), getObserver(), cbTotal, cbFloor))
             {
@@ -48621,6 +49012,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         rowSweepTheirs.push_back(rowSweep.theirs); //#W61-U (C10)
         rowSweepMine.push_back(rowSweep.mine);
         rowSweepEngines.push_back(rowSweep.engines); //#W66-AQ (H10)
+        rowSweepMineNames.push_back(rowSweep.mineNames); //#W80-DF (U7)
+        rowSweepMineEngines.push_back(rowSweep.mineEngines);
         //#W56-B (D15): identity + price of this row, for the menu pass below.
         rowNames.push_back(card->name);
         {
@@ -48718,7 +49111,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W61-U (C10): and the board-sweep ranking, on the same menu copy and
         //for the same reason - a row cannot know its own number until the
         //suppression filter and any re-ask removal have settled.
-        applyBoardSweepMark(menu, rowSweepTheirs, rowSweepMine, &rowSweepEngines);
+        applyBoardSweepMark(menu, rowSweepTheirs, rowSweepMine, &rowSweepEngines,
+                            &rowSweepMineNames, &rowSweepMineEngines); //#W80-DF (U7)
         //#W56-B (D15): and the same-card/same-verdict comparison, on the same
         //menu copy and for the same reason - a row cannot know its own number
         //until the suppression filter and any re-ask removal have settled.
@@ -49124,6 +49518,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             rowSweepMine.erase(rowSweepMine.begin() + pick);
             if (pick < (int) rowSweepEngines.size()) //#W66-AQ (H10): stay parallel
                 rowSweepEngines.erase(rowSweepEngines.begin() + pick);
+            if (pick < (int) rowSweepMineNames.size()) //#W80-DF (U7): stay parallel
+                rowSweepMineNames.erase(rowSweepMineNames.begin() + pick);
+            if (pick < (int) rowSweepMineEngines.size())
+                rowSweepMineEngines.erase(rowSweepMineEngines.begin() + pick);
         }
         if (pick < (int) rowNames.size()) //#W56-B (D15): same, for the duplicate pass
             rowNames.erase(rowNames.begin() + pick);
@@ -50105,6 +50503,52 @@ static string payRepeatBandRowTag(int bandPaid)
     o << " {same effect right now: adds " << bandPaid << " counter"
       << (bandPaid == 1 ? "" : "s") << "}";
     return o.str();
+}
+
+//#W80-DF (U13, wave-79 deck152 HIGH-2). A MENU WHOSE ROWS ALL RESOLVE TO ONE
+//OUTCOME IS NOT A DECISION. `152v130` seqs 6 and 9, `152v123` seq 8, `152v162`
+//seq 10: twenty-one options on the Intrepid Adversary counter ask with ZERO
+//spendable mana, and the engine's own header already states the identity in
+//words - "With no spendable mana left, every option adds 0 counters" - while
+//row 21's clause states it in numbers ("your mana pays for 0 payments and
+//stops"). Every row adds 0 counters and spends 0 mana: they are not twenty-one
+//options, they are one option printed twenty-one times. Four of that seat's 207
+//model calls (~2%) went to it at ~100 s each.
+//THIS REMOVES NO LEGAL OPTION. The engine's option vector is untouched and every
+//row stays exactly as the engine built it; what changes is that the SEAT answers
+//it instead of paying for a model round trip to distinguish outcomes that are
+//the same outcome. The gate is proved ON THE ROW SET, not assumed: EVERY row
+//must be either an `add N counters` row the mana pays 0 of, or a `don't add any
+//counter` row - one unrecognised row, or one add-N row the mana reaches (paid >
+//0), and the menu is asked exactly as before. Returns the index to answer, or -1
+//to ask. Pure over the two vectors, so the whole table is provable without a
+//board.
+static int w80SingleOutcomeRepeatMenu(const vector<string>& optionTexts,
+                                      const vector<int>& paid)
+{
+    if (optionTexts.size() < 2 || optionTexts.size() != paid.size())
+        return -1;
+    int addRows = 0, zeroRow = -1;
+    for (size_t i = 0; i < optionTexts.size(); i++)
+    {
+        if (isAddNCountersOption(optionTexts[i]))
+        {
+            if (paid[i] != 0)
+                return -1; //this rung's mana reaches it, or was never priced
+            addRows++;
+            continue;
+        }
+        //the only other row this shape may carry is the engine's own no-op row.
+        const string low = toLowerCopy(optionTexts[i]);
+        if (low.find("don't add any counter") == string::npos
+            && low.find("dont add any counter") == string::npos)
+            return -1;
+        if (zeroRow < 0)
+            zeroRow = (int) i;
+    }
+    if (addRows < 2 || zeroRow < 0)
+        return -1;
+    return zeroRow;
 }
 
 static string payRepeatModeNote(const vector<string>& opts)
@@ -52009,6 +52453,24 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         DebugTrace("AIPlayerGPT: dropped " << (opts.size() - shownOpts.size())
                    << " display-toggle (Flip Side) row(s) from the menu; the back-face land row is offered");
         opts.swap(shownOpts);
+    }
+    //#W80-DF (U13): a menu every row of which resolves to the SAME outcome is
+    //answered here. Proved on the row set through w80SingleOutcomeRepeatMenu -
+    //every rung priced at 0 payments and no unrecognised row - so no legal option
+    //is lost: the rows are one option, printed many times. The engine's option
+    //vector and the answer index space are untouched.
+    {
+        const int w80One = w80SingleOutcomeRepeatMenu(req.optionTexts, repeatPaid);
+        if (w80One >= 0)
+        {
+            writeSingleOutcomeMenuRecord(ctxName, (int) req.optionTexts.size(), w80One,
+                                         req.optionTexts[(size_t) w80One], 0);
+            DebugTrace("AIPlayerGPT: engine-answered a " << req.optionTexts.size()
+                       << "-row repeat-pay menu whose rows all resolve to the same"
+                          " outcome (0 payments affordable); took row " << (w80One + 1));
+            act.choice = w80One;
+            return 0;
+        }
     }
     int pick = askModel(decision, opts, true, ctxName, false, false, req.canDecline); //#W62-Y (D5)
     if (pick == kChoicePending)
@@ -57052,10 +57514,39 @@ int AIPlayerGPT::chooseBlockers()
                     poisonIncoming += attackers[j]->getToxicity();
             }
         }
+        //#W80-DF (U14): the compulsory draw-step charge the SAME screen's DRAW
+        //FORECAST states. Built from the forecast's own two scans, so the two
+        //lines cannot disagree; this seam is the opponent's combat, so the
+        //seat's next draw step is entirely ahead of it (no resolved-in-step
+        //subtraction applies) and every card of it is undeclinable.
+        int w80CycleLoss = 0;
+        string w80CycleSrc;
+        {
+            std::vector<std::pair<std::string, int> > w80Extras;
+            drawStepExtrasScan(this, opponent(), w80Extras);
+            int w80Cards = 1;
+            for (size_t xi = 0; xi < w80Extras.size(); xi++)
+                w80Cards += w80Extras[xi].second;
+            vector<string> w80Mine, w80Theirs;
+            int w80MinePer = 0, w80TheirsPer = 0;
+            drawPunisherScan(this, opponent(), w80Mine, w80MinePer, w80Theirs, w80TheirsPer);
+            if (w80Cards > 0 && w80TheirsPer > 0 && !w80Theirs.empty())
+            {
+                w80CycleLoss = w80Cards * w80TheirsPer;
+                std::ostringstream sn;
+                sn << "your next draw step (" << w80Cards << " card"
+                   << (w80Cards == 1 ? "" : "s") << " into their ";
+                for (size_t ni = 0; ni < w80Theirs.size(); ni++)
+                    sn << (ni ? ", " : "") << w80Theirs[ni];
+                sn << " - see the DRAW FORECAST line above)";
+                w80CycleSrc = sn.str();
+            }
+        }
         //#W54-E (D21): the opponent's life is what makes "ahead" a fact.
         tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming,
                                      opponent() ? opponent()->life : life,
-                                     lifeLoopProvenWin(opponent())); //#W76-CO (Q3 a)
+                                     lifeLoopProvenWin(opponent()), //#W76-CO (Q3 a)
+                                     w80CycleLoss, w80CycleSrc); //#W80-DF (U14)
     }
     //#W57-B (D22): and the OTHER total this window turns on - what the seat
     //gains, and (under a converter of its own) takes off them, simply for
@@ -79681,6 +80172,9 @@ static const char * kW50Y_r94 =
         //     2 of the 3 asked for: the clause names the number it is pricing.
         const string shortClause = payRepeatTapsClause(taps, rest, 2, 3);
         CHECK(shortClause == " {paying this taps: Katilda, Dawnhart Prime, Elite Spellbinder"
+                             " (that is 2 permanents of yours - one of the names in this"
+                             " list contains a comma, so count them from this number, not"
+                             " from the commas)" //#W80-DF (U4)
                              " - they cannot attack this turn"
                              " (that is the 2 payments your mana covers, not all 3)}",
               "#W63-AE E18 POSITIVE the taps clause renders for a payment that taps attackers,"
@@ -94864,7 +95358,8 @@ static const char * kW50Y_r94 =
                 CHECK(sh == " {crack-back cover, STAY HOME: keeping all 1 of them back"
                             " covers 9 of that 17, leaving 8 -> you would be at -3, which"
                             " still KILLS you. Every attacker you declare without vigilance"
-                            " removes its own body from that cover}",
+                            " removes its own body from that cover."
+                            + string(w80CoverMechanismSentence()) + "}", //#W80-DF (U3)
                       "#W77-CS R6c REPRO/GREEN the attackers menu's stay-home side now"
                       " carries the cover family's NUMBER - RED on base, where the"
                       " CRACK-BACK COST OF ATTACKING paragraph was prose only and the"
@@ -98487,8 +98982,11 @@ static const char * kW50Y_r94 =
         names.push_back("Briarbridge Tracker");
         std::vector<int> rest(2, (int) TAP_RESTRICT_NO_ATTACK);
         const string base = paymentTapsClause(names, rest);
-        CHECK(base == " {paying this taps: Katilda, Dawnhart Prime, Briarbridge Tracker -"
-                      " they cannot attack this turn}",
+        CHECK(base == " {paying this taps: Katilda, Dawnhart Prime, Briarbridge Tracker"
+                      " (that is 2 permanents of yours - one of the names in this list"
+                      " contains a comma, so count them from this number, not from the"
+                      " commas)" //#W80-DF (U4)
+                      " - they cannot attack this turn}",
               "#W79-DA T7 RED-ON-BASE the shipped clause is the seq-17 bytes, and it is false"
               " on that board");
         const string fixed = paymentTapsClause(names, rest, "Intruder Alarm (THEIRS)");
@@ -99945,6 +100443,497 @@ static const char * kW50Y_r94 =
               "#W80-DE U10 GREEN the RESOLVING verdict states the hold row's OWN cost -"
               " `126v125` seq 46 recommended a hold over two live Sorin activations while"
               " saying only that it `covers every remaining link`");
+    }
+
+    // ================= WAVE 80 LANE DF - combat, cover and pricing truth =========
+    // Every string below was read off the wave-79 corpus
+    // `matchups-20260912-000748-final`, from the `prompt` field of the cited
+    // record - i.e. the exact bytes the model saw.
+
+    cout << "\n[#W80-DF] U3 the cover credits only bodies the row leaves, and names its mechanism\n";
+    {
+        // ---- (a) `146v162` seq 32: `2. Cast Acererak the Archlich {2}{b} (5/5)
+        // ... {crack-back cover: ... This adds 1 body ...}` on a prompt whose own
+        // narration nine lines above reads "Your Acererak the Archlich was
+        // returned to your hand from the battlefield". The card's own ETB line
+        // (borderline.txt:442) is the reason, and it is untriggered and names no
+        // other object, so what it moves is the source.
+        const string acererakEtb = "if type(tomb of annihilation[dungeoncompleted]|myzones)"
+                                   "~equalto~0 then name(return to hand) moveto(hand)";
+        CHECK(w80EtbSelfLeavesLine(acererakEtb),
+              "#W80-DF U3 the ETB line that takes the cast body straight back off the"
+              " battlefield is recognised from its own effect shape");
+        CHECK(!w80EtbSelfLeavesLine("target(creature) moveto(hand)")
+                  && !w80EtbSelfLeavesLine("notatarget(creature|mybattlefield) sacrifice")
+                  && !w80EtbSelfLeavesLine("all(creature) moveto(graveyard)"),
+              "#W80-DF U3 MUST-NOT-MATCH a line that names ANOTHER object bounces that"
+              " object, not the source - the cast body stays");
+        CHECK(!w80EtbSelfLeavesLine("@combat(attacking) source(this):moveto(hand)")
+                  && !w80EtbSelfLeavesLine("@movedto(this|battlefield):token(zombie,creature 2/2)")
+                  && !w80EtbSelfLeavesLine("@movedto(this|battlefield):moveto(mybattlefield)"),
+              "#W80-DF U3 MUST-NOT-MATCH another trigger is not this card's arrival, a token"
+              " line moves nothing, and a move ONTO the battlefield leaves the body there");
+        // RED on base: the netting function had no third dimension, so the row
+        // priced the body.
+        CHECK(castBodiesNetOfOwnText(1, true, false) == 1,
+              "#W80-DF U3 RED-ON-BASE wave 79 nets only the legend rule - Acererak's row"
+              " kept its body and the cover clause priced it");
+        CHECK(castBodiesNetOfOwnText(1, true, false, true) == 0
+                  && castBodiesNetOfOwnText(4, true, false, true) == 3
+                  && castBodiesNetOfOwnText(1, true, true, true) == 0
+                  && castBodiesNetOfOwnText(0, true, false, true) == 0,
+              "#W80-DF U3 GREEN the self-leaving body is netted out, the tokens the same"
+              " card makes are not, and the two nettings compose without going negative");
+        CHECK(w80SelfLeavesNoCoverClause("Acererak the Archlich", 6)
+                  == " {crack-back cover: NONE from this body - Acererak the Archlich's own"
+                     " enters-the-battlefield text moves it straight back off the battlefield"
+                     " as it resolves (read the card text on this row), so it is not there to"
+                     " block during the CRACK-BACK NEXT TURN attack above (6). This row is"
+                     " priced as adding no blocker at all}",
+              "#W80-DF U3 GREEN the row says WHY it prices no cover - the trust doctrine's"
+              " no-silent-omission rule: a deleted clause is a gap the model fills");
+        CHECK(w80SelfLeavesNoCoverClause("Acererak the Archlich", 0).empty()
+                  && w80SelfLeavesNoCoverClause("", 6).empty(),
+              "#W80-DF U3 MUST-NOT-MATCH with no crack-back line on the screen this row"
+              " points at nothing and says nothing");
+
+        // ---- (b) the mechanism. `146v162` seq 35 (t15, 1 life): the seat spent
+        // ~2,000 reasoning characters refusing to believe "covers 6 of that 6"
+        // ("If I block 2 attackers with 2 blockers, I take 6 damage. I die").
+        const string stayRed = " {crack-back cover, STAY HOME: keeping all 3 of them back"
+                               " covers 6 of that 6, leaving 0 -> you would be at 1, which you"
+                               " SURVIVE. Every attacker you declare without vigilance removes"
+                               " its own body from that cover}";
+        const string stayNow = w77StayHomeCoverTag(6, 1, false, 3, 6);
+        CHECK(stayNow.compare(0, stayRed.size() - 1, stayRed, 0, stayRed.size() - 1) == 0,
+              "#W80-DF U3 RED-ON-BASE the seq-35 bytes are reproduced exactly up to the point"
+              " the clause used to close - nothing wave 77 printed is removed");
+        CHECK(stayNow.find("HOW A BODY REMOVES POWER FROM THAT TOTAL: an attacker that is"
+                           " BLOCKED deals its combat damage to the blocker, not to you") != string::npos
+                  && stayNow.find("a 1/1 in front of a 5/5 stops the whole 5") != string::npos
+                  && stayNow[stayNow.size() - 1] == '}',
+              "#W80-DF U3 GREEN the stay-home clause now names the rule its own arithmetic"
+              " uses - redirection, not size - which is the sentence the seat was missing");
+        // the same sentence on the CAST row's cover clause: `146v162` seq 32's
+        // numbers (total 6 from two 3-power bodies, 1 life, one checked body).
+        std::vector<CrackBackAttackerFact> dfAtk;
+        {
+            CrackBackAttackerFact a; a.blockersNeeded = 1; a.coverable = true;
+            a.power = 3; dfAtk.push_back(a);
+            a.power = 3; dfAtk.push_back(a);
+        }
+        const string coverNow = crackBackBlockerRowTag(6, 1, 1, 0, dfAtk, false, 0, 0);
+        CHECK(coverNow.find("the CRACK-BACK NEXT TURN line above is 6 from 2 of their"
+                            " creatures and puts you at -5") != string::npos
+                  && coverNow.find("Counting only the checked bodies you cover 3 of 6,"
+                                   " leaving 3 -> you would be at -2, which still KILLS you")
+                         != string::npos,
+              "#W80-DF U3 the seq-32 cover clause is reproduced number for number");
+        CHECK(coverNow.find("Each blocker stops at most ONE attacker. HOW A BODY REMOVES"
+                            " POWER FROM THAT TOTAL:") != string::npos,
+              "#W80-DF U3 GREEN the cast row's cover clause carries the same one mechanism"
+              " sentence, in the same place, on the same family");
+
+        // ---- (c) the spent blocker, on EVERY sacrifice-cost row. `130v152` seqs
+        // 52/54 printed nine `[cost: {1}{r}, Sacrifice]` rows under a CRACK-BACK
+        // line and priced no blocker on any of them, because wave 79's give-back
+        // rides the attacker-KILL clause. On THAT board the honest price is zero -
+        // one attacker of 4 power against six standing bodies, so losing one body
+        // changes nothing - and the clause says nothing, which is the truthful
+        // answer and is pinned as such.
+        {
+            std::vector<CrackBackAttackerFact> one;
+            CrackBackAttackerFact a; a.blockersNeeded = 1; a.power = 4; a.coverable = true;
+            one.push_back(a);
+            CHECK(w79CoveredByBodies(one, 6) == 4 && w79CoveredByBodies(one, 5) == 4,
+                  "#W80-DF U3 the `130v152` seq-52 board gives back NOTHING: six standing"
+                  " bodies against one attacker, so the sixth covers nothing");
+            CHECK(w80SacrificeSpendsBlockerClause(4, 11, true, 0, 6).empty(),
+                  "#W80-DF U3 MUST-NOT-MATCH a give-back of 0 prints no clause - the fix"
+                  " does not invent a price the board does not carry");
+        }
+        CHECK(w80SacrificeSpendsBlockerClause(7, 5, false, 3, 2)
+                  == " {this row's cost SPENDS A BLOCKER: the Sacrifice in this row's own"
+                     " cost takes one of your 2 untapped blockers off the board before the"
+                     " CRACK-BACK NEXT TURN attack above (7), and that body was covering 3"
+                     " of that total. It costs you 3 off your best case WITH blockers - the"
+                     " cost is paid whatever this row targets}",
+              "#W80-DF U3 GREEN a row whose cost DOES take a standing blocker prices it,"
+              " whatever the row targets - a face row and an own-target row as much as a"
+              " kill row");
+        CHECK(w80SacrificeSpendsBlockerClause(7, 5, true, 3, 2).find("(7, a FLOOR)") != string::npos,
+              "#W80-DF U3 ...and it says which number it is subtracting from when the line"
+              " above calls that number a floor (#W65-AL G4, unchanged)");
+        CHECK(w80SacrificeSpendsBlockerClause(7, 5, false, 3, 2)
+                  .find("that projection assumes you declare NO blocks") == string::npos
+                  && w80SacrificeSpendsBlockerClause(7, 5, false, 3, 2)
+                         .find("KILLS you") == string::npos,
+              "#W80-DF U3 MUST-NOT-MATCH #W79-DC (F4)'s ruling holds here too: the spent"
+              " body is stated against the BLOCKED best case and states no death verdict,"
+              " because a sacrifice cannot make the no-block projection worse");
+    }
+
+    cout << "\n[#W80-DF] U4 one tap bill per row, naming every body the row taps\n";
+    {
+        // `152v125` seq 38 row 8: `put 1/1 counters with Katilda, Dawnhart Prime
+        // [cost: {4}{g}{w}, Tap] {paying this taps: Brutal Cathar, Briarbridge
+        // Tracker - they cannot attack this turn} {paying this taps: Katilda,
+        // Dawnhart Prime - it cannot attack this turn}` - three attackers spent,
+        // no clause naming more than two, and the deck-152 guide's LETHAL COUNT
+        // rule counts the names inside that clause.
+        std::vector<std::string> mana;
+        mana.push_back("Brutal Cathar");
+        mana.push_back("Briarbridge Tracker");
+        std::vector<int> manaRest(2, (int) TAP_RESTRICT_NO_ATTACK);
+        const string half1 = paymentTapsClause(mana, manaRest);
+        const string half2 = tapCostBeforeCombatClause("Katilda, Dawnhart Prime");
+        const string redRow = "put 1/1 counters with Katilda, Dawnhart Prime"
+                              " [cost: {4}{g}{w}, Tap]" + half1 + half2;
+        CHECK(half1 == " {paying this taps: Brutal Cathar, Briarbridge Tracker - they cannot"
+                       " attack this turn}"
+                  && half2 == " {paying this taps: Katilda, Dawnhart Prime - it cannot attack"
+                              " this turn}",
+              "#W80-DF U4 RED-ON-BASE the seq-38 row's two clauses are reproduced byte for"
+              " byte from the two emitters that built them");
+        {
+            size_t n = 0;
+            for (size_t i = redRow.find("{paying this taps: "); i != string::npos;
+                 i = redRow.find("{paying this taps: ", i + 1))
+                n++;
+            CHECK(n == 2,
+                  "#W80-DF U4 RED-ON-BASE ...and the row really does carry the bill TWICE,"
+                  " which is the shape the count rule cannot read");
+        }
+        // GREEN: one list, one clause, every tapped body named, and the count
+        // stated because one of the names contains a comma.
+        std::vector<std::string> merged(mana);
+        merged.push_back("Katilda, Dawnhart Prime (this card itself)");
+        std::vector<int> mergedRest(3, (int) TAP_RESTRICT_NO_ATTACK);
+        const string green = paymentTapsClause(merged, mergedRest);
+        CHECK(green == " {paying this taps: Brutal Cathar, Briarbridge Tracker, Katilda,"
+                       " Dawnhart Prime (this card itself) (that is 3 permanents of yours -"
+                       " one of the names in this list contains a comma, so count them from"
+                       " this number, not from the commas) - they cannot attack this turn}",
+              "#W80-DF U4 GREEN one clause names all three bodies and states its own count,"
+              " because the comma inside `Katilda, Dawnhart Prime` makes the list uncountable"
+              " by reading it");
+        {
+            size_t n = 0;
+            for (size_t i = green.find("{paying this taps: "); i != string::npos;
+                 i = green.find("{paying this taps: ", i + 1))
+                n++;
+            CHECK(n == 1, "#W80-DF U4 GREEN exactly one tap bill on the row");
+        }
+        // MUST-NOT-MATCH: no comma in any name, or a single name, and every wave-79
+        // byte stands.
+        std::vector<std::string> plain;
+        plain.push_back("Brutal Cathar");
+        plain.push_back("Briarbridge Tracker");
+        CHECK(paymentTapsClause(plain, manaRest)
+                  == " {paying this taps: Brutal Cathar, Briarbridge Tracker - they cannot"
+                     " attack this turn}"
+                  && paymentTapsClause(std::vector<std::string>(1, "Katilda, Dawnhart Prime"),
+                                       std::vector<int>(1, (int) TAP_RESTRICT_NO_ATTACK))
+                         == " {paying this taps: Katilda, Dawnhart Prime - it cannot attack"
+                            " this turn}",
+              "#W80-DF U4 MUST-NOT-MATCH a countable list, and a one-name list, are"
+              " byte-identical to wave 79 - the count fires only where reading the commas"
+              " gives the wrong answer");
+    }
+
+    cout << "\n[#W80-DF] U6 a cycling row prices the DISCARD as well as the draw\n";
+    {
+        // `130v162` seq 35 (t?, 19 life), the row the seat took:
+        const string red = drawPriceRowTag(1, 1, "Underworld Dreams", 19);
+        CHECK(red == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                     " punishes every draw, so taking it costs you 1 life right now - you"
+                     " would be at 18]",
+              "#W80-DF U6 RED-ON-BASE the seq-35 bytes are reproduced exactly - one life"
+              " charged on a screen whose DISCARD PUNISHERS paragraph named a 2-life"
+              " discard punisher");
+        const string green = drawPriceRowTag(1, 1, "Underworld Dreams", 19, false,
+                                             1, 2, "Liliana's Caress", true);
+        CHECK(green == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams"
+                       " punishes every draw, so taking it costs you 1 life right now; AND"
+                       " paying this row's cost DISCARDS 1 card (a CYCLING cost is a discard"
+                       " as well as a draw - the card you cycle is discarded to pay for it),"
+                       " and the opponent's Liliana's Caress punishes every card you discard,"
+                       " for 2 more - 3 life from this row in total - you would be at 16]",
+              "#W80-DF U6 GREEN the row's whole price, in one bracket, with one resulting"
+              " life - the 3 the engine actually charges");
+        CHECK(drawPriceRowTag(1, 1, "Underworld Dreams", 3, false, 1, 2,
+                              "Liliana's Caress", true).find("you would be at 0; this KILLS you")
+                  != string::npos,
+              "#W80-DF U6 GREEN the lethality tail reads off the FOLDED total, so a cycle"
+              " that kills says so");
+        // discard-only: no draw punisher on the board at all.
+        CHECK(drawPriceRowTag(1, 0, "", 19, false, 1, 2, "Liliana's Caress", true)
+                  == " [DRAW PRICE: paying this row's cost DISCARDS 1 card (a CYCLING cost is"
+                     " a discard as well as a draw - the card you cycle is discarded to pay"
+                     " for it), and the opponent's Liliana's Caress punishes every card you"
+                     " discard, for 2 more - you would be at 17]",
+              "#W80-DF U6 GREEN a discard with no draw punisher out is priced on its own -"
+              " wave 79 printed nothing at all for it");
+        CHECK(drawPriceRowTag(1, 1, "Underworld Dreams", 19, false, 0, 2, "Liliana's Caress")
+                  == red
+                  && drawPriceRowTag(1, 1, "Underworld Dreams", 19, false, 1, 0,
+                                     "Liliana's Caress") == red
+                  && drawPriceRowTag(1, 1, "Underworld Dreams", 19, false, 1, 2, "") == red,
+              "#W80-DF U6 MUST-NOT-MATCH no discard in the cost, no discard punisher, or an"
+              " unnamed one, and every wave-79 byte stands");
+        CHECK(drawPriceRowTag(0, 3, "Underworld Dreams", 19).empty()
+                  && drawPriceRowTag(1, 3, "", 19).empty()
+                  && drawPriceRowTag(0, 0, "", 19, false, 0, 0, "").empty(),
+              "#W80-DF U6 MUST-NOT-MATCH with neither half live the tag is absent, exactly"
+              " as it was");
+    }
+
+    cout << "\n[#W80-DF] U7 the board-sweep marker names BOTH sides' losses\n";
+    {
+        // `123v162` seq 42 row 4 (Damnation), the marker as it shipped:
+        const string fateEngine = "Fate Unraveler - a DRAW PUNISHER (it bills every card the"
+                                  " other player draws)";
+        const string red = boardSweepMarker(2, 1, 1, fateEngine);
+        CHECK(red == " [<- board sweep: THEIRS 2 (including Fate Unraveler - a DRAW PUNISHER"
+                     " (it bills every card the other player draws)) / YOURS 1 - the only row"
+                     " on this menu that prices a board sweep. THAT COUNT IS BODIES, NOT"
+                     " VALUE: what it takes of THEIRS includes the engine(s) named above, and"
+                     " an engine keeps producing while it is on the board, so a body-for-body"
+                     " comparison does not price it]",
+              "#W80-DF U7 RED-ON-BASE the seq-42 marker is reproduced byte for byte: THEIRS"
+              " is named and characterised, YOURS is the integer 1");
+        const string doomsayer = "Thraben Doomsayer - a TOKEN ENGINE (it makes more"
+                                 " permanents, one per activation)";
+        const string green = boardSweepMarker(2, 1, 1, fateEngine, "Thraben Doomsayer",
+                                              doomsayer);
+        CHECK(green.find("/ YOURS 1 (Thraben Doomsayer; of those, Thraben Doomsayer - a TOKEN"
+                         " ENGINE (it makes more permanents, one per activation) - losing that"
+                         " is not losing a body, it is losing what the body keeps making)")
+                  != string::npos,
+              "#W80-DF U7 GREEN the seat's own loss is named on the marker, with the same"
+              " engine predicate the other side's half uses");
+        CHECK(green.find("what it takes of THEIRS includes the engine(s) named above, and what"
+                         " it takes of YOURS includes the engine(s) named above, and an engine"
+                         " keeps producing") != string::npos,
+              "#W80-DF U7 GREEN the BODIES-NOT-VALUE caution now covers both sides - it is"
+              " the same caution in both directions");
+        // `123v162` seq 74: no engine of theirs, one maker of the seat's.
+        const string bk = "Bloodline Keeper - a TOKEN ENGINE (it makes more permanents, one"
+                          " per activation)";
+        const string seq74 = boardSweepMarker(1, 1, 1, "", "Bloodline Keeper", bk);
+        CHECK(seq74 == " [<- board sweep: THEIRS 1 / YOURS 1 (Bloodline Keeper; of those,"
+                       " Bloodline Keeper - a TOKEN ENGINE (it makes more permanents, one per"
+                       " activation) - losing that is not losing a body, it is losing what the"
+                       " body keeps making) - the only row on this menu that prices a board"
+                       " sweep. THAT COUNT IS BODIES, NOT VALUE: what it takes of YOURS"
+                       " includes the engine(s) named above, and an engine keeps producing"
+                       " while it is on the board, so a body-for-body comparison does not"
+                       " price it]",
+              "#W80-DF U7 GREEN the seq-74 row - `THEIRS 1 / YOURS 1` with no editorial at"
+              " all on base - now names what the seat gives up");
+        CHECK(boardSweepMarker(2, 1, 1) == " [<- board sweep: THEIRS 2 / YOURS 1 - the only"
+                                           " row on this menu that prices a board sweep"
+                                           "]"
+                  && boardSweepMarker(2, 0, 1, "", "", "")
+                         .find("/ YOURS 0 -") != string::npos,
+              "#W80-DF U7 MUST-NOT-MATCH with no roster on either side every byte is wave"
+              " 66's, and a sweep that takes none of YOURS names nobody");
+        CHECK(boardSweepMarker(0, 2, 1, fateEngine).empty()
+                  && boardSweepMarker(3, 1, 0, fateEngine).empty(),
+              "#W80-DF U7 MUST-NOT-MATCH the marker's own gates are untouched");
+    }
+
+    cout << "\n[#W80-DF] U13 a menu whose rows all resolve to one outcome is engine-answered\n";
+    {
+        // `152v130` seqs 6 and 9, `152v123` seq 8, `152v162` seq 10: 21 options,
+        // 0 spendable mana. The engine's own header already states the identity
+        // ("With no spendable mana left, every option adds 0 counters").
+        std::vector<string> menu;
+        std::vector<int> paid;
+        menu.push_back("don't add any counter");
+        paid.push_back(-1);
+        for (int n = 1; n <= 20; n++)
+        {
+            std::ostringstream r;
+            r << "add " << n << " counter" << (n == 1 ? "" : "s");
+            menu.push_back(r.str());
+            paid.push_back(0);
+        }
+        CHECK(menu.size() == 21 && payRepeatModeNote(menu)
+                                       .find("every option adds 0 counters") != string::npos,
+              "#W80-DF U13 the corpus menu is rebuilt from the engine's own labels - 21 rows,"
+              " and the header that already says they are one outcome");
+        CHECK(w80SingleOutcomeRepeatMenu(menu, paid) == 0,
+              "#W80-DF U13 GREEN the engine answers it, on row 1 - the rows are one option"
+              " printed twenty-one times, so no legal option is lost");
+        // `152v146` seq 13: 3 mana spendable, the annotation reads `pays for 1 of
+        // them` - that window IS a decision and must still be asked.
+        {
+            std::vector<int> payOne(paid);
+            for (size_t i = 1; i < payOne.size(); i++)
+                payOne[i] = 1;
+            CHECK(w80SingleOutcomeRepeatMenu(menu, payOne) == -1,
+                  "#W80-DF U13 MUST-NOT-MATCH `152v146` seq 13 - one payment affordable means"
+                  " row 1 (0 counters) and the rest (1 counter) differ, so the seat is asked");
+        }
+        {
+            std::vector<int> mixed(paid);
+            mixed[3] = 2;
+            CHECK(w80SingleOutcomeRepeatMenu(menu, mixed) == -1,
+                  "#W80-DF U13 MUST-NOT-MATCH one rung the mana reaches, and the whole menu"
+                  " is asked - the gate is proved on the ROW SET, never on a majority");
+        }
+        {
+            std::vector<string> extra(menu);
+            std::vector<int> extraPaid(paid);
+            extra.push_back("Cast Intrepid Adversary {1}{w}");
+            extraPaid.push_back(-1);
+            CHECK(w80SingleOutcomeRepeatMenu(extra, extraPaid) == -1,
+                  "#W80-DF U13 MUST-NOT-MATCH one row this gate cannot read as the same"
+                  " outcome, and it declines to answer - it never guesses at a row's effect");
+        }
+        {
+            std::vector<string> two;
+            std::vector<int> twoPaid;
+            two.push_back("don't add any counter"); twoPaid.push_back(-1);
+            two.push_back("add 1 counter"); twoPaid.push_back(0);
+            CHECK(w80SingleOutcomeRepeatMenu(two, twoPaid) == -1,
+                  "#W80-DF U13 MUST-NOT-MATCH fewer than two rungs is not the collapsed shape"
+                  " this gate was proved on, and it is asked");
+            std::vector<string> noZero;
+            std::vector<int> noZeroPaid;
+            noZero.push_back("add 1 counter"); noZeroPaid.push_back(0);
+            noZero.push_back("add 2 counters"); noZeroPaid.push_back(0);
+            CHECK(w80SingleOutcomeRepeatMenu(noZero, noZeroPaid) == -1,
+                  "#W80-DF U13 MUST-NOT-MATCH with no engine row to answer ON, the seat asks"
+                  " rather than picking a rung of its own");
+        }
+        CHECK(w80SingleOutcomeRepeatMenu(menu, std::vector<int>(3, 0)) == -1,
+              "#W80-DF U13 MUST-NOT-MATCH a paid vector that does not line up with the rows"
+              " proves nothing and answers nothing");
+    }
+
+    cout << "\n[#W80-DF] U14 the blockers verdict includes the compulsory draw-step charge\n";
+    {
+        // `146v162` seq 29 (t?, 4 life), the two lines on one screen.
+        const string red = combatDamageForecast(4, 0, 3, 0, 13, false);
+        CHECK(red == "Your life: 4. Unblocked, these attackers deal up to 3 - you would be at"
+                     " 1 - NOT lethal: block only where the trade favors you.\n",
+              "#W80-DF U14 RED-ON-BASE the seq-29 header is reproduced byte for byte - `NOT"
+              " lethal` beside a DRAW FORECAST charging 3 on a 4-life seat");
+        const string src = "your next draw step (1 card into their Underworld Dreams, Fate"
+                           " Unraveler, Ob Nixilis, the Hate-Twisted - see the DRAW FORECAST"
+                           " line above)";
+        const string green = combatDamageForecast(4, 0, 3, 0, 13, false, 3, src);
+        CHECK(green.find("- NOT lethal FROM THE COMBAT ALONE, and that is not a survival"
+                         " verdict: " + src + " costs you 3 more life before you act again,"
+                         " and it is COMPULSORY - no row on any menu declines it. 1 - 3 = -2,"
+                         " so taking this swing in full LOSES THE GAME this turn cycle.")
+                  != string::npos
+                  && green.find("Unblocked, these attackers deal up to 3 - you would be at 1")
+                         != string::npos,
+              "#W80-DF U14 GREEN the combat subtraction still prints in full, and the verdict"
+              " is computed over the charge the same screen calls undeclinable");
+        CHECK(green.find("taking damage while ahead on LIFE is often correct") == string::npos,
+              "#W80-DF U14 GREEN the take-the-damage hint goes with the withdrawn verdict"
+              " (#W54-E D21's own reasoning)");
+        CHECK(combatDamageForecast(20, 0, 3, 0, 13, false, 3, src)
+                  == combatDamageForecast(20, 0, 3, 0, 13, false),
+              "#W80-DF U14 MUST-NOT-MATCH a charge that does NOT reach 0 changes nothing -"
+              " the clause fires only where the cycle kills and the combat does not");
+        CHECK(combatDamageForecast(3, 0, 3, 0, 13, false, 3, src)
+                  == combatDamageForecast(3, 0, 3, 0, 13, false)
+                  && combatDamageForecast(3, 0, 3, 0, 13, false, 3, src)
+                         .find("LETHAL if it all connects") != string::npos,
+              "#W80-DF U14 MUST-NOT-MATCH a swing that is already lethal keeps the wave-79"
+              " wording - there is no second verdict to give");
+        CHECK(combatDamageForecast(4, 0, 3, 0, 13, false, 0, src) == red,
+              "#W80-DF U14 MUST-NOT-MATCH no draw punisher on the board, no charge, and"
+              " every wave-79 byte stands");
+    }
+
+    cout << "\n[#W80-DF] KEY every wave-80 DF clause is outside the ask, async-slot and hold keys\n";
+    {
+        // The JOINED menu: one acting row and the hold row beside it, rendered
+        // twice with ONLY this wave's numbers different (#W74's rule).
+        std::vector<CrackBackAttackerFact> atk;
+        {
+            CrackBackAttackerFact a; a.blockersNeeded = 1; a.coverable = true;
+            a.power = 3; atk.push_back(a);
+            a.power = 3; atk.push_back(a);
+        }
+        std::vector<std::string> taps;
+        taps.push_back("Brutal Cathar");
+        taps.push_back("Katilda, Dawnhart Prime (this card itself)");
+        std::vector<int> rest(2, (int) TAP_RESTRICT_NO_ATTACK);
+        const string rowA = "Cast Acererak the Archlich {2}{b}"
+                            + leavesUntappedTag(6, 3)
+                            + crackBackBlockerRowTag(6, 1, 1, 0, atk, false, 0, 0)
+                            + paymentTapsClause(taps, rest)
+                            + drawPriceRowTag(1, 1, "Underworld Dreams", 19)
+                            + w80SacrificeSpendsBlockerClause(7, 5, false, 3, 2);
+        const string rowB = "Cast Acererak the Archlich {2}{b}"
+                            + leavesUntappedTag(6, 3)
+                            + w80SelfLeavesNoCoverClause("Acererak the Archlich", 6)
+                            + paymentTapsClause(taps, rest)
+                            + drawPriceRowTag(1, 1, "Underworld Dreams", 19, false,
+                                              1, 2, "Liliana's Caress", true)
+                            + w80SacrificeSpendsBlockerClause(9, 5, true, 4, 3);
+        const string hold = "Hold priority - pass now, and do not ask me again";
+        CHECK(rowA != rowB,
+              "#W80-DF KEY the pair really does differ in the rendered bytes this wave adds");
+        std::vector<string> menuA, menuB;
+        menuA.push_back(rowA); menuA.push_back(hold);
+        menuB.push_back(rowB); menuB.push_back(hold);
+        CHECK(optionSetKeyOf(menuA) == optionSetKeyOf(menuB),
+              "#W80-DF KEY the option-set key of the JOINED menu is identical");
+        CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(rowB),
+              "#W80-DF KEY the hold-latch ACTION key is identical - a taken hold is not"
+              " re-opened by any number this wave prints");
+        {
+            std::set<string> latchA, latchB;
+            for (size_t i = 0; i < menuA.size(); i++)
+                latchA.insert(holdActionKeyRow(menuA[i]));
+            for (size_t i = 0; i < menuB.size(); i++)
+                latchB.insert(holdActionKeyRow(menuB[i]));
+            CHECK(latchA == latchB,
+                  "#W80-DF KEY the whole latched row SET is identical across the pair, built"
+                  " the way the live seam builds it");
+        }
+        const string tailA = "\n1. " + rowA + "\n2. " + hold + "\n";
+        const string tailB = "\n1. " + rowB + "\n2. " + hold + "\n";
+        CHECK(w77KeyTailOf(tailA) == w77KeyTailOf(tailB),
+              "#W80-DF KEY the ASK key's and the ASYNC SLOT's half of the rendered list is"
+              " identical - every clause this wave touches is one balanced group");
+        CHECK(w77KeyTailOf(tailA).find("crack-back cover") == string::npos
+                  && w77KeyTailOf(tailA).find("paying this taps") == string::npos
+                  && w77KeyTailOf(tailA).find("DRAW PRICE") == string::npos
+                  && w77KeyTailOf(tailA).find("SPENDS A BLOCKER") == string::npos,
+              "#W80-DF KEY MUST-NOT-MATCH none of this wave's clause bodies survives into"
+              " the key");
+        CHECK(w77KeyTailOf(tailA).find("cast acererak the archlich {2}{b}") != string::npos,
+              "#W80-DF KEY the ACTION and its cost pips DO survive - the question is"
+              " unchanged, not erased");
+        // The board-sweep marker is a `[<- ...]` group on a menu row: pinned the
+        // same way, since it carries a board-derived count and now a roster.
+        {
+            const string sweepA = "Cast Damnation {2}{b}{b}"
+                                  + boardSweepMarker(2, 1, 1, "Fate Unraveler - a DRAW"
+                                                     " PUNISHER (it bills every card the"
+                                                     " other player draws)");
+            const string sweepB = "Cast Damnation {2}{b}{b}"
+                                  + boardSweepMarker(3, 2, 1, "", "Thraben Doomsayer",
+                                                     "Thraben Doomsayer - a TOKEN ENGINE (it"
+                                                     " makes more permanents, one per"
+                                                     " activation)");
+            std::vector<string> sA, sB;
+            sA.push_back(sweepA); sA.push_back(hold);
+            sB.push_back(sweepB); sB.push_back(hold);
+            CHECK(sweepA != sweepB && optionSetKeyOf(sA) == optionSetKeyOf(sB)
+                      && holdActionKeyRow(sweepA) == holdActionKeyRow(sweepB),
+                  "#W80-DF KEY the board-sweep marker's new roster is outside the option-set"
+                  " and hold-latch keys too");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

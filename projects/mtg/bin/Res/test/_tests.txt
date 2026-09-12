@@ -1414,3 +1414,4 @@ w79da_t5_trample_soak_decline.txt
 w79da_t5_trample_soak_block.txt
 w79dc_f3_doublestrike_trample_two_steps.txt
 w79dc_f3_firststrike_blocker_kills_trampler.txt
+w80df_u6_cycling_is_discard_and_draw.txt
