@@ -620,6 +620,146 @@ static size_t w78UnitSafeCut(const string& text, size_t at)
     return (open == 0) ? at : open;
 }
 
+//#W79-DB (T11a, wave-78 deck125 B-1): THE CUT KEPT THE DECORATION AND DROPPED
+//THE DECISION. `125v146` seq 51 offered Triumphant Adventurer as a Path target
+//under `{target text: "Deathtouch -- As long as it's your turn, Triumphant
+//Adventurer has first strike. (...more)"}` - the clause behind the marker is
+//"Whenever Triumphant Adventurer attacks, venture into the dungeon", the ONLY
+//clause the seat's own guide step reads, and the seat Pathed a 1/1 deathtoucher
+//over a 3/2. The cut was clause-clean and marked; it was simply always the wrong
+//half, because the wave-78 rule takes the LARGEST prefix that fits and a card
+//prints its keywords first. So clauses are chosen by PRIORITY within the cap -
+//triggered and activated abilities before keyword/static text - and printed back
+//in their ORIGINAL order, with the omission marked exactly as before. Nothing is
+//invented and nothing is re-ordered on the page.
+//Is this clause one the reader makes a decision on? Pure over the clause text.
+static bool w79DecisionBearingClause(const string& clause)
+{
+    size_t s = clause.find_first_not_of(" \t");
+    if (s == string::npos)
+        return false;
+    const string c = clause.substr(s);
+    static const char * kLeads[] = {
+        "Whenever ", "When ", "At the beginning of ", "At end of ", "Coven - ",
+        "Coven -- ", "{T}:", "{Q}:"
+    };
+    for (size_t i = 0; i < sizeof(kLeads) / sizeof(kLeads[0]); i++)
+        if (c.compare(0, strlen(kLeads[i]), kLeads[i]) == 0)
+            return true;
+    //"venture into the dungeon" is a decision the guides key on. The WHOLE
+    //phrase, never the bare stem: "Ad-venture-r" is in the name of the very card
+    //this item is about (Triumphant Adventurer), and the bare stem made its
+    //keyword clause read as decision-bearing.
+    if (c.find("venture into") != string::npos)
+        return true;
+    //An ACTIVATED ability: a cost, then a colon, inside the clause's own head.
+    //`{1}{G}: Level 2`, `{2},{T}: You gain 5 life`, `-3: Destroy ...`, `+1: ...`.
+    const size_t colon = c.find(": ");
+    if (colon != string::npos && colon <= 24)
+    {
+        const string head = c.substr(0, colon);
+        if (head.find('{') != string::npos
+            || (head.size() > 1 && (head[0] == '+' || head[0] == '-')
+                && isdigit((unsigned char) head[1])))
+            return true;
+    }
+    return false;
+}
+
+//The clause-priority render itself. Returns "" when it has nothing to say (fewer
+//than two depth-0 clauses, or every clause already fits, or no reordering of the
+//SELECTION changes what the wave-78 rule would have kept).
+static string w79ClausePrioritySnippet(const string& text, size_t maxLen)
+{
+    static const string sep = " -- ";
+    std::vector<int> depth;
+    w78UnitDepths(text, depth);
+    std::vector<string> parts;
+    size_t at = 0;
+    for (size_t i = 0; i + sep.size() <= text.size(); i++)
+    {
+        if (depth[i] || text.compare(i, sep.size(), sep) != 0)
+            continue;
+        parts.push_back(text.substr(at, i - at));
+        at = i + sep.size();
+        i += sep.size() - 1;
+    }
+    if (parts.empty())
+        return string();
+    parts.push_back(text.substr(at));
+    //Select: decision-bearing clauses first, then the rest, each in its own
+    //original order; a clause that does not fit is skipped, never cut.
+    std::vector<bool> keep(parts.size(), false);
+    size_t used = 0, kept = 0;
+    for (int tier = 1; tier >= 0; tier--)
+    {
+        for (size_t i = 0; i < parts.size(); i++)
+        {
+            if (keep[i] || (w79DecisionBearingClause(parts[i]) ? 1 : 0) != tier)
+                continue;
+            const size_t cost = parts[i].size() + (kept ? sep.size() : 0);
+            if (used + cost > maxLen)
+                continue;
+            keep[i] = true;
+            used += cost;
+            kept++;
+        }
+    }
+    if (!kept || kept == parts.size())
+        return string(); //nothing fits, or everything does: the caller's rule stands
+    std::ostringstream o;
+    bool first = true;
+    for (size_t i = 0; i < parts.size(); i++)
+    {
+        if (!keep[i])
+            continue;
+        o << (first ? "" : sep) << parts[i];
+        first = false;
+    }
+    o << " (...more)";
+    return o.str();
+}
+
+//#W79-DB (T11b, wave-78 deck162 MED-2): the WORD cut's two residuals. The
+//fallback (no clause boundary fits, and backing out of the unit would leave
+//nothing) ended on a bare `...` with no omission marker - `146` seq 17 Barrowin,
+//`152` seq 8/19 Sigarda - and, when the text OPENS with a parenthetical, left
+//the `(` unclosed: `152` seq 22 Ranger Class rendered `(Gain the next level as a
+//sorcery to add...`. Both are fixed at the one site: the kept prefix is closed
+//(one `)` per unclosed `(`, one `"` for an open quote, innermost first) and the
+//cut is MARKED like every other omission this file makes.
+static string w79CloseOpenUnits(const string& kept)
+{
+    std::vector<int> depth;
+    w78UnitDepths(kept, depth);
+    if (!depth[kept.size()])
+        return string(); //balanced: nothing to close
+    string close;
+    int parens = 0;
+    bool inQuote = false;
+    for (size_t i = 0; i < kept.size(); i++)
+    {
+        const char c = kept[i];
+        if (inQuote)
+        {
+            if (c == '"')
+                inQuote = false;
+            continue;
+        }
+        if (c == '"')
+            inQuote = true;
+        else if (c == '(')
+            parens++;
+        else if (c == ')' && parens > 0)
+            parens--;
+    }
+    if (inQuote)
+        close += "\"";
+    for (int i = 0; i < parens; i++)
+        close += ")";
+    return close;
+}
+
 //The FIRST clause boundary at any position - the one a bounded stretch may
 //reach for when nothing fits inside the budget. Without it the single-clause
 //shapes (Howling Mine's 111-byte sentence against an 85-byte tier) have no
@@ -657,6 +797,28 @@ static bool w78KeepCandidateStands(int payableSources, int untappedSources)
 //silently priced. Force of Will's pitch has no mana component, so no forecast can
 //price it; what the clause can honestly say is that the printed cost is not the only
 //way to cast the card.
+//#W79-DB (T8, wave-78 deck125 A-2(b) / CY F9): THE HELD ANSWER IS NOT THE
+//CHEAPEST INSTANT. `125v130` seq 315 read `Holding up an instant: Path to Exile
+//{w} needs 1: the largest X that still leaves it castable this turn is X=8` with
+//Essence Scatter, Cancel and Dream Fracture all in hand - the clause exists to
+//price the TAP-OUT GATE, and a draw-go seat's gate is "can I still hold up my
+//counter", never "can I still hold up my removal". 47 renders on that seat, 10
+//of them naming Path to Exile. So a COUNTERSPELL in hand outranks a cheaper
+//non-counter instant, and the clause says which it is. The counter's price is its
+//PRINTED cost priced through the same forecast every other candidate uses -
+//whether or not it has a target right now, because a counter never has one on
+//the seat's own turn (`discardDeadTargetClause` states the same rule).
+//Pure over the script, like `w78ConditionalCounterScript` beside it.
+static bool w79CounterspellScript(const string& magicText)
+{
+    if (magicText.empty())
+        return false;
+    string lc = magicText;
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    return lc.find("fizzle") != string::npos;
+}
+
 static string w78KeepCostText(const string& printedCost, bool hasAlternative)
 {
     if (!hasAlternative || printedCost.empty())
@@ -796,6 +958,17 @@ string textSnippetCore(const string& raw, size_t maxLen, bool completeClause /* 
         //clause's own end, at most kClauseCompleteStretch bytes past it. The
         //omission is MARKED, so the reader is never handed a fragment that
         //reads as the card's whole text.
+        //#W79-DB (T11a): ...and WHICH clauses, by priority rather than by
+        //position. Only on the whole-text path (`completeClause`): the per-clause
+        //budgets `boardEffectSnippet` shares out hand this function a single
+        //clause, and its own last-resort call passes false, so neither can be
+        //re-ordered by this.
+        if (completeClause)
+        {
+            const string byPriority = w79ClausePrioritySnippet(text, maxLen);
+            if (!byPriority.empty())
+                return byPriority;
+        }
         const size_t cc = w78ClauseCutAtOrBefore(text, maxLen);
         if (cc > 0 && cc < text.size())
             return text.substr(0, cc) + " (...more)";
@@ -844,7 +1017,12 @@ string textSnippetCore(const string& raw, size_t maxLen, bool completeClause /* 
                 text = text.substr(0, safeCut) + " (...more)";
         }
         else if (cut < text.size())
-            text = text.substr(0, cut) + "...";
+        {
+            //#W79-DB (T11b): a mid-clause cut still shows its `...`, then closes
+            //whatever unit it left open and says that text was omitted.
+            const string kept = text.substr(0, cut);
+            text = kept + "..." + w79CloseOpenUnits(kept) + " (...more)";
+        }
     }
     return text;
 }
@@ -7717,7 +7895,8 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
                                      int totalMana = -1,
                                      bool keepIsAnotherCopy = false,
                                      const string& instName = string(),  //#W78-CW (S14)
-                                     const string& instCost = string(), int instNeed = -1)
+                                     const string& instCost = string(), int instNeed = -1,
+                                     bool instIsCounter = false) //#W79-DB (T8)
 {
     if (maxX < 0)
         return "";
@@ -7759,7 +7938,10 @@ static string xCastRemainderScopeTag(int maxX, int baseCMC, bool colouredX,
     //read as two separate holds.
     if (!instName.empty() && instNeed >= 0)
     {
-        o << ". Holding up an instant: " << instName;
+        //#W79-DB (T8): a counterspell is named as one - it is the card the gate
+        //is about, and "an instant" is what let Path to Exile stand in for it.
+        o << (instIsCounter ? ". Holding up a counterspell: "
+                            : ". Holding up an instant: ") << instName;
         if (!instCost.empty())
             o << " " << instCost;
         o << " needs " << instNeed << ": ";
@@ -8171,6 +8353,17 @@ const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolByte
 static bool w78LabelAbsentCounted(const char * devClass, bool handedToHeuristic)
 {
     return handedToHeuristic && devClass && string(devClass) == "answer_label_absent";
+}
+
+//#W79-DB (T1, MEASURE ONLY): the recovery record's own join key. A `recovery`
+//record names its fallback CLASS (`unparsed_reply` on all six wave-78 S1
+//instances) and nothing about the protocol deviation, so the S1 population and
+//the recovery population could not be joined without re-parsing every reply.
+//Pure over the final class string - the same string `w78LabelAbsentCounted`
+//reads, so the field and the meter cannot disagree. No parser change.
+static bool w79RecoveryLabelAbsent(const char * devClass)
+{
+    return devClass && string(devClass) == "answer_label_absent";
 }
 
 //...and the verdict itself. EVERY off-protocol line must be present in the
@@ -10250,6 +10443,32 @@ static const char kCardTextClose[] = "\"}";
 //wave-74 CG re-ask shape on a new clause. The key strippers erase this line by
 //its lead, so the hoist is a render change and nothing else.
 static const char kSharedCardTextHeadLead[] = "Card text shared by option";
+//#W79-DB (T10, wave-78 deck126 MED-3 / known-bugs T10): the hoist's gate was a
+//BODY-LENGTH FLOOR, and on the wave-78 corpus every single residual sat under
+//it. 94 prompts still repeated one `{card text:}` body (up to 11x); measured
+//over all 2,629 corpus prompts the repeated bodies cost 23,440 B and 23,440 B of
+//that - 100% - came from bodies SHORTER than the 100-byte floor. Staff of Nin's
+//text is 96 bytes and `126v152` seq 23 printed it eleven times. A floor is the
+//wrong test: what decides whether the hoist is worth doing is whether it SAVES
+//BYTES, which is arithmetic over the row count, the body and the header this
+//function is about to write. The legacy floor is kept as an OR arm so no case
+//that hoisted in wave 78 stops hoisting here (the change is a strict superset).
+//Pure over three sizes, so every boundary is provable in PARSETEST.
+static const char kSharedCardTextHeadMid[] =
+    " (they all act with the one card this text belongs to, so it is printed"
+    " once here instead of on each of them): \"";
+//Below this a "body" is not rules text and the savings test must not speak for
+//it (an empty gloss repeated eleven times would otherwise "pay").
+static const size_t kSharedCardTextPayFloor = 8;
+static bool w79SharedCardTextPays(size_t rows, size_t bodyLen, size_t rowListLen)
+{
+    if (rows < kSharedCardTextRowFloor || bodyLen < kSharedCardTextPayFloor)
+        return false;
+    const size_t removed = rows * (strlen(kCardTextOpen) + bodyLen + strlen(kCardTextClose));
+    const size_t added = strlen(kSharedCardTextHeadLead) + 2 + rowListLen
+                       + strlen(kSharedCardTextHeadMid) + bodyLen + 2;
+    return removed > added;
+}
 
 //Erases every hoisted-header LINE (lead .. next newline inclusive) from a key
 //tail. Line-anchored: a row that merely quotes the lead mid-line is untouched.
@@ -10309,7 +10528,10 @@ static string w78HoistSharedCardText(vector<string>& rows)
         if (b == string::npos)
             continue;
         const string body = rows[i].substr(a + openLen, b - (a + openLen));
-        if (body.size() < kSharedCardTextMinLen)
+        //#W79-DB (T10): the LENGTH test moved to the per-group gate below, where
+        //the row count that decides whether the hoist pays is known. Gathering
+        //is now by BODY alone.
+        if (body.empty())
             continue;
         size_t k = 0;
         for (; k < bodies.size(); k++)
@@ -10327,6 +10549,12 @@ static string w78HoistSharedCardText(vector<string>& rows)
     {
         if (where[k].size() < kSharedCardTextRowFloor)
             continue;
+        //#W79-DB (T10): hoist when the wave-78 floor says so OR when the header
+        //this group would print is smaller than the copies it removes.
+        const string rowList = w78RowNumberList(where[k]);
+        if (bodies[k].size() < kSharedCardTextMinLen
+            && !w79SharedCardTextPays(where[k].size(), bodies[k].size(), rowList.size()))
+            continue;
         for (size_t j = 0; j < where[k].size(); j++)
         {
             string& r = rows[where[k][j]];
@@ -10339,9 +10567,8 @@ static string w78HoistSharedCardText(vector<string>& rows)
             r.erase(a, b + strlen(kCardTextClose) - a);
         }
         head << kSharedCardTextHeadLead << (where[k].size() == 1 ? " " : "s ")
-             << w78RowNumberList(where[k])
-             << " (they all act with the one card this text belongs to, so it is"
-                " printed once here instead of on each of them): \"" << bodies[k]
+             << rowList //#W79-DB (T10): the SAME bytes the pay test measured
+             << kSharedCardTextHeadMid << bodies[k]
              << "\"\n";
     }
     return head.str();
@@ -19323,6 +19550,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mWallMissNoRetry(0), //#W68-BC (J2)
       mLastAttemptFirstMs(-1), mLastAttemptSecondMs(-1), //#W68-BC (J2)
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
+      mReplyLabelAbsent(false), mRecoveryLabelAbsent(false), //#W79-DB (T1)
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
       mPlanEchoCount(0),
@@ -20162,6 +20390,8 @@ void AIPlayerGPT::flushRecoveryRecord()
     const string execText = mRecoveryExecText;
     const int execRow = mRecoveryExecRow;
     const string execBy = mRecoveryExecBy; //#W68-BC (MED)
+    const bool labelAbsent = mRecoveryLabelAbsent; //#W79-DB (T1)
+    mRecoveryLabelAbsent = false;
     mRecoverySeq = -1;              //cleared BEFORE the write, per the flush idiom
     mRecoveryClass.clear();
     mRecoveryKind.clear();
@@ -20175,6 +20405,11 @@ void AIPlayerGPT::flushRecoveryRecord()
         {"recovers_seq", recovers},
         {"recovers_kind", kind},
         {"recovers_fallback", cls},
+        //#W79-DB (T1, MEASURE ONLY): the recovered record's protocol-deviation
+        //class, as the one bit a seat needs to join this record to the S1
+        //population. ALWAYS present, so `false` is a measured negative and not a
+        //missing field. The parser is untouched.
+        {"answer_label_absent", labelAbsent},
         {"turn", translogTurn(observer->turn)},
         {"phase", observer->getCurrentGamePhaseName()},
         {"my_life", life},
@@ -20890,6 +21125,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //reconciled against the `answer_label_absent` population it is named for.
         if (w78LabelAbsentCounted(devClass, handedToHeuristic(choice, fallback)))
             mAnswerLabelAbsentHeuristicPlayed++;
+        //#W79-DB (T1): the SAME final class, latched for the recovery record the
+        //handoff below may arm. Measure only.
+        mReplyLabelAbsent = w79RecoveryLabelAbsent(devClass);
         mProtocolReplies++; //#W70-BM (E2): the census denominator
         //#W71-BO (L10 sibling, wave-70 P): `plan_steps_done` was absent from every
         //record, so lane BN's F10 step-advance claim was unmeasurable. The pointer
@@ -21108,7 +21346,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mRecoverySeq = rec["seq"].get<int>();
         mRecoveryClass = fallback;
         mRecoveryKind = kind;
+        mRecoveryLabelAbsent = mReplyLabelAbsent; //#W79-DB (T1)
     }
+    mReplyLabelAbsent = false; //#W79-DB (T1): consumed with this record, always
 }
 
 //#W54-F (D7a): the engine force-closed a decision this seat was parked on.
@@ -22445,9 +22685,26 @@ static bool narrationTrimV1()
     }
     return v1 == 1;
 }
+//#W79-DB (T10, wave-78 deck130 MED-1 / deck126 MED-4): THE LOG IS THE PROMPT.
+//`130v125` seq 144 is 29,641 B of which the GAME LOG is 20,647 B and 46 turns of
+//a 68-turn game; 57 of that seat's 321 windows were over the old trigger and all
+//57 were in that one game, and `126v125` seq 279 is 32,777 B with 23,156 B of
+//log. The trim was already BY BYTES on a line boundary - the only thing wrong
+//with it was where it fired. The trigger drops from 24,000 to 16,000 and the
+//retained tail from 20,000 to 12,000, so the newest events are what survives and
+//the trimmed window is ~4 KB of lines from the next trim exactly as before.
+//WAGIC_GPT_TRIM_V1=1 still restores the wave-78 pair byte for byte.
+const size_t kNarrationTrimTrigger = 16000;   //#W79-DB (T10)
+const size_t kNarrationTrimKeepBytes = 12000; //#W79-DB (T10)
+const size_t kNarrationTrimTriggerV1 = 24000;
+const size_t kNarrationTrimKeepV1 = 20000;
+size_t narrationTrimTrigger()
+{
+    return narrationTrimV1() ? kNarrationTrimTriggerV1 : kNarrationTrimTrigger;
+}
 size_t narrationTrimKeep(size_t markerLen)
 {
-    const size_t keep = 20000;
+    const size_t keep = narrationTrimV1() ? kNarrationTrimKeepV1 : kNarrationTrimKeepBytes;
     if (narrationTrimV1() || markerLen + 1 >= keep)
         return keep;
     return keep - markerLen - 1;
@@ -22455,9 +22712,9 @@ size_t narrationTrimKeep(size_t markerLen)
 bool narrationTrimNear(size_t logSize, size_t lineSize, size_t pendingPhaseSize)
 {
     if (narrationTrimV1())
-        return logSize + lineSize > 24000;
+        return logSize + lineSize > kNarrationTrimTriggerV1;
     const size_t decoration = 3 + (pendingPhaseSize ? pendingPhaseSize + 3 : 0);
-    return logSize + lineSize + decoration > 24000;
+    return logSize + lineSize + decoration > kNarrationTrimTrigger;
 }
 
 void narrationAppend(string& narration, string& pendingPhase, const string& line,
@@ -22482,7 +22739,7 @@ void narrationAppend(string& narration, string& pendingPhase, const string& line
     //LOG (dropping its oldest lines behind a marker) and is log maintenance,
     //not a game event; the delta stream carries game-event lines only, and it
     //has already handed its earlier lines to earlier records.
-    if (narration.size() > 24000)
+    if (narration.size() > narrationTrimTrigger()) //#W79-DB (T10)
     {
         //audit-L (L10a): keep the tail SHORT of 20,000 by the marker's own
         //length, so the post-trim size is <= ~20 KB whatever the digest weighs
@@ -28304,7 +28561,16 @@ static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3]
     const int taken = eventLost;
     o << "now " << nowLife << " (" << (delta > 0 ? "+" : "") << delta
       << " since turn " << turnNo[0];
-    if (gained > 0 && taken > 0)
+    //#W79-DB (T15, wave-78 deck162 MED-3): THE SPLIT WENT MISSING ON THE 39
+    //LINES IT WAS MOST NEEDED ON. The wave-78 gate required BOTH directions to
+    //carry events, so a span whose only life events were two Underworld Dreams
+    //pings printed the bare net and the reader - told by the guide that a
+    //net-only line means "no event source" - read 39 sourced spans as sourceless
+    //(`162v123` seq 13 is the repro; 116 trend lines, 68 unchanged, 9 split, 39
+    //net-only). A zero is a measured figure, not a missing one. The drop stays
+    //for the case CY F7 shipped it for: either figure < 0 means no event stream
+    //reached this site, and an UNKNOWN must never print as a zero.
+    if (gained >= 0 && taken >= 0)
         o << "; over those turns life-gain EVENTS put +" << gained
           << " on them and life-loss EVENTS took -" << taken
           << " off - the figure before this is the two netted";
@@ -28392,7 +28658,8 @@ enum HandCastVerdict
 //the sentence; with an empty pool (`floating == 0`) every byte is wave 67's.
 string handCastabilityTag(int verdict, int need, int sources, const string& cost,
                           const string& timingWhy = "", //#W67-AW (M2)
-                          int floating = 0) //#W68-BB (J5)
+                          int floating = 0, //#W68-BB (J5)
+                          bool instantSpeed = false) //#W79-DB (T8)
 {
     std::ostringstream o;
     std::ostringstream haveO;
@@ -28434,6 +28701,22 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
         o << "]";
         return o.str();
     case kHandNoLegalTarget:
+        //#W79-DB (T8, wave-78 deck125 A-2 - the game). `125v162` seq 52 printed
+        //this tag twice, on two Fall of the Gavel, and the reply reasoned "I have
+        //no counterspells in hand right now. So gate is open at any leaves-count"
+        //- it tapped to 2 and lost on turn 21. The tag was true of the WINDOW and
+        //read as a fact about the HAND, which is the trust doctrine's wrong-scope
+        //lie and exactly the class `discardDeadTargetClause` already refuses to
+        //render for a stack-targeting card. The head is byte-identical (every
+        //guide keys on it); what is added says what an instant with no target NOW
+        //actually is. Conditioned on the card's TYPE, which is static, so no
+        //board number enters the bracket and no key can move on it.
+        if (instantSpeed)
+            return " [no cast row now: it must have a target and there is no legal"
+                   " target on the board - HELD: this is an instant, so it is in"
+                   " your hand and castable the moment a legal target appears,"
+                   " including on their turn; this tag is about THIS window, never"
+                   " about your hand]";
         return " [no cast row now: it must have a target and there is no legal"
                " target on the board]";
     case kHandRestricted:
@@ -28910,7 +29193,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //so the remaining one is 601.2c: a mandatory target, none legal.
                 verdict = kHandNoLegalTarget;
             string tag = handCastabilityTag(verdict, need, sources, costStr,
-                                            sorceryWhy, handFloating); //#W67-AW (M2) / #W68-BB (J5)
+                                            sorceryWhy, handFloating, //#W67-AW (M2) / #W68-BB (J5)
+                                            //#W79-DB (T8): instant speed, from the card's
+                                            //own type/keywords - the same test the sorcery
+                                            //gate four lines above already makes.
+                                            hc->hasType(Subtypes::TYPE_INSTANT)
+                                                || hc->has(Constants::FLASH)
+                                                || hc->has(Constants::ASFLASH));
             //#W62-W (D15): and the land face, if this spell has one.
             const string backLand = mdfcHandBackLandName(hc);
             if (!backLand.empty())
@@ -45351,6 +45640,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 //meet; the figure printed is the number of SOURCES that plan taps,
                 //which is the currency `{leaves N of your M}` on this row counts in.
                 bool keepAlt = false, keepInstantAlt = false;
+                //#W79-DB (T8): the COUNTERSPELL arm. Tracked separately so the
+                //cheapest-instant arithmetic above is untouched and the choice
+                //between them is one comparison, made once, below.
+                MTGCardInstance * keepCounter = NULL;
+                int keepCounterNeed = 0;
+                bool keepCounterAlt = false;
                 for (int hi = 0; hi < game->hand->nb_cards; hi++)
                 {
                     MTGCardInstance * hc = game->hand->cards[hi];
@@ -45373,6 +45668,23 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         keepInstantNeed = need;
                         keepInstantAlt = alt;
                     }
+                    if (w79CounterspellScript(hc->magicText) //#W79-DB (T8)
+                        && (!keepCounter || need < keepCounterNeed))
+                    {
+                        keepCounter = hc;
+                        keepCounterNeed = need;
+                        keepCounterAlt = alt;
+                    }
+                }
+                //#W79-DB (T8): the counter is the answer the gate is about, so it
+                //takes the slot whenever one is in hand - even when a cheaper
+                //non-counter instant exists, which is the case that misfired.
+                const bool instIsCounter = (keepCounter != NULL);
+                if (keepCounter)
+                {
+                    keepInstant = keepCounter;
+                    keepInstantNeed = keepCounterNeed;
+                    keepInstantAlt = keepCounterAlt;
                 }
                 if (untappedSources > 0)
                     o << xCastRemainderScopeTag(mx, payCost->getConvertedCost(),
@@ -45392,7 +45704,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                                     ? w78KeepCostText(keepInstant->getManaCost()->toString(),
                                                                       keepInstantAlt) : string(),
                                                 keepInstant && keepInstant != keep
-                                                    ? keepInstantNeed : -1);
+                                                    ? keepInstantNeed : -1,
+                                                instIsCounter); //#W79-DB (T8)
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             }
             int used = 0;
@@ -61684,8 +61997,11 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(pn == 2 && !pstale,
               "W41-4 NEGATIVE a sibling target beside a pile blob is unaffected");
         // The truncation rule is shared with the single-card snippet.
-        CHECK(textSnippetCore("one two three four five", 9) == "one two...",
-              "W41-4 the shared snippet core truncates on a word boundary");
+        //#W79-DB (T11b) RE-DERIVES this pin: the word boundary is unchanged, the
+        //omission is now MARKED (wave 78 ended on a bare `...`, which reads as
+        //punctuation the card contains).
+        CHECK(textSnippetCore("one two three four five", 9) == "one two... (...more)",
+              "W41-4 the shared snippet core truncates on a word boundary, and says so");
         CHECK(textSnippetCore("a\nb", 40) == "a b",
               "W41-4 the shared snippet core flattens newlines");
     }
@@ -66608,18 +66924,38 @@ void AIPlayerGPT::runParseSelfTest()
               "#W48-D5 the back face survives: a cut AT the // separator drops a whole card");
         CHECK(l.find("Flying") != string::npos && l.find("2/2 black") != string::npos,
               "#W48-D5 ... with the front face still present");
-        CHECK(textSnippetCore(lordOfLineage, 140).find("Bloodline Keeper") == string::npos,
-              "#W48-D5 NEGATIVE the flat truncate stopped at ' //' and printed no back face");
+        //#W79-DB (T11a) RE-DERIVES this pin. The wave-48 flat truncate kept the
+        //LARGEST prefix and so stopped at ' //'; the clause-priority render keeps
+        //the `{T}:` activated clause (which on this card carries the face
+        //separator) and drops the static +2/+2 line, marked. `textSnippetCore` is
+        //still face-UNAWARE - that is what the pin guards and it is unchanged:
+        //the face survives here only because it rides a kept clause, and the
+        //dropped clause is not named as a face.
+        {
+            const string flat = textSnippetCore(lordOfLineage, 140);
+            CHECK(flat.find("(...more)") != string::npos
+                  && flat.find("get +2/+2") == string::npos
+                  && flat.find("{T}: Put a 2/2 black") != string::npos,
+                  "#W48-D5 / #W79-DB T11a the flat core keeps the ACTIVATED clause and marks"
+                  " the omission; it still applies no face rule of its own");
+            CHECK(optionCardTextCore(lordOfLineage, 140).find("// Bloodline Keeper")
+                      != string::npos
+                  && optionCardTextCore(lordOfLineage, 140) != flat,
+                  "#W48-D5 NEGATIVE the face-aware path is still the only one that keeps the"
+                  " back face BY NAME");
+        }
         // NEVER MID-WORD. The old rule cut at exactly maxLen whenever the last
         // space sat in the front half of the budget.
         {
             string wordy = "aa " + string(60, 'b') + " cc dd";
             string t = textSnippetCore(wordy, 40);
-            CHECK(t == "aa...", "#W48-D5 a word that overruns the budget is dropped whole, not halved");
+            //#W79-DB (T11b) RE-DERIVES: same cut, marked.
+            CHECK(t == "aa... (...more)",
+                  "#W48-D5 a word that overruns the budget is dropped whole, not halved");
             CHECK(t.find(string(10, 'b')) == string::npos,
                   "#W48-D5 NEGATIVE no fragment of the overrunning word is rendered");
             string noSpace = string(200, 'q');
-            CHECK(textSnippetCore(noSpace, 140).size() == 143,
+            CHECK(textSnippetCore(noSpace, 140).size() == 140 + 3 + 10,
                   "#W48-D5 NEGATIVE a string with no word boundary at all is still bounded");
         }
         // A text with neither separator is byte-identical to the old path.
@@ -70987,14 +71323,28 @@ static const char * kW50Y_r94 =
     }
     cout << "\n[audit-L] L10 narration trim arithmetic\n";
     {
-        CHECK(narrationTrimKeep(0) == 19999 && narrationTrimKeep(100) == 19899,
-              "audit-L L10a the kept tail is short of 20,000 by the marker and its newline");
-        CHECK(narrationTrimKeep(30000) == 20000,
+        //#W79-DB (T10): the same arithmetic, re-expressed against the constants
+        //so the pin cannot silently pass on a stale pair of numbers.
+        CHECK(narrationTrimKeep(0) == kNarrationTrimKeepBytes - 1
+              && narrationTrimKeep(100) == kNarrationTrimKeepBytes - 101,
+              "audit-L L10a the kept tail is short of the keep size by the marker and its newline");
+        CHECK(narrationTrimKeep(30000) == kNarrationTrimKeepBytes,
               "audit-L L10a NEGATIVE an absurd marker cannot drive the tail to zero");
-        CHECK(!narrationTrimNear(23990, 5, 0) && narrationTrimNear(23990, 8, 0),
+        CHECK(!narrationTrimNear(kNarrationTrimTrigger - 10, 5, 0)
+              && narrationTrimNear(kNarrationTrimTrigger - 10, 8, 0),
               "audit-L L10b the line's own '- '/newline decoration counts toward the cap");
-        CHECK(!narrationTrimNear(23980, 5, 0) && narrationTrimNear(23980, 5, 10),
+        CHECK(!narrationTrimNear(kNarrationTrimTrigger - 20, 5, 0)
+              && narrationTrimNear(kNarrationTrimTrigger - 20, 5, 10),
               "audit-L L10b a pending phase line that crosses the cap builds the marker");
+        //#W79-DB (T10) RED-ON-BASE: on base the trigger was 24,000 and the keep
+        //20,000, so a 16 KB log was not trimmed at all and a trimmed log kept
+        //20 KB of history. Both numbers are now 16 KB / 12 KB.
+        CHECK(narrationTrimTrigger() == 16000 && kNarrationTrimKeepBytes == 12000,
+              "#W79-DB T10 the narration trim fires at 16 KB and keeps the newest 12 KB"
+              " (base: 24 KB / 20 KB)");
+        CHECK(narrationTrimNear(16500, 1, 0) && !narrationTrimNear(15000, 1, 0),
+              "#W79-DB T10 RED-ON-BASE a 16,500-byte log IS near the cap now and a"
+              " 15,000-byte one is not - on base neither was");
         CHECK(!narrationTrimNear(100, 100, 100),
               "audit-L L10b NEGATIVE a short log is nowhere near the cap");
         //the composed effect: a heavy marker no longer leaves the log above the
@@ -93583,10 +93933,14 @@ static const char * kW50Y_r94 =
             {
                 const string wide(400, 'a');
                 const string cut = textSnippetCore(wide + " tail", 40);
-                CHECK(cut.find("(...more)") == string::npos
-                      && cut.find("...") != string::npos,
-                      "#W78-CW S8 MUST-NOT-MATCH a text with no clause end inside the stretch"
-                      " still takes the wave-48 word cut");
+                //#W79-DB (T11b) RE-DERIVES: the WORD cut is still what happens
+                //(no clause boundary is invented), and it now says text was
+                //omitted instead of ending on a bare `...`.
+                CHECK(cut.find("...") != string::npos
+                      && cut.find("(...more)") != string::npos
+                      && cut.find(" -- ") == string::npos,
+                      "#W78-CW S8 / #W79-DB T11b a text with no clause end inside the stretch"
+                      " still takes the wave-48 word cut, now marked");
             }
             CHECK(textSnippetCore(howling, 400) == howling,
                   "#W78-CW S8 MUST-NOT-MATCH a text that fits is returned untouched");
@@ -94735,11 +95089,22 @@ static const char * kW50Y_r94 =
         }
         // MUST-NOT-MATCH: a one-way trend is still byte-identical to wave 77.
         {
+            //#W79-DB (T15) RE-DERIVES this pin. Wave 78 dropped the split when
+            //EITHER half was zero, so 39 of deck162's 116 trend lines printed a
+            //bare net over spans that DID have a measured event source, and the
+            //guide reads a bare net as "no source". A measured zero prints as a
+            //zero; only an UNMEASURED half (< 0) still drops the split.
             int up[3] = { 20, 25, 30 };
             CHECK(opponentLifeTrendLine(up, turn, 3, 30, 10, 0)
                   == "Opponent life trend: turn 4: 20, turn 5: 25, turn 6: 30,"
-                     " now 30 (+10 since turn 4).\n",
-                  "#W78-CY F7 MUST-NOT-MATCH a trend with no loss events prints no split");
+                     " now 30 (+10 since turn 4; over those turns life-gain EVENTS put"
+                     " +10 on them and life-loss EVENTS took -0 off - the figure before"
+                     " this is the two netted).\n",
+                  "#W79-DB T15 a one-way trend states the zero half: `+10 ... -0`");
+            CHECK(opponentLifeTrendLine(up, turn, 3, 30, -1, 0).find("EVENTS") == string::npos
+                  && opponentLifeTrendLine(up, turn, 3, 30, 10, -1).find("EVENTS") == string::npos,
+                  "#W78-CY F7 MUST-NOT-MATCH an UNMEASURED half still drops the split - a"
+                  " number that was never measured cannot print as 0");
         }
     }
 
@@ -95232,6 +95597,416 @@ static const char * kW50Y_r94 =
                   && sentence.find("CHANGED COST is a different row") != string::npos,
                   "#W79-CZ T12 GREEN the sentence no longer calls a price both the SAME row"
                   " and a different cost - `152v125` seqs 65 -> 66 read it both ways");
+        }
+    }
+
+    // ================= #W79-DB: render truth, bytes and tools =================
+    cout << "\n[#W79-DB] T8 a held counterspell is IN HAND, and the keep-X gate prices it\n";
+    {
+        // CORPUS FIXTURE `125v162` seq 52 (t19): the hand line, byte-exact off the
+        // prompt, with the wave-78 tag. The reply reasoned "I have no counterspells
+        // in hand right now" over TWO of these and lost the game on turn 21.
+        const string base = handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}");
+        const string held = handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}",
+                                               "", 0, true);
+        const string corpusRow =
+            "Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]";
+        CHECK(base == " [no cast row now: it must have a target and there is no legal"
+                      " target on the board]",
+              "#W79-DB T8 RED-ON-BASE the wave-78 tag, byte-exact - it says only that THIS"
+              " window has no row, and `125v162` seq 52 read it as a fact about the hand");
+        CHECK(held != base && held.find("HELD: this is an instant") != string::npos
+              && held.find("castable the moment a legal target appears") != string::npos,
+              "#W79-DB T8 GREEN an instant with no legal target now reads as HELD");
+        CHECK(held.compare(0, base.size() - 1, base, 0, base.size() - 1) == 0,
+              "#W79-DB T8 the literal head every guide keys on is byte-identical");
+        CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, false) == base,
+              "#W79-DB T8 MUST-NOT-MATCH a sorcery-speed card with no target is unchanged");
+        CHECK(handCastabilityTag(kHandSorcerySpeed, 5, 6, "{3}{u}{w}", "", 0, true)
+                  == handCastabilityTag(kHandSorcerySpeed, 5, 6, "{3}{u}{w}", "", 0, false)
+              && handCastabilityTag(kHandCastableNow, 5, 6, "{3}{u}{w}", "", 0, true)
+                  == kHandCastableNowTagText,
+              "#W79-DB T8 MUST-NOT-MATCH no other verdict changes a byte");
+        // KEY STABILITY (wave-74 lesson). The tag's LIVE channel is the hand line
+        // inside `serializeGameState`, which IS the board half of the ask key - so
+        // the test that matters is that no BOARD NUMBER enters it. It does not:
+        // the HELD text is a pure function of the verdict and the card's static
+        // type, and carries no `need`, no source count, no floating mana and no
+        // cost. Two windows differing only in those numbers give one key.
+        CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, true)
+                  == handCastabilityTag(kHandNoLegalTarget, 1, 0, "{w}", "sorcery", 9, true)
+              && held.find("5") == string::npos && held.find("6") == string::npos,
+              "#W79-DB T8 KEY no board number reaches the new clause - need, sources,"
+              " floating mana and the printed cost are all absent from it");
+        // ...and were it ever to ride an option ROW, it is a `[...]` group, which
+        // the option-set key and the hold-latch key both strip. Proven on the
+        // JOINED menu with the held set built the way the live seam builds it.
+        {
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back("Cast Fall of the Gavel {3}{u}{w}" + base);
+            rowsB.push_back("Cast Fall of the Gavel {3}{u}{w}" + held);
+            rowsA.push_back(kHoldPriorityRowText);
+            rowsB.push_back(kHoldPriorityRowText);
+            const string tA = joinNumberedRows(rowsA, NULL);
+            const string tB = joinNumberedRows(rowsB, NULL);
+            CHECK(tA != tB,
+                  "#W79-DB T8 KEY INSTRUMENT the two rendered menus really do differ");
+            CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB),
+                  "#W79-DB T8 KEY option-set key is equal");
+            std::set<string> heldA, heldB;
+            for (size_t i = 0; i < rowsA.size(); i++)
+            {
+                heldA.insert(holdActionKeyRow(rowsA[i]));
+                heldB.insert(holdActionKeyRow(rowsB[i]));
+            }
+            CHECK(heldA == heldB,
+                  "#W79-DB T8 KEY the held set (mLastMenuRows via holdActionKeyRow, the live"
+                  " seam's own construction) is identical - no hold re-opens on it");
+        }
+        // CORPUS FIXTURE `125v130` seq 315 (t57): the keep-X clause named Path to
+        // Exile while Essence Scatter, Cancel and Dream Fracture sat in hand.
+        // The scripts are the primitives' own `auto=` lines.
+        CHECK(w79CounterspellScript("fizzle")
+              && w79CounterspellScript("fizzle\nlife:5 controller")
+              && w79CounterspellScript("fizzle\ndraw:1 controller"),
+              "#W79-DB T8 Cancel / Fall of the Gavel / Dream Fracture are counterspells by"
+              " their own script");
+        CHECK(!w79CounterspellScript("moveto(exile) && ability$!name(search land)"
+                                     " notaTarget(land[basic]|mylibrary)"
+                                     " moveTo(mybattlefield)$ targetcontroller")
+              && !w79CounterspellScript(""),
+              "#W79-DB T8 MUST-NOT-MATCH Path to Exile's script is not a counter, and an"
+              " empty script names nothing");
+        {
+            const string wave78 = xCastRemainderScopeTag(11, 3, false, "Path to Exile", "{w}", 1,
+                                                         17, false, "Path to Exile", "{w}", 1);
+            const string wave79 = xCastRemainderScopeTag(11, 3, false, "Path to Exile", "{w}", 1,
+                                                         17, false, "Essence Scatter", "{1}{u}", 2,
+                                                         true);
+            CHECK(wave78.find("Holding up an instant: Path to Exile {w}") != string::npos,
+                  "#W79-DB T8 RED-ON-BASE the wave-78 clause, byte-exact: the held answer is"
+                  " named as Path to Exile");
+            CHECK(wave79.find("Holding up a counterspell: Essence Scatter {1}{u} needs 2")
+                      != string::npos
+                  && wave79.find("Path to Exile") != string::npos,
+                  "#W79-DB T8 GREEN the counterspell is named as one, and the cheapest-card"
+                  " clause beside it still names Path to Exile");
+            CHECK(xCastRemainderScopeTag(11, 3, false, "Staff of Nin", "{6}", 6, 17, false,
+                                         "Essence Scatter", "{1}{u}", 2, false)
+                      .find("Holding up an instant: Essence Scatter") != string::npos,
+                  "#W79-DB T8 MUST-NOT-MATCH with no counterspell in hand the clause reads"
+                  " exactly as wave 78 did");
+        }
+    }
+
+    cout << "\n[#W79-DB] T10 the shared card text is hoisted when the hoist PAYS\n";
+    {
+        // CORPUS FIXTURE `126v152` seq 23 (t18 Upkeep, 21,074 B): eleven Staff of
+        // Nin rows, each carrying the same 96-byte gloss. Rows are byte-exact off
+        // the prompt, driven through the LIVE caller `joinNumberedRows`.
+        const string gloss =
+            " {card text: \"At the beginning of your upkeep, draw a card. -- {T}: Staff of"
+            " Nin deals 1 damage to any target.\"}";
+        const char * targets[11] = {
+            "Briarbridge Tracker [opponent's battlefield] {right now: takes 1 damage -"
+            " SURVIVES (toughness 6)}",
+            "Intrepid Adversary [opponent's battlefield] {right now: takes 1 damage -"
+            " SURVIVES (toughness 4)}",
+            "Pride Guardian [your battlefield] {this hits YOUR permanent} {right now: takes"
+            " 1 damage - SURVIVES (toughness 3)}",
+            "Sigarda, Champion of Light [opponent's battlefield] {right now: takes 1 damage -"
+            " SURVIVES (toughness 4)}",
+            "Tovolar, Dire Overlord [opponent's battlefield] {right now: takes 1 damage -"
+            " SURVIVES (loyalty 2, 1 left)}",
+            "Tovolar's Huntmaster [opponent's battlefield] {right now: takes 1 damage -"
+            " SURVIVES (toughness 9)}",
+            "Wall of Omens [your battlefield] {this hits YOUR permanent} {right now: takes 1"
+            " damage - SURVIVES (toughness 4)}",
+            "Wolf #1 [opponent's battlefield] {right now: takes 1 damage - SURVIVES"
+            " (toughness 4)}",
+            "Wolf #2 [opponent's battlefield] {right now: takes 1 damage - SURVIVES"
+            " (toughness 4)}",
+            "the opponent {right now: takes 1 damage - they would be at 17}",
+            "you {right now: takes 1 damage - you would be at 10}"
+        };
+        std::vector<string> rows;
+        for (int i = 0; i < 11; i++)
+            rows.push_back(string("Deal 1 damage with Staff of Nin targeting ") + targets[i]
+                           + " [cost: Tap]" + gloss);
+        const size_t bodyLen = gloss.size() - strlen(kCardTextOpen) - strlen(kCardTextClose);
+        CHECK(bodyLen == 96,
+              "#W79-DB T10 INSTRUMENT the corpus body really is 96 bytes - under the wave-78"
+              " 100-byte floor, which is why the hoist never fired on this menu");
+        CHECK(bodyLen < kSharedCardTextMinLen,
+              "#W79-DB T10 RED-ON-BASE the wave-78 gate (body >= 100) REFUSES this menu");
+        CHECK(w79SharedCardTextPays(11, bodyLen, strlen("1-11")),
+              "#W79-DB T10 GREEN ...and the savings gate admits it: 11 copies of 112 bytes"
+              " against one ~240-byte header");
+        const string joined = joinNumberedRows(rows, NULL);
+        CHECK(joined.find(kSharedCardTextHeadLead) == 0
+              && joined.find("Card text shared by options 1-11") == 0,
+              "#W79-DB T10 GREEN the live caller prints ONE header naming rows 1-11");
+        CHECK(joined.find("At the beginning of your upkeep")
+                  == joined.rfind("At the beginning of your upkeep"),
+              "#W79-DB T10 GREEN the body appears exactly once in the whole rendered menu");
+        CHECK(joined.find("11. Deal 1 damage with Staff of Nin targeting you") != string::npos
+              && joined.find("SURVIVES (toughness 9)") != string::npos,
+              "#W79-DB T10 every row keeps its number and every other annotation - nothing is"
+              " capped, merged or removed");
+        // The byte prediction, computed on the corpus fixture itself.
+        {
+            std::vector<string> flat(rows);
+            std::ostringstream raw;
+            for (size_t i = 0; i < flat.size(); i++)
+                raw << (i + 1) << ". " << flat[i] << "\n";
+            CHECK(raw.str().size() > joined.size() + 900,
+                  "#W79-DB T10 GREEN the hoist saves over 900 B on this one menu");
+        }
+        // MUST-NOT-MATCH: two rows of a 96-byte body do NOT pay, and the wave-78
+        // floor still hoists everything it used to.
+        CHECK(!w79SharedCardTextPays(2, 96, strlen("1-2")),
+              "#W79-DB T10 MUST-NOT-MATCH two rows of a short body cost more hoisted than"
+              " printed, and are left alone");
+        CHECK(!w79SharedCardTextPays(11, 4, strlen("1-11")) && !w79SharedCardTextPays(1, 400, 1),
+              "#W79-DB T10 MUST-NOT-MATCH a scrap of a body never pays, and one row is not"
+              " shared with anything");
+        {
+            std::vector<string> two;
+            const string longGloss = " {card text: \"" + string(200, 'z') + "\"}";
+            two.push_back("Cast A {1}" + longGloss);
+            two.push_back("Cast B {2}" + longGloss);
+            CHECK(joinNumberedRows(two, NULL).find(kSharedCardTextHeadLead) == 0,
+                  "#W79-DB T10 MUST-NOT-MATCH the wave-78 long-body case still hoists - the"
+                  " change is a strict superset");
+        }
+        // KEY STABILITY on the JOINED menu: the hoist is a render change.
+        {
+            std::vector<string> bare;
+            for (int i = 0; i < 11; i++)
+                bare.push_back(string("Deal 1 damage with Staff of Nin targeting ") + targets[i]
+                               + " [cost: Tap]");
+            const string joinedBare = joinNumberedRows(bare, NULL);
+            CHECK(joined != joinedBare,
+                  "#W79-DB T10 KEY INSTRUMENT the hoisted and gloss-free menus really differ");
+            CHECK(w77KeyTailOf(joined) == w77KeyTailOf(joinedBare)
+                  && asyncSlotKeyOf(false, 18, 1, w77KeyTailOf(joined), "BOARD")
+                     == asyncSlotKeyOf(false, 18, 1, w77KeyTailOf(joinedBare), "BOARD"),
+                  "#W79-DB T10 KEY the hoisted header is stripped from the ask key and the"
+                  " async slot key - no re-ask is minted by the hoist");
+            CHECK(optionSetKeyOf(rows) == optionSetKeyOf(bare),
+                  "#W79-DB T10 KEY option-set key is equal with and without the gloss");
+            std::set<string> kA, kB;
+            for (size_t i = 0; i < rows.size(); i++)
+            {
+                kA.insert(holdActionKeyRow(rows[i]));
+                kB.insert(holdActionKeyRow(bare[i]));
+            }
+            CHECK(kA == kB,
+                  "#W79-DB T10 KEY the hold-latch held set is identical - a hold taken over"
+                  " these rows is not re-opened by the hoist");
+        }
+    }
+
+    cout << "\n[#W79-DB] T11 the gloss keeps the clause that decides, and closes what it opens\n";
+    {
+        // The four cards named in the item, each `text=` verbatim from
+        // bin/Res/sets/primitives/borderline.txt (verified against Oracle).
+        const string adventurer =
+            "Deathtouch -- As long as it's your turn, Triumphant Adventurer has first strike."
+            " -- Whenever Triumphant Adventurer attacks, venture into the dungeon. (Enter the"
+            " first room or advance to the next room.)";
+        const string barrowin =
+            "When Barrowin of Clan Undurr enters, venture into the dungeon. (Enter the first"
+            " room or advance to the next room.) -- Whenever Barrowin of Clan Undurr attacks,"
+            " return up to one creature card with mana value 3 or less from your graveyard to"
+            " the battlefield if you've completed a dungeon.";
+        const string rangerClass =
+            "(Gain the next level as a sorcery to add its ability.) -- When Ranger Class"
+            " enters, create a 2/2 green Wolf creature token. -- {1}{G}: Level 2 -- Whenever"
+            " you attack, put a +1/+1 counter on target attacking creature. -- {3}{G}: Level 3"
+            " -- You may look at the top card of your library any time. -- You may cast"
+            " creature spells from the top of your library.";
+        const string sigarda =
+            "Flying, trample -- Humans you control get +1/+1. -- Coven - Whenever Sigarda"
+            " attacks, if you control three or more creatures with different powers, look at"
+            " the top five cards of your library. You may reveal a Human creature card from"
+            " among them and put it into your hand. Put the rest on the bottom of your library"
+            " in a random order.";
+        // (a) CLAUSE PRIORITY. `125v146` seq 51: the target row's 140-byte budget
+        // kept the keywords and cut the trigger the seat's own guide step reads.
+        {
+            const string wave78Bytes =
+                "Deathtouch -- As long as it's your turn, Triumphant Adventurer has first"
+                " strike. (...more)";
+            CHECK(w78ClauseCutAtOrBefore(adventurer, 140) == wave78Bytes.size() - 10,
+                  "#W79-DB T11a RED-ON-BASE the wave-78 rule's cut is exactly the corpus"
+                  " render - the largest prefix that fits, keywords first");
+            const string now = textSnippetCore(adventurer, 140);
+            CHECK(now != wave78Bytes,
+                  "#W79-DB T11a RED-ON-BASE ...and it is no longer what is rendered");
+            CHECK(now.find("venture into the dungeon") != string::npos
+                  && now.find("(...more)") != string::npos,
+                  "#W79-DB T11a GREEN the venture trigger - the only clause the guide's PATH"
+                  " step reads - is KEPT, and the omission is still marked");
+            CHECK(now.find("Deathtouch") == 0,
+                  "#W79-DB T11a the kept clauses print in the card's own order");
+            CHECK(now.size() <= 140 + 10,
+                  "#W79-DB T11a ...inside the budget it was given, plus the marker");
+            CHECK(w79DecisionBearingClause("Whenever Sigarda attacks, look at the top five")
+                  && w79DecisionBearingClause("{T}: Staff of Nin deals 1 damage to any target")
+                  && w79DecisionBearingClause("{1}{G}: Level 2")
+                  && w79DecisionBearingClause("-7: You get an emblem")
+                  && w79DecisionBearingClause("At the beginning of your upkeep, draw a card"),
+                  "#W79-DB T11a triggered and activated clauses are decision-bearing");
+            CHECK(!w79DecisionBearingClause("Deathtouch")
+                  && !w79DecisionBearingClause("Humans you control get +1/+1.")
+                  && !w79DecisionBearingClause("Flying, trample")
+                  && !w79DecisionBearingClause(""),
+                  "#W79-DB T11a MUST-NOT-MATCH keyword and static clauses are not");
+            CHECK(textSnippetCore(adventurer, 4000) == adventurer,
+                  "#W79-DB T11a MUST-NOT-MATCH a text that fits is returned untouched");
+            CHECK(w79ClausePrioritySnippet("Flying", 3).empty()
+                  && w79ClausePrioritySnippet(adventurer, 4000).empty(),
+                  "#W79-DB T11a MUST-NOT-MATCH no clauses, or every clause fitting, leaves the"
+                  " caller's own rule standing");
+        }
+        // (b) THE FALLBACK CUT. `152` seq 22 Ranger Class left `(Gain the next level
+        // as a sorcery to add...` with the parenthesis open; `146` seq 17 Barrowin
+        // and `152` seq 8/19 Sigarda ended on a bare `...` with no marker.
+        {
+            const string opener = "(Gain the next level as a sorcery to add its ability.)";
+            const string wave78Bytes = "(Gain the next level as a sorcery to add...";
+            const string now = textSnippetCore(opener, 40);
+            CHECK(now != wave78Bytes,
+                  "#W79-DB T11b RED-ON-BASE the wave-78 render of this clause, byte-exact,"
+                  " is no longer what is produced");
+            CHECK(now.find("(Gain the next level as a sorcery to add...") == 0
+                  && now.find(")") != string::npos
+                  && now.find("(...more)") != string::npos,
+                  "#W79-DB T11b GREEN the same word cut, the parenthesis CLOSED and the"
+                  " omission marked");
+            std::vector<int> d;
+            w78UnitDepths(now, d);
+            CHECK(!d[now.size()],
+                  "#W79-DB T11b GREEN the rendered clause is balanced end to end");
+            CHECK(w79CloseOpenUnits("all balanced (here)").empty()
+                  && w79CloseOpenUnits("half (open") == ")"
+                  && w79CloseOpenUnits("she said \"go") == "\"",
+                  "#W79-DB T11b the closer is exactly what is open, and nothing when nothing is");
+        }
+        // The whole-card renders, at the live board tiers, with the invariant the
+        // item asks for: every truncation is BALANCED and MARKED.
+        {
+            const string cards[4] = { adventurer, barrowin, rangerClass, sigarda };
+            const size_t tiers[3] = { 55, 90, 140 };
+            int checked = 0;
+            bool allOk = true;
+            for (int c = 0; c < 4 && allOk; c++)
+                for (int t = 0; t < 3 && allOk; t++)
+                {
+                    const string s = boardEffectSnippet(cards[c], tiers[t]);
+                    std::vector<int> d;
+                    w78UnitDepths(s, d);
+                    const bool balanced = !d[s.size()];
+                    const bool marked = (s == cards[c])
+                        || s.find("(...more)") != string::npos
+                        || s.find("not shown]") != string::npos;
+                    if (!balanced || !marked)
+                    {
+                        cout << "  T11 residual: card " << c << " tier " << tiers[t]
+                             << " -> " << s << "\n";
+                        allOk = false;
+                    }
+                    checked++;
+                }
+            CHECK(allOk && checked == 12,
+                  "#W79-DB T11 GREEN all twelve renders of the four named cards are balanced"
+                  " and every omission is marked (base: Ranger Class unclosed, Barrowin and"
+                  " Sigarda bare `...`)");
+        }
+        // KEY STABILITY: the gloss lives inside a `{card text: "..."}` group.
+        {
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back("Cast Triumphant Adventurer {b}{w} (creature 1/1) {card text: \""
+                            + textSnippetCore(adventurer, 140) + "\"}");
+            rowsB.push_back("Cast Triumphant Adventurer {b}{w} (creature 1/1) {card text: \""
+                            + adventurer + "\"}");
+            const string tA = joinNumberedRows(rowsA, NULL);
+            const string tB = joinNumberedRows(rowsB, NULL);
+            CHECK(tA != tB && w77KeyTailOf(tA) == w77KeyTailOf(tB)
+                  && asyncSlotKeyOf(false, 34, 3, w77KeyTailOf(tA), "BOARD")
+                     == asyncSlotKeyOf(false, 34, 3, w77KeyTailOf(tB), "BOARD")
+                  && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                  && holdActionKeyRow(rowsA[0]) == holdActionKeyRow(rowsB[0]),
+                  "#W79-DB T11 KEY which clauses the gloss keeps cannot move the ask key, the"
+                  " async slot key, the option-set key or the hold-latch key");
+        }
+    }
+
+    cout << "\n[#W79-DB] T15 a measured zero prints as a zero\n";
+    {
+        // CORPUS FIXTURE `162v123` seq 13: samples 20, 20, 18 over a span whose only
+        // life events are two Underworld Dreams pings - gains 0, losses 2. Wave 78
+        // printed the bare net, and 39 of this seat's 116 trend lines were read as
+        // "no event source" because the guide reads a bare net that way.
+        int life[3] = { 20, 20, 18 };
+        int turn[3] = { 5, 7, 9 };
+        const string now = opponentLifeTrendLine(life, turn, 3, 18, 0, 2);
+        CHECK(now.find("turn 5: 20, turn 7: 20, turn 9: 18, now 18 (-2 since turn 5") == 0
+                  || now.find("turn 5: 20") != string::npos,
+              "#W79-DB T15 INSTRUMENT the corpus samples render as the corpus printed them");
+        CHECK(now.find("life-gain EVENTS put +0 on them and life-loss EVENTS took -2 off")
+                  != string::npos,
+              "#W79-DB T15 GREEN the split prints with its measured zero - `+0 gained /"
+              " -2 taken` (base: this line carried the net alone)");
+        CHECK(opponentLifeTrendLine(life, turn, 3, 18, -1, -1).find("EVENTS") == string::npos,
+              "#W79-DB T15 MUST-NOT-MATCH an unmeasured split is still dropped");
+        int flat[3] = { 20, 20, 20 };
+        CHECK(opponentLifeTrendLine(flat, turn, 3, 20, 0, 0)
+                  .find("unchanged at 20 since turn 5") != string::npos,
+              "#W79-DB T15 MUST-NOT-MATCH a flat trend still prints its own sentence and no"
+              " split at all");
+    }
+
+    cout << "\n[#W79-DB] T1 the recovery record carries the S1 class (MEASURE ONLY)\n";
+    {
+        // The six wave-78 `answer_label_absent` replies all wrote a `recovery`
+        // record whose only class field reads `unparsed_reply` - so the S1
+        // population and the recovery population could not be joined.
+        const char * one =
+            "\n\nPLAN: Cast Sphinx's Revelation for X=4.\n2 (Cast Sphinx's Revelation)";
+        bool af = false;
+        std::vector<string> off;
+        const long b = offProtocolBytes(one, &af, &off);
+        const char * cls = w75ProtocolDeviationClass(false, (int) b, false,
+                w78AnswerLabelAbsentShape(off, codedAnswerCount(one) > 0));
+        CHECK(string(cls) == "answer_label_absent"
+              && AIPlayerGPT::handedToHeuristic(-1, "unparsed_reply"),
+              "#W79-DB T1 RED-ON-BASE `125v123` seq 83's reply classes `answer_label_absent`"
+              " and IS handed to the heuristic - and the recovery record said only"
+              " `unparsed_reply`");
+        CHECK(w79RecoveryLabelAbsent(cls),
+              "#W79-DB T1 GREEN the recovery record's `answer_label_absent` field is true for"
+              " it, so a seat joins the two populations without re-parsing a reply");
+        CHECK(!w79RecoveryLabelAbsent("unparsed_reply")
+              && !w79RecoveryLabelAbsent("unlabelled_plan")
+              && !w79RecoveryLabelAbsent("compliant")
+              && !w79RecoveryLabelAbsent(NULL),
+              "#W79-DB T1 MUST-NOT-MATCH every other class, and no class at all, is false");
+        {
+            json probe = {{"kind", "recovery"}, {"recovers_fallback", "unparsed_reply"},
+                          {"answer_label_absent", w79RecoveryLabelAbsent(cls)}};
+            CHECK(json::parse(probe.dump())["answer_label_absent"].get<bool>(),
+                  "#W79-DB T1 the field round-trips through the translog as a BOOLEAN, always"
+                  " present - `false` is a measured negative, not an absence");
+        }
+        {
+            int run = 0, rej = 0;
+            CHECK(answerSegmentStatic(one, "CHOICE:", &run, &rej).empty()
+                  && w75ProtocolDeviationClass(true, 5, false, true)
+                         == string("unlabelled_plan"),
+                  "#W79-DB T1 MEASURE ONLY - the parser is byte-identical and no tolerance is"
+                  " added: the unlabelled answer line still yields no answer segment");
         }
     }
 
