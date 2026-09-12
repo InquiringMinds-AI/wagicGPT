@@ -100,6 +100,17 @@ def selftest():
                                 "some_future_kind 3, wall_miss 1"):
         print("SELFTEST FAIL: generic list %r" % census_kind_list(k2))
         ok = False
+    #W80-DH (F11): the wave-80 lane's new kind, `hold_event` - one record per hold
+    # clamp / hold re-open - is a decision-adjacent record that makes NO round trip,
+    # and the derived census explains it with no edit to this tool. Pinned here so
+    # the wave-77 lesson ("the census must sum every record kind, including the new
+    # ones a lane adds") is a test rather than a hope.
+    k3 = _c.Counter({"ask": 4, "hold_event": 6, "menu_single_outcome": 1, "gameend": 1})
+    if census_kind_list(k3) != "hold_event 6, menu_single_outcome 1" \
+            or census_kind_sum(k3) != 7:
+        print("SELFTEST FAIL: hold_event census %r / %d"
+              % (census_kind_list(k3), census_kind_sum(k3)))
+        ok = False
     # ...and a census with nothing but round-trip kinds explains nothing, because
     # there is nothing to explain.
     if census_kind_list(_c.Counter({"ask": 5, "priority": 2, "gameend": 1})) != "":

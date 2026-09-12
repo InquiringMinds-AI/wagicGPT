@@ -275,8 +275,15 @@ struct W76CrossPhaseAsk
     int choice;
     std::vector<std::string> rows;
     bool sorcerySpeed;
+    //#W80-DH (F12, Astra wave-80 finding 12): the RECORD seq of the ask this entry
+    //remembers. `windowSeq` is the window counter and `logAskReplay`'s
+    //`replayed_from` is a RECORD seq on every other path (mAskCacheSeq,
+    //mRepeatAskSeq), so passing the window ordinal there put the join into the
+    //wrong namespace - the two diverge the moment a sidecar replay record advances
+    //mTransSeq without advancing mWindowSeq, which is every replay.
+    int recordSeq;
     W76CrossPhaseAsk() : windowSeq(0), countedSeq(-1), declined(false),
-                         choice(0), sorcerySpeed(false) {}
+                         choice(0), sorcerySpeed(false), recordSeq(-1) {}
 };
 
 struct W76HoldMemory
@@ -1343,6 +1350,12 @@ private:
     //new one, written the moment the deadline is spent).
     void flushWallMissRecord(const char * classOverride = NULL);
     void writeForceCloseRecord(const char * outcome, bool landArm); //#W78-CV (S11)
+    //#W80-DH (F11): one record per hold clamp / hold re-open, written at the event.
+    void writeHoldEventRecord(const char * event, const char * seam,
+                              const std::string& face, const std::string& reason);
+    //#W80-DH (F3): the object identity behind each lethal face, off the live board.
+    std::string w80StackThreatIdentityNow();
+    std::string w80CrackBackThreatIdentityNow();
     //#W80-DF (U13): one record per menu the ENGINE answered because every row of
     //it resolves to the same outcome. The counter alone is unauditable (the
     //wave-79 lesson), so the record names the menu, the row count, the row the
@@ -2059,15 +2072,35 @@ private:
     //UNTESTED by default, the exact outcome the wave-78 lesson exists to prevent.
     //Each clamp event and each re-open now stamps the face pair / the reason on
     //the record of the window it happened at. Consumed by the record writer.
-    std::string mHoldSaferIgnoredFace;
-    std::string mHoldReopenReason;
+    //#W80-DH (F11): the two shared strings are DELETED. One string per class,
+    //overwritten by every clamp and consumed by the next record of ANY kind, is
+    //not per-event accounting - see writeHoldEventRecord.
+    int mHoldEvents; //every clamp and every re-open writes one `hold_event` record
+    //#W80-DH (F3): a hold re-opened because a NEW lethal threat (different
+    //objects, same top-rank face) replaced the one it was taken over.
+    int mHoldReopenedNewLethal;
+    //#W80-DH (F3): WHICH OBJECTS made each lethal face lethal when the hold was
+    //taken, per seam. Object identity, never text and never a number; internal
+    //only - these enter no key, no row, no prompt and no record.
+    std::map<std::string, std::string> mHoldCrackBackIds;
+    std::map<std::string, std::string> mHoldStackIds;
     //#W80-DE (U2): the crack-back and stack-death verdicts, on the channel the
     //model can read. Both markers rendered 0 times in all 2,203 wave-79 prompts
     //(they were latch KEYS only - the wave-77 S6 lesson again). The rendered face
     //is stamped on the record and the counter increments AT THE SEND (U15).
     std::string mCrackBackVerdictFace;
     std::string mStackDeathVerdictFace;
+    //#W80-DH (F10): a caller's verdict faces, STAGED for the one askModel call it
+    //is about to make and applied inside it at the actual send boundary. Consumed
+    //(swapped out) on entry to askModel so they can never key a later ask.
+    std::string mNextSendLoopFace;
+    std::string mNextSendCrackBack;
+    std::string mNextSendStackDeath;
+    bool mNextSendDrain;
     int mCrackBackVerdictLinesRendered;
+    //#W80-DH (F4): of those, the lines that withdrew a false death claim because a
+    //legal block prevents it.
+    int mCrackBackLethalBlockedAway;
     int mCrackBackVerdictCountedSeq;
     int mStackDeathVerdictLinesRendered;
     int mStackDeathVerdictCountedSeq;
@@ -2108,6 +2141,8 @@ private:
     //#W80-DE (U2): the two verdict lines, rendered off the live board, and the
     //starter scan the proven-win face is gated on (U10).
     std::string w80CrackBackVerdictLineNow();
+    int w80CrackBackBestBlockFloorNow(); //#W80-DH (F4)
+    void w80CloseOpenCastStep(const char * why); //#W80-DH (F5)
     std::string w80StackDeathVerdictLineNow();
     std::string w80LiveLoopStarterName();
     //#W80-DE (U8): is THIS window one where sorcery-speed plays are legal for me?
@@ -2422,6 +2457,14 @@ private:
     //so the probe corpus decides them from counts instead of from code reading.
     int mProtocolReplies;          //replies that carried a body (the denominator)
     int mActionBeforePlanReplies;  //...that wrote the action line above the plan
+    //#W80-DH (F2): ...and the ones whose answer was REFUSED for it. The shape
+    //meter above says the model wrote the two lines the wrong way round; this
+    //says the parser dropped the answer and the seam re-asked the window (owner
+    //ruling: "any plan, must precede action"). `mActionBeforePlanRejected` is the
+    //per-window stamp, consumed by that window's own record so it can never
+    //migrate onto a later one; the counter is the record count.
+    bool mActionBeforePlanRejected;
+    int mActionBeforePlanRejects;
     int mPlanStepsDone;            //steps of the carried plan already executed
     //#W80-DG (U1, wave-79 HIGH-1): a CAST is one plan step spanning TWO windows
     //whenever the engine puts a completing menu behind it (the X ladder, the
@@ -2432,6 +2475,14 @@ private:
     //1 = a cast was committed and its completing menu has not been built yet;
     //2 = this window IS that completing menu, so the step is consumed HERE.
     int mPlanCastCompletionState;
+    //#W80-DH (F5): a cast can put up SEVERAL completing menus (cast-mode, then X,
+    //then targets), so the latch above may not be retired by the first of them.
+    //These say WHOSE cast is open and when it was committed; it closes on the cast
+    //EVENT (the spell reaching or leaving the stack) or, as a belt, at the turn
+    //boundary. `mPlanCastStepsClosed` is the per-game census of those closes.
+    std::string mPlanCastOpenName;
+    int mPlanCastOpenTurn;
+    int mPlanCastStepsClosed;
     //#W80-DG (U1 second half): how many sources the queued payment tapped, so a
     //decline row on the completing menu can say what is spent either way.
     int mPaidPendingSources;
