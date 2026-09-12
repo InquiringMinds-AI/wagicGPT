@@ -144,6 +144,25 @@ def selftest():
     if census_kind_list(k4, 0) != "forced_close 32, recovery 8":
         print("SELFTEST FAIL: zero engine-answered changed the listing")
         ok = False
+    #W79-DC (F11): the turn-gap explanation, on the wave-78 corpus's own figures.
+    if turn_gap_note(1016, 974, 42) != (" | gap 42 = 42 seat logs x the +1 narration"
+                                        " offset, exactly: every seat's last record is"
+                                        " on the game's final turn"):
+        print("SELFTEST FAIL: turn gap 1016/974/42 %r" % turn_gap_note(1016, 974, 42))
+        ok = False
+    #a seat that stopped writing records early reads LOWER, and the note says which way
+    if "BELOW" not in turn_gap_note(1010, 974, 42) \
+            or "6 turn(s) of records are missing" not in turn_gap_note(1010, 974, 42):
+        print("SELFTEST FAIL: turn gap below %r" % turn_gap_note(1010, 974, 42))
+        ok = False
+    #...and a gap ABOVE the offset is flagged as an impossibility, never explained away
+    if "EXCEEDS" not in turn_gap_note(1020, 974, 42):
+        print("SELFTEST FAIL: turn gap above %r" % turn_gap_note(1020, 974, 42))
+        ok = False
+    #no results.tsv: no claim at all
+    if turn_gap_note(1016, 0, 42) != "" or turn_gap_note(1016, 974, 0) != "":
+        print("SELFTEST FAIL: turn gap with no results.tsv claimed something")
+        ok = False
     print("corpus-stats selftest: %s" % ("OK" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -165,6 +184,30 @@ def results_turn_sum(dirs):
             except ValueError:
                 pass
     return total
+
+
+def turn_gap_note(record_turns, results_turns, seat_logs):
+    """#W79-DC (F11): the gap between the two turn columns, explained by mechanism.
+
+    The only two contributors are the +1 narration offset (one per seat log) and a
+    seat whose last record predates the final turn (which makes the record column
+    LOWER). A gap of exactly `seat_logs` is the offset alone."""
+    if not results_turns or not seat_logs:
+        return ""
+    gap = record_turns - results_turns
+    if gap == seat_logs:
+        return (" | gap %d = %d seat logs x the +1 narration offset, exactly: every"
+                " seat's last record is on the game's final turn"
+                % (gap, seat_logs))
+    if gap < seat_logs:
+        return (" | gap %d is BELOW the %d expected from the +1 offset, so %d turn(s)"
+                " of records are missing: that many seats stopped writing records"
+                " before the game's final turn (held, collapsed or heuristic-answered"
+                " to the end)" % (gap, seat_logs, seat_logs - gap))
+    return (" | gap %d EXCEEDS the %d expected from the +1 offset by %d - a record"
+            " `turn` past the game's own final turn, which should not happen; check"
+            " for a seat log paired with the wrong results.tsv row"
+            % (gap, seat_logs, gap - seat_logs))
 
 
 def load(dirs):
@@ -278,18 +321,35 @@ def main(argv):
 
     #W79-DB (T17, wave-78 known-bugs): WHICH TURN NUMBER. The wave-78 late-check
     #diagnosis read the seat log's per-record `turn` (62/81) while results.tsv
-    #says 85/68 for the same two games - the record `turn` is `translogTurn`,
-    #which is this SEAT's own turn count, and results.tsv's is the game's. The
-    #tool now names its source and prints BOTH, so no later seat has to guess.
+    #says 85/68 for the same two games. The tool names its source and prints BOTH.
+    #W79-DC (F11, Astra wave-79 review finding 11): AND THE EXPLANATION WAS WRONG.
+    #There is no per-seat turn count anywhere in this engine. The record `turn` is
+    #`AIPlayerGPT::translogTurn`, which is `observer->turn + 1` - the GAME's turn as
+    #the narration prints it ("=== Turn 10"), identical for both seats, which is the
+    #whole point of #W51-D (D18). results.tsv's `turn` is the raw `game->turn` that
+    #GameStateDuel.cpp prints on the WAGIC_SELFPLAY_RESULT line at game end. So the
+    #two columns differ for exactly two reasons, neither of them a seat:
+    #  (a) the +1 narration offset, worth ONE per seat log;
+    #  (b) a seat whose LAST RECORD predates the final turn (it was held, collapsed or
+    #      heuristic-answered through the end of the game) reads LOWER, not higher.
+    #The wave-78 corpus is 1,016 vs 974 over 42 seat logs, and 1016 - 974 = 42 = one
+    #per seat - i.e. (a) alone, with (b) contributing nothing: every seat's last record
+    #landed on the game's final turn. The reported late-check discrepancy is therefore
+    #NOT a turn-numbering artefact at all, and a diagnosis that blamed one was looking
+    #in the wrong place.
     record_turns = 0
     for recs in seen.values():
         t = [r.get("turn") for r in recs if isinstance(r.get("turn"), int)]
         if t:
             record_turns += max(t)
     results_turns = results_turn_sum(dirs)
-    print("TURN SOURCES: sum of max record `turn` per seat %d (this SEAT's turn"
-          " count, translogTurn) | sum of results.tsv `turn` x2 seats %s (the GAME's"
-          " turn count)" % (record_turns, results_turns if results_turns else "n/a"))
+    seat_logs = len(seen)
+    print("TURN SOURCES: sum of max record `turn` per seat %d (translogTurn ="
+          " observer turn + 1, the GAME's turn as the narration prints it - NOT a"
+          " per-seat count) | sum of results.tsv `turn` x2 seats %s (game->turn at"
+          " game end, no +1)%s"
+          % (record_turns, results_turns if results_turns else "n/a",
+             turn_gap_note(record_turns, results_turns, seat_logs)))
     turns = results_turns or record_turns
     print("decisions/turn (model decisions / %s) %.2f"
           % ("results.tsv game turns x2 seats" if results_turns
