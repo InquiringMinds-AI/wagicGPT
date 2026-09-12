@@ -1,0 +1,39 @@
+#NAME: T5 -- soaking a trampler's lethal cut BEATS the wave-78 "AT BEST" figure
+#DESC: #W79-DA (T5), the `146v152` seq 21 board and the block the seat actually played.
+#DESC: CR 702.19b: a trampler assigns lethal damage to each blocker first and only the
+#DESC: REST carries over, so a 2/1 in front of a 6/6 trampler removes 1 of its 6.
+#DESC: Here the 2/1 blocks the TRAMPLER (5 carries over) and the 1/1 blocks the 2/2
+#DESC: (0 carries over): 20 - 5 = 15.
+#DESC:
+#DESC: Its control twin (w79da_t5_trample_soak_decline.txt) ends at 14 on the same
+#DESC: board - the figure wave 78 printed as the seat's CEILING with "no assignment of
+#DESC: your blockers does better" beside it. 15 > 14, from the engine's own
+#DESC: GuiCombat/Damage assignment, so the claim was false and the exact search
+#DESC: w79BestBlockDamage now returns 5 (life 15) on exactly these inputs.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Rootbreaker Wurm,Balduvian Bears
+life:20
+[PLAYER2]
+inplay:Alpha Myr,Dwarven Trader
+life:20
+[DO]
+Rootbreaker Wurm
+Balduvian Bears
+next
+Alpha Myr
+Dwarven Trader
+Dwarven Trader
+next
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Rootbreaker Wurm,Balduvian Bears
+life:20
+[PLAYER2]
+graveyard:Alpha Myr,Dwarven Trader
+life:15
+[END]

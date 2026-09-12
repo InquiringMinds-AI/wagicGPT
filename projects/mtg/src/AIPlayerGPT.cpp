@@ -5720,13 +5720,34 @@ static int lifeAfterPendingStack(int life, int stackLossToMe)
     return life - (stackLossToMe > 0 ? stackLossToMe : 0);
 }
 
-static string pendingStackDamageLine(int dmgToMe, int myLife)
+static string pendingStackDamageLine(int dmgToMe, int myLife,
+                                    int queuedDraws = 0,      //#W79-DA (T16)
+                                    int perDraw = 0,          //#W79-DA (T16)
+                                    const string& punisherNames = "") //#W79-DA (T16)
 {
-    if (dmgToMe <= 0 || myLife < 0)
+    const int drawLoss = (queuedDraws > 0 && perDraw > 0) ? queuedDraws * perDraw : 0;
+    const int total = (dmgToMe > 0 ? dmgToMe : 0) + drawLoss;
+    if (total <= 0 || myLife < 0)
         return "";
-    const int after = lifeAfterPendingStack(myLife, dmgToMe); //#W66-AQ (H4)
+    const int after = lifeAfterPendingStack(myLife, total); //#W66-AQ (H4)
     std::ostringstream o;
-    o << "ON THE STACK: " << dmgToMe << " damage to you - you would be at " << after;
+    o << "ON THE STACK: ";
+    if (drawLoss > 0)
+    {
+        //#W79-DA (T16): both terms, named, then the one total the verdict is
+        //computed from - the reader can check each half against the rows above.
+        o << (dmgToMe > 0 ? dmgToMe : 0) << " damage to you from the damage"
+             " abilities listed above, plus " << drawLoss << " more that the "
+          << queuedDraws << " queued draw" << (queuedDraws == 1 ? "" : "s")
+          << " on this same stack cost" << (queuedDraws == 1 ? "s" : "")
+          << " you (" << queuedDraws << " x " << perDraw << " per draw";
+        if (!punisherNames.empty())
+            o << " to their " << punisherNames;
+        o << " - a queued draw is not declinable) = " << total
+          << " in total - you would be at " << after;
+    }
+    else
+        o << total << " damage to you - you would be at " << after;
     if (after <= 0)
         o << "; that would KILL you";
     return o.str();
@@ -6127,6 +6148,51 @@ static int stackLifeLossBefore(GameObserver * observer, Player * seat, MTGCardIn
     return total;
 }
 
+//#W79-DA (T16, wave-78 deck130 MED-2). THE STACK'S OWN CONSEQUENCES WERE NOT ON
+//THE STACK TOTAL. `130v162` seq 49, at 1 life: the stack listed `Howling Mine's
+//Draw 1`, `Dictate of Kruphix's Draw 1` and three direct-damage abilities, and
+//`ON THE STACK: 3 damage to you - you would be at -2` counted only the three -
+//while the SAME screen's DRAW FORECAST said the two queued draws cost 6 more
+//and put the seat at -5. Two totals about one stack, and the smaller one is the
+//one carrying the death verdict. A queued draw against a live draw punisher is
+//a finished subtraction: the draw is not declinable once it is on the stack,
+//and the punisher fires on every draw. Both figures now come from here, so the
+//`ON THE STACK` line, the stack-death verdict the hold latch keys on and the X
+//ladder cannot disagree about the same stack.
+static void drawPunisherScan(Player * me, Player * opp, //#W79-DA (T16): forward
+                             std::vector<std::string>& mine, int& minePerDraw,
+                             std::vector<std::string>& theirs, int& theirsPerDraw);
+
+static int w79QueuedDrawPunisherLoss(GameObserver * obs, Player * seat,
+                                     int * drawsOut = NULL, int * perOut = NULL,
+                                     std::string * namesOut = NULL)
+{
+    if (drawsOut)
+        *drawsOut = 0;
+    if (perOut)
+        *perOut = 0;
+    if (namesOut)
+        namesOut->clear();
+    if (!obs || !seat || !seat->opponent())
+        return 0;
+    const int draws = stackPendingDrawsFor(obs, seat, NULL);
+    if (draws <= 0)
+        return 0;
+    std::vector<std::string> mine, theirs;
+    int minePer = 0, theirsPer = 0;
+    drawPunisherScan(seat, seat->opponent(), mine, minePer, theirs, theirsPer);
+    if (theirsPer <= 0)
+        return 0;
+    if (drawsOut)
+        *drawsOut = draws;
+    if (perOut)
+        *perOut = theirsPer;
+    if (namesOut)
+        for (size_t i = 0; i < theirs.size(); i++)
+            *namesOut += (i ? ", " : "") + theirs[i];
+    return draws * theirsPer;
+}
+
 //#W66-AQ (H4): the whole pending life loss against `seat` from the stack as it
 //stands - the same walk, the same per-object reader and the same filters the
 //situation block's `ON THE STACK:` total is built from (NOT_RESOLVED, a spell
@@ -6157,6 +6223,9 @@ static int pendingStackLifeLossToSeat(GameObserver * observer, Player * seat,
             continue;
         total += stackObjectLifeLossToSeat(it, seat, NULL);
     }
+    //#W79-DA (T16): plus what the stack's own QUEUED DRAWS cost this seat
+    //through the opponent's draw punishers - undeclinable once queued.
+    total += w79QueuedDrawPunisherLoss(observer, seat);
     return total > 0 ? total : 0;
 }
 
@@ -6818,6 +6887,144 @@ static string attackDeclarationPunishers(Player * opp)
     return o.str();
 }
 
+//#W79-DA (T9, wave-78 deck126 HIGH-2): how much the named attack-declaration
+//punishers deal TO EACH ATTACKER when `declaredCount` of them are declared.
+//Lightmine Field's engine line is `@each blockers:foreach(creature[attacking]
+//|Battlefield) damage:1 all(creature[attacking]|Battlefield)`, i.e. 1 per
+//attacking creature dealt to each of them, so the amount is (literal x count)
+//for a `foreach(creature[attacking]` line and the bare literal otherwise. Every
+//amount that is not a plain number leaves `sized` false and the caller prints
+//nothing - the wave-61 discipline that an unproven kill claim is the one error
+//direction that cannot be tolerated is unchanged; what changes is that a
+//PROVEN one is no longer withheld.
+//#W79-DA (T9): one punisher line's amount PER ATTACKER, for a declaration of
+//`declaredCount` attackers. Pure over the (already lowercased) line, so every
+//shape is provable in PARSETEST without a board: a `foreach(creature[attacking]`
+//multiplier scales the literal by the declaration, anything else is the bare
+//literal, and a non-numeric magnitude leaves `readable` false so the caller
+//claims nothing at all.
+static int w79PunisherLineAmount(const string& lineLc, int declaredCount, bool& readable)
+{
+    readable = false;
+    const size_t dp = lineLc.find("damage:");
+    if (dp == string::npos || declaredCount <= 0)
+        return 0;
+    size_t q = dp + 7;
+    int amount = 0;
+    bool digits = false;
+    while (q < lineLc.size() && isdigit((unsigned char) lineLc[q]))
+    {
+        amount = amount * 10 + (lineLc[q] - '0');
+        digits = true;
+        q++;
+    }
+    if (!digits)
+        return 0;
+    readable = true;
+    return (lineLc.find("foreach(creature[attacking]") != string::npos)
+               ? amount * declaredCount
+               : amount;
+}
+
+static int attackDeclarationPunisherSize(Player * opp, int declaredCount, bool& sized)
+{
+    sized = false;
+    if (!opp || !opp->game || !opp->game->inPlay || declaredCount <= 0)
+        return 0;
+    int per = 0;
+    bool any = false, allRead = true;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        const string mt = scriptLower(c->magicText);
+        size_t lp = 0;
+        while (lp <= mt.size())
+        {
+            const size_t nl = mt.find('\n', lp);
+            const string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+            lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+            if (line.empty() || line[0] != '@')
+                continue;
+            const size_t dp = line.find("damage:");
+            if (dp == string::npos)
+                continue;
+            if (line.find("creature[attacking]") == string::npos)
+                continue;
+            if (line.find("all(") == string::npos && line.find("foreach(") == string::npos)
+                continue;
+            any = true;
+            bool readable = false;
+            const int amount = w79PunisherLineAmount(line, declaredCount, readable);
+            if (!readable)
+            {
+                allRead = false; //a computed magnitude: nothing is claimed
+                continue;
+            }
+            per += amount;
+        }
+    }
+    sized = any && allRead && per > 0;
+    return sized ? per : 0;
+}
+
+//#W79-DA (T7, wave-78 deck152 HIGH-1): the permanents on EITHER battlefield
+//that untap creatures outside the untap step - the class the tap-bill clause's
+//"they cannot attack this turn" is false under. The predicate is the SHAPE of
+//the effect, not a card name: a script line that untaps a SET of creatures
+//(`untap all(creature)`, `untap foreach(creature...)`), whatever triggers it.
+//Intruder Alarm is `@movedTo(creature|myBattlefield):untap all(creature)` plus
+//a standing `lord(creature) doesnotuntap` - the standing half carries the
+//substring "untap" inside "doesnotuntap", so it is deleted before the scan or
+//every no-untap lord in the game would read as an untap engine. Fails closed:
+//an unreadable script is not evidence an untap engine exists, and the failure
+//being fixed is a MISSING exception, never an invented one. Both sides are
+//scanned because an untap-all effect untaps every creature, not only its
+//controller's.
+static string w79UntapEngineSources(Player * me, Player * opp) //#W79-DA (T7)
+{
+    std::ostringstream o;
+    int n = 0;
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? me : opp;
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c)
+                continue;
+            string mt = scriptLower(c->magicText);
+            for (size_t at = 0; (at = mt.find("doesnotuntap")) != string::npos; )
+                mt.erase(at, 12);
+            bool hit = false;
+            size_t lp = 0;
+            while (!hit && lp <= mt.size())
+            {
+                const size_t nl = mt.find('\n', lp);
+                const string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+                lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+                if (line.find("untap") == string::npos)
+                    continue;
+                if (line.find("all(") == string::npos && line.find("foreach(") == string::npos)
+                    continue;
+                if (line.find("creature") == string::npos)
+                    continue;
+                hit = true;
+            }
+            if (!hit)
+                continue;
+            o << (n++ ? ", " : "") << c->getDisplayName() << instanceHandle(c)
+              << (side == 0 ? " (yours)" : " (THEIRS)");
+        }
+    }
+    return o.str();
+}
+
 //#W76-CO (Q4a, wave-75 deck126 HIGH-1). THE AGGREGATE COVER COUNTED A MENACE
 //ATTACKER AS ONE BODY. `126v146` deck126 seq 45 (t20, under a live LOOP
 //COMPLETE): four attackers of which TWO have menace, against four untapped
@@ -6888,7 +7095,11 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
                               bool oppLifeLoop = false, //#W62-X (D2)
                               bool * outKillClaim = NULL, //#W65-AN (G6)
                               int blockLifelink = 0, //#W65-AP (R4)
-                              int selfConverterLifelink = 0) //#W74-CC (O5)
+                              int selfConverterLifelink = 0, //#W74-CC (O5)
+                              int punisherPerAttacker = 0, //#W79-DA (T9)
+                              int punisherKilled = 0,      //#W79-DA (T9)
+                              int punisherKilledPower = 0, //#W79-DA (T9)
+                              const string& punisherVictims = "") //#W79-DA (T9)
 {
     //#W65-AN (G6, deck123 HIGH-1): the A-row life-LOOP clause on the same
     //screen has to yield to this line's kill verdict, and a second computation
@@ -7068,6 +7279,37 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
           << " fires on the declaration, before any combat damage, and can kill"
              " your attackers first - how much it deals depends on how many you"
              " declare, so it is not folded into either number.";
+    //#W79-DA (T9, wave-78 deck126 HIGH-2). THE LINE NAMED THE PUNISHER AND LEFT
+    //THE ARITHMETIC UNDONE. `126v125` seqs 83/95/116/120/125: `ATTACK TOTAL: 1
+    //attacker listed, 1 total combat damage ... At least 1 damage lands whatever
+    //they BLOCK` with Lightmine Field on their battlefield; the 1/1 died to the
+    //declaration trigger five times for 0 damage dealt. Wave 61 withheld the
+    //number because "how much it deals depends on how many you declare" - true
+    //in general, and NOT true of the figure this line is about: the line prices
+    //ONE declaration, ALL of them, and for that declaration the punisher's
+    //amount is exactly computable. So the fold is stated for exactly that
+    //declaration, beside the general caution, and only where the amount was
+    //read (an unsized punisher leaves the wave-61 sentence alone).
+    if (punisherPerAttacker > 0 && attackers > 0)
+    {
+        o << " FOLDED, for the all-in declaration this line prices: " << attackPunishers
+          << " deals " << punisherPerAttacker << " to EACH of the " << attackers
+          << " attacker" << (attackers == 1 ? "" : "s")
+          << " you would declare, before any combat damage.";
+        if (punisherKilled > 0)
+        {
+            o << " That kills " << punisherKilled << " of them";
+            if (!punisherVictims.empty())
+                o << " (" << punisherVictims << ")";
+            o << ", so " << punisherKilledPower << " of the " << totalPower
+              << " above never gets dealt: " << (totalPower - punisherKilledPower)
+              << " reaches them and they would be at "
+              << (oppLife - (totalPower - punisherKilledPower))
+              << " - not " << (oppLife - totalPower) << ".";
+        }
+        else
+            o << " None of them dies to it at that size, so the figures above stand.";
+    }
     o << "\n";
     return o.str();
 }
@@ -7199,8 +7441,11 @@ static bool gangDangerLess(const GangBlockerStat& a, const GangBlockerStat& b)
 static int gangKillNeed(int atkPower, int atkToughness, bool atkFirstStrike,
                         bool atkDeathtouch, const vector<GangBlockerStat>& g,
                         int minBlockers, int * outDamage, bool * outAnyOfThem,
-                        bool * outByDeathtouch)
+                        bool * outByDeathtouch,
+                        int * outSoak = NULL) //#W79-DA (T5)
 {
+    if (outSoak)
+        *outSoak = 0;
     if (outDamage)
         *outDamage = 0;
     if (outAnyOfThem)
@@ -7232,6 +7477,19 @@ static int gangKillNeed(int atkPower, int atkToughness, bool atkFirstStrike,
             *outDamage = anyOk ? wdmg : dmg;
         if (outByDeathtouch)
             *outByDeathtouch = anyOk ? wByDt : byDt;
+        //#W79-DA (T5): the lethal cut this exact group SOAKS, which is what a
+        //trample attacker's carry-over is measured against (CR 702.19b; a
+        //deathtouch attacker's cut is 1 per blocker, CR 702.2b). Reported from
+        //the group the caller is about to NAME - `worst` when "any N of yours"
+        //is true, `best` otherwise - so the spill and the group cannot drift.
+        if (outSoak)
+        {
+            const vector<GangBlockerStat>& grp = anyOk ? worst : best;
+            int soak = 0;
+            for (size_t gi = 0; gi < grp.size(); gi++)
+                soak += atkDeathtouch ? 1 : (grp[gi].toughness > 0 ? grp[gi].toughness : 0);
+            *outSoak = soak;
+        }
         return k;
     }
     return 0;
@@ -7270,7 +7528,9 @@ static int gangKillNeed(int atkPower, int atkToughness, bool atkFirstStrike,
 static string gangBlockPriceTag(int need, int damage, bool anyOfThem, bool mine = false,
                                 bool resultsBelow = false,
                                 bool byDeathtouch = false, //#W64-AG (F7)
-                                bool afterFirstStrike = false) //#W64-AG (F7)
+                                bool afterFirstStrike = false, //#W64-AG (F7)
+                                int trampleSpill = -1, //#W79-DA (T5)
+                                int trampleSoak = 0)   //#W79-DA (T5)
 {
     if (need < 2 || (damage <= 0 && !byDeathtouch))
         return "";
@@ -7294,6 +7554,26 @@ static string gangBlockPriceTag(int need, int damage, bool anyOfThem, bool mine 
       << (mine ? "each B-line result below is a LONE blocker only"
                : (resultsBelow ? "each result below is a LONE blocker only"
                                : "each result above is a LONE blocker only"));
+    //#W79-DA (T5, wave-78 deck146 HIGH-1). KILLING IT IS NOT STOPPING IT.
+    //`146v152` seq 26: `GANG BLOCK: any 3 of yours together deal 6, enough to
+    //kill this attacker` on a 6/6 TRAMPLER, four lines under a B-row reading
+    //`5 tramples to your face` for the lone block. The seat wrote "0 trample",
+    //sent three 2/1 Spiders, and took 3 to the face it had been told it would
+    //not take. A trampler assigns lethal damage to its blockers and carries the
+    //rest over whether or not it dies (CR 702.19b), so the group's own
+    //carry-over is part of the price of fielding it. Stated as the subtraction,
+    //off the SAME group this clause names.
+    if (trampleSpill >= 0)
+    {
+        o << "; this attacker has TRAMPLE, so killing it does NOT stop all of"
+             " its damage: it assigns its lethal damage to that group (";
+        o << trampleSoak << " of toughness between them) and ";
+        if (trampleSpill > 0)
+            o << trampleSpill << (mine ? " still tramples to your face"
+                                       : " still tramples through to them");
+        else
+            o << "NOTHING carries over" << (mine ? " to your face" : " to them");
+    }
     return o.str();
 }
 
@@ -7848,8 +8128,20 @@ static const char * paymentTapRestrictionWords(int r, bool plural)
         return plural ? "they cannot block on their turn" : "it cannot block on their turn";
     return "";
 }
+//#W79-DA (T7, wave-78 deck152 HIGH-1). "THEY CANNOT ATTACK THIS TURN" IS NOT
+//TRUE UNDER AN UNTAP ENGINE. `152v123` seqs 17/18 printed
+//`{paying this taps: Katilda, Dawnhart Prime, Briarbridge Tracker - they cannot
+//attack this turn}` across the table from a live Intruder Alarm ("Whenever a
+//creature enters, untap all creatures"), and BOTH bodies attacked at seq 21 -
+//the seat overrode the clause correctly for the third wave running, which is
+//the trust doctrine failing in the expensive direction. The restriction is real
+//only while nothing untaps them; where an untap engine is on the board the
+//clause names it, so the same sentence carries the same fact AND its exception.
+//Restriction still first: the exception follows the restriction, it does not
+//replace it, and nothing on the row is removed.
 static string paymentTapsClause(const std::vector<std::string>& names,
-                                const std::vector<int>& restrictions)
+                                const std::vector<int>& restrictions,
+                                const string& untapSource = "") //#W79-DA (T7)
 {
     if (names.empty())
         return "";
@@ -7879,6 +8171,21 @@ static string paymentTapsClause(const std::vector<std::string>& names,
             if (r != TAP_RESTRICT_NONE)
                 o << " - " << paymentTapRestrictionWords(r, false);
         }
+    }
+    //#W79-DA (T7): the exception, once for the row, named.
+    if (!untapSource.empty())
+    {
+        bool anyRestriction = false;
+        for (size_t i = 0; i < names.size(); i++)
+            if ((i < restrictions.size() ? restrictions[i] : (int) TAP_RESTRICT_NONE)
+                != TAP_RESTRICT_NONE)
+                anyRestriction = true;
+        if (anyRestriction)
+            o << " - UNLESS " << untapSource << " untaps "
+              << (names.size() == 1 ? "it" : "them")
+              << " first: that untaps creatures OUTSIDE the untap step, so a body"
+                 " tapped for mana here can be standing again before the"
+                 " declaration this clause is about";
     }
     o << "}";
     return o.str();
@@ -11414,6 +11721,20 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                         ? tappedCreatureTag(card->has(Constants::CANBLOCKTAPPED),
                                             card->isAttacker() != 0, blockedName)
                         : string(" [tapped]"));
+            //#W79-DA (T16, wave-78 deck146 MED-2). AN UNTAP KEYWORD WITH NO TAP
+            //STATE BESIDE IT READS AS A TAP STATE. `146v123` seq 15 printed
+            //`Human #1-#102 (1/1) [doesn't untap during its controller's untap
+            //step]` on UNTAPPED bodies - the board line prints `[tapped]` when a
+            //permanent is tapped and NOTHING when it is not, so on every other
+            //card absence means untapped, and on these the keyword filled the
+            //silence with the opposite fact (~1,300 reasoning chars spent on it
+            //in one window). The keyword is about a FUTURE untap step; the state
+            //is about now. Printed ONLY on a card carrying that keyword, so no
+            //other row on the board moves by a byte, and this is the one place
+            //an affirmative face is required - the same exception #W47-N139k
+            //made for "but CAN block".
+            else if (card->has(Constants::DOESNOTUNTAP))
+                out << " [untapped]";
             //A summoning-sick creature renders identically to an attack-ready one
             //otherwise, so the pilot pattern-completes its ATTACK line from the
             //board count and lists slots the A-lines never offered (deck93 N-93a:
@@ -25731,8 +26052,11 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
         if (bestCaseOptimal)
             s << "you SURVIVE at " << bestLife << " if you block";
         else
+            //#W79-DA (T5): "the least damage any block can leave" is the same
+            //optimality claim this branch never computed - it names the line the
+            //search DID find instead.
             s << "no assignment is PROVEN to save you, and none is proven to lose"
-                 " either: the least damage any block can leave puts you at " << bestLife;
+                 " either: the block this search found puts you at " << bestLife;
         survivalClause = s.str();
     }
     if (myLife - unblockedDamage <= 0)
@@ -25860,10 +26184,23 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
         }
         else
         {
-            o << " - at least " << bestCaseDamage << " of that lands whatever you block"
-                 " (trample/menace counted as unblocked): you would be at "
+            //#W79-DA (T5): the optimality claim is gone from this branch. It is
+            //reached only when the exact search could not run (too many bodies
+            //or attackers to enumerate), and then the number counts a trampler's
+            //FULL power as landing - which a block that soaks its lethal cut
+            //beats, so "no assignment does better" was false exactly where the
+            //seat had a better line (`146v152` seq 21, `162v152` seq 19). What
+            //is still true is that this is a BOUND: no assignment does better
+            //than this, and none is proven to reach it either.
+            o << " - one legal assignment leaves " << bestCaseDamage
+              << " of that landing (it blocks what one body stops and leaves every"
+                 " trample/menace attacker unblocked): you would be at "
               << (myLife - bestCaseDamage)
-              << " AT BEST (no assignment of your blockers does better)";
+              << " AT BEST as far as this search went - a REACHABLE figure, not a"
+                 " ceiling: this board is too large for the exact search, and"
+                 " putting a body in front of a trampler to soak its lethal cut,"
+                 " or two in front of a menace attacker, can leave you HIGHER"
+                 " than this";
             if (gain > 0 && llGain <= 0) //#W64-AG (F8b)
                 o << ", " << bestLife << " AT BEST once the " << gain
                   << " your blocking triggers gain you is added";
@@ -25877,8 +26214,13 @@ static string incomingCombatLine(int attackers, int unblockedDamage, int myLife,
                 o << ", " << bestLifeWithMay << " AT BEST if you also take every"
                      " OPTIONAL gain the BLOCKING THIS COMBAT line below meters ("
                   << mayGain << " more; those are \"may\" gains and yours to take)";
+            //#W79-DA (T5): NOT "no block saves you" - this branch never searched
+            //the blocks that soak a trampler, so a death verdict over it is a
+            //claim the computation did not make. The figure is stated and the
+            //verdict is scoped to the line that produced it.
             if (bestLifeWithMay <= 0)
-                o << "; no block saves you";
+                o << "; that line does not save you - and no line on this board"
+                     " was proven either way";
         }
     }
     return o.str();
@@ -26880,12 +27222,27 @@ static bool crackBackBodyHoldsUpOthers(MTGCardInstance * dying, Player * opp,
     }
     return false;
 }
+//#W79-DA (T9, wave-78 deck130 HIGH-1). A ROW THAT SPENDS A BLOCKER PRICED ONLY
+//WHAT IT REMOVED. `130v146` seq 53, at 1 life: `Deal 2 damage with Siege-Gang
+//Commander targeting Goblin #1 ... {removes 2 from the CRACK-BACK total above:
+//7 -> 5 - you would be at -4; that still KILLS you} [cost: {1}{r}, Sacrifice]`.
+//The Sacrifice spends one of the seat's OWN untapped bodies, and two windows
+//later the blockers header computed exactly that missing blocker ("best case
+//with every blocker assigned: you would be at -1"). A relief clause that counts
+//the body it kills and not the body it spends is half a subtraction.
+//`sacrificeGiveBack` is the crack-back power the lost blocker was covering,
+//computed the way the cover clause computes cover (each body stops at most one
+//attacker, an attacker needing N bodies costs N), so the two agree; the caller
+//passes 0 whenever the cost cannot take a blocker at all.
 static string crackBackReliefClause(int total, int removed, int myLife, bool floorTotal,
-                                    const string& staticSourceName = "")
+                                    const string& staticSourceName = "",
+                                    int sacrificeGiveBack = 0, //#W79-DA (T9)
+                                    int sacrificeBodies = 0)   //#W79-DA (T9)
 {
     if (total <= 0 || removed <= 0 || myLife < 0 || removed > total)
         return "";
     const int after = total - removed;
+    const int give = sacrificeGiveBack > 0 ? sacrificeGiveBack : 0;
     std::ostringstream o;
     o << " {removes " << removed << " from the CRACK-BACK total above: " << total
       << " -> " << after;
@@ -26894,7 +27251,15 @@ static string crackBackReliefClause(int total, int removed, int myLife, bool flo
              " the power of their other attackers, and that goes with it, so the"
              " real total after it dies is not exactly " << after;
     o << " - you would be at " << (myLife - after);
-    if (myLife - after <= 0)
+    //#W79-DA (T9): the body this row SPENDS, before any verdict is given.
+    if (give > 0)
+        o << " - but the Sacrifice in this row's own cost takes one of your "
+          << sacrificeBodies << " untapped blocker"
+          << (sacrificeBodies == 1 ? "" : "s")
+          << " off the board before that attack, and that body was covering "
+          << give << " of the same total: count it back and you would be at "
+          << (myLife - after - give);
+    if (myLife - after - give <= 0)
         o << (staticSourceName.empty() ? "; that still KILLS you"
                                        : "; that still KILLS you at this figure");
     else if (floorTotal)
@@ -27155,17 +27520,112 @@ static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
 //and the render already knows them. They are folded FIRST (they are certain -
 //no cast is required to have them), each body is assigned to at most one
 //attacker, and the row's own bodies then cover what is left.
+//#W79-DA (T9): the crack-back power ONE of the seat's untapped blockers is
+//covering, and whether this ability's cost can actually take one. The cover
+//model is the cover clause's own (attackers biggest-power first, each attacker
+//costs `minBlockersRequired()` bodies, each body spends once), so the number
+//given back here and the number the cover clause subtracts are the same
+//arithmetic over the same board. A body is a candidate only if the cost's own
+//TargetChooser accepts it (or, with no chooser, the ability's source IS that
+//body - SacrificeCost's default is to sacrifice itself), so a "Sacrifice an
+//artifact" cost prices nothing here. Returns 0 whenever nothing is claimable.
+static int w79CoveredByBodies(std::vector<CrackBackAttackerFact> sorted, int bodies)
+{
+    if (bodies <= 0)
+        return 0;
+    std::sort(sorted.begin(), sorted.end(), crackBackFactPowerDesc);
+    int spare = bodies, covered = 0;
+    for (size_t i = 0; i < sorted.size(); i++)
+    {
+        const int need = sorted[i].blockersNeeded > 0 ? sorted[i].blockersNeeded : 1;
+        if (need <= spare)
+        {
+            spare -= need;
+            covered += sorted[i].power;
+        }
+    }
+    return covered;
+}
+
+static int w79SacrificeBlockerGiveBack(Player * me, Player * opp, MTGAbility * ability,
+                                       int& bodiesOut)
+{
+    bodiesOut = 0;
+    if (!me || !opp || !ability || !me->game || !me->game->inPlay
+        || !opp->game || !opp->game->inPlay)
+        return 0;
+    ManaCost * cost = ability->getCost();
+    if (!cost || !cost->extraCosts)
+        return 0;
+    std::vector<MTGCardInstance *> standing;
+    for (int i = 0; i < me->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * bc = me->game->inPlay->cards[i];
+        if (!bc || !bc->isCreature() || bc->isTapped())
+            continue;
+        if (bc->basicAbilities[(int) Constants::CANTBLOCK] || !bc->canBlock())
+            continue;
+        standing.push_back(bc);
+    }
+    if (standing.empty())
+        return 0;
+    bool takesOne = false;
+    for (size_t ci = 0; ci < cost->extraCosts->costs.size() && !takesOne; ci++)
+    {
+        ExtraCost * ec = cost->extraCosts->costs[ci];
+        if (!ec || !dynamic_cast<SacrificeCost *>(ec))
+            continue;
+        for (size_t bi = 0; bi < standing.size() && !takesOne; bi++)
+            takesOne = ec->tc ? (ec->tc->canTarget(standing[bi]) != 0)
+                              : (standing[bi] == ability->source);
+    }
+    if (!takesOne)
+        return 0;
+    std::vector<CrackBackAttackerFact> atk;
+    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * ac = opp->game->inPlay->cards[i];
+        if (!ac || crackBackBodyContribution(ac) <= 0)
+            continue;
+        CrackBackAttackerFact f;
+        f.power = crackBackBodyContribution(ac);
+        f.blockersNeeded = ac->minBlockersRequired();
+        atk.push_back(f);
+    }
+    if (atk.empty())
+        return 0;
+    bodiesOut = (int) standing.size();
+    const int give = w79CoveredByBodies(atk, (int) standing.size())
+                     - w79CoveredByBodies(atk, (int) standing.size() - 1);
+    return give > 0 ? give : 0;
+}
+
 static string crackBackBlockerRowTag(int total, int myLife,
                                      int checkedBodies, int uncheckedBodies,
                                      const std::vector<CrackBackAttackerFact>& atk,
                                      bool totalIsFloor = false,
-                                     int existingBodies = 0) //#W69-BH (K6a)
+                                     int existingBodies = 0, //#W69-BH (K6a)
+                                     int floorExtra = 0) //#W79-DA (T6)
 {
     const int bodies = checkedBodies + uncheckedBodies;
     if (bodies <= 0 || total <= 0 || atk.empty())
         return "";
     if (myLife - total > 0 && !totalIsFloor)
         return ""; //#W65-AL (G4): a proven-survivable CEILING needs no cover clause
+    //#W79-DA (T6, wave-78 deck162 HIGH-1). TWO TOTALS, ONE SCREEN. The
+    //CRACK-BACK line's own ADD-THOSE-UP sentence (#W71-BR L18) finishes the
+    //subtraction over creatures AND the sized floor sources it names, and
+    //prints its verdict off THAT number - `162v146` seq 15 read "the total to
+    //subtract from your life is 10 and you would be at -2; that would KILL
+    //you". This clause subtracted its cover from the CREATURE-ONLY 7, told the
+    //seat "you would be at 4", the seat answered "Safe enough", and the game
+    //ended at -2. A cover is a subtraction, and a subtraction has to be from
+    //the number the reader was given. `floorExtra` is the SAME figure the line
+    //above added, threaded in rather than recomputed, so the two sentences
+    //cannot disagree; the bodies still cover only the creature half, because a
+    //blocker is what they are.
+    const int extra = floorExtra > 0 ? floorExtra : 0;
+    const int stated = total + extra;
     std::vector<CrackBackAttackerFact> sorted(atk);
     std::sort(sorted.begin(), sorted.end(), crackBackFactPowerDesc);
     //FLOOR: only the bodies whose block legality is checked, against only the
@@ -27219,16 +27679,23 @@ static string crackBackBlockerRowTag(int total, int myLife,
         coveredExisting = total;
     coveredFloor += coveredExisting;
     coveredCeil += coveredExisting;
+    //#W79-DA (T6): the bodies cover CREATURES, so the cover is still capped at
+    //the creature total - what changes is the number it comes off.
     if (coveredFloor > total)
         coveredFloor = total;
     if (coveredCeil > total)
         coveredCeil = total;
-    const int leftFloor = total - coveredFloor;
-    const int leftCeil = total - coveredCeil;
+    const int leftFloor = stated - coveredFloor;
+    const int leftCeil = stated - coveredCeil;
     std::ostringstream o;
     o << " {crack-back cover: the CRACK-BACK NEXT TURN line above is " << total
-      << " from " << sorted.size() << " of their creatures and puts you at "
-      << (myLife - total);
+      << " from " << sorted.size() << " of their creatures";
+    if (extra > 0) //#W79-DA (T6)
+        o << " PLUS the " << extra << " that line's own ADD THOSE UP sentence adds"
+             " from the other sources it names - " << stated << " in total, which is"
+             " the number that line subtracts from your life and the number this"
+             " clause subtracts from too";
+    o << " and puts you at " << (myLife - stated);
     if (totalIsFloor) //#W65-AL (G4): the line above calls that number a FLOOR
         o << " OR LOWER - that line says the total is a FLOOR, not a ceiling"
              " (triggers, animated permanents and ability damage on their board"
@@ -27262,14 +27729,14 @@ static string crackBackBlockerRowTag(int total, int myLife,
              " clause counts " << (existingBodies == 1 ? "it" : "them")
           << " FIRST: on " << (existingBodies == 1 ? "its" : "their")
           << " own " << (existingBodies == 1 ? "it covers " : "they cover ")
-          << coveredExisting << " of " << total
+          << coveredExisting << " of " << stated
           << " (each of them blocks at most ONE attacker, and none is counted"
              " against two).";
     o << (existingBodies > 0
               ? " Counting those bodies AND the checked new ones you cover "
               : " Counting only the checked bodies you cover ")
       << coveredFloor << " of "
-      << total << ", leaving " << leftFloor << " -> you would be at "
+      << stated << ", leaving " << leftFloor << " -> you would be at "
       << (myLife - leftFloor);
     if (totalIsFloor)
     {
@@ -27277,7 +27744,7 @@ static string crackBackBlockerRowTag(int total, int myLife,
         //reach a total that is a lower bound, so no survival verdict may rest
         //on it - and none is printed, whichever side of 0 the figure falls.
         o << ". THIS IS NOT A SURVIVAL VERDICT: the total it is subtracted from"
-             " is a FLOOR, so a larger crack-back than " << total << " is on the"
+             " is a FLOOR, so a larger crack-back than " << stated << " is on the"
              " table and this row does not say whether you survive"
           << (myLife - leftFloor > 0 ? " - the " : " - and the ")
           << (myLife - leftFloor) << " above is what you would be at ONLY if"
@@ -27295,7 +27762,7 @@ static string crackBackBlockerRowTag(int total, int myLife,
     else if (uncheckedBodies > 0)
     {
         o << ". If EVERY uncounted body could also legally block, the cover rises"
-             " to " << coveredCeil << " of " << total << " and you would be at "
+             " to " << coveredCeil << " of " << stated << " and you would be at "
           << (myLife - leftCeil)
           << ". THIS IS NOT A SURVIVAL VERDICT: whether those bodies may block"
              " these attackers is not established here, so this row does not say"
@@ -27957,6 +28424,127 @@ static int assignableRemainderDamage(const vector<int>& damage,
     return total - prevented;
 }
 
+//#W79-DA (T5, wave-78 deck146 HIGH-1/HIGH-3 + deck162 HIGH-2). THE `AT BEST`
+//FIGURE WAS NOT A BOUND AND NOT AN OPTIMUM. `assignableRemainderDamage` above
+//counts a trample or menace attacker's FULL power as landing and never matches
+//it, on the wave-58 reading that this is the safe direction. It is not: CR
+//702.19b lets a trampler's blockers SOAK their lethal damage, so blocking one
+//with a 2/1 turns 6 into 5, and CR 509.1c makes a menace attacker fully
+//blockable by TWO bodies. So the shipped figure is an assignment the seat can
+//always reach (the matching's own pairing, tramplers unblocked) - never worse
+//than reality - but the sentence beside it claims "no assignment of your
+//blockers does better", and on `146v152` seq 21 the seat's OWN legal block
+//(Spider in front of Sigarda, Goblin in front of Luminarch) ended at 15 while
+//the header swore 14 was the ceiling; `162v152` seq 19 printed 12 against a
+//true 14 (Fog Bank soaks 2 of Sigarda's 6). A ceiling a legal line beats is the
+//one error direction the trust doctrine cannot carry, because the model is
+//instructed to believe it over its own arithmetic.
+//
+//This is the EXACT search the claim needs. Each blocker goes to at most one
+//attacker (CR 509.1a), so the state is "which blockers are still free"; each
+//attacker's residual face damage depends only on the SET assigned to it:
+//  - fewer bodies than `minBlockers` is not a block at all, so that subset is
+//    not a legal assignment and is never considered (CR 509.1c);
+//  - a trampler assigns lethal damage to each blocker first and carries the
+//    rest over, so the residual is power minus the sum of those lethal cuts
+//    (`soak[i]`, the blocker's REMAINING toughness; deathtouch cuts each to 1,
+//    CR 702.2b) and never below 0;
+//  - anything else that is legally blocked deals nothing to the face.
+//dp[j][mask] = the least damage attackers j..end can still deal with `mask`
+//free, so the answer is dp[0][all] and the walk back down it IS the assignment
+//the header names - the same rail #W62-Z (D12) built so the printed life and
+//the printed pairing cannot disagree. Bounded at 12 x 12: the sum over masks of
+//their submasks is 3^nb, which is ~0.5 M steps per attacker and nothing beside
+//the model call this prompt precedes; past the bound the caller keeps the
+//wave-58 figure and the wording drops its optimality claim.
+struct W79AtkFact //#W79-DA (T5)
+{
+    int power;
+    int minBlockers;
+    bool trample;
+    bool deathtouch;
+};
+
+static int w79ResidualFor(const W79AtkFact& a, const vector<int>& soak, unsigned mask)
+{
+    const int p = a.power > 0 ? a.power : 0;
+    int k = 0, cut = 0;
+    for (size_t i = 0; i < soak.size(); i++)
+        if (mask & (1u << i))
+        {
+            k++;
+            cut += a.deathtouch ? 1 : (soak[i] > 0 ? soak[i] : 0);
+        }
+    if (k == 0)
+        return p;
+    if (k < (a.minBlockers > 0 ? a.minBlockers : 1))
+        return -1; //not a legal block: this subset is not an assignment
+    if (!a.trample)
+        return 0;
+    return p - cut > 0 ? p - cut : 0;
+}
+
+static int w79BestBlockDamage(const vector<W79AtkFact>& atk, const vector<int>& soak,
+                              const vector<vector<char> >& can, vector<int> * matchOut)
+{
+    if (matchOut)
+        matchOut->clear();
+    const int na = (int) atk.size();
+    const int nb = (int) can.size();
+    if (na <= 0 || nb <= 0 || na > 12 || nb > 12 || (int) soak.size() != nb)
+        return -1;
+    const unsigned full = (nb >= 32) ? 0xffffffffu : ((1u << nb) - 1u);
+    vector<unsigned> legalMask((size_t) na, 0u);
+    for (int i = 0; i < nb; i++)
+        for (int j = 0; j < na; j++)
+            if (j < (int) can[(size_t) i].size() && can[(size_t) i][j])
+                legalMask[(size_t) j] |= (1u << i);
+    const size_t states = (size_t) full + 1;
+    vector<vector<int> > dp((size_t) na + 1, vector<int>(states, 0));
+    vector<vector<unsigned> > pick((size_t) na, vector<unsigned>(states, 0u));
+    for (int j = na - 1; j >= 0; j--)
+    {
+        const W79AtkFact& a = atk[(size_t) j];
+        const int bare = a.power > 0 ? a.power : 0;
+        for (unsigned mask = 0; mask <= full; mask++)
+        {
+            //Taking nobody is always legal, so it is the baseline every subset
+            //has to beat - no assignment is ever removed by this search.
+            int best = bare + dp[(size_t) j + 1][mask];
+            unsigned bestSet = 0u;
+            const unsigned avail = mask & legalMask[(size_t) j];
+            for (unsigned s = avail; s; s = (s - 1) & avail)
+            {
+                const int r = w79ResidualFor(a, soak, s);
+                if (r < 0)
+                    continue;
+                const int v = r + dp[(size_t) j + 1][mask & ~s];
+                if (v < best)
+                {
+                    best = v;
+                    bestSet = s;
+                }
+            }
+            dp[(size_t) j][mask] = best;
+            pick[(size_t) j][mask] = bestSet;
+        }
+    }
+    if (matchOut)
+    {
+        matchOut->assign((size_t) nb, -1);
+        unsigned mask = full;
+        for (int j = 0; j < na; j++)
+        {
+            const unsigned s = pick[(size_t) j][mask];
+            for (int i = 0; i < nb; i++)
+                if (s & (1u << i))
+                    (*matchOut)[(size_t) i] = j;
+            mask &= ~s;
+        }
+    }
+    return dp[0][full];
+}
+
 //#W62-Z (D12, deck146 HIGH-2, the decision that lost 146v152). The header
 //PROVED a survivable assignment existed - `best case with every blocker
 //assigned: you would be at 6` at 8 life - and then printed only the number.
@@ -28024,9 +28612,24 @@ static string blockKeepAlternativeClause(const string& pairings, int keepDamage,
       << " - every blocker in it survives, and it lets in " << keepDamage
       << " combat damage instead of " << bestCase << " ("
       << (keepDamage - bestCase) << " more damage, and it spends no creature).";
+    //#W79-DA (T5, wave-78 deck146 HIGH-3). ONE HEADER, TWO VERDICTS THAT
+    //DISAGREE. `146v123` seq 19 printed `no assignment of your blockers survives
+    //this` (best case -6) and then, in this clause, `26 KILLS you at 18 life:
+    //this line LOSES THE GAME and the line above does not` - both lines lose,
+    //and the contrast is a statement about a survival the same header had just
+    //denied. The contrast is a fact about the OTHER line, so it is read off the
+    //same two numbers this clause already holds: `bestCase` is the life line's
+    //damage and `lifeAfterGains` the life it is measured against.
     if (lifeAfterGains >= 0 && keepDamage >= lifeAfterGains)
-        o << " " << keepDamage << " KILLS you at " << lifeAfterGains
-          << " life: this line LOSES THE GAME and the line above does not.";
+    {
+        o << " " << keepDamage << " KILLS you at " << lifeAfterGains << " life: ";
+        if (bestCase >= lifeAfterGains)
+            o << "this line LOSES THE GAME - and so does the line above ("
+              << bestCase << " at " << lifeAfterGains << " life). Neither line on"
+                 " this screen survives; the one above simply loses by less.";
+        else
+            o << "this line LOSES THE GAME and the line above does not.";
+    }
     o << " Both lines are legal: the one above is the lowest life, this one is the"
          " lowest material cost.";
     return o.str();
@@ -28621,7 +29224,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             for (int i = (int) items.size() - 1; i >= 0; i--, n++)
                 out << "  " << n << (n == 1 ? " (top): " : ": ") << items[i] << "\n";
             //#W60-L (B2): the total, finished, under the rows it sums.
-            const string pend = pendingStackDamageLine(stackDamageToMe, this->life);
+            //#W79-DA (T16): the queued draws on this same stack, priced.
+            int w79Draws = 0, w79Per = 0;
+            std::string w79PunNames;
+            w79QueuedDrawPunisherLoss(observer, this, &w79Draws, &w79Per, &w79PunNames);
+            const string pend = pendingStackDamageLine(stackDamageToMe, this->life,
+                                                       w79Draws, w79Per, w79PunNames);
             if (!pend.empty())
                 out << pend << "\n";
             //#W71-BR (L8): the hand this screen's counts are taken from.
@@ -29238,6 +29846,63 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                     //assignment of the remaining blockers can touch.
                     if (bestCase >= 0)
                         bestCase += trampleOverflow;
+                    //#W79-DA (T5): and now the EXACT search, on exactly the
+                    //boards the matching cannot price - one where some declared
+                    //attacker has trample or needs two bodies (`exactAssignment`
+                    //is already false for precisely those). The matching's own
+                    //answer is always REACHABLE (its pairing, tramplers left
+                    //unblocked), so the exact optimum can only be lower or
+                    //equal; where it runs, the figure becomes a proven maximum
+                    //and the header's optimality claim becomes true.
+                    bool w79Special = false; //a trample/menace attacker is blocked
+                    if (!exactAssignment && !declared.empty() && !can.empty())
+                    {
+                        vector<W79AtkFact> af;
+                        for (size_t dj = 0; dj < declared.size(); dj++)
+                        {
+                            W79AtkFact f;
+                            f.power = (dj < faceDamage.size() && faceDamage[dj] > 0)
+                                      ? faceDamage[dj] : 0;
+                            f.minBlockers = declared[dj] ? declared[dj]->minBlockersRequired() : 1;
+                            f.trample = declared[dj]
+                                        && declared[dj]->basicAbilities[Constants::TRAMPLE] != 0;
+                            f.deathtouch = declared[dj]
+                                           && declared[dj]->basicAbilities[Constants::DEATHTOUCH] != 0;
+                            af.push_back(f);
+                        }
+                        //CR 702.19b prices the lethal cut off REMAINING toughness
+                        //(marked damage already counted), which is the same basis
+                        //the per-pairing "N tramples to your face" note uses.
+                        vector<int> soak;
+                        for (size_t bi = 0; bi < canCards.size(); bi++)
+                            soak.push_back(canCards[bi]
+                                           ? (canCards[bi]->life > 0 ? canCards[bi]->life
+                                                                     : canCards[bi]->toughness)
+                                           : 0);
+                        vector<int> exMatch;
+                        const int exact = w79BestBlockDamage(af, soak, can, &exMatch);
+                        if (exact >= 0)
+                        {
+                            bestCase = exact + trampleOverflow;
+                            match = exMatch;
+                            exactAssignment = true;
+                            //The material pass below swaps and vacates bodies at
+                            //a FIXED life figure, which holds only while every
+                            //pairing is one body against one ordinary attacker.
+                            //Where this assignment blocks a trampler or stacks
+                            //two bodies on one attacker, moving a body changes
+                            //the damage, so no material claim is made at all.
+                            vector<int> perAtk((size_t) declared.size(), 0);
+                            for (size_t bi = 0; bi < exMatch.size(); bi++)
+                                if (exMatch[bi] >= 0 && exMatch[bi] < (int) perAtk.size())
+                                    perAtk[(size_t) exMatch[bi]]++;
+                            for (size_t dj = 0; dj < perAtk.size(); dj++)
+                                if (perAtk[dj] > 0
+                                    && (perAtk[dj] > 1 || af[dj].trample
+                                        || af[dj].minBlockers > 1))
+                                    w79Special = true;
+                        }
+                    }
                     {
                         vector<string> declaredNames;
                         for (size_t dj = 0; dj < declared.size(); dj++)
@@ -29254,7 +29919,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                         //clause below reads the ranks of the pairings it names.
                         vector<vector<int> > rankMatrix;
                         const size_t kMaxRankPairs = 2048;
-                        if (!match.empty() && can.size() * declared.size() <= kMaxRankPairs)
+                        if (!match.empty() && !w79Special //#W79-DA (T5)
+                            && can.size() * declared.size() <= kMaxRankPairs)
                         {
                             vector<vector<int> >& rank = rankMatrix;
                             for (size_t bi = 0; bi < can.size(); bi++)
@@ -38253,6 +38919,12 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                 bool cbFloor = false;
                                 if (crackBackScreenTotal(this, opponent(), getObserver(),
                                                          cbTotal, cbFloor))
+                                {
+                                    //#W79-DA (T9): and the blocker this row's own
+                                    //cost spends, priced off the same cover.
+                                    int sacBodies = 0;
+                                    const int sacGive = w79SacrificeBlockerGiveBack(
+                                        this, opponent(), action.ability, sacBodies);
                                     out << crackBackReliefClause(cbTotal,
                                                                  crackBackBodyContribution(dtc),
                                                                  life, cbFloor,
@@ -38260,7 +38932,9 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                                                  crackBackBodyHoldsUpOthers(
                                                                      dtc, opponent(), getObserver())
                                                                      ? dtc->getDisplayName()
-                                                                     : string());
+                                                                     : string(),
+                                                                 sacGive, sacBodies); //#W79-DA (T9)
+                                }
                             }
                         }
                         else if (dtc->hasType(Subtypes::TYPE_PLANESWALKER) && dtc->counters
@@ -38483,7 +39157,8 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             //include a creature or the source itself printed the guide-keyed
             //`{paying this taps: ...}` clause TWICE. The builder is the one kept -
             //the self-tap clause below reads its text to avoid a third spelling.
-            paidTapsClause = paymentTapsClause(taps, tapRestrict);
+            paidTapsClause = paymentTapsClause(taps, tapRestrict, //#W79-DA (T7)
+                                               w79UntapEngineSources(this, opponent()));
             out << paidTapsClause;
             //#W69-BG (K5): the pool cannot afford it and the selector found no
             //producer - if the seat's whole colour reach is 0 as well, say so.
@@ -45204,7 +45879,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         ? (blockStillMatters ? (int) TAP_RESTRICT_NO_BLOCK : (int) TAP_RESTRICT_NONE)
                         : (beforeAttack ? (int) TAP_RESTRICT_NO_ATTACK : (int) TAP_RESTRICT_NONE));
                 }
-                o << paymentTapsClause(creatureTaps, tapRestrict);
+                o << paymentTapsClause(creatureTaps, tapRestrict, //#W79-DA (T7)
+                                       w79UntapEngineSources(this, opponent()));
             }
             //#W52-K D7: the life this payment plan spends, and where it leaves you.
             o << paymentLifeCostClause(painNames, painDamage, life);
@@ -45835,8 +46511,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                     this, &cbExisting, cbSettled); //#W69-BH (K6a) #W69-BJ (F2)
                 //#W65-AL (G4): and WHICH number this is - crackBackScreenTotal
                 //already reports whether the line above calls it a floor.
+                //#W79-DA (T6): the SAME ADD-THOSE-UP figure the line above
+                //prints, read from the same scan the line reads it from.
+                int cbExtra = 0;
+                bool cbUnsized = false;
+                crackBackFloorSources(opponent(), &cbExtra, &cbUnsized);
                 o << crackBackBlockerRowTag(cbTotal, life, cbChecked, cbUnchecked,
-                                            cbAtk, cbFloor, cbExisting); //#W69-BH (K6a)
+                                            cbAtk, cbFloor, cbExisting, //#W69-BH (K6a)
+                                            cbExtra); //#W79-DA (T6)
             }
         }
         //#W68-BD (J8, deck126 MED): and, on a row that REMOVES one of their
@@ -47164,9 +47846,10 @@ static string payRepeatRowCostTag(int counters, const string& perCost, int perCm
 //"{paying this taps: "). Pure over its four arguments.
 static string payRepeatTapsClause(const std::vector<std::string>& names,
                                   const std::vector<int>& restrictions,
-                                  int paid, int counters)
+                                  int paid, int counters,
+                                  const string& untapSource = "") //#W79-DA (T7)
 {
-    string clause = paymentTapsClause(names, restrictions);
+    string clause = paymentTapsClause(names, restrictions, untapSource);
     if (clause.empty() || paid <= 0 || counters <= 0 || paid >= counters)
         return clause;
     const size_t close = clause.rfind('}');
@@ -49130,7 +49813,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                        + animatedThisTurnNote(ps));
                         tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
                     }
-                    opts[i] += payRepeatTapsClause(taps, tapRestrict, paid, n); //#W63-AE (E18)
+                    opts[i] += payRepeatTapsClause(taps, tapRestrict, paid, n, //#W63-AE (E18)
+                                                   w79UntapEngineSources(this, opponent()));
                 }
                 SAFE_DELETE(bill);
             }
@@ -53093,14 +53777,26 @@ int AIPlayerGPT::chooseAttackers()
                 const bool atkDT = attackers[j]->basicAbilities[Constants::DEATHTOUCH] != 0;
                 int dmg = 0;
                 bool anyOfThem = false, byDt = false;
+                int soak = 0; //#W79-DA (T5)
                 const int need = gangKillNeed(attackers[j]->power, attackers[j]->toughness,
                                               atkFS, atkDT, gangStats, minB,
-                                              &dmg, &anyOfThem, &byDt);
+                                              &dmg, &anyOfThem, &byDt, &soak);
                 if (need >= 2)
+                {
+                    //#W79-DA (T5): the same carry-over, voiced for the seat that
+                    //owns the trampler - a gang block of theirs that kills it
+                    //still does not stop all of its damage.
+                    int spill = -1;
+                    if (attackers[j]->basicAbilities[Constants::TRAMPLE])
+                    {
+                        const int ap = attackers[j]->power > 0 ? attackers[j]->power : 0;
+                        spill = ap - soak > 0 ? ap - soak : 0;
+                    }
                     //#W63-AB (E4a): hoisted to the front of the tag, so the
                     //clause's own pointer at the 1-on-1 results inverts.
                     gangNote = gangBlockPriceTag(need, dmg, anyOfThem, false, true,
-                                                 byDt, atkFS); //#W64-AG (F7)
+                                                 byDt, atkFS, spill, soak); //#W79-DA (T5)
+                }
             }
             //#W63-AB (E4b): the summed life price of the listed candidates.
             const string sumNote = blockPriceSumTag(pricedCandidates, priceSureSum,
@@ -53417,6 +54113,31 @@ int AIPlayerGPT::chooseAttackers()
                                        + fixedPerEvent * gainEvents;
                 }
             }
+            //#W79-DA (T9): the punisher the line already NAMES, sized for the
+            //one declaration the line prices - all of the listed attackers.
+            int punPer = 0, punKilled = 0, punKilledPower = 0;
+            std::ostringstream punVictims;
+            {
+                bool punSized = false;
+                punPer = attackDeclarationPunisherSize(oppL, (int) rowPower.size(), punSized);
+                if (!punSized)
+                    punPer = 0;
+                if (punPer > 0)
+                    for (size_t ai = 0; ai < attackers.size() && ai < rowPower.size(); ai++)
+                    {
+                        MTGCardInstance * ac = attackers[ai];
+                        if (!ac || ac->basicAbilities[Constants::INDESTRUCTIBLE])
+                            continue;
+                        const int rem = ac->life > 0 ? ac->life : ac->toughness;
+                        if (rem > punPer)
+                            continue;
+                        if (punKilled < 6)
+                            punVictims << (punKilled ? ", " : "")
+                                       << ac->getDisplayName() << instanceHandle(ac);
+                        punKilled++;
+                        punKilledPower += rowPower[ai] > 0 ? rowPower[ai] : 0;
+                    }
+            }
             totalsTail << attackTotalLine((int) rowPower.size(), totalPower,
                                     oppL ? oppL->life : -1, blockerCount, guaranteed,
                                     infectExcluded, suppressed, blockGain,
@@ -53424,7 +54145,9 @@ int AIPlayerGPT::chooseAttackers()
                                     playerHasLifeLoop(oppL), //#W62-X (D2)
                                     &attackTotalKillClaim, //#W65-AN (G6)
                                     blockLifelinkCeiling, //#W65-AP (R4)
-                                    selfConvLifelink); //#W74-CC (O5)
+                                    selfConvLifelink, //#W74-CC (O5)
+                                    punPer, punKilled, punKilledPower, //#W79-DA (T9)
+                                    punVictims.str());
             //#W64-AK (R1): and the exclusion this wave's new row class creates.
             {
                 int walkerOnlyRows = 0;
@@ -54414,13 +55137,22 @@ int AIPlayerGPT::chooseBlockers()
                 const bool atkDT = attackers[j]->basicAbilities[Constants::DEATHTOUCH] != 0;
                 int dmg = 0;
                 bool anyOfThem = false, byDt = false;
+                int soak = 0; //#W79-DA (T5)
                 const int need = gangKillNeed(attackers[j]->power, attackers[j]->toughness,
                                               atkFS, atkDT, gangStats, minBlk,
-                                              &dmg, &anyOfThem, &byDt);
+                                              &dmg, &anyOfThem, &byDt, &soak);
                 if (need >= 2)
                 {
+                    //#W79-DA (T5): the carry-over the group does NOT stop, on
+                    //the attackers this window's B-rows already price per body.
+                    int spill = -1;
+                    if (attackers[j]->basicAbilities[Constants::TRAMPLE])
+                    {
+                        const int ap = attackers[j]->power > 0 ? attackers[j]->power : 0;
+                        spill = ap - soak > 0 ? ap - soak : 0;
+                    }
                     string gp = gangBlockPriceTag(need, dmg, anyOfThem, true, false,
-                                                  byDt, atkFS); //#W64-AG (F7)
+                                                  byDt, atkFS, spill, soak); //#W79-DA (T5)
                     if (!gp.empty())
                     {
                         anyGangPriced = true;
@@ -72134,13 +72866,19 @@ static const char * kW50Y_r94 =
                   "#W57-B D24 the seat no longer has to do the subtraction the header raises"
                   " (#W58-B D7: a provably lethal maximum is now badged)");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
-                  .find("- at least 13 of that lands whatever you block"
-                        " (trample/menace counted as unblocked): you would be at -5 AT BEST"
-                        " (no assignment of your blockers does better); no block saves you")
+                  .find("- one legal assignment leaves 13 of that landing (it blocks what one"
+                        " body stops and leaves every trample/menace attacker unblocked): you"
+                        " would be at -5 AT BEST as far as this search went")
                   != string::npos,
-                  "#W57-B D24 with a trampler or a menace attacker in the total the claim drops to"
-                  " a FLOOR (#W58-B D7: it used to assert an assignment it did not have;"
-                  " #W59-I K5: and the floor names a life CEILING, so -5 is a proven death)");
+                  "#W79-DA T5 SUPERSEDES #W57-B D24 / #W59-I K5: with a trampler or a menace"
+                  " attacker in the total this figure is a REACHABLE line, never a floor - the"
+                  " optimality and the death claim are both withdrawn from the branch");
+            CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
+                  .find("no assignment of your blockers does better") == string::npos
+                  && incomingCombatLine(4, 16, 8, true, 2, 10, 13, false)
+                     .find("; no block saves you") == string::npos,
+                  "#W79-DA T5 MUST-NOT-MATCH the unsearched branch claims neither optimality"
+                  " nor death - a block that soaks a trampler's lethal cut beats it");
             CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, false).find("best case") == string::npos,
                   "#W57-B D24 NEGATIVE no optimality is claimed where the matching cannot prove it");
             CHECK(incomingCombatLine(3, 11, 10, false, 0, 0, 5, true)
@@ -73658,12 +74396,12 @@ static const char * kW50Y_r94 =
                   "#W58-B D7 the floor keeps it: the block removes 3, the trample's 6 still lands");
             CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
                                      assignableRemainderDamage(dmg, can, &prev), false)
-                  .find("at least 6 of that lands whatever you block"
-                        " (trample/menace counted as unblocked): you would be at -1 AT BEST"
-                        " (no assignment of your blockers does better); no block saves you")
+                  .find("one legal assignment leaves 6 of that landing (it blocks what one"
+                        " body stops and leaves every trample/menace attacker unblocked): you"
+                        " would be at -1 AT BEST as far as this search went")
                   != string::npos,
                   "#W58-B D7 a seat at 5 life is no longer told a lethal board gets it to 1"
-                  " (#W59-I K5: and is now told the board is lethal at all)");
+                  " (#W79-DA T5: and the figure is now voiced as the reachable line it is)");
             CHECK(incomingCombatLine(2, 9, 5, true, 0, 0,
                                      assignableRemainderDamage(dmg, can, &prev), false)
                   .find("gets you to") == string::npos,
@@ -73699,14 +74437,22 @@ static const char * kW50Y_r94 =
             //#W59-I (K5) SUPERSEDES the wave-58 negative here: a floor of 4 at 4
             //life proves that no assignment ends above 0, so the death IS
             //provable and withholding it was the deck162 defect.
+            //#W79-DA (T5) SUPERSEDES #W59-I (K5) on this branch: the wave-58
+            //number is an assignment the seat can always REACH, not a lower
+            //bound on the damage, so a value at or above the seat's life proves
+            //nothing about the blocks this search never ran.
             CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, false)
-                  .find("you would be at 0 AT BEST (no assignment of your blockers does better);"
-                        " no block saves you") != string::npos,
-                  "#W59-I K5 a damage FLOOR at or above the seat's life proves death, and the"
-                  " floor form now says so (was: the form claimed no death at all)");
-            CHECK(incomingCombatLine(2, 6, 9, true, 0, 0, 4, false).find("no block saves you")
-                  == string::npos,
-                  "#W59-I K5 NEGATIVE a survivable floor still claims no death");
+                  .find("you would be at 0 AT BEST as far as this search went") != string::npos
+                  && incomingCombatLine(2, 6, 4, true, 0, 0, 4, false)
+                     .find("that line does not save you - and no line on this board was proven"
+                           " either way") != string::npos,
+                  "#W79-DA T5 the unsearched branch states the line's own verdict and scopes it");
+            CHECK(incomingCombatLine(2, 6, 4, true, 0, 0, 4, false).find("; no block saves you")
+                  == string::npos
+                  && incomingCombatLine(2, 6, 9, true, 0, 0, 4, false).find("no block saves you")
+                     == string::npos,
+                  "#W79-DA T5 MUST-NOT-MATCH no unqualified death badge on the unsearched branch,"
+                  " lethal figure or not");
             // The 32-a-side cap and the no-pairing case still yield no number.
             vector<vector<char> > none(2, vector<char>(2, 0));
             CHECK(assignableRemainderDamage(dmg, none, &allPrev) == -1,
@@ -73870,10 +74616,11 @@ static const char * kW50Y_r94 =
     {
         // `162v152` seq 19 verbatim: 18 life, 5 attackers, 20 unblocked, floor 15.
         const string s = incomingCombatLine(5, 20, 18, true, 0, 0, 15, false);
-        CHECK(s.find("at least 15 of that lands whatever you block (trample/menace counted as"
-                     " unblocked): you would be at 3 AT BEST (no assignment of your blockers"
-                     " does better)") != string::npos,
-              "#W59-I K5 the deck162 line states a CEILING on life, not a floor");
+        CHECK(s.find("one legal assignment leaves 15 of that landing (it blocks what one body"
+                     " stops and leaves every trample/menace attacker unblocked): you would be"
+                     " at 3 AT BEST as far as this search went") != string::npos,
+              "#W79-DA T5 SUPERSEDES #W59-I K5: the deck162 line states the REACHABLE figure"
+              " this search found, and says outright that a trample soak can beat it");
         CHECK(s.find("or better") == string::npos,
               "#W59-I K5 NEGATIVE the inverted wording is gone from the floor form");
         CHECK(s.find("no block saves you") == string::npos,
@@ -73881,9 +74628,9 @@ static const char * kW50Y_r94 =
         // The safe case the wave-58 phrasing looked validated on (same file
         // seq 14: floor 4, 20 life) still reads as a survivable ceiling.
         CHECK(incomingCombatLine(2, 4, 20, true, 0, 0, 4, false)
-                  .find("you would be at 16 AT BEST (no assignment of your blockers does better)")
+                  .find("you would be at 16 AT BEST as far as this search went")
               != string::npos,
-              "#W59-I K5 the non-lethal floor keeps its number and gains no death claim");
+              "#W79-DA T5 the non-lethal unsearched line keeps its number and gains no death claim");
         // The exact branch is untouched, byte for byte.
         CHECK(incomingCombatLine(4, 16, 8, true, 2, 10, 13, true)
                   .find("best case with every blocker assigned: you would be at -5;"
@@ -77062,8 +77809,10 @@ static const char * kW50Y_r94 =
                   "#W62-Z D12 the header that proves a survivable line now names one");
             CHECK(incomingCombatLine(3, 13, 8, true, 0, 0, 2, false, 3, 3,
                                      " - one legal assignment that reaches it: X blocks Y")
-                      .find("one legal assignment") == string::npos,
-                  "#W62-Z D12 MUST-NOT-MATCH the FLOOR branch names no assignment - no single one reaches it");
+                      .find("one legal assignment that reaches it") == string::npos,
+                  "#W62-Z D12 MUST-NOT-MATCH the unsearched branch names no PROVEN assignment -"
+                  " no single one is claimed to reach the figure (#W79-DA T5: the branch now"
+                  " says which line it did find, and that a better one may exist)");
             //#W63-AB (E3b) RE-PINNED, deliberately reversed: withdrawing the line
             //on a lethal screen left `146v152` seq 28 unguided and it picked the
             //damage-MAXIMISING block. The line is printed; the CALLER labels it
@@ -78813,7 +79562,7 @@ static const char * kW50Y_r94 =
         cout << "     s31 header: \"" << s31 << "\"\n";
         CHECK(s31.find("; this KILLS you ONLY if you decline every block") != string::npos
               && s31.find("- no assignment is PROVEN to save you, and none is proven to lose"
-                          " either: the least damage any block can leave puts you at 1")
+                          " either: the block this search found puts you at 1")
                  != string::npos
               && s31.find("ONLY if you decline") < s31.find("AT BEST"),
               "#W64-AG F9 POSITIVE on the FLOOR branch the death claim is scoped to declining, and the survivable figure precedes the ceiling");
@@ -78821,7 +79570,7 @@ static const char * kW50Y_r94 =
         // the position the death verdict used to hold.
         const string s31inline = incomingCombatLine(3, 8, 5, true, 0, 0, 4, false, 3, 3);
         CHECK(s31inline.find("; no assignment is PROVEN to save you, and none is proven to"
-                             " lose either: the least damage any block can leave puts you"
+                             " lose either: the block this search found puts you"
                              " at 1 - this KILLS you ONLY if you decline every block")
               != string::npos,
               "#W64-AG F9 POSITIVE with no unblockable split, the survivable figure is stated FIRST");
@@ -91833,8 +92582,7 @@ static const char * kW50Y_r94 =
             // and may gain 2 more - up to 4 life for you". True best: -1.
             const string base = incomingCombatLine(6, 14, 4, true, 0, 0, 9, false,
                                                    2, 6, "", false, 0, 0);
-            CHECK(base.find("you would be at -5 AT BEST (no assignment of your blockers"
-                            " does better)") != string::npos
+            CHECK(base.find("you would be at -5 AT BEST as far as this search went") != string::npos
                   && base.find("OPTIONAL gain") == string::npos,
                   "#W77-CS R4 RED-ON-BASE the seeded tree's own call prints -5 AT BEST and"
                   " nothing about the 4 optional life the next line meters");
@@ -91848,11 +92596,12 @@ static const char * kW50Y_r94 =
             CHECK(fixed.find("you would be at -5 AT BEST") != string::npos,
                   "#W77-CS R4 GREEN nothing is deleted: the CERTAIN figure still prints"
                   " first, and the optional one never displaces it");
-            CHECK(fixed.find("no block saves you") != string::npos,
-                  "#W77-CS R4 GREEN at -1 the badge is still TRUE, and it is now computed"
-                  " from the number that is actually the best reachable one");
+            CHECK(fixed.find("that line does not save you") != string::npos,
+                  "#W77-CS R4 GREEN at -1 the verdict is still TRUE of the line it names, and"
+                  " it is computed from the number that is actually the best reachable one"
+                  " (#W79-DA T5 re-voices the badge on this branch)");
             CHECK(incomingCombatLine(6, 14, 4, true, 0, 0, 9, false, 2, 6, "", false,
-                                     0, 0, 10).find("no block saves you") == string::npos,
+                                     0, 0, 10).find("does not save you") == string::npos,
                   "#W77-CS R4 REPRO/GREEN when the metered gain carries the seat PAST 0 the"
                   " death badge is withdrawn - RED on base, where -1 kept it");
             CHECK(incomingCombatLine(6, 14, 4, true, 0, 0, 9, false, 2, 6, "", false,
@@ -94451,6 +95200,502 @@ static const char * kW50Y_r94 =
                   "#W78-CY F10 MEASURE ONLY - the parser is byte-identical: the unlabelled"
                   " answer line still yields no answer segment and no tolerance is added");
         }
+    }
+
+    cout << "\n[#W79-DA] T5 the AT BEST figure is the true knapsack: trample spill, menace two bodies\n";
+    {
+        // ---- `146v152` seq 21 (turn 12, Blockers, 20 life), from the wave-78
+        // corpus prompt verbatim. A1 Sigarda, Champion of Light (6/6) [trample,
+        // flying]; A2 Luminarch Aspirant (2/2). B1 Spider #2 (2/1) [reach] may
+        // block A1 and A2; B2 Goblin (1/1) may block A2 only.
+        vector<int> dmg;
+        dmg.push_back(6); dmg.push_back(2);
+        vector<char> prev;                     //the wave-58 preventability column
+        prev.push_back(0); prev.push_back(1);  //the trampler is "unblockable"
+        vector<vector<char> > can(2, vector<char>(2, 0));
+        can[0][0] = 1; can[0][1] = 1;          //Spider: A1 (reach) and A2
+        can[1][1] = 1;                         //Goblin: A2 only
+        // RED ON BASE: the shipped matching leaves Sigarda's full 6 landing and
+        // prints the seat's ceiling one point BELOW the line the seat itself
+        // played (Spider on Sigarda, Goblin on Luminarch, which ended at 15).
+        CHECK(assignableRemainderDamage(dmg, can, &prev) == 6,
+              "#W79-DA T5 RED-ON-BASE `146v152` seq 21: the matching prices the trampler at"
+              " its FULL power and returns 6, i.e. 14 life");
+        CHECK(incomingCombatLine(2, 8, 20, true, 0, 0, 6, false)
+                  .find("you would be at 14 AT BEST") != string::npos,
+              "#W79-DA T5 RED-ON-BASE the header printed 14 AT BEST on that board");
+        // GREEN: the exact search blocks the trampler, soaks its lethal cut and
+        // finds the seat's own line - 5 landing, 15 life.
+        vector<W79AtkFact> af;
+        {
+            W79AtkFact a1; a1.power = 6; a1.minBlockers = 1; a1.trample = true; a1.deathtouch = false;
+            W79AtkFact a2; a2.power = 2; a2.minBlockers = 1; a2.trample = false; a2.deathtouch = false;
+            af.push_back(a1); af.push_back(a2);
+        }
+        vector<int> soak;
+        soak.push_back(1); soak.push_back(1); //Spider's remaining toughness, Goblin's
+        vector<int> m;
+        CHECK(w79BestBlockDamage(af, soak, can, &m) == 5,
+              "#W79-DA T5 GREEN the exact search returns 5 (6 - the Spider's 1 toughness, plus"
+              " 0 from the blocked Aspirant): 15 life, which is where that combat ended");
+        CHECK(m.size() == 2 && m[0] == 0 && m[1] == 1,
+              "#W79-DA T5 GREEN the assignment it hands back IS the seat's own line - Spider on"
+              " Sigarda, Goblin on Luminarch");
+        CHECK(incomingCombatLine(2, 8, 20, true, 0, 0, 5, true)
+                  .find("best case with every blocker assigned: you would be at 15") != string::npos,
+              "#W79-DA T5 GREEN the header now states the reachable maximum and, being exact,"
+              " uses the PROVEN branch");
+        // ---- `162v152` seq 19 (turn 11, 18 life): A1 Brutal Cathar (5/5),
+        // A2 Sigarda (6/6) [trample, flying], A3 Briarbridge Tracker (5/6).
+        // B1 Fog Bank (0/2) [flying] blocks all three; B2 Fate Unraveler (3/4)
+        // and B3 Shield Sphere (0/6) are groundbound - A1 and A3 only.
+        {
+            vector<int> d3;
+            d3.push_back(5); d3.push_back(6); d3.push_back(5);
+            vector<char> p3;
+            p3.push_back(1); p3.push_back(0); p3.push_back(1);
+            vector<vector<char> > c3(3, vector<char>(3, 0));
+            c3[0][0] = 1; c3[0][1] = 1; c3[0][2] = 1;
+            c3[1][0] = 1; c3[1][2] = 1;
+            c3[2][0] = 1; c3[2][2] = 1;
+            CHECK(assignableRemainderDamage(d3, c3, &p3) == 6,
+                  "#W79-DA T5 RED-ON-BASE `162v152` seq 19: the matching returns 6, i.e. the"
+                  " 12 AT BEST the prompt printed");
+            vector<W79AtkFact> a3;
+            {
+                W79AtkFact x; x.minBlockers = 1; x.deathtouch = false;
+                x.power = 5; x.trample = false; a3.push_back(x);
+                x.power = 6; x.trample = true;  a3.push_back(x);
+                x.power = 5; x.trample = false; a3.push_back(x);
+            }
+            vector<int> s3;
+            s3.push_back(2); s3.push_back(4); s3.push_back(6);
+            vector<int> m3;
+            CHECK(w79BestBlockDamage(a3, s3, c3, &m3) == 4,
+                  "#W79-DA T5 GREEN the exact search returns 4 - Fog Bank soaks 2 of Sigarda's 6"
+                  " while the other two bodies stop the ground attackers: 14 life, which is what"
+                  " the seat's own block reached");
+            CHECK(m3.size() == 3 && m3[0] == 1 && m3[1] >= 0 && m3[2] >= 0 && m3[1] != m3[2],
+                  "#W79-DA T5 GREEN the only flier-legal body is put in front of the flier and"
+                  " the other two each take one ground attacker");
+        }
+        // MENACE: two bodies fully block it, one body is no block at all (CR 509.1c).
+        {
+            vector<int> d1(1, 4);
+            vector<vector<char> > c1(2, vector<char>(1, 1));
+            vector<W79AtkFact> a1;
+            W79AtkFact men; men.power = 4; men.minBlockers = 2; men.trample = false;
+            men.deathtouch = false;
+            a1.push_back(men);
+            vector<int> s2(2, 1);
+            vector<int> mm;
+            CHECK(w79BestBlockDamage(a1, s2, c1, &mm) == 0,
+                  "#W79-DA T5 GREEN a menace attacker is fully stopped by TWO bodies, so its"
+                  " damage is not 'counted as unblocked' when the seat has two");
+            vector<vector<char> > c1one(1, vector<char>(1, 1));
+            vector<int> s1(1, 1);
+            CHECK(w79BestBlockDamage(a1, s1, c1one, NULL) == 4,
+                  "#W79-DA T5 MUST-NOT-MATCH with only ONE legal body the menace attacker's"
+                  " full power still lands - one creature does not block it at all");
+            vector<char> pm(1, 0);
+            CHECK(assignableRemainderDamage(d1, c1, &pm) == 4,
+                  "#W79-DA T5 RED-ON-BASE the matching charges the menace attacker in full even"
+                  " with two legal bodies standing");
+        }
+        // A DEATHTOUCH trampler cuts to 1 per blocker (CR 702.2b), so the spill is
+        // larger, never smaller - the direction that cannot lie.
+        {
+            vector<W79AtkFact> adt;
+            W79AtkFact t; t.power = 6; t.minBlockers = 1; t.trample = true; t.deathtouch = true;
+            adt.push_back(t);
+            vector<vector<char> > c(1, vector<char>(1, 1));
+            vector<int> big(1, 5);
+            CHECK(w79BestBlockDamage(adt, big, c, NULL) == 5,
+                  "#W79-DA T5 GREEN a deathtouch trampler assigns 1 as lethal to each blocker,"
+                  " so a 5-toughness body soaks 1 and 5 carries over");
+        }
+        // NO legal pairing / over the bound: nothing is computed and the caller
+        // keeps the wave-58 figure with its optimality claim withdrawn.
+        {
+            vector<W79AtkFact> a1(1);
+            a1[0].power = 3; a1[0].minBlockers = 1; a1[0].trample = true; a1[0].deathtouch = false;
+            CHECK(w79BestBlockDamage(a1, vector<int>(), vector<vector<char> >(), NULL) == -1
+                      && w79BestBlockDamage(vector<W79AtkFact>(), vector<int>(1, 1),
+                                            vector<vector<char> >(1, vector<char>(1, 1)), NULL) == -1,
+                  "#W79-DA T5 NEGATIVE an empty side yields no number, not a zero");
+            vector<vector<char> > wide(13, vector<char>(1, 1));
+            CHECK(w79BestBlockDamage(a1, vector<int>(13, 1), wide, NULL) == -1,
+                  "#W79-DA T5 NEGATIVE past the 12-body bound the search declines rather than"
+                  " running unbounded - the caller then prints the unsearched wording");
+        }
+    }
+
+    cout << "\n[#W79-DA] T5 the GANG BLOCK clause states the trample spill\n";
+    {
+        // `146v152` seq 26: A1 Sigarda (6/6) [trample]; three Spiders (2/1) are
+        // its only legal blockers. The shipped clause said "any 3 of yours
+        // together deal 6, enough to kill this attacker" and stopped there; the
+        // seat wrote "0 trample", sent all three, and took 3 to the face.
+        vector<GangBlockerStat> spiders;
+        for (int i = 0; i < 3; i++)
+        {
+            GangBlockerStat g;
+            g.power = 2; g.toughness = 1; g.deathtouch = false; g.firstStrike = false;
+            spiders.push_back(g);
+        }
+        int dmg = 0, soak = 0;
+        bool any = false, byDt = false;
+        const int need = gangKillNeed(6, 6, false, false, spiders, 1, &dmg, &any, &byDt, &soak);
+        CHECK(need == 3 && dmg == 6 && any && soak == 3,
+              "#W79-DA T5 the group the clause names is the three Spiders, and the lethal cut"
+              " they soak between them is 3");
+        const string base = gangBlockPriceTag(need, dmg, any, true, false, byDt, false);
+        CHECK(base == "GANG BLOCK: any 3 of yours together deal 6, enough to kill this attacker;"
+                      " each B-line result below is a LONE blocker only",
+              "#W79-DA T5 RED-ON-BASE the shipped clause says nothing about the carry-over");
+        const string fixed = gangBlockPriceTag(need, dmg, any, true, false, byDt, false,
+                                               6 - soak, soak);
+        CHECK(fixed.find("this attacker has TRAMPLE, so killing it does NOT stop all of its"
+                         " damage: it assigns its lethal damage to that group (3 of toughness"
+                         " between them) and 3 still tramples to your face") != string::npos,
+              "#W79-DA T5 GREEN the gang clause now states the spill, in the same words the"
+              " B-row's own lone-block note uses");
+        CHECK(fixed.compare(0, base.size(), base) == 0,
+              "#W79-DA T5 GREEN nothing is removed: the kill claim is byte-identical and the"
+              " spill is appended to it");
+        // The attackers voicing points the other way, and a group that soaks the
+        // whole power says so rather than printing a bare 0.
+        CHECK(gangBlockPriceTag(2, 8, true, false, true, false, false, 0, 6)
+                  .find("and NOTHING carries over to them") != string::npos
+              && gangBlockPriceTag(2, 8, true, true, false, false, false, 2, 4)
+                     .find("2 still tramples to your face") != string::npos,
+              "#W79-DA T5 GREEN both voicings, and the zero-spill face");
+        CHECK(gangBlockPriceTag(need, dmg, any, true, false, byDt, false, -1, 0) == base,
+              "#W79-DA T5 MUST-NOT-MATCH a non-trample attacker's clause is byte-identical to"
+              " wave 78 - the spill is printed only where trample exists");
+    }
+
+    cout << "\n[#W79-DA] T5 one header never prints two verdicts that disagree\n";
+    {
+        // `146v123` seq 19: 18 life, best case 24 damage (at -6, "no assignment
+        // of your blockers survives this"), material line 26.
+        const string base = blockKeepAlternativeClause("B blocks A", 26, 24, 18);
+        CHECK(base.find("26 KILLS you at 18 life: this line LOSES THE GAME - and so does the"
+                        " line above (24 at 18 life). Neither line on this screen survives;"
+                        " the one above simply loses by less.") != string::npos,
+              "#W79-DA T5 GREEN the contrast is computed from the same two numbers the clause"
+              " already holds, so it cannot contradict the header above it");
+        CHECK(base.find("and the line above does not") == string::npos,
+              "#W79-DA T5 RED-ON-BASE / MUST-NOT-MATCH the wave-78 sentence claimed a survival"
+              " the same header had denied");
+        // The genuinely-different case is untouched, byte for byte.
+        CHECK(blockKeepAlternativeClause("B blocks A", 7, 4, 6)
+                  .find("7 KILLS you at 6 life: this line LOSES THE GAME and the line above"
+                        " does not.") != string::npos,
+              "#W79-DA T5 GREEN where the life line DOES survive the wave-69 sentence stands"
+              " unchanged");
+        CHECK(blockKeepAlternativeClause("B blocks A", 7, 4, -1).find("KILLS you") == string::npos,
+              "#W79-DA T5 NEGATIVE with no effective life known, no lethality is claimed"
+              " either way");
+    }
+
+    cout << "\n[#W79-DA] T6 the crack-back cover subtracts from the total the line above states\n";
+    {
+        // `162v146` seq 15 verbatim: 8 life, CRACK-BACK 7 from 3 creatures, and an
+        // ADD-THOSE-UP of 3 more from Hive of the Eye Tyrant -> "the total to
+        // subtract from your life is 10 and you would be at -2; that would KILL
+        // you". The Master of the Feast row's cover clause said "you cover 3 of 7,
+        // leaving 4 -> you would be at 4"; the seat answered "Safe enough" and the
+        // game ended at -2.
+        std::vector<CrackBackAttackerFact> atk;
+        {
+            CrackBackAttackerFact a; a.blockersNeeded = 1; a.coverable = true;
+            a.power = 3; atk.push_back(a);
+            a.power = 3; atk.push_back(a);
+            a.power = 1; atk.push_back(a);
+        }
+        const string base = crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0);
+        CHECK(base.find("the CRACK-BACK NEXT TURN line above is 7 from 3 of their creatures"
+                        " and puts you at 1") != string::npos
+              && base.find("you cover 3 of 7, leaving 4 -> you would be at 4") != string::npos,
+              "#W79-DA T6 RED-ON-BASE the shipped clause reproduces `162v146` seq 15 byte for"
+              " byte: it prices the creature-only 7 and promises 4");
+        const string fixed = crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0, 3);
+        CHECK(fixed.find("the CRACK-BACK NEXT TURN line above is 7 from 3 of their creatures"
+                         " PLUS the 3 that line's own ADD THOSE UP sentence adds from the other"
+                         " sources it names - 10 in total, which is the number that line"
+                         " subtracts from your life and the number this clause subtracts from"
+                         " too and puts you at -2") != string::npos,
+              "#W79-DA T6 GREEN the clause names the SAME total the line above prints its own"
+              " verdict off, and the same resulting life (-2)");
+        CHECK(fixed.find("you cover 3 of 10, leaving 7 -> you would be at 1") != string::npos,
+              "#W79-DA T6 GREEN the cover is still the creature half (3 - bodies block"
+              " creatures) and it comes off the stated total, so the row promises 1, not 4");
+        CHECK(fixed.find("a larger crack-back than 10 is on the table") != string::npos,
+              "#W79-DA T6 GREEN the floor caution names the stated total too");
+        // With nothing to add up, every byte is wave 78's.
+        CHECK(crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0, 0) == base
+              && crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0, -4) == base,
+              "#W79-DA T6 MUST-NOT-MATCH a screen with no ADD-THOSE-UP figure renders exactly"
+              " the wave-78 bytes");
+    }
+
+    cout << "\n[#W79-DA] T7 the tap bill names the untap engine that breaks it\n";
+    {
+        // `152v123` seqs 17/18: both named bodies attacked at seq 21 under the
+        // opponent's Intruder Alarm.
+        std::vector<std::string> names;
+        names.push_back("Katilda, Dawnhart Prime");
+        names.push_back("Briarbridge Tracker");
+        std::vector<int> rest(2, (int) TAP_RESTRICT_NO_ATTACK);
+        const string base = paymentTapsClause(names, rest);
+        CHECK(base == " {paying this taps: Katilda, Dawnhart Prime, Briarbridge Tracker -"
+                      " they cannot attack this turn}",
+              "#W79-DA T7 RED-ON-BASE the shipped clause is the seq-17 bytes, and it is false"
+              " on that board");
+        const string fixed = paymentTapsClause(names, rest, "Intruder Alarm (THEIRS)");
+        CHECK(fixed.find("they cannot attack this turn - UNLESS Intruder Alarm (THEIRS) untaps"
+                         " them first: that untaps creatures OUTSIDE the untap step, so a body"
+                         " tapped for mana here can be standing again before the declaration"
+                         " this clause is about}") != string::npos,
+              "#W79-DA T7 GREEN the restriction still leads and the exception names its source");
+        CHECK(fixed.compare(0, base.size() - 1, base, 0, base.size() - 1) == 0,
+              "#W79-DA T7 GREEN nothing is removed - the wave-78 body is intact up to its brace");
+        // A row that loses nothing by tapping states no restriction, so there is
+        // no exception to state either.
+        std::vector<int> none(2, (int) TAP_RESTRICT_NONE);
+        CHECK(paymentTapsClause(names, none, "Intruder Alarm (THEIRS)")
+                  == paymentTapsClause(names, none),
+              "#W79-DA T7 MUST-NOT-MATCH with no restriction on the row, no untap exception is"
+              " printed");
+        CHECK(paymentTapsClause(names, rest, "") == base,
+              "#W79-DA T7 MUST-NOT-MATCH a board with no untap engine renders the wave-78 bytes");
+        // The repeat-row form carries it through with its own scope clause.
+        CHECK(payRepeatTapsClause(names, rest, 2, 20, "Intruder Alarm (THEIRS)")
+                  .find("Intruder Alarm (THEIRS) untaps them first") != string::npos
+              && payRepeatTapsClause(names, rest, 2, 20, "Intruder Alarm (THEIRS)")
+                     .find("not all 20)") != string::npos,
+              "#W79-DA T7 GREEN the repeat row keeps both halves");
+    }
+
+    cout << "\n[#W79-DA] T9 a sacrifice row prices the blocker it spends; ATTACK TOTAL folds its punisher\n";
+    {
+        // `130v146` seq 53, at 1 life. The row removed 2 from a crack-back of 7
+        // and said nothing about the body its own Sacrifice cost takes; two
+        // windows later the blockers header computed exactly that missing blocker.
+        const string base = crackBackReliefClause(7, 2, 1, false);
+        CHECK(base == " {removes 2 from the CRACK-BACK total above: 7 -> 5 - you would be at -4;"
+                      " that still KILLS you}",
+              "#W79-DA T9 RED-ON-BASE the seq-53 clause, byte for byte, with the spent blocker"
+              " unpriced");
+        const string fixed = crackBackReliefClause(7, 2, 1, false, "", 2, 4);
+        CHECK(fixed.find("you would be at -4 - but the Sacrifice in this row's own cost takes"
+                         " one of your 4 untapped blockers off the board before that attack,"
+                         " and that body was covering 2 of the same total: count it back and"
+                         " you would be at -6; that still KILLS you}") != string::npos,
+              "#W79-DA T9 GREEN the row prices BOTH bodies - the one it kills and the one it"
+              " spends - and the verdict is computed off the second figure");
+        CHECK(crackBackReliefClause(7, 2, 1, false, "", 0, 4) == base
+              && crackBackReliefClause(7, 2, 1, false, "", -1, 4) == base,
+              "#W79-DA T9 MUST-NOT-MATCH a cost that cannot take a blocker prices nothing and"
+              " renders the wave-78 bytes");
+        // A give-back that turns a survivable figure lethal is stated as such.
+        CHECK(crackBackReliefClause(7, 2, 6, false, "", 2, 3).find("you would be at -1;"
+                                                                   " that still KILLS you")
+              != string::npos
+              && crackBackReliefClause(7, 2, 6, false).find("KILLS you") == string::npos,
+              "#W79-DA T9 GREEN the verdict follows the corrected number, in both directions");
+        // The cover model the give-back is computed from: each body stops ONE
+        // attacker, a menace attacker costs two (CR 509.1c).
+        {
+            std::vector<CrackBackAttackerFact> atk;
+            CrackBackAttackerFact a; a.coverable = true;
+            a.power = 5; a.blockersNeeded = 1; atk.push_back(a);
+            a.power = 3; a.blockersNeeded = 1; atk.push_back(a);
+            a.power = 2; a.blockersNeeded = 1; atk.push_back(a);
+            CHECK(w79CoveredByBodies(atk, 3) == 10 && w79CoveredByBodies(atk, 2) == 8
+                      && w79CoveredByBodies(atk, 1) == 5 && w79CoveredByBodies(atk, 0) == 0,
+                  "#W79-DA T9 the cover ladder: the biggest attackers first, one body each");
+            std::vector<CrackBackAttackerFact> men;
+            CrackBackAttackerFact m; m.coverable = true;
+            m.power = 6; m.blockersNeeded = 2; men.push_back(m);
+            m.power = 1; m.blockersNeeded = 1; men.push_back(m);
+            CHECK(w79CoveredByBodies(men, 2) == 6 && w79CoveredByBodies(men, 1) == 1,
+                  "#W79-DA T9 a menace attacker costs TWO bodies, so losing one body here gives"
+                  " back 5, not 1");
+        }
+        // `126v125` seq 83: one 1/1 Vampire, Lightmine Field out. The shipped line
+        // promised 1 damage and withheld the arithmetic; the 1/1 died five times
+        // over for 0 damage dealt.
+        const string atBase = attackTotalLine(1, 1, 41, 0, 1, 0, false, 0, "Lightmine Field");
+        CHECK(atBase.find("1 total combat damage to a player - declaring all of them with none"
+                          " blocked puts them at 40") != string::npos
+              && atBase.find("so it is not folded into either number") != string::npos
+              && atBase.find("FOLDED") == string::npos,
+              "#W79-DA T9 RED-ON-BASE the wave-61 line names the punisher and folds nothing");
+        const string atFixed = attackTotalLine(1, 1, 41, 0, 1, 0, false, 0, "Lightmine Field",
+                                               false, NULL, 0, 0, 1, 1, 1, "Vampire #1");
+        CHECK(atFixed.find("FOLDED, for the all-in declaration this line prices: Lightmine Field"
+                           " deals 1 to EACH of the 1 attacker you would declare, before any"
+                           " combat damage. That kills 1 of them (Vampire #1), so 1 of the 1"
+                           " above never gets dealt: 0 reaches them and they would be at 41 -"
+                           " not 40.") != string::npos,
+              "#W79-DA T9 GREEN the fold is stated for the ONE declaration this line prices,"
+              " and the general caution above it is kept");
+        CHECK(atFixed.find("so it is not folded into either number") != string::npos,
+              "#W79-DA T9 GREEN nothing is deleted: the wave-61 scoping sentence still stands"
+              " for every OTHER declaration");
+        CHECK(attackTotalLine(4, 8, 20, 0, 8, 0, false, 0, "Lightmine Field", false, NULL,
+                              0, 0, 4, 0, 0, "")
+                  .find("None of them dies to it at that size, so the figures above stand.")
+              != string::npos,
+              "#W79-DA T9 GREEN a punisher that kills nothing says so rather than going silent");
+        CHECK(attackTotalLine(1, 1, 41, 0, 1, 0, false, 0, "Lightmine Field") == atBase,
+              "#W79-DA T9 MUST-NOT-MATCH an UNSIZED punisher leaves every wave-78 byte alone");
+        // The per-line amount the sizer reads.
+        {
+            bool ok = false;
+            CHECK(w79PunisherLineAmount("@each blockers:foreach(creature[attacking]|battlefield)"
+                                        " damage:1 all(creature[attacking]|battlefield)", 3, ok)
+                      == 3 && ok,
+                  "#W79-DA T9 Lightmine Field's own line: 1 per attacking creature, so 3 to each"
+                  " when 3 are declared");
+            CHECK(w79PunisherLineAmount("@combat(attacking) damage:2 all(creature[attacking])",
+                                        5, ok) == 2 && ok,
+                  "#W79-DA T9 a flat punisher is the bare literal whatever the declaration");
+            CHECK(w79PunisherLineAmount("@each blockers: damage:x all(creature[attacking])",
+                                        3, ok) == 0 && !ok,
+                  "#W79-DA T9 MUST-NOT-MATCH a non-numeric magnitude is UNREADABLE and the"
+                  " caller then claims nothing at all");
+            CHECK(w79PunisherLineAmount("@combat(attacking) tap all(creature[attacking])", 3, ok)
+                      == 0 && !ok,
+                  "#W79-DA T9 MUST-NOT-MATCH a line with no damage: is not a damage punisher");
+        }
+    }
+
+    cout << "\n[#W79-DA] T16 the stack total includes the punisher damage its own queued draws cause\n";
+    {
+        // `130v162` seq 49, at 1 life: three damage abilities and two queued draw
+        // abilities on one stack, under Underworld Dreams x2 + Ob Nixilis.
+        const string base = pendingStackDamageLine(3, 1);
+        CHECK(base == "ON THE STACK: 3 damage to you - you would be at -2; that would KILL you",
+              "#W79-DA T16 RED-ON-BASE the seq-49 line, byte for byte - the two queued draws"
+              " cost 6 more and the same screen's DRAW FORECAST said so");
+        const string fixed = pendingStackDamageLine(3, 1, 2, 3,
+                                                    "Underworld Dreams #1, Underworld Dreams #2,"
+                                                    " Ob Nixilis, the Hate-Twisted");
+        CHECK(fixed == "ON THE STACK: 3 damage to you from the damage abilities listed above,"
+                       " plus 6 more that the 2 queued draws on this same stack cost you"
+                       " (2 x 3 per draw to their Underworld Dreams #1, Underworld Dreams #2,"
+                       " Ob Nixilis, the Hate-Twisted - a queued draw is not declinable) = 9"
+                       " in total - you would be at -8; that would KILL you",
+              "#W79-DA T16 GREEN both halves are named and the verdict is computed off the one"
+              " total, which is the figure the DRAW FORECAST on the same screen already gave");
+        CHECK(pendingStackDamageLine(3, 1, 0, 3, "x") == base
+              && pendingStackDamageLine(3, 1, 2, 0, "x") == base,
+              "#W79-DA T16 MUST-NOT-MATCH no queued draw, or no punisher, renders the wave-78"
+              " bytes exactly");
+        // A stack with NO damage ability but a queued draw under a punisher is
+        // still a priced stack - the wave-78 line printed nothing there at all.
+        CHECK(pendingStackDamageLine(0, 4, 2, 3, "Underworld Dreams")
+                  .find("= 6 in total - you would be at -2; that would KILL you") != string::npos
+              && pendingStackDamageLine(0, 4).empty(),
+              "#W79-DA T16 GREEN the draw-only stack is priced where wave 78 was silent");
+        // The hold latch's own verdict is built from the same number, so the two
+        // cannot disagree about whether this stack kills.
+        CHECK(stackDeathVerdictKey(9, 1) == "[stack death verdict: the stack KILLS you]"
+              && stackDeathVerdictKey(3, 4) == "[stack death verdict: you survive the stack]",
+              "#W79-DA T16 the verdict key reads the same total pendingStackLifeLossToSeat now"
+              " returns");
+    }
+
+    cout << "\n[#W79-DA] T16 an untap keyword prints beside an affirmative tap state\n";
+    {
+        // `146v123` seq 15: `Human #1-#102 (1/1) [doesn't untap during its
+        // controller's untap step]` on UNTAPPED bodies, beside the same board's
+        // `[tapped - cannot attack or block this turn]` on tapped ones. The board
+        // line prints nothing for an untapped card, so on these rows the keyword
+        // filled the silence with the opposite fact.
+        const string kw = legibleKeywordName("doesnotuntap");
+        CHECK(kw == "doesn't untap during its controller's untap step",
+              "#W79-DA T16 the keyword text is the wave-78 one, unchanged");
+        const string tappedRow = "Human #1 (1/1) [" + kw + "]"
+                                 + tappedCreatureTag(false, false, "");
+        const string untappedRow = "Human #2 (1/1) [" + kw + "] [untapped]";
+        CHECK(tappedRow.find("[tapped - cannot attack or block this turn]") != string::npos
+              && untappedRow.find("[untapped]") != string::npos,
+              "#W79-DA T16 GREEN the two states are now distinguishable on rows carrying the"
+              " keyword - one says tapped, the other says untapped");
+        // KEY: the face is a `[...]` group, so it is outside the hold-latch and
+        // option-set keys exactly as every other state note is, and it moves only
+        // when the tapped state moves - which already moves the board key.
+        CHECK(holdActionKeyRow(untappedRow) == holdActionKeyRow("Human #2 (1/1) [" + kw + "]")
+              && optionSetKeyLine(untappedRow)
+                     == optionSetKeyLine("Human #2 (1/1) [" + kw + "]"),
+              "#W79-DA T16 KEY the affirmative face is a bracket note: it changes no action key");
+    }
+
+    cout << "\n[#W79-DA] KEY every wave-79 clause is outside the ask, async-slot and hold keys\n";
+    {
+        // The JOINED menu: one acting row and the hold row that stands beside it,
+        // rendered twice with ONLY this wave's numbers different. #W74's rule:
+        // the ask key half, the async slot's tail half (both w77KeyTailOf), the
+        // hold-latch action key (holdActionKeyRow, the live builder) and the
+        // option-set key must all be byte-identical across the pair.
+        std::vector<CrackBackAttackerFact> atk;
+        {
+            CrackBackAttackerFact a; a.blockersNeeded = 1; a.coverable = true;
+            a.power = 3; atk.push_back(a);
+            a.power = 3; atk.push_back(a);
+            a.power = 1; atk.push_back(a);
+        }
+        std::vector<std::string> taps;
+        taps.push_back("Katilda, Dawnhart Prime");
+        std::vector<int> rest(1, (int) TAP_RESTRICT_NO_ATTACK);
+        const string rowA = "Cast Master of the Feast {1}{b}{b}"
+                            + leavesUntappedTag(5, 3)
+                            + crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0)
+                            + paymentTapsClause(taps, rest)
+                            + crackBackReliefClause(7, 2, 1, false);
+        const string rowB = "Cast Master of the Feast {1}{b}{b}"
+                            + leavesUntappedTag(5, 3)
+                            + crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0, 3)
+                            + paymentTapsClause(taps, rest, "Intruder Alarm (THEIRS)")
+                            + crackBackReliefClause(7, 2, 1, false, "", 2, 4);
+        const string hold = "Hold priority - pass now, and do not ask me again";
+        CHECK(rowA != rowB,
+              "#W79-DA KEY the pair really does differ in the rendered bytes this wave adds");
+        std::vector<string> menuA, menuB;
+        menuA.push_back(rowA); menuA.push_back(hold);
+        menuB.push_back(rowB); menuB.push_back(hold);
+        CHECK(optionSetKeyOf(menuA) == optionSetKeyOf(menuB),
+              "#W79-DA KEY the option-set key of the JOINED menu is identical");
+        CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(rowB)
+              && holdActionKeyRow(hold) == holdActionKeyRow(hold),
+              "#W79-DA KEY the hold-latch ACTION key is identical - a taken hold is not"
+              " re-opened by any number this wave prints");
+        {
+            //#W74 LESSON: the held set is built the way the LIVE seam builds it.
+            std::set<string> latchA, latchB;
+            for (size_t i = 0; i < menuA.size(); i++)
+                latchA.insert(holdActionKeyRow(menuA[i]));
+            for (size_t i = 0; i < menuB.size(); i++)
+                latchB.insert(holdActionKeyRow(menuB[i]));
+            CHECK(latchA == latchB,
+                  "#W79-DA KEY the whole latched row SET is identical across the pair");
+        }
+        const string tailA = "\n1. " + rowA + "\n2. " + hold + "\n";
+        const string tailB = "\n1. " + rowB + "\n2. " + hold + "\n";
+        CHECK(w77KeyTailOf(tailA) == w77KeyTailOf(tailB),
+              "#W79-DA KEY the ASK key's and the ASYNC SLOT's half of the rendered list is"
+              " identical - every clause this wave touches is one balanced `{...}` group");
+        CHECK(w77KeyTailOf(tailA).find("crack-back cover") == string::npos
+              && w77KeyTailOf(tailA).find("paying this taps") == string::npos
+              && w77KeyTailOf(tailA).find("removes 2 from") == string::npos,
+              "#W79-DA KEY MUST-NOT-MATCH none of the three clause bodies survives into the key");
+        CHECK(w77KeyTailOf(tailA).find("Cast Master of the Feast {1}{b}{b}") != string::npos,
+              "#W79-DA KEY the ACTION and its cost pips DO survive - the question is unchanged,"
+              " not erased");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
