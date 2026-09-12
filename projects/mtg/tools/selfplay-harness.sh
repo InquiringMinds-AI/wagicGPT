@@ -854,8 +854,25 @@ pilot_stall_selftest() {
     v=$(silent_fallbacks_in "$tmp/9999999999-ai_baka_deck2-k.jsonl")
     case "$v" in 0) ;; *) echo "pilot-stall-selftest FAIL: unparsed_reply counted as silence ('$v'), want '0'" >&2; fails=1;; esac
 
+    ##W79-DB (T17, wave-78 deck152 MED-3 / known-bugs T17): A ZERO-ELIGIBLE
+    # ENGINE-ANSWERED WINDOW IS NOT A FALLBACK. `152v123` seq 22 is a Sigarda
+    # Coven reveal whose eligibility filter selected zero rows - no Human was
+    # revealed, so `get a human` had no legal target and there was nothing to
+    # ask. The engine answered correctly and the corpus census counted it as the
+    # run's eighth fallback. Neither harness surface may count it: it is not
+    # endpoint silence, and no decision was lost.
+    printf '%s\n' \
+      '{"kind":"reveal","seq":22,"fallback":"engine_answered","choice":-1,"latency_ms":-1}' \
+      '{"kind":"recovery","seq":23,"recovers_fallback":"engine_answered"}' \
+      > "$tmp/9999999999-ai_baka_deck152-w79.jsonl"
+    v=$(silent_fallbacks_in "$tmp/9999999999-ai_baka_deck152-w79.jsonl")
+    case "$v" in 0) ;; *) echo "pilot-stall-selftest FAIL: engine_answered counted as a silent fallback ('$v'), want '0'" >&2; fails=1;; esac
+    v=$(pilot_stall_verdict "$tmp" 1 1)
+    case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: an engine-answered window tripped the stall wire ('$v'), want OK" >&2; fails=1;; esac
+    rm -f "$tmp"/*.jsonl
+
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 17 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 19 checks, 0 failed"
     return "$fails"
 }
 
@@ -1460,12 +1477,21 @@ for d in sorted(games, key=lambda x:-(wins[x]/games[x] if games[x] else 0)):
 SILENT = tuple(os.environ.get("PILOT_SILENT_CLASSES", "timeout").split())
 to_fb = {}
 by_class = Counter()
+#W79-DB (T17): `engine_answered` is counted SEPARATELY and named as not-a-fallback.
+# `152v123` seq 22 (wave 78) is a reveal whose eligibility filter selected zero
+# rows: there was nothing to ask, the engine answered, no decision was lost. It is
+# not endpoint silence and it is not a play problem, and reading it in the fallback
+# tally cost the wave-78 engine seat a paragraph explaining that it was neither.
+engine_answered = 0
 for f in files:
     n = 0
     for line in open(f, errors="replace"):
         try: r = json.loads(line)
         except: continue
         fb = str(r.get("fallback", ""))
+        if fb == "engine_answered":
+            engine_answered += 1
+            continue
         if fb.startswith(SILENT):
             n += 1
             by_class[fb] += 1
@@ -1480,6 +1506,10 @@ else:
         print(f"  {n:5d}  class {c}")
     for b, n in sorted(to_fb.items(), key=lambda kv: -kv[1]):
         print(f"  {n:5d}  {b}")
+if engine_answered:
+    print(f"\n== engine-answered windows: {engine_answered} ==")
+    print("   zero-eligible decisions (no legal option to offer) - the engine answered them;")
+    print("   NOT a fallback, no round trip was owed and no decision was lost")
 print(f"\nlogs + results.tsv in: {out}")
 PY
 

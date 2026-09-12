@@ -2168,6 +2168,14 @@ private:
     int mRecoverySeq;
     string mRecoveryClass;
     string mRecoveryKind;
+    //#W79-DB (T1, owner ruling: MEASURE ONLY). The six wave-78
+    //`answer_label_absent` replies are all classed `unparsed_reply` on the
+    //`recovery` record that names them, so no seat can join the recovery
+    //population to the S1 population without re-parsing every reply. The class is
+    //stamped as its own boolean field on the recovery record. Nothing reads it in
+    //the engine, the parser is byte-identical and no key or tail moves.
+    bool mReplyLabelAbsent;     //the record just written was classed answer_label_absent
+    bool mRecoveryLabelAbsent;  //...and the handoff it armed carries that fact
     //#W67-AX (I7): ...and WHAT ANSWERED. The wave-66 corpus wrote `choice: -1`
     //and `chosen_text: "<refused: unparsed_reply>"` on 76 of its 83 fallbacks,
     //so 51 of them were unadjudicable: the engine seat could not say whether a
