@@ -96,6 +96,12 @@ NO_PROGRESS_S="${WAGIC_NO_PROGRESS_S:-3600}"
 FAST_HANG_QUIET_S="${WAGIC_FAST_HANG_QUIET_S:-300}"
 FAST_HANG_MB="${WAGIC_FAST_HANG_MB:-64}"
 OUTDIR=""
+#W81-DJ: every check below asks tools/runmanifest.py which seat logs are THIS
+#RUN'S (the shared $LOGDIR cannot be read by time - see that module's header).
+#The python heredocs read it from here; exported so a heredoc needs no path
+#argument of its own.
+WAGIC_TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+export WAGIC_TOOLS_DIR
 URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev default)
 MODEL="qwen35"
 KEY=""
@@ -263,8 +269,27 @@ harvest_selftest() {
     harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before" 2>/dev/null
     [ -f "$tmp/out/1005-ai_baka_deck125-0xff-vs-ai_baka_deck123.jsonl" ] \
         || { echo "harvest-selftest FAIL: with no .seatlogs the fallback predicate must still harvest (#W77-CU F10)" >&2; fails=1; }
+    #W81-DJ: the 2026-09-12 SHAPE, in the harvest. Another lane's suite fixture
+    #(deck198 vs deck199, stub endpoint, thinking off) is written into the same
+    #shared $LOGDIR while our game runs. It is newer than $BEFORE_LIST, so the
+    #set difference alone takes it; only the announced-name manifest keeps it
+    #out. Every other check now reads the same manifest, which is the point of
+    #the lane - this pin is the harvest's half of it.
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "harvest-selftest: 14 checks, 0 failed"
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/log" "$tmp/out"
+    ls "$tmp/log"/*.jsonl 2>/dev/null | sort > "$tmp/before"
+    : > "$tmp/log/1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl"
+    : > "$tmp/log/1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl"
+    printf '%s\n' '1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl' > "$tmp/out/.seatlogs"
+    harvest_translogs "$tmp/log" "$tmp/out" "$tmp/before"
+    [ -f "$tmp/out/1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl" ] \
+        || { echo "harvest-selftest FAIL: our own announced seat log was not harvested" >&2; fails=1; }
+    [ -f "$tmp/out/1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl" ] \
+        && { echo "harvest-selftest FAIL: another lane's foreign seat log was harvested (#W81-DJ)" >&2; fails=1; }
+
+    rm -rf "$tmp"
+    [ "$fails" = 0 ] && echo "harvest-selftest: 16 checks, 0 failed"
     return "$fails"
 }
 
@@ -311,23 +336,32 @@ PILOT_STALL_K="${WAGIC_PILOT_STALL_K:-6}"
 PILOT_SILENT_CLASSES="timeout wall_miss_no_retry wall_miss_unrecorded empty_reply http_error"
 export PILOT_SILENT_CLASSES
 pilot_stall_verdict() {
-    #$1 = logdir, $2 = run start epoch, $3 = K -> "STALL <n>" | "OK <n>"
-    python3 - "$1" "$2" "$3" <<'PSY'
+    #$1 = logdir, $2 = run start epoch, $3 = K, $4 = this run's OUTDIR
+    #   -> "STALL <n>" | "OK <n>"
+    python3 - "$1" "$2" "$3" "${4:-}" <<'PSY'
 import glob, json, os, sys
+sys.path.insert(0, os.environ.get("WAGIC_TOOLS_DIR", ""))
+import runmanifest
 logdir, start, k = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+#W81-DJ: THIS RUN'S SEATS ONLY. $LOGDIR is shared, and another lane's stub-endpoint
+#fixture timing out has nothing to say about whether OUR pilot is generating - in
+#either direction (its timeouts would read as our stall; its healthy records would
+#hide ours). Identity is the run's own announcements, never the epoch.
+own = runmanifest.own_seatlogs(sys.argv[4] if len(sys.argv) > 4 else "")
 SILENT = tuple(os.environ.get("PILOT_SILENT_CLASSES", "timeout").split())
 
 def silent(r):
     return str(r.get("fallback", "")).startswith(SILENT)
 
 live = []   # (mtime, [decision records, newest first]) for every ACTIVE seat
-for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
-    try:
-        ep = int(os.path.basename(f).split("-")[0])
-    except ValueError:
-        continue
-    if ep < start - 5:
-        continue
+for f in runmanifest.own_logs(logdir, own):
+    if own is None:
+        try:
+            ep = int(os.path.basename(f).split("-")[0])
+        except ValueError:
+            continue
+        if ep < start - 5:
+            continue
     recs = []
     ended = False
     try:
@@ -421,7 +455,7 @@ PSY
 
 pilot_stall_sweep() {
     local verdict
-    verdict=$(pilot_stall_verdict "$LOGDIR" "$START" "$PILOT_STALL_K") || return 0
+    verdict=$(pilot_stall_verdict "$LOGDIR" "$START" "$PILOT_STALL_K" "$OUTDIR") || return 0
     case "$verdict" in
         STALL*)
             set -- $verdict
@@ -471,12 +505,18 @@ pilot_stall_sweep() {
 WINDOW_LOOP_N="${WAGIC_WINDOW_LOOP_N:-40}"
 WINDOW_LOOP_K="${WAGIC_WINDOW_LOOP_K:-8}"
 window_loop_verdict() {
-    #$1 = logdir, $2 = run start epoch, $3 = N, $4 = K (default 8)
-    #   -> "LOOP <n> <seat>" | "OK <n>"
-    python3 - "$1" "$2" "$3" "${4:-8}" <<'WLY'
+    #$1 = logdir, $2 = run start epoch, $3 = N, $4 = K (default 8),
+    #$5 = this run's OUTDIR  -> "LOOP <n> <seat>" | "OK <n>"
+    python3 - "$1" "$2" "$3" "${4:-8}" "${5:-}" <<'WLY'
 import glob, json, os, re, sys
+sys.path.insert(0, os.environ.get("WAGIC_TOOLS_DIR", ""))
+import runmanifest
 logdir, start, n = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 k = int(sys.argv[4]) if len(sys.argv) > 4 else 8
+#W81-DJ: this run's announced seats only. A foreign seat stuck in a window is
+#another lane's corpus to stop, not ours, and stopping OUR run over it is the
+#same defect the regime gate hit on 2026-09-12.
+own = runmanifest.own_seatlogs(sys.argv[5] if len(sys.argv) > 5 else "")
 DECL = re.compile(r"declined this exact list (\d+) times? this turn")
 STACK_HEAD = "ON THE STACK"
 
@@ -496,13 +536,14 @@ def board_of(r):
     return (r.get("my_life"), r.get("opp_life"), stack_top(r.get("prompt", "")))
 
 worst, worstSeat = 0, ""
-for f in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
-    try:
-        ep = int(os.path.basename(f).split("-")[0])
-    except ValueError:
-        continue
-    if ep < start - 5:
-        continue
+for f in runmanifest.own_logs(logdir, own):
+    if own is None:
+        try:
+            ep = int(os.path.basename(f).split("-")[0])
+        except ValueError:
+            continue
+        if ep < start - 5:
+            continue
     recs, ended = [], False
     try:
         for line in open(f, errors="replace"):
@@ -541,7 +582,7 @@ WLY
 
 window_loop_sweep() {
     local verdict
-    verdict=$(window_loop_verdict "$LOGDIR" "$START" "$WINDOW_LOOP_N" "$WINDOW_LOOP_K") || return 0
+    verdict=$(window_loop_verdict "$LOGDIR" "$START" "$WINDOW_LOOP_N" "$WINDOW_LOOP_K" "$OUTDIR") || return 0
     case "$verdict" in
         LOOP*)
             set -- $verdict
@@ -665,8 +706,32 @@ window_loop_selftest() {
     v=$(window_loop_verdict "$tmp" 1 40 8)
     case "$v" in LOOP\ 100*) ;;
       *) echo "window-loop-selftest FAIL: a frozen board with narration gave '$v', want LOOP" >&2; fails=1;; esac
+    #W81-DJ: A FOREIGN SEAT IN THE SHARED $LOGDIR IS NOT OUR WINDOW. Another
+    #lane's fixture stuck at 295 declines is that lane's corpus to stop; killing
+    #ours over it is the 2026-09-12 defect wearing a different watchdog. Our run
+    #announces its seats on its own game stderr, so it is read by name.
+    rm -f "$tmp"/*.jsonl
+    local wout="$tmp/out"
+    mkdir -p "$wout"
+    mk 1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl \
+      '{"kind":"ask","seq":9,"prompt":"3. Cast nothing {... you have already declined this exact list 3 times this turn}"}'
+    mk 1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl \
+      '{"kind":"ask","seq":300,"prompt":"3. Cast nothing {... you have already declined this exact list 295 times this turn}"}'
+    printf 'WAGIC_GPT_TRANSLOG_FILE %s\n' \
+      '1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl' \
+      > "$wout/game-162v123-1789238538.stderr"
+    v=$(window_loop_verdict "$tmp" 1 40 8 "$wout")
+    case "$v" in "OK 3") ;; *) echo "window-loop-selftest FAIL: a FOREIGN seat's dead window gave '$v', want 'OK 3'" >&2; fails=1;; esac
+    #MUST-NOT-MATCH: our OWN announced seat in the same directory still stops the run.
+    mk 1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl \
+      '{"kind":"ask","seq":300,"prompt":"3. Cast nothing {... you have already declined this exact list 295 times this turn}"}'
+    v=$(window_loop_verdict "$tmp" 1 40 8 "$wout")
+    case "$v" in "LOOP 295 1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl") ;;
+      *) echo "window-loop-selftest FAIL: our OWN dead window gave '$v', want LOOP on our seat" >&2; fails=1;; esac
+    rm -rf "$tmp"/*.jsonl "$wout"
+
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "window-loop-selftest: 12 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "window-loop-selftest: 14 checks, 0 failed"
     return "$fails"
 }
 
@@ -871,8 +936,46 @@ pilot_stall_selftest() {
     case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: an engine-answered window tripped the stall wire ('$v'), want OK" >&2; fails=1;; esac
     rm -f "$tmp"/*.jsonl
 
+    #W81-DJ: A FOREIGN SEAT LOG IN THE SHARED $LOGDIR IS NOT OUR EVIDENCE.
+    #$HOME/.Wagic/ai/gpt/logs is shared with every other lane; on 2026-09-12 a
+    #suite fixture (deck198 vs deck199, stub endpoint) sitting in it killed a
+    #valid run through the regime gate. The same directory is what this
+    #tripwire reads. Our run announces its own seats on its own game stderr;
+    #the foreign log must be invisible whatever its tail says.
+    local sout="$tmp/out"
+    mkdir -p "$sout"
+    printf '%s\n' \
+      '{"kind":"ask","seq":1}' '{"kind":"ask","seq":2}' '{"kind":"ask","seq":3}' \
+      > "$tmp/1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl"
+    printf '%s\n' \
+      '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":3,"fallback":"timeout"}' \
+      > "$tmp/1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl"
+    printf 'WAGIC_GPT_TRANSLOG_FILE %s\n' \
+      '1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl' \
+      > "$sout/game-162v123-1789238538.stderr"
+    v=$(pilot_stall_verdict "$tmp" 1 3 "$sout")
+    case "$v" in OK*) ;; *) echo "pilot-stall-selftest FAIL: a FOREIGN all-timeout seat log stalled our run ('$v'), want OK" >&2; fails=1;; esac
+    #...and the direction that MASKS a wedge, which is where reading the shared
+    #directory actually loses this tripwire: our own announced seat is timing
+    #out on every decision while a foreign seat in the same directory is being
+    #answered normally. "Every live seat is failing" was computed over seats
+    #that are not ours, so the run kept burning on the heuristic. (This is the
+    #RED case: before this lane the verdict here was OK.)
+    printf '%s\n' \
+      '{"kind":"ask","seq":1,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":2,"fallback":"timeout"}' \
+      '{"kind":"ask","seq":3,"fallback":"timeout"}' \
+      > "$tmp/1789238542-ai_baka_deck162-0xaa-vs-ai_baka_deck123.jsonl"
+    printf '%s\n' '{"kind":"ask","seq":1}' '{"kind":"ask","seq":2}' '{"kind":"ask","seq":3}' \
+      > "$tmp/1789239545-ai_baka_deck198-0xbb-vs-ai_baka_deck199.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 3 "$sout")
+    case "$v" in STALL\ 3) ;; *) echo "pilot-stall-selftest FAIL: our OWN wedged seat gave '$v', want 'STALL 3'" >&2; fails=1;; esac
+    rm -rf "$tmp"/*.jsonl "$sout"
+
     rm -rf "$tmp"
-    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 19 checks, 0 failed"
+    [ "$fails" = 0 ] && echo "pilot-stall-selftest: 21 checks, 0 failed"
     return "$fails"
 }
 
@@ -1084,18 +1187,29 @@ run_one_game() {
         # reconstruction. The gamestart header's opp_deck disambiguates
         # concurrent games that share a deck.
         local adj
-        adj=$(python3 - "$LOGDIR" "$d0" "$d2" "$gstart" <<'PYEOF' 2>/dev/null
+        adj=$(python3 - "$LOGDIR" "$d0" "$d2" "$gstart" "$OUTDIR" \
+                      "game-${d0}v${d2}-${gstart}.stderr" <<'PYEOF' 2>/dev/null
 import json, glob, os, sys
+sys.path.insert(0, os.environ.get("WAGIC_TOOLS_DIR", ""))
+import runmanifest
 logdir, d0, d2, gstart = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+#W81-DJ: adjudicate from THIS GAME'S announced seat logs. The deck+window scan
+#could read a concurrent game's last record and hand a seat a life total it
+#never had (the wave-77 F10 shape, in the adjudicator instead of the harvest).
+own = runmanifest.own_seatlogs(sys.argv[5], game=sys.argv[6])
 def last_state(mine, other):
     cand = []
-    for f in glob.glob(os.path.join(logdir, "*-ai_baka_deck%s-*.jsonl" % mine)):
-        try:
-            ep = int(os.path.basename(f).split('-')[0])
-        except ValueError:
+    for f in runmanifest.own_logs(logdir, own):
+        base = os.path.basename(f)
+        if ("-ai_baka_deck%s-" % mine) not in base:
             continue
-        if not (gstart - 2 <= ep <= gstart + 300):
-            continue
+        if own is None:
+            try:
+                ep = int(base.split('-')[0])
+            except ValueError:
+                continue
+            if not (gstart - 2 <= ep <= gstart + 300):
+                continue
         try:
             recs = [json.loads(l) for l in open(f) if l.strip()]
         except Exception:
@@ -1170,22 +1284,35 @@ no_progress_sweep() {
         read -r gpid gstart gd0 gd1 < "$m" || continue
         [ -n "${gpid:-}" ] || continue
         local quiet
-        quiet=$(python3 - "$LOGDIR" "$gstart" "$gd0" "$gd1" <<'NPY'
+        quiet=$(python3 - "$LOGDIR" "$gstart" "$gd0" "$gd1" "$OUTDIR" \
+                        "game-${gd0}v${gd1}-${gstart}.stderr" <<'NPY'
 import glob, os, sys
+sys.path.insert(0, os.environ.get("WAGIC_TOOLS_DIR", ""))
+import runmanifest
 logdir, gstart, d0, d1 = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+outdir, game = sys.argv[5], sys.argv[6]
+#W81-DJ: THIS GAME'S OWN TWO SEATS, by the names it announced on its own stderr.
+#Deck name plus a 300 s window is not identity in a SHARED $LOGDIR: another
+#lane's game of the same deck writing every few seconds made this game look
+#alive (and its silence could equally have hung ours). A game that has not
+#announced a seat log yet has no clock, which is the pre-existing -1 case.
+own = runmanifest.own_seatlogs(outdir, game=game)
 newest = 0
-for d in (d0, d1):
-    for f in glob.glob(os.path.join(logdir, "*-ai_baka_deck%s-*.jsonl" % d)):
+for f in runmanifest.own_logs(logdir, own):
+    if own is None:
+        base = os.path.basename(f)
+        if not any(("-ai_baka_deck%s-" % d) in base for d in (d0, d1)):
+            continue
         try:
-            ep = int(os.path.basename(f).split("-")[0])
+            ep = int(base.split("-")[0])
         except ValueError:
             continue
         if not (gstart - 2 <= ep <= gstart + 300):
             continue
-        try:
-            newest = max(newest, int(os.path.getmtime(f)))
-        except OSError:
-            pass
+    try:
+        newest = max(newest, int(os.path.getmtime(f)))
+    except OSError:
+        pass
 print(-1 if not newest else newest)
 NPY
 )
@@ -1258,6 +1385,7 @@ regime_gate_sweep() {
     #five records of each not-yet-checked seat log.
     local verdict
     verdict=$(python3 "$HERE/tools/regime-gate.py" --logdir "$LOGDIR" --start "$START" \
+                      --outdir "$OUTDIR" \
                       --regime "$THINKING" --prose-abort "$PROSE_ABORT" \
                       --state "$OUTDIR/regime-gate-state.txt" 2>&1)
     case "$verdict" in
@@ -1324,17 +1452,24 @@ supervisor() {
         #nothing to violate - that half stands down (the sweep above does not).
         [ "$GAME_TIMEOUT_S" = "0" ] && continue
         local verdict
-        verdict=$(python3 - "$LOGDIR" "$START" "$EXPECTED_DECISIONS" "$GAME_TIMEOUT_S" <<'WPY'
+        verdict=$(python3 - "$LOGDIR" "$START" "$EXPECTED_DECISIONS" "$GAME_TIMEOUT_S" "$OUTDIR" <<'WPY'
 import json, glob, os, sys
+sys.path.insert(0, os.environ.get("WAGIC_TOOLS_DIR", ""))
+import runmanifest
 logdir, start, dec, cap = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+#W81-DJ: our own seats' latencies. A foreign stub endpoint answering in 5 ms (or
+#a foreign pilot crawling) would move this median and decide whether OUR corpus
+#is feasible.
+own = runmanifest.own_seatlogs(sys.argv[5] if len(sys.argv) > 5 else "")
 lat = []
-for f in glob.glob(os.path.join(logdir, "*.jsonl")):
-    try:
-        ep = int(os.path.basename(f).split("-")[0])
-    except ValueError:
-        continue
-    if ep < start - 5:
-        continue
+for f in runmanifest.own_logs(logdir, own):
+    if own is None:
+        try:
+            ep = int(os.path.basename(f).split("-")[0])
+        except ValueError:
+            continue
+        if ep < start - 5:
+            continue
     for line in open(f):
         try: r = json.loads(line)
         except Exception: continue
