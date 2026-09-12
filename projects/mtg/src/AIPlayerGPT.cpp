@@ -20206,7 +20206,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -21624,6 +21624,32 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["own_loop_verdict"] = mOwnLoopVerdictFace;
         mOwnLoopVerdictFace.clear();
     }
+    //#W80-DE (U2, wave-79 engine-seat HIGH-2): the two verdicts the hold latch
+    //arbitrates, on the record of the window whose prompt printed them, and the
+    //clamp's own two events. Without these four fields `hold_verdict_safer_ignored`
+    //59 and `hold_reopened_new_threat` 0 were unsamplable: neither the window, nor
+    //the held face, nor the live face was recoverable from any of the 42 seat logs.
+    //All four are consumed here so no later record can inherit them.
+    if (!mCrackBackVerdictFace.empty())
+    {
+        rec["crackback_verdict"] = mCrackBackVerdictFace;
+        mCrackBackVerdictFace.clear();
+    }
+    if (!mStackDeathVerdictFace.empty())
+    {
+        rec["stack_death_verdict"] = mStackDeathVerdictFace;
+        mStackDeathVerdictFace.clear();
+    }
+    if (!mHoldSaferIgnoredFace.empty())
+    {
+        rec["hold_safer_ignored_face"] = mHoldSaferIgnoredFace;
+        mHoldSaferIgnoredFace.clear();
+    }
+    if (!mHoldReopenReason.empty())
+    {
+        rec["hold_reopen_reason"] = mHoldReopenReason;
+        mHoldReopenReason.clear();
+    }
     if (holdCheckRefSeq > -2)
         rec["hold_check_ref_seq"] = holdCheckRefSeq;       //#W78-CV (S7): the RECORD seq
     if (holdCheckRefWindow > -2)
@@ -22206,6 +22232,15 @@ void AIPlayerGPT::logGameEnd()
         {"ask_key_continuation_differs", mAskKeyContinuationDiffers},
         //#W79-DC (F2): holds re-opened by a NEW threat at the same danger rank.
         {"hold_reopened_new_threat", mHoldReopenedNewThreat},
+        //#W80-DE (U2): the two verdicts, now RENDERED - 0 in 2,203 wave-79 prompts.
+        {"crackback_verdict_lines_rendered", mCrackBackVerdictLinesRendered},
+        {"stack_death_verdict_lines_rendered", mStackDeathVerdictLinesRendered},
+        //#W80-DE (U8): declined lists re-served across a phase on an unchanged board.
+        {"crossphase_replayed", mCrossPhaseReplayed},
+        //#W80-DE (U9): the replay population SPLIT BY PATH, so the census sums and
+        //is comparable across waves. `ask_replays_reserved` stays the total.
+        {"ask_replays_cache", mAskReplaysCache},
+        {"ask_replays_repeat_latch", mAskReplaysRepeatLatch},
         {"menu_pass_no_progress_suppressed", mMenuPassNoProgressSuppressed},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
@@ -32930,9 +32965,20 @@ string w78OwnLoopVerdictLine(int state, const string& theirSpell, const string& 
                " do not treat this window as already won]";
     }
     if (state == kW77LoopResolving)
+        //#W80-DE (U10, wave-79 deck126 HIGH-2): THE HOLD ROW AND THE VERDICT SAID
+        //DIFFERENT THINGS ABOUT THE SAME ROW. `126v125` seqs 45/46 printed this
+        //line's blanket "the HOLD row covers every remaining link" beside a hold
+        //row whose own text is an absolute - it gives up every other row on the
+        //menu for as long as they stand, and at seq 46 those rows were two live
+        //Sorin activations. Both sentences were true and the pair read as a
+        //contradiction, which is the #W73-BY N5 shape (two surfaces, one board,
+        //opposite advice). The verdict now states the hold's OWN cost in the hold
+        //row's own terms, so the two surfaces compose one rule.
         return "\n[own loop verdict: RESOLVING - a piece of your own proven life loop is on"
                " the stack and nothing of theirs targets it: the loop closes without another"
-               " action from you, and the HOLD row covers every remaining link]";
+               " action from you, and the HOLD row covers every remaining link - taking it"
+               " also gives up every other row on this menu for as long as those rows stand,"
+               " which is what the hold row itself says]";
     return string();
 }
 
@@ -32950,8 +32996,13 @@ string w78OwnLoopVerdictLine(int state, const string& theirSpell, const string& 
 //      that a silent omission is worse than wrong text: the model confabulates rules
 //      into the gap. Every shape now prints its true face, name or no name.
 //Pure over the state, the proven flag and the two names.
+string w80ProvenWinLoopLine(const string& starterName); //#W80-DE (U10): defined below
+//#W80-DE (U10): ...and the proven-win face is gated on a LIVE STARTER, named.
+//`starterName` is empty when the engine can see no way to enter the chain from
+//this board; the line then prints the gap instead of the win (w80ProvenWinLoopLine).
 string w79OwnLoopVerdictLineFor(int state, bool loopProven,
-                                const string& theirSpell, const string& component)
+                                const string& theirSpell, const string& component,
+                                const string& starterName)
 {
     const string named = w78OwnLoopVerdictLine(state, theirSpell, component);
     if (!named.empty())
@@ -32966,9 +33017,7 @@ string w79OwnLoopVerdictLineFor(int state, bool loopProven,
         return "\n[own loop verdict: an object of theirs resolves before your trigger - the"
                " loop is NOT proven: the engine cannot tell whether it survives, so do not"
                " treat this window as already won]";
-    return "\n[own loop verdict: your life loop is a proven win, and no link of it is on the"
-           " stack right now - nothing of it is waiting to resolve, so a hold here covers no"
-           " link of it]";
+    return w80ProvenWinLoopLine(starterName); //#W80-DE (U10)
 }
 
 //#W78-CV (S4, wave-77 deck152 HIGH-2). NINE BYTE-IDENTICAL WINDOWS WHILE THEIR
@@ -33883,12 +33932,45 @@ void AIPlayerGPT::w77CountOwnLoopWindow()
 //discipline, but counted where the bytes enter the prompt rather than where the
 //rows are built. `own_loop_verdict_lines_rendered` is therefore the number of
 //prompts a reviewer can find the line in, by construction.
+bool w80CountRenderedAtSend(bool sent, bool rendered, int windowSeq,
+                            int& countedSeq, int& counter); //#W80-DE (U15): defined below
 void AIPlayerGPT::w79CountOwnLoopVerdictLine()
 {
     if (mOwnLoopVerdictCountedSeq == mWindowSeq)
         return;
     mOwnLoopVerdictCountedSeq = mWindowSeq;
     mOwnLoopVerdictLinesRendered++;
+}
+
+//#W80-DE (U15 + U2): the send-time application, one call per seam. A window that
+//is not SENT stamps nothing and counts nothing - and it CLEARS both faces, so a
+//suppressed window's verdict can never be consumed by a later record (the #W79-DC
+//F10 rule, applied to the two new families as well). The drain counter moves here
+//too: it was incremented at its build site, upstream of the honoured hold, the
+//reservation decline and the loop auto-pass, which is the 30-counted-vs-18-rendered
+//gap the wave-79 engine seat could not run down.
+void AIPlayerGPT::w80ApplyVerdictFacesAtSend(bool sent, const string& pendingCrackBack,
+                                             const string& pendingStackDeath,
+                                             bool pendingDrain)
+{
+    if (!sent)
+    {
+        mCrackBackVerdictFace.clear();
+        mStackDeathVerdictFace.clear();
+        return;
+    }
+    if (w80CountRenderedAtSend(true, !pendingCrackBack.empty(), mWindowSeq,
+                               mCrackBackVerdictCountedSeq, mCrackBackVerdictLinesRendered))
+        mCrackBackVerdictFace = pendingCrackBack;
+    else if (pendingCrackBack.empty())
+        mCrackBackVerdictFace.clear();
+    if (w80CountRenderedAtSend(true, !pendingStackDeath.empty(), mWindowSeq,
+                               mStackDeathVerdictCountedSeq, mStackDeathVerdictLinesRendered))
+        mStackDeathVerdictFace = pendingStackDeath;
+    else if (pendingStackDeath.empty())
+        mStackDeathVerdictFace.clear();
+    w80CountRenderedAtSend(true, pendingDrain, mWindowSeq,
+                           mStackDrainCountedSeq, mStackDrainWindowsAsked);
 }
 
 void AIPlayerGPT::w77DropUnaskedCastNote()
@@ -34890,6 +34972,175 @@ void w79ApplyLoopFaceAtSend(bool sent, const string& pendingFace,
     countIt = true;
 }
 
+//#W80-DE (U15, wave-79 engine-seat MED-3). ONE SEND-TIME COUNTER, EVERY SEAM.
+//Three render counters overshot their rendered population by a fixed margin -
+//own-loop 63 vs 56 prompts, cross-phase 172 vs 170 notes, stack-drain 30 vs 18
+//clauses - because each was incremented where its clause was BUILT, upstream of
+//every gate that can still discard the window, and each re-implemented the
+//once-per-window guard. A counter whose name says "rendered" and whose value is
+//"built" is not adjudicable: a reviewer comparing the census to the corpus finds
+//an unexplained gap and cannot tell a miscount from a suppressed window. This is
+//the single predicate all of them now call, at the point the prompt is handed to
+//the model: it counts only when the prompt is SENT and the clause is IN it, and
+//only once per window (`mWindowSeq` moves when a record is written, so a prompt
+//rebuilt on a polling tick cannot count twice). Returns whether it counted, so a
+//caller can stamp its record face on exactly the same condition. Pure.
+bool w80CountRenderedAtSend(bool sent, bool rendered, int windowSeq,
+                            int& countedSeq, int& counter)
+{
+    if (!sent || !rendered)
+        return false;
+    if (countedSeq == windowSeq)
+        return false;
+    countedSeq = windowSeq;
+    counter++;
+    return true;
+}
+
+//#W80-DE (U2, wave-79 engine-seat HIGH-2 + the wave-77 S6 lesson, RE-CONFIRMED).
+//A VERDICT THAT LIVES ONLY IN A KEY IS INVISIBLE. `[crack-back verdict:` and
+//`[stack death verdict:` rendered ZERO times in all 2,203 wave-79 prompts: both
+//are synthetic marker rows in the hold latch's key set and nothing ever printed
+//them. So the engine computed, at every window, the two facts that decide whether
+//a hold is safe - can their board kill me next turn, does the stack kill me now -
+//and the model never saw either. These are the lines. They are prompt-only, on the
+//same channel as every other bracket of this family: they enter no ask key, no
+//async slot key and no hold key, and the MARKER strings the latch compares are
+//untouched, so no hold's behaviour changes by rendering them. Pure over the face.
+string w80CrackBackVerdictLine(const string& face)
+{
+    if (face.find("[crack-back verdict:") != 0)
+        return string();
+    if (face.find("none") != string::npos)
+        return string(); //nothing can swing back: no claim is owed
+    if (face.find("LETHAL") != string::npos)
+        return "\n[crack-back verdict: LETHAL - if you pass this window and they"
+               " attack with everything that can, the damage they can deal reaches"
+               " your life total: a hold here is taken over a board that kills you"
+               " next turn]";
+    return "\n[crack-back verdict: you survive - if you pass this window and they"
+           " attack with everything that can, you are still alive afterwards: the"
+           " crack-back alone does not end the game]";
+}
+
+string w80StackDeathVerdictLine(const string& face)
+{
+    if (face.find("[stack death verdict:") != 0)
+        return string();
+    if (face.find("nothing lethal") != string::npos)
+        return string(); //an empty or harmless stack owes no line
+    if (face.find("KILLS") != string::npos)
+        return "\n[stack death verdict: the stack KILLS you - what is waiting to"
+               " resolve takes you to 0 or below. Every row on this menu that"
+               " declines, the hold row included, lets it resolve]";
+    return "\n[stack death verdict: you survive the stack - what is waiting to"
+           " resolve does not take you to 0 by itself]";
+}
+
+//#W80-DE (U10, wave-79 deck126 HIGH-2 + engine-seat MED-2). THE RECORD FACE AND
+//THE RENDERED LINE WERE TWO DIFFERENT FACTS. The stamp was
+//`w77OwnLoopVerdictKey(state, "", "")`, which returns `none` for the state that
+//RENDERS the proven-win line - so 61 of the corpus's 63 stamped faces read
+//`[own loop verdict: none]` while the prompt carried a paragraph claiming a proven
+//win, and a reviewer joining the two found neither. The face is now read off the
+//LINE THAT WAS PRINTED, so the record names what the model actually saw; an empty
+//line stamps nothing, which is what makes the counter and the literal one figure.
+//This face is RECORD-ONLY - it enters no latch and no key (the latch's marker is
+//still `w77OwnLoopVerdictNow`), so the wave-74 rule about board-derived bytes in
+//keys is untouched. Pure over the rendered line.
+string w80LoopFaceOfLine(const string& line)
+{
+    if (line.find("[own loop verdict:") == string::npos)
+        return string();
+    if (line.find("THREATENED") != string::npos)
+        return "[own loop verdict: THREATENED]";
+    if (line.find("NOT proven") != string::npos)
+        return "[own loop verdict: unproven]";
+    if (line.find("RESOLVING") != string::npos)
+        return "[own loop verdict: resolving]";
+    if (line.find("no live way to start it") != string::npos)
+        return "[own loop verdict: proven but no live starter]";
+    if (line.find("proven win") != string::npos)
+        return "[own loop verdict: proven win]";
+    return string();
+}
+
+//#W80-DE (U10, wave-79 deck126 HIGH-1). A "PROVEN WIN" WITH NO WAY TO START IT.
+//`[own loop verdict: your life loop is a proven win ...]` printed four times over
+//`126v130` seqs 31-36 on a board whose ONLY life-gain source could not block the
+//flier that was killing it - the game deck126 lost. `lifeLoopProvenWin` proves the
+//CHAIN (both halves out, nothing forbids the life change); it proves nothing about
+//an ENTRY, and the chain starts only from life they lose or life you gain. So the
+//claim is gated on a live starter and NAMES it; with no starter the line prints the
+//GAP instead of the win, in the trust doctrine's own terms - the true token, never
+//a deletion, and never a hedge against the render. Pure over the starter's name.
+string w80ProvenWinLoopLine(const string& starterName)
+{
+    if (starterName.empty())
+        return "\n[own loop verdict: both halves of your life loop are out and the"
+               " chain is not forbidden, but the engine can see no live way to start"
+               " it from this board: the chain starts only from life THEY lose or"
+               " life YOU gain, and nothing you control or can pay for right now"
+               " does either - so this is NOT yet a win, and a hold here wins"
+               " nothing]";
+    return "\n[own loop verdict: your life loop is a proven win, and no link of it"
+           " is on the stack right now - nothing of it is waiting to resolve, so a"
+           " hold here covers no link of it. It starts from " + starterName
+           + ": one point of life THEY lose or YOU gain closes it]";
+}
+
+//#W80-DE (U10): the SCRIPT test behind the starter scan. A starter is anything
+//that moves life in one of the two directions the chain enters from - the engine's
+//own `life:` term (a life change on either player) or `damage:` (which the loop's
+//own converter turns into the other half). Deliberately a broad over-approximation
+//on the SCRIPT axis: the scan below narrows it on the LIVENESS axis, and an
+//over-broad script test can only ever make the engine claim LESS ("a starter
+//exists") - never assert a gap that is not there. Pure over the script text.
+bool w80LoopStarterScript(const string& magicText)
+{
+    if (magicText.empty())
+        return false;
+    string lc = magicText;
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    return lc.find("life:") != string::npos
+        || lc.find("damage:") != string::npos
+        || lc.find("lifeset:") != string::npos;
+}
+
+//#W80-DE (U8, wave-79 known-bugs U8 + Astra wave-79 F1). WHEN A DECLINED LIST MAY
+//CROSS A PHASE ON THE SEAT'S OWN ANSWER. `crossphase_board_unchanged` went 4 -> 26:
+//full model calls over a board the bracket ITSELF certifies unchanged, because the
+//ask key carries the phase, so one dead list crossed every phase of a turn at full
+//price (`123v130` seqs 72-80, nine windows, 746 s of inference for no board effect).
+//The replay is admissible only where nothing the model could decide has moved:
+//  (a) the seat's own last answer to this list DECLINED it (an ACTING answer is
+//      never replayed - it was executed, and the board it acted on is gone);
+//  (b) the board key the bracket compares is EQUAL, so the printed rows' prices,
+//      forecasts and targets are the same facts;
+//  (c) the list is byte-identical - that is what makes this the same list at all,
+//      and it is what proves the LEGAL OPTION SET is identical, so nothing is
+//      removed, capped or auto-answered: the seat is served its own answer to a
+//      screen it has already read;
+//  (d) and the window is not the one where PHASE-GATED legality changes. Astra's
+//      wave-79 F1 warning is exactly this: a sorcery-speed row becomes legal when
+//      the seat's own main phase opens, and a decline taken before that opened was
+//      taken over a strictly smaller set of plays. So a transition INTO a
+//      sorcery-speed window is always asked, however unchanged the board is.
+//Pure over the six facts, so PARSETEST drives both verdicts.
+bool w80CrossPhaseReplayable(bool declined, bool boardUnchanged, bool rowsIdentical,
+                             bool prevSorcerySpeed, bool nowSorcerySpeed,
+                             const string& prevPhase, const string& nowPhase)
+{
+    if (!declined || !boardUnchanged || !rowsIdentical)
+        return false;
+    if (prevPhase.empty() || nowPhase.empty() || prevPhase == nowPhase)
+        return false;
+    if (nowSorcerySpeed && !prevSorcerySpeed)
+        return false; //(d) the phase-gated window: always asked
+    return true;
+}
+
 //#W79-DC (F1): the deadlock breaker's premise, as a predicate PARSETEST can drive.
 //"The action did not progress the game" is a claim about the BOARD, so the board is
 //its evidence: an unchanged menu after a successful, board-changing activation is
@@ -35137,6 +35388,70 @@ string AIPlayerGPT::crackBackVerdictNow()
 string AIPlayerGPT::stackDeathVerdictNow()
 {
     return stackDeathVerdictKey(pendingStackLifeLossToSeat(observer, this), life);
+}
+
+//#W80-DE (U2): the two verdicts as RENDERED LINES, off the same two walks the
+//markers are built from - so the line and the marker can never disagree.
+string AIPlayerGPT::w80CrackBackVerdictLineNow()
+{
+    return w80CrackBackVerdictLine(crackBackVerdictNow());
+}
+
+string AIPlayerGPT::w80StackDeathVerdictLineNow()
+{
+    return w80StackDeathVerdictLine(stackDeathVerdictNow());
+}
+
+//#W80-DE (U8): the seat's own speed class for this window, off the same three
+//facts the casting menu's `sorcerySpeedOk` gate reads (my turn, a main phase, an
+//empty stack) so the two surfaces cannot disagree. Reads, mutates nothing.
+bool AIPlayerGPT::w80SorcerySpeedWindowNow()
+{
+    if (!observer || !observer->mLayers || !observer->mLayers->stackLayer())
+        return false;
+    const int phase = observer->getCurrentGamePhase();
+    return observer->currentPlayer == this
+        && (phase == (int) MTG_PHASE_FIRSTMAIN || phase == (int) MTG_PHASE_SECONDMAIN)
+        && observer->mLayers->stackLayer()->mObjects.empty();
+}
+
+//#W80-DE (U10): THE LIVE STARTER. `lifeLoopProvenWin` proves the CHAIN; it proves
+//nothing about an ENTRY. This is the entry, and only the entries that exist RIGHT
+//NOW count: a permanent I control whose script can move life (its ability is on
+//the board and usable this window), or a card in my hand whose cost the mana
+//engine can actually plan a payment for. A creature whose life gain rides a combat
+//trigger it will never get to make is NOT a live starter - that is the `126v130`
+//board this gate exists for. The loop's own two halves are excluded: they are what
+//the chain is MADE of, not what starts it. Reads the board, mutates nothing.
+string AIPlayerGPT::w80LiveLoopStarterName()
+{
+    if (!game)
+        return string();
+    if (MTGGameZone * bf = game->inPlay)
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c || w77IsLoopComponentCard(c, this))
+                continue;
+            if (w80LoopStarterScript(c->magicText))
+                return c->getDisplayName();
+        }
+    if (MTGGameZone * h = game->hand)
+        for (int i = 0; i < h->nb_cards; i++)
+        {
+            MTGCardInstance * c = h->cards[i];
+            if (!c || !w80LoopStarterScript(c->magicText))
+                continue;
+            ManaCost * cost = c->getManaCost();
+            if (!cost)
+                continue;
+            if (getManaPool()->canAfford(cost, 0))
+                return c->getDisplayName();
+            GptManaPolicy pol(this);
+            if (!ManaEngine::planPayment(this, pol, c, cost, 0).empty())
+                return c->getDisplayName();
+        }
+    return string();
 }
 
 //#W72-BX (F1, Astra review finding 1 - HIGH): a row that DECLINES rather than
@@ -35473,7 +35788,19 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                 }
             const string use = w79HoldVerdictForCompare(heldMarker, liveMarkers[fam]);
             if (!heldMarker.empty() && use != liveMarkers[fam])
+            {
                 mHoldVerdictSaferIgnored++; //#W79-CZ (T3): the census of what was kept
+                //#W80-DE (U2, wave-79 engine-seat HIGH-2): ...and WHAT was kept,
+                //on the record of this window and in the stderr trace. 59 clamp
+                //events were invisible at the window level and the brief's
+                //"sample 15 and say whether the ignored verdict was truly safer"
+                //was unanswerable from the whole corpus.
+                mHoldSaferIgnoredFace = string("held ") + heldMarker + " over live "
+                                        + liveMarkers[fam] + " at the " + seam + " seam";
+                DebugTrace("AIPlayerGPT: hold verdict CLAMPED at the " << seam
+                           << " seam - the live face is no more dangerous than the held"
+                              " one: held " << heldMarker << " -> live " << liveMarkers[fam]);
+            }
             //#W79-DC (F2): ...and the census of what is NOT kept at the same rank -
             //a THREATENED face whose threat identity differs from the latched one.
             else if (!heldMarker.empty() && heldMarker != liveMarkers[fam]
@@ -35481,6 +35808,10 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                      && w79VerdictDangerRank(heldMarker) >= 0)
             {
                 mHoldReopenedNewThreat++;
+                //#W80-DE (U2): the counter's own record field, naming the threat.
+                mHoldReopenReason = string("NEW threat at the same rank: held ") + heldMarker
+                                    + " -> live " + liveMarkers[fam] + " at the " + seam
+                                    + " seam";
                 DebugTrace("AIPlayerGPT: a hold re-opened at the " << seam << " seam because a"
                            " NEW threat at the same rank replaced the answered one: held "
                            << heldMarker << " -> live " << liveMarkers[fam]);
@@ -35496,6 +35827,10 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         : holdStillStands(it->second, rowsWithVerdict, &why, holdActionKeyRow); //#W74-CH
     if (!stands)
     {
+        //#W80-DE (U2): every re-open names its reason on the record of the window
+        //it re-opened, not only in a stderr line no census can join.
+        if (mHoldReopenReason.empty())
+            mHoldReopenReason = string(why ? why : "") + " at the " + seam + " seam";
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         //#W63-AD (E10, engine HIGH-2). THE PROMISE WAS BROKEN BY THE NEIGHBOUR.
         //takeHold's own comment says "a hold at a DIFFERENT seam still keeps its
@@ -44372,17 +44707,41 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //`pollCompletionRetry`; a suppressed window CLEARS the face, so a later record
     //can never consume it.
     string w79PendingLoopFace;
+    //#W80-DE (U2/U15): the two verdict lines and the drain clause are HELD here
+    //with the loop face and applied at the send, so nothing is counted or stamped
+    //for a prompt the gates below still discard.
+    string w80PendingCrackBackFace, w80PendingStackDeathFace;
+    bool w80PendingDrain = false;
     {
         //#W79-CZ (T4): the verdict, on the channel that reaches the model.
         string w78LoopSpell, w78LoopPiece;
         {
             const int lst = w77OwnLoopStackState(w78LoopSpell, w78LoopPiece);
             const string vline = w79OwnLoopVerdictLineFor(lst, lifeLoopProvenWin(this),
-                                                          w78LoopSpell, w78LoopPiece);
+                                                          w78LoopSpell, w78LoopPiece,
+                                                          w80LiveLoopStarterName());
             if (!vline.empty())
             {
                 w78SeamNotes += vline;
-                w79PendingLoopFace = w77OwnLoopVerdictKey(lst, "", "");
+                //#W80-DE (U10): the face is read off the LINE THAT PRINTED, so the
+                //record names what the model saw instead of `none`.
+                w79PendingLoopFace = w80LoopFaceOfLine(vline);
+            }
+        }
+        //#W80-DE (U2): the crack-back and stack-death verdicts, RENDERED. Both
+        //were latch keys only and printed 0 times in 2,203 wave-79 prompts.
+        {
+            const string cbLine = w80CrackBackVerdictLineNow();
+            if (!cbLine.empty())
+            {
+                w78SeamNotes += cbLine;
+                w80PendingCrackBackFace = crackBackVerdictNow();
+            }
+            const string sdLine = w80StackDeathVerdictLineNow();
+            if (!sdLine.empty())
+            {
+                w78SeamNotes += sdLine;
+                w80PendingStackDeathFace = stackDeathVerdictNow();
             }
         }
         const string drain = w78StackDrainNote(w78TheirDrainingTriggerCount(),
@@ -44391,7 +44750,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (!drain.empty())
         {
             w78SeamNotes += drain;
-            w78CountStackDrainWindow();
+            w80PendingDrain = true; //#W80-DE (U15): counted at the send, not here
         }
     }
     const string promptNotes = declinedNote + holdNote + w78SeamNotes //#W61-U (C14): same channel
@@ -44439,6 +44798,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             bool w79c = false; //#W79-DC (F10): nothing was sent
             w79ApplyLoopFaceAtSend(false, w79PendingLoopFace, mOwnLoopVerdictFace, w79c);
+            w80ApplyVerdictFacesAtSend(false, w80PendingCrackBackFace,
+                                       w80PendingStackDeathFace, w80PendingDrain);
         }
         return NULL;
     }
@@ -44466,6 +44827,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             bool w79c = false;
             w79ApplyLoopFaceAtSend(false, w79PendingLoopFace, mOwnLoopVerdictFace, w79c);
+            w80ApplyVerdictFacesAtSend(false, w80PendingCrackBackFace,
+                                       w80PendingStackDeathFace, w80PendingDrain);
         }
         choice = mLastChoice;
     }
@@ -44479,6 +44842,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             w79ApplyLoopFaceAtSend(true, w79PendingLoopFace, mOwnLoopVerdictFace, w79c);
             if (w79c)
                 w79CountOwnLoopVerdictLine();
+            w80ApplyVerdictFacesAtSend(true, w80PendingCrackBackFace,
+                                       w80PendingStackDeathFace, w80PendingDrain);
         }
         string content;
         if (pollCompletionRetry(userMsg, content, "priority") == kChoicePending)
@@ -45662,6 +46027,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         {
             mAskAnswerReserved = true; //#W60-M (B13c): a replay, not a window the model saw
             mAskReplaysReserved++;
+            mAskReplaysCache++; //#W80-DE (U9): which PATH re-served it
             logAskReplay("cache_replay", decision, cached->second, (int) options.size(),
                          fromSeq, mAskReplayRuns[askKey]); //#W72-BT (M22): this window's own run
             return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
@@ -45707,6 +46073,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mAskAnswerReserved = true; //#W60-M (B13c): the model was not shown this window
         //#W71-BP (L2): the OTHER silent re-serve path. Same argument, same record.
         mAskReplaysReserved++;
+        mAskReplaysRepeatLatch++; //#W80-DE (U9): which PATH re-served it
         logAskReplay("repeat_ask_reserved", decision, mRepeatAskChoice,
                      (int) optionsIn.size(), mRepeatAskSeq,
                      mRepeatAskRuns[nowRepeatKey]); //#W73-CA (N8): this window's run
@@ -45724,6 +46091,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //collapsed: every row stays answerable, and the window is still put.
     const string crossPhaseKey = w76CrossPhaseListKey(observer ? observer->turn : -1,
                                                       decision, optionsIn);
+    W76CrossPhaseAsk * w80PendingCrossPhase = NULL;  //#W80-DE (U15): counted at the send
+    bool w80PendingCrossPhaseUnchanged = false;
     {
         //the key is turn-scoped, so nothing older than this turn can ever match:
         //drop it rather than grow a map for the length of a 77-turn game.
@@ -45749,19 +46118,50 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             const bool boardUnchanged =
                 !cp->second.boardKey.empty()
                 && cp->second.boardKey == w76PhaseFreeBoardKey(boardStateKey);
+            //#W80-DE (U15): STAGED here, counted at the send below - the wave-79
+            //census read 172 against 170 rendered notes because two counted
+            //windows never reached a prompt.
             if (cp->second.countedSeq != mWindowSeq)
             {
-                cp->second.countedSeq = mWindowSeq;
-                mCrossPhaseRePuts++;
-                //#W77-CR (R8): and the split is MEASURED on the same
-                //one-per-window gate, so the next seat can read the positive
-                //clause's rate off the gameend record instead of grepping 109
-                //prompts for it. Never summed with the total above.
-                if (boardUnchanged)
-                    mCrossPhaseBoardUnchanged++;
+                w80PendingCrossPhase = &cp->second;
+                w80PendingCrossPhaseUnchanged = boardUnchanged;
             }
             promptOnlyNote += w76CrossPhaseRePutNote(mWindowSeq - cp->second.windowSeq,
                                                      cp->second.phaseName, boardUnchanged);
+            //#W80-DE (U8, wave-79 known bugs U8). THE DEAD LIST CROSSES A PHASE ON
+            //THE SEAT'S OWN ANSWER. Everything above already knows this is the same
+            //list, declined, at another phase of the same turn, over a board this
+            //very block has just COMPARED and found equal - and wave 79 then paid a
+            //full model call for it 26 times (`123v130` seqs 72-80: nine windows,
+            //746 s, no board effect). The replay is admissible only under
+            //w80CrossPhaseReplayable, whose clause (c) is that the option list is
+            //BYTE-IDENTICAL: that is what proves the legal option set is the same
+            //one the seat already read and answered, so nothing is removed, capped
+            //or auto-answered here - the seat is served its own answer. Clause (d)
+            //is Astra's wave-79 F1: a transition INTO a sorcery-speed window is
+            //ALWAYS asked, because that is where phase-gated legality changes.
+            const bool rowsIdentical = (cp->second.rows == optionsIn);
+            if (w80CrossPhaseReplayable(cp->second.declined, boardUnchanged, rowsIdentical,
+                                        cp->second.sorcerySpeed, w80SorcerySpeedWindowNow(),
+                                        cp->second.phaseName, phaseNow)
+                && cp->second.choice >= 1 && cp->second.choice <= (int) optionsIn.size())
+            {
+                mCrossPhaseReplayed++;
+                mAskReplaysReserved++;
+                mAskAnswerReserved = true; //#W60-M (B13c): the model did not see this window
+                //the per-event trace this counter is adjudicated from: the answer,
+                //the window it came from, and both phase names.
+                logAskReplay((string("crossphase_replay from ") + cp->second.phaseName
+                              + " to " + phaseNow).c_str(),
+                             decision, cp->second.choice, (int) optionsIn.size(),
+                             cp->second.windowSeq, mCrossPhaseReplayed);
+                DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: this exact list was declined at "
+                           << cp->second.phaseName << " this turn and nothing on the board has"
+                              " changed - re-serving this seat's own answer "
+                           << cp->second.choice << " of " << optionsIn.size()
+                           << " at " << phaseNow << " instead of asking again");
+                return cp->second.choice - 1;
+            }
         }
     }
     string userTail = tailStr;
@@ -45770,6 +46170,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //#W57-H (D43): this window's ask class, for the log window and the record.
     mLogWindowKind = askWindowKindForAsk(decision, options);
     string userMsg = assemblePrompt(userTail, NULL, &keyTailStr); //#W62-fix: notes stay out of the slot key; #W74-CG: and so does the decline count
+    //#W80-DE (U15): the cross-phase re-put is counted HERE, at the send, on the
+    //same one-per-window gate - so `crossphase_identical_reputs` is by
+    //construction the number of prompts the note is in.
+    if (w80PendingCrossPhase && w80PendingCrossPhase->countedSeq != mWindowSeq)
+    {
+        w80PendingCrossPhase->countedSeq = mWindowSeq;
+        mCrossPhaseRePuts++;
+        if (w80PendingCrossPhaseUnchanged)
+            mCrossPhaseBoardUnchanged++;
+    }
     string content;
     if (pollCompletionRetry(userMsg, content, "ask") == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
@@ -46000,6 +46410,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         e.countedSeq = -1;
         e.windowSeq = mWindowSeq;
         e.declined = w72RowIsDeclineOrHold(holdKeyRow(optionsIn[callerChoice - 1]));
+        //#W80-DE (U8): the answer itself, the rows it was given over, and this
+        //window's speed class - the three facts a cross-phase replay is gated on.
+        e.choice = callerChoice;
+        e.rows = optionsIn;
+        e.sorcerySpeed = w80SorcerySpeedWindowNow();
     }
     if (callerChoice >= 1 && callerChoice <= (int) optionsIn.size())
     {
@@ -46918,6 +47333,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //binary with one right answer. A land drop cannot falsify a plan, so the
         //request for one is pure cost here. Nothing is removed from the reply
         //rules: a volunteered PLAN is still parsed and carried.
+        //#W80-DE (U10, wave-79 engine-seat MED-2 - THE SEAM DC F10 MISSED). All
+        //SEVEN of the corpus's `[own loop verdict: none]` record writes with no
+        //rendered line are two-row LAND DROP menus. This seam calls askModel
+        //directly and never touched the own-loop face, so a face stamped by a cast
+        //window still in flight was consumed by the NEXT record written - which is
+        //this one. The land prompt carries no verdict line, so it stamps no face
+        //and clears whatever was staged, exactly as every other non-verdict send.
+        {
+            bool w80c = false;
+            w79ApplyLoopFaceAtSend(false, string(), mOwnLoopVerdictFace, w80c);
+            w80ApplyVerdictFacesAtSend(false, string(), string(), false);
+        }
         int pick = askModel(q.str(), opts, false, string(), false, true); //the play narrates itself as a zone event
         if (pick == kChoicePending)
         {
@@ -48398,13 +48825,16 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mNextAskPromptNote += mCastHoldNote;
         //#W78-CV (S6 + S4): the same two lines on the casting menu, same channel.
         string w79PendingCastLoopFace; //#W79-DC (F10): applied at the send, not here
+        string w80PendingCastCrackBack, w80PendingCastStackDeath; //#W80-DE (U2)
+        bool w80PendingCastDrain = false;                         //#W80-DE (U15)
         {
             string w78LoopSpell2, w78LoopPiece2;
             {
                 //#W79-CZ (T4): same line, same counting rule, on the casting menu.
                 const int lst2 = w77OwnLoopStackState(w78LoopSpell2, w78LoopPiece2);
                 const string vline2 = w79OwnLoopVerdictLineFor(lst2, lifeLoopProvenWin(this),
-                                                               w78LoopSpell2, w78LoopPiece2);
+                                                               w78LoopSpell2, w78LoopPiece2,
+                                                               w80LiveLoopStarterName());
                 if (!vline2.empty())
                 {
                     mNextAskPromptNote += vline2;
@@ -48414,7 +48844,22 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     //line plus a stamped face for a prompt that was never sent is the
                     //wave-78 helper-versus-caller failure in its own shape. The face is
                     //applied at the askModel call, and a suppressed window clears it.
-                    w79PendingCastLoopFace = w77OwnLoopVerdictKey(lst2, "", "");
+                    w79PendingCastLoopFace = w80LoopFaceOfLine(vline2); //#W80-DE (U10)
+                }
+            }
+            //#W80-DE (U2): the same two verdict lines on the casting menu.
+            {
+                const string cb2 = w80CrackBackVerdictLineNow();
+                if (!cb2.empty())
+                {
+                    mNextAskPromptNote += cb2;
+                    w80PendingCastCrackBack = crackBackVerdictNow();
+                }
+                const string sd2 = w80StackDeathVerdictLineNow();
+                if (!sd2.empty())
+                {
+                    mNextAskPromptNote += sd2;
+                    w80PendingCastStackDeath = stackDeathVerdictNow();
                 }
             }
             const string drain2 = w78StackDrainNote(w78TheirDrainingTriggerCount(),
@@ -48424,7 +48869,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             {
                 mNextAskPromptNote += drain2;
                 if (attempt == 0)
-                    w78CountStackDrainWindow();
+                    w80PendingCastDrain = true; //#W80-DE (U15): counted at the send
             }
         }
         //#W66-AS (H3 second half): prompt-only, same channel, never in a key.
@@ -48449,6 +48894,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 bool w79c = false; //#W79-DC (F10): this window was never sent
                 w79ApplyLoopFaceAtSend(false, w79PendingCastLoopFace,
                                        mOwnLoopVerdictFace, w79c);
+                w80ApplyVerdictFacesAtSend(false, w80PendingCastCrackBack,
+                                           w80PendingCastStackDeath, w80PendingCastDrain);
             }
             return NULL;
         }
@@ -48468,6 +48915,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 bool w79c = false; //#W79-DC (F10): this window was never sent
                 w79ApplyLoopFaceAtSend(false, w79PendingCastLoopFace,
                                        mOwnLoopVerdictFace, w79c);
+                w80ApplyVerdictFacesAtSend(false, w80PendingCastCrackBack,
+                                           w80PendingCastStackDeath, w80PendingCastDrain);
             }
             return NULL;
         }
@@ -48479,6 +48928,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 bool w79c = false; //#W79-DC (F10): this window was never sent
                 w79ApplyLoopFaceAtSend(false, w79PendingCastLoopFace,
                                        mOwnLoopVerdictFace, w79c);
+                w80ApplyVerdictFacesAtSend(false, w80PendingCastCrackBack,
+                                           w80PendingCastStackDeath, w80PendingCastDrain);
             }
             return NULL;
         }
@@ -48550,6 +49001,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             w79ApplyLoopFaceAtSend(true, w79PendingCastLoopFace, mOwnLoopVerdictFace, w79c);
             if (w79c && attempt == 0)
                 w79CountOwnLoopVerdictLine();
+            w80ApplyVerdictFacesAtSend(true, w80PendingCastCrackBack,
+                                       w80PendingCastStackDeath, w80PendingCastDrain);
         }
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
@@ -95298,10 +95751,18 @@ static const char * kW50Y_r94 =
               "#W78-CV S6 INSTRUMENT the key-side marker is unchanged - it still re-opens a"
               " hold when the verdict moves");
         const string line = w78OwnLoopVerdictLine(kW77LoopResolving, "", "");
+        //#W80-DE (U10) SUPERSEDES this pin's byte string in place: the RESOLVING line
+        //now also states the hold row's OWN cost, because `126v125` seqs 45/46 printed
+        //the blanket "covers every remaining link" beside a hold row that gives up two
+        //live Sorin activations. The pin still asserts the RENDERED BYTES, which is
+        //what S6 was for.
         CHECK(line == "\n[own loop verdict: RESOLVING - a piece of your own proven life loop is"
                       " on the stack and nothing of theirs targets it: the loop closes without"
-                      " another action from you, and the HOLD row covers every remaining link]",
-              "#W78-CV S6 GREEN the seq-43 shape RENDERS a verdict line - RED on base, where"
+                      " another action from you, and the HOLD row covers every remaining link -"
+                      " taking it also gives up every other row on this menu for as long as"
+                      " those rows stand, which is what the hold row itself says]",
+              "#W78-CV S6 GREEN (#W80-DE U10 rewrite) the seq-43 shape RENDERS a verdict line"
+              " that agrees with the hold row - RED on base, where"
               " this string does not exist and the window printed no verdict at all");
         const string threat = w78OwnLoopVerdictLine(kW77LoopThreatened, "Vanishing Verse",
                                                     "Sanguine Bond");
@@ -97297,21 +97758,26 @@ static const char * kW50Y_r94 =
                   "#W79-CZ T4 RED-ON-BASE the wave-78 line builder is SILENT on an unnamed"
                   " threat, an unnamed unproven object and a proven loop with nothing on the"
                   " stack - a silent omission the model confabulates into");
-            CHECK(!w79OwnLoopVerdictLineFor(kW78LoopUnproven, true, "", "").empty()
-                  && !w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "", "").empty()
-                  && !w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "").empty()
-                  && !w79OwnLoopVerdictLineFor(kW77LoopResolving, true, "", "").empty(),
+            CHECK(!w79OwnLoopVerdictLineFor(kW78LoopUnproven, true, "", "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "", "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopResolving, true, "", "", "").empty(),
                   "#W79-CZ T4 GREEN every face of a PROVEN loop renders a line");
-            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "")
+            //#W80-DE (U10) SUPERSEDES the wave-79 byte pin below: the idle face now
+            //carries the starter it is proven FROM, and prints the GAP when there is
+            //none. Both bytes are pinned in the #W80-DE U10 block at the corpus end.
+            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "", "Gray Merchant of Asphodel")
                       == "\n[own loop verdict: your life loop is a proven win, and no link of"
                          " it is on the stack right now - nothing of it is waiting to resolve,"
-                         " so a hold here covers no link of it]",
-                  "#W79-CZ T4 GREEN the idle face, verbatim - the bytes the prompt carries");
+                         " so a hold here covers no link of it. It starts from Gray Merchant"
+                         " of Asphodel: one point of life THEY lose or YOU gain closes it]",
+                  "#W79-CZ T4 GREEN (#W80-DE U10 rewrite) the idle face, verbatim, with its"
+                  " named live starter - the bytes the prompt carries");
             CHECK(w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "Doom Blade",
-                                           "Sanguine Bond").find("Doom Blade") != string::npos,
+                                           "Sanguine Bond", "").find("Doom Blade") != string::npos,
                   "#W79-CZ T4 GREEN a NAMED threat still renders its names");
-            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, false, "", "").empty()
-                  && w79OwnLoopVerdictLineFor(kW78LoopUnproven, false, "", "").empty(),
+            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, false, "", "", "").empty()
+                  && w79OwnLoopVerdictLineFor(kW78LoopUnproven, false, "", "", "").empty(),
                   "#W79-CZ T4 MUST-NOT-MATCH a seat with NO proven loop is owed no verdict -"
                   " the line never appears on a board it is not about");
         }
@@ -99243,6 +99709,242 @@ static const char * kW50Y_r94 =
                   " `hasCodedAnswerLine` alone called this consume `phase2_answer_missing`"
                   " while `consumePlan` was about to answer the window from it");
         }
+    }
+
+
+    // ================= WAVE 80 LANE DE - windows, holds and keys =================
+    // U15 (MED, wave-79 engine-seat MED-3): three render counters overshot their
+    // rendered population by a fixed margin - own-loop 63 vs 56 prompts, cross-phase
+    // 172 vs 170 notes, stack-drain 30 vs 18 clauses - because each incremented where
+    // its clause was BUILT, upstream of every gate that still discards the window.
+    {
+        // RED ON BASE: the wave-79 shape, written out. Counting at the BUILD site and
+        // then suppressing the window leaves a counted line for a prompt that never
+        // existed - and the base had no one predicate to fix it at, which is why the
+        // same defect was repaired at the own-loop seam (F10) and left standing at the
+        // other two.
+        int baseCounter = 0, baseSeq = -1;
+        const int w80Window = 41;
+        // build-site counting: the clause was composed, so it counted - sent or not
+        if (baseSeq != w80Window) { baseSeq = w80Window; baseCounter++; }
+        CHECK(baseCounter == 1,
+              "#W80-DE U15 RED-ON-BASE the build-site counter increments for a window the"
+              " gates below it can still discard - a counted line for a prompt that was"
+              " never sent, which is the wave-78 helper-versus-caller failure");
+        // GREEN: the one send-time predicate. Not sent -> nothing counts, however the
+        // clause was built.
+        int c = 0, seq = -1;
+        CHECK(!w80CountRenderedAtSend(false, true, w80Window, seq, c) && c == 0 && seq == -1,
+              "#W80-DE U15 GREEN a SUPPRESSED window counts nothing even with the clause built");
+        CHECK(!w80CountRenderedAtSend(true, false, w80Window, seq, c) && c == 0,
+              "#W80-DE U15 GREEN a SENT window with NO clause counts nothing - this is the"
+              " `own_loop_verdict_lines_rendered` 63-vs-56 gap, at its source");
+        CHECK(w80CountRenderedAtSend(true, true, w80Window, seq, c) && c == 1 && seq == w80Window,
+              "#W80-DE U15 GREEN a sent window carrying the clause counts exactly one");
+        CHECK(!w80CountRenderedAtSend(true, true, w80Window, seq, c) && c == 1,
+              "#W80-DE U15 GREEN the same window on a later polling tick counts nothing more -"
+              " the prompt is rebuilt every tick while an answer is in flight");
+        CHECK(w80CountRenderedAtSend(true, true, w80Window + 1, seq, c) && c == 2,
+              "#W80-DE U15 GREEN the NEXT window counts again - the guard is per window,"
+              " not a one-shot");
+    }
+
+    // U2 (HIGH, wave-79 engine-seat HIGH-2 + the wave-77 S6 lesson): the crack-back and
+    // stack-death verdicts rendered 0 times in all 2,203 wave-79 prompts. The fixture
+    // board is `125v162` seq 199 (deck125, turn 28 Upkeep, life 28 vs 20, the opponent's
+    // battlefield holding 0 creatures) and its own next window seq 200, where the stack
+    // carries 2 damage to the seat.
+    {
+        // RED ON BASE: the two verdicts exist ONLY as marker rows joined to the hold
+        // latch's key set, and the base's prompt-tail composer for the priority seam is
+        // exactly `w79OwnLoopVerdictLineFor` + `w78StackDrainNote`. Neither can ever
+        // carry either verdict's bytes - which is the corpus fact, restated through the
+        // live composer's own inputs.
+        const string w80BaseSeamNotes =
+            w79OwnLoopVerdictLineFor(kW77LoopIdle, false, "", "", "")
+            + w78StackDrainNote(3, true, "Hold priority");
+        CHECK(w80BaseSeamNotes.find("crack-back verdict") == string::npos
+              && w80BaseSeamNotes.find("stack death verdict") == string::npos,
+              "#W80-DE U2 RED-ON-BASE the wave-79 seam-note composer cannot carry either"
+              " verdict - both are latch KEYS only, and both rendered 0 times in 2,203"
+              " prompts while the latch arbitrated 59 clamp events over them");
+        // GREEN: both verdicts render, off the SAME two key builders the latch compares,
+        // so a line and its marker can never disagree.
+        // seq 199's own crack-back: 0 able attackers on their board -> no claim is owed.
+        CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(0, 0, 28)).empty(),
+              "#W80-DE U2 GREEN the `125v162` seq-199 board owes NO crack-back line - their"
+              " battlefield holds 0 creatures, and a silent face is not a claim");
+        // the same board with their side able to swing, still survivable, and lethal.
+        CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(4, 13, 28))
+                  == "\n[crack-back verdict: you survive - if you pass this window and they"
+                     " attack with everything that can, you are still alive afterwards: the"
+                     " crack-back alone does not end the game]",
+              "#W80-DE U2 GREEN the survivable crack-back renders, verbatim");
+        CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(4, 30, 28))
+                  .find("LETHAL - if you pass this window") != string::npos,
+              "#W80-DE U2 GREEN the LETHAL crack-back renders and names what passing costs");
+        // seq 200's stack: 2 damage against 28 life -> the survivable face renders.
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28))
+                  == "\n[stack death verdict: you survive the stack - what is waiting to"
+                     " resolve does not take you to 0 by itself]",
+              "#W80-DE U2 GREEN the `125v162` seq-200 stack renders its survivable face");
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(30, 28))
+                  .find("the stack KILLS you") != string::npos
+              && w80StackDeathVerdictLine(stackDeathVerdictKey(0, 28)).empty(),
+              "#W80-DE U2 GREEN the lethal face renders and an empty stack owes no line");
+        // KEY STABILITY (the wave-74 rule): the rendered line is PROMPT-ONLY. Two windows
+        // whose ONLY difference is the rendered verdict line - the same board number that
+        // creates no row - key IDENTICAL through the live latch builder.
+        {
+            const string hold =
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE"
+                " ONE OF THE ROWS ABOVE LATER THIS TURN";
+            const string cast = "Cast Sphinx's Revelation {u}{u}{w}{x}";
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(cast); rowsA.push_back(hold);
+            rowsB.push_back(cast); rowsB.push_back(hold);
+            std::vector<string> keysA, keysB;
+            w78HoldLatchKeys(rowsA, holdActionKeyRow, keysA);
+            w78HoldLatchKeys(rowsB, holdActionKeyRow, keysB);
+            CHECK(keysA == keysB,
+                  "#W80-DE U2 KEY the two windows key IDENTICAL - the verdict LINE is"
+                  " prompt-only and never joins a row, so rendering it changes no hold");
+            const char * whyDe = "";
+            CHECK(w78HoldStillStands(keysA, rowsB, &whyDe, holdActionKeyRow),
+                  "#W80-DE U2 KEY ...and the hold taken at seq 199 still STANDS over the"
+                  " same rows once the verdicts are rendered - no hold is retired by the"
+                  " render, and none is added");
+        }
+    }
+
+    // U8 (HIGH): `crossphase_board_unchanged` 4 -> 26 - full model calls over a board
+    // the bracket ITSELF certifies unchanged. Acceptance board: `123v130` seqs 72-80,
+    // one dead 3-row list (`Cast Devour Flesh {1}{b}` + Hold + Cast nothing) walked
+    // across Upkeep, Draw, Main 1, Combat begins, Attackers, Combat ends, Main 2, End
+    // and Cleanup of turn 12 - nine windows, 746 s of inference, no board effect.
+    {
+        const char * deRows[3] = {
+            "Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does nothing;"
+            " YOU control 0 creatures - targeting yourself does nothing}",
+            "Hold priority - pass now, and do not ask me again",
+            "Cast nothing right now {closes ONLY this window - the same list can be put to you again"
+            " this turn, at this seam or another; the hold row is the row that closes the run}"
+        };
+        std::vector<string> deA(deRows, deRows + 3), deB(deRows, deRows + 3);
+        // RED ON BASE: the cross-phase key already MATCHES across the two phases - the
+        // engine knows this is the same list at the same turn - and the base then asked
+        // anyway, because the ASK key carries the phase and nothing replays across one.
+        CHECK(w76CrossPhaseListKey(12, "Casting decision (End, YOUR turn)", deA)
+                  == w76CrossPhaseListKey(12, "Casting decision (Cleanup, YOUR turn)", deB),
+              "#W80-DE U8 RED-ON-BASE the engine already keys `123v130` seqs 79 and 80 as ONE"
+              " list at one turn - and wave 79 paid a full model call for the second, 26 times"
+              " corpus-wide over boards its own bracket certified unchanged");
+        CHECK(w79AskScopeKey(12, 9, string()) != w79AskScopeKey(12, 10, string()),
+              "#W80-DE U8 RED-ON-BASE ...because the ASK key carries the phase, so no cache"
+              " hit is possible across one however dead the list is");
+        // GREEN: the four clauses of the replay rule.
+        CHECK(w80CrossPhaseReplayable(true, true, true, false, false, "End", "Cleanup"),
+              "#W80-DE U8 GREEN seqs 79->80 (End -> Cleanup, declined, board unchanged,"
+              " byte-identical rows, neither window sorcery-speed) REPLAYS");
+        CHECK(w80CrossPhaseReplayable(true, true, true, true, false, "Main phase 2", "End"),
+              "#W80-DE U8 GREEN the corpus's largest population (Main phase 2 -> End, 14 of"
+              " the 26) replays - leaving a sorcery-speed window loses no option");
+        CHECK(!w80CrossPhaseReplayable(true, true, true, false, true, "Draw", "Main phase 1"),
+              "#W80-DE U8 GREEN/ASTRA-F1 the PHASE-GATED window is still ASKED: entering a"
+              " sorcery-speed window is where a phase-gated legal option first becomes"
+              " legal, and a decline taken before it was taken over a smaller set of plays");
+        CHECK(!w80CrossPhaseReplayable(true, false, true, false, false, "End", "Cleanup"),
+              "#W80-DE U8 GREEN a MOVED board is asked - the replay's whole warrant is the"
+              " bracket's own board comparison");
+        CHECK(!w80CrossPhaseReplayable(true, true, false, false, false, "End", "Cleanup"),
+              "#W80-DE U8 GREEN rows that are not BYTE-IDENTICAL are asked - byte identity is"
+              " what proves the legal option set is the one the seat already answered, so"
+              " nothing is removed, capped or auto-answered by a replay");
+        CHECK(!w80CrossPhaseReplayable(false, true, true, false, false, "End", "Cleanup"),
+              "#W80-DE U8 GREEN an ACTING answer is never replayed - it was executed, and the"
+              " board it acted on is gone");
+        CHECK(!w80CrossPhaseReplayable(true, true, true, false, false, "End", "End"),
+              "#W80-DE U8 MUST-NOT-MATCH the SAME phase is not a cross-phase replay - that"
+              " population belongs to the ask cache and is untouched here");
+    }
+
+    // U9 (MED): the wave-79 census read `ask_replays_reserved` 1,344 -> 1,084 and
+    // `identical_ask_answers_reserved` 953 -> 0 and called it a 260-replay drop. It was
+    // not: the population MOVED path (953 latch / 391 cache -> 0 latch / 1,084 cache),
+    // and the two counters name different unions of the same three paths.
+    {
+        // RED ON BASE: one counter counted two paths under one name and the other
+        // counted one of them, so no census could separate them.
+        const int w79Total = 1084, w79Latch = 0;
+        CHECK(w79Total - w79Latch == 1084,
+              "#W80-DE U9 RED-ON-BASE the cache path was recoverable only by SUBTRACTING"
+              " two counters whose relationship is documented nowhere on the record");
+        // GREEN: three named counters whose sum IS the total, so a wave-to-wave
+        // comparison reads path movement instead of an invented drop.
+        int total = 0, cache = 0, latch = 0, crossphase = 0;
+        total++; cache++;      //a cache replay
+        total++; latch++;      //a repeat-latch replay
+        total++; crossphase++; //a cross-phase replay
+        CHECK(total == cache + latch + crossphase,
+              "#W80-DE U9 GREEN `ask_replays_reserved` == `ask_replays_cache` +"
+              " `ask_replays_repeat_latch` + `crossphase_replayed`, by construction - the"
+              " census sums and the wave-78/79 path swap is readable off the record");
+    }
+
+    // U10 (MED): `[own loop verdict: your life loop is a proven win]` printed 4x on a
+    // board with NO live starter (`126v130` seqs 31-36, the game deck126 lost); 61 of 63
+    // record faces read `none` while the prompt carried a proven-win paragraph; and the
+    // RESOLVING verdict contradicted the hold row it recommended (`126v125` seqs 45/46).
+    {
+        // RED ON BASE: the stamped face was the STATE's key with its names blanked, and
+        // for the state that renders the proven-win line that key is `none`.
+        CHECK(w77OwnLoopVerdictKey(kW77LoopIdle, "", "") == "[own loop verdict: none]"
+              && !w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "", "Staff of Nin").empty(),
+              "#W80-DE U10 RED-ON-BASE the face the record stamped (`none`) and the line the"
+              " prompt printed (a proven win) were two different facts about one window -"
+              " 61 of the corpus's 63 stamped faces read `none` and 7 of them had no line"
+              " in the prompt at all");
+        // GREEN (a): the face is read off the LINE THAT PRINTED.
+        CHECK(w80LoopFaceOfLine(w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "",
+                                                         "Staff of Nin"))
+                  == "[own loop verdict: proven win]"
+              && w80LoopFaceOfLine(w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "", ""))
+                  == "[own loop verdict: proven but no live starter]"
+              && w80LoopFaceOfLine(w79OwnLoopVerdictLineFor(kW77LoopResolving, true, "", "", ""))
+                  == "[own loop verdict: resolving]"
+              && w80LoopFaceOfLine(w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "Doom Blade",
+                                                            "Sanguine Bond", ""))
+                  == "[own loop verdict: THREATENED]",
+              "#W80-DE U10 GREEN the record face NAMES the face the model read, at every"
+              " shape - so the counter and the literal in the prompt are one figure");
+        CHECK(w80LoopFaceOfLine("").empty()
+              && w80LoopFaceOfLine("[hold check: every row above was also on the menu]").empty(),
+              "#W80-DE U10 GREEN/MUST-NOT-MATCH a window with NO verdict line stamps NO face -"
+              " which is what makes `own_loop_verdict_lines_rendered` == the prompts carrying"
+              " the literal");
+        // GREEN (b): "proven win" requires a LIVE STARTER and names it; with none the line
+        // prints the GAP, in the trust doctrine's terms - the true token, never a deletion.
+        CHECK(w80ProvenWinLoopLine("Gray Merchant of Asphodel")
+                  .find("It starts from Gray Merchant of Asphodel") != string::npos,
+              "#W80-DE U10 GREEN the proven-win claim NAMES the live starter it rests on");
+        CHECK(w80ProvenWinLoopLine("").find("no live way to start it") != string::npos
+              && w80ProvenWinLoopLine("").find("NOT yet a win") != string::npos
+              && w80ProvenWinLoopLine("").find("proven win") == string::npos,
+              "#W80-DE U10 GREEN the `126v130` seqs 31-36 board - a closed loop with no live"
+              " starter - prints the GAP and never the words `proven win`");
+        // the starter scan's SCRIPT half, both directions of the chain.
+        CHECK(w80LoopStarterScript("target player loses 2 life:life:-2 target(player)")
+              && w80LoopStarterScript("damage:3 target(creature,player)")
+              && !w80LoopStarterScript("counter target spell")
+              && !w80LoopStarterScript(""),
+              "#W80-DE U10 GREEN the starter test reads the engine's own life/damage terms"
+              " and nothing else - a counterspell starts no chain");
+        // GREEN (c): the hold row and the verdict state ONE rule.
+        CHECK(w78OwnLoopVerdictLine(kW77LoopResolving, "", "")
+                  .find("gives up every other row on this menu") != string::npos,
+              "#W80-DE U10 GREEN the RESOLVING verdict states the hold row's OWN cost -"
+              " `126v125` seq 46 recommended a hold over two live Sorin activations while"
+              " saying only that it `covers every remaining link`");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
