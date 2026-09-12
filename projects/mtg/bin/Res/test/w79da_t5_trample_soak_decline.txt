@@ -1,0 +1,40 @@
+#NAME: T5 CONTROL -- the wave-78 "AT BEST" line: the small body blocks the SMALL attacker
+#DESC: #W79-DA (T5), the `146v152` seq 21 board in the engine's own damage code.
+#DESC: Wave 78's blockers header computed its AT BEST figure by counting a TRAMPLE
+#DESC: attacker's full power as landing and never matching it, then printed "no
+#DESC: assignment of your blockers does better". On that seq the seat was told
+#DESC: "you would be at 14 AT BEST" and its own legal block ended at 15.
+#DESC:
+#DESC: This fixture is the line the shipped arithmetic priced: the 2/1 stands in front
+#DESC: of the 2/2 (which is exactly what the matching does - the trampler is out of the
+#DESC: matching entirely), the 1/1 blocks nothing, and the 6/6 trampler connects in
+#DESC: full. 20 - 6 = 14. The header's number is reproduced here by the engine, so its
+#DESC: twin (w79da_t5_trample_soak_block.txt) is a strictly better legal line and
+#DESC: falsifies the optimality claim rather than merely disagreeing with it.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Rootbreaker Wurm,Balduvian Bears
+life:20
+[PLAYER2]
+inplay:Alpha Myr,Dwarven Trader
+life:20
+[DO]
+Rootbreaker Wurm
+Balduvian Bears
+next
+Alpha Myr
+Alpha Myr
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Rootbreaker Wurm
+graveyard:Balduvian Bears
+life:20
+[PLAYER2]
+inplay:Dwarven Trader
+graveyard:Alpha Myr
+life:14
+[END]
