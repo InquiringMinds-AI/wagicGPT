@@ -16140,8 +16140,49 @@ static string drawForecastBlock(bool theirs, int base,
 //Puzzle Box form (`count(type:*:myhand) ... draw:countedamount`) draws the hand
 //size and is named with it; any other non-numeric amount names the permanent
 //with 0 rather than inventing a count.
+//#W80-DH (F9, Astra wave-80 review finding 9 - MED). A "MAY" DRAW IS NOT A COST.
+//Sylvan Library's line is `@each my draw:may name(Draw 2 cards) draw:2 && ...` -
+//the two extra cards are the CONTROLLER'S CHOICE (CR: "you may draw two additional
+//cards"). #W80-DF (U14) imported this scan into the blockers lethal verdict and
+//charged them as compulsory damage through the opponent's Underworld Dreams: at 4
+//life with 2 incoming, the forecast declared loss at -1 over a draw the seat can
+//simply decline and live at 1. Under the trust doctrine a lethal verdict is an
+//instruction, and this one argues for a chump block the seat does not owe.
+//The engine's own optionality token is a `may` before the payload's effect, at the
+//top level of the line (a `may` inside a nested `newability[...]` belongs to that
+//sub-ability, not to this draw). Pure over the already-lowercased payload.
+static bool w80DrawExtraIsOptional(const string& payloadLow)
+{
+    const size_t d = payloadLow.find("draw:");
+    const string head = payloadLow.substr(0, d == string::npos ? payloadLow.size() : d);
+    int depth = 0;
+    for (size_t i = 0; i + 3 <= head.size(); i++)
+    {
+        const char c = head[i];
+        if (c == '(' || c == '[' || c == '{')
+            depth++;
+        else if (c == ')' || c == ']' || c == '}')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        if (depth != 0)
+            continue;
+        if (head.compare(i, 3, "may") != 0)
+            continue;
+        const bool leftOk = (i == 0) || head[i - 1] == ' ' || head[i - 1] == '\t'
+                            || head[i - 1] == ':';
+        const bool rightOk = (i + 3 >= head.size()) || head[i + 3] == ' '
+                             || head[i + 3] == '\t';
+        if (leftOk && rightOk)
+            return true;
+    }
+    return false;
+}
+
 static void drawStepExtrasScan(Player * me, Player * opp,
-                               std::vector<std::pair<std::string, int> >& extras)
+                               std::vector<std::pair<std::string, int> >& extras,
+                               std::vector<char> * optionalOut = NULL) //#W80-DH (F9)
 {
     for (int side = 0; side < 2; side++)
     {
@@ -16197,6 +16238,9 @@ static void drawStepExtrasScan(Player * me, Player * opp,
                                                     me->game->hand->nb_cards));
                 else
                     extras.push_back(std::make_pair(c->name + instanceHandle(c) + " (amount not fixed)", 0));
+                //#W80-DH (F9): ...and whether the controller has to take it.
+                if (optionalOut)
+                    optionalOut->push_back(w80DrawExtraIsOptional(payload) ? 1 : 0);
             }
         }
     }
@@ -20482,7 +20526,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mSingleOutcomeMenusAnswered(0), mSingleOutcomeRowsSpared(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -20807,6 +20851,39 @@ void AIPlayerGPT::writeForceCloseRecord(const char * outcome, bool landArm)
         {"park_armed", mRetryPark.forceCloseArmed ? 1 : 0},
         {"defer_ticks", mForceCloseDeferTicks},
         {"unrecorded_so_far", mForceCloseUnrecorded},
+        {"turn", translogTurn(observer ? observer->turn : 0)},
+        {"phase", observer ? observer->getCurrentGamePhase() : -1},
+    };
+    transLogWrite(rec.dump());
+}
+
+//#W80-DH (F11, Astra wave-80 review finding 11 - MED). ONE RECORD PER HOLD EVENT.
+//The wave-80 shape incremented three counters immediately and wrote their story
+//into ONE shared string each, consumed by the next `writeTransLog` of any kind:
+//multiple clamps in one window retained at most one field, and the next unrelated
+//target or discard record inherited whatever was left - the exact
+//counter-without-an-adjudicable-trace failure the LESSON OF WAVE 79 names. This is
+//the event, at the event, with its seam, its face, its reason and the window it
+//happened in. It is telemetry about a window that may never be asked, so (like
+//`forced_close` and `menu_single_outcome`) it takes no ask seq of the window
+//counter. `hold_events` on the gameend record equals the number of these records,
+//and the sum of the three class counters equals it too.
+void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
+                                       const string& face, const string& reason)
+{
+    mHoldEvents++;
+    if (mTransLogPath.empty())
+        return;
+    ensureGameStartRecord();
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "hold_event"},
+        {"event", mHoldEvents},
+        {"what", event ? event : ""},
+        {"seam", seam ? seam : ""},
+        {"face", face},
+        {"reason", reason},
+        {"window_seq", mWindowSeq},
         {"turn", translogTurn(observer ? observer->turn : 0)},
         {"phase", observer ? observer->getCurrentGamePhase() : -1},
     };
@@ -21683,8 +21760,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //this is the wave-70 rule unchanged.
     if (planStepExecuted(!mCurrentPlan.empty(), !userMsg.empty(), choice, fallback))
     {
+        //#W80-DH (F5): a completing menu consumes NO step - the cast row's own
+        //record already advanced it - and it does not close the cast either: the
+        //latch drops back to 1 and waits for the next completing menu or the cast
+        //event.
         if (mPlanCastCompletionState == 2)
-            mPlanCastCompletionState = 0;
+            mPlanCastCompletionState = 1;
         else if ((size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(mCurrentPlan))
             mPlanStepsDone++;
     }
@@ -21954,16 +22035,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["stack_death_verdict"] = mStackDeathVerdictFace;
         mStackDeathVerdictFace.clear();
     }
-    if (!mHoldSaferIgnoredFace.empty())
-    {
-        rec["hold_safer_ignored_face"] = mHoldSaferIgnoredFace;
-        mHoldSaferIgnoredFace.clear();
-    }
-    if (!mHoldReopenReason.empty())
-    {
-        rec["hold_reopen_reason"] = mHoldReopenReason;
-        mHoldReopenReason.clear();
-    }
+    //#W80-DH (F11, Astra wave-80 finding 11 - MED): `hold_safer_ignored_face` and
+    //`hold_reopen_reason` are DELETED from the window record. They were ONE shared
+    //string each, overwritten by every clamp in the window and consumed by
+    //whichever writeTransLog came next - so a window that clamped both faces kept
+    //at most one of them, and an unrelated target or discard record inherited the
+    //survivor. The events are now their own records (`kind: hold_event`), written
+    //AT the event, and the counters reconcile against them by construction.
     if (holdCheckRefSeq > -2)
         rec["hold_check_ref_seq"] = holdCheckRefSeq;       //#W78-CV (S7): the RECORD seq
     if (holdCheckRefWindow > -2)
@@ -22076,6 +22154,19 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //silently accepted. The gameend census carries the game's total.
         rec["action_before_plan"] = true;
         mActionBeforePlanReplies++;
+    }
+    //#W80-DH (F2): ...and whether the PARSER acted on it. `action_before_plan` is
+    //the SHAPE meter (computed on the raw reply by offProtocolBytes);
+    //`action_before_plan_rejected` is the EVENT - the window whose answer was
+    //dropped for stating the action above the plan, stamped by consumePlan at the
+    //refusal and consumed here so it can never migrate onto a later record. The
+    //two counters reconcile with the corpus: `action_before_plan_rejected_replies`
+    //is by construction the number of records carrying this field.
+    if (mActionBeforePlanRejected)
+    {
+        rec["action_before_plan_rejected"] = true;
+        mActionBeforePlanRejects++;
+        mActionBeforePlanRejected = false;
     }
     //#W71-BO (L10, wave-70 MED-2). A MISSING PLAN LINE IS NOW VISIBLE. The
     //corpus carried 11 replies with NO `PLAN:` line at all, every one of them
@@ -22519,6 +22610,10 @@ void AIPlayerGPT::logGameEnd()
         //distinction is exactly what the wave-70 audit could not make from code.
         {"protocol_replies", mProtocolReplies},
         {"action_before_plan_replies", mActionBeforePlanReplies},
+        //#W80-DH (F2): of those, the ones whose answer was refused and re-asked.
+        //Equal, by construction, to the number of records carrying
+        //`action_before_plan_rejected`.
+        {"action_before_plan_rejected_replies", mActionBeforePlanRejects},
         {"phase2_answer_recovered", mPhase2AnswerRecovered},
         {"phase2_answer_missing", mPhase2AnswerMissing},
         //#W75-CJ (P2c): closes that armed and never reached any record.
@@ -22550,8 +22645,25 @@ void AIPlayerGPT::logGameEnd()
         {"ask_key_continuation_differs", mAskKeyContinuationDiffers},
         //#W79-DC (F2): holds re-opened by a NEW threat at the same danger rank.
         {"hold_reopened_new_threat", mHoldReopenedNewThreat},
+        //#W80-DH (F3): ...and by a NEW LETHAL threat - a top-rank crack-back or
+        //stack-death face over an object set the hold was not taken over. Astra's
+        //second-Bolt board. Per-record trace: `kind: hold_event`, what =
+        //`reopen_new_lethal`.
+        {"hold_reopened_new_lethal", mHoldReopenedNewLethal},
+        //#W80-DH (F11): every clamp and every re-open, as its own record. This
+        //equals the number of `kind: hold_event` records in the seat log, and the
+        //three class counters above plus the rows-moved re-opens sum to it.
+        {"hold_events", mHoldEvents},
+        //#W80-DH (F5): cast plan steps that closed on the CAST EVENT (or the turn
+        //belt) instead of on the first completing menu. Per-record trace: the
+        //stderr close line names which of the two closed it.
+        {"plan_cast_steps_closed", mPlanCastStepsClosed},
         //#W80-DE (U2): the two verdicts, now RENDERED - 0 in 2,203 wave-79 prompts.
         {"crackback_verdict_lines_rendered", mCrackBackVerdictLinesRendered},
+        //#W80-DH (F4): of those, the ones a legal block saves - the false death
+        //claims wave 80 would have printed. Per-record trace: `crackback_verdict`
+        //= `[crack-back verdict: LETHAL unblocked, blocked away]`.
+        {"crackback_lethal_blocked_away", mCrackBackLethalBlockedAway},
         {"stack_death_verdict_lines_rendered", mStackDeathVerdictLinesRendered},
         //#W80-DE (U8): declined lists re-served across a phase on an unchanged board.
         {"crossphase_replayed", mCrossPhaseReplayed},
@@ -23483,7 +23595,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
-            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
+            mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
+                                                  //cast step (#W80-DH F5: its name too)
             mPlanSetSeq = -1; //#W53-N (D12a): expired, so it has no age
         }
     }
@@ -23582,7 +23695,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
-            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
+            mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
+                                                  //cast step (#W80-DH F5: its name too)
             mPlanSetSeq = -1;
         }
         else if (!planAsserted.empty())
@@ -23591,7 +23705,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
-            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
+            mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
+                                                  //cast step (#W80-DH F5: its name too)
             mPlanSetSeq = -1;
         }
         else if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
@@ -23600,7 +23715,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
-            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
+            mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
+                                                  //cast step (#W80-DH F5: its name too)
             mPlanSetSeq = -1;
         }
         else
@@ -23615,8 +23731,18 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         //cast finished without a second half and the latch retires here, so the
         //echo is byte-identical to wave 79 on every window that is not a
         //completing menu. Idempotent - the same window rebuilt re-reads state 2.
-        if (mPlanCastCompletionState == 1)
-            mPlanCastCompletionState = w80CompletingCastMenu(tail, mInAnnounceXAsk) ? 2 : 0;
+        //#W80-DH (F5, Astra wave-80 review finding 5 - HIGH): the latch is NOT
+        //retired by a window that happens not to be a completing menu, and not by
+        //the FIRST completing menu either. A cast can put up several (the cast-mode
+        //menu, then the X announcement, then its targets), and wave 80 cleared the
+        //latch on the first of them - so the second echoed the plan with the cast
+        //clause deleted again, which is the very defect U1 was written for. State 2
+        //means only "THIS window is a completing menu of the open cast"; the cast
+        //step closes on the CAST EVENT (receiveEvent: the spell reaching or leaving
+        //the stack), never on a menu answer. Idempotent - a rebuilt window re-reads
+        //its own class.
+        if (mPlanCastCompletionState >= 1)
+            mPlanCastCompletionState = w80CompletingCastMenu(tail, mInAnnounceXAsk) ? 2 : 1;
         u << carriedPlanHeaderText(planAgeClause(), planAbsent,
                                    w80CarriedPlanSteps(mCurrentPlan, mPlanStepsDone,
                                                        mPlanCastCompletionState >= 1));
@@ -24772,6 +24898,20 @@ static string gptLineAtOffset(const string& text, size_t off)
     return (last == string::npos) ? string() : ln.substr(0, last + 1);
 }
 
+//#W80-DH (F2): THE ORDER RULE, as one predicate over the two offsets the live
+//scanners produce - `gptAnswerSegment`'s answer line start and `findPlanMarker`'s
+//marker, in that order, exactly as consumePlan reads them. consumePlan CALLS this;
+//it is not a mirror of it. `npos` on either side means the reply is missing that
+//part, and a reply missing one of them is not an ordering violation - it is
+//handled by the paths that already exist for it (no answer -> re-ask; no plan ->
+//the carry stands). Pure over two numbers, so PARSETEST walks every case.
+static bool w80AnswerPrecedesPlan(size_t labelLineStart, size_t planMarkerPos)
+{
+    if (labelLineStart == string::npos || planMarkerPos == string::npos)
+        return false;
+    return labelLineStart < planMarkerPos;
+}
+
 //#W63-AD (E6b): the offset of the FIRST LINE-LEADING "PLAN:" marker - the same
 //marker choiceRetractedNoReplacement scans for, factored out so the answer
 //selector and the retraction gate agree on where the plan block begins. A
@@ -24895,6 +25035,36 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     //reply-shape probe used further down, not the plan.
     size_t firstPos = string::npos;
     size_t pos = findPlanMarker(text, labelLineStart, &firstPos);
+    //#W80-DH (F2, Astra wave-80 review finding 2 - HIGH). AN ANSWER THAT PRECEDES
+    //THE PLAN IS NOT AN ANSWER. OWNER RULING (2026-09-12, verbatim): "any plan,
+    //must precede action. Mechanically, for an llm, a plan that follows a choice
+    //is post hoc justification instead of load bearing reasoning." The LABEL-LESS
+    //reader has enforced this since #W79-DD (its fifth unambiguity clause); the
+    //LABELLED walk did not, so `CHOICE: 2 (Cast Wall of Omens)\nPLAN: block and
+    //draw.` was accepted and executed, and the order was recorded as telemetry
+    //only. It is the ORDER that is refused, never the parser's tolerance: the
+    //answer is dropped and the seam re-asks it on exactly the path a missing
+    //answer takes (`replyLabelMissing` -> the one re-ask), so no legal option is
+    //removed, capped or auto-answered - the same window comes back.
+    //`findPlanMarker` already anchors the plan to the answer's own block: `pos`
+    //is the last marker BEFORE the answer line when the reply led with its plan,
+    //and only otherwise the first marker after it. So `pos > labelLineStart` is
+    //exactly "this reply stated no plan before its action line".
+    //The PLAN is still folded below - a plan the model wrote is a plan, and the
+    //re-asked window is served it; only the action is refused.
+    bool w80ActionBeforePlan = false;
+    if (answerStart != string::npos && w80AnswerPrecedesPlan(labelLineStart, pos))
+    {
+        w80ActionBeforePlan = true;
+        mActionBeforePlanRejected = true;
+        answerStart = string::npos;
+        answerEnd = 0;
+        labelLineStart = string::npos;
+        DebugTrace("AIPlayerGPT: the reply wrote its action line ABOVE its PLAN line -"
+                   " a plan must precede the action, so the answer is refused and the"
+                   " window is re-asked");
+    }
+    (void) w80ActionBeforePlan;
     if (pos == string::npos)
     {
         //#W70-BM (E1): the model omitted its PLAN, so the carried sequence stands.
@@ -24963,7 +25133,7 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         if (plan != mCurrentPlan)
         {
             mPlanStepsDone = 0;
-            mPlanCastCompletionState = 0; //#W80-DG (U1): a new sequence, no open cast
+            mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1), #W80-DH (F5)
         }
         //#W53-N (D12a): the model WROTE a plan line here, whatever it says -
         //that, not its content, is what the age stamp reports.
@@ -25018,6 +25188,20 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     return string();
 }
 
+//#W80-DH (F5): the one place the open cast step closes, so the latch, the name and
+//the turn stamp can never disagree. Counted, and traced, so a corpus can adjudicate
+//whether a cast step closed on its own event or on the belt.
+void AIPlayerGPT::w80CloseOpenCastStep(const char * why)
+{
+    if (mPlanCastCompletionState < 1)
+        return;
+    mPlanCastCompletionState = 0;
+    mPlanCastOpenName.clear();
+    mPlanCastOpenTurn = -1;
+    mPlanCastStepsClosed++;
+    DebugTrace("AIPlayerGPT: the open cast plan step closed - " << (why ? why : ""));
+}
+
 int AIPlayerGPT::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);
@@ -25030,6 +25214,30 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     {
         releaseHoldIfUntapPassed();
         flushMainPhaseSkip(); //#W73-CB (F6): the phase ENDED - count it now or never
+        //#W80-DH (F5): the BELT. A cast the seat committed to and then never
+        //completed (the engine cancelled it, or the window was lost) must not hold
+        //its plan step open across a turn - the step would never be consumed and
+        //the echo would carry a cast that never happened.
+        if (mPlanCastCompletionState >= 1 && observer && observer->turn != mPlanCastOpenTurn)
+            w80CloseOpenCastStep("turn changed with the cast never completed");
+    }
+    //#W80-DH (F5, Astra wave-80 finding 5): THE CAST EVENT closes the cast step.
+    //A cast is one plan step however many menus the engine puts behind it, so the
+    //step is open from the validated cast row until the spell actually reaches the
+    //stack - and it closes again when it leaves (resolved, countered or fizzled),
+    //which is the "a countered/fizzled cast retires it too" half. Matched on the
+    //committed card's display name, because this engine CLONES a card instance on
+    //every zone move and a pointer taken at the cast row is not the object that
+    //arrives.
+    if (mPlanCastCompletionState >= 1 && !mPlanCastOpenName.empty())
+    {
+        if (WEventZoneChange * cz = dynamic_cast<WEventZoneChange *>(event))
+        {
+            if (cz->card && cz->card->getDisplayName() == mPlanCastOpenName
+                && game && ((cz->to == game->stack) || (cz->from == game->stack)))
+                w80CloseOpenCastStep(cz->to == game->stack ? "the spell reached the stack"
+                                                           : "the spell left the stack");
+        }
     }
 
     //#W66-AQ (H1, engine HIGH-1): count the library->hand moves that happen
@@ -28559,11 +28767,68 @@ static bool w75LegendTwinControlled(const std::vector<W75LegendBoardCard>& board
 //source itself, the engine's default. A conditional line (`if ... then`) counts
 //too: an UNDER-count of the cover is the conservative direction for a survival
 //verdict, which is the only direction that cannot lie. Pure over the script.
+//#W80-DH (F7, Astra wave-80 review finding 7 - HIGH). AN ACTIVATED BOUNCE IS NOT
+//AN ETB. Fleeting Image's whole script is `{1}{U}:moveto(hand)` - an ACTIVATED
+//ability whose cost its controller may simply not pay. The wave-80 test looked for
+//a trigger and, finding no `@`, treated the line as the permanent's own
+//enters-the-battlefield text: it subtracted the body from the crack-back cover and
+//printed that the card's "enters-the-battlefield text moves it straight back off
+//the battlefield as it resolves". Both halves are false - the flier stays and can
+//block - and the second is worse than the arithmetic, because it is a stated
+//MECHANISM the model is instructed to believe.
+//The engine's own shape for an activated ability is `<cost>:<effect>`, and a cost
+//is what sits before a TOP-LEVEL colon on a line with no trigger. So an untriggered
+//line that carries one is an activation, not an arrival. Colons inside (), [] or {}
+//belong to a spec (`this(variable{type:*:myhand}=0)`) and are not the split - the
+//scan is depth-aware for the same reason #W71-BR (L16)'s is. A triggered line keeps
+//its existing handling: the trigger must be this card's own arrival.
+static bool w80ScriptLineHasActivationCost(const string& low)
+{
+    //The split is the FIRST top-level `:`, and what makes the text before it a
+    //COST rather than an effect is a top-level `{...}` group - `{1}{U}:`, `{T}:`,
+    //`aslongas(*|myhand) {2}{T}:`. This is the same rule #W71-BR (L16) states for
+    //the draw scan, and it is why `draw:1`, `life:-4 controller` and
+    //`moveto(hand)` are effects: their colon has no cost in front of it. Braces
+    //inside (), [] or {} belong to a spec (`this(variable{type:*:myhand}=0)`) and
+    //are not a cost, so the group test is depth-aware too.
+    int depth = 0;
+    bool topLevelBraceGroup = false;
+    for (size_t i = 0; i < low.size(); i++)
+    {
+        const char c = low[i];
+        if (c == '(' || c == '[')
+            depth++;
+        else if (c == ')' || c == ']')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        else if (c == '{')
+        {
+            if (depth == 0)
+                topLevelBraceGroup = true;
+            depth++;
+        }
+        else if (c == '}')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        else if (c == ':' && depth == 0)
+            return topLevelBraceGroup; //a cost group stands in front of the split
+    }
+    return false;
+}
+
 static bool w80EtbSelfLeavesLine(const string& low)
 {
     const size_t at = low.find('@');
     if (at != string::npos && low.compare(at, 27, "@movedto(this|battlefield):") != 0)
         return false; //some other trigger: not this card's own arrival
+    //#W80-DH (F7): no trigger AND an activation cost -> an activated ability that
+    //nobody has to pay for. The body is there to block.
+    if (at == string::npos && w80ScriptLineHasActivationCost(low))
+        return false;
     if (low.find("target(") != string::npos || low.find("notatarget(") != string::npos
         || low.find("all(") != string::npos || low.find("foreach(") != string::npos)
         return false; //it names another object; the source is not what moves
@@ -28663,7 +28928,14 @@ struct CrackBackAttackerFact
     //block this attacker, by index into the caller's own list of them. Empty on
     //every pre-wave-69 call, and then every figure below is byte-identical.
     std::vector<int> existingBlockers;
-    CrackBackAttackerFact() : power(0), blockersNeeded(1), coverable(false) {}
+    //#W80-DH (F8): does this attacker TRAMPLE? The cover's whole arithmetic is
+    //"a blocker removes its attacker's full power from the total", and CR 702.19b
+    //says that is false for a trampler: only the blocker's lethal cut is absorbed
+    //and the rest reaches the player. The cover model does not carry blocker
+    //toughness, so it cannot price the spill - it must not claim survival over one.
+    bool trample;
+    CrackBackAttackerFact() : power(0), blockersNeeded(1), coverable(false),
+                              trample(false) {}
 };
 static bool crackBackFactPowerDesc(const CrackBackAttackerFact& a,
                                    const CrackBackAttackerFact& b)
@@ -28775,6 +29047,7 @@ static int w79SacrificeBlockerGiveBack(Player * me, Player * opp, MTGAbility * a
         CrackBackAttackerFact f;
         f.power = crackBackBodyContribution(ac);
         f.blockersNeeded = ac->minBlockersRequired();
+        f.trample = ac->basicAbilities[Constants::TRAMPLE] != 0; //#W80-DH (F8)
         atk.push_back(f);
     }
     if (atk.empty())
@@ -28798,15 +29071,37 @@ static int w79SacrificeBlockerGiveBack(Player * me, Player * opp, MTGAbility * a
 //bodies' sizes are (CR 510.1a/c). The clause states it once. It claims nothing
 //new; it names the mechanism its own arithmetic already uses, which is what
 //turns a number the model must take on faith into one it can check.
-static const char * w80CoverMechanismSentence()
+//#W80-DH (F8, Astra wave-80 review finding 8 - HIGH). THE LESSON WAS FALSE FOR
+//TRAMPLE. The sentence was unconditional: "a 1/1 in front of a 5/5 stops the whole
+//5". CR 702.19b says the blocked trampler assigns only LETHAL damage to its
+//blockers and its controller may assign the rest to the player, so a 1/1 in front
+//of a 5/5 TRAMPLER stops ONE and four reach the face - at four life that is the
+//seat's whole life total, taught as a rule. The cover model carries attacker power
+//and block legality and NOT blocker toughness, so it cannot price the spill; what
+//it can do is tell the truth about which rule applies and stop claiming survival
+//where the arithmetic it has does not prove it (the same discipline #W65-AL G4
+//applied to a FLOOR total). Pure over the one fact.
+static const char * w80CoverMechanismSentence(bool anyTrampler)
 {
+    if (anyTrampler)
+        return " HOW A BODY REMOVES POWER FROM THAT TOTAL: an attacker that is"
+               " BLOCKED deals its combat damage to the blocker, not to you - all"
+               " of it, whatever the blocker's size, so an ordinary attacker is"
+               " fully absorbed by any one blocker. BUT AT LEAST ONE OF THESE"
+               " ATTACKERS HAS TRAMPLE, and a trampler is the exception: it"
+               " assigns only enough damage to kill its blockers (their remaining"
+               " toughness) and the REST TRAMPLES THROUGH to you - a 1/1 in front"
+               " of a 5/5 trampler absorbs 1 and 4 still reach you. The figures"
+               " below subtract each blocked attacker's FULL power, which is right"
+               " for the non-tramplers and too generous for the tramplers, so they"
+               " are an upper bound on what your blocks remove.";
     return " HOW A BODY REMOVES POWER FROM THAT TOTAL: an attacker that is"
            " BLOCKED deals its combat damage to the blocker, not to you - all of"
            " it, whatever the blocker's size, and a 1/1 in front of a 5/5 stops"
            " the whole 5. That is why each blocker subtracts its attacker's FULL"
            " power here, and why the blocker's own toughness does not appear in"
            " this arithmetic (it decides whether the blocker survives, not how"
-           " much reaches you).";
+           " much reaches you). None of these attackers has trample.";
 }
 
 //#W80-DF (U3, wave-79 deck130 HIGH-1 residual / DC F4 FAIL, positive half).
@@ -28865,6 +29160,12 @@ static string crackBackBlockerRowTag(int total, int myLife,
     //blocker is what they are.
     const int extra = floorExtra > 0 ? floorExtra : 0;
     const int stated = total + extra;
+    //#W80-DH (F8): is any attacker in this cover a TRAMPLER? If so the "each
+    //blocker removes its attacker's full power" arithmetic is an UPPER BOUND on
+    //what the blocks remove, so no survival verdict may rest on it.
+    bool w80AnyTrampler = false;
+    for (size_t ti = 0; ti < atk.size() && !w80AnyTrampler; ti++)
+        w80AnyTrampler = atk[ti].trample;
     std::vector<CrackBackAttackerFact> sorted(atk);
     std::sort(sorted.begin(), sorted.end(), crackBackFactPowerDesc);
     //FLOOR: only the bodies whose block legality is checked, against only the
@@ -28944,7 +29245,7 @@ static string crackBackBlockerRowTag(int total, int myLife,
       << (bodies == 1 ? " body" : " bodies")
       << " - a creature that arrives this turn CAN block on their turn"
          " (summoning sickness stops attacking, not blocking). Each blocker"
-         " stops at most ONE attacker." << w80CoverMechanismSentence();
+         " stops at most ONE attacker." << w80CoverMechanismSentence(w80AnyTrampler);
     o << " CHECKED: " << checkedBodies << " of them "
       << (checkedBodies == 1 ? "is a body" : "are bodies")
       << " whose block legality against these attackers this row computed";
@@ -28992,6 +29293,19 @@ static string crackBackBlockerRowTag(int total, int myLife,
         if (uncheckedBodies > 0)
             o << ", and up to " << coveredCeil
               << " if every uncounted body could also legally block";
+    }
+    else if (myLife - leftFloor > 0 && w80AnyTrampler)
+    {
+        //#W80-DH (F8): the cover credits a blocked trampler's FULL power and the
+        //rules credit only the blocker's toughness, so this figure is an upper
+        //bound on the cover and the survival claim it would carry is not proven.
+        //Nothing is deleted: the arithmetic prints in full and says what it is.
+        o << ". THIS IS NOT A SURVIVAL VERDICT: at least one of these attackers has"
+             " TRAMPLE, so blocking it does not remove its whole power - only as"
+             " much as its blockers' toughness absorbs, and the rest still reaches"
+             " you. The cover figure above subtracts the FULL power of every blocked"
+             " attacker, which is the most your blocks could possibly remove, so"
+             " the " << (myLife - leftFloor) << " is a BEST case and not a promise";
     }
     else if (myLife - leftFloor > 0)
     {
@@ -29074,7 +29388,8 @@ static int w77StayHomeCoveredPower(const std::vector<CrackBackAttackerFact>& atk
 //what keeping EVERY offered body home is worth against the line above, and
 //obeying #W65-AL (G4): no survival verdict against a FLOOR.
 static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
-                                  int bodies, int covered)
+                                  int bodies, int covered,
+                                  bool anyTrampler = false) //#W80-DH (F8)
 {
     if (total <= 0 || bodies <= 0 || myLife < 0)
         return "";
@@ -29086,13 +29401,22 @@ static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
         o << ". THIS IS NOT A SURVIVAL VERDICT: the total above is a FLOOR, so a"
              " larger crack-back is on the table - what this establishes is what"
              " the bodies are worth if none of them attacks."
-          << w80CoverMechanismSentence() << "}"; //#W80-DF (U3)
+          << w80CoverMechanismSentence(anyTrampler) << "}"; //#W80-DF (U3), #W80-DH (F8)
+    else if (myLife - left > 0 && anyTrampler)
+        //#W80-DH (F8): a blocked trampler is not fully absorbed, so the same
+        //arithmetic on the same bodies proves no survival here either.
+        o << ". THIS IS NOT A SURVIVAL VERDICT: at least one of these attackers has"
+             " TRAMPLE, so the cover above is the MOST your blocks could remove and"
+             " the " << (myLife - left) << " it would leave you at is a best case."
+             " Every attacker you declare without vigilance removes its own body"
+             " from that cover."
+          << w80CoverMechanismSentence(anyTrampler) << "}";
     else
         o << " -> you would be at " << (myLife - left)
           << (myLife - left > 0 ? ", which you SURVIVE" : ", which still KILLS you")
           << ". Every attacker you declare without vigilance removes its own body"
              " from that cover."
-          << w80CoverMechanismSentence() << "}"; //#W80-DF (U3)
+          << w80CoverMechanismSentence(anyTrampler) << "}"; //#W80-DF (U3)
     return o.str();
 }
 
@@ -29449,6 +29773,7 @@ static void crackBackCoverFacts(Player * opp, MTGCardInstance * card, int bodies
         CrackBackAttackerFact f;
         f.power = pw;
         f.blockersNeeded = c->minBlockersRequired();
+        f.trample = c->basicAbilities[Constants::TRAMPLE] != 0; //#W80-DH (F8)
         f.coverable = selfBlocks && card->canBlockPairwise(c) != 0;
         for (size_t sj = 0; sj < standing.size(); sj++) //#W69-BH (K6a)
             if (standing[sj]->canBlockPairwise(c) != 0)
@@ -34540,7 +34865,17 @@ void AIPlayerGPT::w80ApplyVerdictFacesAtSend(bool sent, const string& pendingCra
     }
     if (w80CountRenderedAtSend(true, !pendingCrackBack.empty(), mWindowSeq,
                                mCrackBackVerdictCountedSeq, mCrackBackVerdictLinesRendered))
+    {
         mCrackBackVerdictFace = pendingCrackBack;
+        //#W80-DH (F4): of the rendered crack-back lines, the ones whose UNBLOCKED
+        //total was lethal and whose blocker-aware floor was not - the population
+        //wave 80 would have told "a hold here is taken over a board that kills you
+        //next turn". Counted AT THE SEND, on the same gate as the line itself; the
+        //per-record trace is `crackback_verdict` reading
+        //`[crack-back verdict: LETHAL unblocked, blocked away]`.
+        if (pendingCrackBack.find("blocked away") != string::npos)
+            mCrackBackLethalBlockedAway++;
+    }
     else if (pendingCrackBack.empty())
         mCrackBackVerdictFace.clear();
     if (w80CountRenderedAtSend(true, !pendingStackDeath.empty(), mWindowSeq,
@@ -35586,20 +35921,82 @@ bool w80CountRenderedAtSend(bool sent, bool rendered, int windowSeq,
 //same channel as every other bracket of this family: they enter no ask key, no
 //async slot key and no hold key, and the MARKER strings the latch compares are
 //untouched, so no hold's behaviour changes by rendering them. Pure over the face.
-string w80CrackBackVerdictLine(const string& face)
+//#W80-DH (F4, Astra wave-80 review finding 4 - HIGH). THE LINE TURNED UNBLOCKED
+//POWER INTO CERTAIN DEATH. `crackBackVerdictNow()` sums the power of everything
+//that can attack and compares it to life - a THRESHOLD, which is all the latch's
+//marker ever needed. #W80-DE (U2) then promoted that threshold to a rendered
+//sentence saying "a hold here is taken over a board that kills you next turn", and
+//the sum subtracts no blockers: at four life, against their ordinary 5/5, with an
+//untapped 0/6 of your own, the paragraph claims death that a legal block prevents
+//outright. Under the trust doctrine a rendered statement is an INSTRUCTION, so
+//this is not conservatism - it is a false one, and it argues for exactly the panic
+//play the seat should not make.
+//So the LINE is blocker-aware and the MARKER is not: `bestBlockFloor` is the same
+//DP the blockers header proves its own survival claim with (#W79-DA T5 / #W79-DC
+//F3, both damage steps), run over the crack-back's own attacker walk. -1 means the
+//floor could not be proven (no blockers, an ability outside the DP's model, a
+//board too wide to search) and the wording is then exactly what wave 80 shipped -
+//nothing is weakened where nothing was learned. The latch's rank is untouched, so
+//no hold's behaviour changes. Pure over the face and the two numbers.
+string w80CrackBackVerdictLine(const string& face, int bestBlockFloor = -1, int myLife = 0)
 {
     if (face.find("[crack-back verdict:") != 0)
         return string();
     if (face.find("none") != string::npos)
         return string(); //nothing can swing back: no claim is owed
     if (face.find("LETHAL") != string::npos)
-        return "\n[crack-back verdict: LETHAL - if you pass this window and they"
-               " attack with everything that can, the damage they can deal reaches"
-               " your life total: a hold here is taken over a board that kills you"
-               " next turn]";
+    {
+        if (bestBlockFloor >= 0 && myLife > bestBlockFloor)
+        {
+            std::ostringstream o;
+            o << "\n[crack-back verdict: their UNBLOCKED total reaches your life"
+                 " total, but a legal block prevents it - with your best block: "
+              << bestBlockFloor << " damage still gets through, leaving you at "
+              << (myLife - bestBlockFloor)
+              << ". So passing this window does NOT hand them the game: you still"
+                 " get the blockers decision on their turn, and that assignment is"
+                 " what this figure is computed from. It does assume those blockers"
+                 " are still there and untapped when they attack]";
+            return o.str();
+        }
+        if (bestBlockFloor >= 0)
+        {
+            std::ostringstream o;
+            o << "\n[crack-back verdict: LETHAL EVEN THROUGH YOUR BEST BLOCK - if you"
+                 " pass this window and they attack with everything that can, the best"
+                 " legal assignment of your blockers still lets "
+              << bestBlockFloor << " through and you are at " << (myLife - bestBlockFloor)
+              << ": a hold here is taken over a board that kills you next turn]";
+            return o.str();
+        }
+        return "\n[crack-back verdict: LETHAL if it is UNBLOCKED - if you pass this"
+               " window and they attack with everything that can, the damage they can"
+               " deal reaches your life total. This figure subtracts no blockers (the"
+               " engine could not prove a best block on this board), so a hold here is"
+               " taken over a board that kills you next turn unless your blocks stop"
+               " it]";
+    }
     return "\n[crack-back verdict: you survive - if you pass this window and they"
            " attack with everything that can, you are still alive afterwards: the"
            " crack-back alone does not end the game]";
+}
+
+//#W80-DH (F4): the RECORD face, read off the LINE THAT PRINTED - the #W80-DE (U10)
+//discipline, applied to this family too. The marker is a threshold and says only
+//LETHAL/survive/none; the LINE now has four faces, and a reviewer joining the
+//census to the corpus has to be able to tell which of them the model read. This
+//face is RECORD-ONLY: it enters no latch and no key. Pure over the rendered line.
+string w80CrackBackFaceOfLine(const string& line)
+{
+    if (line.find("[crack-back verdict:") == string::npos)
+        return string();
+    if (line.find("a legal block prevents it") != string::npos)
+        return "[crack-back verdict: LETHAL unblocked, blocked away]";
+    if (line.find("LETHAL EVEN THROUGH YOUR BEST BLOCK") != string::npos)
+        return "[crack-back verdict: LETHAL through your best block]";
+    if (line.find("LETHAL if it is UNBLOCKED") != string::npos)
+        return "[crack-back verdict: LETHAL unblocked, no floor proven]";
+    return "[crack-back verdict: you survive]";
 }
 
 string w80StackDeathVerdictLine(const string& face)
@@ -35685,6 +36082,56 @@ bool w80LoopStarterScript(const string& magicText)
     return lc.find("life:") != string::npos
         || lc.find("damage:") != string::npos
         || lc.find("lifeset:") != string::npos;
+}
+
+//#W80-DH (F6, Astra wave-80 review finding 6 - MED). "LIVE STARTER" MEANT SCRIPT
+//SUBSTRING. #W80-DE (U10) gated the proven-win claim on a starter and then took
+//ANY battlefield permanent whose script mentions `life:`/`damage:` - so a TAPPED
+//Prodigal Sorcerer with no untap effect, or a Soul Warden with nothing able to
+//enter, NAMES the entry to a "proven win" that cannot be entered. That is the same
+//false-mechanism failure U10 was written to fix, moved one step down: the claim is
+//now specific enough to be checked and still not true.
+//A starter is LIVE when its action is available NOW, and which question that is
+//depends on the line's SHAPE:
+//  - ACTIVATED (`<cost>:<effect>`, no trigger): the engine's own verdict - can its
+//    controller legally use AND afford it right now (LegalActionsOracle::
+//    hasUsableAbility, the same gate the human's ability border is drawn from, so
+//    the two cannot disagree). A tapped Sorcerer fails it;
+//  - an ENTERS trigger (`@movedto(...|...battlefield)`): the event needs something
+//    able to enter, so it counts only while the seat can actually put a creature
+//    onto the battlefield this turn cycle. Soul Warden with an empty hand fails it;
+//  - any OTHER trigger (upkeep, draw, combat, attack...): its event belongs to the
+//    turn cycle itself and will come round. Live.
+//Pure over the script line, so PARSETEST walks the classifier without a board.
+static const int kW80StarterNone = 0;
+static const int kW80StarterActivated = 1;
+static const int kW80StarterEntersTrigger = 2;
+static const int kW80StarterCycleTrigger = 3;
+
+int w80StarterLineKind(const string& low)
+{
+    if (!w80LoopStarterScript(low))
+        return kW80StarterNone;
+    const size_t at = low.find('@');
+    if (at == string::npos)
+        return w80ScriptLineHasActivationCost(low) ? kW80StarterActivated
+                                                   : kW80StarterCycleTrigger;
+    //a trigger: which event?
+    const size_t close = low.find(')', at);
+    const string ev = low.substr(at, close == string::npos ? string::npos : close - at + 1);
+    if (ev.find("movedto(") != string::npos
+        && (ev.find("battlefield") != string::npos || ev.find("inplay") != string::npos))
+        return kW80StarterEntersTrigger;
+    return kW80StarterCycleTrigger;
+}
+
+bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter)
+{
+    if (kind == kW80StarterActivated)
+        return abilityUsableNow;
+    if (kind == kW80StarterEntersTrigger)
+        return aCreatureCanEnter;
+    return kind == kW80StarterCycleTrigger;
 }
 
 //#W80-DE (U8, wave-79 known-bugs U8 + Astra wave-79 F1). WHEN A DECLINED LIST MAY
@@ -35969,11 +36416,173 @@ string AIPlayerGPT::stackDeathVerdictNow()
     return stackDeathVerdictKey(pendingStackLifeLossToSeat(observer, this), life);
 }
 
+//#W80-DH (F3, Astra wave-80 review finding 3 - HIGH). A LETHAL FACE IS AN EVENT,
+//NOT A RANK. #W79-CZ (T3) compares the held verdict MARKER against the live one
+//and keeps the held face while the live one is no more dangerous - which is right
+//for an escalation ladder and wrong for a face that is already at the top of it.
+//Astra's board: at three life the seat holds with a Bolt under a Healing Salve;
+//both resolve, the seat survives at three, and a SECOND Bolt arrives before untap.
+//The remembered stack face is `KILLS`, the live face is `KILLS`, the marker
+//strings are byte-identical, the cast rows are unchanged - so the latch stands and
+//the window is never put. Rendering the lethal paragraph (#W80-DE U2) does not
+//save the seat: the suppressed window carries no prompt at all.
+//So the latch also remembers WHICH OBJECTS made the face lethal, and a top-rank
+//face over a DIFFERENT object set is a different question. Identity is the
+//engine's own object identity - the stack entries and the attacking bodies
+//themselves - never a number and never the rendered text: two Lightning Bolts are
+//byte-identical as text and are two threats, which is exactly the case that killed
+//the seat. These strings are compared INTERNALLY and enter no key, no row, no
+//prompt and no record: the wave-74 rule ("any byte derived from a board NUMBER
+//that creates no row stays out of every key") is untouched, and so is every held
+//row set.
+string AIPlayerGPT::w80StackThreatIdentityNow()
+{
+    if (!observer || !observer->mLayers)
+        return string();
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return string();
+    std::vector<string> ids;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
+            continue;
+        if (stackObjectLifeLossToSeat(it, this, NULL) <= 0)
+            continue; //not part of what makes this face lethal
+        std::ostringstream o;
+        o << (const void *) it;
+        ids.push_back(o.str());
+    }
+    std::sort(ids.begin(), ids.end()); //stack order is not the identity
+    string out;
+    for (size_t i = 0; i < ids.size(); i++)
+        out += (i ? "," : "") + ids[i];
+    return out;
+}
+
+string AIPlayerGPT::w80CrackBackThreatIdentityNow()
+{
+    Player * opp = opponent();
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return string();
+    std::vector<string> ids;
+    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * ac = opp->game->inPlay->cards[i];
+        if (!ac || crackBackBodyContribution(ac) <= 0)
+            continue;
+        std::ostringstream o;
+        o << (const void *) ac;
+        ids.push_back(o.str());
+    }
+    std::sort(ids.begin(), ids.end());
+    string out;
+    for (size_t i = 0; i < ids.size(); i++)
+        out += (i ? "," : "") + ids[i];
+    return out;
+}
+
+//#W80-DH (F3): the rule itself, pure over the two identities and the live face -
+//so PARSETEST walks every branch without a board. A hold re-opens when the live
+//face is at the TOP of its ladder (crack-back LETHAL / stack KILLS) and the set of
+//objects behind it is not the set the hold was taken over. A face that is lethal
+//over the SAME objects is the question the model already answered; a safer face is
+//not a re-opener at all (#W79-CZ T3 stands); an empty held identity means the hold
+//predates this record and nothing is claimed.
+bool w80NewLethalThreat(const string& liveMarker, const string& heldIdentity,
+                        const string& liveIdentity)
+{
+    if (w79VerdictDangerRank(liveMarker) != 2)
+        return false; //only the top of the crack-back / stack-death ladders
+    if (!w79MarkerHasPrefix(liveMarker, "[crack-back verdict:")
+        && !w79MarkerHasPrefix(liveMarker, "[stack death verdict:"))
+        return false;
+    if (liveIdentity.empty())
+        return false; //nothing identifiable is threatening: no claim
+    return heldIdentity != liveIdentity;
+}
+
 //#W80-DE (U2): the two verdicts as RENDERED LINES, off the same two walks the
 //markers are built from - so the line and the marker can never disagree.
+//#W80-DH (F4): THE BLOCKER-AWARE FLOOR for the crack-back, off the SAME DP the
+//blockers header proves survival with. Their attackers are the crack-back walk's
+//own bodies (`crackBackBodyContribution`), so the line and the marker are about
+//the same combat; the blockers are the seat's own bodies that will still be able
+//to block when that attack happens - a body tapped now is still tapped through
+//their turn (it untaps on the seat's own untap step, which is after it), so
+//`canBlock()` is exactly the test. Returns -1 whenever the figure cannot be
+//PROVEN: no attackers, no blockers, an ability the DP does not model (protection,
+//indestructible, wither/infect - `w79CombatAbilityOutsideModel`), or a combat too
+//wide for the search. A -1 leaves the wave-80 wording standing, so this can only
+//ever withdraw a false death claim, never manufacture a false survival one.
+int AIPlayerGPT::w80CrackBackBestBlockFloorNow()
+{
+    Player * opp = opponent();
+    if (!opp || !opp->game || !opp->game->inPlay || !game || !game->inPlay)
+        return -1;
+    std::vector<MTGCardInstance *> atkCards, blkCards;
+    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * ac = opp->game->inPlay->cards[i];
+        if (ac && crackBackBodyContribution(ac) > 0)
+            atkCards.push_back(ac);
+    }
+    for (int i = 0; i < game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * bc = game->inPlay->cards[i];
+        if (bc && bc->isCreature() && !bc->isPhased && bc->canBlock())
+            blkCards.push_back(bc);
+    }
+    if (atkCards.empty() || blkCards.empty())
+        return -1;
+    for (size_t i = 0; i < atkCards.size(); i++)
+        if (w79CombatAbilityOutsideModel(atkCards[i]))
+            return -1;
+    for (size_t i = 0; i < blkCards.size(); i++)
+        if (w79CombatAbilityOutsideModel(blkCards[i]))
+            return -1;
+    std::vector<W79AtkFact> af;
+    for (size_t i = 0; i < atkCards.size(); i++)
+    {
+        W79AtkFact f;
+        f.power = crackBackBodyContribution(atkCards[i]);
+        f.minBlockers = atkCards[i]->minBlockersRequired();
+        f.trample = atkCards[i]->basicAbilities[Constants::TRAMPLE] != 0;
+        f.deathtouch = atkCards[i]->basicAbilities[Constants::DEATHTOUCH] != 0;
+        f.toughness = atkCards[i]->life > 0 ? atkCards[i]->life : atkCards[i]->toughness;
+        f.firstStrike = atkCards[i]->basicAbilities[Constants::FIRSTSTRIKE] != 0;
+        f.doubleStrike = atkCards[i]->basicAbilities[Constants::DOUBLESTRIKE] != 0;
+        af.push_back(f);
+    }
+    std::vector<W79BlkFact> soak;
+    std::vector<std::vector<char> > can;
+    for (size_t i = 0; i < blkCards.size(); i++)
+    {
+        W79BlkFact b;
+        b.soak = blkCards[i]->life > 0 ? blkCards[i]->life : blkCards[i]->toughness;
+        b.power = blkCards[i]->getPower();
+        b.firstStrike = blkCards[i]->basicAbilities[Constants::FIRSTSTRIKE] != 0;
+        b.doubleStrike = blkCards[i]->basicAbilities[Constants::DOUBLESTRIKE] != 0;
+        b.deathtouch = blkCards[i]->basicAbilities[Constants::DEATHTOUCH] != 0;
+        soak.push_back(b);
+        std::vector<char> row;
+        for (size_t j = 0; j < atkCards.size(); j++)
+            row.push_back(blkCards[i]->canBlockPairwise(atkCards[j]) ? 1 : 0);
+        can.push_back(row);
+    }
+    return w79BestBlockDamage(af, soak, can, NULL); //-1 when the search declines
+}
+
 string AIPlayerGPT::w80CrackBackVerdictLineNow()
 {
-    return w80CrackBackVerdictLine(crackBackVerdictNow());
+    //#W80-DH (F4): the MARKER (threshold, for the latch) and the LINE (blocker-
+    //aware, for the model) are built from the same walk and say different things
+    //on purpose - the line may not claim a death a legal block prevents.
+    return w80CrackBackVerdictLine(crackBackVerdictNow(),
+                                   w80CrackBackBestBlockFloorNow(), life);
 }
 
 string AIPlayerGPT::w80StackDeathVerdictLineNow()
@@ -36006,13 +36615,51 @@ string AIPlayerGPT::w80LiveLoopStarterName()
 {
     if (!game)
         return string();
+    //#W80-DH (F6): a battlefield starter must be AVAILABLE, not merely present.
+    //`aCreatureCanEnter` is computed once: is there a creature in hand this seat
+    //can actually pay for? That is what an enters-trigger starter needs, and it is
+    //the same payment test the hand branch below uses, so the two cannot disagree.
+    bool aCreatureCanEnter = false;
+    if (MTGGameZone * h0 = game->hand)
+        for (int i = 0; i < h0->nb_cards && !aCreatureCanEnter; i++)
+        {
+            MTGCardInstance * c = h0->cards[i];
+            if (!c || !c->isCreature())
+                continue;
+            ManaCost * cost = c->getManaCost();
+            if (!cost)
+                continue;
+            if (getManaPool()->canAfford(cost, 0))
+                aCreatureCanEnter = true;
+            else
+            {
+                GptManaPolicy pol(this);
+                aCreatureCanEnter = !ManaEngine::planPayment(this, pol, c, cost, 0).empty();
+            }
+        }
     if (MTGGameZone * bf = game->inPlay)
         for (int i = 0; i < bf->nb_cards; i++)
         {
             MTGCardInstance * c = bf->cards[i];
             if (!c || w77IsLoopComponentCard(c, this))
                 continue;
-            if (w80LoopStarterScript(c->magicText))
+            if (!w80LoopStarterScript(c->magicText))
+                continue;
+            const bool usable = LegalActionsOracle::hasUsableAbility(c);
+            bool live = false;
+            const string raw = c->magicText;
+            size_t lp = 0;
+            while (lp <= raw.size() && !live)
+            {
+                const size_t nl = raw.find('\n', lp);
+                string line = raw.substr(lp, nl == string::npos ? string::npos : nl - lp);
+                lp = (nl == string::npos) ? raw.size() + 1 : nl + 1;
+                if (line.find('_') != string::npos)
+                    line = AutoLineMacro::Process(line);
+                live = w80StarterIsLive(w80StarterLineKind(scriptLower(line)),
+                                        usable, aCreatureCanEnter);
+            }
+            if (live)
                 return c->getDisplayName();
         }
     if (MTGGameZone * h = game->hand)
@@ -36343,6 +36990,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //prompt - a latched copy would notice the change one window late, which is
     //exactly the window the seat dies in.
     std::vector<string> rowsWithVerdict = rows;
+    bool w80NewLethalReopen = false; //#W80-DH (F3)
     //#W79-CZ (T3): the three markers, CLAMPED TO THEIR HELD FACE while the live
     //face is no more dangerous than the one the hold was taken over. J9's
     //obligation is one-way - never miss the window the seat dies in - and that is
@@ -36355,8 +37003,41 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         liveMarkers[0] = crackBackVerdictNow();
         liveMarkers[1] = stackDeathVerdictNow(); //#W74-CH: J9's other half
         liveMarkers[2] = w77OwnLoopVerdictNow(); //#W77-CU (F4)
+        //#W80-DH (F3): the two lethal families' OBJECT identities, live and held.
+        string liveIds[3], heldIds[3];
+        liveIds[0] = w80CrackBackThreatIdentityNow();
+        liveIds[1] = w80StackThreatIdentityNow();
+        {
+            std::map<string, string>::iterator ci = mHoldCrackBackIds.find(seam);
+            if (ci != mHoldCrackBackIds.end())
+                heldIds[0] = ci->second;
+            std::map<string, string>::iterator si = mHoldStackIds.find(seam);
+            if (si != mHoldStackIds.end())
+                heldIds[1] = si->second;
+        }
         for (int fam = 0; fam < 3; fam++)
         {
+            //#W80-DH (F3): a SECOND lethal threat over the same face. Checked
+            //before the clamp, because the clamp's whole premise is that an
+            //equal-or-safer face is the same question - and a new lethal stack is
+            //not. The re-open is unconditional: the model owes an answer about
+            //the objects it has not seen.
+            if (fam < 2 && w80NewLethalThreat(liveMarkers[fam], heldIds[fam], liveIds[fam]))
+            {
+                w80NewLethalReopen = true;
+                mHoldReopenedNewLethal++;
+                const string w80Reason = string("new_lethal_stack: a NEW ")
+                    + (fam == 0 ? "crack-back" : "stack")
+                    + " threat over the same " + liveMarkers[fam]
+                    + " face at the " + seam + " seam - the objects behind it are not"
+                      " the ones this hold was taken over";
+                writeHoldEventRecord("reopen_new_lethal", seam, liveMarkers[fam],
+                                     w80Reason);
+                DebugTrace("AIPlayerGPT: a hold re-opened at the " << seam
+                           << " seam - the live " << liveMarkers[fam]
+                           << " face is lethal over a DIFFERENT object set than the"
+                              " one the hold was taken over");
+            }
             string heldMarker;
             for (std::set<string>::const_iterator hk = it->second.begin();
                  hk != it->second.end(); ++hk)
@@ -36374,8 +37055,11 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                 //events were invisible at the window level and the brief's
                 //"sample 15 and say whether the ignored verdict was truly safer"
                 //was unanswerable from the whole corpus.
-                mHoldSaferIgnoredFace = string("held ") + heldMarker + " over live "
-                                        + liveMarkers[fam] + " at the " + seam + " seam";
+                //#W80-DH (F11, Astra wave-80 finding 11): the event is a RECORD,
+                //not a shared string. See writeHoldEventRecord.
+                writeHoldEventRecord("verdict_clamped", seam, liveMarkers[fam],
+                                     string("held ") + heldMarker + " over live "
+                                     + liveMarkers[fam]);
                 DebugTrace("AIPlayerGPT: hold verdict CLAMPED at the " << seam
                            << " seam - the live face is no more dangerous than the held"
                               " one: held " << heldMarker << " -> live " << liveMarkers[fam]);
@@ -36387,10 +37071,13 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                      && w79VerdictDangerRank(heldMarker) >= 0)
             {
                 mHoldReopenedNewThreat++;
-                //#W80-DE (U2): the counter's own record field, naming the threat.
-                mHoldReopenReason = string("NEW threat at the same rank: held ") + heldMarker
-                                    + " -> live " + liveMarkers[fam] + " at the " + seam
-                                    + " seam";
+                //#W80-DE (U2): the counter's own record, naming the threat.
+                //#W80-DH (F11): per EVENT, at the event - not one shared string.
+                const string w80Reason = string("NEW threat at the same rank: held ")
+                                    + heldMarker + " -> live " + liveMarkers[fam]
+                                    + " at the " + seam + " seam";
+                writeHoldEventRecord("reopen_same_rank_new_threat", seam, liveMarkers[fam],
+                                     w80Reason);
                 DebugTrace("AIPlayerGPT: a hold re-opened at the " << seam << " seam because a"
                            " NEW threat at the same rank replaced the answered one: held "
                            << heldMarker << " -> live " << liveMarkers[fam]);
@@ -36401,15 +37088,27 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //#W78-CY (F5 b): the bracket's key, so bracket-unchanged <=> no re-open. The
     //set-based predicate stays as the fallback for a seam with no recorded list.
     std::map<string, std::vector<string> >::iterator lk = mHoldLatchRows.find(seam);
-    const bool stands = (lk != mHoldLatchRows.end())
+    bool stands = (lk != mHoldLatchRows.end())
         ? w78HoldStillStands(lk->second, rowsWithVerdict, &why, holdActionKeyRow)
         : holdStillStands(it->second, rowsWithVerdict, &why, holdActionKeyRow); //#W74-CH
+    //#W80-DH (F3): a new lethal threat re-opens whatever the rows say - the rows
+    //are exactly what does NOT move when a second Bolt replaces the first.
+    if (w80NewLethalReopen)
+    {
+        stands = false;
+        why = "a NEW lethal threat: the objects behind it are not the ones this hold"
+              " was taken over";
+    }
     if (!stands)
     {
-        //#W80-DE (U2): every re-open names its reason on the record of the window
-        //it re-opened, not only in a stderr line no census can join.
-        if (mHoldReopenReason.empty())
-            mHoldReopenReason = string(why ? why : "") + " at the " + seam + " seam";
+        //#W80-DE (U2): every re-open names its reason.
+        //#W80-DH (F11): ...on its OWN record, written at the event. The wave-80
+        //shape stamped one shared string that the NEXT writeTransLog consumed -
+        //so several clamps in one window kept at most one of them, and an
+        //unrelated target or discard record inherited whichever survived.
+        if (!w80NewLethalReopen) //already recorded above, with its own reason
+            writeHoldEventRecord("reopen_rows_moved", seam, string(),
+                                 string(why ? why : ""));
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         //#W63-AD (E10, engine HIGH-2). THE PROMISE WAS BROKEN BY THE NEIGHBOUR.
         //takeHold's own comment says "a hold at a DIFFERENT seam still keeps its
@@ -36427,6 +37126,8 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         //window, so nothing is held over a screen the model has not answered.
         mHoldRows.erase(it);
         mHoldLatchRows.erase(seam); //#W78-CY (F5 b)
+        mHoldCrackBackIds.erase(seam); //#W80-DH (F3): the latch's threat identity
+        mHoldStackIds.erase(seam);     //goes with the latch it belongs to
         if (mHoldRows.empty())
             mHoldTurn = -1;
         return false;
@@ -36507,6 +37208,10 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
         latchRows.push_back(w77OwnLoopVerdictNow());
         w78HoldLatchKeys(latchRows, holdActionKeyRow, mHoldLatchRows[seam ? seam : ""]);
     }
+    //#W80-DH (F3): WHICH OBJECTS the two lethal faces were about when this hold
+    //was taken. Internal only - never rendered, never keyed, never recorded.
+    mHoldCrackBackIds[seam ? seam : ""] = w80CrackBackThreatIdentityNow();
+    mHoldStackIds[seam ? seam : ""] = w80StackThreatIdentityNow();
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - later " << seam
                << " windows are held until one of these rows changes"); //#W61-U (C14)
@@ -45536,7 +46241,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (!cbLine.empty())
             {
                 w78SeamNotes += cbLine;
-                w80PendingCrackBackFace = crackBackVerdictNow();
+                //#W80-DH (F4): the face the LINE carries, not the latch's marker.
+                w80PendingCrackBackFace = w80CrackBackFaceOfLine(cbLine);
             }
             const string sdLine = w80StackDeathVerdictLineNow();
             if (!sdLine.empty())
@@ -46595,6 +47301,37 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //is #W79-CZ's shipped behaviour for it).
     mContinuationDigest.clear();
     mContinuationDigest.swap(mNextContinuationDigest);
+    //#W80-DH (F10): THE SEND BOUNDARY IS IN HERE. The caller stages its verdict
+    //faces and this guard applies them exactly once - `true` at the line that hands
+    //the prompt over, and `false` on EVERY other way out of this function (the ask
+    //cache, the repeat latch, the cross-phase replay, a single/resolved option, no
+    //endpoint). A destructor rather than a `false` call at each `return`, because
+    //the exits are twelve and the next one added would be silently uncounted. The
+    //staging is swapped out first, so it can never leak onto a later ask.
+    struct W80SendFaceGuard
+    {
+        AIPlayerGPT * self;
+        std::string loop, crackBack, stackDeath;
+        bool drain, done;
+        W80SendFaceGuard(AIPlayerGPT * s) : self(s), drain(false), done(false) {}
+        void apply(bool sent)
+        {
+            if (done)
+                return;
+            done = true;
+            bool counted = false;
+            w79ApplyLoopFaceAtSend(sent, loop, self->mOwnLoopVerdictFace, counted);
+            if (counted)
+                self->w79CountOwnLoopVerdictLine();
+            self->w80ApplyVerdictFacesAtSend(sent, crackBack, stackDeath, drain);
+        }
+        ~W80SendFaceGuard() { apply(false); }
+    } w80SendFaces(this);
+    w80SendFaces.loop.swap(mNextSendLoopFace);
+    w80SendFaces.crackBack.swap(mNextSendCrackBack);
+    w80SendFaces.stackDeath.swap(mNextSendStackDeath);
+    w80SendFaces.drain = mNextSendDrain;
+    mNextSendDrain = false;
     //#W75-CI (P19): the hold contract, once per prompt, on exactly the windows
     //that offer the row - one site, so the three row spellings and both seams
     //cannot drift. Matched on the shared head every other consumer binds by.
@@ -46975,7 +47712,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                 logAskReplay((string("crossphase_replay from ") + cp->second.phaseName
                               + " to " + phaseNow).c_str(),
                              decision, cp->second.choice, (int) optionsIn.size(),
-                             cp->second.windowSeq, mCrossPhaseReplayed);
+                             cp->second.recordSeq, mCrossPhaseReplayed); //#W80-DH (F12)
                 DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: this exact list was declined at "
                            << cp->second.phaseName << " this turn and nothing on the board has"
                               " changed - re-serving this seat's own answer "
@@ -47001,6 +47738,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         if (w80PendingCrossPhaseUnchanged)
             mCrossPhaseBoardUnchanged++;
     }
+    //#W80-DH (F10): THE SEND. Everything that can answer without a round trip has
+    //returned by now, so this is the boundary the counters and the record faces
+    //belong to.
+    w80SendFaces.apply(true);
     string content;
     if (pollCompletionRetry(userMsg, content, "ask") == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
@@ -47230,6 +47971,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         e.boardKey = w76PhaseFreeBoardKey(boardStateKey); //#W76-CQ (F4)
         e.countedSeq = -1;
         e.windowSeq = mWindowSeq;
+        //#W80-DH (F12): mTransSeq is the seq the ask record written below will
+        //take - the same snapshot mAskCacheSeq and mRepeatAskSeq take here.
+        e.recordSeq = mTransSeq;
         e.declined = w72RowIsDeclineOrHold(holdKeyRow(optionsIn[callerChoice - 1]));
         //#W80-DE (U8): the answer itself, the rows it was given over, and this
         //window's speed class - the three facts a cross-phase replay is gated on.
@@ -49703,7 +50447,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 if (!cb2.empty())
                 {
                     mNextAskPromptNote += cb2;
-                    w80PendingCastCrackBack = crackBackVerdictNow();
+                    //#W80-DH (F4): the face the LINE carries, not the latch's marker.
+                    w80PendingCastCrackBack = w80CrackBackFaceOfLine(cb2);
                 }
                 const string sd2 = w80StackDeathVerdictLineNow();
                 if (!sd2.empty())
@@ -49846,14 +50591,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //the face is stamped and the line is counted -
         //`own_loop_verdict_lines_rendered` is by construction the number of prompts
         //the line is in.
-        {
-            bool w79c = false;
-            w79ApplyLoopFaceAtSend(true, w79PendingCastLoopFace, mOwnLoopVerdictFace, w79c);
-            if (w79c && attempt == 0)
-                w79CountOwnLoopVerdictLine();
-            w80ApplyVerdictFacesAtSend(true, w80PendingCastCrackBack,
-                                       w80PendingCastStackDeath, w80PendingCastDrain);
-        }
+        //#W80-DH (F10, Astra wave-80 review finding 10 - MED): the faces are STAGED
+        //here and applied INSIDE askModel, at the point the prompt is actually
+        //handed to the model. The caller asserting `sent=true` one line above the
+        //call is not evidence from the send boundary: askModel's ask cache, its
+        //repeat latch and its cross-phase replay each return an answer with no
+        //round trip, so a rebuilt verdict-bearing casting menu with a cached
+        //decline counted a rendered line for a prompt that never existed - the
+        //wave-78 helper-versus-caller failure, one level up. `attempt` rides with
+        //the staging because only the first attempt of a re-ask ladder may count.
+        mNextSendLoopFace = (attempt == 0) ? w79PendingCastLoopFace : string();
+        mNextSendCrackBack = w80PendingCastCrackBack;
+        mNextSendStackDeath = w80PendingCastStackDeath;
+        mNextSendDrain = w80PendingCastDrain;
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
@@ -49942,6 +50692,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //completing. Stamped with the turn - see the header.
             mCommittedCastName = validated->getDisplayName();
             mCommittedCastTurn = observer->turn;
+            mPlanCastOpenName = mCommittedCastName; //#W80-DH (F5): whose cast is open
+            mPlanCastOpenTurn = observer->turn;
             //#W80-DG (U1): the cast step is now OPEN. The next window decides
             //whether it was one window or two (see w80CompletingCastMenu).
             mPlanCastCompletionState = 1;
@@ -57390,16 +58142,21 @@ int AIPlayerGPT::chooseAttackers()
                     CrackBackAttackerFact f;
                     f.power = pw;
                     f.blockersNeeded = cc->minBlockersRequired();
+                    f.trample = cc->basicAbilities[Constants::TRAMPLE] != 0; //#W80-DH (F8)
                     f.coverable = false;
                     for (size_t hj = 0; hj < homeBodies.size(); hj++)
                         if (homeBodies[hj]->canBlockPairwise(cc) != 0)
                             f.existingBlockers.push_back((int) hj);
                     cbAtk.push_back(f);
                 }
+                bool w80HomeTrample = false; //#W80-DH (F8)
+                for (size_t ti = 0; ti < cbAtk.size() && !w80HomeTrample; ti++)
+                    w80HomeTrample = cbAtk[ti].trample;
                 tail << w77StayHomeCoverTag(cbTotal, life, cbFloor,
                                             (int) homeBodies.size(),
                                             w77StayHomeCoveredPower(cbAtk,
-                                                (int) homeBodies.size()));
+                                                (int) homeBodies.size()),
+                                            w80HomeTrample);
             }
             tail << "\n";
         }
@@ -58011,10 +58768,22 @@ int AIPlayerGPT::chooseBlockers()
         string w80CycleSrc;
         {
             std::vector<std::pair<std::string, int> > w80Extras;
-            drawStepExtrasScan(this, opponent(), w80Extras);
-            int w80Cards = 1;
+            std::vector<char> w80ExtraOptional; //#W80-DH (F9)
+            drawStepExtrasScan(this, opponent(), w80Extras, &w80ExtraOptional);
+            //#W80-DH (F9): only the FORCED draws are a cost this verdict may
+            //charge. An optional one (Sylvan Library's `may`) is the seat's own
+            //choice, so it is named as a choice and never summed into the lethal
+            //arithmetic - a verdict that charges it declares a loss the seat can
+            //decline its way out of.
+            int w80Cards = 1, w80OptionalCards = 0;
             for (size_t xi = 0; xi < w80Extras.size(); xi++)
-                w80Cards += w80Extras[xi].second;
+            {
+                const bool opt = xi < w80ExtraOptional.size() && w80ExtraOptional[xi];
+                if (opt)
+                    w80OptionalCards += w80Extras[xi].second;
+                else
+                    w80Cards += w80Extras[xi].second;
+            }
             vector<string> w80Mine, w80Theirs;
             int w80MinePer = 0, w80TheirsPer = 0;
             drawPunisherScan(this, opponent(), w80Mine, w80MinePer, w80Theirs, w80TheirsPer);
@@ -58027,6 +58796,12 @@ int AIPlayerGPT::chooseBlockers()
                 for (size_t ni = 0; ni < w80Theirs.size(); ni++)
                     sn << (ni ? ", " : "") << w80Theirs[ni];
                 sn << " - see the DRAW FORECAST line above)";
+                if (w80OptionalCards > 0) //#W80-DH (F9)
+                    sn << ", plus up to " << w80OptionalCards << " more if you CHOOSE"
+                          " to take the optional draw"
+                       << (w80OptionalCards == 1 ? "" : "s")
+                       << " your own permanent offers - that is your decision and is"
+                          " NOT counted in the figure above";
                 w80CycleSrc = sn.str();
             }
         }
@@ -95855,7 +96630,7 @@ static const char * kW50Y_r94 =
                             " covers 9 of that 17, leaving 8 -> you would be at -3, which"
                             " still KILLS you. Every attacker you declare without vigilance"
                             " removes its own body from that cover."
-                            + string(w80CoverMechanismSentence()) + "}", //#W80-DF (U3)
+                            + string(w80CoverMechanismSentence(false)) + "}", //#W80-DF (U3)
                       "#W77-CS R6c REPRO/GREEN the attackers menu's stay-home side now"
                       " carries the cover family's NUMBER - RED on base, where the"
                       " CRACK-BACK COST OF ATTACKING paragraph was prose only and the"
@@ -100778,8 +101553,11 @@ static const char * kW50Y_r94 =
                      " attack with everything that can, you are still alive afterwards: the"
                      " crack-back alone does not end the game]",
               "#W80-DE U2 GREEN the survivable crack-back renders, verbatim");
+        //#W80-DH (F4): the wave-80 wording is now the NO-FLOOR-PROVEN branch - the
+        //figure subtracts no blockers and the line says so, instead of asserting a
+        //death a legal block may prevent.
         CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(4, 30, 28))
-                  .find("LETHAL - if you pass this window") != string::npos,
+                  .find("LETHAL if it is UNBLOCKED - if you pass this window") != string::npos,
               "#W80-DE U2 GREEN the LETHAL crack-back renders and names what passing costs");
         // seq 200's stack: 2 damage against 28 life -> the survivable face renders.
         CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28))
@@ -101772,6 +102550,321 @@ static const char * kW50Y_r94 =
                   != string::npos,
               "#W80-DG U16 MUST-NOT-MATCH the hold ROW keeps its own re-opener clause - the"
               " U16 saving is taken at the bracket, not by reversing a wave-61 truth fix");
+    }
+
+
+    // ================= #W80-DH: the Astra wave-80 review, fixed =================
+    cout << "\n[#W80-DH F2] an answer that PRECEDES the plan is refused, not executed\n";
+    {
+        // Astra's trigger, verbatim. The offsets are DERIVED through the live
+        // scanners - `gptAnswerSegment` (the selector consumePlan calls) and
+        // `findPlanMarker` (the marker consumePlan reads), in that order - and the
+        // order rule is the predicate consumePlan itself calls on them. Nothing is
+        // supplied by hand.
+        const string flipped = "CHOICE: 2 (Cast Wall of Omens)\nPLAN: block and draw.";
+        const string ordered = "PLAN: block and draw.\nCHOICE: 2 (Cast Wall of Omens)";
+        size_t fs = 0, fe = 0, fl = string::npos, os_ = 0, oe = 0, ol = string::npos;
+        const bool fGot = gptAnswerSegment(flipped, "CHOICE:", fs, fe, fl, NULL, NULL, NULL, NULL);
+        const bool oGot = gptAnswerSegment(ordered, "CHOICE:", os_, oe, ol, NULL, NULL, NULL, NULL);
+        size_t fFirst = string::npos, oFirst = string::npos;
+        const size_t fPlan = findPlanMarker(flipped, fl, &fFirst);
+        const size_t oPlan = findPlanMarker(ordered, ol, &oFirst);
+        CHECK(fGot && oGot,
+              "#W80-DH F2 RED-ON-BASE the selector finds the labelled answer in BOTH orders"
+              " - the parser is robust and stays robust (owner ruling 2026-09-12)");
+        CHECK(w80AnswerPrecedesPlan(fl, fPlan),
+              "#W80-DH F2 GREEN the flipped reply is an ORDER violation: its answer line"
+              " starts above the plan marker the same reply carries, so consumePlan drops"
+              " the answer and the seam re-asks (`any plan, must precede action`)");
+        CHECK(!w80AnswerPrecedesPlan(ol, oPlan),
+              "#W80-DH F2 MUST-NOT-MATCH the ordered reply is untouched - it is the shape"
+              " the protocol asks for");
+        // lane DD's label-less answer AFTER the plan stays read, and stays ordered.
+        {
+            const string bare = "PLAN: block and draw.\n2 (Cast Wall of Omens)";
+            size_t bs = 0, be = 0, bl = string::npos;
+            bool labelless = false;
+            const bool bGot = gptAnswerSegment(bare, "CHOICE:", bs, be, bl, NULL, NULL, NULL,
+                                               &labelless);
+            size_t bFirst = string::npos;
+            const size_t bPlan = findPlanMarker(bare, bl, &bFirst);
+            CHECK(bGot && labelless && !w80AnswerPrecedesPlan(bl, bPlan),
+                  "#W80-DH F2 the #W79-DD label-less action line AFTER the plan is still"
+                  " READ and is not an order violation - lane DD's pins stay green");
+        }
+        CHECK(!w80AnswerPrecedesPlan(string::npos, 0)
+                  && !w80AnswerPrecedesPlan(0, string::npos),
+              "#W80-DH F2 MUST-NOT-MATCH a reply missing one of the two parts is not an"
+              " ordering violation - the no-answer and no-plan paths already own it");
+    }
+
+    cout << "\n[#W80-DH F3] a SECOND lethal stack re-opens the hold\n";
+    {
+        // Astra's board: at three life the seat holds with a Bolt under a Healing
+        // Salve; both resolve, the seat survives, and another Bolt arrives before
+        // untap. The faces are built by the SAME two key builders the latch
+        // compares, so the pin drives the shipped markers, not literals.
+        const string killsA = stackDeathVerdictKey(3, 3);
+        const string killsB = stackDeathVerdictKey(3, 3);
+        CHECK(killsA == killsB && w79VerdictDangerRank(killsA) == 2,
+              "#W80-DH F3 RED-ON-BASE the second Bolt's face is BYTE-IDENTICAL to the"
+              " first's and sits at the top of the ladder - so no rank test and no"
+              " string test can tell the two stacks apart");
+        CHECK(w79HoldVerdictForCompare(killsA, killsB) == killsA,
+              "#W80-DH F3 RED-ON-BASE the wave-79 clamp keeps the HELD face, the rows are"
+              " unchanged, and the window is suppressed with the model never asked");
+        CHECK(w80NewLethalThreat(killsB, "0x1000", "0x2000"),
+              "#W80-DH F3 GREEN a top-rank stack-death face over a DIFFERENT object set"
+              " re-opens the hold - the threat's IDENTITY, never its text or its number");
+        CHECK(!w80NewLethalThreat(killsB, "0x1000", "0x1000"),
+              "#W80-DH F3 MUST-NOT-MATCH the SAME objects are the question the model"
+              " already answered - no re-open, and #W79-CZ T3's saving stands");
+        CHECK(!w80NewLethalThreat(stackDeathVerdictKey(1, 3), "0x1000", "0x2000"),
+              "#W80-DH F3 MUST-NOT-MATCH a face that is not lethal never re-opens here");
+        CHECK(!w80NewLethalThreat(killsB, "0x1000", ""),
+              "#W80-DH F3 MUST-NOT-MATCH an empty live identity claims nothing");
+        CHECK(w80NewLethalThreat(crackBackVerdictKey(2, 30, 3), "", "0xA")
+                  && !w80NewLethalThreat(w77OwnLoopVerdictKey(0, "", ""), "0xA", "0xB"),
+              "#W80-DH F3 the rule covers BOTH lethal families and no other - the own-loop"
+              " ladder keeps #W79-DC F2's same-rank identity rule and nothing else moves");
+    }
+
+    cout << "\n[#W80-DH F4] the crack-back verdict LINE subtracts blockers\n";
+    {
+        // Astra's board: four life, their ordinary 5/5, your untapped 0/6.
+        // The DP that proves the floor is the blockers header's own
+        // (`w79BestBlockDamage`), driven here over that board.
+        vector<W79AtkFact> af(1);
+        af[0].power = 5; af[0].minBlockers = 1; af[0].toughness = 5;
+        vector<W79BlkFact> blk(1);
+        blk[0].soak = 6; blk[0].power = 0;
+        vector<vector<char> > can(1, vector<char>(1, 1));
+        const int floorDmg = w79BestBlockDamage(af, blk, can, NULL);
+        const string face = crackBackVerdictKey(1, 5, 4);
+        CHECK(w79VerdictDangerRank(face) == 2 && floorDmg == 0,
+              "#W80-DH F4 RED-ON-BASE the marker reads LETHAL off 5 power vs 4 life while"
+              " the engine's own block DP says a legal block lets 0 through");
+        CHECK(w80CrackBackVerdictLine(face).find("LETHAL if it is UNBLOCKED") != string::npos,
+              "#W80-DH F4 with no floor proven the line no longer asserts death - it says"
+              " the figure subtracts no blockers");
+        const string line = w80CrackBackVerdictLine(face, floorDmg, 4);
+        CHECK(line.find("a legal block prevents it") != string::npos
+                  && line.find("with your best block: 0 damage still gets through") != string::npos
+                  && line.find("leaving you at 4") != string::npos
+                  && line.find("kills you next turn") == string::npos,
+              "#W80-DH F4 GREEN Astra's board is NOT lethal on the rendered line, and the"
+              " line NAMES the floor it is computed from");
+        CHECK(w80CrackBackVerdictLine(crackBackVerdictKey(1, 5, 4), 5, 4)
+                  .find("LETHAL EVEN THROUGH YOUR BEST BLOCK") != string::npos,
+              "#W80-DH F4 POSITIVE a board the best block does NOT save still says so - the"
+              " fix withdraws a false death claim, it does not silence a true one");
+        CHECK(w79VerdictDangerRank(crackBackVerdictKey(1, 5, 4)) == 2,
+              "#W80-DH F4 MUST-NOT-MATCH the latch's MARKER is untouched, so no hold's"
+              " behaviour changes with the line");
+        // the RECORD face is read off the LINE (the #W80-DE U10 discipline), so the
+        // census counter and the corpus join on the same fact.
+        CHECK(w80CrackBackFaceOfLine(line) == "[crack-back verdict: LETHAL unblocked,"
+                                              " blocked away]",
+              "#W80-DH F4 the record face names the branch the model READ, so"
+              " `crackback_lethal_blocked_away` has a per-record trace");
+        CHECK(w80CrackBackFaceOfLine(w80CrackBackVerdictLine(face, 5, 4))
+                  == "[crack-back verdict: LETHAL through your best block]"
+                  && w80CrackBackFaceOfLine(w80CrackBackVerdictLine(face))
+                         == "[crack-back verdict: LETHAL unblocked, no floor proven]"
+                  && w80CrackBackFaceOfLine(w80CrackBackVerdictLine(crackBackVerdictKey(1, 2, 9)))
+                         == "[crack-back verdict: you survive]",
+              "#W80-DH F4 all four faces of the line are distinguishable on the record");
+        CHECK(w80CrackBackFaceOfLine("").empty(),
+              "#W80-DH F4 MUST-NOT-MATCH a line that was not printed stamps no face");
+    }
+
+    cout << "\n[#W80-DH F5] a cast with TWO completing menus keeps its clause at both\n";
+    {
+        // Astra's trigger: commit Starstorm with the #W80-DG U1 plan, answer its
+        // "Cast Card Normally" cast-mode menu, then be put its X announcement. The
+        // two live sites are (a) the prompt builder, which reads
+        // `w80CompletingCastMenu` off the window's own tail and sets the latch, and
+        // (b) writeTransLog, which consumes the completing menu's record. This pin
+        // walks the SAME state machine those two sites run, in the order they run
+        // it, and reads the echo out of `w80CarriedPlanSteps` - the live entry.
+        const string plan = "Cast Starstorm X=2 to kill Fog Bank, then attack with Rorix"
+                            " in second main phase.";
+        const string modeMenu = string("Choose an option for Starstorm") + kCompletingCastNote;
+        const string otherMenu = "Casting decision (Main phase 1, YOUR turn)";
+        int stepsDone = 1;      // the cast row's own record already advanced it
+        int latch = 1;          // the validated cast set this
+
+        // window 1: the cast-mode menu.
+        latch = (latch >= 1) ? (w80CompletingCastMenu(modeMenu, false) ? 2 : 1) : 0;
+        const string echo1 = w80CarriedPlanSteps(plan, stepsDone, latch >= 1);
+        const bool consumed1 = (latch == 2);
+        latch = consumed1 ? 1 : latch;   // writeTransLog, #W80-DH (F5)
+
+        // window 2: the X announcement, the SAME cast.
+        latch = (latch >= 1) ? (w80CompletingCastMenu("", true) ? 2 : 1) : 0;
+        const string echo2 = w80CarriedPlanSteps(plan, stepsDone, latch >= 1);
+
+        CHECK(echo1 == plan,
+              "#W80-DH F5 the FIRST completing menu keeps the cast clause (the #W80-DG U1"
+              " fix, unchanged)");
+        CHECK(echo2 == plan,
+              "#W80-DH F5 GREEN the SECOND completing menu of the SAME cast keeps it too -"
+              " RED on base, where the first menu's record cleared the latch and this"
+              " window echoed `then attack with Rorix in second main phase.` with the X it"
+              " was being asked to announce already deleted");
+        CHECK(consumed1 && stepsDone == 1,
+              "#W80-DH F5 neither completing menu consumes a second plan step - the cast"
+              " row's own record already advanced it");
+        {
+            // ...and a window that is NOT a completing menu is byte-identical to
+            // wave 79: the clause is trimmed, and the latch simply waits.
+            int l2 = 1;
+            l2 = (l2 >= 1) ? (w80CompletingCastMenu(otherMenu, false) ? 2 : 1) : 0;
+            CHECK(l2 == 1 && w80CarriedPlanSteps(plan, stepsDone, l2 >= 2)
+                                 == gptcaveat::planStepsAfter(plan, 1),
+                  "#W80-DH F5 MUST-NOT-MATCH an ordinary window between two completing"
+                  " menus echoes exactly what wave 79 echoed, and does NOT retire the cast");
+        }
+    }
+
+    cout << "\n[#W80-DH F7] an ACTIVATED self-bounce is not an ETB\n";
+    {
+        // Fleeting Image's whole script, from the repository, lowercased the way
+        // w80CastSelfLeavesOnResolution lowercases it.
+        CHECK(!w80EtbSelfLeavesLine("{1}{u}:moveto(hand)"),
+              "#W80-DH F7 GREEN Fleeting Image's `{1}{U}: Return ... to hand` is an"
+              " ACTIVATION, so the flier is on the battlefield to block and the row may"
+              " not subtract it or claim its ETB text removes it");
+        CHECK(!w80EtbSelfLeavesLine("{t}:moveto(exile)")
+                  && !w80EtbSelfLeavesLine("{2}{b}:sacrifice"),
+              "#W80-DH F7 MUST-NOT-MATCH any cost-prefixed self-leave is an activation");
+        CHECK(w80EtbSelfLeavesLine("if type(tomb of annihilation[dungeoncompleted]|myzones)"
+                                   "~equalto~0 then name(return to hand) moveto(hand)"),
+              "#W80-DH F7 POSITIVE Acererak's own untriggered ETB line still counts - the"
+              " #W80-DF U3 case the detector was built for is untouched");
+        CHECK(w80EtbSelfLeavesLine("@movedto(this|battlefield):moveto(hand)"),
+              "#W80-DH F7 POSITIVE an explicit enters-trigger keeps its colon and counts");
+        CHECK(w80ScriptLineHasActivationCost("this(variable{type:*:myhand}=0) {t}:draw:1")
+                  && !w80ScriptLineHasActivationCost("this(variable{type:*:myhand}=0) draw:1")
+                  && !w80ScriptLineHasActivationCost("life:-4 controller moveto(hand)"),
+              "#W80-DH F7 the cost split is DEPTH-AWARE and needs a top-level COST group -"
+              " a colon inside a spec, and an effect's own `draw:`/`life:` colon, are not"
+              " activations and do not disqualify an untriggered line");
+    }
+
+    cout << "\n[#W80-DH F8] the blocking lesson is true for trample\n";
+    {
+        CHECK(string(w80CoverMechanismSentence(false))
+                  .find("a 1/1 in front of a 5/5 stops the whole 5") != string::npos,
+              "#W80-DH F8 RED-ON-BASE the wave-80 sentence teaches full absorption"
+              " unconditionally - false for a trampler, and taught as a rule");
+        CHECK(string(w80CoverMechanismSentence(true)).find("REST TRAMPLES THROUGH") != string::npos
+                  && string(w80CoverMechanismSentence(true))
+                         .find("a 1/1 in front of a 5/5 trampler absorbs 1 and 4 still reach you")
+                         != string::npos
+                  && string(w80CoverMechanismSentence(true))
+                         .find("a 1/1 in front of a 5/5 stops the whole 5") == string::npos,
+              "#W80-DH F8 GREEN with a trampler in the combat the sentence states the SPILL"
+              " and never the false full-absorb rule");
+        {
+            // At four life, their lone 5/5 TRAMPLER, this row adds one 1/1.
+            vector<CrackBackAttackerFact> t(1);
+            t[0].power = 5; t[0].blockersNeeded = 1; t[0].coverable = true; t[0].trample = true;
+            const string tag = crackBackBlockerRowTag(5, 4, 1, 0, t);
+            CHECK(tag.find("THIS IS NOT A SURVIVAL VERDICT") != string::npos
+                      && tag.find("TRAMPLE") != string::npos
+                      && tag.find("which you SURVIVE") == string::npos,
+                  "#W80-DH F8 GREEN the cover no longer prints SURVIVE over a trampler it"
+                  " cannot price - the arithmetic prints in full and says what it is");
+            vector<CrackBackAttackerFact> o(1);
+            o[0].power = 5; o[0].blockersNeeded = 1; o[0].coverable = true;
+            const string plain = crackBackBlockerRowTag(5, 4, 1, 0, o);
+            CHECK(plain.find("which you SURVIVE") != string::npos
+                      && plain.find("None of these attackers has trample") != string::npos,
+                  "#W80-DH F8 MUST-NOT-MATCH the POSITIVE clause still prints on the shape it"
+                  " was built for - an ordinary 5/5 is fully absorbed and the row says so");
+        }
+    }
+
+    cout << "\n[#W80-DH F6] a live starter is an AVAILABLE action, not a substring\n";
+    {
+        CHECK(w80StarterLineKind("{t}:damage:1 target(creature,player)") == kW80StarterActivated,
+              "#W80-DH F6 Prodigal Sorcerer's ping is an ACTIVATED ability");
+        CHECK(!w80StarterIsLive(kW80StarterActivated, false, true),
+              "#W80-DH F6 GREEN a TAPPED (or unaffordable) Sorcerer is not a live starter -"
+              " the engine's own hasUsableAbility answers it, and the line prints the GAP");
+        CHECK(w80StarterIsLive(kW80StarterActivated, true, false),
+              "#W80-DH F6 POSITIVE an untapped, affordable Sorcerer IS one");
+        CHECK(w80StarterLineKind("@movedto(creature|battlefield):life:1 controller")
+                  == kW80StarterEntersTrigger,
+              "#W80-DH F6 Soul Warden's gain is an ENTERS trigger");
+        CHECK(!w80StarterIsLive(kW80StarterEntersTrigger, true, false)
+                  && w80StarterIsLive(kW80StarterEntersTrigger, false, true),
+              "#W80-DH F6 GREEN Soul Warden counts only while a creature can actually enter"
+              " - naming an existing permanent does not prove an entry into the loop");
+        CHECK(w80StarterLineKind("@each my upkeep:life:-1 controller") == kW80StarterCycleTrigger
+                  && w80StarterIsLive(kW80StarterCycleTrigger, false, false),
+              "#W80-DH F6 MUST-NOT-MATCH a trigger whose event belongs to the turn cycle"
+              " itself will come round, and stays live");
+        CHECK(w80StarterLineKind("{t}:draw:1") == kW80StarterNone,
+              "#W80-DH F6 MUST-NOT-MATCH a line that moves no life is no starter at all");
+        CHECK(w80ProvenWinLoopLine("").find("no live way to start it") != string::npos,
+              "#W80-DH F6 ECHO with no live starter the line prints the GAP, which is the"
+              " #W80-DE U10 wording it already owns");
+    }
+
+    cout << "\n[#W80-DH F9] a `may` draw is not a compulsory lethal charge\n";
+    {
+        // Sylvan Library's payload, as drawStepExtrasScan splits it, beside
+        // Howling Mine's.
+        CHECK(w80DrawExtraIsOptional("may name(draw 2 cards) draw:2 && transforms((,newability"
+                                     "[name(choose 2 cards) target(<2>*[fresh]|myhand)])) oneshot"),
+              "#W80-DH F9 GREEN Sylvan Library's two extra cards are the controller's CHOICE");
+        CHECK(!w80DrawExtraIsOptional("draw:1 controller"),
+              "#W80-DH F9 MUST-NOT-MATCH Howling Mine's extra card is compulsory and is"
+              " still charged in full");
+        CHECK(!w80DrawExtraIsOptional("name(draw with maybelle) draw:1 controller"),
+              "#W80-DH F9 MUST-NOT-MATCH `may` inside a word is not the optionality token");
+        CHECK(!w80DrawExtraIsOptional("transforms((,newability[may draw:1])) draw:1 controller"),
+              "#W80-DH F9 MUST-NOT-MATCH a `may` nested in a sub-ability belongs to THAT"
+              " ability, not to this draw");
+    }
+
+    cout << "\n[#W80-DH F10] the render counters count at the SEND\n";
+    {
+        // The predicate the send boundary calls, and the two things a caller
+        // asserting `sent=true` one line above askModel cannot know.
+        int seq = -1, n = 0;
+        CHECK(!w80CountRenderedAtSend(false, true, 4, seq, n) && n == 0 && seq == -1,
+              "#W80-DH F10 RED-ON-BASE a window answered from the ask cache SENT no prompt,"
+              " so it counts nothing - the caller's `true` was an assertion, not evidence");
+        CHECK(w80CountRenderedAtSend(true, true, 4, seq, n) && n == 1 && seq == 4,
+              "#W80-DH F10 GREEN a real send counts once");
+        CHECK(!w80CountRenderedAtSend(true, true, 4, seq, n) && n == 1,
+              "#W80-DH F10 MUST-NOT-MATCH the same window rebuilt on a polling tick cannot"
+              " count twice");
+        {
+            string face = "stale";
+            bool counted = true;
+            w79ApplyLoopFaceAtSend(false, "[own loop verdict: THREATENED]", face, counted);
+            CHECK(face.empty() && !counted,
+                  "#W80-DH F10 a window that is not sent CLEARS the face, so no later record"
+                  " can consume a verdict for a prompt that never existed");
+        }
+    }
+
+    cout << "\n[#W80-DH F12] a replay's source seq is a RECORD seq\n";
+    {
+        W76CrossPhaseAsk e;
+        CHECK(e.recordSeq == -1,
+              "#W80-DH F12 an entry that has stored no ask records no source record");
+        e.windowSeq = 7;
+        e.recordSeq = 31;
+        CHECK(e.recordSeq != e.windowSeq,
+              "#W80-DH F12 RED-ON-BASE the window ordinal and the record seq diverge the"
+              " moment a sidecar replay record advances mTransSeq without advancing"
+              " mWindowSeq - and the wave-80 replay passed the window ordinal into"
+              " `replayed_from`, where every other path passes a record seq");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
