@@ -696,6 +696,28 @@ static bool w79ClauseNeedsAntecedent(const string& clause)
 //The clause-priority render itself. Returns "" when it has nothing to say (fewer
 //than two depth-0 clauses, or every clause already fits, or no reordering of the
 //SELECTION changes what the wave-78 rule would have kept).
+//#W80-DG (U12): a LOYALTY (or level-up) clause's own label - "+1:", "-2:",
+//"-6:". Deliberately narrow: a sign, one or two digits and a colon inside the
+//first four characters, so ordinary prose clauses never produce one and the
+//naming clause below fires only on the body class the wave-79 deck126 review
+//named. Pure over one string.
+static string w80LoyaltyClauseLabel(const string& clause)
+{
+    size_t i = 0;
+    while (i < clause.size() && isspace((unsigned char) clause[i]))
+        i++;
+    if (i >= clause.size())
+        return "";
+    const bool signed_ = (clause[i] == '+' || clause[i] == '-');
+    size_t d = signed_ ? i + 1 : i;   //a bare "0:" is a loyalty ability too
+    const size_t firstDigit = d;
+    while (d < clause.size() && isdigit((unsigned char) clause[d]) && d - firstDigit < 2)
+        d++;
+    if (d == firstDigit || d >= clause.size() || clause[d] != ':')
+        return "";
+    return clause.substr(i, d - i + 1);
+}
+
 static string w79ClausePrioritySnippet(const string& text, size_t maxLen)
 {
     static const string sep = " -- ";
@@ -793,7 +815,36 @@ static string w79ClausePrioritySnippet(const string& text, size_t maxLen)
         o << (first ? "" : sep) << parts[i];
         first = false;
     }
-    o << " (...more)";
+    //#W80-DG (U12, wave-79 deck126 MED-5): NAME THE LOYALTY ABILITIES THAT DID
+    //NOT FIT. Sorin, Lord of Innistrad is three same-priority activated clauses
+    //(78 / 61 / 154 B) against a 140 B budget, so the selector keeps the `+1:`
+    //and drops the `-2:` and the `-6:` - and `(...more)` does not say that an
+    //ability exists, which is the silent-omission failure the trust doctrine
+    //names: the deck guide devotes a paragraph to taking the `-6` over the `+1`
+    //and the model met that teach with a card that appeared to have one ability
+    //(every library-search row at this seat, all six games). The labels are
+    //cheap and they are a POINTER: the decklist in the system prompt carries
+    //every card's full text, so naming the ability is enough to find it.
+    {
+        std::ostringstream om;
+        int omitted = 0, labelled = 0;
+        for (size_t i = 0; i < parts.size(); i++)
+        {
+            if (keep[i])
+                continue;
+            omitted++;
+            const string lab = w80LoyaltyClauseLabel(parts[i]);
+            if (lab.empty())
+                continue;
+            om << (labelled ? ", " : "") << lab;
+            labelled++;
+        }
+        if (omitted > 0 && labelled == omitted)
+            o << " (...more - this card also has " << om.str()
+              << "; their full text is in the decklist in your instructions)";
+        else
+            o << " (...more)";
+    }
     return o.str();
 }
 
@@ -1053,6 +1104,47 @@ static string w78RedundantCounterTag(const string& myCounterName, bool condition
            " yours is itself countered or removed first}";
 }
 
+//#W80-DG (U12 first half, wave-79 deck146 MED): A CUT THAT ENDS ON A DANGLING
+//CONNECTIVE. `146` seq 22 and 60 other windows rendered "...becomes a 3/3 black
+//Beholder creature with menace and (...more)" and "-8: You get an emblem with
+//(...more)": the word cut landed after a conjunction or a preposition, so the
+//reader is handed a clause that PROMISES a term and never names one - the shape
+//the trust doctrine says the model confabulates into. Trimming the dangling word
+//loses nothing (the marker already says text was omitted) and leaves a phrase
+//that ends where a phrase can end. Connectives only - never a verb or a noun, so
+//"Enchanted creature has (...more)" is untouched. Pure over one string.
+static bool w80DanglingConnective(const string& w)
+{
+    static const char * kWords[] = {
+        "and", "or", "with", "of", "to", "a", "an", "the", "in", "on", "for",
+        "from", "by", "that", "than", "as", "at", "into", "until", "up", "each",
+        "its", "their", "your", "this", "these", "those", "target", NULL };
+    string lc = w;
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    for (int i = 0; kWords[i]; i++)
+        if (lc == kWords[i])
+            return true;
+    return false;
+}
+static string w80TrimDanglingTail(const string& kept)
+{
+    string t = kept;
+    for (int guard = 0; guard < 4; guard++)
+    {
+        while (!t.empty() && (isspace((unsigned char) t[t.size() - 1])
+                              || t[t.size() - 1] == ',' || t[t.size() - 1] == '-'))
+            t.erase(t.size() - 1);
+        const size_t sp = t.find_last_of(' ');
+        if (sp == string::npos || sp + 1 >= t.size())
+            break;
+        if (!w80DanglingConnective(t.substr(sp + 1)))
+            break;
+        t.erase(sp);
+    }
+    return t.empty() ? kept : t;
+}
+
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
 //model picked discard/removal targets near-arbitrarily from bare names).
@@ -1128,14 +1220,23 @@ string textSnippetCore(const string& raw, size_t maxLen, bool completeClause /* 
         if (safeCut < cut)
         {
             if (safeCut < text.size())
-                text = text.substr(0, safeCut) + " (...more)";
+                text = w80TrimDanglingTail(text.substr(0, safeCut)) + " (...more)"; //#W80-DG (U12)
         }
         else if (cut < text.size())
         {
-            //#W79-DB (T11b): a mid-clause cut still shows its `...`, then closes
-            //whatever unit it left open and says that text was omitted.
-            const string kept = text.substr(0, cut);
-            text = kept + "..." + w79CloseOpenUnits(kept) + " (...more)";
+            //#W79-DB (T11b): a mid-clause cut closes whatever unit it left open
+            //and says that text was omitted.
+            //#W80-DG (U12 second half, wave-79 deck126 MED): ONE marker per cut.
+            //Wave 79 printed the `...` AND the `(...more)` on the same cut, so
+            //Sigarda's line read "...look at the top five... (...more)" - two
+            //omission marks for one omission, which reads as two different cuts.
+            //`(...more)` already opens with the ellipsis and already says text
+            //was omitted, and with the dangling-connective trim above the cut now
+            //ends on a phrase that can end, so the separate `...` says nothing
+            //the marker does not. The marker itself is UNCHANGED, which is what
+            //keeps every "is this render marked?" pin binding on one literal.
+            const string kept = w80TrimDanglingTail(text.substr(0, cut));
+            text = kept + w79CloseOpenUnits(kept) + " (...more)";
         }
     }
     return text;
@@ -12465,6 +12566,41 @@ static string zoneTagText(bool isDungeon, bool mine, const string& zoneName)
     return string(" [") + (mine ? "your " : "opponent's ") + zoneName + "]";
 }
 
+//#W80-DG (U11, wave-79 known-bugs MED): A POINTER TO A BLOCK THAT IS NOT THERE.
+//The sorcery-speed tag says why a card has no cast row, and its stack half read
+//"the stack is not empty (see ON THE STACK above)" off `count(0, NOT_RESOLVED)`,
+//which counts EVERY object on the stack; the ON THE STACK block prints only the
+//RESPONDABLE ones (a phase step, a day/night designation marker and an emblem
+//are all skipped), so 135 prompts in the wave-79 corpus pointed at a block the
+//screen did not carry. The legality reason is true and stays; the POINTER is
+//printed only where there is something to point at. Pure over one bool.
+static string w80StackNotEmptyReason(bool stackBlockRendered)
+{
+    return stackBlockRendered ? "the stack is not empty (see ON THE STACK above)"
+                              : "the stack is not empty";
+}
+
+//#W80-DG (U11, wave-79 known-bugs MED): THE SEAT COUNTERED ITS OWN SPELL.
+//`125v146` deck125 seqs 104 -> 105: the cast row offered Cancel and named both
+//stack objects, the target menu listed `2. Dream Fracture [instant] [your stack]`
+//- the seat's OWN counter, already aimed at the opponent's Vanishing Verse - and
+//the seat took row 2. Two counters spent for nothing, in a game it lost. The
+//zone tag was the only signal and it is a LOCATION, not a warning. Nothing is
+//removed and nothing is answered: aiming at your own spell is legal and is
+//occasionally right (a cast trigger, a fizzle you want), so the row states the
+//FACT and the model decides. Pure over two values.
+//NOTE on wording: the wave-80 brief's suggested literal was
+//"[your own spell - never a counter target]". "Never" is advice, and it is not
+//always true, so the row says what the object IS - restriction-first, no verb
+//the model can read as a recommendation (the #W53-N D2 rule for the hold row).
+static string w80OwnStackSpellTag(bool mine, const string& zoneName)
+{
+    if (!mine || zoneName != "stack")
+        return "";
+    return " [THIS IS YOUR OWN spell, waiting to resolve on the stack - aiming at it"
+           " spends this effect on your own play, not on theirs]";
+}
+
 string targetZoneTag(Player * me, MTGCardInstance * c)
 {
     if (!c || !c->currentZone)
@@ -15502,6 +15638,30 @@ static void handConverterScan(Player * me, std::vector<std::string>& drawNames,
 //the class this row actually feeds. The discard punishers are not deleted (the
 //pilot's own release conditions are written against them): they are printed in
 //their own clause, labelled with what does and does not set them off.
+//#W80-DG (U12, wave-79 deck162 MED-1): "AN AMOUNT THAT IS NOT FIXED" WHEN THE
+//AMOUNT IS ON THE SCREEN. Teferi's Puzzle Box is
+//`count(type:*:opponenthand) && bottomoflibrary all(*|opponenthand) &&
+//draw:countedamount opponent` - the variable IS the hand size, the same hand
+//size the board block prints one paragraph above (`162v152` seq 18: 14 cards
+//against a 6-card hand, unpriced). The script names its own counter, so the row
+//can too. Pure over the script text; the LIVE number is read at the call site.
+static bool w80VariableDrawIsHandSize(const string& script, const char * zone)
+{
+    if (!zone || !*zone)
+        return false;
+    const string needle = string("count(type:*:") + zone + ")";
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        const size_t nl = script.find('\n', lp);
+        const string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        if (line.find("countedamount") != string::npos && line.find(needle) != string::npos)
+            return true;
+    }
+    return false;
+}
+
 static string feedsRowTag(int perTurn, bool variable, int perCast,
                           const std::vector<std::string>& converters,
                           const std::vector<std::string>& handConverters
@@ -15510,7 +15670,8 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
                               = std::vector<std::string>(),
                           const std::vector<std::string>& handDiscardConverters
                               = std::vector<std::string>(),
-                          int selfPerTurn = 0) //#W65-AO (MED): the symmetric half
+                          int selfPerTurn = 0, //#W65-AO (MED): the symmetric half
+                          int variableHandSize = -1) //#W80-DG (U12)
 {
     if (perTurn <= 0 && !variable && perCast <= 0)
         return "";
@@ -15529,7 +15690,18 @@ static string feedsRowTag(int perTurn, bool variable, int perCast,
         said = true;
     }
     if (variable)
-        o << (said ? ", plus " : "") << "an amount that is not fixed (read the card)";
+    {
+        o << (said ? ", plus " : "");
+        //#W80-DG (U12): where the script's own counter is a HAND SIZE, the number
+        //is knowable and is on this same screen - print it rather than send the
+        //reader back to the card for a value the engine already has.
+        if (variableHandSize >= 0)
+            o << "their whole hand: " << variableHandSize << " card"
+              << (variableHandSize == 1 ? "" : "s") << " right now (the amount is"
+                 " their hand size at the moment it fires, so it moves with their hand)";
+        else
+            o << "an amount that is not fixed (read the card)";
+    }
     //#W65-AO (MED, deck162 41/41): a card whose script also draws its CONTROLLER
     //feeds BOTH players, and the row said only what it gave THEM. The number is
     //the controller half of the same @each scan; nothing is deleted and the
@@ -20206,7 +20378,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -21371,9 +21543,16 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W70-BN (F10): the plan pointer advances HERE, on the executed decision, and
     //nowhere else. Clamped one short of the last step so a fully-walked plan
     //still carries its final step (planStepsAfter's own rule).
-    if (planStepExecuted(!mCurrentPlan.empty(), !userMsg.empty(), choice, fallback)
-        && (size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(mCurrentPlan))
-        mPlanStepsDone++;
+    //#W80-DG (U1): the completing menu CONSUMES the cast step the cast row's own
+    //record already advanced - it does not consume a second one. Everywhere else
+    //this is the wave-70 rule unchanged.
+    if (planStepExecuted(!mCurrentPlan.empty(), !userMsg.empty(), choice, fallback))
+    {
+        if (mPlanCastCompletionState == 2)
+            mPlanCastCompletionState = 0;
+        else if ((size_t) (mPlanStepsDone + 1) < gptcaveat::planStepCount(mCurrentPlan))
+            mPlanStepsDone++;
+    }
     //#W71-BO (R1): the record keeps the reply verbatim - the trim is deleted.
     bool replyActionFirst = false;
     std::vector<string> replyOffLines; //#W76-CQ (F9)
@@ -22971,6 +23150,45 @@ static string planWithdrawnBlock(const string& ageClause, const string& absentCl
          + "): state a fresh PLAN with this window's answer.\n";
 }
 
+//#W80-DG (U1, wave-79 known-bugs HIGH-1): THE COMPLETING MENU.
+//A cast the model answers on the casting menu is not finished when the row is
+//taken: an X spell opens the X ladder and a card with an alternative hand path
+//opens "Choose an option for <card>:". Both of those windows are the SECOND
+//HALF of the cast the seat just announced, and the engine says so on the menu
+//itself (the ANNOUNCE_X scope, and castModeCommitmentNote's own sentence). This
+//predicate reads THAT, off the tail the model is about to be shown - so a menu
+//armed by the heuristic, or for another card, or a turn later, is not a
+//completing menu and nothing about it moves.
+static const char kCompletingCastNote[] = "this menu completes THAT cast";
+static bool w80CompletingCastMenu(const string& tail, bool inAnnounceXAsk)
+{
+    return inAnnounceXAsk || tail.find(kCompletingCastNote) != string::npos;
+}
+
+//Which step of the carried sequence does the echo start from? The pointer
+//advanced on the cast row's own record (planStepExecuted, #W70-BN), so on the
+//completing menu it is ONE TOO FAR: the cast clause the seat is being asked to
+//complete has already been trimmed off the front. `130v162` deck130 seq 31 wrote
+//"Cast Starstorm X=2 to kill Fog Bank, then attack with Rorix in second main
+//phase." and seq 32's completing menu echoed "then attack with Rorix in second
+//main phase." - the seat then took `Decline - do nothing` on six tapped sources.
+//Pure over two values, so the whole carry is pinned without a board.
+static size_t w80EchoStepIndex(int stepsDone, bool castPendingCompletion)
+{
+    if (stepsDone <= 0)
+        return 0;
+    return (size_t) (castPendingCompletion ? stepsDone - 1 : stepsDone);
+}
+
+//The one entry the echo builder calls. The pins drive THIS, with the corpus's
+//own plan strings, so the fixture rides the live caller path.
+static string w80CarriedPlanSteps(const string& plan, int stepsDone,
+                                  bool castPendingCompletion)
+{
+    return gptcaveat::planStepsAfter(plan, w80EchoStepIndex(stepsDone,
+                                                            castPendingCompletion));
+}
+
 string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
 {
     return assemblePrompt(tail, situation, NULL);
@@ -23091,6 +23309,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
+            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
             mPlanSetSeq = -1; //#W53-N (D12a): expired, so it has no age
         }
     }
@@ -23189,6 +23408,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
+            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
             mPlanSetSeq = -1;
         }
         else if (!planAsserted.empty())
@@ -23197,6 +23417,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
+            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
             mPlanSetSeq = -1;
         }
         else if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
@@ -23205,6 +23426,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
+            mPlanCastCompletionState = 0; //#W80-DG (U1): and no open cast step
             mPlanSetSeq = -1;
         }
         else
@@ -23213,9 +23435,17 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         //not executed yet. #W70-BN (F10): `mPlanStepsDone` advances only on the
         //record of an EXECUTED decision, so it cannot change between two rebuilds
         //of the SAME window and never reaches the async slot key or the ask key.
+        //#W80-DG (U1): a cast committed one window ago holds its step open until
+        //its completing menu is built. If THIS window is that menu the echo
+        //steps back one and the cast clause survives; if it is anything else the
+        //cast finished without a second half and the latch retires here, so the
+        //echo is byte-identical to wave 79 on every window that is not a
+        //completing menu. Idempotent - the same window rebuilt re-reads state 2.
+        if (mPlanCastCompletionState == 1)
+            mPlanCastCompletionState = w80CompletingCastMenu(tail, mInAnnounceXAsk) ? 2 : 0;
         u << carriedPlanHeaderText(planAgeClause(), planAbsent,
-                                   gptcaveat::planStepsAfter(mCurrentPlan,
-                                                             (size_t) mPlanStepsDone));
+                                   w80CarriedPlanSteps(mCurrentPlan, mPlanStepsDone,
+                                                       mPlanCastCompletionState >= 1));
         //#W77-CS (R10): the #W48 D9 hazard, NAMED instead of the echo deleted.
         //Any X in that plan was chosen on the cast row, one screen before this
         //menu's per-X kill lists existed, so the rows below are the authority on
@@ -24557,7 +24787,10 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //a carried plan keeps the pointer it has. Neither advances here - the
         //advance belongs to the executed action (writeTransLog).
         if (plan != mCurrentPlan)
+        {
             mPlanStepsDone = 0;
+            mPlanCastCompletionState = 0; //#W80-DG (U1): a new sequence, no open cast
+        }
         //#W53-N (D12a): the model WROTE a plan line here, whatever it says -
         //that, not its content, is what the age stamp reports.
         mPlanSetSeq = mTransSeq;
@@ -29981,6 +30214,16 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     //untouched). Opponent's completions shown too when present (rare, but symmetric).
     out << dungeonsCompletedLine(this->dungeonCompleted, opp ? opp->dungeonCompleted : 0);
 
+    //#W80-DG (U11, wave-79 known-bugs MED): did the ON THE STACK block actually
+    //render on THIS prompt? The sorcery-speed tag below says "the stack is not
+    //empty (see ON THE STACK above)" off `count(0, NOT_RESOLVED)`, which counts
+    //every object; the block prints only the RESPONDABLE ones, so a phase step, a
+    //day/night marker or an emblem left the sentence pointing at a block that is
+    //not on the screen - 135 prompts in the wave-79 corpus (`125v162` seq 199 is
+    //the review's citation). The legality reason is TRUE and stays; only the
+    //pointer is conditional, because a pointer to nothing is the silent-omission
+    //failure the trust doctrine names.
+    bool stackBlockRendered = false;
     //The stack, top-first. Pending spells/abilities were previously invisible
     //in the situation block: the model saw "Cast Counterspell" offered but not
     //WHAT it could counter, and read post-cast game-log lines as already
@@ -30059,6 +30302,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         }
         if (!items.empty())
         {
+            stackBlockRendered = true; //#W80-DG (U11)
             out << "ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):\n";
             int n = 1;
             for (int i = (int) items.size() - 1; i >= 0; i--, n++)
@@ -30271,7 +30515,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 sep = " and ";
             }
             if (!stackEmpty)
-                sw << sep << "the stack is not empty (see ON THE STACK above)";
+                sw << sep << w80StackNotEmptyReason(stackBlockRendered); //#W80-DG (U11)
             sorceryWhy = sw.str();
         }
         GptManaPolicy castPolicy(this);
@@ -32232,6 +32476,28 @@ static string xDeclineForfeitClause(int floating)
     return o.str();
 }
 
+//#W80-DG (U1 second half, wave-79 known-bugs HIGH-1): THE MODAL DECLINE ROW
+//SAID NOTHING ABOUT THE MANA. The X ladder's decline row has carried
+//xDeclineForfeitClause since wave 68; the cast-mode menu that completes the
+//SAME kind of announcement offered a bare "Decline - do nothing"
+//(`130v162` seq 32, on six sources already tapped; the contrast pair is
+//`130v123` seqs 26/33, where the X menu prints it). Printed only where the
+//engine has actually queued a payment for THIS card in THIS step, so it is a
+//fact about the receipt already in the log, never a guess. Pure over two values.
+static string w80CompletingDeclineSpentClause(int sources, const string& card)
+{
+    if (sources <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {your " << sources << " tapped source" << (sources == 1 ? " is" : "s are")
+      << " SPENT either way: the payment for " << (card.empty() ? string("that cast") : card)
+      << " is already made, so abandoning the cast here does not untap "
+      << (sources == 1 ? "it" : "them") << " - the card goes back to your hand, the mana"
+         " it paid stays floating in your pool, and whatever is still floating when the"
+         " step ends is lost}";
+    return o.str();
+}
+
 //#W68-BB (J5): the receipt says a cost was PAID; nothing said the spell it was
 //paid for never happened. Written at the decline, in the narration's own voice.
 static string castAbandonedNarration(const string& card, int floating)
@@ -32253,6 +32519,12 @@ void AIPlayerGPT::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, c
     {
         mPaidPendingCard = target->getDisplayName();
         mPaidPendingStep = stepKey();
+        //#W80-DG (U1): how many sources that receipt tapped - the number the
+        //completing menu's decline rows price.
+        mPaidPendingSources = 0;
+        for (size_t si = 0; si < sources.size(); si++)
+            if (sources[si])
+                mPaidPendingSources++;
     }
 }
 
@@ -32430,6 +32702,13 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 static const char * kHoldPriorityRowShortHead =
     "Hold priority - pass now, and do not ask me again";
 
+//#W80-DG (U16): the ROW keeps its own re-opener clause. Folding it into
+//`holdContractParagraph` (which states the same rule below the list) was tried
+//and REVERTED: #W61-U C14 put that clause on the row from live evidence - the
+//wave-55 literal promised a hold that expired with the TURN and deck146 HIGH-3
+//was the cost - and three pins assert the row promises re-opening IN ITS OWN
+//WORDS. The U16 saving is taken at the hold-CHECK bracket instead, which
+//restated the rule a third time with no such claim on it.
 static const char * kHoldPriorityRowHead =
     "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
@@ -33313,7 +33592,15 @@ void w78HoldRowDelta(const std::vector<string>& lastRowKeys,
 
 //#W78-CV (S9 b): `gone` is the fourth argument and defaults to 0, so every
 //existing caller and pin reads byte-identically.
-static string holdReopenNoteText(int unseenRows, int repeats, bool first = false, int goneRows = 0)
+//#W80-DG (U16, wave-79 known-bugs MED): `contractBelow` says the HOW A HOLD ENDS
+//paragraph is on this same prompt (askModel and the priority seam splice it on
+//exactly the windows that carry a hold row). When it is, this bracket stops
+//restating the same-row rule it states in full - the bracket keeps what only it
+//knows, which is the MEASUREMENT - and points at it instead. Defaulted false, so
+//every existing caller and pin reads byte-identically and a seam with no hold row
+//(the land menu) still carries the rule itself.
+static string holdReopenNoteText(int unseenRows, int repeats, bool first = false, int goneRows = 0,
+                                 bool contractBelow = false)
 {
     if (first)
         return "\n[hold check: this is the first window I have asked you at this seam -"
@@ -33339,27 +33626,34 @@ static string holdReopenNoteText(int unseenRows, int repeats, bool first = false
         //different COST as a re-opener, so `152v125` seqs 65 -> 66 read one cost
         //change as both. The `[cost: ...]` group is kept by `holdActionKeyRow` and
         //by nothing else: a changed cost IS a different row, once, in one clause.
-        o << " - a row that changes only in"
-             " its annotations (a forecast, a clock, a count, a life total) is the SAME"
-             " row and does not re-open a hold; the same action at a CHANGED COST is a"
-             " different row, as is a row appearing, disappearing, or naming a different"
-             " card or target]";
+        if (contractBelow)
+            o << " - HOW A HOLD ENDS, below this list, says what counts as the same row]";
+        else
+            o << " - a row that changes only in"
+                 " its annotations (a forecast, a clock, a count, a life total) is the SAME"
+                 " row and does not re-open a hold; the same action at a CHANGED COST is a"
+                 " different row, as is a row appearing, disappearing, or naming a different"
+                 " card or target]";
     }
     else if (goneRows > 0)
         o << goneRows << (goneRows == 1 ? " row that was on the menu at the last window I asked"
                                           " you at this seam is gone and no row above is new"
                                         : " rows that were on the menu at the last window I asked"
                                           " you at this seam are gone and no row above is new")
-          << " - a row disappearing re-opens a hold exactly as a row appearing does, and so"
-             " does the same action at a CHANGED COST; a row that changes only in its"
-             " annotations (a forecast, a clock, a count, a life total) is the SAME row]";
+          << (contractBelow
+                  ? " - HOW A HOLD ENDS, below this list, says what counts as the same row]"
+                  : " - a row disappearing re-opens a hold exactly as a row appearing does, and so"
+                    " does the same action at a CHANGED COST; a row that changes only in its"
+                    " annotations (a forecast, a clock, a count, a life total) is the SAME row]");
     else
         o << "every row above was also on the menu at the last window I asked you at this seam"
           << " (" << repeats << " window" << (repeats == 1 ? "" : "s")
           << " in a row now), and no row that was on it is gone"
-             " - a hold taken here holds until one of them appears,"
-             " disappears, changes its COST, or names a different card or target; a row"
-             " that changes only in its annotations is the same row]";
+          << (contractBelow
+                  ? " - HOW A HOLD ENDS, below this list, says what counts as the same row]"
+                  : " - a hold taken here holds until one of them appears,"
+                    " disappears, changes its COST, or names a different card or target; a row"
+                    " that changes only in its annotations is the same row]");
     return o.str();
 }
 
@@ -33412,11 +33706,26 @@ int w74HoldUnseenRows(const std::set<string>& lastKeys, const std::vector<string
 //run both readings of one window sequence side by side; the live wiring passes
 //false. Pure over the memory + the rows, so the whole thing is pinned without a
 //game.
+//#W80-DG (U16): does THIS menu carry the hold row? If it does, the HOW A HOLD
+//ENDS paragraph is on this same prompt (askModel and the priority seam both
+//splice it on exactly that condition), and the bracket below folds to its
+//measurement. Read off the rows the bracket is about, with the same shared head
+//every other consumer binds by, so the two surfaces cannot disagree.
+static bool w80HoldRowOnMenu(const std::vector<string>& rows)
+{
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].compare(0, strlen(kHoldPriorityRowShortHead),
+                            kHoldPriorityRowShortHead) == 0)
+            return true;
+    return false;
+}
+
 string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
                          const std::vector<string>& rows, int windowSeq,
                          bool commitAtBuild, HoldRowKeyFn keyOf)
 {
     const string s(seam ? seam : "");
+    const bool contractBelow = w80HoldRowOnMenu(rows); //#W80-DG (U16)
     std::map<string, std::set<string> >::iterator it = m.last.find(s);
     int unseen = 0;
     int gone = 0; //#W78-CV (S9 b)
@@ -33473,7 +33782,8 @@ string w76HoldReopenNote(W76HoldMemory& m, const char * seam,
     //the hold row's contract says so, and the latch enforces it.
     const int runIfAsked = (first || unseen > 0 || gone > 0) ? 0 : prevRun + 1;
     const string note = holdReopenNoteText(first ? 0 : unseen, first ? 0 : runIfAsked,
-                                           first, first ? 0 : gone); //#W77-CR (R2 b), #W78-CV (S9 b)
+                                           first, first ? 0 : gone,
+                                           contractBelow); //#W77-CR (R2 b), #W78-CV (S9 b), #W80-DG (U16)
     m.measuredSeq[s] = windowSeq;
     //#W77-CR (R2 d): the referent this note names, written down rather than
     //left to be re-derived. -1 at the first window (there is none).
@@ -37590,10 +37900,31 @@ static string tutorSearchType(const string& magicText)
 //                into cards not yet controlled or held and copies of ones that
 //                are. The decklist is in the system prompt, so the library's
 //                remaining names are the pilot's own knowledge, not a peek.
-static string legendTwinTag(const string& name)
+//#W80-DG (U12): the twin's live loyalty, or -1 when the question does not
+//apply. Read off the same counter the board line prints.
+static int w80TwinLoyalty(MTGCardInstance * twin)
 {
-    return " [legendary: you already control " + name
-           + " - legend rule: casting this sends one copy to your graveyard (you choose which)]";
+    if (!twin || !twin->hasType(Subtypes::TYPE_PLANESWALKER) || !twin->counters)
+        return -1;
+    Counter * c = twin->counters->hasCounter("loyalty", 0, 0);
+    return c ? c->nb : -1;
+}
+
+//#W80-DG (U12, wave-79 deck162 MED-2): WHICH COPY THE CHOICE IS BETWEEN. The
+//clause says "you choose which" and named neither copy's state; on a
+//PLANESWALKER the state that decides is the LOYALTY, and `162v125` seq 41 spent
+//5 mana to replace a loyalty-5 copy with a fresh one (the board line carries
+//`[counters: Nx loyalty]`, the CAST row did not). `loyalty` is -1 for anything
+//that is not a planeswalker with loyalty counters, which is the byte-identical
+//wave-79 face. Pure over two values.
+static string legendTwinTag(const string& name, int loyalty = -1)
+{
+    std::ostringstream o;
+    o << " [legendary: you already control " << name;
+    if (loyalty >= 0)
+        o << " at " << loyalty << " loyalty";
+    o << " - legend rule: casting this sends one copy to your graveyard (you choose which)]";
+    return o.str();
 }
 //#W53-P (D11, wave-52 ledger MED): the wave-52 clause answered a LEGALITY
 //question ("both stay - no legend rule") where the wave-51 tag it replaced had
@@ -39859,9 +40190,19 @@ string namedCardRemainingTag(int theirNotPublic, int myNotPublic)
 //half - and calling it dead is what let `146v162` seq 24 read the mode ask as
 //"whole modes" and take one. The bucket is OMITTED when empty, so a board with
 //no half-dead pair renders exactly as wave 65 wrote it.
+//#W80-DG (U12, wave-79 deck146 MED-2): `liveObjects` is index-parallel to
+//`live` and names the objects that make each live mode live. THE CLAUSE NAMED
+//THE MODE AND NEVER THE OBJECT: `146v152` seq 21 row 2 read
+//`{modes live right now: ... return creature and you draw, ...}` while Soul
+//Shatter's row on the SAME screen named its object
+//(`{right now: they sacrifice Luminarch Aspirant (MV 2, their highest)}`) and
+//Vanishing Verse named its legal targets. The seat wrote "No targets for modes
+//really" and cast the other spell, at the decision that lost the game. Empty
+//entries print exactly the wave-79 bytes.
 static string modalModesTag(const std::vector<std::string>& live,
                             const std::vector<std::string>& halfDead,
-                            const std::vector<std::string>& dead)
+                            const std::vector<std::string>& dead,
+                            const std::vector<std::string> * liveObjects = NULL)
 {
     if (live.empty() && halfDead.empty() && dead.empty())
         return "";
@@ -39870,7 +40211,11 @@ static string modalModesTag(const std::vector<std::string>& live,
     if (live.empty())
         o << "none";
     for (size_t i = 0; i < live.size(); i++)
+    {
         o << (i ? ", " : "") << live[i];
+        if (liveObjects && i < liveObjects->size() && !(*liveObjects)[i].empty())
+            o << " (right now: " << (*liveObjects)[i] << ")";
+    }
     if (!halfDead.empty())
     {
         o << "; HALF DEAD (one half of the pair has no legal object, so it does"
@@ -39937,6 +40282,68 @@ static int modalSpecObjectCount(GameObserver * observer, MTGCardInstance * card,
     SAFE_DELETE(tc);
     return n;
 }
+//#W80-DG (U12, deck146 MED-2): the objects behind a live mode, NAMED. Same
+//chooser `modalSpecObjectCount` asks the count of, walked the way
+//TargetChooser::countValidTargets walks it, so the names and the count cannot
+//disagree. Bounded at three names plus a count, each with the zone it sits in -
+//the fact the review's repro needed was "Silverquill Silencer from your
+//graveyard", which the model would otherwise have to reconstruct by applying a
+//mana-value filter to the graveyard line by hand.
+static string w80ModalSpecObjects(GameObserver * observer, Player * me,
+                                  MTGCardInstance * card, const string& spec)
+{
+    if (!observer || spec.empty())
+        return "";
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const char c = spec[i];
+        if (!isalnum((unsigned char) c) && !strchr("[]|,-<>=;*_. :+", c))
+            return ""; //the same shape guard the count uses
+    }
+    TargetChooserFactory tcf(observer);
+    TargetChooser * tc = tcf.createTargetChooser(spec, card);
+    if (!tc)
+        return "";
+    std::vector<std::string> names;
+    int extra = 0;
+    for (int pi = 0; pi < 2; pi++)
+    {
+        Player * pl = observer->players[pi];
+        if (!pl || !pl->game)
+            continue;
+        MTGGameZone * zones[] = { pl->game->inPlay, pl->game->graveyard, pl->game->hand,
+                                  pl->game->exile, pl->game->stack };
+        for (int k = 0; k < 5; k++)
+        {
+            MTGGameZone * z = zones[k];
+            if (!z || !tc->targetsZone(z))
+                continue;
+            for (int j = 0; j < z->nb_cards; j++)
+            {
+                MTGCardInstance * c = z->cards[j];
+                if (!c || !tc->canTarget(c))
+                    continue;
+                if (names.size() >= 3)
+                {
+                    extra++;
+                    continue;
+                }
+                names.push_back(c->getDisplayName() + instanceHandle(c)
+                                + targetZoneTag(me, c));
+            }
+        }
+    }
+    SAFE_DELETE(tc);
+    if (names.empty())
+        return "";
+    std::ostringstream o;
+    for (size_t i = 0; i < names.size(); i++)
+        o << (i ? ", " : "") << names[i];
+    if (extra > 0)
+        o << " (+" << extra << " more)";
+    return o.str();
+}
+
 //#W66-AQ (H9): ONE census, three buckets, and the per-label verdict map the
 //mode ask reads. `script` is the text the menu was built from - the arm-time
 //snapshot when the subject pointer is gone - and `card` is only the object the
@@ -39946,13 +40353,17 @@ static bool modalModeLiveness(GameObserver * observer, MTGCardInstance * card,
                               std::vector<std::string>& live,
                               std::vector<std::string>& halfDead,
                               std::vector<std::string>& dead,
-                              std::vector<int> * verdicts = NULL)
+                              std::vector<int> * verdicts = NULL,
+                              std::vector<std::string> * liveObjects = NULL, //#W80-DG (U12)
+                              Player * me = NULL)
 {
     live.clear();
     halfDead.clear();
     dead.clear();
     if (verdicts)
         verdicts->clear();
+    if (liveObjects)
+        liveObjects->clear();
     if (!observer || !card)
         return false;
     std::vector<GptModalMode> modes;
@@ -39967,6 +40378,16 @@ static bool modalModeLiveness(GameObserver * observer, MTGCardInstance * card,
         if (verdicts)
             verdicts->push_back(v);
         (v == 0 ? live : (v == 1 ? halfDead : dead)).push_back(modes[i].label);
+        //#W80-DG (U12): index-parallel to `live` only; the half-dead and dead
+        //buckets already say WHY they are not live.
+        if (liveObjects && v == 0)
+        {
+            string objs = w80ModalSpecObjects(observer, me, card, modes[i].outerSpec);
+            const string sub = w80ModalSpecObjects(observer, me, card, modes[i].subSpec);
+            if (!sub.empty())
+                objs += (objs.empty() ? "" : "; then ") + sub;
+            liveObjects->push_back(objs);
+        }
     }
     return !live.empty() || !halfDead.empty() || !dead.empty();
 }
@@ -45256,9 +45677,21 @@ static string exemplarSentence(const string& exemplarText, int exemplarRow)
     std::ostringstream o;
     o << " and its SHORT NAME in parentheses (the name only - copy nothing from the"
          " {...} annotations), e.g. \"" << exemplarText << "\"";
+    //#W80-DG (U5, wave-79 known-bugs HIGH): row -2 is the NEUTRAL template the
+    //ask seam now uses everywhere wave 79 wrote a live row out. The example was
+    //built from row 1 (`e.g. "CHOICE: 1 (Cast Dictate of Kruphix)"`) while the
+    //priority menu's has always been a placeholder; deck162's reasoning quoted
+    //the example three times and "picked Dictate as it's first in the menu", and
+    //the seat took the exemplified row in 62 of 139 windows. The FORMAT is what
+    //the example is for - see #W77-CS, which already made exactly this move on
+    //the one seam where the row was a priced choice.
+    if (exemplarRow == -2)
+        o << " (a worked example of the FORMAT only - the number and the name in it are"
+             " placeholders, not a recommendation: read the rows below and answer with the"
+             " number and short name of the row YOU want)";
     //#W77-CS (R10): row -1 is the ANNOUNCE_X template - a FORMAT example with
     //no claim about the rows at all. Row 0 keeps its wave-66 dead-menu face.
-    if (exemplarRow < 0)
+    else if (exemplarRow < 0)
         o << " (a worked example of the FORMAT only - <n> is a placeholder, not a"
              " recommendation: read the rows below and choose the X YOU want)";
     else if (exemplarRow == 0)
@@ -45565,6 +45998,14 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     {
         exemplarText = "CHOICE: <n> (X = <n>)";
         exemplarRow = -1; //#W77-CS: a template, not a row - see exemplarSentence
+    }
+    //#W80-DG (U5): ...and the same on every other ask. A quoted LIVE row is a
+    //recommendation the sentence never meant to make; the dead-menu face (row 0)
+    //is a claim about the ROWS, not an example to copy, so it is untouched.
+    else if (exemplarRow > 0)
+    {
+        exemplarText = "CHOICE: <row number> (<that row's short name>)";
+        exemplarRow = -2;
     }
     tail << "\n" << kPlanFirstLead //#W70-BL (E2)
          << "on a line of its own CHOICE: followed by the number of your choice "
@@ -47091,7 +47532,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         heldOfType.insert(bc->getDisplayName());
                 }
                 if (twin)
-                    o << (legendary ? legendTwinTag(twin->getDisplayName())
+                    o << (legendary ? legendTwinTag(twin->getDisplayName(),
+                                                    w80TwinLoyalty(twin)) //#W80-DG (U12)
                                     : secondCopyTag(twin->getDisplayName(), card->magicText));
                 if (!want.empty() && game && game->library)
                 {
@@ -47577,6 +48019,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 }
                                 hits << w78RedundantCounterTag(mine, mineConditional, mineEscape);
                             }
+                            //#W80-DG (U11): and the same fact on the CAST row, so
+                            //the two surfaces the decision is read off agree.
+                            if (sz->cards[zi] && sz->cards[zi]->currentZone)
+                                hits << w80OwnStackSpellTag(
+                                    sz->cards[zi]->controller() == this,
+                                    zoneDesc(sz->cards[zi]->currentZone));
                             firstHit = false;
                         }
                 }
@@ -47981,9 +48429,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //right now - the fact the engine must already compute to build the
         //mode sub-menu, carried on the refusable window that precedes it.
         {
-            std::vector<std::string> liveM, halfM, deadM;
-            if (modalModeLiveness(observer, card, card->magicText, liveM, halfM, deadM))
-                o << modalModesTag(liveM, halfM, deadM); //#W66-AQ (H9)
+            std::vector<std::string> liveM, halfM, deadM, liveObjM; //#W80-DG (U12)
+            if (modalModeLiveness(observer, card, card->magicText, liveM, halfM, deadM,
+                                  NULL, &liveObjM, this))
+                o << modalModesTag(liveM, halfM, deadM, &liveObjM); //#W66-AQ (H9), #W80-DG (U12)
         }
         //#W48 D8: and the price of what it DRAWS, when the opponent punishes
         //draws. The summary line on the same screen states the standing rate;
@@ -48040,8 +48489,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 handConverterScan(this, handConv, handDiscConv);
                 bool selfVariable = false; //#W65-AO (MED)
                 const int selfPerTurn = ownExtraDrawPerTurn(card->magicText, selfVariable);
+                //#W80-DG (U12): the live number behind a `countedamount` that
+                //counts the opponent's hand. -1 everywhere else, which is the
+                //byte-identical wave-79 face.
+                int variableHand = -1;
+                if (variable && opponent() && opponent()->game && opponent()->game->hand
+                    && w80VariableDrawIsHandSize(card->magicText, "opponenthand"))
+                    variableHand = opponent()->game->hand->nb_cards;
                 o << feedsRowTag(perTurn, variable, perCastFed, conv, handConv,
-                                 discConv, handDiscConv, selfPerTurn);
+                                 discConv, handDiscConv, selfPerTurn, variableHand);
             }
         }
         //#W61-S (C12): and the ONE-SHOT draw grant, which neither of the two
@@ -48639,6 +49095,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //completing. Stamped with the turn - see the header.
             mCommittedCastName = validated->getDisplayName();
             mCommittedCastTurn = observer->turn;
+            //#W80-DG (U1): the cast step is now OPEN. The next window decides
+            //whether it was one window or two (see w80CompletingCastMenu).
+            mPlanCastCompletionState = 1;
             markCastDecisionAnswered(); //#W72-BX (F3)
             return validated;
         }
@@ -51536,6 +51995,30 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             }
         }
     }
+    //#W80-DG (U1 second half): every row on a COMPLETING cast menu that abandons
+    //the cast prices the payment already made. Scoped three ways so nothing else
+    //moves: the menu must carry the engine's own "Cast Card Normally" label and
+    //be about the card the model committed to this turn (the same gate
+    //castModeCommitmentNote uses for the header), the engine must have queued a
+    //payment for THAT card in THIS step, and the row must be one that does not
+    //cast (the engine's own decline row, or a plain no-op). Nothing is removed,
+    //nothing is answered: one more true clause on rows that already existed.
+    if (castModeMenu && !mCommittedCastName.empty() && ctxName == mCommittedCastName
+        && mCommittedCastTurn == observer->turn
+        && mPaidPendingCard == mCommittedCastName && mPaidPendingStep == stepKey())
+    {
+        const string spent = w80CompletingDeclineSpentClause(mPaidPendingSources,
+                                                             mCommittedCastName);
+        if (!spent.empty())
+            for (size_t i = 0; i < opts.size(); i++)
+            {
+                const bool engineDecline = (i >= req.optionTexts.size());
+                const bool noOpRow = (i < req.optionTexts.size()
+                                      && AIPlayerGPT::rowSaysNoOp(opts[i]));
+                if (engineDecline || noOpRow)
+                    opts[i] += spent;
+            }
+    }
     vector<string> shownOpts;
     vector<size_t> shownToFull;
     if (mdfcLandRowShown)
@@ -52108,6 +52591,11 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 string priceNote = lifeCostPerTarget ? perTargetLifeCostNote(t) : string();
                 narrOpts.push_back(describeTarget(this, t, false) + priceNote);
                 string tdesc = describeTarget(this, t) + priceNote;
+                //#W80-DG (U11): the seat's own spell on the stack, named as such.
+                if (MTGCardInstance * ostc = dynamic_cast<MTGCardInstance *>(t))
+                    if (ostc->currentZone)
+                        tdesc += w80OwnStackSpellTag(ostc->controller() == this,
+                                                     zoneDesc(ostc->currentZone));
                 //W36 #4: the kill verdict rides the creature target line.
                 if (dmgAmount > 0)
                     if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
@@ -63724,7 +64212,9 @@ void AIPlayerGPT::runParseSelfTest()
         //#W79-DB (T11b) RE-DERIVES this pin: the word boundary is unchanged, the
         //omission is now MARKED (wave 78 ended on a bare `...`, which reads as
         //punctuation the card contains).
-        CHECK(textSnippetCore("one two three four five", 9) == "one two... (...more)",
+        //#W80-DG (U12) RE-DERIVES again: ONE omission marker, not `...` and
+        //`(...more)` on the same cut.
+        CHECK(textSnippetCore("one two three four five", 9) == "one two (...more)",
               "W41-4 the shared snippet core truncates on a word boundary, and says so");
         CHECK(textSnippetCore("a\nb", 40) == "a b",
               "W41-4 the shared snippet core flattens newlines");
@@ -67838,7 +68328,12 @@ void AIPlayerGPT::runParseSelfTest()
             " they lose life equal to the difference.\"";
         string flat = textSnippetCore(lolth, 140);
         // The DEFECT, restated as a test: the old one-flat-truncate path drops the ultimate.
-        CHECK(flat.find("-8:") == string::npos,
+        //#W80-DG (U12) RE-DERIVES: the defect this pin names is that the flat path
+        //loses the ULTIMATE - its text. That is still true. What is no longer true
+        //is that the flat path says nothing about it: the omission now NAMES the
+        //loyalty abilities it dropped, so the reader knows the ability exists and
+        //where its text is (deck126 MED-5).
+        CHECK(flat.find("-8: You get an emblem") == string::npos,
               "#W47-R6 REPRO the flat truncate at the same width loses the -8 entirely");
         string fixed = boardEffectSnippet(lolth, 140);
         CHECK(fixed.find("-8: You get an emblem") != string::npos,
@@ -68674,12 +69169,13 @@ void AIPlayerGPT::runParseSelfTest()
             string wordy = "aa " + string(60, 'b') + " cc dd";
             string t = textSnippetCore(wordy, 40);
             //#W79-DB (T11b) RE-DERIVES: same cut, marked.
-            CHECK(t == "aa... (...more)",
+            //#W80-DG (U12) RE-DERIVES again: one marker per cut.
+            CHECK(t == "aa (...more)",
                   "#W48-D5 a word that overruns the budget is dropped whole, not halved");
             CHECK(t.find(string(10, 'b')) == string::npos,
                   "#W48-D5 NEGATIVE no fragment of the overrunning word is rendered");
             string noSpace = string(200, 'q');
-            CHECK(textSnippetCore(noSpace, 140).size() == 140 + 3 + 10,
+            CHECK(textSnippetCore(noSpace, 140).size() == 140 + 10, //#W80-DG (U12)
                   "#W48-D5 NEGATIVE a string with no word boundary at all is still bounded");
         }
         // A text with neither separator is byte-identical to the old path.
@@ -97638,7 +98134,11 @@ static const char * kW50Y_r94 =
             CHECK(now != wave78Bytes,
                   "#W79-DB T11b RED-ON-BASE the wave-78 render of this clause, byte-exact,"
                   " is no longer what is produced");
-            CHECK(now.find("(Gain the next level as a sorcery to add...") == 0
+            //#W80-DG (U12) RE-DERIVES: the same word cut, the same closer and the
+            //same marker - what is gone is the SECOND omission mark, the bare
+            //`...` that used to sit between the kept text and `(...more)`.
+            CHECK(now.find("(Gain the next level as a sorcery to add") == 0
+                  && now.find("...") == now.find("(...more)") + 1
                   && now.find(")") != string::npos
                   && now.find("(...more)") != string::npos,
                   "#W79-DB T11b GREEN the same word cut, the parenthesis CLOSED and the"
@@ -99243,6 +99743,345 @@ static const char * kW50Y_r94 =
                   " `hasCodedAnswerLine` alone called this consume `phase2_answer_missing`"
                   " while `consumePlan` was about to answer the window from it");
         }
+    }
+
+
+    // ================= #W80-DG (wave-80 lane DG: U1, U5, U11, U12, U16) =========
+    // Every fixture below is built from the wave-79 corpus
+    // (matchups-20260912-000748-final) - the actual prompt/plan/menu bytes the
+    // seat was shown - and driven through the entry the LIVE seam calls.
+    cout << "\n[#W80-DG] U1: a cast step stays in the echo until its completing menu resolves\n";
+    {
+        // `130v162` deck130 seq 31 -> 32. The reply at seq 31 wrote this plan and
+        // answered the CAST row; seq 32 is the completing menu for that same cast,
+        // and its echo read "then attack with Rorix in second main phase." - the
+        // cast clause deleted, on a board with six sources already tapped. The seat
+        // then took `Decline - do nothing`.
+        const string plan130 = "Cast Starstorm X=2 to kill Fog Bank, then attack with Rorix"
+                               " in second main phase.";
+        const string wave79Echo = gptcaveat::planStepsAfter(plan130, 1);
+        CHECK(wave79Echo == "then attack with Rorix in second main phase.",
+              "#W80-DG U1 RED-ON-BASE the wave-79 echo at the completing menu, byte-exact:"
+              " `130v162` seq 32 was shown this and nothing of the cast it was completing");
+        CHECK(w80CarriedPlanSteps(plan130, 1, false) == wave79Echo,
+              "#W80-DG U1 the live entry reproduces the wave-79 bytes on every window that"
+              " is NOT a completing menu - the fix is scoped, not a rewrite of the carry");
+        CHECK(w80CarriedPlanSteps(plan130, 1, true) == plan130,
+              "#W80-DG U1 GREEN at the completing menu the cast clause is BACK - the seat"
+              " sees the X it announced while it is being asked to set it");
+        // `125v126` deck125 seqs 44 -> 45: announced Sphinx's Revelation, then
+        // Declined at the X menu. 5 mana burned; the game was lost.
+        const string plan125 = "Cast Sphinx's Revelation at X=2 to draw cards and find Staff"
+                               " of Nin, then hold up mana for counterspells.";
+        CHECK(gptcaveat::planStepsAfter(plan125, 1) == "then hold up mana for counterspells."
+                  && w80CarriedPlanSteps(plan125, 1, false)
+                         == "then hold up mana for counterspells.",
+              "#W80-DG U1 RED-ON-BASE the second corpus pair, byte-exact: `125v126` seq 45's"
+              " echo carried the hold and not the cast it was completing");
+        CHECK(w80CarriedPlanSteps(plan125, 1, true) == plan125,
+              "#W80-DG U1 GREEN ...and the same one entry restores it");
+        // The step index itself: bounded at 0, and unchanged when nothing is pending.
+        CHECK(w80EchoStepIndex(0, true) == 0 && w80EchoStepIndex(0, false) == 0
+                  && w80EchoStepIndex(3, false) == 3 && w80EchoStepIndex(3, true) == 2,
+              "#W80-DG U1 the index steps back exactly one, never below zero");
+        // WHICH windows are completing menus. The positive is the engine's own
+        // sentence, off `130v162` seq 32's header; the negatives are seq 31's and
+        // seq 33's casting-menu headers from the same game.
+        const string completing = "Choose an option for Starstorm: (you answered \"Cast"
+            " Starstorm\" at the previous window - this menu completes THAT cast, it is not"
+            " a new offer: the \"Cast Card Normally\" row casts it, and every other row"
+            " abandons the cast you just chose)";
+        const string castingMenu = "Casting decision (Upkeep, YOUR turn): which card do you"
+            " cast now, if any?";
+        CHECK(w80CompletingCastMenu(completing, false)
+                  && w80CompletingCastMenu(castingMenu, true), //the ANNOUNCE_X scope
+              "#W80-DG U1 GREEN both completing seams are recognised - the cast-mode menu by"
+              " the engine's own commitment sentence, the X ladder by its ask scope");
+        CHECK(!w80CompletingCastMenu(castingMenu, false)
+                  && !w80CompletingCastMenu("Choose an option for Starstorm:", false),
+              "#W80-DG U1 MUST-NOT-MATCH a fresh casting menu, and a cast-mode menu the"
+              " model did NOT answer for (no commitment sentence), hold nothing open");
+        // The second half: every decline row on a completing menu prices the payment.
+        CHECK(w80CompletingDeclineSpentClause(6, "Starstorm")
+                  == " {your 6 tapped sources are SPENT either way: the payment for Starstorm"
+                     " is already made, so abandoning the cast here does not untap them - the"
+                     " card goes back to your hand, the mana it paid stays floating in your"
+                     " pool, and whatever is still floating when the step ends is lost}",
+              "#W80-DG U1 GREEN the modal decline row prices the six tapped sources of"
+              " `130v162` seq 32 - RED on base, where that row was the bare"
+              " \"Decline - do nothing\" while the X ladder one screen later prints"
+              " xDeclineForfeitClause");
+        CHECK(w80CompletingDeclineSpentClause(1, "Starstorm").find("1 tapped source is")
+                  != string::npos,
+              "#W80-DG U1 the singular agrees");
+        CHECK(w80CompletingDeclineSpentClause(0, "Starstorm").empty()
+                  && w80CompletingDeclineSpentClause(-1, "Starstorm").empty(),
+              "#W80-DG U1 MUST-NOT-MATCH no receipt, no clause - never a \"0 sources\" claim");
+        // KEY STABILITY (LESSON OF WAVE 74): the clause carries a board NUMBER and
+        // creates no row, so two windows differing ONLY in that number key alike.
+        {
+            vector<string> a, b;
+            a.push_back("cycling {card text: \"Cycling {3}\"}");
+            b.push_back("cycling {card text: \"Cycling {3}\"}");
+            a.push_back("Cast Card Normally [cost: {r}{r}{x}]");
+            b.push_back("Cast Card Normally [cost: {r}{r}{x}]");
+            a.push_back("Decline - do nothing" + w80CompletingDeclineSpentClause(6, "Starstorm"));
+            b.push_back("Decline - do nothing" + w80CompletingDeclineSpentClause(2, "Starstorm"));
+            bool ra = false, rb = false;
+            const string ta = "Choose an option for Starstorm:\n" + joinNumberedRows(a, &ra);
+            const string tb = "Choose an option for Starstorm:\n" + joinNumberedRows(b, &rb);
+            CHECK(ta != tb && w77KeyTailOf(ta) == w77KeyTailOf(tb),
+                  "#W80-DG U1 KEY the spent-sources number is rendered and OUT of the ask key"
+                  " and the async slot key - two windows differing only in it are one question");
+        }
+    }
+
+    cout << "\n[#W80-DG] U5: the worked example is the FORMAT, never a row\n";
+    {
+        // `162v152` seq 6 (and 138 more windows): the sentence quoted row 1 -
+        // `e.g. "CHOICE: 1 (Cast Luminarch Aspirant)"` - and deck162's reasoning
+        // quoted the example three times, once as "picked Dictate as it's first in
+        // the menu". The seat took the exemplified row in 62 of 139 windows.
+        vector<string> rows162;
+        rows162.push_back("Cast Luminarch Aspirant {1}{w} {right now: nothing}");
+        rows162.push_back("Cast Dictate of Kruphix {3}{u}");
+        rows162.push_back("Cast nothing right now");
+        int used = -1;
+        const string ex = askExemplar(rows162, &used);
+        CHECK(used == 1 && ex == "CHOICE: 1 (Cast Luminarch Aspirant)",
+              "#W80-DG U5 RED-ON-BASE the exemplar built from row 1, byte-exact - this is"
+              " what the ask seam printed on every live menu in the wave-79 corpus");
+        const string wave79 = exemplarSentence(ex, used);
+        CHECK(wave79.find("Cast Luminarch Aspirant") != string::npos
+                  && wave79.find("written out from row 1 of this list") != string::npos,
+              "#W80-DG U5 RED-ON-BASE ...and the sentence named the row it had chosen");
+        // The seam now writes the template instead. Nothing about askExemplar moves:
+        // its dead-menu face is a claim about the ROWS, not an example to copy.
+        const string neutral = exemplarSentence("CHOICE: <row number> (<that row's short name>)", -2);
+        CHECK(neutral.find("Cast Luminarch Aspirant") == string::npos
+                  && neutral.find("written out from row") == string::npos
+                  && neutral.find("placeholders, not a recommendation") != string::npos
+                  && neutral.find("CHOICE: <row number> (<that row's short name>)") != string::npos,
+              "#W80-DG U5 GREEN the neutral face names no row and no card, and says the"
+              " number in it is a placeholder - the move #W77-CS already made on ANNOUNCE_X,"
+              " now on every ask seam");
+        CHECK(exemplarSentence("CHOICE: <n> (X = <n>)", -1).find("choose the X YOU want")
+                  != string::npos
+              && exemplarSentence("CHOICE: <row number> (<that row's short name>)", 0)
+                     .find("every row on this list does nothing right now") != string::npos,
+              "#W80-DG U5 MUST-NOT-MATCH the ANNOUNCE_X template and the dead-menu face are"
+              " byte-identical to wave 79 - only the LIVE-row face moved");
+        // KEY: the example is now a constant, so it cannot move a key at all.
+        CHECK(w77KeyTailOf(neutral) == w77KeyTailOf(exemplarSentence(
+                  "CHOICE: <row number> (<that row's short name>)", -2)),
+              "#W80-DG U5 KEY the format sentence is the same bytes on every menu");
+    }
+
+    cout << "\n[#W80-DG] U11: the seat's own spell on the stack, and a pointer that points\n";
+    {
+        // `125v146` deck125 seqs 104 -> 105. The Cancel target menu listed
+        // `2. Dream Fracture [instant] [your stack]` - the seat's own counter,
+        // already aimed at the opponent's Vanishing Verse - and the seat took it.
+        CHECK(w80OwnStackSpellTag(true, "stack")
+                  == " [THIS IS YOUR OWN spell, waiting to resolve on the stack - aiming at it"
+                     " spends this effect on your own play, not on theirs]",
+              "#W80-DG U11 GREEN the own-spell row is MARKED - RED on base, where the only"
+              " signal was the zone tag `[your stack]`, which is a location and not a warning");
+        CHECK(w80OwnStackSpellTag(false, "stack").empty()
+                  && w80OwnStackSpellTag(true, "battlefield").empty()
+                  && w80OwnStackSpellTag(true, "graveyard").empty(),
+              "#W80-DG U11 MUST-NOT-MATCH the opponent's stack spell and every other zone of"
+              " the seat's own are untouched - nothing is removed and nothing is advised");
+        // and the pointer half: 135 wave-79 prompts said "see ON THE STACK above"
+        // with no such block (the stack held only unrespondable objects).
+        CHECK(w80StackNotEmptyReason(false) == "the stack is not empty"
+                  && w80StackNotEmptyReason(true)
+                         == "the stack is not empty (see ON THE STACK above)",
+              "#W80-DG U11 GREEN the legality reason is unchanged and the POINTER is printed"
+              " only where the block it names is on the screen - RED on base, where the"
+              " pointer rode on `count(0, NOT_RESOLVED)` and the block on respondability");
+    }
+
+    cout << "\n[#W80-DG] U12: the six gloss residuals\n";
+    {
+        // (1) `146` seq 22 and 60 more: a cut that ends on a dangling connective.
+        const string hive = "Until end of turn, Hive of the Eye Tyrant becomes a 3/3 black"
+            " Beholder creature with menace and deathtouch. It's still a land.";
+        const string cutHive = textSnippetCore(hive, 96);
+        CHECK(cutHive.find("with menace and (...more)") == string::npos,
+              "#W80-DG U12 GREEN the wave-79 render of this card, byte-exact, is no longer"
+              " produced - `146` seq 22 read \"...creature with menace and (...more)\"");
+        CHECK(cutHive.find("(...more)") != string::npos
+                  && cutHive.find("and (...more)") == string::npos
+                  && cutHive.find("with (...more)") == string::npos,
+              "#W80-DG U12 GREEN the omission is still MARKED and the cut ends on a phrase"
+              " that can end");
+        CHECK(w80TrimDanglingTail("a 3/3 Beholder creature with menace and")
+                  == "a 3/3 Beholder creature with menace"
+              && w80TrimDanglingTail("-8: You get an emblem with") == "-8: You get an emblem",
+              "#W80-DG U12 the trim takes the dangling connective, and only that");
+        CHECK(w80TrimDanglingTail("Enchanted creature has") == "Enchanted creature has"
+                  && w80TrimDanglingTail("Sacrifice a creature") == "Sacrifice a creature"
+                  && w80TrimDanglingTail("and").find("and") != string::npos,
+              "#W80-DG U12 MUST-NOT-MATCH a verb, a noun and a whole-string connective are"
+              " never trimmed - a trim that emptied the text would print nothing at all");
+        // (2) `126v152` seq 15: Sigarda carried a bare `...` AND a `(...more)`.
+        const string sigarda = "Flying, trample -- Humans you control get +1/+1. -- Coven -"
+            " Whenever Sigarda attacks, if you control three or more creatures with different"
+            " powers, look at the top five cards of your library.";
+        const string cutSig = textSnippetCore(sigarda, 150);
+        CHECK(cutSig.find("... (...more)") == string::npos
+                  && cutSig.find("(...more)") != string::npos,
+              "#W80-DG U12 GREEN ONE omission marker per cut - RED on base, where this card"
+              " rendered \"...look at the top five... (...more)\"");
+        // (3) `162v152` seq 18: Teferi's Puzzle Box, with the hand size on screen.
+        const string boxScript =
+            "@each my draw:name(recycle draw) count(type:*:myhand) && bottomoflibrary"
+            " all(*|myhand) && draw:countedamount controller\n"
+            "@each opponent draw:name(recycle draw) count(type:*:opponenthand) &&"
+            " bottomoflibrary all(*|opponenthand) && draw:countedamount opponent";
+        CHECK(w80VariableDrawIsHandSize(boxScript, "opponenthand")
+                  && w80VariableDrawIsHandSize(boxScript, "myhand"),
+              "#W80-DG U12 the script names its own counter - the variable IS a hand size");
+        CHECK(!w80VariableDrawIsHandSize("@each opponent draw:draw:1 opponent", "opponenthand")
+                  && !w80VariableDrawIsHandSize(boxScript, "opponentgraveyard"),
+              "#W80-DG U12 MUST-NOT-MATCH a fixed draw, and a counter over another zone,"
+              " claim no hand size");
+        {
+            std::vector<std::string> none;
+            const string priced = feedsRowTag(0, true, 0, none, none, none, none, 0, 6);
+            CHECK(priced.find("their whole hand: 6 cards right now") != string::npos
+                      && priced.find("an amount that is not fixed") == string::npos,
+                  "#W80-DG U12 GREEN the feed is PRICED off the live hand - RED on base,"
+                  " where `162v152` seq 18 read \"an amount that is not fixed (read the"
+                  " card)\" beside a 6-card hand on the same screen");
+            CHECK(feedsRowTag(0, true, 0, none, none, none, none, 0, -1)
+                      .find("an amount that is not fixed (read the card)") != string::npos,
+                  "#W80-DG U12 MUST-NOT-MATCH a variable the engine cannot count keeps the"
+                  " wave-79 wording, byte for byte");
+            CHECK(feedsRowTag(0, true, 0, none, none, none, none, 0, 1)
+                      .find("their whole hand: 1 card right now") != string::npos,
+                  "#W80-DG U12 the singular agrees");
+            // KEY: the hand size is a board NUMBER that creates no row.
+            {
+                vector<string> a, b;
+                a.push_back("Cast Teferi's Puzzle Box {4}"
+                            + feedsRowTag(0, true, 0, none, none, none, none, 0, 6));
+                b.push_back("Cast Teferi's Puzzle Box {4}"
+                            + feedsRowTag(0, true, 0, none, none, none, none, 0, 2));
+                bool ra = false, rb = false;
+                const string ta = joinNumberedRows(a, &ra);
+                const string tb = joinNumberedRows(b, &rb);
+                CHECK(ta != tb && w77KeyTailOf(ta) == w77KeyTailOf(tb),
+                      "#W80-DG U12 KEY the priced hand size is out of every key");
+            }
+        }
+        // (4) `162v125` seq 41: 5 mana spent to replace a loyalty-5 copy.
+        CHECK(legendTwinTag("Sorin, Lord of Innistrad", 5)
+                  == " [legendary: you already control Sorin, Lord of Innistrad at 5 loyalty"
+                     " - legend rule: casting this sends one copy to your graveyard (you"
+                     " choose which)]",
+              "#W80-DG U12 GREEN the legend mark names the copy's LOYALTY - RED on base,"
+              " where the row said \"you choose which\" over two copies it never told apart");
+        CHECK(legendTwinTag("Teferi, Who Slows the Sunset")
+                  == " [legendary: you already control Teferi, Who Slows the Sunset - legend"
+                     " rule: casting this sends one copy to your graveyard (you choose which)]",
+              "#W80-DG U12 MUST-NOT-MATCH a twin with no loyalty (a legendary creature, an"
+              " artifact) prints the wave-79 bytes");
+        // (5) deck126 MED-5: Sorin's library-search row showed one of three abilities.
+        {
+            const string sorin =
+                "+1: Put a 1/1 black Vampire creature token with lifelink onto the"
+                " battlefield. -- -2: You get an emblem with \"Creatures you control get"
+                " +1/+0.\" -- -6: Destroy up to three target creatures and/or other"
+                " planeswalkers. Return each card put into a graveyard this way to the"
+                " battlefield under your control.";
+            const string row = textSnippetCore(sorin, 140);
+            CHECK(row.find("+1: Put a 1/1 black Vampire") == 0
+                      && row.find("-6: Destroy up to three") == string::npos,
+                  "#W80-DG U12 RED-ON-BASE the 140 B budget still keeps only the +1 - the"
+                  " -6 the deck guide teaches is not on the row, in any of six games");
+            CHECK(row.find("this card also has -2:, -6:") != string::npos
+                      && row.find("full text is in the decklist") != string::npos,
+                  "#W80-DG U12 GREEN ...and the omission now NAMES the abilities it dropped"
+                  " and says where their text is, instead of a bare `(...more)`");
+            CHECK(w80LoyaltyClauseLabel("+1: Put a token") == "+1:"
+                      && w80LoyaltyClauseLabel("-6: Destroy") == "-6:"
+                      && w80LoyaltyClauseLabel("0: You draw a card") == "0:"
+                      && w80LoyaltyClauseLabel("-12: ultimate") == "-12:",
+                  "#W80-DG U12 the label reader takes a loyalty cost and nothing else");
+            CHECK(w80LoyaltyClauseLabel("Whenever a creature you control dies, put").empty()
+                      && w80LoyaltyClauseLabel("Flying, trample").empty()
+                      && w80LoyaltyClauseLabel("-: no digits").empty(),
+                  "#W80-DG U12 MUST-NOT-MATCH a static or triggered clause yields no label,"
+                  " so a body that drops one keeps the plain marker");
+        }
+        // (6) `146v152` seq 21 row 2: the mode clause named the mode, never the object.
+        {
+            std::vector<std::string> live, none, objs;
+            live.push_back("return creature and you draw");
+            objs.push_back("Silverquill Silencer [your graveyard]");
+            const string named = modalModesTag(live, none, none, &objs);
+            CHECK(named.find("return creature and you draw (right now: Silverquill Silencer"
+                             " [your graveyard])") != string::npos,
+                  "#W80-DG U12 GREEN the live mode names its OBJECT the way Soul Shatter's"
+                  " row on the same screen named its own - RED on base, where the seat wrote"
+                  " \"No targets for modes really\" and cast the other spell");
+            CHECK(modalModesTag(live, none, none) == modalModesTag(live, none, none, NULL),
+                  "#W80-DG U12 MUST-NOT-MATCH with no object list the clause is the wave-79"
+                  " bytes, byte for byte");
+            std::vector<std::string> blank;
+            blank.push_back("");
+            CHECK(modalModesTag(live, none, none, &blank)
+                      == modalModesTag(live, none, none),
+                  "#W80-DG U12 MUST-NOT-MATCH a mode whose objects could not be enumerated"
+                  " prints no empty parenthesis");
+        }
+    }
+
+    cout << "\n[#W80-DG] U16: the hold apparatus states its rule ONCE\n";
+    {
+        // deck146 MED-3: the hold row, the `[hold check:` bracket and the
+        // `[HOW A HOLD ENDS:` paragraph together are ~1.0-1.4 KB of every prompt,
+        // and all three state the same same-row rule. The paragraph is the one
+        // that OWNS it, so the bracket points at it.
+        const string folded = holdReopenNoteText(1, 0, false, 2, true);
+        const string wave79 = holdReopenNoteText(1, 0, false, 2, false);
+        CHECK(wave79.find("a row that changes only in its annotations") != string::npos
+                  && wave79.find("naming a different card or target]") != string::npos,
+              "#W80-DG U16 RED-ON-BASE the wave-79 bracket restates the whole same-row rule");
+        CHECK(folded.find("1 row above is new") != string::npos
+                  && folded.find("2 rows that were on it are gone") != string::npos
+                  && folded.find("HOW A HOLD ENDS, below this list, says what counts as the"
+                                 " same row]") != string::npos
+                  && folded.size() + 100 < wave79.size(),
+              "#W80-DG U16 GREEN the MEASUREMENT - which is the only thing this bracket"
+              " knows - survives whole, and the rule it was repeating is a pointer");
+        CHECK(holdReopenNoteText(0, 0, false, 1, true).find("HOW A HOLD ENDS") != string::npos
+                  && holdReopenNoteText(0, 3, false, 0, true).find("HOW A HOLD ENDS")
+                         != string::npos,
+              "#W80-DG U16 all three faces of the bracket fold, not just the one");
+        CHECK(holdReopenNoteText(0, 3, false, 0, false)
+                  .find("a hold taken here holds until one of them appears") != string::npos,
+              "#W80-DG U16 MUST-NOT-MATCH with no paragraph on the prompt the bracket keeps"
+              " the rule itself - the land seam has no hold row and loses nothing");
+        {
+            vector<string> withHold, without;
+            withHold.push_back("Cast Bear {1}{g}");
+            withHold.push_back(holdRowLine());
+            without.push_back("Cast Bear {1}{g}");
+            without.push_back("Cast nothing right now");
+            CHECK(w80HoldRowOnMenu(withHold) && !w80HoldRowOnMenu(without),
+                  "#W80-DG U16 the fold's condition is read off the ROWS, with the same"
+                  " shared head askModel uses to splice the paragraph - so the bracket"
+                  " cannot point at a paragraph that is not there");
+        }
+        // The ROW itself is UNCHANGED: #W61-U C14 put its re-opener clause there
+        // from live evidence (deck146 HIGH-3) and three pins assert it.
+        CHECK(string(kHoldPriorityRowText).find("any change re-opens this window")
+                  != string::npos,
+              "#W80-DG U16 MUST-NOT-MATCH the hold ROW keeps its own re-opener clause - the"
+              " U16 saving is taken at the bracket, not by reversing a wave-61 truth fix");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
