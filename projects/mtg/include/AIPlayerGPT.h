@@ -2135,6 +2135,19 @@ private:
     //progress" - which a scope-plus-rows key cannot tell apart on its own.
     std::string mLastProgressBoardKey;
     int mMenuPassNoProgressSuppressed;
+    //#W81-DI (wave-80 HUNG game `162v123`): the priority cache's replay bound. The
+    //key whose replay run is being counted, the run itself (-1 = a re-ask for that
+    //key is latched and in flight), the counter, and the face the re-asked window's
+    //record carries. An ACTIVATING or CASTING cached answer stands at most once per
+    //key; the option is never removed and never auto-answered - the MODEL decides
+    //again. See `w81CachedReplayMustReask`.
+    std::string mCachedReplayKey;
+    int mCachedReplayRuns;
+    //#W81-DI: how many replies the development-build offline stub has served
+    //(WAGIC_GPT_STUB; see w81StubReplyNext). Unused in a release build.
+    int mStubReplyIndex;
+    int mCachedReplayReasked;
+    std::string mReaskReasonFace;
     bool w77OwnLoopResolving();
     int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
     void w78CountStackDrainWindow();     //#W78-CV (S4)

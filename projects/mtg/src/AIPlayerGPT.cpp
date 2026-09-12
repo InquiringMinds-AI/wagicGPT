@@ -19223,8 +19223,71 @@ string AIPlayerGPT::asyncSlotKey(const string& userMsg)
 }
 
 
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+//#W81-DI: the OFFLINE REPLY STUB, development builds only (the owner's rule: a
+//diagnostic is compiled out of a release build, not merely runtime-gated). It
+//exists so a SUITE fixture can drive the live ask/replay path with a known answer
+//and no endpoint: `WAGIC_GPT_STUB` is a `|`-separated list of replies, one
+//consumed per model call, the last repeating, with `\n` written as the two
+//characters backslash-n. It is the only way to put a whole game's worth of the
+//cached-replay path under the test harness's game timeout. Pure.
+static string w81StubReplyNext(const string& spec, int index)
+{
+    std::vector<string> parts;
+    size_t s = 0;
+    while (true)
+    {
+        const size_t bar = spec.find('|', s);
+        parts.push_back(spec.substr(s, bar == string::npos ? string::npos : bar - s));
+        if (bar == string::npos)
+            break;
+        s = bar + 1;
+    }
+    if (parts.empty())
+        return string();
+    const size_t pick = (index < 0) ? 0
+                      : ((size_t) index >= parts.size() ? parts.size() - 1 : (size_t) index);
+    string out;
+    const string& r = parts[pick];
+    for (size_t i = 0; i < r.size(); i++)
+    {
+        if (r[i] == '\\' && i + 1 < r.size() && r[i + 1] == 'n')
+        {
+            out += '\n';
+            i++;
+        }
+        else
+            out += r[i];
+    }
+    return out;
+}
+#endif
+
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W81-DI: the stub answers synchronously, in place of the whole async
+    //transport, so a fixture game is deterministic and needs no network.
+    if (const char * w81Stub = getenv("WAGIC_GPT_STUB"))
+    {
+        if (w81Stub[0])
+        {
+            content = w81StubReplyNext(w81Stub, mStubReplyIndex++);
+            mLastLatencyMs = 0;
+            mLastTimeout = false;
+            mLastHttpStatus = 200;
+            mLastCurlResult = 0;
+            mLastReasoningOnly = false;
+            mLastFinishLength = false;
+            mLastBadReply = false;
+            mStaleDropStreak = 0;
+            mLastStaleLivelock = false;
+            DebugTrace("AIPlayerGPT: STUB reply " << mStubReplyIndex << ": " << content);
+            return 0;
+        }
+    }
+#endif
+
     //#W57-A (D5): THE ARM'S OWN SLOT. `mPromptTail` is the question-and-options
     //tail assemblePrompt wrote for THIS ask, in this same tick, so the arm is
     //read off the question being asked - not off any latched state. A land-drop
@@ -20526,7 +20589,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCachedReplayRuns(0), mCachedReplayReasked(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mSingleOutcomeMenusAnswered(0), mSingleOutcomeRowsSpared(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -22035,6 +22098,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["stack_death_verdict"] = mStackDeathVerdictFace;
         mStackDeathVerdictFace.clear();
     }
+    //#W81-DI: WHY this window was asked rather than served from the cache -
+    //`cached_replay_bound` (an activating answer had already stood once for this
+    //key and the board moved under it) or `cached_replay_past_stop` (the row it
+    //would have taken is already at the model's own stated stop). Stamped at the
+    //send and consumed here, so no later record can inherit it; the counter
+    //`cached_replay_reasked` is the join.
+    if (!mReaskReasonFace.empty())
+    {
+        rec["reask_reason"] = mReaskReasonFace;
+        mReaskReasonFace.clear();
+    }
     //#W80-DH (F11, Astra wave-80 finding 11 - MED): `hold_safer_ignored_face` and
     //`hold_reopen_reason` are DELETED from the window record. They were ONE shared
     //string each, overwritten by every clamp in the window and consumed by
@@ -22672,6 +22746,10 @@ void AIPlayerGPT::logGameEnd()
         {"ask_replays_cache", mAskReplaysCache},
         {"ask_replays_repeat_latch", mAskReplaysRepeatLatch},
         {"menu_pass_no_progress_suppressed", mMenuPassNoProgressSuppressed},
+        //#W81-DI: windows the priority cache would have replayed an ACTIVATING or
+        //CASTING answer into a second time and that went back to the model instead.
+        //Per-record trace: `reask_reason`. > 0 whenever a loop engine is live.
+        {"cached_replay_reasked", mCachedReplayReasked},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -22720,6 +22798,23 @@ void AIPlayerGPT::logGameEnd()
 
 void AIPlayerGPT::resolveEndpoint()
 {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W81-DI: the offline stub IS the endpoint. Without this the live
+    //reachability probe clears mEndpoint and `chooseOrderedAction` hands every
+    //decision straight back to Baka - the GPT seam, and the cached-replay path
+    //under test, would never run at all. Development builds only.
+    if (const char * w81Stub = getenv("WAGIC_GPT_STUB"))
+    {
+        if (w81Stub[0])
+        {
+            const char * url = getenv("WAGIC_GPT_URL");
+            mEndpoint = (url && url[0]) ? url : "stub://offline";
+            const char * mdl = getenv("WAGIC_GPT_MODEL");
+            mModel = (mdl && mdl[0]) ? mdl : "stub";
+            return;
+        }
+    }
+#endif
     vector<string> candidates;
     if (const char * url = getenv("WAGIC_GPT_URL"))
         candidates.push_back(url);
@@ -36176,6 +36271,69 @@ bool w79ForcePassNoProgress(bool keyUnchanged, int lastChoice, bool boardMoved)
     return keyUnchanged && lastChoice > 0 && !boardMoved;
 }
 
+//#W81-DI (wave-80 corpus HUNG game, `162v123` 3,641 s in a dead loop). THE OTHER
+//HALF OF #W79-DC (F1). That finding gated the deadlock breaker's FORCED PASS on
+//the board, correctly: an activation that moved the board is not a no-op and must
+//not be punished with a forced pass. It deliberately left the CACHE half ungated,
+//so an unchanged key still replays `mLastChoice` with no round trip. Put the two
+//together under Intruder Alarm and the seat has an unbounded engine loop: Thraben
+//Doomsayer taps for a token, the Alarm untaps it, the menu, the target identities
+//and the untapped-source count are all byte-identical, so the key is unchanged and
+//the same ACTIVATION is replayed - 3,659 times in the hung game, the model asked
+//exactly zero times after the one window that answered it.
+//The bound is not a cap on the option: the row stays on the menu, nothing is
+//removed and nothing is auto-answered. It is a bound on how many times ONE answer
+//may stand for a question the board has moved under. An answer that ACTIVATES or
+//CASTS is replayed at most ONCE per window key; the next identical offer goes back
+//to the model, which restates its plan, names a stop, or passes. A cached PASS or
+//HOLD is untouched - it commits nothing and progresses nothing, and #W79-CZ (T3)'s
+//whole finding is that re-asking those is waste.
+//A replay is also refused outright when the row it would take is already AT OR PAST
+//the stop the model itself stated (the wave-72 machinery, which until now bound only
+//windows that were ASKED): a stop the model wrote binds its cached answer too.
+//Pure over its four facts, so PARSETEST walks the whole loop without a board.
+bool w81CachedReplayMustReask(bool keyUnchanged, int lastChoice,
+                              int replaysThisKey, bool rowPastStatedStop)
+{
+    if (!keyUnchanged || lastChoice <= 0)
+        return false; //a fresh ask, or a cached pass/hold: not this bound's business
+    if (replaysThisKey < 0)
+        return true;  //a re-ask is already LATCHED for this key and in flight
+    if (rowPastStatedStop)
+        return true;  //(3) a replay never runs past the model's own stated stop
+    return replaysThisKey >= 1; //(1) one replay per key, then the model decides again
+}
+
+//#W81-DI: does taking this row CREATE or MOVE objects? A token maker, a zone
+//mover and a copier all change WHICH OBJECTS EXIST for the next activation, which
+//is a legal-continuation fact and not a board number. One NestedAbility unwrap,
+//the same shape `makesCreatureToken` and `asActivatedForCount` use (a
+//GenericActivated wrapper is the outer object). Reads nothing, mutates nothing.
+static bool w81RowCreatesOrMovesObjects(MTGAbility * a)
+{
+    if (!a)
+        return false;
+    for (int layer = 0; layer < 2; layer++)
+    {
+        if (dynamic_cast<ATokenCreator *>(a) || dynamic_cast<AAMover *>(a)
+            || dynamic_cast<AACopier *>(a))
+            return true;
+        NestedAbility * na = dynamic_cast<NestedAbility *>(a);
+        if (!na || !na->ability)
+            return false;
+        a = na->ability;
+    }
+    return false;
+}
+
+//#W81-DI: the seat's own battlefield object count, for the digest term above.
+static int w81BattlefieldObjectCount(Player * p)
+{
+    if (!p || !p->game || !p->game->battlefield)
+        return 0;
+    return p->game->battlefield->nb_cards;
+}
+
 //#W79-DC (F1): the identities a live chooser accepts right now, as a SORTED,
 //DEDUPLICATED token list. Identity is the display name plus `instanceHandle`
 //(what the rows themselves address the object by) - never a preview, never a
@@ -36226,14 +36384,27 @@ static string w79ChooserTargetTokens(TargetChooser * tc, GameObserver * obs)
 //through the same formatter the live seams use. Rows with no chooser contribute
 //their label and an empty set, so a row APPEARING or LEAVING is visible here too
 //(the key tail already carries that; this keeps the two halves consistent).
+//#W81-DI: `objectCount` is the seat's battlefield object count and it enters the
+//digest ONLY when some offered row's own resolution creates or moves objects
+//(-1 = no such row, and the term is omitted byte for byte, so every window
+//without one keys exactly as wave 79 keyed it). The standing rule is that a board
+//NUMBER creating no row stays out of every key; this is the stated exception and
+//it is the same rule, not a hole in it - a row that MAKES an object makes the next
+//activation a different legal continuation, and the count is the only term that
+//says so. A life tick, a damage count and a clock still key EQUAL because none of
+//them is this number. It is a digest term only: `w79RePutCollapseIdentity`, the
+//hold latch (`holdActionKeyRow`) and the hold check are untouched.
 static string w79ContinuationDigestOf(const std::vector<string>& rowLabels,
                                       const std::vector<string>& rowTargets,
-                                      int untappedSources)
+                                      int untappedSources,
+                                      int objectCount = -1)
 {
     std::ostringstream o;
     for (size_t i = 0; i < rowLabels.size(); i++)
         o << (i ? "; " : "") << rowLabels[i] << "->[" << (i < rowTargets.size() ? rowTargets[i] : string()) << "]";
     o << (rowLabels.empty() ? "" : "; ") << "sources=" << untappedSources;
+    if (objectCount >= 0)
+        o << "; objects=" << objectCount;
     return o.str();
 }
 
@@ -36245,6 +36416,7 @@ string AIPlayerGPT::w79ContinuationDigestPriority(const std::vector<const Ordere
     if (!observer)
         return string();
     std::vector<string> labels, targets;
+    bool objectRow = false; //#W81-DI
     for (size_t i = 0; i < shown.size(); i++)
     {
         const OrderedAIAction * a = shown[i];
@@ -36255,10 +36427,13 @@ string AIPlayerGPT::w79ContinuationDigestPriority(const std::vector<const Ordere
         lab << (src ? src->getDisplayName() + instanceHandle(src) : string("?"));
         labels.push_back(lab.str());
         targets.push_back(w79ChooserTargetTokens(a->ability->getActionTc(), observer));
+        if (w81RowCreatesOrMovesObjects(a->ability))
+            objectRow = true; //#W81-DI: this window can change which objects exist
     }
     GptManaPolicy policy(this);
     return w79ContinuationDigestOf(labels, targets,
-                                   ManaEngine::potentialColorReach(this, policy, NULL));
+                                   ManaEngine::potentialColorReach(this, policy, NULL),
+                                   objectRow ? w81BattlefieldObjectCount(this) : -1); //#W81-DI
 }
 
 //#W79-DC (F1): ...and for the casting seam, where a row is a hand card and its
@@ -45699,6 +45874,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //on exactly the twelve windows the docket names.
     bool everyBaseRowStopPriced = (baseIndex > 0);
     bool anyStopReachedRow = false;
+    //#W81-DI: the SAME verdict, per base row, so the replay bound below can ask it
+    //of the one row a cached answer would take rather than of the whole window
+    //(`w79StopReachedRePutCollapses` needs EVERY row stop-priced; a replay needs
+    //only its own). Filled from `rowStopPriced` inside this loop - one verdict,
+    //two readers, so the row's printed clause and the bound cannot disagree.
+    std::vector<char> w81StopReachedRow((size_t) (baseIndex > 0 ? baseIndex : 0), 0);
     for (int rb = 0; rb < baseIndex; rb++)
     {
         if (isManaOnlyAction(shown[rb]->ability))
@@ -45714,6 +45895,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         }
         const bool rowStopPriced = (pricedCount >= 0 && carriedStop >= 0
                                     && pricedCount >= carriedStop);
+        if (rowStopPriced)
+            w81StopReachedRow[(size_t) rb] = 1; //#W81-DI
         if (!rowStopPriced)
             everyBaseRowStopPriced = false;
         if (!repeatRowEligible(asActivatedForCount(shown[rb]->ability)))
@@ -46319,6 +46502,52 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                       " so priority is not force-passed");
     }
 
+    //#W81-DI: THE REPLAY BOUND. See `w81CachedReplayMustReask` for the finding.
+    //The run counter is per KEY - a different window (or the same window after the
+    //object count moves under #W81-DI's digest term) is a different question and
+    //starts its own run, exactly as `askReplayRefuseScoped` does at the ask seam.
+    if (askKey != mCachedReplayKey)
+    {
+        mCachedReplayKey = askKey;
+        mCachedReplayRuns = 0;
+    }
+    //...and the stop verdict for the row a cached answer would take, mapped through
+    //the repeat row's base when the cached answer took a repeat row.
+    bool w81ReplayPastStop = false;
+    if (unchanged && mLastChoice >= 1 && mLastChoice <= index)
+    {
+        int w81Base = mLastChoice - 1;
+        if (w81Base >= baseIndex && (size_t) w81Base < repeatBaseRow.size()
+            && repeatBaseRow[w81Base] >= 0)
+            w81Base = repeatBaseRow[w81Base];
+        if (w81Base >= 0 && (size_t) w81Base < w81StopReachedRow.size()
+            && w81StopReachedRow[(size_t) w81Base])
+            w81ReplayPastStop = true;
+    }
+    string w81PendingReaskReason; //#W79-DC (F10): stamped at the SEND, never here
+    if (w81CachedReplayMustReask(unchanged, mLastChoice, mCachedReplayRuns, w81ReplayPastStop))
+    {
+        //The re-ask is LATCHED (`mCachedReplayRuns` = -1) until the model really
+        //answers this key. Without the latch the round trip's own `kChoicePending`
+        //ticks would find a zeroed run counter, fall back into the cache and replay
+        //the very activation the bound just refused - the bound would hold for one
+        //tick and then let the loop run again.
+        if (mCachedReplayRuns >= 0)
+        {
+            mCachedReplayReasked++;
+            DebugTrace("AIPlayerGPT[ph" << phase << "]: cached answer " << mLastChoice
+                       << " already stood once for this window and the board moved under"
+                          " it; asking the model again rather than replaying an activation"
+                          " (" << mCachedReplayReasked << " this game)");
+        }
+        mCachedReplayRuns = -1;
+        w81PendingReaskReason = w81ReplayPastStop ? "cached_replay_past_stop"
+                                                  : "cached_replay_bound";
+        unchanged = false;
+    }
+    else if (unchanged && mLastChoice > 0)
+        mCachedReplayRuns++;
+
     int choice;
     //#W79-DC (F1): the CACHE half is deliberately NOT gated on the board. #W79-CZ
     //(T3)'s whole finding is that a life tick under an unchanged menu is not a new
@@ -46351,6 +46580,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 w79CountOwnLoopVerdictLine();
             w80ApplyVerdictFacesAtSend(true, w80PendingCrackBackFace,
                                        w80PendingStackDeathFace, w80PendingDrain);
+            //#W81-DI: same discipline - the reason rides the record of the window
+            //whose prompt was actually handed over, and an ordinary new-key send
+            //writes the empty string, which clears any face a discarded window left.
+            mReaskReasonFace = w81PendingReaskReason;
         }
         string content;
         if (pollCompletionRetry(userMsg, content, "priority") == kChoicePending)
@@ -46797,6 +47030,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         }
 
         mLastAskKey = askKey;
+        //#W81-DI: the model answered THIS key, so the latch is released and this
+        //key's replay allowance starts again from nothing.
+        mCachedReplayKey = askKey;
+        mCachedReplayRuns = 0;
         //#W79-DC (F1): the board this decision was taken over, so the deadlock
         //breaker's next reading is "has the board moved SINCE the action", not
         //"do the rows still read the same".
@@ -102865,6 +103102,116 @@ static const char * kW50Y_r94 =
               " moment a sidecar replay record advances mTransSeq without advancing"
               " mWindowSeq - and the wave-80 replay passed the window ordinal into"
               " `replayed_from`, where every other path passes a record seq");
+    }
+
+    // ============== WAVE 81 LANE DI - the priority cache's replay bound ==============
+    // `162v123` in matchups-20260912-074153, the wave-80 corpus's HUNG game: 3,641 s
+    // in an engine dead loop, killed by the harness. Seat deck123's stderr counts
+    // 3,674 `Using Activated ability` on Thraben Doomsayer, 3,655 `the menu is
+    // unchanged after action 2 but the board moved`, 3,659 `take action 2/3
+    // (cached=1)` - and SIX `model chose` lines in the whole game. The seat controls
+    // Intruder Alarm: every token untaps the Doomsayer, the same row is re-offered,
+    // the ask key is byte-identical, and `mLastChoice` is replayed with no round trip
+    // and no bound. The model's last real answer (seq 35) asked for NINE - the repeat
+    // plan ran its 8 remaining iterations and then the cache ran 3,659 more.
+    cout << "\n[#W81-DI] a cached ACTIVATION is replayed at most once per window key\n";
+    {
+        int baseReplays = 0, boundReplays = 0, reasks = 0, runs = 0;
+        for (int tick = 0; tick < 3659; tick++)
+        {
+            baseReplays++; // the base rule IS `unchanged` - nothing else gates it
+            if (w81CachedReplayMustReask(true, 2, runs, false))
+            {
+                reasks++;
+                runs = 0;  // the model answers this key, and its allowance restarts
+            }
+            else
+            {
+                boundReplays++;
+                runs++;
+            }
+        }
+        CHECK(baseReplays == 3659,
+              "#W81-DI RED-ON-BASE the base rule replays the cached ACTIVATION on every one"
+              " of the hung game's 3,659 identical offers and asks the model none of them");
+        CHECK(boundReplays * 2 == 3659 + 1 && reasks * 2 == 3659 - 1 && reasks > 0,
+              "#W81-DI GREEN under the bound every second identical offer goes back to the"
+              " model - the engine loop cannot outrun the model's own decision, and the"
+              " option is still on the menu at every one of them");
+        CHECK(!w81CachedReplayMustReask(true, 2, 0, false)
+              && w81CachedReplayMustReask(true, 2, 1, false),
+              "#W81-DI the allowance is exactly ONE: the first identical offer replays, the"
+              " second re-asks");
+        CHECK(w81CachedReplayMustReask(true, 2, -1, false),
+              "#W81-DI the LATCH: while a re-ask for this key is in flight the polling ticks"
+              " must not fall back into the cache and replay the refused activation");
+        CHECK(!w81CachedReplayMustReask(false, 2, 9, false),
+              "#W81-DI MUST-NOT-MATCH a key that CHANGED is an ordinary ask, not a bound");
+        CHECK(!w81CachedReplayMustReask(true, 0, 9, false)
+              && !w81CachedReplayMustReask(true, -1, 9, false),
+              "#W81-DI MUST-NOT-MATCH a cached PASS or a deferred window commits nothing and"
+              " progresses nothing - #W79-CZ (T3)'s finding is that re-asking those is waste");
+        CHECK(w81CachedReplayMustReask(true, 2, 0, true),
+              "#W81-DI the wave-72 stop binds the REPLAY path too: a cached answer whose row"
+              " is already at or past the model's own stated stop is never replayed, not even"
+              " the one time the bound would otherwise allow");
+    }
+
+    cout << "\n[#W81-DI] a token the row's own effect made is a NEW legal continuation\n";
+    {
+        // The same window before and after one Doomsayer activation under Intruder
+        // Alarm: one row, the same source instance, no target chooser, and the Alarm
+        // untaps everything so the untapped-source count is identical too.
+        std::vector<string> labels, targets;
+        labels.push_back("Thraben Doomsayer#12");
+        targets.push_back(string());
+        const string dcBefore = w79ContinuationDigestOf(labels, targets, 3);
+        CHECK(dcBefore == w79ContinuationDigestOf(labels, targets, 3),
+              "#W81-DI RED-ON-BASE the wave-79 digest cannot tell the two windows apart: the"
+              " row targets nothing and the Alarm restores the source count, so the token"
+              " moves NO term of the key");
+        CHECK(w79ContinuationDigestOf(labels, targets, 3, 5)
+                  != w79ContinuationDigestOf(labels, targets, 3, 6),
+              "#W81-DI GREEN with the seat's object count the token IS a change - the next"
+              " activation is offered over a different set of objects");
+        CHECK(w79ContinuationDigestOf(labels, targets, 3, -1) == dcBefore,
+              "#W81-DI a window with no object-making row omits the term byte for byte, so"
+              " every wave-79 key is unchanged");
+        CHECK(w79AskScopeKey(8, 10, w79ContinuationDigestOf(labels, targets, 3, 5))
+                  != w79AskScopeKey(8, 10, w79ContinuationDigestOf(labels, targets, 3, 6)),
+              "#W81-DI GREEN the seam's own key carries the term through");
+    }
+
+    cout << "\n[#W81-DI] KEY the object count enters the DIGEST only - no latch key moves\n";
+    {
+        // The JOINED menu the hung window printed (`162v123` seq 35 options_text),
+        // rendered twice with only the numbers that move while the loop runs.
+        const string doomBody =
+            "Create human with Thraben Doomsayer [cost: Tap]"
+            " {card text: \"{T}: Put a 1/1 white Human creature token onto the battlefield.\"}";
+        const string rowA = doomBody + repeatRowStopClause(2, 9, 20, 20);
+        const string rowB = doomBody + repeatRowStopClause(3, 9, 20, 19);
+        const string hold = "Hold priority - pass now, and do not ask me again";
+        CHECK(rowA != rowB,
+              "#W81-DI KEY the pair really does differ in the rendered bytes");
+        std::vector<string> menuA, menuB;
+        menuA.push_back(rowA); menuA.push_back(hold);
+        menuB.push_back(rowB); menuB.push_back(hold);
+        CHECK(optionSetKeyOf(menuA) == optionSetKeyOf(menuB)
+              && holdActionKeyRow(rowA) == holdActionKeyRow(rowB),
+              "#W81-DI KEY a life tick and a moving count still key EQUAL on the joined menu -"
+              " the option-set key and the hold-latch ACTION key are untouched by this wave");
+        const string tailA = "\n1. " + rowA + "\n2. " + hold + "\n";
+        const string tailB = "\n1. " + rowB + "\n2. " + hold + "\n";
+        CHECK(w77KeyTailOf(tailA) == w77KeyTailOf(tailB),
+              "#W81-DI KEY the ask key's and the async slot's half of the rendered list is"
+              " identical across the pair - the object count is a DIGEST term, never a row byte");
+        CHECK(w79RePutCollapseIdentity(menuA, 9) == w79RePutCollapseIdentity(menuB, 9),
+              "#W81-DI KEY the stop-reached re-put identity is untouched: nothing this wave"
+              " adds can collapse or re-open a window the wave-79 rule kept");
+        CHECK(w77KeyTailOf(tailA).find("objects=") == string::npos,
+              "#W81-DI KEY MUST-NOT-MATCH the object count never reaches the hold-latch or"
+              " hold-check keys - it lives in the legal-continuation digest and nowhere else");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
