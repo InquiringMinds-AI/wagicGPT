@@ -286,6 +286,53 @@ struct W76CrossPhaseAsk
                          choice(0), sorcerySpeed(false), recordSeq(-1) {}
 };
 
+//#W81-DK (V15, wave-80 known-bugs V15 / engine-seat MED-5). A COUNTER WITH NO
+//PER-RECORD TRACE CANNOT BE ADJUDICATED (the LESSON OF WAVE 79). Six wave-80
+//counters live only on the `gameend` record, and three of the wave-80 brief's own
+//sampling requests could not be answered because of it. These are SKIP counters:
+//they fire on windows that write no record at all, so the trace they CAN carry is
+//the DELTA since the previous record - which window pair the skips fall between,
+//on the record that closes that pair. The tail (skips after the last prompt-bearing
+//record) rides the gameend record, so the identity
+//   sum of every record's delta + the tail == the gameend counter
+//holds by construction, and is pinned.
+//#W81-DK: the wave-81 lane-DK pure helpers, declared here because AIPlayerGPT.cpp
+//uses them from inside an anonymous namespace as well as outside it. Defined in
+//AIPlayerGPT.cpp beside the rest of the key helpers; each is pinned in PARSETEST.
+bool w81AskCacheUsable(bool stateBasedActionWindow);                       //V1
+std::string w81CastDigestStackTerm(bool anyInstantSpeedRow,
+                                   const std::vector<std::string>& stackObjectHandles); //V4
+bool w81CastAnsweredStampMatches(int stampTurn, int stampPhase,
+                                 const std::string& stampStack,
+                                 int nowTurn, int nowPhase, const std::string& nowStack); //V4
+enum W81SendDisposition
+{
+    kW81SendSuppressed = 0,
+    kW81SendInFlight = 1,
+    kW81SendHandedOff = 2
+};
+int w81SendDisposition(bool transportHandedOff, bool pollReturnedPending); //V9
+
+struct W81SkipTrace
+{
+    std::map<std::string, int> pending;
+    std::map<std::string, int> total;
+    void note(const char * what)
+    {
+        if (!what || !*what)
+            return;
+        pending[what]++;
+        total[what]++;
+    }
+    //Consumed by the record writer: the deltas since the previous record, then zero.
+    std::map<std::string, int> drain()
+    {
+        std::map<std::string, int> out;
+        out.swap(pending);
+        return out;
+    }
+};
+
 struct W76HoldMemory
 {
     std::map<std::string, std::set<std::string> > last;
@@ -684,7 +731,11 @@ private:
     static bool askReplayRefuseScoped(const std::string & key,
                                       std::map<std::string, int> & runs, int maxRun);
     //#W72-BT (M14): the count MED-5 could not make.
-    virtual void noteOwnTurnWindowSkipped() { mOwnTurnWindowsSkipped++; }
+    virtual void noteOwnTurnWindowSkipped()
+    {
+        mOwnTurnWindowsSkipped++;
+        mSkipTrace.note("own_turn_windows_skipped"); //#W81-DK (V15)
+    }
     //#W73-BY (N16, wave-72 deck152 MED-3): `152v146` t18 ran a whole main
     //phase 1 with Teferi x2 and Katilda all `[castable now]` and no casting
     //window; 2 of the corpus's 102 own turns did this and NOTHING counted it -
@@ -757,6 +808,7 @@ private:
         if (w76MainSkipFlush(mMainSkip))
         {
             mMainPhaseWindowsSkipped++;
+            mSkipTrace.note("main_phase_windows_skipped"); //#W81-DK (V15)
             //#W76-CN (Q7): THE TRACE SPEAKS THE RECORDS' TURN. It printed
             //`observer->turn` while every translog record prints
             //translogTurn(observer->turn) = observer->turn + 1, so a reviewer
@@ -1352,7 +1404,11 @@ private:
     void writeForceCloseRecord(const char * outcome, bool landArm); //#W78-CV (S11)
     //#W80-DH (F11): one record per hold clamp / hold re-open, written at the event.
     void writeHoldEventRecord(const char * event, const char * seam,
-                              const std::string& face, const std::string& reason);
+                              const std::string& face, const std::string& reason,
+                              int answerInvalidated = -1); //#W81-DK (V3)
+    //#W81-DK (V3): drop the retained answer for the window held at <seam>, so a
+    //re-opened window is ASKED instead of re-served the hold row it just retired.
+    bool w81InvalidateHeldAnswer(const char * seam);
     //#W80-DH (F3): the object identity behind each lethal face, off the live board.
     std::string w80StackThreatIdentityNow();
     std::string w80CrackBackThreatIdentityNow();
@@ -2148,6 +2204,50 @@ private:
     int mStubReplyIndex;
     int mCachedReplayReasked;
     std::string mReaskReasonFace;
+    //#W81-DK (V1): this askModel call is a STATE-BASED ACTION window (the legend
+    //rule's "which copy goes to the graveyard"). Neither re-serve cache may answer
+    //it and its answer is never stored: the answer DESTROYS a permanent, and the
+    //objects the rule applies to are re-derived by the engine every time it applies.
+    bool mInStateBasedActionAsk;
+    struct StateBasedActionAskScope
+    {
+        AIPlayerGPT * p;
+        StateBasedActionAskScope(AIPlayerGPT * _p, bool on) : p(_p)
+        { p->mInStateBasedActionAsk = on; }
+        ~StateBasedActionAskScope() { p->mInStateBasedActionAsk = false; }
+    };
+    int mSbaWindowsCacheBypassed;
+    std::string mCacheBypassFace;
+    //#W81-DK (V3): the ask key whose answer produced the hold at each seam. A hold
+    //RE-OPEN invalidates it, so the re-opened window goes to the model instead of
+    //being re-served the very hold row the re-open just retired.
+    std::map<std::string, std::string> mHoldAskKey;
+    std::string mLastAskKeyBuilt;
+    int mHoldReopenAnswerInvalidated;
+    //#W81-DK (V4): the stack the phase's casting decision was answered over, the
+    //re-open census, and the per-record reason staged for the send.
+    std::string mCastAskStack;
+    int mCastDecisionReopenedNewStack;
+    int mCastReopenCountedSeq;
+    std::string mNextSendCastReopen;
+    std::string mCastReopenFace;
+    //#W81-DK (V9): set by the TRANSPORT when it actually hands a prompt over (a
+    //spawned worker, or the development stub) - never by a caller's literal.
+    bool mTransportHandedOff;
+    //#W81-DK (V9): the window ordinal the staged verdict faces belong to. A record
+    //consumes a face only when it closes that window; a face whose window never
+    //wrote a record is dropped and counted, so
+    //`<counter> == records carrying the face + verdict_faces_dropped_unrecorded`.
+    int mVerdictFaceWindow;
+    int mVerdictFacesDroppedUnrecorded;
+    //#W81-DK (V15): the six skip counters' per-record trace - deltas since the
+    //previous record, with the tail on the gameend record.
+    W81SkipTrace mSkipTrace;
+    std::vector<std::string> w81StackObjectHandles();
+    std::string w81StackStateStamp();
+    //#W81-DK (V15): the record seq of the last prompt-bearing record, so a
+    //`hold_event` names the window it refers to on the numbering a reviewer joins on.
+    int mLastWindowRecordSeq;
     bool w77OwnLoopResolving();
     int w78TheirDrainingTriggerCount();  //#W78-CV (S4)
     void w78CountStackDrainWindow();     //#W78-CV (S4)

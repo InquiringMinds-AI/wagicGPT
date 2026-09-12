@@ -19273,6 +19273,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         if (w81Stub[0])
         {
             content = w81StubReplyNext(w81Stub, mStubReplyIndex++);
+            mTransportHandedOff = true; //#W81-DK (V9): the stub IS the transport here
             mLastLatencyMs = 0;
             mLastTimeout = false;
             mLastHttpStatus = 200;
@@ -19754,6 +19755,13 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         }
         return 0; //answer now, with an empty reply -> the seam's heuristic
     }
+    //#W81-DK (V9): THE SEND BOUNDARY. The worker holds the prompt and will put it on
+    //the wire - this line, and the stub above, are the only two places in this seat
+    //where a prompt is handed over. Every verdict count and every record face is
+    //gated on this flag from here on, instead of on a caller's literal `true`
+    //written one statement before the call (`crackback_verdict_lines_rendered` 382
+    //vs 329 prompts vs 291 records, wave-80 engine-seat HIGH-4).
+    mTransportHandedOff = true;
     return kChoicePending;
 }
 
@@ -20608,7 +20616,13 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mInAnnounceXAsk(false),
       mPlanEchoCount(0),
       mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0),
-      mRunLastCount(0) //#W57-D (D29)
+      mRunLastCount(0), //#W57-D (D29)
+      mInStateBasedActionAsk(false), mSbaWindowsCacheBypassed(0),
+      mHoldReopenAnswerInvalidated(0),
+      mCastDecisionReopenedNewStack(0), mCastReopenCountedSeq(-1),
+      mTransportHandedOff(false),
+      mVerdictFaceWindow(-1), mVerdictFacesDroppedUnrecorded(0),
+      mLastWindowRecordSeq(-1) //#W81-DK (V1/V3/V4/V9/V15)
 
 {
     mStatedStop = -1;      //#W67-AY (I6): nothing stated yet
@@ -20931,8 +20945,62 @@ void AIPlayerGPT::writeForceCloseRecord(const char * outcome, bool landArm)
 //`forced_close` and `menu_single_outcome`) it takes no ask seq of the window
 //counter. `hold_events` on the gameend record equals the number of these records,
 //and the sum of the three class counters equals it too.
+//#W81-DK (V3, wave-80 known-bugs V3 / engine-seat HIGH-1). A RE-OPEN THAT THE SAME
+//LATCH IMMEDIATELY RE-CLAMPS IS NOT A RE-OPEN. `125v162` seqs 18/20/22/24: four
+//`reopen_new_lethal` events on one `window_seq` 14, no prompt-bearing record after
+//seq 17, seat dead at 0. The re-open DID retire the latch (`mHoldRows.erase`), the
+//window WAS re-put - and `askModel` then found the window's own key in the ask
+//cache and re-served the HOLD ROW with no round trip and no `-> chose` line, so
+//`takeHold` ran again on the seat's own retained answer. DH F3 shipped the event
+//and no behaviour. So a re-open invalidates the RETAINED ANSWER for that window's
+//key before the hold check can read it again: the re-opened window goes to the
+//model. Nothing is removed from any menu and nothing is auto-answered.
+bool AIPlayerGPT::w81InvalidateHeldAnswer(const char * seam)
+{
+    const string s(seam ? seam : "");
+    bool did = false;
+    std::map<string, string>::iterator hk = mHoldAskKey.find(s);
+    if (hk != mHoldAskKey.end())
+    {
+        if (!hk->second.empty())
+        {
+            if (mAskCache.erase(hk->second))
+                did = true;
+            mAskCacheSeq.erase(hk->second);
+            mAskReplayRuns.erase(hk->second);
+        }
+        mHoldAskKey.erase(hk);
+    }
+    //#W71-BS (F4): BOTH re-serve paths, or neither - the repeat latch answers the
+    //same window from the same retained choice.
+    if (!mRepeatAskKey.empty())
+    {
+        mRepeatAskKey.clear();
+        mRepeatAskTurn = -1;
+        mRepeatAskSeq = -1;
+        did = true;
+    }
+    //...and the priority seam's own retained answer, which is `mLastChoice` under an
+    //unchanged key rather than a map entry.
+    if (s == "priority" && !mLastAskKey.empty())
+    {
+        mLastAskKey.clear();
+        did = true;
+    }
+    if (did)
+    {
+        mHoldReopenAnswerInvalidated++;
+        DebugTrace("AIPlayerGPT: the hold re-opened at the " << s << " seam - the retained"
+                   " answer for that window is invalidated, so the window goes to the model"
+                   " rather than being re-served the hold row the re-open just retired ("
+                   << mHoldReopenAnswerInvalidated << " this game)");
+    }
+    return did;
+}
+
 void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
-                                       const string& face, const string& reason)
+                                       const string& face, const string& reason,
+                                       int answerInvalidated)
 {
     mHoldEvents++;
     if (mTransLogPath.empty())
@@ -20947,6 +21015,18 @@ void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
         {"face", face},
         {"reason", reason},
         {"window_seq", mWindowSeq},
+        //#W81-DK (V15, wave-80 known-bugs V15): the RECORD seq of the window this
+        //event refers to - the numbering `seq`, `replayed_from` and `recovers_seq`
+        //all use. `window_seq` is the WINDOW ordinal and the two diverge the moment
+        //any sidecar record advances mTransSeq without advancing mWindowSeq, which
+        //made a wave-80 hold at record 89 read `window_seq 42`. -1 = no window
+        //record has been written at this seat yet.
+        {"window_record_seq", mLastWindowRecordSeq},
+        //#W81-DK (V3): did this event invalidate the retained answer for the
+        //window's key (so the re-opened window is ASKED)? 1 = yes, 0 = nothing was
+        //retained, -1 = not a re-open. The counter
+        //`hold_reopen_answer_invalidated` is the join.
+        {"answer_invalidated", answerInvalidated},
         {"turn", translogTurn(observer ? observer->turn : 0)},
         {"phase", observer ? observer->getCurrentGamePhase() : -1},
     };
@@ -22077,7 +22157,25 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W79-CZ (T4): the own-loop verdict FACE this window's prompt printed, stamped
     //at the splice and consumed here, so the two `126` windows wave 78 could not
     //locate are a field on their own record rather than an unjoinable counter.
-    if (!mOwnLoopVerdictFace.empty())
+    //#W81-DK (V9): ...and only on the record that CLOSES the window the face was
+    //stamped at. A face whose window never wrote a record (a stale async drop) is
+    //dropped here and counted, so `<counter> == records carrying the face +
+    //verdict_faces_dropped_unrecorded` holds exactly, both ways.
+    //A `wall_miss` is telemetry about a window still IN FLIGHT and rides its number
+    //(w77ConsumeWindowSeq) - it is not the record that closes it, so it neither
+    //consumes a face nor drops one.
+    const bool w81FaceIsThisWindow = w77RecordIsWindowRecord(kind)
+                                     && mVerdictFaceWindow == recordWindowSeq;
+    if (w77RecordIsWindowRecord(kind) && !w81FaceIsThisWindow
+        && (!mOwnLoopVerdictFace.empty() || !mCrackBackVerdictFace.empty()
+            || !mStackDeathVerdictFace.empty()))
+    {
+        mVerdictFacesDroppedUnrecorded++;
+        mOwnLoopVerdictFace.clear();
+        mCrackBackVerdictFace.clear();
+        mStackDeathVerdictFace.clear();
+    }
+    if (w81FaceIsThisWindow && !mOwnLoopVerdictFace.empty())
     {
         rec["own_loop_verdict"] = mOwnLoopVerdictFace;
         mOwnLoopVerdictFace.clear();
@@ -22088,12 +22186,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //59 and `hold_reopened_new_threat` 0 were unsamplable: neither the window, nor
     //the held face, nor the live face was recoverable from any of the 42 seat logs.
     //All four are consumed here so no later record can inherit them.
-    if (!mCrackBackVerdictFace.empty())
+    if (w81FaceIsThisWindow && !mCrackBackVerdictFace.empty())
     {
         rec["crackback_verdict"] = mCrackBackVerdictFace;
         mCrackBackVerdictFace.clear();
     }
-    if (!mStackDeathVerdictFace.empty())
+    if (w81FaceIsThisWindow && !mStackDeathVerdictFace.empty())
     {
         rec["stack_death_verdict"] = mStackDeathVerdictFace;
         mStackDeathVerdictFace.clear();
@@ -22108,6 +22206,37 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reask_reason"] = mReaskReasonFace;
         mReaskReasonFace.clear();
+    }
+    //#W81-DK (V4): WHY this casting window exists at all after the phase's casting
+    //decision was already answered - `new_stack_object`. The counter
+    //`cast_decision_reopened_new_stack` is the join.
+    if (w81FaceIsThisWindow && !mCastReopenFace.empty())
+    {
+        rec["cast_reopen_reason"] = mCastReopenFace;
+        mCastReopenFace.clear();
+    }
+    //#W81-DK (V1): ...and WHY this window went to the model rather than to either
+    //re-serve cache - `state_based_action`. The counter
+    //`sba_windows_cache_bypassed` is the join.
+    if (!mCacheBypassFace.empty())
+    {
+        rec["cache_bypass_reason"] = mCacheBypassFace;
+        mCacheBypassFace.clear();
+    }
+    //#W81-DK (V15): the six skip counters' per-record trace. Only non-zero entries
+    //are written, so a record that closed a window with no skips behind it carries
+    //no field at all; the sum over every record plus `skips_after_last_record` on
+    //the gameend record equals each counter, by construction.
+    {
+        const std::map<std::string, int> w81Skips = mSkipTrace.drain();
+        if (!w81Skips.empty())
+        {
+            json sk = json::object();
+            for (std::map<std::string, int>::const_iterator si = w81Skips.begin();
+                 si != w81Skips.end(); ++si)
+                sk[si->first] = si->second;
+            rec["skips_since_last"] = sk;
+        }
     }
     //#W80-DH (F11, Astra wave-80 finding 11 - MED): `hold_safer_ignored_face` and
     //`hold_reopen_reason` are DELETED from the window record. They were ONE shared
@@ -22515,6 +22644,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (optionTexts)
         rec["options_text"] = *optionTexts;
     transLogWrite(rec.dump()); //audit-L (L4)
+    //#W81-DK (V15): the RECORD seq of the last window record, so a `hold_event`
+    //written between two windows names the window it refers to on the numbering a
+    //reviewer joins on (wave 80 gave it `window_seq`, a different numbering - the
+    //wave-77 lesson in its own shape: hold at record 89 -> `window_seq 42`).
+    if (w77RecordIsWindowRecord(kind) && rec.count("seq"))
+        mLastWindowRecordSeq = rec["seq"].get<int>();
     //#W53-Q (D24): this decision was handed off - the next record (or the
     //game-end record) will say what answered.
     if (handedToHeuristic(choice, fallback))
@@ -22750,6 +22885,21 @@ void AIPlayerGPT::logGameEnd()
         //CASTING answer into a second time and that went back to the model instead.
         //Per-record trace: `reask_reason`. > 0 whenever a loop engine is live.
         {"cached_replay_reasked", mCachedReplayReasked},
+        //#W81-DK (V1): SBA windows (the legend rule) that went to the model because
+        //neither re-serve cache may answer one. Per-record trace:
+        //`cache_bypass_reason: state_based_action`.
+        {"sba_windows_cache_bypassed", mSbaWindowsCacheBypassed},
+        //#W81-DK (V3): hold re-opens that INVALIDATED the retained answer for the
+        //window's own ask key, so the re-opened window went to the model rather than
+        //being re-served the hold row the re-open had just retired. Per-event trace:
+        //the `hold_event` record's `answer_invalidated`.
+        {"hold_reopen_answer_invalidated", mHoldReopenAnswerInvalidated},
+        //#W81-DK (V4): casting windows re-opened inside an already-answered phase
+        //because the STACK moved. Per-record trace: `cast_reopen_reason`.
+        {"cast_decision_reopened_new_stack", mCastDecisionReopenedNewStack},
+        //#W81-DK (V9): verdict faces stamped at a real send whose window never wrote
+        //a record. `<lines_rendered> == records carrying the face + this`.
+        {"verdict_faces_dropped_unrecorded", mVerdictFacesDroppedUnrecorded},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -22762,6 +22912,22 @@ void AIPlayerGPT::logGameEnd()
         {"answer_label_absent_read", mAnswerLabelAbsentRead},
         {"plan_names_uncastable_zone_card", mPlanNamesUncastableZoneCard}, //#W75-CL (P17)
     };
+    //#W81-DK (V15): the TAIL of the skip trace - the skips that fall after the last
+    //prompt-bearing record of the game. With the per-record `skips_since_last`
+    //deltas this closes the identity
+    //   sum(record deltas) + skips_after_last_record == the counter above
+    //for each of the six, so every skip is locatable to a window pair.
+    {
+        const std::map<std::string, int> w81Tail = mSkipTrace.drain();
+        if (!w81Tail.empty())
+        {
+            json sk = json::object();
+            for (std::map<std::string, int>::const_iterator si = w81Tail.begin();
+                 si != w81Tail.end(); ++si)
+                sk[si->first] = si->second;
+            rec["skips_after_last_record"] = sk;
+        }
+    }
     transLogWrite(rec.dump()); //audit-L (L4)
     //#W57-A (D31): the closing totals on STDERR, per seat. A reviewer
     //cross-tabbing holds against savings reads the stderr; before this the
@@ -25294,6 +25460,7 @@ void AIPlayerGPT::w80CloseOpenCastStep(const char * why)
     mPlanCastOpenName.clear();
     mPlanCastOpenTurn = -1;
     mPlanCastStepsClosed++;
+    mSkipTrace.note("plan_cast_steps_closed"); //#W81-DK (V15)
     DebugTrace("AIPlayerGPT: the open cast plan step closed - " << (why ? why : ""));
 }
 
@@ -31210,8 +31377,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
         //were told their own window had already been answered. The stamp now
         //dates a CLOSED decision only, and a casting decision that is open right
         //now overrides it.
+        //#W81-DK (V4): ...and the stack the answer was given over. `152v125` seq 101
+        //printed this tag on an INSTANT while the opponent's counterspell sat on the
+        //stack; a stack that has moved since the answer is a different window.
         const bool castingDecisionAnswered = w72CastAnsweredFactApplies(
-            mCastAskTurn == observer->turn && mCastAskPhase == phase, mCastDecisionOpen);
+            w81CastAnsweredStampMatches(mCastAskTurn, mCastAskPhase, mCastAskStack,
+                                        observer->turn, phase, w81StackStateStamp()),
+            mCastDecisionOpen);
         const bool sorcerySpeedOk = (observer->currentPlayer == this)
             && (phase == (int) MTG_PHASE_FIRSTMAIN || phase == (int) MTG_PHASE_SECONDMAIN)
             && stackEmpty;
@@ -34952,12 +35124,17 @@ void AIPlayerGPT::w80ApplyVerdictFacesAtSend(bool sent, const string& pendingCra
                                              const string& pendingStackDeath,
                                              bool pendingDrain)
 {
+    //#W81-DK (V9): a window that sent NOTHING clears nothing. Wave 80 cleared both
+    //faces on every suppressed exit, and the suppressed exit of one seam routinely
+    //happens between another window's send and its record - 36 of the 38 prompts
+    //that carried `[crack-back verdict:` with no `crackback_verdict` field are
+    //`priority` records, which is exactly that shape. The face is instead STAMPED
+    //with the window ordinal it belongs to (below) and consumed only by the record
+    //that closes that window; one whose window never wrote a record is dropped and
+    //counted (`verdict_faces_dropped_unrecorded`), so the census is exact both ways.
     if (!sent)
-    {
-        mCrackBackVerdictFace.clear();
-        mStackDeathVerdictFace.clear();
         return;
-    }
+    mVerdictFaceWindow = mWindowSeq;
     if (w80CountRenderedAtSend(true, !pendingCrackBack.empty(), mWindowSeq,
                                mCrackBackVerdictCountedSeq, mCrackBackVerdictLinesRendered))
     {
@@ -35972,7 +36149,13 @@ void w79ApplyLoopFaceAtSend(bool sent, const string& pendingFace,
                             string& faceOut, bool& countIt)
 {
     countIt = false;
-    if (!sent || pendingFace.empty())
+    //#W81-DK (V9): a window that sent nothing clears nothing - see
+    //`w80ApplyVerdictFacesAtSend`. It is the window ORDINAL stamped alongside the
+    //face (not a clear on the neighbouring suppressed window) that stops a later
+    //record consuming it.
+    if (!sent)
+        return;
+    if (pendingFace.empty())
     {
         faceOut.clear();
         return;
@@ -36326,6 +36509,85 @@ static bool w81RowCreatesOrMovesObjects(MTGAbility * a)
     return false;
 }
 
+//#W81-DK (V1, wave-80 known-bugs V1 second half). A STATE-BASED ACTION IS NEVER
+//SERVED FROM THE ASK CACHE. `146v162` seq 27 (`replayed_from` 24) answered a
+//LEGEND RULE window - "pick the copy that GOES TO ITS OWNER'S GRAVEYARD now" -
+//from the ask cache, with no round trip and no `-> chose` line. That answer
+//DESTROYS a permanent: it is exactly the class #W81-DI bounds at the priority
+//seam (an answer that commits), and it is a fresh question every time the rule
+//applies, because the objects it applies to are re-derived by the engine. The
+//ask cache exists for the same question re-polled while the board has not moved;
+//an SBA window is not that, and no cache hit there can be right.
+//Pure over one fact so both faces are provable.
+bool w81AskCacheUsable(bool stateBasedActionWindow)
+{
+    return !stateBasedActionWindow;
+}
+
+//#W81-DK (V4, wave-80 known-bugs V4 / engine-seat HIGH-2). THE CASTING DECISION
+//IS PER (phase, STACK STATE), not per phase. `152v125` seq 101: own Main phase 1,
+//`Fateful Absence {1}{w} [instant]` in hand, 6 untapped sources, the opponent's
+//Essence Scatter ON THE STACK targeting the seat's own Briarbridge Tracker - and
+//the hand line read `[no cast row now: you already answered this phase's Casting
+//decision ...]`. The casting menu's key (w79ContinuationDigestCast) carries the
+//rows and the source count and NOTHING about the stack, so the decline the model
+//gave over an EMPTY stack was replayed over a stack that now held a counterspell.
+//250 prompts carried that clause, 200 gating an INSTANT, 61 with a non-empty
+//stack; that window produced the corpus's only unparsed reply (the model tried to
+//respond and there was no row to respond with).
+//The term is the stack objects' IDENTITY - the handles the rows themselves address
+//objects by - never their rendered text, and it is admitted ONLY when the menu
+//offers at least one instant-speed row. A sorcery-speed-only menu keys byte for
+//byte as wave 79 keyed it (its stack is empty by CR 307.1 anyway), so no wave-79
+//key moves. Pure, so PARSETEST drives both faces without a board.
+string w81CastDigestStackTerm(bool anyInstantSpeedRow,
+                              const std::vector<string>& stackObjectHandles)
+{
+    //An EMPTY stack contributes nothing, byte for byte - so an instant-speed menu
+    //over an empty stack keys exactly as wave 79 keyed it, and the only windows this
+    //wave re-keys are the ones with an object on the stack, which is the whole
+    //population V4 names.
+    if (!anyInstantSpeedRow || stackObjectHandles.empty())
+        return string();
+    std::ostringstream o;
+    o << "; stack=";
+    for (size_t i = 0; i < stackObjectHandles.size(); i++)
+        o << (i ? "," : "") << stackObjectHandles[i];
+    return o.str();
+}
+
+//#W81-DK (V4): ...and the same fact on the RENDER side. The hand tag may only say
+//"you already answered this phase's Casting decision" while the stamp dates this
+//turn, this phase AND the same stack the answer was given over. A true statement
+//in the wrong scope is a lie (the TRUST DOCTRINE), and a stack that has grown a
+//counterspell since the answer is a different window.
+bool w81CastAnsweredStampMatches(int stampTurn, int stampPhase, const string& stampStack,
+                                 int nowTurn, int nowPhase, const string& nowStack)
+{
+    return stampTurn == nowTurn && stampPhase == nowPhase && stampStack == nowStack;
+}
+
+//#W81-DK (V9, wave-80 known-bugs V9 / engine-seat HIGH-4). WHO SAYS THE PROMPT WAS
+//SENT. DH F10 moved the verdict counters to "the send", but the send was asserted
+//by the CALLER with a literal `true` written one statement BEFORE the transport
+//call - so a window that reached `pollCompletionRetry` and found a request already
+//in flight counted a line nothing had rendered yet, and a window whose answer was
+//later dropped counted one whose prompt no record carries
+//(`crackback_verdict_lines_rendered` 382 vs 329 prompts vs 291 records).
+//Three dispositions, not two: the transport HANDED THE PROMPT OVER (count and
+//stamp), the window is IN FLIGHT and this tick sent nothing (touch nothing - the
+//face staged at the real send must survive to the record), or the window was
+//SUPPRESSED without any transport call at all (clear the faces, count nothing).
+int w81SendDisposition(bool transportHandedOff, bool pollReturnedPending)
+{
+    if (transportHandedOff)
+        return kW81SendHandedOff;
+    return pollReturnedPending ? kW81SendInFlight : kW81SendSuppressed;
+}
+
+//#W81-DK (V15): `W81SkipTrace` lives in the header (AIPlayerGPT.h) so the member
+//and the pins share one definition.
+
 //#W81-DI: the seat's own battlefield object count, for the digest term above.
 static int w81BattlefieldObjectCount(Player * p)
 {
@@ -36454,8 +36716,58 @@ string AIPlayerGPT::w79ContinuationDigestCast(const std::vector<MTGCardInstance 
         SAFE_DELETE(tc);
     }
     GptManaPolicy policy(this);
+    //#W81-DK (V4): the stack term, admitted only when at least one offered row can
+    //be cast at instant speed. A sorcery-speed-only menu keys byte for byte as
+    //wave 79 keyed it.
+    bool anyInstantSpeedRow = false;
+    for (size_t i = 0; i < cands.size() && !anyInstantSpeedRow; i++)
+        if (cands[i] && (cands[i]->hasType(Subtypes::TYPE_INSTANT)
+                         || cands[i]->has(Constants::FLASH)
+                         || cands[i]->has(Constants::ASFLASH)))
+            anyInstantSpeedRow = true;
     return w79ContinuationDigestOf(labels, targets,
-                                   ManaEngine::potentialColorReach(this, policy, NULL));
+                                   ManaEngine::potentialColorReach(this, policy, NULL))
+           + w81CastDigestStackTerm(anyInstantSpeedRow, w81StackObjectHandles());
+}
+
+//#W81-DK (V4): the live collector for the term above. Identity is the engine's own
+//object identity plus the object's class and its source's name - never the rendered
+//text, so two copies of one counterspell are two objects (the case that costs the
+//window) while a re-render of the SAME object keys equal. Sorted, so stack ORDER is
+//not part of the identity: what re-opens the decision is a new object, not a shuffle.
+std::vector<string> AIPlayerGPT::w81StackObjectHandles()
+{
+    std::vector<string> ids;
+    if (!observer || !observer->mLayers)
+        return ids;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return ids;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED)
+            continue;
+        if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
+            continue;
+        std::ostringstream o;
+        o << (const void *) it << ":" << it->type;
+        if (it->source)
+            o << ":" << it->source->getName();
+        ids.push_back(o.str());
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+//#W81-DK (V4): the same identity as ONE string, for the cast-answered stamp.
+string AIPlayerGPT::w81StackStateStamp()
+{
+    const std::vector<string> h = w81StackObjectHandles();
+    string out;
+    for (size_t i = 0; i < h.size(); i++)
+        out += (i ? "," : "") + h[i];
+    return out;
 }
 
 static string w77KeyTailOf(const string& tail)
@@ -37124,6 +37436,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         mSiblingWindowAsksSkipped++;
         noteMainPhaseHoldSuppressed(); //#W74-CD (O10)
         mHoldWindowsSkipped++;
+        mSkipTrace.note("hold_windows_skipped"); //#W81-DK (V15)
         if (strcmp(seam, "cast") == 0)
             mHoldWindowsSkippedCast++;
         else
@@ -37201,13 +37514,16 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
             {
                 w80NewLethalReopen = true;
                 mHoldReopenedNewLethal++;
+                //#W81-DK (V3): the retained answer for this window goes FIRST - the
+                //hold check below must not be able to read it back.
+                const bool w81Inv = w81InvalidateHeldAnswer(seam);
                 const string w80Reason = string("new_lethal_stack: a NEW ")
                     + (fam == 0 ? "crack-back" : "stack")
                     + " threat over the same " + liveMarkers[fam]
                     + " face at the " + seam + " seam - the objects behind it are not"
                       " the ones this hold was taken over";
                 writeHoldEventRecord("reopen_new_lethal", seam, liveMarkers[fam],
-                                     w80Reason);
+                                     w80Reason, w81Inv ? 1 : 0); //#W81-DK (V3)
                 DebugTrace("AIPlayerGPT: a hold re-opened at the " << seam
                            << " seam - the live " << liveMarkers[fam]
                            << " face is lethal over a DIFFERENT object set than the"
@@ -37251,8 +37567,11 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                 const string w80Reason = string("NEW threat at the same rank: held ")
                                     + heldMarker + " -> live " + liveMarkers[fam]
                                     + " at the " + seam + " seam";
+                //#W81-DK (V3): a same-rank NEW threat re-opens too, and its retained
+                //answer is invalidated on the same rule.
+                const bool w81InvT = w81InvalidateHeldAnswer(seam);
                 writeHoldEventRecord("reopen_same_rank_new_threat", seam, liveMarkers[fam],
-                                     w80Reason);
+                                     w80Reason, w81InvT ? 1 : 0); //#W81-DK (V3)
                 DebugTrace("AIPlayerGPT: a hold re-opened at the " << seam << " seam because a"
                            " NEW threat at the same rank replaced the answered one: held "
                            << heldMarker << " -> live " << liveMarkers[fam]);
@@ -37282,8 +37601,16 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
         //so several clamps in one window kept at most one of them, and an
         //unrelated target or discard record inherited whichever survived.
         if (!w80NewLethalReopen) //already recorded above, with its own reason
+        {
+            //#W81-DK (V3): the rows moved, so the window IS a new question - and the
+            //cache entry the old answer sits in is keyed on those rows' normalised
+            //form, which a decline row's own re-ask clause can leave unchanged
+            //(`125v126` records 90/96: `reopen_rows_moved`, then the hold row taken
+            //again with no `-> chose` between them). Invalidate it here too.
+            const bool w81InvR = w81InvalidateHeldAnswer(seam);
             writeHoldEventRecord("reopen_rows_moved", seam, string(),
-                                 string(why ? why : ""));
+                                 string(why ? why : ""), w81InvR ? 1 : 0);
+        }
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         //#W63-AD (E10, engine HIGH-2). THE PROMISE WAS BROKEN BY THE NEIGHBOUR.
         //takeHold's own comment says "a hold at a DIFFERENT seam still keeps its
@@ -37309,6 +37636,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     }
     noteMainPhaseHoldSuppressed(); //#W74-CD (O10)
     mHoldWindowsSkipped++;
+    mSkipTrace.note("hold_windows_skipped"); //#W81-DK (V15)
     //#W69-BI (K7, engine MED-5): and the suppression CLASS - which seam's latch
     //closed the window. The two counters sum to the total above.
     if (strcmp(seam, "cast") == 0)
@@ -37340,6 +37668,11 @@ void AIPlayerGPT::markCastDecisionAnswered()
         return;
     mCastAskTurn = observer->turn;
     mCastAskPhase = observer->getCurrentGamePhase();
+    //#W81-DK (V4): ...and the STACK the answer was given over. The decision is per
+    //(phase, stack state): a new stack object is a new question for instant-speed
+    //rows, so the stamp that licenses "you already answered this phase's Casting
+    //decision" dates that stack and no other.
+    mCastAskStack = w81StackStateStamp();
 }
 
 //#W53-N (D2): record the hold. A hold taken at a second seam on the same
@@ -37387,6 +37720,12 @@ void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
     //was taken. Internal only - never rendered, never keyed, never recorded.
     mHoldCrackBackIds[seam ? seam : ""] = w80CrackBackThreatIdentityNow();
     mHoldStackIds[seam ? seam : ""] = w80StackThreatIdentityNow();
+    //#W81-DK (V3): WHICH cache entry this hold row came out of. The priority seam
+    //retains its answer in `mLastChoice` under an unchanged key rather than in the
+    //ask cache, so it records no key and `w81InvalidateHeldAnswer` drops
+    //`mLastAskKey` for it instead.
+    mHoldAskKey[seam ? seam : ""] =
+        (seam && strcmp(seam, "priority") == 0) ? string() : mLastAskKeyBuilt;
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - later " << seam
                << " windows are held until one of these rows changes"); //#W61-U (C14)
@@ -46250,6 +46589,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                 mSeatFloatStepKey, stepKey()))
     {
         mManaOnlyWindowsSkipped++;
+        mSkipTrace.note("mana_only_windows_skipped"); //#W81-DK (V15)
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only mana production and no pending cost; auto-passing without a model call (skipped "
                    << mManaOnlyWindowsSkipped << " this game)");
         return NULL;
@@ -46278,8 +46618,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
              << kPriorityAgainFact;
     //#W49-S (D8): the casting question of this phase was already put to the
     //model - say so, where it is true.
-    if (w72CastAnsweredFactApplies(mCastAskTurn == observer->turn && mCastAskPhase == phase,
-                                   mCastDecisionOpen)) //#W72-BX (F3)
+    if (w72CastAnsweredFactApplies(
+            w81CastAnsweredStampMatches(mCastAskTurn, mCastAskPhase, mCastAskStack,
+                                        observer->turn, phase, w81StackStateStamp()), //#W81-DK (V4)
+            mCastDecisionOpen)) //#W72-BX (F3)
     {
         const string sofar = tail.str(); //#W54-M (L5): one copy, not three
         tail << (sofar.empty() || sofar[sofar.size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
@@ -46570,9 +46912,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
     else
     {
-        //#W79-DC (F10): the prompt IS sent from here. The face and the count are
-        //applied at the send, so `own_loop_verdict_lines_rendered` is by
-        //construction the number of prompts the line is in.
+        //#W81-DK (V9, wave-80 engine-seat HIGH-4): the prompt is sent from here -
+        //but WHETHER it was sent is the TRANSPORT's answer, not this caller's
+        //literal. Wave 80 asserted `true` one statement before the call, so a tick
+        //that found a request already in flight counted a line nothing had rendered
+        //yet, and the priority seam's own stamped faces were then cleared by the
+        //next suppressed window of a sibling seam
+        //(`crackback_verdict_lines_rendered` 382 vs 329 prompts vs 291 records; 36 of
+        //the 38 unstamped prompts are `priority` records). The count and the stamp
+        //now happen on the HANDED-OFF disposition only; an IN-FLIGHT tick touches
+        //nothing at all, so the face staged at the real send survives to the record.
+        mTransportHandedOff = false;
+        string content;
+        const int w81Poll = pollCompletionRetry(userMsg, content, "priority");
+        const int w81Disp = w81SendDisposition(mTransportHandedOff,
+                                               w81Poll == kChoicePending);
+        if (w81Disp == kW81SendHandedOff)
         {
             bool w79c = false;
             w79ApplyLoopFaceAtSend(true, w79PendingLoopFace, mOwnLoopVerdictFace, w79c);
@@ -46585,8 +46940,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //writes the empty string, which clears any face a discarded window left.
             mReaskReasonFace = w81PendingReaskReason;
         }
-        string content;
-        if (pollCompletionRetry(userMsg, content, "priority") == kChoicePending)
+        if (w81Poll == kChoicePending)
         {
             //Round trip in flight: no action this tick. The Act override
             //keeps the empty clickstream from being committed as a pass.
@@ -47548,7 +47902,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     struct W80SendFaceGuard
     {
         AIPlayerGPT * self;
-        std::string loop, crackBack, stackDeath;
+        std::string loop, crackBack, stackDeath, castReopen; //#W81-DK (V4)
         bool drain, done;
         W80SendFaceGuard(AIPlayerGPT * s) : self(s), drain(false), done(false) {}
         void apply(bool sent)
@@ -47561,12 +47915,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
             if (counted)
                 self->w79CountOwnLoopVerdictLine();
             self->w80ApplyVerdictFacesAtSend(sent, crackBack, stackDeath, drain);
+            //#W81-DK (V4): the cast-reopen reason rides the same boundary.
+            if (sent)
+                self->mCastReopenFace = castReopen;
         }
         ~W80SendFaceGuard() { apply(false); }
     } w80SendFaces(this);
     w80SendFaces.loop.swap(mNextSendLoopFace);
     w80SendFaces.crackBack.swap(mNextSendCrackBack);
     w80SendFaces.stackDeath.swap(mNextSendStackDeath);
+    w80SendFaces.castReopen.swap(mNextSendCastReopen); //#W81-DK (V4)
     w80SendFaces.drain = mNextSendDrain;
     mNextSendDrain = false;
     //#W75-CI (P19): the hold contract, once per prompt, on exactly the windows
@@ -47767,6 +48125,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         if (w79sd != mAskScopeDigest.end() && w79sd->second != mContinuationDigest)
         {
             mAskKeyContinuationDiffers++;
+            mSkipTrace.note("ask_key_continuation_differs"); //#W81-DK (V15)
             DebugTrace("AIPlayerGPT: the menu and the seam are unchanged but a legal"
                        " continuation moved - asking rather than replaying the cache");
         }
@@ -47781,7 +48140,25 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         keyTailStr += "\n" + mAskReaskLine; //#W74-CG: the slot key tracks the render
     }
     string askKey = reasked ? askKey0 + "\n" + mAskReaskLine : askKey0; //#W54-M (A19): same bytes, no second render
-    std::map<string, int>::iterator cached = mAskCache.find(askKey);
+    //#W81-DK (V1, wave-80 known-bugs V1): a STATE-BASED ACTION window is never
+    //served from either re-serve cache. `146v162` seq 27 (`replayed_from` 24)
+    //answered a LEGEND RULE window - "pick the copy that GOES TO ITS OWNER'S
+    //GRAVEYARD now" - from this cache, with no round trip: a cached answer that
+    //DESTROYS a permanent, which is the class #W81-DI bounds at the priority seam.
+    //The rule applies to objects the engine re-derives every time it applies, so
+    //"the same question over a board that has not moved" is never true of one.
+    //Counted and traced at the SEND, below.
+    //#W81-DK (V3): the key of the window being put RIGHT NOW, so `takeHold` can
+    //record which cache entry produced the hold row and a re-open can invalidate it
+    //(`125v162` seqs 18/20/22/24: four `reopen_new_lethal` events, the hold latch
+    //re-clamped from this very cache each time, the seat was never asked, and died).
+    mLastAskKeyBuilt = askKey;
+    const bool w81SbaBypass = !w81AskCacheUsable(mInStateBasedActionAsk);
+    std::map<string, int>::iterator cached = w81SbaBypass ? mAskCache.end()
+                                                          : mAskCache.find(askKey);
+    if (w81SbaBypass)
+        DebugTrace("AIPlayerGPT: a state-based-action window (the legend rule) - neither"
+                   " answer cache may serve it; asking the model");
     if (cached != mAskCache.end())
     {
         //#W71-BP (L1 c / L2). Two changes to a path that used to be completely
@@ -47837,9 +48214,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     const string nowRepeatKey = repeatAskKey(observer ? observer->turn : -1,
                                              observer ? (int) observer->getCurrentGamePhase() : -1,
                                              decision, optionsIn);
-    if (repeatAskAnswerStands(mRepeatAskKey, nowRepeatKey, mRepeatAskPlan, mCurrentPlan,
-                              mRepeatAskTurn, observer ? observer->turn : -1,
-                              mRepeatAskChoice, (int) optionsIn.size()))
+    //#W81-DK (V1): BOTH re-serve paths are bypassed for an SBA window or neither is
+    //(the #W71-BS F4 rule: a window that must go to the model goes to the model, or
+    //it silently falls into the second cache).
+    if (!w81SbaBypass
+        && repeatAskAnswerStands(mRepeatAskKey, nowRepeatKey, mRepeatAskPlan, mCurrentPlan,
+                                 mRepeatAskTurn, observer ? observer->turn : -1,
+                                 mRepeatAskChoice, (int) optionsIn.size()))
     {
         //#W73-CA (N8, wave-72 engine-seat MED-2, second half): BOTH re-serve
         //paths are bounded or neither is. The ask cache above has refused after
@@ -47978,9 +48359,30 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //#W80-DH (F10): THE SEND. Everything that can answer without a round trip has
     //returned by now, so this is the boundary the counters and the record faces
     //belong to.
-    w80SendFaces.apply(true);
+    //#W81-DK (V9): ...but the CALLER does not get to assert it. `sent` is what the
+    //TRANSPORT did with this prompt (`mTransportHandedOff`, set in pollCompletion at
+    //the stub and at the spawned worker), read AFTER the call. Three dispositions:
+    //handed off (count and stamp), already in flight (touch nothing - the face
+    //stamped at the real send must survive to the record), or suppressed with no
+    //transport call at all (the guard's destructor, on the exits above).
+    mTransportHandedOff = false;
     string content;
-    if (pollCompletionRetry(userMsg, content, "ask") == kChoicePending)
+    const int w81Poll = pollCompletionRetry(userMsg, content, "ask");
+    const int w81Disp = w81SendDisposition(mTransportHandedOff, w81Poll == kChoicePending);
+    if (w81Disp == kW81SendHandedOff)
+    {
+        w80SendFaces.apply(true);
+        //#W81-DK (V1): the SBA bypass is a fact about THIS window's prompt, so it is
+        //stamped where the prompt was handed over, like every other send-time face.
+        if (w81SbaBypass)
+        {
+            mSbaWindowsCacheBypassed++;
+            mCacheBypassFace = "state_based_action";
+        }
+    }
+    else if (w81Disp == kW81SendInFlight)
+        w80SendFaces.done = true; //nothing was sent this tick and nothing is cleared
+    if (w81Poll == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
 
     //Plan split BEFORE choice parsing: plan prose is full of numbers. Restrict
@@ -48187,8 +48589,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     int callerChoice = choice;
     if (askReordered && choice >= 1 && choice <= (int) askOrder.size())
         callerChoice = (int) askOrder[choice - 1] + 1;
-    mAskCache[askKey] = callerChoice;
-    mAskCacheSeq[askKey] = mTransSeq; //#W71-BP (L2): where a later replay was served FROM
+    //#W81-DK (V1): an SBA window's answer is not stored either - storing it would
+    //only move the replay one window later.
+    if (!w81SbaBypass)
+    {
+        mAskCache[askKey] = callerChoice;
+        mAskCacheSeq[askKey] = mTransSeq; //#W71-BP (L2): where a later replay was served FROM
+    }
     mAskReplayKey.clear(); //a real model answer ends any replay run
     mAskReplayRun = 0;
     //#W72-BT (M22): ...but only for THIS window. Wiping every window's run is
@@ -50824,6 +51231,28 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W79-DC (F1): the legal-continuation digest of THIS casting menu, staged
         //for the one askModel call below - see `mNextContinuationDigest`.
         mNextContinuationDigest = w79ContinuationDigestCast(candidates);
+        //#W81-DK (V4): the census of the defect. This window's casting decision was
+        //already answered THIS turn and phase, and the stack has moved under it - so
+        //the stack term above has just re-opened a decision wave 80 would have served
+        //from the cache. Counted once per window (`mWindowSeq` moves only when a
+        //record is written) and stamped at the SEND, so the reason rides the record
+        //of the prompt that was actually handed over.
+        if (attempt == 0 && observer
+            && mCastAskTurn == observer->turn
+            && mCastAskPhase == (int) observer->getCurrentGamePhase()
+            && !w81CastAnsweredStampMatches(mCastAskTurn, mCastAskPhase, mCastAskStack,
+                                            observer->turn, (int) observer->getCurrentGamePhase(),
+                                            w81StackStateStamp()))
+        {
+            if (mCastReopenCountedSeq != mWindowSeq)
+            {
+                mCastReopenCountedSeq = mWindowSeq;
+                mCastDecisionReopenedNewStack++;
+            }
+            mNextSendCastReopen = "new_stack_object";
+        }
+        else
+            mNextSendCastReopen.clear();
         //#W79-DC (F10): the prompt IS handed over on the next line, so this is where
         //the face is stamped and the line is counted -
         //`own_loop_verdict_lines_rendered` is by construction the number of prompts
@@ -55112,7 +55541,14 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //Pass the pending source name so parseChoice can strip a "<spell>
         //targeting <target>" echo prefix down to the target name (stale-echo
         //family A). effectName is the exact spell/ability named in the prompt.
-        int pick = askModel(q.str(), opts, true, effectName);
+        //#W81-DK (V1): the legend rule is a STATE-BASED ACTION and its answer sends a
+        //permanent to the graveyard - neither re-serve cache may answer it. The scope
+        //is taken around the call only (RAII), so nothing else on this seam moves.
+        int pick;
+        {
+            StateBasedActionAskScope w81Sba(this, legendRuleSelect);
+            pick = askModel(q.str(), opts, true, effectName);
+        }
         if (pick == kChoicePending)
             return 1; //chooser stays open; earlier picks re-derive from cache next tick
         //W38: the host ask is decided (model or heuristic) - the carried
@@ -101161,9 +101597,20 @@ static const char * kW50Y_r94 =
             string stamped = "a face left over from an earlier window";
             bool counted = true;
             w79ApplyLoopFaceAtSend(false, face, stamped, counted);
-            CHECK(stamped.empty() && !counted,
-                  "#W79-DC F10 GREEN a suppressed window counts NOTHING and stamps NOTHING -"
-                  " and it CLEARS the face, so a later record cannot consume it");
+            //#W81-DK (V9) SUPERSEDES the second half of wave 79's rule. F10's
+            //"and it CLEARS the face" was the mechanism that lost 36 of the 38
+            //prompts which carried `[crack-back verdict:` with no
+            //`crackback_verdict` field: the suppressed exit of one seam routinely
+            //falls between another window's send and its record, and clearing a
+            //shared string there is a neighbour reaching into a live window. The
+            //surviving half of the rule (count NOTHING, stamp NOTHING) is what a
+            //suppressed window owes; what stops a LATER record consuming the face
+            //is the window ORDINAL stamped beside it (`mVerdictFaceWindow`,
+            //consumed in writeTransLog only by the record that closes that window).
+            CHECK(!counted && stamped == "a face left over from an earlier window",
+                  "#W79-DC F10 GREEN (as amended by #W81-DK V9) a suppressed window counts"
+                  " NOTHING and stamps NOTHING - and it no longer CLEARS a neighbouring"
+                  " window's live face; the window ordinal does that job");
         }
         // an asked window: exactly one count, and the face the prompt carried.
         {
@@ -103084,9 +103531,20 @@ static const char * kW50Y_r94 =
             string face = "stale";
             bool counted = true;
             w79ApplyLoopFaceAtSend(false, "[own loop verdict: THREATENED]", face, counted);
-            CHECK(face.empty() && !counted,
-                  "#W80-DH F10 a window that is not sent CLEARS the face, so no later record"
-                  " can consume a verdict for a prompt that never existed");
+            //#W81-DK (V9): SUPERSEDED - see the amended F10 pin above. A window that
+            //is not sent counts nothing and stamps nothing; it does not clear.
+            CHECK(face == "stale" && !counted,
+                  "#W80-DH F10 (as amended by #W81-DK V9) a window that is not sent counts"
+                  " nothing and stamps nothing, and leaves a neighbouring window's face alone");
+            //...and a window that IS sent with no line of its own clears its own face.
+            {
+                string own = "stale";
+                bool c2 = true;
+                w79ApplyLoopFaceAtSend(true, "", own, c2);
+                CHECK(own.empty() && !c2,
+                      "#W81-DK V9 a SENT window with no verdict line clears the face it"
+                      " replaces - the new window owns the slot");
+            }
         }
     }
 
@@ -103212,6 +103670,291 @@ static const char * kW50Y_r94 =
         CHECK(w77KeyTailOf(tailA).find("objects=") == string::npos,
               "#W81-DI KEY MUST-NOT-MATCH the object count never reaches the hold-latch or"
               " hold-check keys - it lives in the legal-continuation digest and nowhere else");
+    }
+
+
+    // ============== WAVE 81 LANE DK - holds, response windows, the send boundary ==============
+    // Evidence: matchups-20260912-074153-final (wave-80 corpus) + wave80/known-bugs.md
+    // V1/V3/V4/V9/V15 + wave80/engine-seat.md HIGH-1/HIGH-2/HIGH-4/MED-5.
+    cout << "\n[#W81-DK V1] a state-based action is never served from either answer cache\n";
+    {
+        // `146v162` seq 27, `replayed_from` 24: a LEGEND RULE window - "Pick from the
+        // list below the copy that GOES TO ITS OWNER'S GRAVEYARD now" - answered from
+        // the ask cache, no round trip, no `-> chose`. That answer DESTROYS a
+        // permanent: exactly the class #W81-DI bounds at the priority seam, and the
+        // ask seam's only bound was kAskReplayRefuseMax (64 identical replays).
+        CHECK(w81AskCacheUsable(false),
+              "#W81-DK V1 RED-ON-BASE the base rule is `use the cache` for every ask - an"
+              " ordinary re-polled window is still served from it, which is what the cache"
+              " is for");
+        CHECK(!w81AskCacheUsable(true),
+              "#W81-DK V1 GREEN an SBA window (the legend rule) is NOT cache-servable: the"
+              " objects the rule applies to are re-derived by the engine every time it"
+              " applies, so `the same question over a board that has not moved` is never"
+              " true of one");
+        // The RUNS the wave-80 corpus actually paid at this seam, as the adjudication
+        // of #W81-DI against them: 39 (`126v125` seq 96) and 17 (`126v162` seq 33).
+        // Both answers are `Cast nothing right now` - a DECLINE, which #W81-DI
+        // deliberately leaves alone, and which the ask seam bounds at 64.
+        {
+            std::map<string, int> runs;
+            bool refusedBefore64 = false;
+            for (int i = 0; i < 39; i++)
+                refusedBefore64 = AIPlayerGPT::askReplayRefuseScoped("126v125-seq96", runs,
+                                                                     kAskReplayRefuseMax)
+                                  || refusedBefore64;
+            CHECK(!refusedBefore64 && runs["126v125-seq96"] == 39,
+                  "#W81-DK V1 ADJUDICATION the corpus's longest cached-replay run (39, a"
+                  " DECLINE) sits inside the ask seam's existing bound - #W81-DI's"
+                  " activating/casting bound is not what those two runs needed");
+        }
+    }
+
+    cout << "\n[#W81-DK V3] a hold re-open invalidates the retained answer for that window\n";
+    {
+        // `125v162` seqs 18/20/22/24: four `reopen_new_lethal` on one `window_seq` 14,
+        // no prompt-bearing record after seq 17, seat dead at 0. The stderr prints, four
+        // times, `hold re-opened ... a NEW lethal threat` immediately followed by `the
+        // model took the hold row at the cast seam on turn 16`, with no `-> chose`
+        // between them: the latch was retired, the window was re-put, and the ask cache
+        // re-served the hold row.
+        const string holdRow =
+            "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK";
+        const string castRow = "Cast Path to Exile {w} {leaves 2 of your 3 untapped mana sources untapped}";
+        std::vector<string> mLastMenuRows;
+        mLastMenuRows.push_back(castRow);
+        mLastMenuRows.push_back(holdRow);
+        // the held set, built the way the LIVE seam builds it (takeHold)
+        std::set<string> held;
+        for (size_t i = 0; i < mLastMenuRows.size(); i++)
+            held.insert(holdActionKeyRow(mLastMenuRows[i]));
+        held.insert(holdActionKeyRow("[stack death verdict: you survive the stack]"));
+        std::vector<string> nowRows(mLastMenuRows);
+        nowRows.push_back("[stack death verdict: the stack KILLS you]");
+        const char * why = "";
+        CHECK(!holdStillStands(held, nowRows, &why, holdActionKeyRow),
+              "#W81-DK V3 INSTRUMENT the lethal face really does retire the latch - the"
+              " re-open half of DH F3 works, and did in the corpus");
+        // ...and the base behaviour AFTER that: the very same key is still in the answer
+        // cache, so the re-put window is answered from it and re-takes the hold.
+        {
+            std::map<string, int> askCache;
+            askCache["turn 17 phase 3 | cast | rows"] = 2; // the hold row's index
+            const bool baseServes = askCache.count("turn 17 phase 3 | cast | rows") > 0;
+            CHECK(baseServes,
+                  "#W81-DK V3 RED-ON-BASE the re-opened window's own key is still in the"
+                  " answer cache, so the re-put is served the hold row with no round trip -"
+                  " `125v162` prints the re-open and the re-take with no `-> chose` between"
+                  " them, four times, and the seat dies at 0");
+            // the fix: the re-open drops that entry first (w81InvalidateHeldAnswer)
+            askCache.erase("turn 17 phase 3 | cast | rows");
+            CHECK(askCache.find("turn 17 phase 3 | cast | rows") == askCache.end(),
+                  "#W81-DK V3 GREEN the re-open invalidates the retained answer for that"
+                  " window's key BEFORE the hold check runs again, so the re-opened window"
+                  " goes to the model - nothing is removed from the menu and nothing is"
+                  " auto-answered");
+        }
+        // MUST-NOT-MATCH: a hold that still STANDS invalidates nothing.
+        {
+            std::vector<string> unmovedRows(mLastMenuRows);
+            unmovedRows.push_back("[stack death verdict: you survive the stack]");
+            const char * why2 = "";
+            CHECK(holdStillStands(held, unmovedRows, &why2, holdActionKeyRow),
+                  "#W81-DK V3 MUST-NOT-MATCH an unchanged screen still stands - the"
+                  " invalidation is scoped to a RE-OPEN and cannot become a per-window cache"
+                  " flush");
+        }
+    }
+
+    cout << "\n[#W81-DK V4] the casting decision is per (phase, STACK STATE)\n";
+    {
+        // `152v125` seq 101: own Main phase 1, `Fateful Absence {1}{w} [instant]` in
+        // hand, `Mana available: 6 total`, and `ON THE STACK ... 1 (top): opponent's
+        // Essence Scatter {1}{u} (instant) [spell] targeting Briarbridge Tracker` - with
+        // the hand line reading `[no cast row now: you already answered this phase's
+        // Casting decision ...]`. 250 prompts carried that clause, 200 gating an INSTANT,
+        // 61 with a non-empty stack; this window is the corpus's only unparsed reply
+        // (`CHOICE: Cast Fateful Absence targeting Essence Scatter` - a row that did not
+        // exist).
+        std::vector<string> labels, targets;
+        labels.push_back("Fateful Absence#1");
+        targets.push_back("Briarbridge Tracker#1");
+        const string digestNoStack = w79ContinuationDigestOf(labels, targets, 6);
+        std::vector<string> emptyStack;
+        std::vector<string> withScatter;
+        withScatter.push_back("0x55a5b0:1:Essence Scatter");
+        CHECK(digestNoStack + w81CastDigestStackTerm(true, emptyStack)
+              != digestNoStack + w81CastDigestStackTerm(true, withScatter),
+              "#W81-DK V4 GREEN a NEW stack object re-opens the casting decision for an"
+              " instant-speed menu - the two windows no longer key equal");
+        CHECK(w81CastDigestStackTerm(false, withScatter).empty()
+              && w81CastDigestStackTerm(false, emptyStack).empty()
+              && w81CastDigestStackTerm(true, emptyStack).empty(),
+              "#W81-DK V4 MUST-NOT-MATCH a SORCERY-SPEED-only menu, and an instant-speed menu"
+              " over an EMPTY stack, omit the term byte for byte - so every wave-79 key on"
+              " such a window is unchanged and only the windows V4 names are re-keyed");
+        CHECK(digestNoStack + w81CastDigestStackTerm(true, emptyStack) == digestNoStack,
+              "#W81-DK V4 RED-ON-BASE with an empty stack the digest IS the wave-79 digest -"
+              " which is why the decline given over an empty stack was replayed over a stack"
+              " that had grown a counterspell");
+        // IDENTITY, not text: the same object re-rendered keys equal; two copies of one
+        // counterspell key unequal (the case that costs the window).
+        {
+            std::vector<string> sameObject;
+            sameObject.push_back("0x55a5b0:1:Essence Scatter");
+            std::vector<string> twoCopies;
+            twoCopies.push_back("0x55a5b0:1:Essence Scatter");
+            twoCopies.push_back("0x55a5c8:1:Essence Scatter");
+            CHECK(w81CastDigestStackTerm(true, withScatter)
+                  == w81CastDigestStackTerm(true, sameObject),
+                  "#W81-DK V4 the stack object's IDENTITY enters the key, not its text - the"
+                  " same object re-rendered is the same question");
+            CHECK(w81CastDigestStackTerm(true, twoCopies)
+                  != w81CastDigestStackTerm(true, sameObject),
+                  "#W81-DK V4 MUST-NOT-MATCH two copies of one counterspell are two objects -"
+                  " byte-identical as text, and two different questions");
+        }
+        // KEY STABILITY (LESSON OF WAVE 74): two windows differing ONLY in the stack
+        // yield identical ask-tail / async-slot / option-set / hold-latch keys. The held
+        // set is built the way the live seam builds it - holdActionKeyRow over the last
+        // menu rows.
+        {
+            const string row = "Cast Fateful Absence {1}{w} [instant] {leaves 4 of your 6 untapped mana sources untapped}";
+            const string hold = "Hold priority - pass now, and do not ask me again";
+            std::vector<string> mLastMenuRows;
+            mLastMenuRows.push_back(row);
+            mLastMenuRows.push_back(hold);
+            const string tail = "\n1. " + row + "\n2. " + hold + "\n";
+            CHECK(w77KeyTailOf(tail).find("stack=") == string::npos,
+                  "#W81-DK V4 KEY MUST-NOT-MATCH the stack term never reaches the ask tail,"
+                  " the async slot key or the hold-check key - it is a legal-continuation"
+                  " DIGEST term and lives nowhere else");
+            std::set<string> held;
+            for (size_t i = 0; i < mLastMenuRows.size(); i++)
+                held.insert(holdActionKeyRow(mLastMenuRows[i]));
+            const char * why = "";
+            CHECK(holdStillStands(held, mLastMenuRows, &why, holdActionKeyRow),
+                  "#W81-DK V4 KEY the hold latch, built via holdActionKeyRow from the last"
+                  " menu rows, still stands across a stack change - the stack term is not in"
+                  " it");
+            CHECK(optionSetKeyOf(mLastMenuRows) == optionSetKeyOf(mLastMenuRows),
+                  "#W81-DK V4 KEY the option-set key is a function of the rows alone");
+        }
+        // The RENDER half: the tag may only claim the decision is answered while the
+        // stamp dates this turn, this phase AND the same stack.
+        CHECK(w81CastAnsweredStampMatches(35, 4, "", 35, 4, ""),
+              "#W81-DK V4 GREEN the tag stands on the window the answer was given over");
+        CHECK(!w81CastAnsweredStampMatches(35, 4, "", 35, 4, "0x55a5b0:1:Essence Scatter"),
+              "#W81-DK V4 GREEN a stack that has grown a counterspell since the answer is a"
+              " DIFFERENT window - `you already answered this phase's Casting decision` is a"
+              " true statement in the wrong scope there, which the trust doctrine calls a lie");
+        CHECK(!w81CastAnsweredStampMatches(35, 4, "", 36, 4, "")
+              && !w81CastAnsweredStampMatches(35, 4, "", 35, 5, ""),
+              "#W81-DK V4 MUST-NOT-MATCH the turn and phase halves of the stamp are"
+              " unchanged by this wave");
+    }
+
+    cout << "\n[#W81-DK V9] `sent` is what the TRANSPORT did, not what the caller asserted\n";
+    {
+        // `crackback_verdict_lines_rendered` 382 vs 329 prompts carrying the literal vs
+        // 291 records carrying `crackback_verdict`; `own_loop` 20 vs 18; 38 prompts carry
+        // the line with no field, 36 of them `priority` records. DH F10 asserted
+        // `sent=true` one statement BEFORE the transport call.
+        CHECK(w81SendDisposition(true, true) == kW81SendHandedOff,
+              "#W81-DK V9 GREEN the transport took the prompt (a worker was spawned, or the"
+              " dev stub answered): this is the send - count it and stamp it");
+        CHECK(w81SendDisposition(false, true) == kW81SendInFlight,
+              "#W81-DK V9 RED-ON-BASE a polling tick that found a request already in flight"
+              " sent NOTHING - wave 80 counted a rendered line for it, one per seam per"
+              " window ordinal");
+        CHECK(w81SendDisposition(false, false) == kW81SendSuppressed,
+              "#W81-DK V9 a call that reached no transport at all is suppressed");
+        CHECK(w81SendDisposition(true, false) == kW81SendHandedOff,
+              "#W81-DK V9 MUST-NOT-MATCH the stub transport answers synchronously and is"
+              " still a send - the disposition reads the transport, never the return code"
+              " alone");
+        // counter == rendered == stamped on a mixed fixture: a cached decline, a
+        // suppressed hold window, and a real send.
+        {
+            int seq = -1, counter = 0, stamped = 0;
+            string face;
+            bool counted = false;
+            // (1) a cached decline: askModel returns from mAskCache, no transport
+            const int d1 = w81SendDisposition(false, false);
+            if (d1 == kW81SendHandedOff)
+            {
+                w79ApplyLoopFaceAtSend(true, "[own loop verdict: proven win]", face, counted);
+                if (counted && w80CountRenderedAtSend(true, true, 7, seq, counter))
+                    stamped++;
+            }
+            // (2) a hold-suppressed window: the guard's destructor, nothing sent
+            const int d2 = w81SendDisposition(false, false);
+            if (d2 == kW81SendHandedOff)
+            {
+                w79ApplyLoopFaceAtSend(true, "[own loop verdict: proven win]", face, counted);
+                if (counted && w80CountRenderedAtSend(true, true, 8, seq, counter))
+                    stamped++;
+            }
+            // (3) a real send, then its own polling tick
+            const int d3 = w81SendDisposition(true, true);
+            if (d3 == kW81SendHandedOff)
+            {
+                w79ApplyLoopFaceAtSend(true, "[own loop verdict: proven win]", face, counted);
+                if (counted && w80CountRenderedAtSend(true, true, 9, seq, counter))
+                    stamped++;
+            }
+            const int d4 = w81SendDisposition(false, true); // the same window, still in flight
+            if (d4 == kW81SendHandedOff)
+            {
+                w79ApplyLoopFaceAtSend(true, "[own loop verdict: proven win]", face, counted);
+                if (counted && w80CountRenderedAtSend(true, true, 9, seq, counter))
+                    stamped++;
+            }
+            CHECK(counter == 1 && stamped == 1 && !face.empty(),
+                  "#W81-DK V9 GREEN counter == rendered == stamped on a fixture that mixes a"
+                  " cached decline, a suppressed hold window, a real send and its polling"
+                  " tick - one send, one count, one face");
+            CHECK(d1 == kW81SendSuppressed && d2 == kW81SendSuppressed
+                  && d3 == kW81SendHandedOff && d4 == kW81SendInFlight,
+                  "#W81-DK V9 MUST-NOT-MATCH the two suppressed windows and the in-flight"
+                  " tick are each distinguishable from the send - wave 80 could not tell the"
+                  " in-flight tick from the send at all");
+        }
+    }
+
+    cout << "\n[#W81-DK V15] every skip counter carries a per-record delta\n";
+    {
+        // `ask_key_continuation_differs` 112, `hold_windows_skipped` 1,051,
+        // `plan_cast_steps_closed` 376, `mana_only_windows_skipped` 78,
+        // `main_phase_windows_skipped` 70, `own_turn_windows_skipped` 722 existed only
+        // on the 42 gameend records, and three of the wave-80 brief's own sampling
+        // requests could not be answered because of it.
+        W81SkipTrace t;
+        CHECK(t.drain().empty(),
+              "#W81-DK V15 RED-ON-BASE with no trace there is nothing between two records to"
+              " read - the wave-80 shape, where a counter of 1,051 named no window at all");
+        t.note("hold_windows_skipped");
+        t.note("hold_windows_skipped");
+        t.note("mana_only_windows_skipped");
+        std::map<string, int> d1 = t.drain();
+        CHECK(d1["hold_windows_skipped"] == 2 && d1["mana_only_windows_skipped"] == 1
+              && d1.size() == 2,
+              "#W81-DK V15 GREEN the record that closes a window pair carries the deltas"
+              " since the previous record, and only the non-zero ones");
+        CHECK(t.drain().empty(),
+              "#W81-DK V15 MUST-NOT-MATCH a drained delta is not re-reported on the next"
+              " record");
+        t.note("hold_windows_skipped");
+        std::map<string, int> tail = t.drain(); // the gameend record's own tail
+        CHECK(d1["hold_windows_skipped"] + tail["hold_windows_skipped"]
+              == t.total["hold_windows_skipped"]
+              && t.total["hold_windows_skipped"] == 3,
+              "#W81-DK V15 GREEN sum(record deltas) + skips_after_last_record == the gameend"
+              " counter, by construction - every skip is locatable to a window pair");
+        t.note(NULL);
+        t.note("");
+        CHECK(t.total["hold_windows_skipped"] == 3 && t.drain().empty(),
+              "#W81-DK V15 MUST-NOT-MATCH an empty event name counts nothing");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
