@@ -29,7 +29,7 @@
 # that branch; what it CAN see is a manifest that is still EMPTY because no game
 # has announced yet, and an empty set is the honest answer there - the check
 # waits for the announcement instead of scanning the directory.
-import glob, os, re
+import glob, os, re, sys
 
 #The announcement the engine prints once per seat when the translog opens.
 ANNOUNCE_RE = re.compile(r'WAGIC_GPT_TRANSLOG_FILE\s+(\S+)\s*$')
@@ -94,13 +94,126 @@ def own_seatlogs(outdir, game=None):
     return own
 
 
+#W81-DM (V2 residual). The degrade above is deliberate, but wave 80 shipped it
+#SILENT: a manifest-less outdir fell back to scanning the shared directory by
+#time and every consumer's output looked identical to a manifest-keyed one. That
+#is the exact shape the wave-80 false regime gate cost a rerun for, so the
+#degraded path now SAYS SO, before it returns anything, on the first line of the
+#degraded read. One announcement per process (the six harness sites each run in
+#their own python), on stderr so no consumer's parsed stdout changes.
+MANIFEST_ABSENT_LINE = 'MANIFEST ABSENT - scanning by time'
+_announced_degrade = False
+
+
+def announce_degrade(stream=None):
+    """Print the degrade banner once per process. Returns True if it printed."""
+    global _announced_degrade
+    if _announced_degrade:
+        return False
+    _announced_degrade = True
+    print(MANIFEST_ABSENT_LINE, file=stream if stream is not None else sys.stderr)
+    return True
+
+
 def own_logs(logdir, own):
     """The full paths in `logdir` that belong to this run, sorted.
 
     `own` is an `own_seatlogs` result: None means no manifest and every *.jsonl
-    in the directory is returned (the documented degrade); a set - including the
-    EMPTY set, which is "nothing announced yet" - selects by exact basename."""
+    in the directory is returned (the documented degrade, which announces itself
+    via `announce_degrade`); a set - including the EMPTY set, which is "nothing
+    announced yet" - selects by exact basename."""
     files = sorted(glob.glob(os.path.join(logdir, '*.jsonl')))
     if own is None:
+        announce_degrade()
         return files
     return [f for f in files if os.path.basename(f) in own]
+
+
+def _selftest():
+    import tempfile
+    global _announced_degrade
+    fails = []
+
+    def check(cond, what):
+        print('%s  %s' % ('ok  ' if cond else 'FAIL', what))
+        if not cond:
+            fails.append(what)
+
+    root = tempfile.mkdtemp(prefix='runmanifest-selftest-')
+    logdir = os.path.join(root, 'logs')
+    os.makedirs(logdir)
+    mine = os.path.join(logdir, '1789216933-ai_baka_deck130-0xAA-vs-ai_baka_deck126.jsonl')
+    theirs = os.path.join(logdir, '1789239545-ai_baka_deck198-0xBB-vs-ai_baka_deck199.jsonl')
+    for f in (mine, theirs):
+        open(f, 'w').close()
+
+    #(1) A manifest-less outdir returns None and its read announces the degrade
+    #    on the FIRST line it emits, and returns every jsonl in the directory.
+    bare = os.path.join(root, 'bare')
+    os.makedirs(bare)
+    own = own_seatlogs(bare)
+    check(own is None, 'manifest-less outdir -> own_seatlogs None')
+    import io
+    _announced_degrade = False
+    buf = io.StringIO()
+    err = sys.stderr
+    sys.stderr = buf
+    try:
+        got = own_logs(logdir, own)
+    finally:
+        sys.stderr = err
+    first = buf.getvalue().splitlines()[:1]
+    check(first == [MANIFEST_ABSENT_LINE],
+          'degraded read prints %r on its first line (got %r)'
+          % (MANIFEST_ABSENT_LINE, first))
+    check(got == sorted([mine, theirs]), 'degraded read returns every jsonl')
+
+    #(2) The banner is once per process, not once per call.
+    buf2 = io.StringIO()
+    sys.stderr = buf2
+    try:
+        own_logs(logdir, None)
+    finally:
+        sys.stderr = err
+    check(buf2.getvalue() == '', 'degrade banner prints once per process')
+
+    #(3) NEGATIVE: an announcing outdir keys by name, takes no degrade branch and
+    #    prints NOTHING - the foreign log is not returned.
+    live = os.path.join(root, 'live')
+    os.makedirs(live)
+    with open(os.path.join(live, 'game-130v126-1789216933.stderr'), 'w') as fh:
+        fh.write('noise\nWAGIC_GPT_TRANSLOG_FILE %s\nmore noise\n' % mine)
+    own2 = own_seatlogs(live)
+    check(own2 == {os.path.basename(mine)}, 'announcing outdir -> the run\'s own basename')
+    _announced_degrade = False
+    buf3 = io.StringIO()
+    sys.stderr = buf3
+    try:
+        got2 = own_logs(logdir, own2)
+    finally:
+        sys.stderr = err
+    check(got2 == [mine], 'keyed read returns only the run\'s own log')
+    check(buf3.getvalue() == '', 'keyed read prints no degrade banner')
+
+    #(4) The EMPTY set is "nothing announced yet", NOT a degrade.
+    _announced_degrade = False
+    buf4 = io.StringIO()
+    sys.stderr = buf4
+    try:
+        got3 = own_logs(logdir, set())
+    finally:
+        sys.stderr = err
+    check(got3 == [] and buf4.getvalue() == '',
+          'empty manifest selects nothing and does not announce a degrade')
+
+    import shutil
+    shutil.rmtree(root, ignore_errors=True)
+    print('runmanifest selftest: %s' % ('OK' if not fails else '%d FAILED' % len(fails)))
+    return 1 if fails else 0
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--selftest':
+        sys.exit(_selftest())
+    print(__doc__ or 'runmanifest: a library; run with --selftest', file=sys.stderr)
+    sys.exit(2)
