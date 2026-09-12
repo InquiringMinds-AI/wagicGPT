@@ -17921,6 +17921,8 @@ bool AIPlayerGPT::isLongReply(long latencyMs, long timeoutMs, bool answered)
 //rows the model was shown; turn, phase and the board serialization are the
 //belt to that brace. The force-close retry is its own slot: its reply is
 //consumed by a caller that reads it differently.
+static string w79AskScopeKey(int turn, int phase); //#W79-CZ (T3): defined below
+
 static string asyncSlotKeyOf(bool forceClose, int turn, int phase,
                              const string& seamTail, const string& board)
 {
@@ -18007,7 +18009,13 @@ string AIPlayerGPT::asyncSlotKey(const string& userMsg)
 {
     return asyncSlotKeyOf(userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0,
                           observer->turn, observer->getCurrentGamePhase(),
-                          mPromptTail, serializeGameState());
+                          //#W79-CZ (T3): the slot's board half is the SEAM SCOPE. The
+                          //slot key already carries turn and phase; the serialised board
+                          //added nothing but churn, and 39 of the wave-78 corpus's 46
+                          //stale drops read "the question and board moved" on a menu whose
+                          //actions had not.
+                          mPromptTail,
+                          w79AskScopeKey(observer->turn, observer->getCurrentGamePhase()));
 }
 
 
@@ -19301,7 +19309,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentHeuristicPlayed(0), //#W78-CX (S1) //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
@@ -20703,6 +20711,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //record that carries the bracket. -1 = "first window asked at this seam";
     //absent = this window printed no bracket. Consumed here so the next record
     //cannot inherit it (the same discipline as mLastParseNote).
+    //#W79-CZ (T4): the own-loop verdict FACE this window's prompt printed, stamped
+    //at the splice and consumed here, so the two `126` windows wave 78 could not
+    //locate are a field on their own record rather than an unjoinable counter.
+    if (!mOwnLoopVerdictFace.empty())
+    {
+        rec["own_loop_verdict"] = mOwnLoopVerdictFace;
+        mOwnLoopVerdictFace.clear();
+    }
     if (holdCheckRefSeq > -2)
         rec["hold_check_ref_seq"] = holdCheckRefSeq;       //#W78-CV (S7): the RECORD seq
     if (holdCheckRefWindow > -2)
@@ -21175,6 +21191,8 @@ void AIPlayerGPT::logGameEnd()
         //#W72-BT (M10 / M14): the two window classes that never reached the model.
         {"stop_reached_windows_skipped", mStopReachedWindowsSkipped},
         {"stop_reached_reputs_collapsed", mStopReachedRePutsCollapsed}, //#W78-CV (S3)
+        //#W79-CZ (T3): re-opens the escalation test kept from happening.
+        {"hold_verdict_safer_ignored", mHoldVerdictSaferIgnored},
         {"stack_drain_windows_asked", mStackDrainWindowsAsked},         //#W78-CV (S4)
         {"own_turn_windows_skipped", mOwnTurnWindowsSkipped},
         //#W69-BI (K7, engine MED-5): the same total by suppression class.
@@ -21187,7 +21205,6 @@ void AIPlayerGPT::logGameEnd()
         {"ask_replays_reserved", mAskReplaysReserved},
         {"ask_replays_refused", mAskReplaysRefused},
         {"menu_pass_no_progress", mMenuPassNoProgress},
-        {"declined_face_latches", mDeclinedFaceLatches},
         {"hold_windows_skipped_priority", mHoldWindowsSkippedPriority},
         {"hold_windows_skipped_cast", mHoldWindowsSkippedCast},
         //#W72-BU (M4): of those, the ones closed because the OTHER seam of the
@@ -21272,6 +21289,8 @@ void AIPlayerGPT::logGameEnd()
         //#W77-CR (R1): windows put to the model while the SEAT'S OWN proven life
         //loop was mid-resolution - the 32-window population of engine-seat HIGH-1.
         {"own_loop_windows_asked", mOwnLoopWindowsAsked},
+        //#W79-CZ (T4): the same population, counted where the line is spliced.
+        {"own_loop_verdict_lines_rendered", mOwnLoopVerdictLinesRendered},
         {"put_gloss_stripped", mPutGlossStripped},
         //#W71-BO (L10): replies that wrote no PLAN line at all, over the same
         //denominator - the class `off_protocol_bytes` cannot see.
@@ -21299,8 +21318,20 @@ void AIPlayerGPT::logGameEnd()
                << "; repeated identical asks re-served from the seat's own answer: "
                << mRepeatAskAnswersReserved
                << "; deadline misses: " << mWallMissEvents
-               << " (" << mWallMissUnrecorded << " unrecorded, "
-               << mWallMissNoRetry << " no-retry)"); //#W68-BC (J2)
+               //#W79-CZ (T14, wave-78 known bugs T14): SAY WHOSE. This figure is the
+               //DEADLINE-MISS population, and it printed `0 unrecorded` beside a wave
+               //whose `forced_close_unrecorded` was 16 - two different "unrecorded"s,
+               //one line, and the wave-78 seat had to open both surfaces to tell them
+               //apart. Each is now named by its own mechanism, and the force-close
+               //identity (armed = the stderr `unclosed <think>` lines; unrecorded =
+               //`dropped_decision_moved`, the decision moving out from under a pending
+               //retry) is printed here so it reconciles without a record join.
+               << " (" << mWallMissUnrecorded << " wall-miss unrecorded, "
+               << mWallMissNoRetry << " no-retry)" //#W68-BC (J2)
+               << "; forced closes: " << mForceCloseEvents << " events, "
+               << mForceCloseUnrecorded << " superseded (dropped_decision_moved)"
+               << "; phase-2 answer recovery: " << mPhase2AnswerRecovered << " recovered, "
+               << mPhase2AnswerMissing << " missing");
     if (mTransLog.is_open())
         mTransLog.close(); //the game's last record
 }
@@ -31390,6 +31421,41 @@ string w78OwnLoopVerdictLine(int state, const string& theirSpell, const string& 
     return string();
 }
 
+//#W79-CZ (T4, wave-78 known bugs T4 / engine-seat 2(d)). THE LINE NEVER RENDERED:
+//`[own loop verdict:` occurs 0 times in all 42 seat logs while
+//`own_loop_windows_asked` read 2. Two causes, both here and both silent:
+//  (i) `w77CountOwnLoopWindow` is called at the ROW-BUILD site, ahead of every
+//      collapse/hold gate, and `mWindowSeq` only advances when a record is written -
+//      so a counted window that is then SKIPPED writes no record and no prompt, and
+//      its count is attributed to whatever window is written next. The population and
+//      the render were never the same fact. The counter now lives at the SPLICE.
+//  (ii) `w78OwnLoopVerdictLine` returns the empty string on three live shapes - a
+//      THREATENED or UNPROVEN verdict whose card names the walk could not fill, and a
+//      proven loop with nothing of it on the stack. The trust doctrine's own rule is
+//      that a silent omission is worse than wrong text: the model confabulates rules
+//      into the gap. Every shape now prints its true face, name or no name.
+//Pure over the state, the proven flag and the two names.
+string w79OwnLoopVerdictLineFor(int state, bool loopProven,
+                                const string& theirSpell, const string& component)
+{
+    const string named = w78OwnLoopVerdictLine(state, theirSpell, component);
+    if (!named.empty())
+        return named;
+    if (!loopProven)
+        return string(); //no proven loop: there is no verdict to owe
+    if (state == kW77LoopThreatened)
+        return "\n[own loop verdict: THREATENED - something of theirs on the stack is aimed"
+               " at a piece of your own life loop: the loop STOPS if it resolves, so a hold"
+               " here does NOT cover this window]";
+    if (state == kW78LoopUnproven)
+        return "\n[own loop verdict: an object of theirs resolves before your trigger - the"
+               " loop is NOT proven: the engine cannot tell whether it survives, so do not"
+               " treat this window as already won]";
+    return "\n[own loop verdict: your life loop is a proven win, and no link of it is on the"
+           " stack right now - nothing of it is waiting to resolve, so a hold here covers no"
+           " link of it]";
+}
+
 //#W78-CV (S4, wave-77 deck152 HIGH-2). NINE BYTE-IDENTICAL WINDOWS WHILE THEIR
 //TRIGGERS DRAINED. `152v162` deck152 seqs 55-63: one Draw step, a seven-object
 //stack of the OPPONENT's triggers resolving one link at a time, and the seat asked
@@ -31414,11 +31480,18 @@ string w78StackDrainNote(int theirTriggers, bool rowsUnchangedSinceLastAsk,
     //activation's source falsifies it, and a rendered non-fact is an instruction
     //that costs games. The clause now states only what the engine has established:
     //the menu is unchanged NOW, and the hold covers every link.
+    //#W79-CZ (T13, wave-78 known bugs T13 / S4 residual). "HOLD covers every link"
+    //was read as a promise with no end, and `123v125` seqs 379 -> 382 and 395 -> 398
+    //falsify it: the two windows are byte-identical menus one TURN apart (T51 -> T52,
+    //T53 -> T54), and the hold between them was retired by the seat's own untap
+    //release, which is the latch's own rule. The promise is true of THIS stack and of
+    //nothing beyond it, so it says which stack and names the release.
     o << "\n[their stack is draining " << theirTriggers
       << " triggers - each link will put this same list to you; HOLD ("
-      << holdRowShortName << ") covers every link. The rows above are what is legal"
-         " NOW - this says nothing about what will still be legal after their stack"
-         " resolves]";
+      << holdRowShortName << ") covers every link OF THIS STACK, and is released at"
+         " your next untap - a new stack on a later turn asks you again. The rows above"
+         " are what is legal NOW - this says nothing about what will still be legal"
+         " after their stack resolves]";
     return o.str();
 }
 
@@ -31454,17 +31527,81 @@ bool w78RowsUnchangedSinceLastAsk(const string& holdCheckNote)
 //use this shape for exactly this reason: a verdict row is its own key, so a
 //change in the verdict re-opens the window while nothing is removed or
 //auto-answered. Recomputed off the live board at every check, never latched.
+//#W79-CZ (T3): THE MARKER IS A FACE, NEVER A NAME. This string is a synthetic row
+//in the HOLD LATCH's key set, and it carried the names of whatever was on the
+//opponent's stack - so every change of stack top re-opened a hold over a menu whose
+//rows had not moved (`123v126` seqs 93->96: the hold taken at 93, the byte-identical
+//menu asked again at 96, stderr `a printed row changed or is newly available`, 194
+//such re-opens corpus-wide). A name is a board fact that creates no row; the VERDICT
+//is what the latch must react to. The RENDERED line (`w78OwnLoopVerdictLine`) still
+//names both cards - it is prompt-only and enters no key.
 string w77OwnLoopVerdictKey(int state, const string& theirSpell,
                             const string& component)
 {
+    (void) theirSpell;
+    (void) component;
     if (state == kW77LoopThreatened)
-        return "[own loop verdict: THREATENED - " + theirSpell + " targets "
-               + component + "]";
+        return "[own loop verdict: THREATENED]";
     if (state == kW78LoopUnproven)
-        return "[own loop verdict: unproven - " + theirSpell + " resolves first]"; //#W78-CY (F4)
+        return "[own loop verdict: unproven]"; //#W78-CY (F4)
     if (state == kW77LoopResolving)
         return "[own loop verdict: resolving]";
     return "[own loop verdict: none]";
+}
+
+//#W79-CZ (T3, wave-78 engine-seat HIGH-2 second half - THE HOLD LATCH DOES NOT
+//HOLD WHEN THE BOARD MOVES). The latch compares three SYNTHETIC verdict markers
+//alongside the menu's rows (crack-back, stack death, own loop). They exist so a
+//hold taken over a survivable board cannot stand once the board turns lethal
+//(#W68-BB J9) - a one-way obligation. As written they re-opened the hold in BOTH
+//directions, so a life tick UPWARDS (`123v126` 93->96, life 13 -> 14) or a
+//resolved stack link retired a hold and bought a full model call over a menu the
+//model had already answered: 87 holds taken at deck123, 56 of them followed at
+//once by a byte-identical menu at the same seam.
+//The rule the markers were built for is ESCALATION. Each family is a small ordered
+//ladder of faces, and a move DOWN it (safer) is not a re-opener; a move UP it is,
+//exactly as before. Pure over the marker string, so PARSETEST walks every face.
+static bool w79MarkerHasPrefix(const string& s, const char * p)
+{
+    const size_t n = strlen(p);
+    return s.size() >= n && s.compare(0, n, p) == 0;
+}
+
+int w79VerdictDangerRank(const string& marker)
+{
+    if (w79MarkerHasPrefix(marker, "[crack-back verdict:"))
+    {
+        if (marker.find("LETHAL") != string::npos)
+            return 2;
+        return (marker.find("none") != string::npos) ? 0 : 1;
+    }
+    if (w79MarkerHasPrefix(marker, "[stack death verdict:"))
+    {
+        if (marker.find("KILLS") != string::npos)
+            return 2;
+        return (marker.find("nothing lethal") != string::npos) ? 0 : 1;
+    }
+    if (w79MarkerHasPrefix(marker, "[own loop verdict:"))
+    {
+        if (marker.find("THREATENED") != string::npos)
+            return 3;
+        if (marker.find("unproven") != string::npos)
+            return 2;
+        return (marker.find("none") != string::npos) ? 1 : 0; //resolving = safest
+    }
+    return -1; //not a verdict marker: never clamped
+}
+
+//Which marker the latch compares: the HELD one while the live face is no more
+//dangerous than it was, the LIVE one the moment it escalates. Returns the live
+//string unchanged whenever either side is not a verdict marker of one family.
+string w79HoldVerdictForCompare(const string& heldMarker, const string& nowMarker)
+{
+    const int h = w79VerdictDangerRank(heldMarker);
+    const int n = w79VerdictDangerRank(nowMarker);
+    if (h < 0 || n < 0)
+        return nowMarker;
+    return (n <= h) ? heldMarker : nowMarker;
 }
 
 void w77ApplyOwnLoopThreatFeed(std::vector<string>& rows, const string& tag)
@@ -31546,6 +31683,19 @@ static bool holdNoteSameWindow(bool first, int unseenRows, int measuredSeq, int 
 //counting key, and MULTIPLICITY carries the fact it used to carry - two rows
 //that normalise to the same key are two instances, and a window holding two
 //where the last held one has exactly one new row. Pure over the key string.
+//#W79-CZ (T12, wave-78 engine-seat MED-1). THE STRIP OVER-MERGES. It dropped
+//EVERY ordinal, so `125v123` seq 263 - whose two rows went from
+//`deal 1 damage with Staff of Nin targeting ...` to
+//`... with Staff of Nin #2 targeting ...` because a SECOND Staff had entered and
+//the first one's rows were no longer offered - normalised to the same key as seq
+//260's and the bracket printed `every row above was also on the menu ... and no
+//row that was on it is gone`. The rows address a DIFFERENT PERMANENT; the
+//bracket's own contract says a row "naming a different card" re-opens a hold.
+//Only `#1` is the renumber artefact: Wagic prints no ordinal on a lone copy and
+//appends `#1` to it the moment `#2` arrives, so ` #1` and no-ordinal are the SAME
+//instance and every higher ordinal is a different one. Stripping ` #1` alone
+//keeps wave-78's fix for the renumber-in-place case (one row -> `#1` + `#2` reads
+//as exactly one new row) and restores the identity wave 78 lost.
 string w78StripHandleOrdinal(const string& key)
 {
     string out;
@@ -31558,11 +31708,16 @@ string w78StripHandleOrdinal(const string& key)
             size_t j = i + 1;
             while (j < key.size() && isdigit((unsigned char) key[j]))
                 j++;
-            //drop the ordinal AND the space that introduced it
-            if (!out.empty() && out[out.size() - 1] == ' ')
-                out.erase(out.size() - 1);
-            i = j - 1;
-            continue;
+            //#W79-CZ (T12): ...only when the ordinal is `1`. `#2` and up name a
+            //second instance, which is a different action on a different permanent.
+            if (j == i + 2 && key[i + 1] == '1')
+            {
+                //drop the ordinal AND the space that introduced it
+                if (!out.empty() && out[out.size() - 1] == ' ')
+                    out.erase(out.size() - 1);
+                i = j - 1;
+                continue;
+            }
         }
         out += key[i];
     }
@@ -31632,26 +31787,32 @@ static string holdReopenNoteText(int unseenRows, int repeats, bool first = false
         if (goneRows > 0)
             o << " and " << goneRows << (goneRows == 1 ? " row that was on it is gone"
                                                        : " rows that were on it are gone");
+        //#W79-CZ (T12, wave-78 known bugs T12 second half): the sentence named a
+        //PRICE as an annotation that leaves the row the same and then named a
+        //different COST as a re-opener, so `152v125` seqs 65 -> 66 read one cost
+        //change as both. The `[cost: ...]` group is kept by `holdActionKeyRow` and
+        //by nothing else: a changed cost IS a different row, once, in one clause.
         o << " - a row that changes only in"
-             " its annotations (a price, a forecast, a clock, a count) is the SAME"
-             " row and does not re-open a hold; only a row appearing, disappearing,"
-             " or naming a different card, cost or target does]";
+             " its annotations (a forecast, a clock, a count, a life total) is the SAME"
+             " row and does not re-open a hold; the same action at a CHANGED COST is a"
+             " different row, as is a row appearing, disappearing, or naming a different"
+             " card or target]";
     }
     else if (goneRows > 0)
         o << goneRows << (goneRows == 1 ? " row that was on the menu at the last window I asked"
                                           " you at this seam is gone and no row above is new"
                                         : " rows that were on the menu at the last window I asked"
                                           " you at this seam are gone and no row above is new")
-          << " - a row disappearing re-opens a hold exactly as a row appearing does; a row that"
-             " changes only in its annotations (a price, a forecast, a clock, a count) is the"
-             " SAME row]";
+          << " - a row disappearing re-opens a hold exactly as a row appearing does, and so"
+             " does the same action at a CHANGED COST; a row that changes only in its"
+             " annotations (a forecast, a clock, a count, a life total) is the SAME row]";
     else
         o << "every row above was also on the menu at the last window I asked you at this seam"
           << " (" << repeats << " window" << (repeats == 1 ? "" : "s")
           << " in a row now), and no row that was on it is gone"
              " - a hold taken here holds until one of them appears,"
-             " disappears, or names a different card, cost or target; a row that"
-             " changes only in its annotations is the same row]";
+             " disappears, changes its COST, or names a different card or target; a row"
+             " that changes only in its annotations is the same row]";
     return o.str();
 }
 
@@ -32169,6 +32330,18 @@ void AIPlayerGPT::w77CountOwnLoopWindow()
         return;
     mOwnLoopCountedSeq = mWindowSeq;
     mOwnLoopWindowsAsked++;
+}
+
+//#W79-CZ (T4): the SPLICE's own census - one per window, the same `mWindowSeq`
+//discipline, but counted where the bytes enter the prompt rather than where the
+//rows are built. `own_loop_verdict_lines_rendered` is therefore the number of
+//prompts a reviewer can find the line in, by construction.
+void AIPlayerGPT::w79CountOwnLoopVerdictLine()
+{
+    if (mOwnLoopVerdictCountedSeq == mWindowSeq)
+        return;
+    mOwnLoopVerdictCountedSeq = mWindowSeq;
+    mOwnLoopVerdictLinesRendered++;
 }
 
 void AIPlayerGPT::w77DropUnaskedCastNote()
@@ -32939,13 +33112,96 @@ static string stripDeclineReaskTags(const string& s)
 //`w76StripBalancedAnnotationGroups` keeps) is the question; every `{...}`
 //annotation is the render's commentary on the board, and the board half of the
 //key is what carries the board. `[...]` notes were already outside the key.
+//#W79-CZ (T3, wave-78 engine-seat HIGH-2 - THE CG SHAPE, A FOURTH WAVE). The
+//comment above ends "`[...]` notes were already outside the key". THEY ARE NOT.
+//`w76StripBalancedAnnotationGroups` takes `{...}` groups only, and the corpus's
+//own re-asked pairs name the byte: `123v126` seqs 83->86 (cast seam, turn 13) are
+//byte-identical apart from `[this cannot target the spell on the stack -
+//battlefield permanents only] ` appearing on row 1 - a RENDER note about the
+//board, in the ask key and the async slot key, minting a fresh question for a
+//menu whose actions had not moved. 186 of the corpus's 1,454 same-seam same-turn
+//re-asks are exactly this shape.
+//The fix is not another named strip. The KEY of a window is its ACTION-KEY SET,
+//and the seat already owns the builder that says what an action is:
+//`holdActionKeyRow` - every annotation group out (`[...]` and `{...}`, balanced),
+//the target preview's numbers out, life projections normalised, and the
+//`[cost: ...]` group kept, so a cost change is still a different question. So
+//every NUMBERED ROW of the tail goes through it, and nothing else in the tail is
+//touched (the question head - `Land drop: ` - and the closing instruction are
+//left byte-exact, because `asyncLandArm` reads the head and the closing sentence
+//is the protocol's).
+static bool w79NumberedRowBody(const string& line, size_t * bodyAt)
+{
+    size_t i = 0;
+    if (line.empty() || !isdigit((unsigned char) line[0]))
+        return false;
+    while (i < line.size() && isdigit((unsigned char) line[i]))
+        i++;
+    if (i < line.size() && line[i] == '-')
+    {
+        size_t j = i + 1;
+        if (j >= line.size() || !isdigit((unsigned char) line[j]))
+            return false;
+        while (j < line.size() && isdigit((unsigned char) line[j]))
+            j++;
+        i = j;
+    }
+    if (i + 1 >= line.size() || line[i] != '.' || line[i + 1] != ' ')
+        return false;
+    if (bodyAt)
+        *bodyAt = i + 2;
+    return true;
+}
+
+static string w79ActionNormalisedKeyTail(const string& tail)
+{
+    string out;
+    size_t i = 0;
+    for (;;)
+    {
+        const size_t nl = tail.find('\n', i);
+        const string line = tail.substr(i, (nl == string::npos ? tail.size() : nl) - i);
+        size_t body = 0;
+        if (w79NumberedRowBody(line, &body))
+            out += line.substr(0, body) + holdActionKeyRow(line.substr(body));
+        else
+            out += line;
+        if (nl == string::npos)
+            break;
+        out += "\n";
+        i = nl + 1;
+    }
+    return out;
+}
+
+//#W79-CZ (T3): the other half of the same defect - the BOARD half. `123v126`
+//seqs 82->85 are byte-identical apart from one `{...}` group the strip above
+//already removes, and they were still asked twice: the key's board half is
+//`serializeGameState()`, so a life tick, a resolved log line or a moving stack
+//top mints a fresh question for a menu that offers the same actions. 233 of the
+//1,454 same-seam same-turn re-asks are that shape.
+//The owner's rule is the identity: a byte derived from a board NUMBER that
+//creates no row may not enter an ask key. What is left of the board once that
+//rule is applied is the SEAM the window belongs to - its turn and its phase -
+//and the ask cache is already cleared at every turn change. A window whose legal
+//option set differs still has a different tail and so a different key: nothing
+//is merged that offers a different play.
+static string w79AskScopeKey(int turn, int phase)
+{
+    std::ostringstream o;
+    o << "window scope: turn " << turn << " phase " << phase << "\n";
+    return o.str();
+}
+
 static string w77KeyTailOf(const string& tail)
 {
     //#W78-CY (F8): the hoisted shared-card-text header comes out FIRST. It is the
     //same bytes that were inside a `{card text: "..."}` group on every row before
     //the hoist, and those were already outside every key.
-    return w76StripBalancedAnnotationGroups(
-               stripDeclineReaskTags(w78StripSharedCardTextHeader(tail)));
+    //#W79-CZ (T3): and every numbered row then reduces to its ACTION key.
+    return w79ActionNormalisedKeyTail(
+               w76StripBalancedAnnotationGroups(
+                   stripDeclineReaskTags(w78StripSharedCardTextHeader(tail))));
 }
 
 static string declinedListNote(int n)
@@ -33380,9 +33636,34 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
     //prompt - a latched copy would notice the change one window late, which is
     //exactly the window the seat dies in.
     std::vector<string> rowsWithVerdict = rows;
-    rowsWithVerdict.push_back(crackBackVerdictNow());
-    rowsWithVerdict.push_back(stackDeathVerdictNow()); //#W74-CH: J9's other half
-    rowsWithVerdict.push_back(w77OwnLoopVerdictNow()); //#W77-CU (F4)
+    //#W79-CZ (T3): the three markers, CLAMPED TO THEIR HELD FACE while the live
+    //face is no more dangerous than the one the hold was taken over. J9's
+    //obligation is one-way - never miss the window the seat dies in - and that is
+    //exactly what an escalation test keeps; what it stops is the 194 re-opens the
+    //wave-78 corpus paid for a board that got SAFER or merely moved.
+    {
+        const char * fams[3] = { "[crack-back verdict:", "[stack death verdict:",
+                                 "[own loop verdict:" };
+        string liveMarkers[3];
+        liveMarkers[0] = crackBackVerdictNow();
+        liveMarkers[1] = stackDeathVerdictNow(); //#W74-CH: J9's other half
+        liveMarkers[2] = w77OwnLoopVerdictNow(); //#W77-CU (F4)
+        for (int fam = 0; fam < 3; fam++)
+        {
+            string heldMarker;
+            for (std::set<string>::const_iterator hk = it->second.begin();
+                 hk != it->second.end(); ++hk)
+                if (w79MarkerHasPrefix(*hk, fams[fam]))
+                {
+                    heldMarker = *hk;
+                    break;
+                }
+            const string use = w79HoldVerdictForCompare(heldMarker, liveMarkers[fam]);
+            if (!heldMarker.empty() && use != liveMarkers[fam])
+                mHoldVerdictSaferIgnored++; //#W79-CZ (T3): the census of what was kept
+            rowsWithVerdict.push_back(use);
+        }
+    }
     //#W78-CY (F5 b): the bracket's key, so bracket-unchanged <=> no re-open. The
     //set-based predicate stays as the fallback for a seam with no recorded list.
     std::map<string, std::vector<string> >::iterator lk = mHoldLatchRows.find(seam);
@@ -34103,6 +34384,51 @@ static bool w78RePutIdentityStands(const string& recordedAtDecline, const string
     if (recordedAtDecline.empty() || nowIdentity.empty())
         return false;
     return recordedAtDecline == nowIdentity;
+}
+
+//#W79-CZ (T2, wave-78 known bugs T2 / engine-seat HIGH-1). ZERO COLLAPSES OVER 44
+//ASKED STOP-REACHED WINDOWS, 90.8 MINUTES OF DECODE FOR 3 NON-PASS ANSWERS. Two
+//legs of the wave-78 identity move on every live board and either alone is fatal:
+//  (b) `declineBoardScope(serializeGameState())` - `123v162` seqs 36-41 took the
+//      seat's life 20 -> 19 -> 18 -> 17 across identical-row re-puts as their
+//      Underworld Dreams drained, so the identity never stood once;
+//  (c) `stopTurn` / `stopCountAtStatement` / the source - the model RESTATES its
+//      PLAN at nearly every window, re-dating and re-counting its own stop.
+//And the wave-72 predicate underneath demands `planTurn == nowTurn`, while every
+//one of the four chains spans a turn boundary from the window that stated the stop.
+//The owner's allowance is "a collapse may lose NO legal option", and the thing that
+//makes the earlier decline an answer to THIS question is the ACTION-KEY SET, not
+//the board: a row that appears, disappears, or changes its cost is a different
+//question and `holdActionKeyRow` says so; a life total that creates no row is not.
+//The stop NUMBER stays in the identity (a different stated stop is a different
+//question); its date does not, because the seat's own PLAN carries the stop across
+//the turn boundary and re-dating it is the model restating, not changing, its answer.
+//The re-put arm therefore drops the same-turn clause too - `declinedN >= 1` is
+//already this-turn scoped (`mListDeclineCount` is cleared at every turn change), so
+//the FIRST put of the list on any turn is still asked and only its re-puts collapse.
+//Pure over its inputs, so PARSETEST walks the table without a board.
+static string w79RePutCollapseIdentity(const std::vector<string>& actingRows, int carriedStop)
+{
+    string a;
+    for (size_t i = 0; i < actingRows.size(); i++)
+        a += holdActionKeyRow(actingRows[i]) + "\n";
+    std::ostringstream o;
+    o << "A:" << a << "|S:" << carriedStop;
+    return o.str();
+}
+
+static bool w79StopReachedRePutCollapses(bool everyBaseRowStopPriced, bool anyStopReachedRow,
+                                         int carriedStop, int declinedN, bool identityStands)
+{
+    if (declinedN < 1)
+        return false; //the first put of this exact list is always asked
+    if (!identityStands)
+        return false; //the decline was given on another question
+    if (!everyBaseRowStopPriced || !anyStopReachedRow)
+        return false; //one live row of any other kind and the window is asked
+    if (carriedStop < 0)
+        return false; //nothing stated: nothing is already answered
+    return true;
 }
 
 static bool w78StopReachedRePutCollapses(bool everyBaseRowStopPriced, bool anyStopReachedRow,
@@ -41819,10 +42145,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W78-CY (F1): the collapse identity for THIS window, built here - before the
     //HOLD row is appended - so the string recorded at the decline below and the
     //string compared at the next re-put are built over the same rows.
-    const string rePutIdentity =
-        w78RePutCollapseIdentity(shownLines, declineBoardScope(boardKey), carriedStop,
-                                 mStatedStopTurn, mStatedStopCount,
-                                 (mStatedStop >= 0) ? "store" : "plan");
+    //#W79-CZ (T2): the ACTION-KEY SET and the stated stop NUMBER - nothing else.
+    const string rePutIdentity = w79RePutCollapseIdentity(shownLines, carriedStop);
     const bool rePutIdentityStands =
         w78RePutIdentityStands(mListDeclineIdent.count(listKeyHash(listKey))
                                    ? mListDeclineIdent[listKeyHash(listKey)] : string(),
@@ -41844,9 +42168,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
 
     //#W78-CV (S3, wave-77 deck123 HIGH-2): the RE-PUT arm. Same answer, already
     //given, on a list this seat has already declined this turn.
-    if (observer && w78StopReachedRePutCollapses(everyBaseRowStopPriced, anyStopReachedRow,
-                                                 carriedStop, mStatedStopTurn, observer->turn,
-                                                 declinedN, rePutIdentityStands)) //#W78-CY (F1)
+    if (observer && w79StopReachedRePutCollapses(everyBaseRowStopPriced, anyStopReachedRow,
+                                                 carriedStop,
+                                                 declinedN, rePutIdentityStands)) //#W79-CZ (T2)
     {
         mStopReachedWindowsSkipped++;
         mStopReachedRePutsCollapsed++;
@@ -42176,7 +42500,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //#W74-CG: the KEY half of that list, with the one clause whose text moves
     //with the answer count taken out. The model still reads `tailStr`.
     const string keyTailStr = w77KeyTailOf(tailStr); //#W77-CU (F1)
-    string askKey = boardKey + keyTailStr;
+    //#W79-CZ (T3): the seam scope, not the whole serialised board - see
+    //`w79AskScopeKey`. `boardKey` is still computed and still carries every other
+    //consumer (the decline scope, the sibling rule); only the ASK KEY drops it.
+    string askKey = w79AskScopeKey(observer->turn, phase) + keyTailStr;
     //#W53-N (D2): the decline annotation goes into the PROMPT only - askKey is
     //built from tail.str() alone, so a count that rises with every answer can
     //never mint a fresh question and turn the cache into a call per tick.
@@ -42200,9 +42527,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //is gated on the hold-check bracket's own comparison.
     string w78SeamNotes;
     {
+        //#W79-CZ (T4): the verdict, on the channel that reaches the model, and
+        //COUNTED HERE - at the splice, where the bytes actually enter a prompt.
         string w78LoopSpell, w78LoopPiece;
-        w78SeamNotes += w78OwnLoopVerdictLine(w77OwnLoopStackState(w78LoopSpell, w78LoopPiece),
-                                              w78LoopSpell, w78LoopPiece);
+        {
+            const int lst = w77OwnLoopStackState(w78LoopSpell, w78LoopPiece);
+            const string vline = w79OwnLoopVerdictLineFor(lst, lifeLoopProvenWin(this),
+                                                          w78LoopSpell, w78LoopPiece);
+            if (!vline.empty())
+            {
+                w78SeamNotes += vline;
+                mOwnLoopVerdictFace = w77OwnLoopVerdictKey(lst, "", "");
+                w79CountOwnLoopVerdictLine();
+            }
+        }
         const string drain = w78StackDrainNote(w78TheirDrainingTriggerCount(),
                                                w78RowsUnchangedSinceLastAsk(holdNote),
                                                w78HoldRowShortName(shownLines));
@@ -43354,7 +43692,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //carry the SAME bytes the ask cache keys on rather than a second rendering.
     const string boardStateKey =
         (situationPrefill.empty() || auditMOff()) ? serializeGameState() : situationPrefill;
-    string askKey0 = boardStateKey + keyTailStr;
+    //#W79-CZ (T3): the seam scope, not the whole serialised board. `boardStateKey`
+    //stays for the cross-phase entry below, which is a DIFFERENT question (has this
+    //exact list been put at another phase over an unchanged board?).
+    string askKey0 = w79AskScopeKey(observer->turn, observer->getCurrentGamePhase())
+                     + keyTailStr;
     //#W49-S (D8): this state+question already earned its one re-ask - the
     //corrected question is THE question from here on (its own cache slot).
     bool reasked = (!mAskReaskKey.empty() && mAskReaskKey == askKey0);
@@ -46106,9 +46448,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W78-CV (S6 + S4): the same two lines on the casting menu, same channel.
         {
             string w78LoopSpell2, w78LoopPiece2;
-            mNextAskPromptNote +=
-                w78OwnLoopVerdictLine(w77OwnLoopStackState(w78LoopSpell2, w78LoopPiece2),
-                                      w78LoopSpell2, w78LoopPiece2);
+            {
+                //#W79-CZ (T4): same line, same counting rule, on the casting menu.
+                const int lst2 = w77OwnLoopStackState(w78LoopSpell2, w78LoopPiece2);
+                const string vline2 = w79OwnLoopVerdictLineFor(lst2, lifeLoopProvenWin(this),
+                                                               w78LoopSpell2, w78LoopPiece2);
+                if (!vline2.empty())
+                {
+                    mNextAskPromptNote += vline2;
+                    mOwnLoopVerdictFace = w77OwnLoopVerdictKey(lst2, "", "");
+                    if (attempt == 0)
+                        w79CountOwnLoopVerdictLine();
+                }
+            }
             const string drain2 = w78StackDrainNote(w78TheirDrainingTriggerCount(),
                                                     w78RowsUnchangedSinceLastAsk(mCastHoldNote),
                                                     w78HoldRowShortName(menu));
@@ -76099,21 +76451,23 @@ static const char * kW50Y_r94 =
               == "\n[hold check: every row above was also on the menu at the last window I asked"
                  " you at this seam (3 windows in a row now), and no row that was on it is gone"
                  " - a hold taken here holds until one of them"
-                 " appears, disappears, or names a different card, cost or target; a row that"
-                 " changes only in its annotations is the same row]",
-              "#W61-U C14 an unchanged menu says the hold will hold, and for how long it has"
-              " (#W75-CI P1 b: and by WHICH test)");
+                 " appears, disappears, changes its COST, or names a different card or target;"
+                 " a row that changes only in its annotations is the same row]",
+              "#W79-CZ T12 an unchanged menu says the hold will hold, and for how long it has,"
+              " and a changed COST is named ONCE as a re-opener (#W75-CI P1 b: and by WHICH"
+              " test)");
         // deck152 I2 (`152v162` s32-s42): eleven windows whose prices moved with
         // a ticking life total - there "any change re-opens" is a COST, and the
         // note says so instead of the row promising a saving it cannot deliver.
         CHECK(holdReopenNoteText(1, 0)
               == "\n[hold check: 1 row above is new since the last window I asked you at this seam"
-                 " - a row that changes only in its annotations (a price, a forecast, a clock, a count)"
-                 " is the SAME row and does not re-open a hold; only a row appearing,"
-                 " disappearing, or naming a different card, cost or target does]",
-              "#W61-U C14 a moving menu states the re-open as the real cost it is"
-              " (#W75-CI P1 b: engine-seat MED-4, the old second half was FALSE under the"
-              " #W74-CH action key on 351 windows)");
+                 " - a row that changes only in its annotations (a forecast, a clock, a count,"
+                 " a life total) is the SAME row and does not re-open a hold; the same action at"
+                 " a CHANGED COST is a different row, as is a row appearing, disappearing, or"
+                 " naming a different card or target]",
+              "#W79-CZ T12 a moving menu states the re-open as the real cost it is, and the"
+              " word `price` is gone from the same-row list - `152v125` seqs 65 -> 66 read one"
+              " cost change as both `the SAME row` and `a different cost`");
         CHECK(holdReopenNoteText(2, 0).find("2 rows above are new") != string::npos,
               "#W61-U C14 the count and its verb agree");
         CHECK(holdReopenNoteText(0, 0).empty(),
@@ -92029,9 +92383,12 @@ static const char * kW50Y_r94 =
                               == asyncSlotKeyOf(false, 9, 1, w77KeyTailOf(tB), "BOARD"),
                           "#W77-CU F1 KEY async slot key: the same tail feeds"
                           " assemblePrompt's slot key, so it moves with neither number");
-                    CHECK(w77KeyTailOf(tA).find("Cast Hammer of Bogardan {2}{r}{r}")
+                    //#W79-CZ (T3): the key tail now reduces each numbered row through
+                    //`holdActionKeyRow`, which lower-cases - so the ACTION and its cost
+                    //pips are still the question, in the action key's own spelling.
+                    CHECK(w77KeyTailOf(tA).find("cast hammer of bogardan {2}{r}{r}")
                               != string::npos,
-                          "#W77-CU F1 KEY ...and the ACTION (name and cost pips) is still"
+                          "#W79-CZ T3 KEY ...and the ACTION (name and cost pips) is still"
                           " IN the key - the strip removes commentary, not the question");
                 }
                 // the stay-home clause is PROMPT PROSE, not a row: it never reaches a
@@ -92307,10 +92664,21 @@ static const char * kW50Y_r94 =
                 CHECK(none != res && res != thr && none != thr,
                       "#W77-CU F4 GREEN three verdicts, three keys - the hold re-opens on any"
                       " transition between them");
-                CHECK(thr.find("Doom Blade") != string::npos
-                      && thr.find("Sanguine Bond") != string::npos,
-                      "#W77-CU F4 GREEN the threatened marker names the spell and the piece,"
-                      " so a re-opened window is adjudicable from the trace");
+                //#W79-CZ (T3) SUPERSEDES the wave-77 pin below it: the MARKER is a
+                //face and carries no name, because a name is a board fact that creates
+                //no row and every stack-top change re-opened the hold through it. The
+                //RENDERED line still names both, and that is where the trace reads them.
+                CHECK(thr.find("Doom Blade") == string::npos
+                      && thr.find("Sanguine Bond") == string::npos
+                      && thr == "[own loop verdict: THREATENED]",
+                      "#W79-CZ T3 GREEN the threatened MARKER is the face alone - no card"
+                      " name enters the hold-latch key");
+                CHECK(w78OwnLoopVerdictLine(kW77LoopThreatened, "Doom Blade", "Sanguine Bond")
+                          .find("Doom Blade") != string::npos
+                      && w78OwnLoopVerdictLine(kW77LoopThreatened, "Doom Blade", "Sanguine Bond")
+                          .find("Sanguine Bond") != string::npos,
+                      "#W79-CZ T3 GREEN ...and the RENDERED line still names the spell and the"
+                      " piece, so a re-opened window is adjudicable from the prompt");
             }
             CHECK(w77OwnLoopThreatTag("", "Sanguine Bond").empty()
                   && w77OwnLoopThreatTag("Doom Blade", "").empty(),
@@ -92754,11 +93122,14 @@ static const char * kW50Y_r94 =
               "#W78-CV S4 MUST-NOT-MATCH a moved menu, and a window with no bracket at all");
         const string note = w78StackDrainNote(7, true, hold);
         CHECK(note == "\n[their stack is draining 7 triggers - each link will put this same list"
-                      " to you; HOLD (Hold priority) covers every link. The rows above are what"
-                      " is legal NOW - this says nothing about what will still be legal after"
-                      " their stack resolves]",
-              "#W78-CV S4 GREEN the drain clause, verbatim (#W78-CY F2: the post-resolution"
-              " legality promise is gone) - RED on base, where no such string exists");
+                      " to you; HOLD (Hold priority) covers every link OF THIS STACK, and is"
+                      " released at your next untap - a new stack on a later turn asks you"
+                      " again. The rows above are what is legal NOW - this says nothing about"
+                      " what will still be legal after their stack resolves]",
+              "#W79-CZ T13 GREEN the drain clause, verbatim, with the promise SCOPED to this"
+              " stack and the untap release named - RED on base, where the clause promised"
+              " `covers every link` with no end and `123v125` seqs 379 -> 382 (T51 -> T52) and"
+              " 395 -> 398 (T53 -> T54) falsified it across the untap release");
         CHECK(w78StackDrainNote(1, true, hold).empty(),
               "#W78-CV S4 MUST-NOT-MATCH one link is not a drain");
         CHECK(w78StackDrainNote(7, false, hold).empty(),
@@ -93840,9 +94211,10 @@ static const char * kW50Y_r94 =
               " the same key tail in mPromptTail");
         // ...and the ACTION and its cost pips are still IN the key: this strips a
         // header line, never a row.
-        CHECK(keyTailA.find("Equip with Bonesplitter") != string::npos
+        //#W79-CZ (T3): in the action key's own (lower-cased) spelling.
+        CHECK(keyTailA.find("equip with bonesplitter") != string::npos
               && keyTailA.find("{1}") != string::npos,
-              "#W78-CY F8 the action and its cost pips still ARE the question");
+              "#W79-CZ T3 the action and its cost pips still ARE the question");
         // MUST-NOT-MATCH: a real row change is still a different key.
         {
             std::vector<string> rowsC(rowsB);
@@ -93910,14 +94282,20 @@ static const char * kW50Y_r94 =
                   "#W78-CY F4 GREEN the third face is RENDERED and makes no closing claim");
         }
         // ...and its key is its own, so a hold taken under any other verdict re-opens.
+        //#W79-CZ (T3) SUPERSEDES the last clause of the wave-78 pin: a transition
+        //between FACES is still a different key (the hold still re-opens on any of
+        //them), but two UNPROVEN boards that differ only in which opposing card sits
+        //above the trigger are the SAME key - that name creates no row.
         CHECK(w77OwnLoopVerdictKey(kW78LoopUnproven, "Cryptic Command", "Sanguine Bond")
                   != w77OwnLoopVerdictKey(kW77LoopResolving, "", "")
               && w77OwnLoopVerdictKey(kW78LoopUnproven, "Cryptic Command", "Sanguine Bond")
-                  != w77OwnLoopVerdictKey(kW77LoopIdle, "", "")
-              && w77OwnLoopVerdictKey(kW78LoopUnproven, "Cryptic Command", "Sanguine Bond")
-                  != w77OwnLoopVerdictKey(kW78LoopUnproven, "Vendilion Clique", "Sanguine Bond"),
-              "#W78-CY F4 the marker row is the key - every transition into or out of UNPROVEN"
-              " re-opens a hold, and a different spell above the trigger is a different key");
+                  != w77OwnLoopVerdictKey(kW77LoopIdle, "", ""),
+              "#W78-CY F4 the marker row is the key - every transition into or out of"
+              " UNPROVEN re-opens a hold");
+        CHECK(w77OwnLoopVerdictKey(kW78LoopUnproven, "Cryptic Command", "Sanguine Bond")
+                  == w77OwnLoopVerdictKey(kW78LoopUnproven, "Vendilion Clique", "Sanguine Bond"),
+              "#W79-CZ T3 GREEN ...and a DIFFERENT spell above the trigger under the same"
+              " face is the SAME key - the stack top is not the question");
         // MUST-NOT-MATCH: an opposing object BELOW the trigger does not unprove it,
         // and an unproven board is never fed the "resolving" row tag.
         CHECK(w78LoopVerdictFrom(true, true, false, false, false) == kW77LoopResolving
@@ -94073,9 +94451,13 @@ static const char * kW50Y_r94 =
             w76HoldReopenNote(mg, "priority", g1, 1, false, holdActionKeyRow);
             w76HoldWindowAsked(mg, "priority", 1);
             const string n2 = w76HoldReopenNote(mg, "priority", g2, 2, false, holdActionKeyRow);
-            CHECK(n2.find("every row above was also on the menu") != string::npos,
-                  "#W78-CY F5 the BRACKET calls the re-ordinalled row unchanged (the ordinal is"
-                  " a render handle)");
+            //#W79-CZ (T12) SUPERSEDES the wave-78 reading: `#1` -> `#2` is not a
+            //renumber, it is a row that now addresses a DIFFERENT permanent (the
+            //`125v123` seq 260 -> 263 Staff of Nin case). The renumber artefact is
+            //no-ordinal -> `#1`, and THAT is what stays unchanged.
+            CHECK(n2.find("is new") != string::npos && n2.find("is gone") != string::npos,
+                  "#W79-CZ T12 GREEN `#1` -> `#2` is one row new and one row gone - the two"
+                  " rows address two different permanents");
         }
         {
             std::set<string> held;
@@ -94087,9 +94469,24 @@ static const char * kW50Y_r94 =
             std::vector<string> latch;
             w78HoldLatchKeys(g1, holdActionKeyRow, latch);
             why = "";
-            CHECK(w78HoldStillStands(latch, g2, &why, holdActionKeyRow) && string(why).empty(),
-                  "#W78-CY F5 GREEN one normalised key: bracket-unchanged now means no"
-                  " re-open");
+            //#W79-CZ (T12): the bracket and the latch still give ONE answer - they now
+            //both say the row moved, which is the true answer for `#1` -> `#2`.
+            CHECK(!w78HoldStillStands(latch, g2, &why, holdActionKeyRow),
+                  "#W79-CZ T12 GREEN one normalised key: the bracket and the latch agree,"
+                  " and on `#1` -> `#2` they agree that the row moved");
+            // ...and the RENUMBER case (no ordinal -> `#1`) is the one that holds.
+            {
+                std::vector<string> g0, gl0;
+                g0.push_back("Sacrifice Goblin Token to Goblin Bombardment {0}");
+                std::vector<string> g1only;
+                g1only.push_back("Sacrifice Goblin Token #1 to Goblin Bombardment {0}");
+                w78HoldLatchKeys(g0, holdActionKeyRow, gl0);
+                const char * why0 = "";
+                CHECK(w78HoldStillStands(gl0, g1only, &why0, holdActionKeyRow)
+                      && string(why0).empty(),
+                      "#W79-CZ T12 GREEN the renumber-in-place artefact (no ordinal -> `#1`)"
+                      " is still the SAME row and re-opens nothing");
+            }
             // ...and MULTIPLICITY is still a difference: two instances where one was.
             std::vector<string> both;
             both.push_back(g1[0]);
@@ -94450,6 +94847,391 @@ static const char * kW50Y_r94 =
             CHECK(answerSegmentStatic(noPlan, "CHOICE:", &run, &rej).empty(),
                   "#W78-CY F10 MEASURE ONLY - the parser is byte-identical: the unlabelled"
                   " answer line still yields no answer segment and no tolerance is added");
+        }
+    }
+
+
+    // ================= wave 79, lane CZ: the window/hold family =================
+    // Every fixture below is the CORPUS's own bytes - `options_text` lifted verbatim
+    // from `matchups-20260911-125420-final` - driven through the LIVE key builders
+    // (`joinNumberedRows` -> `w77KeyTailOf` -> `asyncSlotKeyOf`, `holdActionKeyRow`,
+    // `w78HoldRowDelta`, the collapse identity) rather than through a re-implementation.
+    {
+        // ---------------- T3 (a): the `[...]` byte in the ask key.
+        // `123v125` seqs 59 -> 62 (cast seam, turn 12, Main phase 1): two puts of the
+        // same three rows, differing ONLY by the render note
+        // `[this cannot target the spell on the stack - battlefield permanents only] `
+        // on row 1. 98 of the corpus's same-turn same-phase re-asks are this shape.
+        {
+            const char * r59[3] = {
+                "Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn, so Morbid does NOT a"
+                "pply)} {leaves 0 of your 1 untapped mana source untapped - casting this taps you out} {kills"
+                " 0 of the 1 CREATURE target at -1/-1} - the only legal targets are YOUR OWN right now: Blood"
+                "line Keeper {2}{b}{b} (creature 3/3) [flying] {target text: \"Flying -- {T}: Put a 2/2 black"
+                " Vampire creature token with flying onto the battlefield. -- {B}: Transform Bloodline Keeper"
+                ". (...more)\"} [this cannot target the spell on the stack - battlefield permanents only] {ca"
+                "rd text: \"Target creature gets -1/-1 until end of turn. -- Morbid - that creature gets -13/"
+                "-13 instead if a creature died this turn.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; on THIS menu that means you also give up t"
+                "his turn's remaining CASTING windows for as long as these rows stand, and NOT the priority w"
+                "indow that follows on this same step - that is a different question at a different seam and "
+                "you will still be asked it) {a hold taken in your first main phase also covers your second m"
+                "ain phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same lis"
+                "t can be put to you again this turn, at this seam or another; the hold row is the row that c"
+                "loses the run}"
+            };
+            const char * r62[3] = {
+                "Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn, so Morbid does NOT a"
+                "pply)} {leaves 0 of your 1 untapped mana source untapped - casting this taps you out} {kills"
+                " 0 of the 1 CREATURE target at -1/-1} - the only legal targets are YOUR OWN right now: Blood"
+                "line Keeper {2}{b}{b} (creature 3/3) [flying] {target text: \"Flying -- {T}: Put a 2/2 black"
+                " Vampire creature token with flying onto the battlefield. -- {B}: Transform Bloodline Keeper"
+                ". (...more)\"} {card text: \"Target creature gets -1/-1 until end of turn. -- Morbid - that "
+                "creature gets -13/-13 instead if a creature died this turn.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; on THIS menu that means you also give up t"
+                "his turn's remaining CASTING windows for as long as these rows stand, and NOT the priority w"
+                "indow that follows on this same step - that is a different question at a different seam and "
+                "you will still be asked it) {a hold taken in your first main phase also covers your second m"
+                "ain phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same lis"
+                "t can be put to you again this turn, at this seam or another; the hold row is the row that c"
+                "loses the run}"
+            };
+            std::vector<string> a(r59, r59 + 3), b(r62, r62 + 3);
+            const string tA = joinNumberedRows(a, NULL);
+            const string tB = joinNumberedRows(b, NULL);
+            CHECK(tA != tB,
+                  "#W79-CZ T3 INSTRUMENT the two corpus puts really do differ as rendered");
+            CHECK(tA.find("[this cannot target the spell on the stack") != string::npos
+                  && tB.find("[this cannot target the spell on the stack") == string::npos,
+                  "#W79-CZ T3 INSTRUMENT ...and the differing byte is NAMED: a `[...]` render"
+                  " note about the board, present at seq 59 and absent at seq 62");
+            // RED ON BASE: the wave-78 key tail took `{...}` groups only.
+            const string baseA = w76StripBalancedAnnotationGroups(
+                                     stripDeclineReaskTags(w78StripSharedCardTextHeader(tA)));
+            const string baseB = w76StripBalancedAnnotationGroups(
+                                     stripDeclineReaskTags(w78StripSharedCardTextHeader(tB)));
+            CHECK(baseA != baseB,
+                  "#W79-CZ T3 RED-ON-BASE the wave-78 key tail differs on this pair - the ask"
+                  " key and the async slot key both moved, and the window was asked again");
+            CHECK(w77KeyTailOf(tA) == w77KeyTailOf(tB),
+                  "#W79-CZ T3 GREEN the ACTION-KEY SET is identical, so the key tail is");
+            const string scope = w79AskScopeKey(12, 3);
+            CHECK(asyncSlotKeyOf(false, 12, 3, w77KeyTailOf(tA), scope)
+                      == asyncSlotKeyOf(false, 12, 3, w77KeyTailOf(tB), scope),
+                  "#W79-CZ T3 GREEN ...and so is the ASYNC SLOT key, which carries the same"
+                  " tail through mPromptTail");
+            // MUST-NOT-MATCH: a changed COST and a vanished ROW are still the question.
+            std::vector<string> c(a);
+            c[0] = "Cast Tragic Slip {1}{b} [cost: Sacrifice a creature]";
+            CHECK(w77KeyTailOf(joinNumberedRows(c, NULL)) != w77KeyTailOf(tA),
+                  "#W79-CZ T3 MUST-NOT-MATCH the same action at a different cost is a"
+                  " different key - `holdActionKeyRow` keeps the `[cost: ...]` group");
+            std::vector<string> d(a.begin() + 1, a.end());
+            CHECK(w77KeyTailOf(joinNumberedRows(d, NULL)) != w77KeyTailOf(tA),
+                  "#W79-CZ T3 MUST-NOT-MATCH a menu that lost a row is a different key -"
+                  " no window whose legal option set differs is merged with another");
+        }
+        // ---------------- T3 (b): the BOARD half of the ask key.
+        // `123v126` seqs 93 -> 96 (priority, turn 13, Main phase 1): BYTE-IDENTICAL rows,
+        // re-asked. 135 of the corpus's same-turn same-phase re-asks are this shape.
+        {
+            const char * r93[2] = {
+                "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
+                "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
+                "ther creatures you control get +2/+2.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            const char * r96[2] = {
+                "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
+                "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
+                "ther creatures you control get +2/+2.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            std::vector<string> a(r93, r93 + 2), b(r96, r96 + 2);
+            const string tA = joinNumberedRows(a, NULL);
+            const string tB = joinNumberedRows(b, NULL);
+            CHECK(tA == tB,
+                  "#W79-CZ T3 INSTRUMENT the corpus pair is byte-identical as rendered - the"
+                  " question had not moved at all");
+            // the two boards the seat serialised between them: one life tick, one log line.
+            const string board13 = "Phase: Main 1 | It is their turn.\nYou: 13 life\n";
+            const string board14 = "Phase: Main 1 | It is their turn.\nYou: 14 life\n";
+            CHECK(board13 + w77KeyTailOf(tA) != board14 + w77KeyTailOf(tB),
+                  "#W79-CZ T3 RED-ON-BASE the wave-78 ask key was serializeGameState() + the"
+                  " tail, so ONE life tick minted a fresh question for an unmoved menu");
+            CHECK(w79AskScopeKey(13, 3) + w77KeyTailOf(tA)
+                      == w79AskScopeKey(13, 3) + w77KeyTailOf(tB),
+                  "#W79-CZ T3 GREEN the ask key is the SEAM SCOPE plus the action-key set -"
+                  " a board number that creates no row is outside it");
+            // MUST-NOT-MATCH: turn and phase still separate the seams.
+            CHECK(w79AskScopeKey(13, 3) != w79AskScopeKey(13, 4)
+                  && w79AskScopeKey(13, 3) != w79AskScopeKey(14, 3),
+                  "#W79-CZ T3 MUST-NOT-MATCH a different phase and a different turn are"
+                  " different windows - the cross-phase re-offer the decline scope grants"
+                  " is untouched");
+        }
+        // ---------------- T3 (c): the hold latch under a life tick and a moving stack top.
+        // 194 `a printed row changed or is newly available` re-opens in the corpus, 87 holds
+        // taken at deck123 and 56 followed at once by a byte-identical menu at the same seam.
+        {
+            CHECK(w79VerdictDangerRank("[crack-back verdict: none]") == 0
+                  && w79VerdictDangerRank("[crack-back verdict: you survive]") == 1
+                  && w79VerdictDangerRank("[crack-back verdict: LETHAL]") == 2
+                  && w79VerdictDangerRank("[stack death verdict: nothing lethal on the stack]") == 0
+                  && w79VerdictDangerRank("[stack death verdict: you survive the stack]") == 1
+                  && w79VerdictDangerRank("[stack death verdict: the stack KILLS you]") == 2
+                  && w79VerdictDangerRank("[own loop verdict: resolving]") == 0
+                  && w79VerdictDangerRank("[own loop verdict: none]") == 1
+                  && w79VerdictDangerRank("[own loop verdict: unproven]") == 2
+                  && w79VerdictDangerRank("[own loop verdict: THREATENED]") == 3,
+                  "#W79-CZ T3 the three marker families are ordered ladders of FACES");
+            CHECK(w79VerdictDangerRank("Cast Doom Blade {1}{b}") == -1
+                  && w79HoldVerdictForCompare("Cast Doom Blade {1}{b}", "Cast Shock {r}")
+                         == "Cast Shock {r}",
+                  "#W79-CZ T3 MUST-NOT-MATCH an ordinary row is never clamped - only the"
+                  " three synthetic verdict markers are");
+            // the corpus shape: the board got SAFER (life 13 -> 14 retired a LETHAL face).
+            const string heldCb = crackBackVerdictKey(4, 13, 13);
+            const string nowCb = crackBackVerdictKey(4, 13, 14);
+            CHECK(heldCb != nowCb,
+                  "#W79-CZ T3 RED-ON-BASE one life tick moves the crack-back marker, and the"
+                  " wave-78 latch compared the marker itself - the hold re-opened");
+            CHECK(w79HoldVerdictForCompare(heldCb, nowCb) == heldCb,
+                  "#W79-CZ T3 GREEN a face that got SAFER is not a re-opener");
+            CHECK(w79HoldVerdictForCompare(nowCb, heldCb) == heldCb,
+                  "#W79-CZ T3 MUST-NOT-MATCH ...and the ESCALATION still is: a hold taken"
+                  " while the crack-back was survivable re-opens the moment it turns LETHAL,"
+                  " which is the whole of #W68-BB J9's obligation");
+            CHECK(w79HoldVerdictForCompare("[own loop verdict: resolving]",
+                                           "[own loop verdict: THREATENED]")
+                      == "[own loop verdict: THREATENED]"
+                  && w79HoldVerdictForCompare("[own loop verdict: unproven]",
+                                              "[own loop verdict: resolving]")
+                      == "[own loop verdict: unproven]",
+                  "#W79-CZ T3 GREEN the own-loop ladder escalates into THREATENED and clamps"
+                  " back down to resolving");
+            // and the latch itself, through the live predicate: a byte-identical menu whose
+            // only movement is a safer verdict marker still stands.
+            const char * r93x[2] = {
+                "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
+                "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
+                "ther creatures you control get +2/+2.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            const char * r96x[2] = {
+                "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
+                "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
+                "ther creatures you control get +2/+2.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            std::vector<string> held93(r93x, r93x + 2), now96(r96x, r96x + 2);
+            held93.push_back(heldCb);
+            now96.push_back(w79HoldVerdictForCompare(heldCb, nowCb));
+            std::vector<string> latch;
+            w78HoldLatchKeys(held93, holdActionKeyRow, latch);
+            const char * why = "";
+            CHECK(w78HoldStillStands(latch, now96, &why, holdActionKeyRow),
+                  "#W79-CZ T3 GREEN the LIVE latch predicate holds over the corpus pair once"
+                  " the marker is clamped - `123v126` seq 93's hold covers seq 96");
+            // ...and the ESCALATION direction, on the same two menus: a hold taken while
+            // the crack-back was SURVIVABLE does not survive the board turning lethal.
+            std::vector<string> heldSafe(r93x, r93x + 2);
+            heldSafe.push_back(crackBackVerdictKey(4, 13, 20)); //you survive
+            std::vector<string> latchSafe;
+            w78HoldLatchKeys(heldSafe, holdActionKeyRow, latchSafe);
+            std::vector<string> lethal96(r96x, r96x + 2);
+            lethal96.push_back(w79HoldVerdictForCompare(crackBackVerdictKey(4, 13, 20),
+                                                        crackBackVerdictKey(4, 13, 9)));
+            why = "";
+            CHECK(w79HoldVerdictForCompare(crackBackVerdictKey(4, 13, 20),
+                                           crackBackVerdictKey(4, 13, 9))
+                      == crackBackVerdictKey(4, 13, 9),
+                  "#W79-CZ T3 INSTRUMENT the escalating face is the LIVE one, unclamped");
+            CHECK(!w78HoldStillStands(latchSafe, lethal96, &why, holdActionKeyRow),
+                  "#W79-CZ T3 MUST-NOT-MATCH ...and the LIVE latch does NOT hold once the"
+                  " same board turns lethal - J9's obligation is untouched");
+        }
+        // ---------------- T2: the S3 collapse, on the corpus's own re-put.
+        // `123v152` seqs 16 -> 17 (priority, turn 9, Upkeep -> Draw): one acting row
+        // (`Create human with Thraben Doomsayer [cost: Tap]`) printing
+        // `{right now: M=26, your stated stop=26, ... ALREADY AT OR PAST your own stop}`
+        // plus the hold row; 44 such windows were ASKED this corpus for 90.8 minutes of
+        // decode and 3 non-pass answers, and `stop_reached_reputs_collapsed` read 0.
+        {
+            const char * s16[2] = {
+                "Create human with Thraben Doomsayer [cost: Tap] {card text: \"{T}: Put a 1/1 white Human cre"
+                "ature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, othe"
+                "r creatures you control get +2/+2.\"} {right now: M=26, your stated stop=26, so this window "
+                "would add to a count ALREADY AT OR PAST your own stop - past your stop = a wasted window}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            const char * s17[2] = {
+                "Create human with Thraben Doomsayer [cost: Tap] {card text: \"{T}: Put a 1/1 white Human cre"
+                "ature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, othe"
+                "r creatures you control get +2/+2.\"} {if you pass here, this option is not offered again un"
+                "til the board changes} {right now: M=26, your stated stop=26, so this window would add to a "
+                "count ALREADY AT OR PAST your own stop - past your stop = a wasted window}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
+                " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
+                "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
+                "ile these rows do not change}"
+            };
+            std::vector<string> a(s16, s16 + 2), b(s17, s17 + 2);
+            CHECK(a[0] != b[0],
+                  "#W79-CZ T2 INSTRUMENT the two corpus puts differ as rendered");
+            CHECK(holdActionKeyRow(a[0]) == holdActionKeyRow(b[0])
+                  && holdActionKeyRow(a[1]) == holdActionKeyRow(b[1]),
+                  "#W79-CZ T2 INSTRUMENT ...and their ACTION-KEY SETS are identical: the only"
+                  " delta is the `{if you pass here, ...}` group, a render annotation");
+            // RED ON BASE, leg (b): the board key.
+            const string bUpkeep = "Phase: Upkeep | It is their turn.\nYou: 20 life\n";
+            const string bDraw = "Phase: Draw | It is their turn.\nYou: 19 life\n";
+            CHECK(w78RePutCollapseIdentity(a, declineBoardScope(bUpkeep), 26, 9, 26, "plan")
+                      != w78RePutCollapseIdentity(b, declineBoardScope(bDraw), 26, 9, 26, "plan"),
+                  "#W79-CZ T2 RED-ON-BASE the wave-78 identity carries the whole serialised"
+                  " board, so a drained life total alone made the earlier decline `not this"
+                  " question` - `123v162` seqs 36-41 ran 20 -> 19 -> 18 -> 17 that way");
+            // RED ON BASE, leg (c): the stop's own date, re-stated every window.
+            CHECK(w78RePutCollapseIdentity(a, declineBoardScope(bUpkeep), 26, 9, 26, "plan")
+                      != w78RePutCollapseIdentity(a, declineBoardScope(bUpkeep), 26, 10, 27, "plan"),
+                  "#W79-CZ T2 RED-ON-BASE ...and re-dating the same stop by restating the PLAN"
+                  " moved it too");
+            // RED ON BASE, leg (a): the wave-72 same-turn clause, over a chain that spans
+            // a turn boundary from the window that stated the stop.
+            CHECK(!w78StopReachedRePutCollapses(true, true, 26, 9, 10, 1, true),
+                  "#W79-CZ T2 RED-ON-BASE ...and the wave-72 predicate underneath refuses"
+                  " every window of a chain that crosses the turn the stop was stated on");
+            // GREEN.
+            CHECK(w79RePutCollapseIdentity(a, 26) == w79RePutCollapseIdentity(b, 26),
+                  "#W79-CZ T2 GREEN the identity is the ACTION-KEY SET plus the stated stop"
+                  " NUMBER, so the corpus re-put is the question the seat already answered");
+            CHECK(w79StopReachedRePutCollapses(true, true, 26, 1, true),
+                  "#W79-CZ T2 GREEN ...and the re-put collapses - no turn clause, because"
+                  " `declinedN >= 1` is already this-turn scoped");
+            // MUST-NOT-MATCH: a collapse may lose NO legal option.
+            CHECK(!w79StopReachedRePutCollapses(true, true, 26, 0, true),
+                  "#W79-CZ T2 MUST-NOT-MATCH the FIRST put of a list is always asked");
+            CHECK(!w79StopReachedRePutCollapses(true, true, 26, 3, false),
+                  "#W79-CZ T2 MUST-NOT-MATCH an identity that moved is a different question");
+            CHECK(!w79StopReachedRePutCollapses(false, true, 26, 3, true)
+                  && !w79StopReachedRePutCollapses(true, false, 26, 3, true)
+                  && !w79StopReachedRePutCollapses(true, true, -1, 3, true),
+                  "#W79-CZ T2 MUST-NOT-MATCH one live row of another kind, no stop-reached"
+                  " row, or no stated stop and the window is asked");
+            std::vector<string> costMoved(a);
+            costMoved[0] = "Create human with Thraben Doomsayer [cost: Tap, Sacrifice a creature]";
+            CHECK(w79RePutCollapseIdentity(costMoved, 26) != w79RePutCollapseIdentity(a, 26),
+                  "#W79-CZ T2 MUST-NOT-MATCH a changed COST on the acting row is a different"
+                  " identity - the row is a different legal option and the window is asked");
+            std::vector<string> rowAdded(a);
+            rowAdded.push_back("Cast Lightning Bolt {r}");
+            CHECK(w79RePutCollapseIdentity(rowAdded, 26) != w79RePutCollapseIdentity(a, 26),
+                  "#W79-CZ T2 MUST-NOT-MATCH a row that APPEARED is a different identity -"
+                  " nothing the model has not seen can be collapsed away");
+            CHECK(w79RePutCollapseIdentity(a, 26) != w79RePutCollapseIdentity(a, 29),
+                  "#W79-CZ T2 MUST-NOT-MATCH a different stated stop is a different question");
+        }
+        // ---------------- T4: the own-loop verdict that never rendered.
+        {
+            // RED ON BASE: three live shapes returned the empty string, and 42 seat logs
+            // carry 0 `[own loop verdict:` lines while `own_loop_windows_asked` read 2.
+            CHECK(w78OwnLoopVerdictLine(kW78LoopUnproven, "", "").empty()
+                  && w78OwnLoopVerdictLine(kW77LoopThreatened, "", "Sanguine Bond").empty()
+                  && w78OwnLoopVerdictLine(kW77LoopIdle, "", "").empty(),
+                  "#W79-CZ T4 RED-ON-BASE the wave-78 line builder is SILENT on an unnamed"
+                  " threat, an unnamed unproven object and a proven loop with nothing on the"
+                  " stack - a silent omission the model confabulates into");
+            CHECK(!w79OwnLoopVerdictLineFor(kW78LoopUnproven, true, "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "").empty()
+                  && !w79OwnLoopVerdictLineFor(kW77LoopResolving, true, "", "").empty(),
+                  "#W79-CZ T4 GREEN every face of a PROVEN loop renders a line");
+            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, true, "", "")
+                      == "\n[own loop verdict: your life loop is a proven win, and no link of"
+                         " it is on the stack right now - nothing of it is waiting to resolve,"
+                         " so a hold here covers no link of it]",
+                  "#W79-CZ T4 GREEN the idle face, verbatim - the bytes the prompt carries");
+            CHECK(w79OwnLoopVerdictLineFor(kW77LoopThreatened, true, "Doom Blade",
+                                           "Sanguine Bond").find("Doom Blade") != string::npos,
+                  "#W79-CZ T4 GREEN a NAMED threat still renders its names");
+            CHECK(w79OwnLoopVerdictLineFor(kW77LoopIdle, false, "", "").empty()
+                  && w79OwnLoopVerdictLineFor(kW78LoopUnproven, false, "", "").empty(),
+                  "#W79-CZ T4 MUST-NOT-MATCH a seat with NO proven loop is owed no verdict -"
+                  " the line never appears on a board it is not about");
+        }
+        // ---------------- T12: the occurrence index over-merge.
+        // `125v123` seq 263 (referent 260): the two acting rows went from `Staff of Nin` to
+        // `Staff of Nin #2` - a SECOND Staff had entered and the first one's rows were no
+        // longer offered - and the bracket printed `no row that was on it is gone`.
+        {
+            CHECK(w78StripHandleOrdinal("deal 1 damage with staff of nin #2 targeting you")
+                      == "deal 1 damage with staff of nin #2 targeting you",
+                  "#W79-CZ T12 GREEN a `#2` handle SURVIVES the strip - RED on base, where"
+                  " every ordinal was dropped and the row merged with the first Staff's");
+            CHECK(w78StripHandleOrdinal("deal 1 damage with staff of nin #1 targeting you")
+                      == "deal 1 damage with staff of nin targeting you",
+                  "#W79-CZ T12 GREEN ...and `#1` still does not, because no-ordinal -> `#1`"
+                  " is the renumber Wagic performs when a second copy arrives");
+            std::vector<string> last, now;
+            last.push_back("deal 1 damage with Staff of Nin targeting the opponent");
+            last.push_back("deal 1 damage with Staff of Nin targeting you");
+            now.push_back("deal 1 damage with Staff of Nin #2 targeting the opponent");
+            now.push_back("deal 1 damage with Staff of Nin #2 targeting you");
+            int unseen = -1, gone = -1;
+            w78HoldRowDelta(last, now, unseen, gone);
+            CHECK(unseen == 2 && gone == 2,
+                  "#W79-CZ T12 GREEN the corpus case reads two rows new and two rows gone -"
+                  " the rows address a different permanent, which the bracket's own contract"
+                  " calls a re-opener");
+            // MUST-NOT-MATCH: the renumber-in-place case is still one new row, none gone.
+            std::vector<string> one, two;
+            one.push_back("deal 1 damage with Staff of Nin targeting you");
+            two.push_back("deal 1 damage with Staff of Nin #1 targeting you");
+            two.push_back("deal 1 damage with Staff of Nin #2 targeting you");
+            unseen = -1; gone = -1;
+            w78HoldRowDelta(one, two, unseen, gone);
+            CHECK(unseen == 1 && gone == 0,
+                  "#W79-CZ T12 MUST-NOT-MATCH one row becoming `#1` + `#2` is exactly ONE new"
+                  " row and nothing gone - wave 78's fix for the renumber case is kept");
+            // the cost-change sentence: named ONCE, in one direction.
+            const string sentence = holdReopenNoteText(1, 0);
+            CHECK(sentence.find("a price") == string::npos
+                  && sentence.find("CHANGED COST is a different row") != string::npos,
+                  "#W79-CZ T12 GREEN the sentence no longer calls a price both the SAME row"
+                  " and a different cost - `152v125` seqs 65 -> 66 read it both ways");
         }
     }
 
