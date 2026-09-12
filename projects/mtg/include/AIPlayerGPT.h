@@ -2375,7 +2375,7 @@ private:
     //HEURISTIC then played because the parser refused them. MEASURE ONLY - the
     //parser is unchanged and this number is the size of what the pending owner
     //ruling would recover (wave 77: 5, all one seat).
-    int mAnswerLabelAbsentHeuristicPlayed;
+    int mAnswerLabelAbsentRead;
     int mPhase2AnswerRecovered;    //B1.5: forced close produced an answer
     int mPhase2AnswerMissing;      //B1.5: ...and did not
     //#W75-CJ (P2c, engine-seat HIGH-3 "the third path"): a forced close that was

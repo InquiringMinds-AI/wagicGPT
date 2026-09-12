@@ -8746,9 +8746,18 @@ static bool planNamesStrandedCard(const string& plan, const string& cardName)
 //  - that line is `<digits>` then `(` ... `)` and ends at the `)`, with a
 //    non-empty name inside - the protocol's own answer line with the label
 //    elided, and nothing else.
-//Whether the PARSER may read this line is the owner's call and is NOT taken
-//here (invariant 000: no tolerance for an unlabelled answer line without his
-//ruling). Pure over the two inputs; PARSETEST walks it.
+//#W79-DD: THE "MEASURE ONLY / the parser is unchanged" PIN ABOVE IS RETIRED BY
+//OWNER RULING (2026-09-12, verbatim): "no such rule exists. Explicitly the rule
+//is to 'make the parser robust'. And that 'any plan, must precede action.'
+//Mechanically, for an llm, a plan that follows a choice is post hoc
+//justification instead of load bearing reasoning." The line IS read now - see
+//`w79LabellessAnswerLine` below and its wiring in `consumePlan`. This function
+//keeps its job unchanged: it NAMES the record's shape for the census. Naming and
+//reading are two different questions and stay two different functions; the class
+//is deliberately the narrower of the two, because the census wants the clean
+//two-line population and the reader wants every answer it can locate without
+//ambiguity.
+//Pure over the two inputs; PARSETEST walks it.
 bool w78AnswerLabelAbsentShape(const std::vector<string>& offLines, bool hadLabelledAnswer)
 {
     if (hadLabelledAnswer || offLines.size() != 1)
@@ -8767,6 +8776,141 @@ bool w78AnswerLabelAbsentShape(const std::vector<string>& offLines, bool hadLabe
     if (s[s.size() - 1] != ')')
         return false; //anything after the closing paren is prose
     return (s.size() - 1) > (j + 1); //a non-empty short name between the parens
+}
+
+//#W79-DD: ONE LINE IS A BARE ANSWER LINE. `[start,end)` is a line already
+//trimmed of leading blanks/tabs and of trailing blanks/tabs/CR. The shape is the
+//protocol's own action line with the label elided and NOTHING else on it:
+//  <digits> [ws] ( <non-empty name> )
+//and the closing paren is the LAST byte of the line, matched by BALANCE from the
+//opener - so a short name that carries its own parentheses ("Goblin (1/1)") is
+//the whole name, while bytes after the real close make the line prose. The row
+//number leads, so a NEGATED payload ("not 2 (Cast Alpha)", wave-75 P9) and a
+//sentence that merely contains a numbered parenthetical are both refused here
+//rather than by a blacklist of negation words.
+static bool w79BareAnswerLineSpan(const std::string& t, size_t start, size_t end)
+{
+    size_t i = start;
+    while (i < end && t[i] >= '0' && t[i] <= '9')
+        i++;
+    if (i == start)
+        return false; //no row number leading the line
+    size_t j = i;
+    while (j < end && (t[j] == ' ' || t[j] == '\t'))
+        j++;
+    if (j >= end || t[j] != '(')
+        return false;
+    if (t[end - 1] != ')')
+        return false; //bytes after the closing paren are prose
+    if (end - 1 <= j + 1)
+        return false; //an empty short name is not a name
+    int depth = 0;
+    for (size_t k = j; k < end; k++)
+    {
+        if (t[k] == '(')
+            depth++;
+        else if (t[k] == ')')
+        {
+            depth--;
+            if (depth == 0)
+                return (k == end - 1); //the balanced close IS the end of the line
+        }
+    }
+    return false;
+}
+
+//#W79-DD (wave-78 engine-seat / lane CX S1, now RULED): READ THE LABEL-LESS
+//ANSWER LINE. OWNER RULING 2026-09-12, verbatim: "no such rule exists.
+//Explicitly the rule is to 'make the parser robust'. And that 'any plan, must
+//precede action.' Mechanically, for an llm, a plan that follows a choice is post
+//hoc justification instead of load bearing reasoning."
+//
+//So the two constraints that survive are (i) the protocol TEXT is untouched - it
+//asks for `PLAN:` then the action line and licenses nothing else - and (ii) PLAN
+//BEFORE ACTION. Everything else is this parser's job: find the answer wherever it
+//unambiguously is. Twelve replies across the wave-77 and wave-78 corpora wrote a
+//correct plan and then the action line with `CHOICE: ` elided, and the heuristic
+//played all twelve - twice spending a removal spell the pilot had just said it
+//was holding.
+//
+//UNAMBIGUOUS is the whole gate, and it is five clauses, each of which is a
+//direction the read must not go:
+//  - `hadCodedAnswerLine` false: the reply carried NO labelled answer line
+//    anywhere, of any label. A bare row number written BESIDE a real `CHOICE:`
+//    line is a second answer, not this shape, and the labelled line wins;
+//  - EXACTLY ONE line in the whole reply has the bare-answer shape. Two of them
+//    is two answers and the reply is ambiguous - refused, re-asked;
+//  - that line is the LAST non-blank line of the reply. An answer with anything
+//    said after it is not the reply's last word;
+//  - at least one non-blank line PRECEDES it. A reply that is only `2 (Hold
+//    priority)` is an action with no plan at all, and the legacy bare-head
+//    tolerance stays deleted;
+//  - when the reply wrote a line-leading `PLAN:` marker, the answer line starts
+//    AFTER it. THIS IS THE RULING'S OWN CLAUSE: an answer that precedes the plan
+//    is post hoc justification, and is refused exactly as it is today.
+//Prose beyond the two parts is still MEASURED as off-protocol (`off_protocol_bytes`
+//and the deviation class are computed on the raw reply and are untouched by this
+//read) - it is simply not read as the answer; the numbered line is.
+//The name and the row number are NOT checked here: `parseChoice` is the one
+//resolver for those, and it already rejects an out-of-range row and a name that
+//echoes no offered option. Pure over the text; PARSETEST walks it.
+bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
+                            bool hadCodedAnswerLine,
+                            size_t * segStart, size_t * segEnd)
+{
+    if (segStart)
+        *segStart = std::string::npos;
+    if (segEnd)
+        *segEnd = 0;
+    if (hadCodedAnswerLine)
+        return false;
+    size_t candStart = std::string::npos, candEnd = 0;
+    int candidates = 0;
+    bool sawNonBlank = false;         //any non-blank line seen so far
+    bool nonBlankBeforeCand = false;  //...at the moment the candidate was seen
+    bool nonBlankAfterCand = false;
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        const size_t lineEnd = text.find('\n', lineStart);
+        const size_t end = (lineEnd == std::string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t'))
+            s++;
+        size_t e = end;
+        while (e > s && (text[e - 1] == ' ' || text[e - 1] == '\t' || text[e - 1] == '\r'))
+            e--;
+        if (e > s)
+        {
+            if (w79BareAnswerLineSpan(text, s, e))
+            {
+                candidates++;
+                nonBlankBeforeCand = sawNonBlank;
+                nonBlankAfterCand = false;
+                candStart = s;
+                candEnd = e;
+            }
+            else if (candidates > 0)
+                nonBlankAfterCand = true;
+            sawNonBlank = true;
+        }
+        if (lineEnd == std::string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (candidates != 1)
+        return false;
+    if (nonBlankAfterCand)
+        return false; //something was said after the answer
+    if (!nonBlankBeforeCand)
+        return false; //an action with nothing before it is an action with no plan
+    if (planLineStart != std::string::npos && candStart <= planLineStart)
+        return false; //PLAN BEFORE ACTION - the ruling's own clause
+    if (segStart)
+        *segStart = candStart;
+    if (segEnd)
+        *segEnd = candEnd;
+    return true;
 }
 //#W78-CX (S10, wave-77 deck152 HIGH-1 / engine-seat M4): A `defer` RECORD THAT
 //CANNOT SAY WHAT WAS DEFERRED, IN THE WRONG SEAT'S LOG. The corpus's one
@@ -8832,19 +8976,27 @@ const char * w75ProtocolDeviationClass(bool planLineMissing, int offProtocolByte
     return "compliant";
 }
 
-//#W78-CY (F10): the counter's own predicate. MEASURE ONLY - the parser is not
-//touched and no tolerance is added (S1 stays measure-only pending the owner's
-//ruling); this decides which records the METER counts. Pure over the class string.
-static bool w78LabelAbsentCounted(const char * devClass, bool handedToHeuristic)
+//#W78-CY (F10): the counter's own predicate. Pure over the class string.
+//#W79-DD: RE-DERIVED, not deleted. Wave 78 counted the class's COST - records of
+//this shape the heuristic played because the parser refused them - and pinned
+//"the parser is unchanged". The ruling retires that pin, so the same meter now
+//counts the opposite side of the same split: records of this shape whose answer
+//the PARSER READ. The wave-78 reading of any corpus is recoverable from it
+//(cost = the class's population minus this count, and the population is the
+//`answer_label_absent` census), and the meter is a live regression check: a
+//record classed `answer_label_absent` that is NOT counted here is one the reader
+//refused, which is the falsifier the lane note names. Renamed with the meaning:
+//`answer_label_absent_heuristic_played` -> `answer_label_absent_read`.
+static bool w79LabelAbsentRead(const char * devClass, bool handedToHeuristic)
 {
-    return handedToHeuristic && devClass && string(devClass) == "answer_label_absent";
+    return !handedToHeuristic && devClass && string(devClass) == "answer_label_absent";
 }
 
 //#W79-DB (T1, MEASURE ONLY): the recovery record's own join key. A `recovery`
 //record names its fallback CLASS (`unparsed_reply` on all six wave-78 S1
 //instances) and nothing about the protocol deviation, so the S1 population and
 //the recovery population could not be joined without re-parsing every reply.
-//Pure over the final class string - the same string `w78LabelAbsentCounted`
+//Pure over the final class string - the same string `w79LabelAbsentRead`
 //reads, so the field and the meter cannot disagree. No parser change.
 static bool w79RecoveryLabelAbsent(const char * devClass)
 {
@@ -18079,6 +18231,7 @@ static bool splitReasoningBlock(string& content, string& reasoning)
 }
 
 static bool hasCodedAnswerLine(const string& content); //defined below
+static size_t firstLineLeadingPlanPos(const string& text); //#W79-DD: defined with the parser
 
 //HIDDEN REASONING IS NORMAL, NOT A FAULT. Some providers reason and never
 //return the trace: OpenAI and Anthropic withhold raw chain-of-thought as
@@ -18974,7 +19127,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //back in; the marker pair is stamped on the same tick.
                 if (forceClosePoll)
                 {
-                    if (hasCodedAnswerLine(content))
+                    //#W79-DD: the census must agree with the PARSER, or the
+                    //instrument reports a recovered answer as missing. A phase-2
+                    //consume returns `content`, and `content` goes to the seams'
+                    //`consumePlan` like any other reply - which now also reads an
+                    //unambiguous label-less action line. So the same two shapes
+                    //count here. (`answerTailFromReasoning` above stays
+                    //label-anchored on purpose: it selects a tail out of a
+                    //REASONING trace, which is full of numbered parentheticals,
+                    //and that is the genuine ambiguity the ruling still excludes.)
+                    size_t w79bs = 0, w79be = 0;
+                    const bool w79Bare =
+                        w79LabellessAnswerLine(content, firstLineLeadingPlanPos(content),
+                                               hasCodedAnswerLine(content), &w79bs, &w79be);
+                    if (hasCodedAnswerLine(content) || w79Bare)
                         mPhase2AnswerRecovered++;
                     else
                         mPhase2AnswerMissing++;
@@ -20041,7 +20207,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mStuckCastTurn(-1), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
        mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCrossPhaseBoardUnchanged(0), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1)
-        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentHeuristicPlayed(0), //#W78-CX (S1) //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -21617,18 +21783,19 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["protocol_deviation"] = string(devClass);
         if (planLineMissing || replyOffProtocol > 0)
             mProtocolDeviationReplies++;
-        //#W78-CX (S1): ...and the MEASURE the ruling asks for - of the records
-        //that carried an answer line with its label elided, how many were then
-        //played by the HEURISTIC because the parser refused them. Counted on
-        //the same predicate the recovery handoff latches on, so the count and
-        //the `recovery` records it will be joined against cannot disagree.
+        //#W78-CX (S1): ...and the MEASURE - of the records that carried an answer
+        //line with its label elided, how many the parser READ (#W79-DD: the ruling
+        //flipped this meter from the heuristic's side of the split to the
+        //parser's; same denominator, same class, opposite arm). Counted on the
+        //same predicate the recovery handoff latches on, so the count and the
+        //`recovery` records it will be joined against cannot disagree.
         //#W78-CY (F10, Astra MED 10): ...counted on the FINAL class, not on the raw
         //shape flag. A reply that is only `2 (Hold priority)` - no PLAN at all -
         //classifies `unlabelled_plan`, yet `w78LabelAbsent` is true for it, so the
         //counter counted records that carry a different class and could never be
         //reconciled against the `answer_label_absent` population it is named for.
-        if (w78LabelAbsentCounted(devClass, handedToHeuristic(choice, fallback)))
-            mAnswerLabelAbsentHeuristicPlayed++;
+        if (w79LabelAbsentRead(devClass, handedToHeuristic(choice, fallback)))
+            mAnswerLabelAbsentRead++;
         //#W79-DB (T1): the SAME final class, latched for the recovery record the
         //handoff below may arm. Measure only.
         mReplyLabelAbsent = w79RecoveryLabelAbsent(devClass);
@@ -22045,10 +22212,11 @@ void AIPlayerGPT::logGameEnd()
         //denominator - the class `off_protocol_bytes` cannot see.
         {"plan_line_missing", mPlanLineMissing},
         {"protocol_deviation_replies", mProtocolDeviationReplies}, //#W75-CL (P23 d)
-        //#W78-CX (S1): the `answer_label_absent` class's cost - replies that
-        //gave a legible answer without its label and were played by the
-        //heuristic anyway. MEASURE ONLY; the parser is unchanged.
-        {"answer_label_absent_heuristic_played", mAnswerLabelAbsentHeuristicPlayed},
+        //#W78-CX (S1) / #W79-DD: the `answer_label_absent` class's READ count -
+        //replies that gave a legible answer without its label and whose answer the
+        //parser took. The class's population minus this is what the heuristic
+        //still played.
+        {"answer_label_absent_read", mAnswerLabelAbsentRead},
         {"plan_names_uncastable_zone_card", mPlanNamesUncastableZoneCard}, //#W75-CL (P17)
     };
     transLogWrite(rec.dump()); //audit-L (L4)
@@ -23959,6 +24127,52 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     return true;
 }
 
+//#W79-DD: THE ANSWER SELECTOR - the one entry every seam's reply parsing goes
+//through. `consumePlan` calls it, and so does PARSETEST's `answerSegmentStatic`,
+//so a case in the corpus is exercising the code the ask seam runs and not a
+//mirror of it (the wave-64 lesson: two scanners that "agree" about the same
+//bytes eventually do not).
+//Step 1 is the labelled walk, unchanged. Step 2 fires ONLY when step 1 found no
+//answer line AND refused no rejection line: the label-less action line, read
+//under `w79LabellessAnswerLine`'s five unambiguity clauses (owner ruling
+//2026-09-12 - make the parser robust; any plan must precede action). A reply
+//that wrote only rejection lines still yields no answer, exactly as #W50-Y D7
+//left it - a refusal is not an answer with its label missing.
+static bool gptAnswerSegment(const string& text, const char * expectedLabel,
+                             size_t& segStart, size_t& segEnd, size_t& labelLineStart,
+                             int * extraAnswerLines, int * rejectedLines,
+                             size_t * lastHeadLineStart, bool * labellessRead)
+{
+    if (labellessRead)
+        *labellessRead = false;
+    int rejected = 0;
+    const bool got = findAnswerLabelLine(text, expectedLabel, segStart, segEnd, labelLineStart,
+                                         extraAnswerLines, &rejected, lastHeadLineStart);
+    if (rejectedLines)
+        *rejectedLines = rejected;
+    if (got || rejected > 0)
+        return got;
+    size_t bareStart = string::npos, bareEnd = 0;
+    if (!w79LabellessAnswerLine(text, firstLineLeadingPlanPos(text),
+                                codedAnswerCount(text) > 0, &bareStart, &bareEnd))
+        return false;
+    //The WHOLE line is the payload - there is no label to skip past. `parseChoice`
+    //then validates the row number and the echoed short name, so an out-of-range
+    //row and a name no option carries still fail here exactly as they do with a
+    //label. `labelLineStart` is the line's own start, which bounds the plan carry
+    //in consumePlan: the action line is never folded back into the plan.
+    segStart = bareStart;
+    segEnd = bareEnd;
+    labelLineStart = bareStart;
+    if (extraAnswerLines)
+        *extraAnswerLines = 0;
+    if (lastHeadLineStart)
+        *lastHeadLineStart = bareStart;
+    if (labellessRead)
+        *labellessRead = true;
+    return true;
+}
+
 //WHICH "PLAN:" IS THE CURRENT PLAN (wave-34 #3, N-36e). Case-insensitive, and
 //the colon is required so prose like "I plan to attack" cannot truncate the
 //reply. The CONSUMER anchors LAST: a reply that stated a plan, kept
@@ -24250,8 +24464,9 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         (void) planEnd;
         size_t lastHead = string::npos;
         int extraLines = 0;
-        const bool got = findAnswerLabelLine(text, expectedLabel, ss, se, ls,
-                                             &extraLines, rejectedLines, &lastHead);
+        //#W79-DD: the selector, labelled walk then the label-less action line.
+        const bool got = gptAnswerSegment(text, expectedLabel, ss, se, ls,
+                                          &extraLines, rejectedLines, &lastHead, NULL);
         if (got && extraLines > 0)
         {
             //#W70-BM (E2): a SECOND answer line. The first one runs (a decision
@@ -58852,14 +59067,17 @@ int AIPlayerGPT::cleanupDiscard(int over)
 //#W50-Y: the CHOICE answer segment as consumePlan's label walk selects it
 //(findAnswerLabelLine with the D7 rejection/clean rule), for PARSETEST -
 //consumePlan itself is a member that also updates the plan carry.
-static string answerSegmentStatic(const string& content, const char * label, int * run, int * rej)
+static string answerSegmentStatic(const string& content, const char * label, int * run, int * rej,
+                                  bool * labellessRead = NULL)
 {
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
     size_t ss = 0, se = 0, ls = 0;
-    if (!findAnswerLabelLine(text, label, ss, se, ls, run, rej))
+    //#W79-DD: `gptAnswerSegment`, which is the selector `consumePlan` itself
+    //calls - not a mirror of it.
+    if (!gptAnswerSegment(text, label, ss, se, ls, run, rej, NULL, labellessRead))
         return string();
     return text.substr(ss, se - ss);
 }
@@ -95750,16 +95968,18 @@ static const char * kW50Y_r94 =
                   != "prose_outside_two_lines",
               "#W78-CX S1 RED-ON-BASE ...stated as the negative the wave-77 engine seat"
               " raised: the shipped stamp told a reviewer the model rambled");
-        // THE PARSER IS NOT CHANGED. The owner's ruling on whether an
-        // unlabelled answer line may be READ is pending (invariant 000), so the
-        // reply still finds no answer segment and the window still falls to the
-        // heuristic. This pin is what makes the measure honest: the class says
-        // what happened, it does not recover the decision.
+        // #W79-DD: THIS PIN IS RETIRED BY OWNER RULING (2026-09-12) AND INVERTED.
+        // Wave 78 pinned "the parser is UNCHANGED" pending his call; he ruled the
+        // rule never existed - "make the parser robust", and "any plan, must
+        // precede action". So the selector the ask seam calls now READS this line,
+        // and the pin states the read rather than the refusal.
         int run = 0, rej = 0;
-        CHECK(answerSegmentStatic(s1Repro, "CHOICE:", &run, &rej).empty(),
-              "#W78-CX S1 PIN the parser is UNCHANGED - the unlabelled answer line still"
-              " yields no answer segment and the heuristic still plays the window (owner"
-              " ruling pending; no tolerance added)");
+        bool s1Bare = false;
+        CHECK(answerSegmentStatic(s1Repro, "CHOICE:", &run, &rej, &s1Bare)
+                  == "2 (Hold priority)" && s1Bare,
+              "#W79-DD (retires the #W78-CX S1 parser-unchanged pin) the selector"
+              " `consumePlan` calls now READS the label-less action line, whole:"
+              " `2 (Hold priority)`");
         {
             size_t ia = 0, ib = 0, ic = 0;
             CHECK(!gptInlineChoiceOnPlanLine(s1Repro, ia, ib, ic),
@@ -96694,10 +96914,11 @@ static const char * kW50Y_r94 =
               "#W78-CY F10 RED-ON-BASE ...while the raw shape flag `w78LabelAbsent` is TRUE"
               " for it - the flag the base counter tested");
         CHECK(labelAbsent && AIPlayerGPT::handedToHeuristic(-1, "unparsed_reply"),
-              "#W78-CY F10 RED-ON-BASE ...and the window IS handed to the heuristic, so on"
-              " base `answer_label_absent_heuristic_played` incremented on a record whose"
+              "#W78-CY F10 RED-ON-BASE ...and the window IS handed to the heuristic (nothing"
+              " precedes the action line, so #W79-DD's reader refuses it too), so on base"
+              " `answer_label_absent_heuristic_played` incremented on a record whose"
               " class is not `answer_label_absent`");
-        CHECK(!w78LabelAbsentCounted(cls, true),
+        CHECK(!w79LabelAbsentRead(cls, true),
               "#W78-CY F10 GREEN the counter does not count it - the meter reconciles with"
               " the `answer_label_absent` records and with nothing else");
         // ...and the five wave-77 records still count five.
@@ -96722,26 +96943,33 @@ static const char * kW50Y_r94 =
                 const long ob = offProtocolBytes(five[i], &af, &o);
                 const char * c = w75ProtocolDeviationClass(false, (int) ob, false,
                         w78AnswerLabelAbsentShape(o, codedAnswerCount(five[i]) > 0));
-                if (w78LabelAbsentCounted(c, true))
+                if (w79LabelAbsentRead(c, false))
                     counted++;
             }
             CHECK(counted == 5,
-                  "#W78-CY F10 GREEN the five wave-77 `answer_label_absent` records still"
-                  " count five - the fix narrows the meter, it does not empty it");
+                  "#W79-DD (re-derived from #W78-CY F10) the five wave-77"
+                  " `answer_label_absent` records still count five - on the READ arm now,"
+                  " because #W79-DD's parser reads all five");
         }
-        // MUST-NOT-MATCH: a record the heuristic did NOT play never counts, and the
-        // parser is untouched.
-        CHECK(!w78LabelAbsentCounted("answer_label_absent", false)
-              && !w78LabelAbsentCounted(NULL, true)
-              && !w78LabelAbsentCounted("prose_outside_two_lines", true)
-              && !w78LabelAbsentCounted("compliant", true),
-              "#W78-CY F10 MUST-NOT-MATCH no heuristic, no class, and every other class"
-              " are all uncounted");
+        // MUST-NOT-MATCH: a record the HEURISTIC played is not a read, and no other
+        // class is counted on either arm.
+        CHECK(!w79LabelAbsentRead("answer_label_absent", true)
+              && !w79LabelAbsentRead(NULL, false)
+              && !w79LabelAbsentRead("prose_outside_two_lines", false)
+              && !w79LabelAbsentRead("compliant", false),
+              "#W79-DD MUST-NOT-MATCH a heuristic-played record, no class, and every other"
+              " class are all uncounted on the read arm");
         {
             int run = 0, rej = 0;
             CHECK(answerSegmentStatic(noPlan, "CHOICE:", &run, &rej).empty(),
-                  "#W78-CY F10 MEASURE ONLY - the parser is byte-identical: the unlabelled"
-                  " answer line still yields no answer segment and no tolerance is added");
+                  "#W78-CY F10 the LABEL walk still yields nothing for it - the label really"
+                  " is absent");
+            size_t bs = 0, be = 0;
+            CHECK(!w79LabellessAnswerLine(noPlan, firstLineLeadingPlanPos(noPlan),
+                                          codedAnswerCount(noPlan) > 0, &bs, &be),
+                  "#W79-DD MUST-NOT-MATCH ...and the READER refuses it too: an action line"
+                  " with nothing before it is an action with no plan, which is the one"
+                  " thing the ruling keeps refusing");
         }
     }
 
@@ -97532,11 +97760,17 @@ static const char * kW50Y_r94 =
         }
         {
             int run = 0, rej = 0;
-            CHECK(answerSegmentStatic(one, "CHOICE:", &run, &rej).empty()
+            bool bare = false;
+            //#W79-DD: the "byte-identical parser" half of this pin is RETIRED by the
+            //owner's 2026-09-12 ruling and inverted; the CLASS half is untouched,
+            //because naming a record's shape and reading its answer stay two jobs.
+            CHECK(answerSegmentStatic(one, "CHOICE:", &run, &rej, &bare)
+                      == "2 (Cast Sphinx's Revelation)" && bare
                   && w75ProtocolDeviationClass(true, 5, false, true)
                          == string("unlabelled_plan"),
-                  "#W79-DB T1 MEASURE ONLY - the parser is byte-identical and no tolerance is"
-                  " added: the unlabelled answer line still yields no answer segment");
+                  "#W79-DD (retires the #W79-DB T1 byte-identical-parser pin) `125v123` seq"
+                  " 83's action line is READ, and the deviation class is still computed and"
+                  " recorded exactly as before");
         }
     }
 
@@ -98726,6 +98960,289 @@ static const char * kW50Y_r94 =
         CHECK(!w79UntapEngineLineQualifies("{2}{u}:untap target(creature)", true),
               "#W79-DC F8 MUST-NOT-MATCH a single-target untap is not an untap-ALL engine -"
               " the clause is about the class of effect that untaps a SET");
+    }
+
+    cout << "\n[#W79-DD] the label-less action line, READ - 12 corpus replies through the selector consumePlan calls\n";
+    {
+        // Every reply below is VERBATIM off a corpus record (`reply` field); every
+        // option list is that record's own `options_text`, verbatim. Runs the LIVE
+        // chain: `answerSegmentStatic` -> `gptAnswerSegment` (the selector
+        // `consumePlan` itself calls) -> `parseChoice` with the real rows.
+        // RED ON BASE: base's selector was `findAnswerLabelLine` alone; none of these
+        // replies carries a coded answer line (pinned per case), so on base every one
+        // returned an empty segment and the heuristic played the window.
+        struct W79Case { const char * tag; const char * reply; int row; int n; const char * o[6]; };
+        static const W79Case kW79DD[] = {
+            { "125v123 seq 83 (wave-78)", "\n\nPLAN: Cast Sphinx's Revelation for X=4.\n2 (Cast Sphinx's Revelation)", 2, 4, {
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 3 of your 7 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
+                "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=4 (7 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=4 - largest affordable X - X=4 gains 4 life and draws 4 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=4, 7 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Supreme Verdict {1}{u}{w}{w} in your hand needs 4: the largest X that still leaves it payable this turn is X=0} {card text: \"You gain X life and draw X cards.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+            } },
+            { "125v123 seq 140 (wave-78)", "\n\nPLAN: Play a land and hold for Emrakul next turn.\n3 (Cast nothing right now)", 3, 3, {
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 8 of your 12 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v123 seq 215 (wave-78)", "\n\nPLAN: I will hold priority to skip further windows this turn, as the opponent has no threats and I have no plays to make right now.\n2 (Hold priority)", 2, 3, {
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 2 of your 6 untapped mana sources untapped} {spends 4 of your 6 untapped mana sources this turn; Dream Fracture {1}{u}{u} in your hand needs 3} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 21 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v123 seq 305 (wave-78)", "\n\nPLAN: I will hold priority to end my turn and proceed to the next turn to attack with the two Staffs of Nin, which will win the game in 4 turns.\n4 (Cast nothing right now)", 4, 4, {
+                "Cast Elixir of Immortality {1} {leaves 17 of your 18 untapped mana sources untapped} {card text: \"{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library.\"} {leaves 17 sources - no other row on this menu needs more than 17}",
+                "Cast Emrakul, the Aeons Torn {15} (15/15) {leaves 3 of your 18 untapped mana sources untapped} {spends 15 of your 18 untapped mana sources this turn; Fall of the Gavel {3}{u}{w} in your hand needs 5} {card text: \"Emrakul, the Aeons Torn can't be countered. -- When you cast Emrakul, take an extra turn after this one. -- Flying, protection from colored spells, annihilator 6 -- When Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.\"} {leaves 3 sources - no other row on this menu needs more than 3}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 4 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+            } },
+            { "125v126 seq 107 (wave-78)", "\n\nPLAN: Pass main phase and hold priority.\n4 (Cast nothing right now)", 4, 4, {
+                "Cast Path to Exile {w} {leaves 8 of your 9 untapped mana sources untapped} {removes: 3 bodies: Wall of Omens #1, Wall of Omens #2, Overgrown Battlement} - legal targets right now: Wall of Omens #1 {1}{w} (creature 0/4) [defender] {target text: \"Defender (This creature can't attack.) -- When Wall of Omens enters, draw a card.\"}, Wall of Omens #2 {1}{w} (creature 0/4) [defender], Overgrown Battlement {1}{g} (creature 0/4) [defender] {target text: \"Defender -- {T}: Add {G} for each creature with defender you control.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"} {leaves 8 sources - no other row on this menu needs more than 8}",
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 3 of their creatures (all of them carry a restriction against attacking), 0 of yours - THEIRS: 3 bodies: Wall of Omens #1 (0/4) [defender], Wall of Omens #2 (0/4) [defender], Overgrown Battlement (0/4) [defender]} {leaves 5 of your 9 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {leaves 5 sources - no other row on this menu needs more than 5} [<- board sweep: THEIRS 3 / YOURS 0 - the only row on this menu that prices a board sweep]",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+            } },
+            { "162v146 seq 16 (wave-78)", "\n\nCast nothing right now.\n3 (Cast nothing right now)", 3, 3, {
+                "Cast Howling Mine {2} [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule, and this copy is a second instance of an effect you already have: each line it repeats happens a second time. The price is a card and this window's cast, spent on repeating an effect that is already on your battlefield rather than on one that is not] {leaves 0 of your 2 untapped mana sources untapped - casting this taps you out} {card text: \"At the beginning of each player's draw step, if Howling Mine is untapped, that player draws an additional card.\"} {feeds: the opponent draws 1 extra card per turn; and so do YOU: 1 extra card per turn (this engine is SYMMETRIC - it feeds both players, and your own extra draws are priced by any draw punisher THEY control); draw converters (they fire when the opponent DRAWS) on your battlefield: 0 (nothing of yours punishes their DRAWS yet - the cards you hand them are free until a draw converter is out; a discard punisher is a different class and is counted separately below); draw converters in your hand: 1 - Ob Nixilis, the Hate-Twisted; discard punishers (a different class - this row hands them CARDS, and a discard punisher fires only when a card leaves a hand as a discard, though a larger hand can overflow a cleanup step): on your battlefield: 1 - Liliana's Caress; in your hand: 0}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v130 seq 303 (wave-78)", "\n\nPLAN: Pass upkeep, cast Staff of Nin in main phase 1.\n2 (Hold priority)", 2, 3, {
+                "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=9, 12 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Elixir of Immortality {1} in your hand needs 1: the largest X that still leaves it payable this turn is X=8. Holding up an instant: Essence Scatter {1}{u} needs 2: the largest X that still leaves it castable this turn is X=7} {card text: \"You gain X life and draw X cards.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 16 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v123 seq 315 (wave-77)", "\n\nPLAN: Opponent is at 5 life, my two Staffs will deal 2 damage per turn, securing the win in 3 turns. Stop 3 prohibits Sphinx's Revelation, and there are no threats to answer. I will hold priority to close the turn.\n2 (Hold priority)", 2, 3, {
+                "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=9, 12 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Path to Exile {w} in your hand needs 1: the largest X that still leaves it payable this turn is X=8} {card text: \"You gain X life and draw X cards.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 3 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v126 seq 140 (wave-77)", "\n\nPLAN: Let Staff pings resolve and hold priority to stop the menu loop.\n2 (Hold priority)", 2, 3, {
+                "Cast Path to Exile {w} {leaves 12 of your 13 untapped mana sources untapped} {removes: Perimeter Captain, Pride Guardian} - legal targets right now: Perimeter Captain {w} (creature 0/4) [defender] {target text: \"Defender -- Whenever a creature you control with defender blocks, you may gain 2 life.\"}, Pride Guardian {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 5 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v126 seq 201 (wave-77)", "\n\nPLAN: Wait for Staff of Nin to ping the opponent down to 0.\n3 (Cast nothing right now)", 3, 3, {
+                "Cast Path to Exile {w} {leaves 14 of your 15 untapped mana sources untapped} {removes: Pride Guardian #1, Pride Guardian #2} - legal targets right now: Pride Guardian #1 {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"}, Pride Guardian #2 {w} (creature 0/3) [defender] {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 3 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+                NULL,
+            } },
+            { "125v126 seq 219 (wave-77)", "\n\nPLAN: Exquisite Blood converts my damage to their life gain, so I will avoid dealing damage and hold priority to survive.\n5 (Cast nothing right now)", 5, 5, {
+                "Cast Path to Exile {w} {leaves 14 of your 15 untapped mana sources untapped} {removes: Pride Guardian} - legal targets right now: Pride Guardian {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"} {leaves 14 sources - no other row on this menu needs more than 14}",
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 1 of their creature (it carries a restriction against attacking), 0 of yours - THEIRS: Pride Guardian (0/3) [defender]} {leaves 11 of your 15 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {leaves 11 sources - no other row on this menu needs more than 11} [<- board sweep: THEIRS 1 / YOURS 0 - the only row on this menu that prices a board sweep]",
+                "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=12 (15 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=12 - largest affordable X - X=12 gains 12 life and draws 12 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=12, 15 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Path to Exile {w} in your hand needs 1: the largest X that still leaves it payable this turn is X=11} {card text: \"You gain X life and draw X cards.\"}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 2 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+            } },
+            { "125v162 seq 49 (wave-77)", "\n\nPLAN: Cast nothing right now.\n4 (Cast nothing right now)", 4, 4, {
+                "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {spends 4 of your 4 untapped mana sources this turn; Essence Scatter {1}{u} in your hand needs 2} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {taps you out - row 2 needs more mana sources than the 0 this leaves}",
+                "Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker} [second copy: you already control Lightmine Field; both stay on the battlefield - no legend rule, and this copy is one more of the same effect - each line it repeats happens again; the price is a card and this window's cast spent DOUBLING an effect you already have on the battlefield, not adding one you do not] {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {spends 4 of your 4 untapped mana sources this turn; Essence Scatter {1}{u} in your hand needs 2} {card text: \"Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures.\"} {taps you out - row 1 needs more mana sources than the 0 this leaves}",
+                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Cast nothing right now (combat comes next this turn) {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 19 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
+                NULL,
+                NULL,
+            } },
+        };
+        int readOk = 0;
+        for (size_t ci = 0; ci < sizeof(kW79DD) / sizeof(kW79DD[0]); ci++)
+        {
+            const W79Case& c = kW79DD[ci];
+            vector<string> opts;
+            for (int k = 0; k < c.n; k++)
+                opts.push_back(c.o[k]);
+            int run = 0, rej = 0; bool bare = false, stale = false;
+            const string seg = answerSegmentStatic(c.reply, "CHOICE:", &run, &rej, &bare);
+            const int got = seg.empty() ? -1
+                          : parseChoice(seg, (int) opts.size(), &opts, &stale, NULL, NULL, false);
+            const bool redOnBase = (codedAnswerCount(c.reply) == 0);
+            size_t ia = 0, ib = 0, ic = 0;
+            const bool noInline = !gptInlineChoiceOnPlanLine(c.reply, ia, ib, ic);
+            if (bare && got == c.row && redOnBase && noInline)
+                readOk++;
+            else
+                cout << "    (" << c.tag << " read=" << bare << " row=" << got
+                     << " want=" << c.row << ")\n";
+        }
+        CHECK(readOk == 12,
+              "#W79-DD GREEN all TWELVE corpus replies whose action line lost its label are"
+              " now READ to the row and the option the pilot named - and each carries no"
+              " coded answer line and no inline CHOICE:, which is why base refused all"
+              " twelve and the heuristic played them (twice spending a removal spell the"
+              " pilot had just said it was holding)");
+    }
+
+    cout << "\n[#W79-DD] what stays REFUSED - the ruling's own clause, and every ambiguity\n";
+    {
+        // The reader's whole job is "read it where it UNAMBIGUOUSLY is". Each case
+        // below is a direction it must not go; `bare` is the selector's own signal
+        // that it read a label-less line, so a case that fails here fails loudly.
+        vector<string> rows;
+        rows.push_back("Cast Alpha {1}{u} (2/2) [flying]");
+        rows.push_back("Hold priority - pass now, and do not ask me again");
+        rows.push_back("Cast nothing right now (combat comes next this turn)");
+        int run = 0, rej = 0; bool bare = false;
+        // (1) THE RULING'S OWN CLAUSE: an answer that PRECEDES the plan is post hoc
+        // justification and is refused, exactly as it is today.
+        CHECK(answerSegmentStatic("2 (Hold priority)\nPLAN: hold and pass the turn.",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH an action line BEFORE the plan line is refused -"
+              " \"a plan that follows a choice is post hoc justification instead of load"
+              " bearing reasoning\" (owner, 2026-09-12)");
+        // ...and the same reply with the two lines in the ruled order IS read.
+        CHECK(answerSegmentStatic("PLAN: hold and pass the turn.\n2 (Hold priority)",
+                                  "CHOICE:", &run, &rej, &bare) == "2 (Hold priority)" && bare,
+              "#W79-DD GREEN ...and the SAME two lines in the ruled order are read - the"
+              " clause is about ORDER, not about the label");
+        // (2) TWO bare answer lines is two answers: ambiguous, refused, re-asked.
+        CHECK(answerSegmentStatic("PLAN: hold.\n2 (Hold priority)\n1 (Cast Alpha)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH two bare action lines are two answers - genuine"
+              " ambiguity, refused");
+        // (3) Something said AFTER the action line: it is not the reply's last word.
+        CHECK(answerSegmentStatic("PLAN: hold.\n2 (Hold priority)\nOn reflection Alpha is"
+                                  " better.", "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH an action line with prose after it is refused - the"
+              " reader takes the reply's LAST word or nothing");
+        // (4) Nothing before it: an action with no plan at all. The legacy bare-head
+        // tolerance (#W70-BM E2) stays deleted.
+        CHECK(answerSegmentStatic("\n\n2 (Hold priority)\n", "CHOICE:", &run, &rej, &bare)
+                  .empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH an action line with NOTHING before it is refused -"
+              " the deleted bare-head tolerance is not coming back through this door");
+        // (5) A bare row number written BESIDE a real CHOICE: line: the labelled line
+        // wins and the reader never runs.
+        CHECK(answerSegmentStatic("PLAN: hold.\nCHOICE: 1 (Cast Alpha)\n2 (Hold priority)",
+                                  "CHOICE:", &run, &rej, &bare) == " 1 (Cast Alpha)" && !bare,
+              "#W79-DD MUST-NOT-MATCH a labelled answer always wins - a bare row number"
+              " beside it is a second answer, not this shape");
+        // (6) A NEGATED payload (wave-75 P9). The row number must LEAD the line, so
+        // this is refused by shape and not by a blacklist of negation words.
+        CHECK(answerSegmentStatic("PLAN: hold.\nnot 2 (Hold priority)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH a negated payload `not 2 (...)` stays refused"
+              " (wave-75 P9) - the row number has to LEAD the line");
+        // (7) P9/F3: the inline CHOICE: on the PLAN's own physical line is still
+        // ACCEPTED, and by P9's reader, not this one.
+        {
+            bool b2 = false;
+            const string seg = answerSegmentStatic("PLAN: hold up the counter. CHOICE: 2"
+                                                  " (Hold priority)", "CHOICE:", &run, &rej,
+                                                  &b2);
+            CHECK(seg == " 2 (Hold priority)" && !b2,
+                  "#W79-DD PIN the inline `CHOICE:` on the PLAN's physical line is still"
+                  " accepted, and still by P9's inline reader - the label-less path is not"
+                  " what answers it");
+        }
+        // (8) bytes after the closing paren, and (9) an empty short name.
+        CHECK(answerSegmentStatic("PLAN: hold.\n2 (Hold priority) is best",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W79-DD MUST-NOT-MATCH bytes after the closing paren make the line prose");
+        CHECK(answerSegmentStatic("PLAN: hold.\n2 ()", "CHOICE:", &run, &rej, &bare).empty()
+                  && !bare,
+              "#W79-DD MUST-NOT-MATCH an empty short name is not a name");
+        // (10) a REJECTION line is not an answer with its label missing (#W50-Y D7).
+        {
+            int r2 = 0, j2 = 0; bool b3 = false;
+            CHECK(answerSegmentStatic("PLAN: hold.\nCHOICE: 1 (Cast Alpha) is wrong\n"
+                                      "2 (Hold priority)",
+                                      "CHOICE:", &r2, &j2, &b3).empty() && !b3 && j2 > 0,
+                  "#W79-DD PIN a reply whose only coded line is a REJECTION still yields no"
+                  " answer (#W50-Y D7) - a refusal is not an answer with its label missing");
+        }
+        // (11) the row number and the name are `parseChoice`'s job, unchanged: an
+        // out-of-range row whose name matches no offered option FAILS.
+        {
+            bool b4 = false, stale = false;
+            const string seg = answerSegmentStatic("PLAN: hold.\n9 (Cast Zeta)", "CHOICE:",
+                                                  &run, &rej, &b4);
+            CHECK(b4 && seg == "9 (Cast Zeta)"
+                  && parseChoice(seg, 3, &rows, &stale, NULL, NULL, false) < 0,
+                  "#W79-DD PIN the reader LOCATES the line; `parseChoice` still judges it -"
+                  " an out-of-range row naming no offered option fails, and the heuristic"
+                  " answers that window");
+            bool b5 = false, stale2 = false;
+            const string seg2 = answerSegmentStatic("PLAN: hold.\n2 (Cast Zeta)", "CHOICE:",
+                                                   &run, &rej, &b5);
+            CHECK(b5 && parseChoice(seg2, 3, &rows, &stale2, NULL, NULL, false) < 0,
+                  "#W79-DD PIN ...and an IN-RANGE row whose name matches no option fails the"
+                  " same way - reading the line adds no tolerance to the resolution");
+        }
+        // (12) a short name that carries its own parentheses is read WHOLE (the
+        // #W50-Y D8 shape, now on a label-less line).
+        {
+            bool b6 = false, stale = false;
+            vector<string> r2;
+            r2.push_back("Cast Goblin (1/1) [haste]");
+            r2.push_back("Cast nothing right now");
+            const string seg = answerSegmentStatic("PLAN: make a body.\n1 (Goblin (1/1))",
+                                                  "CHOICE:", &run, &rej, &b6);
+            CHECK(b6 && seg == "1 (Goblin (1/1))"
+                  && parseChoice(seg, 2, &r2, &stale, NULL, NULL, false) == 1,
+                  "#W79-DD GREEN a short name carrying its own parentheses is read whole -"
+                  " the close is matched by BALANCE, not by the last ')' in the line");
+        }
+        // (13) PROSE BEYOND THE TWO PARTS: the numbered line is still read, and the
+        // prose is still MEASURED as off-protocol. Reading an answer does not make a
+        // rambling reply compliant, and never silently accepts the prose as the answer.
+        {
+            bool b7 = false, af = false, stale = false;
+            const char * rambled = "PLAN: hold.\nI think holding is right here.\n"
+                                   "2 (Hold priority)";
+            std::vector<string> off;
+            const long ob = offProtocolBytes(rambled, &af, &off);
+            const string seg = answerSegmentStatic(rambled, "CHOICE:", &run, &rej, &b7);
+            CHECK(b7 && seg == "2 (Hold priority)"
+                  && parseChoice(seg, 3, &rows, &stale, NULL, NULL, false) == 2
+                  && ob > (long) seg.size() && off.size() == 2,
+                  "#W79-DD GREEN prose between the plan and the action line does not hide the"
+                  " answer - and the prose is STILL charged off-protocol (two off lines, more"
+                  " bytes than the answer line), so a rambling reply is not laundered"
+                  " compliant by being readable");
+            CHECK(!w78AnswerLabelAbsentShape(off, codedAnswerCount(rambled) > 0),
+                  "#W79-DD PIN ...and the CLASS is still the narrower one: the census names"
+                  " `prose_outside_two_lines` for it while the reader reads it - naming a"
+                  " record and locating its answer are two jobs and stay two functions");
+        }
+        // (14) the phase-2 recovery path reads the SAME shape. A forced close whose
+        // content is a plan plus a label-less action line counts as RECOVERED, not
+        // missing - the instrument and the parser cannot disagree.
+        {
+            const char * phase2 = "PLAN: hold up the counter.\n2 (Hold priority)";
+            size_t ps = 0, pe = 0;
+            CHECK(!hasCodedAnswerLine(phase2)
+                  && w79LabellessAnswerLine(phase2, firstLineLeadingPlanPos(phase2),
+                                            hasCodedAnswerLine(phase2), &ps, &pe),
+                  "#W79-DD GREEN the phase-2 census reads the same shape - on base"
+                  " `hasCodedAnswerLine` alone called this consume `phase2_answer_missing`"
+                  " while `consumePlan` was about to answer the window from it");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
