@@ -1,0 +1,15 @@
+# Bug list after the engine audit (2026-09-15) — the next STEP ONE starts here (a list, not a quota)
+
+Carried from the four fix passes (sources: fix-lane.md .. fix-lane-4.md "weakest evidence", fix-review-*.md):
+1. HUMAN EDICT PROMPT — the edict re-choice now routes to the targeted player, but no one has OBSERVED the Vita/PC GUI presenting the sacrifice chooser to a human seat; the suite cannot drive a human seat. Verify by a GUI play (Tribute to Hunger / Devour Flesh cast BY the AI at the human) before the next VPK.
+2. MULTIPLE-CHOICE AFTER COMPACTION — a scripted `choice 0` never reached doReactTo after `shrinkactionlayer` on BOTH the pre- and post-fix binaries (fix-lane-2.md); the lane dropped the fixture rather than ship a green it could not explain. Unexplained; possibly a further defect in the mode-menu dispatch. Find out.
+3. forgetElement RE-ADD CAVEAT — an element `addToGame`d after `moveToGarbage` leaves a second live slot (pre-W83 walk was immune); not shown reachable; guard or prove unreachable.
+4. mRevealAbove IDENTITY — parked-card eligibility compares raw pointers against the live library; a freed instance whose address is reused reads "still above" for one draw. Use ids, not pointers.
+5. PASS-FLOOR ARM NEVER OBSERVED — the wave-71 re-arming-menu shape has not been produced on demand in four lanes; the floor's firing is pinned by predicate only. If a heuristic hang ever recurs, this arm is the first suspect.
+6. FINGERPRINT — still a fingerprint (energy/experience/poison/target-set sizes added); library order, prevention amounts, and effect state are not in it. Acceptable while the floor also requires an untaken offered set; revisit only on evidence.
+7. WARD vs COST TAXES — 12 cards (Boreal Elemental, Callaphe, Charix, Esior, Jubilant Skybonder, Kaervek's Torch, Kopala, Pursued Whale, Sphinx of New Prahv, Syr Elenora, Elderwood Scion, Kasmina) model "costs {N} more" as pay-or-counter (pre-existing approximation; owner: not a problem unless heuristic play worsens). Card-script item, low.
+8. 55 UNINITIALISED SCALARS outside AIPlayerGPT (SimpleButton/SimplePad/SimplePopup/TestSuiteAI/TextScroller; `check-ctor-init.py --notes`). Mechanical.
+9. DECK123 DRIFT (waves 51-52) and 126v152 STEP (3329c40f1's reveal-path hunk) — heuristic-play changes accepted as the baseline; if the owner ever judges Baka plays WORSE on those decks, those are the commits to read.
+10. Bisect-era crashes at c15106f4d / 462c63982 / 7be32f8f0 (cores overwritten) — shapes match the two classes fixed by lane 1 (StackAbility resolve on a dead card; GuiPlay assert after a free activation). Consider closed unless the gate sees them again.
+
+Standing gate: every shipping binary passes tools/baka-ab.sh (210+ games, 0 unfinished) vs archives/baka-ab/<accepted>; the accepted baseline after this audit = the fourth-pass merge (see the anchor memory for the hash).
