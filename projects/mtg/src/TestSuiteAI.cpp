@@ -462,6 +462,8 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                              || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                              || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
+                || action.compare(0, 9, "millcard ") == 0 //#W85-HB (review-3 item 2)
+                             || action.compare(0, 9, "millcard ") == 0 //#W85-HB (review-3 item 2)
                              || action.compare(0, 14, "aideclineface ") == 0 //#W71-BP
                              || action.compare(0, 22, "assertdeclinesapplied ") == 0 //#W71-BP
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
@@ -528,6 +530,7 @@ int TestSuiteAI::Act(float)
             && action.compare(0, 19, "assertpendingdraws ") != 0 //#W63-AF (R1/R8)
             //#W69-BG (K1): the draw driver is not a menu answer.
             && action.compare(0, 9, "drawcard ") != 0
+            && action.compare(0, 9, "millcard ") != 0 //#W85-HB (review-3 item 2)
             //#W71-BP: the decline ARM is not a menu answer - it must reach its own
             //handler, which arms a standing decline the AI seat applies on its own
             //ticks. Pre-answering it with the suite default would answer ONE menu
@@ -938,6 +941,93 @@ int TestSuiteAI::Act(float)
                    << suite->filename << "]");
         for (int i = 0; i < howmany; ++i)
             dp->game->drawFromLibrary();
+    }
+    else if (action.compare(0, 9, "millcard ") == 0)
+    {
+        //#W85-HB (review-3 item 2): take cards off the TOP of a library without
+        //drawing them - the shape a mill, a tutor or a `bottomoflibrary` leaves
+        //behind. That is the removal route the wave-84 depth COUNT could not see
+        //(only a draw decremented it), which is why a parked card underneath could
+        //never become the logical top again. Syntax: `millcard <1|2> <count>`.
+        int who = 1, howmany = 1;
+        {
+            std::istringstream ms(action.substr(9));
+            ms >> who >> howmany;
+        }
+        if (who < 1) who = 1;
+        if (who > 2) who = 2;
+        if (howmany < 1) howmany = 1;
+        Player * mp = observer->players[who - 1];
+        for (int i = 0; i < howmany && mp->game->library->nb_cards; ++i)
+        {
+            MTGCardInstance * top = mp->game->library->cards[mp->game->library->nb_cards - 1];
+            mp->game->putInZone(top, mp->game->library, mp->game->graveyard);
+        }
+        DebugTrace("TESTSUITE millcard: player " << who << " milled " << howmany
+                   << " (library " << mp->game->library->nb_cards
+                   << ", reveal " << mp->game->reveal->nb_cards << ") ["
+                   << suite->filename << "]");
+        return 1;
+    }
+    else if (action.find("assertpassfloorreachable ") == 0)
+    {
+        //#W85-HA (review-3 item 1). CAN THE LIVELOCK BREAKER STILL FIRE HERE?
+        //The floor's hold arm keeps the phase while LegalActionsOracle::
+        //hasAnyLegalAction is true and the tick is not "stalled". Wave 84 made
+        //`stalled` require a REFUSAL of a non-empty non-mana offered set - and
+        //those two predicates disagree by construction. hasAnyLegalAction answers
+        //TRUE for a cleanup discard, a declare-attackers window, a declare-blockers
+        //window, the blocker-ORDER step and casts priced on POTENTIAL mana;
+        //menuPassOfferedSet prices casts on the current mana POOL and carries no
+        //combat or cleanup rows at all. In any window where it is EMPTY and
+        //hasAnyLegalAction is TRUE, the breaker became impossible and the seat held
+        //the phase for ever (CR 117.3d).
+        //No fixture can pump the 24 + 200 ticks the arm needs, so this asserts the
+        //arm's own predicate against a REAL board in exactly such a window - the
+        //same technique `assertloopautopass` uses for the auto-pass gate.
+        //Syntax: assertpassfloorreachable <0|1> [1|2]
+        string rest = action.substr(25);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        int seat = 0;
+        if (rest.size() > 2 && rest[2] == '2')
+            seat = 1;
+        AIPlayerBaka * bp = dynamic_cast<AIPlayerBaka *>(observer->players[seat]);
+        if (!bp)
+        {
+            std::cerr << "TESTSUITE assertpassfloorreachable: player " << (seat + 1)
+                      << " is not an AIPlayerBaka seat [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        const bool anyLegal = LegalActionsOracle::hasAnyLegalAction(bp);
+        const std::string offered = bp->menuPassOfferedSet();
+        //The arm as Act evaluates it, on the 200th identical tick of a run in which
+        //nothing was ever taken: sameState true, sameRefusal false (an empty
+        //offered set can never accumulate a refusal run).
+        const bool got = AIPlayerBaka::menuPassStalled(true, offered.empty(), false);
+        if ((got ? 1 : 0) != expect)
+        {
+            std::cerr << "TESTSUITE assertpassfloorreachable: player " << (seat + 1)
+                      << " expected " << expect << " got " << (got ? 1 : 0)
+                      << " (hasAnyLegalAction=" << (anyLegal ? 1 : 0)
+                      << ", offered rows=" << (offered.empty() ? "none" : "some")
+                      << ") - with a legal action and no offered row, a floor that"
+                         " cannot fire holds the phase for ever"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        //The window is only the window under test if the two disagree; say so
+        //loudly rather than passing vacuously.
+        if (!anyLegal || !offered.empty())
+        {
+            std::cerr << "TESTSUITE assertpassfloorreachable: this window does not"
+                      << " exercise the disagreement (hasAnyLegalAction="
+                      << (anyLegal ? 1 : 0) << ", offered="
+                      << (offered.empty() ? "empty" : "non-empty") << ")"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
     }
     else if (action.compare(0, 18, "revealstallbudget ") == 0)
     {
