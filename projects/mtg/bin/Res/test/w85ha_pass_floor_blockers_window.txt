@@ -1,0 +1,41 @@
+#NAME: The forced-pass floor can still fire in a declare-blockers window (#W85-HA)
+#DESC: review-3 item 1, second of two windows. See
+#DESC: w85ha_pass_floor_cleanup_window.txt for the mechanism and CR 117.3d.
+#DESC: This is the combat half: the DEFENDING seat has a legal block, so
+#DESC: LegalActionsOracle::hasAnyLegalAction answers TRUE, while
+#DESC: menuPassOfferedSet - castable spells priced on the mana POOL, land drops and
+#DESC: permanents with a usable non-mana activated ability - is EMPTY, because it
+#DESC: carries no combat rows of any kind. Under wave 84 the livelock breaker could
+#DESC: never fire here; the seat would hold the declare-blockers step for ever if it
+#DESC: ever hit the re-arming-menu shape.
+#DESC: WITNESS: P1 attacks with Rootbreaker Wurm, P2 has an untapped Alpha Myr that
+#DESC: could block. The assertion is taken in P2's blockers window, on P2's seat.
+#DESC: The command fails loudly if the window does not exercise the disagreement.
+#DESC: RED with the engine hunk reverted: "player 2 expected 1 got 0
+#DESC: (hasAnyLegalAction=1, offered rows=none)".
+#DESC: GREEN: the floor is reachable; combat then resolves normally (P2 declines the
+#DESC: block and takes 6).
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Alpha Myr
+life:20
+[DO]
+Rootbreaker Wurm
+next
+assertpassfloorreachable 1 2
+next
+next
+next
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Alpha Myr
+life:14
+[END]

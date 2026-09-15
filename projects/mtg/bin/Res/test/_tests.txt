@@ -1429,3 +1429,6 @@ w83fc_partial_library_logical_top.txt
 w84gb_garbage_child_deregistered.txt
 w84gc_edict_seat_is_the_targeted_player.txt
 w84gd_selective_reveal_logical_top.txt
+w85ha_pass_floor_cleanup_window.txt
+w85ha_pass_floor_blockers_window.txt
+w85hb_mill_above_parked_card.txt

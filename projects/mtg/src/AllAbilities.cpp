@@ -292,6 +292,18 @@ void MTGRevealingCards::Update(float dt)
             TargetChooserFactory tcf(game);
             TargetChooser * rTc = tcf.createTargetChooser(revealCertainTypes, source);
             int startingNumber = RevealFromZone->nb_cards - 1;
+            //#W84-GD (review-2 item 4) / #W85-HB (review-3 item 2): WHICH cards
+            //this walk LEAVES BEHIND above each one it parks. A selective reveal
+            //skips what it does not match, so the first card it parks is NOT the
+            //library's top - Dwarven Recruiter parks only the Dwarves and leaves
+            //every non-Dwarf above them exactly where it was. The walk runs
+            //downward from the top and removes as it goes, so at index i the cards
+            //still above it are precisely the ones already skipped.
+            //Recorded as identities rather than a count so the draw can re-derive
+            //against the CURRENT library: a mill, a tutor or a bottom-of-library
+            //that takes those cards away makes this one the top, and a count that
+            //only a draw could decrement could not see that.
+            vector<MTGCardInstance *> skippedAbove;
             if (rTc)
                 for (int i = startingNumber; i > -1; i--)
                 {
@@ -303,20 +315,14 @@ void MTGRevealingCards::Update(float dt)
                         if (rTc->canTarget(toMove, true))
                         {
                             CardViewBackup(toMove);
-                            //#W84-GD (review-2 item 4): HOW DEEP was this card.
-                            //A selective reveal skips the cards it does not match,
-                            //so the first card it parks is NOT the library's top -
-                            //Dwarven Recruiter parks only Dwarves and leaves every
-                            //non-Dwarf above them in place. The walk runs downward
-                            //from the top and removes as it goes, so everything
-                            //still above index i is exactly what stayed behind.
-                            const int above = (RevealFromZone->nb_cards - 1) - i;
                             MTGCardInstance * parked =
                                 playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
                             if (parked)
-                                parked->mRevealAboveCount = (above > 0) ? above : 0;
+                                parked->mRevealAbove = skippedAbove;
                             source->revealedLast = toMove;
                         }
+                        else
+                            skippedAbove.push_back(toMove);
                     }
 
                 }
@@ -347,12 +353,12 @@ void MTGRevealingCards::Update(float dt)
                     }
 
                     CardViewBackup(toMove);
-                    //#W84-GD (review-2 item 4): this branch always takes the
-                    //current top, so nothing is above the card it parks.
+                    //#W85-HB: this branch always takes the current top, so nothing
+                    //is left above the card it parks.
                     MTGCardInstance * parked =
                         playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
                     if (parked)
-                        parked->mRevealAboveCount = 0;
+                        parked->mRevealAbove.clear();
                     source->revealedLast = toMove;
                 }
 
@@ -369,12 +375,12 @@ void MTGRevealingCards::Update(float dt)
                 if (toMove)
                 {
                     CardViewBackup(toMove);
-                    //#W84-GD (review-2 item 4): a top-N reveal takes the top each
-                    //time, so every card it parks had nothing above it when it left.
+                    //#W85-HB: a top-N reveal takes the top each time, so nothing is
+                    //left above any card it parks.
                     MTGCardInstance * parked =
                         playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
                     if (parked)
-                        parked->mRevealAboveCount = 0;
+                        parked->mRevealAbove.clear();
                     source->revealedLast = toMove;
                 }
 

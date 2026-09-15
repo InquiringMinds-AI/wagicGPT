@@ -279,6 +279,18 @@ public:
     //whole run proves the seat was given those rows and took none of them, and
     //only both together match CR 117.3d's "chooses not to take any actions".
     std::string menuPassOfferedSet();
+    //#W85-HA (review-3 item 1): the floor's no-progress arm, as one pure
+    //predicate so it can be pinned without a 224-tick game. An identical state is
+    //required always; the REFUSAL evidence is required only when there was
+    //something to refuse. An empty offered set must never make the arm
+    //impossible - the hold arm it gates is driven by hasAnyLegalAction, which
+    //answers true in windows (cleanup discard, declare attackers/blockers, the
+    //ORDER step, casts priced on potential mana) where the offered set is empty by
+    //construction, and the seat would then hold the phase for ever.
+    static bool menuPassStalled(bool sameState, bool offeredEmpty, bool sameRefusal)
+    {
+        return sameState && (offeredEmpty || sameRefusal);
+    }
     std::string mMenuPassOffered;
     int mMenuPassDeclineRun = 0;
     int mMenuPassProbeRun = 0;

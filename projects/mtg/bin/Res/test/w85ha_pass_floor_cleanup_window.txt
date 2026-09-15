@@ -1,0 +1,47 @@
+#NAME: The forced-pass floor can still fire in a cleanup-discard window (#W85-HA)
+#DESC: review-3 item 1, first of two windows. The floor's HOLD arm keeps the phase
+#DESC: while LegalActionsOracle::hasAnyLegalAction is true and the tick is not
+#DESC: "stalled". Wave 84 made `stalled` require a REFUSAL of a NON-EMPTY non-mana
+#DESC: offered set, which is false by construction whenever that set is empty - and
+#DESC: the two predicates disagree by construction. hasAnyLegalAction answers TRUE
+#DESC: for a cleanup discard, a declare-attackers window, a declare-blockers window,
+#DESC: the blocker-ORDER step, and casts priced on POTENTIAL mana;
+#DESC: menuPassOfferedSet prices casts on the current mana POOL and carries no
+#DESC: combat or cleanup rows at all. In any such window the livelock breaker became
+#DESC: IMPOSSIBLE and the seat held the phase for ever - the wave-58/71 shape that
+#DESC: wave 83 recovered from after 24 + 200 identical ticks.
+#DESC:   CR 117.3d "If a player has priority and chooses not to take any actions,
+#DESC:   that player passes."
+#DESC: A seat answering the same re-armed menu 200 times over a byte-identical board
+#DESC: with nothing on the table it could take is that player.
+#DESC: FIX (the reviewer's one-liner, as a pure predicate): the refusal evidence is
+#DESC: required only where there IS something to refuse -
+#DESC: `stalled = sameState && (offeredEmpty || sameRefusal)`.
+#DESC: WITNESS: cleanup with eight uncastable cards in hand and no mana - so
+#DESC: hasAnyLegalAction is TRUE (the discard) and the offered set is EMPTY. No
+#DESC: fixture can pump the 24 + 200 ticks the arm needs, so this asserts the arm's
+#DESC: own predicate against a real board in exactly that window, the technique
+#DESC: `assertloopautopass` already uses for the auto-pass gate. The command also
+#DESC: fails LOUDLY if the window does not actually exercise the disagreement, so it
+#DESC: cannot pass vacuously.
+#DESC: RED with the engine hunk reverted: "expected 1 got 0 (hasAnyLegalAction=1,
+#DESC: offered rows=none) - with a legal action and no offered row, a floor that
+#DESC: cannot fire holds the phase for ever".
+#DESC: GREEN: the floor is reachable.
+[INIT]
+cleanup
+[PLAYER1]
+hand:Craw Wurm,Craw Wurm,Craw Wurm,Craw Wurm,Craw Wurm,Craw Wurm,Craw Wurm,Craw Wurm
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertpassfloorreachable 1
+[ASSERT]
+cleanup
+[PLAYER1]
+hand:*,*,*,*,*,*,*,*
+life:20
+[PLAYER2]
+life:20
+[END]

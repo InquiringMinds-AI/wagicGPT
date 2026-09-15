@@ -6028,10 +6028,32 @@ int AIPlayerBaka::Act(float dt)
                 mMenuPassDeclineRun++;
                 sameRefusal = (mMenuPassDeclineRun >= kMenuPassNoProgressMax);
             }
-            //An EMPTY offered set is not a refusal of anything; that case is the
-            //hasAnyLegalAction arm's business, not the no-progress arm's.
-            stalled = sameState && sameRefusal;
-            if (sameState && !sameRefusal)
+            //#W85-HA (review-3 item 1). THE EMPTY OFFERED SET MUST NOT DISABLE THE
+            //BREAKER.
+            //The wave-84 line was `sameState && sameRefusal`, and `sameRefusal` is
+            //false by construction whenever the offered set is EMPTY. The hold arm
+            //below keeps the phase for as long as
+            //LegalActionsOracle::hasAnyLegalAction is true AND the tick is not
+            //stalled - and those two predicates disagree by construction.
+            //hasAnyLegalAction answers TRUE for a cleanup discard, a declare-
+            //attackers window with a legal attacker, a declare-blockers window with
+            //a legal block, the blocker-ORDER step, and casts priced on POTENTIAL
+            //mana; menuPassOfferedSet prices casts on the current mana POOL and has
+            //no combat or cleanup rows at all. In any of those windows the wave-58
+            //shape - a menu that re-arms and is answered every tick - held the phase
+            //FOR EVER: wave 83 broke it after 24 + 200 identical ticks, wave 84
+            //never did. That is a livelock reintroduced into the code whose whole
+            //job is to break one, on the shared Act path (AIPlayerGPT does not
+            //override Act, so the model seat inherits it too).
+            //An empty offered set is not evidence of a refusal - but it is also not
+            //a reason to stop believing an identical state repeated 200 times. CR
+            //117.3d: "If a player has priority and chooses not to take any actions,
+            //that player passes" - a seat answering the same re-armed menu 200 times
+            //over a byte-identical board, with nothing on the table it could take,
+            //is that player. So the refusal EVIDENCE is required only where there is
+            //something to refuse.
+            stalled = menuPassStalled(sameState, offered.empty(), sameRefusal);
+            if (sameState && !stalled)
                 DebugTrace("AIPLAYER: the board fingerprint repeated but the offered"
                            " non-mana rows did not - not treating this as a stall");
         }

@@ -194,15 +194,24 @@ public:
     Player * previousController;
     MTGGameZone * getCurrentZone();
     MTGGameZone * previousZone;
-    //#W84-GD (review-2 item 4): while this card is PARKED in a reveal zone, how
-    //many cards were still above it in the library it came out of at the moment it
-    //was parked. Revealing does not move a card (CR 701.20b), so a parked card is
-    //still a library card; it is the library's LOGICAL TOP only when nothing was
-    //above it. A selective reveal (`Reveal:type:...`, Dwarven Recruiter parking
-    //only Dwarves) leaves non-matching cards above the first parked one, so
-    //"first parked" is not "top". -1 = not parked out of a library.
-    //MTGPlayerCards::drawFromLibrary decrements it as the cards above it are drawn.
-    int mRevealAboveCount;
+    //#W84-GD (review-2 item 4) / #W85-HB (review-3 items 2 and 3): while this card
+    //is PARKED in a reveal zone, WHICH library cards the reveal left behind ABOVE
+    //it. Revealing does not move a card (CR 701.20b), so a parked card is still a
+    //library card; it is the library's LOGICAL TOP only while none of these is
+    //still there. A selective reveal (`Reveal:type:...`; Dwarven Recruiter parks
+    //only the Dwarves) leaves non-matching cards above the first parked one, so
+    //"first parked" is not "top".
+    //This is a SET, not a count, deliberately. The wave-84 count could only be
+    //decremented by a physical DRAW, so any other removal of the cards above - a
+    //mill, a tutor, a `bottomoflibrary`, a shuffle - left it stuck above zero and
+    //the draw then silently did nothing and never decked (CR 121.1 / 704.5b). An
+    //identity set is re-derived against the CURRENT library on every draw, so it
+    //cannot go stale, and a card parked by a route that records nothing (scry,
+    //`moveto(myreveal)`) has an EMPTY set and is therefore eligible - which is the
+    //right default and needs no per-site stamping.
+    //Pointer identity only: entries are compared against the live library and are
+    //never dereferenced.
+    vector<MTGCardInstance *> mRevealAbove;
     MTGCardInstance * tokCard;
     MTGCardInstance * previous;
     MTGCardInstance * next;

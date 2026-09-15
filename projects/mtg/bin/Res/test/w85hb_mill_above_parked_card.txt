@@ -1,0 +1,44 @@
+#NAME: A mill above a parked card makes it the logical top (#W85-HB, review-3 item 2)
+#DESC: The wave-84 repair recorded how many library cards were above a parked card
+#DESC: and decremented that COUNT on a physical draw. Only a draw moved it, so any
+#DESC: other removal of the cards above - a mill, a tutor, a `bottomoflibrary`, a
+#DESC: shuffle - left it stuck above zero. Once the physical library was empty the
+#DESC: draw then returned having drawn NOTHING, every draw step, and never decked.
+#DESC:   CR 121.1 "A player draws a card by putting the top card of their library
+#DESC:   into their hand."
+#DESC:   CR 701.20b "Revealing a card doesn't cause it to leave the zone it's in."
+#DESC:   CR 704.5b "If a player attempted to draw a card from a library with no
+#DESC:   cards in it since the last time state-based actions were checked, that
+#DESC:   player loses the game."
+#DESC: The library is logically NOT empty in that state, so the correct outcome is
+#DESC: the draw - not a skipped draw, and not a loss.
+#DESC: FIX: the depth is not stored at all. Each parked card carries the IDENTITIES
+#DESC: of the library cards left above it, and eligibility is re-derived against the
+#DESC: CURRENT library on every draw, so it cannot go stale under any removal route.
+#DESC: WITNESS: the selective peek parks the Dwarf and leaves Grizzly Bears above it
+#DESC: (and Craw Wurm below). `millcard 1 1` takes the Bears off the top without
+#DESC: drawing it - the removal route a count cannot see - and then `drawcard 1 1`
+#DESC: must draw the Dwarf, which is now the logical top.
+#DESC: RED on base (master + review commit): the Dwarf's count is still 1, so it is
+#DESC: never eligible; the draw takes Craw Wurm from UNDER it instead -
+#DESC: "Card ID not the same. Didn't find 23" (Dwarven Grunt) in hand.
+#DESC: GREEN: Dwarven Grunt is drawn and Craw Wurm stays in the library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Selective Deadend Peek
+library:Craw Wurm,Dwarven Grunt,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Selective Deadend Peek
+millcard 1 1
+drawcard 1 1
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Selective Deadend Peek,Grizzly Bears
+hand:Dwarven Grunt
+library:Craw Wurm
+[PLAYER2]
+[END]
