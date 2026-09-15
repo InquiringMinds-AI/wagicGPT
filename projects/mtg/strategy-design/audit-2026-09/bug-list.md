@@ -1,5 +1,7 @@
 # Bug list after the engine audit (2026-09-15) — the next STEP ONE starts here (a list, not a quota)
 
+STATUS 2026-09-15 afternoon: items 1 (OBSERVED on the GUI, edict-gui-check.md), 2, 3, 4, 5, 8 (buglist-lane.md, merged 62a5733ec) are CLOSED; 6, 7, 9, 10 are watch items. NEW OPEN: 11 below. AIPlayerGPT.cpp was split (split-parsetest.md); the census (gpt-layer-census.md) tier A/B removal is NOT scheduled — it needs the decision-quality experiment first.
+
 Carried from the four fix passes (sources: fix-lane.md .. fix-lane-4.md "weakest evidence", fix-review-*.md):
 1. HUMAN EDICT PROMPT — the edict re-choice now routes to the targeted player, but no one has OBSERVED the Vita/PC GUI presenting the sacrifice chooser to a human seat; the suite cannot drive a human seat. Verify by a GUI play (Tribute to Hunger / Devour Flesh cast BY the AI at the human) before the next VPK.
 2. MULTIPLE-CHOICE AFTER COMPACTION — a scripted `choice 0` never reached doReactTo after `shrinkactionlayer` on BOTH the pre- and post-fix binaries (fix-lane-2.md); the lane dropped the fixture rather than ship a green it could not explain. Unexplained; possibly a further defect in the mode-menu dispatch. Find out.
@@ -13,3 +15,5 @@ Carried from the four fix passes (sources: fix-lane.md .. fix-lane-4.md "weakest
 10. Bisect-era crashes at c15106f4d / 462c63982 / 7be32f8f0 (cores overwritten) — shapes match the two classes fixed by lane 1 (StackAbility resolve on a dead card; GuiPlay assert after a free activation). Consider closed unless the gate sees them again.
 
 Standing gate: every shipping binary passes tools/baka-ab.sh (210+ games, 0 unfinished) vs archives/baka-ab/<accepted>; the accepted baseline after this audit = the fourth-pass merge (see the anchor memory for the hash).
+11. `ButtonPressedOnMultipleChoice` never examines mObjects[0] and treats its not-found sentinel (-1) as kCancelMenuID; slot 0 holds a game rule by convention, not by construction (buglist-lane.md item 2 residual). Make the sentinel and slot-0 semantics explicit; a shared dispatch path — gate it.
+12. Item 3 shipped a GUARD (addToGame refuses a garbaged element) rather than a proof; 221 addToGame call sites were not enumerated. If the guard ever fires in a corpus stderr, that is the shipped path to read.
