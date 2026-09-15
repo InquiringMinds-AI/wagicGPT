@@ -1,0 +1,41 @@
+#W81-DM (V6). Wave-80 known-bugs V6 / deck130 review HIGH-1 claimed Exquisite
+#Blood "never triggers on life lost to damage", from `130v126` turns 20-22 where
+#11 points of damage produced zero triggers. Oracle, re-verified on Scryfall
+#2026-09-12 (/cards/named?exact=Exquisite+Blood, oracle_id
+#8f933fae-6c0c-42d7-a817-14760d8285cd): "Whenever an opponent loses life, you
+#gain that much life." The card script (mtg.txt:37966,
+#`auto=@lifelostfoeof(player):life:thatmuch controller`) is a faithful encoding.
+#
+#w62y_lifelost_damage_fires.txt already pins the SPELL-damage path. This fixture
+#pins the COMBAT-damage path, which V6 named and which no fixture covered:
+#Damage::resolve (Damage.cpp:299) raises WEventLife(-damage, fromDamage=true)
+#for every player target regardless of typeOfDamage, and
+#TrLifeGained::triggerOnEventImpl (AllAbilities.h:1626) filters only on the
+#event's SIGN and the two side flags - it never reads fromDamage or the damage
+#type. So combat damage and spell damage take the same path and this is GREEN on
+#base: the engine owes nothing for V6.
+#
+#No Sanguine Bond is on P1's side, so no chain can form and the test cannot loop.
+#P1 holds Exquisite Blood and attacks with a 3/3 into an empty board. P2 (an
+#opponent of P1) loses 3 to COMBAT damage, so P1 gains exactly 3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Exquisite Blood,Hill Giant
+life:20
+[PLAYER2]
+life:20
+[DO]
+next
+next
+Hill Giant
+next
+next
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:Exquisite Blood,Hill Giant
+life:23
+[PLAYER2]
+life:17
+[END]

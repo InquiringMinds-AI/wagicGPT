@@ -285,12 +285,17 @@ def main(argv):
     for deck in sorted(per):
         s = per[deck]
         n = max(1, s["n"])
-        tot = s["hrow"] + s["hcheck"] + s["hcontract"]
+        #W81-DM (V17 / wave-80 LOW-3): this per-deck subtotal was named `tot`
+        #and shadowed the CORPUS-TOTAL dict built at the top of this function, so
+        #the corpus line below died with `TypeError: 'int' object is not
+        #subscriptable` at line 297 and the tool exited 1 on every corpus. The
+        #per-deck tables had already printed, which is why it read as usable.
+        holdTot = s["hrow"] + s["hcheck"] + s["hcontract"]
         print("  deck%-4s row %5.0f  check %5.0f  contract %5.0f  TOTAL %6.0f"
               "  -> after fold %6.0f  (fold saves %5.0f B/prompt, %.2f%% of the"
               " mean prompt)"
-              % (deck, s["hrow"] / n, s["hcheck"] / n, s["hcontract"] / n, tot / n,
-                 (tot - s["hsaved"]) / n, s["hsaved"] / n,
+              % (deck, s["hrow"] / n, s["hcheck"] / n, s["hcontract"] / n, holdTot / n,
+                 (holdTot - s["hsaved"]) / n, s["hsaved"] / n,
                  100.0 * s["hsaved"] / max(1, s["now"])))
     print("  TOTAL   n=%-5d mean %6d -> %6d   >20KB %4d -> %4d   hoist %7d B"
           " (%d prompts)   log trim %8d B   all prompts %d -> %d B (-%.1f%%)"

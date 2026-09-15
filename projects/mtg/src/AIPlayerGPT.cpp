@@ -483,10 +483,33 @@ static const size_t kPlanCarryMaxSteps = 12;
 //and the board is the one the engine computes - so the plan is withdrawn and
 //the withdrawal says exactly which claim withdrew it. Nothing is hidden: the
 //model is told what it wrote, what the board says, and to restate.
+//#W81-DM (V16, wave-80 known-bugs V16 + deck125 MED B-1). THE ECHO HEADING
+//STOPS NAMING A PLAN IN CAPS. The old heading opened `THE PLAN YOU LAST STATED`
+//and the reply protocol's own label is `PLAN:`; all four of deck125's protocol
+//deviations are that collision - three replies whose label slot reads
+//`THE PLAN: ...` (`125v126` seqs 164/165, `125v152` seq 63) and, at `152` seq
+//111, a reply whose entire plan line is the render's own sentence echoed back
+//(`THE PLAN YOU LAST STATED reads "End turn."` + `CHOICE: 6`). #W73-CA already
+//established the mechanism and the remedy: what the model copies into the label
+//slot is the CAPS PHRASE that names a plan, not the punctuation. #W73-CA removed
+//`YOUR PLAN` for exactly this and the carry heading kept a second one.
+//
+//So the phrase goes, on all three faces that carry it - the carry heading and
+//both withdrawal blocks - and it lives in ONE constant so no face can drift
+//back. The rendered heading now contains the token `PLAN` nowhere.
+//
+//RENDER TEXT ONLY, under the owner's 2026-09-12 ruling: the golden protocol
+//(`bin/Res/ai/gpt/reply-protocol.txt` / `kReplyProtocol`) is untouched, the
+//parser is untouched, no option is removed, capped or auto-answered, and the
+//#W73-CA quotation shape (a verb, then the plan in quotes, never
+//`<CAPS>: <text>`) is preserved on every face. The pins assert the rendered
+//bytes and MUST-NOT-MATCH the token `PLAN` on each of the three.
+static const char * const kEchoHeadWord = "WHAT YOU LAST WROTE";
+
 static string planContradictedBlock(const string& deniedName)
 {
     std::ostringstream o;
-    o << "\nTHE PLAN YOU LAST STATED was withdrawn: it says you have no \"" << deniedName
+    o << "\n" << kEchoHeadWord << " was withdrawn: it says you have no \"" << deniedName
       << "\", and the CURRENT SITUATION below shows \"" << deniedName
       << "\" on your own battlefield. State a fresh plan from the board as it is now.\n";
     return o.str();
@@ -501,7 +524,7 @@ static string planContradictedBlock(const string& deniedName)
 static string planAssertedAbsentBlock(const string& assertedName)
 {
     std::ostringstream o;
-    o << "\nTHE PLAN YOU LAST STATED was withdrawn: it says \"" << assertedName
+    o << "\n" << kEchoHeadWord << " was withdrawn: it says \"" << assertedName
       << "\" is on a battlefield, and the CURRENT SITUATION below shows \"" << assertedName
       << "\" on neither battlefield. State a fresh plan from the board as it is now.\n";
     return o.str();
@@ -2590,6 +2613,31 @@ static string w77ConverterTakeClause(bool theyGain, const string& convName, int 
           << (upTo ? "up to " : "") << convTakes << " off THEIRS";
     return o.str();
 }
+//#W81-DM (V13, wave-80 deck123 HIGH-2 - 13 turns of an empty board). THE ENGINE
+//MARKER REACHES THE ROW THAT DECIDES THE CAST. The detector exists and is
+//correct (#W66-AQ H10 / #W80-DF U7): it runs on board-sweep rows and on the
+//per-creature victim ask, so `162v123` seq 79 reads
+//`Thraben Doomsayer #1 (2/2) ... THIS IS NOT JUST A BODY: TOKEN ENGINE (it makes
+//more permanents, one per activation)` where the pick is a real choice. It does
+//NOT run where the victim is FORCED: `125v123` seq 238's cast row names the
+//Keeper outright (`YOU control 1 creature - targeting yourself sacrifices
+//Bloodline Keeper, and you gain 3`) and does not mark it, and seq 239, the
+//forced player-target ask and the last window before the seat's engine left the
+//board for good, is unmarked too. deck123 Devour-Fleshed its only Keeper.
+//
+//So the same detector runs over the name the row ALREADY resolves, on the same
+//literal (`THIS IS NOT JUST A BODY: <kind>`) the pick surface prints, so the two
+//can never disagree about one card. It fires only where the victim is a single
+//DETERMINED body - at N > 1 no row names a victim and there is nothing to mark.
+//Pure over the card's script.
+static string w81EngineBodyTail(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    const char * ek = engineKindForScript(c->magicText);
+    return ek ? (string("; THIS IS NOT JUST A BODY: ") + ek) : string();
+}
+
 static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness,
                           bool targetGains = false, const string& onlyFacts = "",
                           const string& converterName = "", int converterTakes = 0, int myLife = -1,
@@ -3656,7 +3704,8 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
 //no surface said so.
 static string edictSelfClause(int myCreatures, const string& onlyName, int onlyToughness,
                               bool targetGains, int myMaxToughness = 0, //#W68-BB (J9)
-                              const string& myConvName = "", int myConvTakes = 0)
+                              const string& myConvName = "", int myConvTakes = 0,
+                              const string& engineTail = "") //#W81-DM (V13)
 {
     std::ostringstream o;
     if (myCreatures <= 0)
@@ -3669,6 +3718,7 @@ static string edictSelfClause(int myCreatures, const string& onlyName, int onlyT
         if (targetGains)
             o << ", and you gain " << onlyToughness
               << w77ConverterTakeClause(false, myConvName, myConvTakes); //#W77-CS (R3 c)
+        o << engineTail; //#W81-DM (V13): the named victim is the seat's engine
     }
     else
     {
@@ -3696,7 +3746,8 @@ static string edictSelfClause(int myCreatures, const string& onlyName, int onlyT
 static string w77EdictPlayerTargetTag(bool targetIsOpponent, int creatures,
                                       const string& onlyName, int onlyToughness,
                                       int minT, int maxT,
-                                      const string& convName, int convTakes)
+                                      const string& convName, int convTakes,
+                                      const string& engineTail = "") //#W81-DM (V13)
 {
     std::ostringstream o;
     o << " {right now: ";
@@ -3712,7 +3763,8 @@ static string w77EdictPlayerTargetTag(bool targetIsOpponent, int creatures,
         o << (targetIsOpponent ? "they sacrifice " : "you sacrifice ") << onlyName
           << (targetIsOpponent ? " and they gain " : " and you gain ") << onlyToughness
           << " life (its toughness)"
-          << w77ConverterTakeClause(targetIsOpponent, convName, convTakes);
+          << w77ConverterTakeClause(targetIsOpponent, convName, convTakes)
+          << engineTail; //#W81-DM (V13): the forced victim is an engine
     else
     {
         o << (targetIsOpponent ? "they sacrifice one of their " : "you sacrifice one of your ")
@@ -3775,7 +3827,8 @@ static string w77EdictPlayerTargetTagFor(Player * me, Player * tgt, MTGCardInsta
     return w77EdictPlayerTargetTag(tgt != me, n,
                                    (n == 1 && only)
                                        ? only->getDisplayName() + instanceHandle(only) : string(),
-                                   only ? only->toughness : 0, mn, mx, convName, convTakes);
+                                   only ? only->toughness : 0, mn, mx, convName, convTakes,
+                                   (n == 1) ? w81EngineBodyTail(only) : string()); //#W81-DM (V13)
 }
 
 static bool spellCanTargetSelf(MTGCardInstance * card)
@@ -3983,7 +4036,8 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
                             (mine == 1 && myOnly)
                                 ? myOnly->getDisplayName() + instanceHandle(myOnly) : string(),
                             myOnly ? myOnly->toughness : 0, targetGains, myMaxT,
-                            myConvName, myConvTakes);
+                            myConvName, myConvTakes,
+                            (mine == 1) ? w81EngineBodyTail(myOnly) : string()); //#W81-DM (V13)
         }
         //#W57-C (D11): at N == 1 the victim is DETERMINED, so the stack can be
         //asked about it exactly as the highest-MV branch above asks about its
@@ -4010,11 +4064,16 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText,
             edictFloorScan(card->controller()->opponent(), edictTheirs, minTough,
                            minToughCount, NULL);
         }
+        //#W81-DM (V13): the THEIRS half of the same row gets the same marker, off
+        //the same detector, so the two halves of one enumeration cannot price the
+        //same class of body asymmetrically (deck123 MED-5's defect, one row over).
+        const string w81TheirEngineTail = (theirs == 1) ? w81EngineBodyTail(only) : string();
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
                            targetGains, facts, convName, convTakes, myLife,
                            myLoopClosed, minTough, minToughCount, //#W62-X (D8) / #W67-AW (M4)
                            edictMaxT) //#W77-CS (R3 c)
+             + w81TheirEngineTail //#W81-DM (V13): after the verdict, never inside the name
              + stackTail + selfClause;
     }
     if (sweepVerb)
@@ -14907,6 +14966,29 @@ static string drawPriceRowTag(int cards, int perDraw, const string& punishers, i
         if (drawHalf)
             o << " - " << dealt << " life from this row in total";
     }
+    //#W81-DM (V17, wave-80 LOW-1 / engine-seat §2(g)). THE CYCLE SAYS IT
+    //DISCARDS EVEN WITH NO PUNISHER ON THE BOARD. #W80-DF (U6) gated the whole
+    //discard clause on a discard PUNISHER existing, so all 9 priced cycling rows
+    //at `162v130` seqs 76-103 read `[DRAW PRICE: this draws 1 card ...]` with no
+    //discard term, and `a CYCLING cost is a discard` rendered 0 times in the
+    //whole wave-80 corpus. A punisher changes what the discard COSTS; it does
+    //not change whether the row discards, and a model reading the row still
+    //could not tell that cycling throws the card away.
+    //So the MECHANISM clause rides every cycling row that ALREADY prints this
+    //tag, and it carries no life figure of its own - nothing is priced that the
+    //board does not price, and the clause says outright that nothing prices it
+    //(#W76 R3's rule: a clause carrying a number about LIFE must name the event
+    //that moves it, so a clause with no such event says so). A cycling row WITH
+    //a punisher takes the discHalf branch above and is byte-identical to wave 80;
+    //a row that prints no tag at all is byte-identical too (the early return
+    //above is untouched, so `cycleFact` can only be reached with `drawHalf`).
+    const bool cycleFact = discardIsCycleCost && discards > 0 && !discHalf;
+    if (cycleFact)
+        o << "; AND paying this row's cost DISCARDS " << discards << " card"
+          << (discards == 1 ? "" : "s")
+          << " (a CYCLING cost is a discard as well as a draw - the card you"
+             " cycle is discarded to pay for it), which nothing on this board"
+             " charges you life for";
     if (deferTotal)
         o << " (this row carries a SECOND draw price below; the two are added there"
              " and the resulting life is stated once)";
@@ -20711,7 +20793,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mCastDecisionReopenedNewStack(0), mCastReopenCountedSeq(-1),
       mTransportHandedOff(false),
       mVerdictFaceWindow(-1), mVerdictFacesDroppedUnrecorded(0),
-      mLastWindowRecordSeq(-1) //#W81-DK (V1/V3/V4/V9/V15)
+      mLastWindowRecordSeq(-1), //#W81-DK (V1/V3/V4/V9/V15)
+      mOppCounteredSpells(0), mCounterIntelRendered(0), //#W81-DM (V13)
+      mMultiAnswerFirstTaken(0) //#W81-DM (V12)
 
 {
     mStatedStop = -1;      //#W67-AY (I6): nothing stated yet
@@ -20730,6 +20814,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mOppLifeSamples = 0;
     mOppLifeEventGained = 0; //#W78-CY (F7)
     mOppLifeEventLost = 0;
+    mOppCounteredSpells = 0; //#W81-DM (V13)
+    mCounterIntelRendered = 0; //#W81-DM (V13)
+    mMultiAnswerFirstTaken = 0; //#W81-DM (V12)
     mOppLifeLastTurn = -1;
     mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
     mBulkMoveMine = false;
@@ -22440,6 +22527,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (!mLastParseNote.empty())
     {
         rec["parse_note"] = mLastParseNote;
+        //#W81-DM (V12): the game total for the one note that silently DISCARDS
+        //part of the model's answer. Counted here, on the record that carries
+        //the note, so `multi_answer_first_taken` in the gameend census and
+        //`parse_note` on this seq are the same event seen twice.
+        if (mLastParseNote.find("multi_answer_first_taken") != string::npos)
+            mMultiAnswerFirstTaken++;
         mLastParseNote.clear();
     }
     //Commit-failure counters (see offProtocolBytes / commitRetracted above).
@@ -22869,6 +22962,18 @@ void AIPlayerGPT::logGameEnd()
         {"chain_selfharm_rows_cast", mChainSelfharmRowsCast}, //#W75-CI (P12)
         {"chain_acting_rows_cast", mChainActingRowsCast}, //#W75-CI (P12)
         {"main_phase_windows_skipped", mMainPhaseWindowsSkipped}, //#W73-BY (N16)
+        //#W81-DM (V12, wave-80 engine-seat MED-3): records whose answer named
+        //more rows than the window takes. The parser keeps row 1 and the model
+        //believes it chose all of them; wave 80 had 2 (`152` seqs 217/237, both
+        //Emrakul's Annihilator sacrifice-6) and no counter reported them.
+        //Per-record trace: `parse_note` on the same seq.
+        {"multi_answer_first_taken", mMultiAnswerFirstTaken},
+        //#W81-DM (V13, wave-80 deck123 HIGH-3): the counterspell intel line -
+        //the EVENTS it reports, and the windows it actually reached. The second
+        //is incremented AT the render (wave-79 LESSON 1); a `counter_intel_
+        //rendered` of 0 on a game whose opponent countered anything is a FAIL.
+        {"opp_countered_spells", mOppCounteredSpells},
+        {"counter_intel_rendered", mCounterIntelRendered},
         //#W69-BI (K7, engine MED-2): the game's stale-drop total. The
         //per-decision `async_drops` field is consumed with its record, so this
         //is the only place a reader can take the game's number from.
@@ -23514,6 +23619,51 @@ int askWindowKindForPriority(const vector<string>& rows, bool stackRespondable)
 const char * const kLogWindowTurnHeader = "=== Turn ";
 const char * const kLogWindowTrimMarkerHead = "(...earlier events trimmed";
 
+//#W81-DM (V14, wave-80 known-bugs V14 / deck152 MED-2). THE NARRATION BUDGET IS
+//A FUNCTION OF THE WHOLE PROMPT, NOT OF ITSELF. `kNarrationTrimTrigger` fires as
+//the log GROWS, so it knows only the log's own size and stabilises the narration
+//at ~15 KB whatever else the window costs. At `152v125` seq 215 that is 15,298 B
+//of narration under a 6.8 KB `--- CURRENT SITUATION ---` block: 22,143 B total,
+//and 83 of that seat's 85 over-20-KB prompts are that one 49-turn game. The board
+//block's size is KNOWN before the log is placed - it is built from the same
+//board - so the log can be budgeted against it.
+//
+//The budget: aim the ASSEMBLED prompt at `kW81PromptByteTarget` (20,000 B - the
+//corpus's own over-20-KB line, the figure MED-2 is measured in), give the log
+//whatever is left after everything else on the window, and never take it below
+//`kW81NarrationFloor`. A prompt already under the target trims NOTHING and is
+//byte-identical to wave 80, which is every prompt in five of the seven decks.
+//The cut is the SAME cut the growth trim makes - on a line boundary, oldest
+//lines first, behind the same marker - so the newest events always survive and
+//nothing is summarised away. WAGIC_GPT_TRIM_V1=1 disables it with the rest of
+//the wave-79 pair, so "was it me?" is one env var (the wave-80 instrument rule).
+static bool narrationTrimV1(); //#W81-DM (V14): defined with the growth trim below
+const size_t kW81PromptByteTarget = 20000;
+const size_t kW81NarrationFloor = 6000;
+size_t w81NarrationBudget(size_t otherBytes)
+{
+    if (otherBytes + kW81NarrationFloor >= kW81PromptByteTarget)
+        return kW81NarrationFloor;
+    return kW81PromptByteTarget - otherBytes;
+}
+//Cut `body` to at most `keep` bytes on a LINE boundary, oldest first, behind
+//`marker`. Returns body unchanged when it already fits or when no line boundary
+//lies inside the budget. Pure over its three inputs.
+string w81TrimNarrationToBudget(const string& body, size_t keep, const string& marker)
+{
+    if (narrationTrimV1() || body.size() <= keep)
+        return body;
+    if (marker.size() + 1 >= keep)
+        return body;
+    const size_t want = keep - marker.size() - 1;
+    const size_t from = body.size() - want;
+    const size_t nl = body.find('\n', from);
+    if (nl == string::npos || nl + 1 >= body.size())
+        return body;
+    return marker + "\n" + body.substr(nl + 1);
+}
+
+
 string logWindowSplit(const string& narration, int keepTurns, string& elidedPrefix,
                       int& elidedTurns, bool& earlierTrimmed)
 {
@@ -23668,10 +23818,12 @@ static const char * const kAnnounceXPlanScopeNote =
     "(that plan was written on the CAST row, one screen before this menu's"
     " per-X kill lists existed: if it names an X, treat that as intent and"
     " re-read the rows below before choosing - they are what prices each X.)\n";
+//#W81-DM (V16): the heading word is `kEchoHeadWord` (declared with the
+//withdrawal blocks above) so the carry and both withdrawals cannot drift apart.
 static string carriedPlanHeaderText(const string& ageClause, const string& absentClause,
                                     const string& plan)
 {
-    return string("\nTHE PLAN YOU LAST STATED (as you stated it") + ageClause + absentClause
+    return string("\n") + kEchoHeadWord + " (as you wrote it" + ageClause + absentClause
            + ") reads \"" + plan + "\"\n";
 }
 
@@ -23844,13 +23996,116 @@ static size_t w80EchoStepIndex(int stepsDone, bool castPendingCompletion)
     return (size_t) (castPendingCompletion ? stepsDone - 1 : stepsDone);
 }
 
+//#W81-DM (V11, wave-80 known-bugs V11 / deck152 MED-1). THE LATCH KEYS ON THE
+//CAST OBJECT, NOT ON THE SENTENCE THAT CONTAINS IT.
+//
+//#W80-DG's step-back fires while a cast is OPEN - from the validated cast row
+//until the spell reaches or leaves the stack (#W80-DH F5's close). Two real
+//completing windows arrive AFTER that close and were therefore served a trimmed
+//echo:
+//  * `152v125` seqs 15 -> 16. The plan was `Cast Intrepid Adversary and add 1
+//    valor counter. Attack with Elite Spellbinder only to survive Lightmine
+//    Field. Tap Katilda for mana in main 2.` and the valor-counter menu - the
+//    window that ADDS THE COUNTER - echoed only `"Attack with Elite Spellbinder
+//    ... Tap Katilda for mana in main 2."`: the cast clause AND this window's
+//    own step both gone. The two PASSING pairs (`152v123` 20 -> 21, `152v125`
+//    21 -> 22) differ only in PUNCTUATION - they wrote the cast and the counter
+//    as comma-joined clauses of ONE sentence, which `planStepEnds` never splits,
+//    so nothing could be trimmed. A sentence boundary is not a fact about the
+//    game.
+//  * `152v126` seqs 19 -> 20. `Cast Brutal Cathar to exile a Perimeter Captain,
+//    then level Ranger Class to 2 with the remaining {G}.` echoed at the ETB
+//    TARGET window as `"then level Ranger Class to 2 with the remaining {G}."` -
+//    the clause naming the target, dropped at the window that picks the target.
+//
+//The rule the two share is deck152 MED-1's: A STEP THAT NAMES THE CHOICE THE
+//CURRENT WINDOW IS MAKING MUST NEVER BE TRIMMED FROM THAT WINDOW'S ECHO. So the
+//carry asks ONE question before it trims - does the step the pointer has just
+//passed name an OBJECT this window is about? - and the object is matched by the
+//name the two surfaces share, never by the sentence, the punctuation or the
+//latch state.
+//
+//BOUNDED AT ONE STEP. Only the immediately-preceding step can be reclaimed, so
+//the carry can never walk backwards through a plan and re-print history: the
+//window that executes a step is the one right after it. A window that names
+//nothing from that step is byte-identical to wave 80.
+//
+//WHAT COUNTS AS A NAME: a capitalised run of two or more words, or one
+//capitalised word of four or more characters, that does not start the step (a
+//step opens with its verb - "Cast", "Attack", "Tap" - and those are not names)
+//and that appears VERBATIM in the window's own text. Pure over (plan, index,
+//tail), so the whole rule is provable without a board.
+static void w81StepNameCandidates(const string& step, vector<string>& out)
+{
+    size_t i = 0;
+    //Skip the step's leading verb: the first word is never the object.
+    while (i < step.size() && isspace((unsigned char) step[i])) i++;
+    while (i < step.size() && !isspace((unsigned char) step[i])) i++;
+    while (i < step.size())
+    {
+        if (!isupper((unsigned char) step[i]))
+        {
+            i++;
+            continue;
+        }
+        //A capitalised run: words that start uppercase, joined by single spaces.
+        size_t start = i, end = i, words = 0;
+        while (i < step.size())
+        {
+            if (!isupper((unsigned char) step[i]))
+                break;
+            size_t w = i;
+            while (w < step.size()
+                   && (isalnum((unsigned char) step[w]) || step[w] == '\'' || step[w] == '-'))
+                w++;
+            words++;
+            end = w;
+            i = w;
+            if (i < step.size() && step[i] == ' ' && i + 1 < step.size()
+                && isupper((unsigned char) step[i + 1]))
+            {
+                i++;
+                continue;
+            }
+            break;
+        }
+        if (end > start && (words >= 2 || end - start >= 4))
+            out.push_back(step.substr(start, end - start));
+        if (i <= start)
+            i = start + 1;
+    }
+}
+
+static bool w81StepNamedByWindow(const string& plan, size_t stepIndex, const string& tail)
+{
+    if (tail.empty())
+        return false;
+    const vector<size_t> ends = gptcaveat::planStepEnds(plan);
+    if (stepIndex >= ends.size())
+        return false;
+    const size_t from = stepIndex ? ends[stepIndex - 1] : 0;
+    if (ends[stepIndex] <= from)
+        return false;
+    const string step = plan.substr(from, ends[stepIndex] - from);
+    vector<string> names;
+    w81StepNameCandidates(step, names);
+    for (size_t i = 0; i < names.size(); i++)
+        if (tail.find(names[i]) != string::npos)
+            return true;
+    return false;
+}
+
 //The one entry the echo builder calls. The pins drive THIS, with the corpus's
 //own plan strings, so the fixture rides the live caller path.
 static string w80CarriedPlanSteps(const string& plan, int stepsDone,
-                                  bool castPendingCompletion)
+                                  bool castPendingCompletion,
+                                  const string& tail = string()) //#W81-DM (V11)
 {
-    return gptcaveat::planStepsAfter(plan, w80EchoStepIndex(stepsDone,
-                                                            castPendingCompletion));
+    size_t at = w80EchoStepIndex(stepsDone, castPendingCompletion);
+    //#W81-DM (V11): reclaim the one step this window is executing.
+    if (at > 0 && w81StepNamedByWindow(plan, at - 1, tail))
+        at--;
+    return gptcaveat::planStepsAfter(plan, at);
 }
 
 string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
@@ -23897,6 +24152,12 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
     //three-option land drop (deck158 vs116 seq 2, 3/3 on-the-play games).
     //mInPregameAsk is set by the three pregame entry points themselves.
     bool pregame = mInPregameAsk;
+    //#W81-DM (V14): the board block is built FIRST so the log can be budgeted
+    //against it. The emission ORDER below is unchanged (log, then situation);
+    //only the order in which the two strings are computed moves.
+    const string w81SituationBody = pregame
+        ? serializePregameState()
+        : (situation ? *situation : serializeGameState(&tail));
     if (!mNarration.empty() && !pregame)
     {
         //#W57-H (D43): the game-log window. Default `full` -> logWindowApply
@@ -23911,8 +24172,20 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         //#W68-BD (MED): and the past-turn payment-source fold, over the same
         //composed body. Order matters: bucketing first, so a run this fold
         //would break into non-identical lines is already collapsed.
-        const string body = narrationFoldPaidSources(
+        string body = narrationFoldPaidSources(
             narrationBucketRuns(logWindowApply(mNarration, &elided)));
+        //#W81-DM (V14): everything else this prompt will carry - what is already
+        //in `u`, the board block just built, and the option list below it.
+        const size_t w81Other = u.str().size() + w81SituationBody.size() + tail.size();
+        //The SAME marker the growth trim writes, built from the same four zone
+        //digests, so a budget cut and a growth cut are indistinguishable to a
+        //reader and to every consumer that keys on the marker head.
+        body = w81TrimNarrationToBudget(
+            body, w81NarrationBudget(w81Other),
+            trimMarkerLine(zoneNameDigest(game ? game->graveyard : NULL),
+                           zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
+                           zoneNameDigest(game ? game->removedFromGame : NULL),
+                           zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL)));
         u << logWindowLogHeader(elided > 0, wturns) << "\n" << body << "\n";
     }
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
@@ -23925,9 +24198,9 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
     //seats. Suppressing that ONE line would have left the same frame standing, so
     //the whole board frame is replaced here rather than filtered.
     if (pregame)
-        u << "--- YOUR OPENING HAND ---\n" << serializePregameState();
+        u << "--- YOUR OPENING HAND ---\n" << w81SituationBody; //#W81-DM (V14)
     else
-        u << "--- CURRENT SITUATION ---\n" << (situation ? *situation : serializeGameState(&tail));
+        u << "--- CURRENT SITUATION ---\n" << w81SituationBody; //#W81-DM (V14)
     //#W47-R9b (wave-46 docket R9; extends the N-146k owner directive of
     //2026-07-27 that pregame asks get the HAND and nothing else): the carried
     //plan is the last board-scoped sentence still reaching the pre-game asks,
@@ -24123,7 +24396,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             mPlanCastCompletionState = w80CompletingCastMenu(tail, mInAnnounceXAsk) ? 2 : 1;
         u << carriedPlanHeaderText(planAgeClause(), planAbsent,
                                    w80CarriedPlanSteps(mCurrentPlan, mPlanStepsDone,
-                                                       mPlanCastCompletionState >= 1));
+                                                       mPlanCastCompletionState >= 1,
+                                                       tail)); //#W81-DM (V11)
         //#W77-CS (R10): the #W48 D9 hazard, NAMED instead of the echo deleted.
         //Any X in that plan was chosen on the cast row, one screen before this
         //menu's per-X kill lists existed, so the rows below are the authority on
@@ -26434,6 +26708,14 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 && e->from->cards[ci]->getDisplayName() == cardName)
                 sameNameLeft++;
         string copiesTag = copiesLeftBehindTag(fromMine, fromDesc, cardName, sameNameLeft);
+        //#W81-DM (V13, deck123 HIGH-3): the EVENT this seat's counterspell intel
+        //line counts. `countered` is the engine's own verdict that this departure
+        //was a counter, not a resolution, and `mine` is the destination owner -
+        //so a spell of THIS SEAT'S that was countered is exactly "they countered
+        //one of yours". Counted here and nowhere else: a counterspell in a
+        //graveyard is not evidence it countered anything.
+        if (countered && mine)
+            mOppCounteredSpells++;
         return zoneChangeNarration(mine, cardName, zoneDesc(e->from), toName,
                                    e->card->isCreature() != 0,
                                    e->card->hasType(Subtypes::TYPE_LAND) != 0,
@@ -30885,6 +31167,48 @@ static string opponentOpenManaLine(int sources, const string& colours)
     return o.str();
 }
 
+//#W81-DM (V13, wave-80 deck123 HIGH-3 - two makers died to it in one game). A
+//COUNTERSPELL THREAT EXISTED ONLY AS A CARD NAME IN A GRAVEYARD LIST. `125v123`
+//seq 143 (t22 main 1) carries `Their untapped sources: 11 (colours they could
+//make: {u}{w})` and `Their graveyard (8 cards): Essence Scatter {1}{u} x2;
+//Dream Fracture {1}{u}{u}; ...; Cancel {1}{u}{u}; ...`, and the seat cast its
+//Thraben Doomsayer into it; the Bloodline Keeper died the same way at seq 190.
+//NOTHING on either prompt said a counter was live. The prompt already holds both
+//facts and already classifies cards by FUNCTION in four other places (`a DRAW
+//PUNISHER`, `a TOKEN ENGINE`, `LIFE-TO-DAMAGE CONVERTER`, `a life-loss mirror`),
+//so this is the fifth member of that family, not a new kind of claim.
+//
+//WHAT IT ASSERTS, and nothing beyond it: the number of times a spell of THIS
+//SEAT'S was countered this game (an EVENT count, `mOppCounteredSpells`, taken at
+//the zone-change observer - never inferred from the graveyard, because a
+//counterspell can reach a graveyard without countering anything), and the names
+//of the counterspells now visible in their graveyard, which is a zone the prompt
+//already prints in full. It makes NO claim about their hand: the closing clause
+//says so outright, because "they can counter this" is not derivable and the
+//trust doctrine forbids printing it as if it were. One line, under the open-mana
+//line whose number it is read against. Pure over its three inputs.
+static string w81CounterspellsSeenLine(int timesCountered, const vector<string>& names,
+                                       int theirUntapped)
+{
+    if (names.empty())
+        return "";
+    std::ostringstream o;
+    o << "COUNTERSPELLS THEY HAVE USED: ";
+    if (timesCountered > 0)
+        o << "they have countered " << timesCountered << " of your spells this game";
+    else
+        o << "they have countered none of your spells yet";
+    o << ", and their graveyard holds " << names.size() << " counterspell"
+      << (names.size() == 1 ? "" : "s") << " - ";
+    for (size_t i = 0; i < names.size(); i++)
+        o << (i ? ", " : "") << names[i];
+    o << ". Read that against their " << theirUntapped << " untapped source"
+      << (theirUntapped == 1 ? "" : "s") << " on the line above. This is a record of"
+         " what they have DONE and what is in a zone you can see; it is not a claim"
+         " that they hold one now - their hand is not shown to you.";
+    return o.str();
+}
+
 //#W57-E (D15, wave-56 ledger MED): the board frame carried the opponent's mana
 //(D24) but not their LIFE TREND, and deck130's entire face-damage decision -
 //and the CROSS-CHECK latch its guide is built on - turn on whether the
@@ -31761,6 +32085,24 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             string oppColors = manaColourSetText(oppPotential);
             SAFE_DELETE(oppPotential);
             out << "\n" << opponentOpenManaLine(oppSources, oppColors);
+            //#W81-DM (V13): the counterspell intel, off the same two surfaces -
+            //the event count this seat has kept since turn 1 and the graveyard
+            //the block above just printed in full.
+            vector<string> w81CsNames;
+            MTGGameZone * w81Gy = opp->game ? opp->game->graveyard : NULL;
+            for (int gi = 0; w81Gy && gi < w81Gy->nb_cards; gi++)
+            {
+                MTGCardInstance * gc = w81Gy->cards[gi];
+                if (gc && w79CounterspellScript(gc->magicText))
+                    w81CsNames.push_back(gc->getDisplayName() + " " + gc->getManaCost()->toString());
+            }
+            const string w81CsLine = w81CounterspellsSeenLine(mOppCounteredSpells, w81CsNames,
+                                                              oppSources);
+            if (!w81CsLine.empty())
+            {
+                out << "\n" << w81CsLine;
+                mCounterIntelRendered++; //#W81-DM (V13): counted AT the render
+            }
         }
         //#W56-B (D6): the incoming total, on EVERY window during their combat -
         //the seat with no creature is never handed a blockers ask, and that is
@@ -38557,8 +38899,25 @@ static string repeatRowLine(const string& shortName, int rowIndex, int creatureC
     o << shortName << ", repeated then stop [";
     if (creatureCount >= 0)
         o << "you control " << creatureCount << " creatures right now; ";
-    o << "you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
-      << shortName << " x<N>)\" - N is a DIGIT you choose, and copying this row's"
+    //#W81-DM (V17, wave-80 LOW-2 / engine-seat §2(i)). THE LAST WORKED EXAMPLE
+    //THAT QUOTES A LIVE ROW GOES NEUTRAL. #W80-DG (U5) replaced the ask seam's
+    //exemplar with a FORMAT template because the seat took the exemplified row in
+    //62 of 139 windows and quoted the example back as its reason ("picked Dictate
+    //as it's first in the menu"); it converted the ask seam and the ANNOUNCE_X
+    //template and missed this one, so 5 wave-80 prompts still read
+    //`e.g. "CHOICE: 19 (Create human with Thraben Doomsayer x<N>)"` - this row's
+    //own index and its own name, written as the thing to copy.
+    //The example now names the SHAPE and nothing else, in U5's own literal
+    //(`<row number>` / `<that row's short name>`), so the bytes are a constant on
+    //every repeat row and cannot move a key. What the bracket is FOR is untouched
+    //and is the sentence immediately after it: N is a digit, the bare name is
+    //refused. Nothing is removed, capped or auto-answered; the row is still
+    //offered and still answerable exactly as before.
+    (void)rowIndex;
+    o << "you name N on the CHOICE line, e.g. \"CHOICE: <row number> (<that row's"
+         " short name> x<N>)\" - THIS ROW's number and name go in those two slots"
+         " (they are placeholders, not a recommendation of any row) - N is a DIGIT"
+         " you choose, and copying this row's"
          " name alone, with no x<count> after it, names no count and is refused and"
          " re-asked; the engine performs it N times, re-checking the cost each"
          " iteration and stopping early if it becomes unpayable, then returns priority to you"
@@ -40731,6 +41090,85 @@ static void applyDuplicateEffectTags(std::vector<std::string>& rows,
     }
 }
 
+//#W81-DM (V14, wave-80 known-bugs V14 / engine-seat MED-2). THE COVER
+//PARAGRAPH PRINTS ONCE PER PROMPT, NOT ONCE PER ROW. `162v146` seq 30 is a
+//25,717-byte prompt carrying the `{crack-back cover: ...}` paragraph TWICE,
+//byte for byte identical, at 2,012 B each - both rows add one body to the same
+//board, so both paragraphs compute the same cover against the same 17. 2,012 B
+//of a 25.7 KB prompt is a straight 7.8% for zero information, and the corpus
+//mean rose +1,095 B (+9.1%) this wave with the share over 20 KB going
+//5.6% -> 13.4%.
+//
+//WHAT IS FOLDED, and only this: a cover paragraph whose bytes are EXACTLY those
+//of one already printed on this menu. Its arithmetic is that row's arithmetic,
+//so the later row says so and names the row that carries it in full - nothing
+//is summarised, nothing is recomputed, and a reader who wants the numbers has
+//them one row up. Two rows whose covers DIFFER by even one digit both print in
+//full, because the difference is the per-row delta and that is the whole point
+//of the clause.
+//
+//No option is removed, capped or auto-answered: every row stays, in order, with
+//its own cover clause present and its own answer available. The fold is inside
+//the `{...}` annotation channel, so it is stripped from the narrated record and
+//is outside every key exactly as the paragraph it replaces was.
+static const char kW81CoverHead[] = " {crack-back cover: ";
+static size_t w81CoverParagraphAt(const string& row, size_t& len)
+{
+    const size_t at = row.find(kW81CoverHead);
+    if (at == string::npos)
+        return string::npos;
+    int depth = 0;
+    for (size_t i = at + 1; i < row.size(); i++)
+    {
+        if (row[i] == '{')
+            depth++;
+        else if (row[i] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                len = i - at + 1;
+                return at;
+            }
+        }
+    }
+    return string::npos;
+}
+static void w81FoldDuplicateCoverParagraphs(std::vector<std::string>& rows)
+{
+    std::vector<std::string> seen;   //the paragraph bytes, per row that printed one
+    std::vector<size_t> seenRow;     //that row's 1-based menu number
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        size_t len = 0;
+        const size_t at = w81CoverParagraphAt(rows[i], len);
+        if (at == string::npos)
+            continue;
+        const string body = rows[i].substr(at, len);
+        size_t match = 0;
+        bool hit = false;
+        for (size_t k = 0; k < seen.size(); k++)
+            if (seen[k] == body)
+            {
+                match = seenRow[k];
+                hit = true;
+                break;
+            }
+        if (!hit)
+        {
+            seen.push_back(body);
+            seenRow.push_back(i + 1);
+            continue;
+        }
+        std::ostringstream fold;
+        fold << " {crack-back cover: identical to the one printed in full on row " << match
+             << " above - this row adds the same bodies against the same total and covers"
+                " the same amount of it, so its arithmetic is that row's arithmetic, word"
+                " for word. Read it there.}";
+        rows[i] = rows[i].substr(0, at) + fold.str() + rows[i].substr(at + len);
+    }
+}
+
 //#W58-C (D2): the header's fold over ONE row's printed verdict. A `{right now:}`
 //clause is a LIST of per-scope verdicts separated by `;` - Devour Flesh renders
 //"they control 1 creature - Rorix Bladewing (6/5) [flying, haste, ...] is
@@ -40825,17 +41263,61 @@ bool AIPlayerGPT::verdictReadsZero(const string& verdictClause)
 //around it - a `{card text: "..."}` blob quoting "does nothing" must not make a
 //live row read as dead - and EVERY cast row must carry a verdict, so a menu
 //holding one unpriced row never fires. Pure over the rows.
-static bool everyCastRowDead(const std::vector<std::string>& rows)
+//#W81-DM (V13, wave-80 deck126 MED-3). THE THIRD DEAD SHAPE. `everyCastRowDead`
+//asks each row for a `{right now: ...}` verdict, so a cast row that this engine
+//already marked dead with a BRACKET TAG instead of a verdict made the whole
+//header go silent. `126v130` seqs 15, 21, 22, 32 and 38 are the repro: seq 32's
+//entire menu is `1. Cast Idyllic Tutor {2}{w} [finds only an enchantment card -
+//every enchantment left in your library is a copy of one you already control or
+//hold: Sanguine Bond]`, a hold row and a decline row, and seqs 22/38 add
+//`2. Cast Exquisite Blood {4}{b} [second copy: ... a second instance of an
+//effect you already have]`. The marker printed on NONE of the five while the
+//same marker printed 25 times at that seat on menus dead in exactly the same
+//way; the seat had to classify them itself and got 3 of 5 right.
+//
+//Only the two tag faces whose text is a DEAD claim count, never the whole tag
+//family: `secondCopyTag`'s verdict-1 tail ("a second copy changes nothing") and
+//`tutorFindsTag`'s two exhausted searches ("every <type> left in your library is
+//a copy of one you already control or hold", "none left in your library"). The
+//second-copy STACKING face and the "adds only its own abilities" face are both
+//live rows and are deliberately excluded - a false header is the one failure
+//this fold has already had (#W58-C D2, 8 of 497 renders), and the miss direction
+//is the header staying silent.
+static const char kW81DeadSecondCopy[] =
+    "a second copy changes nothing]";
+static const char kW81DeadTutorAllCopies[] =
+    " left in your library is a copy of one you already control or hold: ";
+static const char kW81DeadTutorEmpty[] =
+    " left in your library]";
+static bool w81RowDeadByTag(const string& row)
 {
+    return row.find(kW81DeadSecondCopy) != string::npos
+        || row.find(kW81DeadTutorAllCopies) != string::npos
+        || (row.find("[finds only ") != string::npos
+            && row.find(kW81DeadTutorEmpty) != string::npos);
+}
+static bool everyCastRowDead(const std::vector<std::string>& rows, bool * anyTagDead = NULL)
+{
+    if (anyTagDead)
+        *anyTagDead = false;
     if (rows.empty())
         return false;
+    bool sawTag = false;
     for (size_t i = 0; i < rows.size(); i++)
     {
         //#W58-C (D2): the fold, per SCOPE of the row's own verdict.
         const string v = rowVerdictClause(rows[i]);
-        if (v.empty() || !AIPlayerGPT::verdictReadsZero(v))
-            return false;
+        if (!v.empty() && AIPlayerGPT::verdictReadsZero(v))
+            continue;
+        if (w81RowDeadByTag(rows[i])) //#W81-DM (V13)
+        {
+            sawTag = true;
+            continue;
+        }
+        return false;
     }
+    if (anyTagDead)
+        *anyTagDead = sawTag;
     return true;
 }
 
@@ -40857,14 +41339,27 @@ static bool everyCastRowDead(const std::vector<std::string>& rows)
 //clause is omitted entirely and nothing is claimed about it. The rest is a
 //SCOPE statement about seams this engine has - it names no card, promises no
 //legality, and cannot be false of a board.
-static string allCastRowsDeadNote(bool allDead, int castRows, int landPlaysLegal = 0)
+//#W81-DM (V13): `anyTagDead` widens ONLY the opening clause, and only on a menu
+//that actually carries a tag-dead row. A menu whose every row is verdict-dead -
+//the 25 renders that already worked - is byte-identical to wave 80.
+static string allCastRowsDeadNote(bool allDead, int castRows, int landPlaysLegal = 0,
+                                  bool anyTagDead = false)
 {
     if (!allDead || castRows <= 0)
         return "";
     std::ostringstream o;
     o << "\nNO LIVE CAST ROW ON THIS MENU: all " << castRows << " cast row"
-      << (castRows == 1 ? "" : "s") << " below carry a verdict computed from the board"
-         " that reads zero - not one of them changes a number on the board as it stands."
+      << (castRows == 1 ? "" : "s") << " below carry a";
+    if (anyTagDead)
+        o << " mark this engine computed from the board that reads dead - a verdict"
+             " reading zero, a second copy whose effect is already on your battlefield,"
+             " or a search that can only find a copy of something you already control or"
+             " hold - not one of them puts an effect on the board that is not already"
+             " working for you.";
+    else
+        o << " verdict computed from the board"
+             " that reads zero - not one of them changes a number on the board as it stands.";
+    o <<
          " Nothing is withheld and no row is capped: casting one is still legal and still"
          " your choice, and the decline and hold rows are on the menu as always."
          " THIS IS THE CASTING SEAM ONLY, NOT YOUR WHOLE TURN: your land drop, the"
@@ -51327,12 +51822,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //menu copy and for the same reason - a row cannot know its own number
         //until the suppression filter and any re-ask removal have settled.
         applyDuplicateEffectTags(menu, rowNames, rowCosts);
+        //#W81-DM (V14): and the cover paragraph's per-prompt fold, on the same
+        //settled menu copy - a row cannot know whether its cover duplicates
+        //another until every row's cover has been built.
+        w81FoldDuplicateCoverParagraphs(menu);
         //#W57-C (D12): the menu-level verdict, taken over the CAST rows only -
         //before the decline and hold rows join the list, since neither is a
         //cast and neither carries a board verdict.
+        bool w81AnyTagDead = false; //#W81-DM (V13)
+        const bool w81AllDead = everyCastRowDead(menu, &w81AnyTagDead);
         const string deadMenuNote = allCastRowsDeadNote(
-            everyCastRowDead(menu), (int) menu.size(),
-            (int) LegalActionsOracle::legalLandPlays(this).size()); //#W68-BD (MED)
+            w81AllDead, (int) menu.size(),
+            (int) LegalActionsOracle::legalLandPlays(this).size(),
+            w81AnyTagDead); //#W68-BD (MED); #W81-DM (V13)
         int declineRowIdx = -1; //#W66-AS (H7 second half): the decline's own row number
         //#W65-AL (G9, deck125 HIGH-1): and its PRICE, where it has one. The
         //cleanup step this clause prices is THIS turn's, so the clause is
@@ -54978,6 +55480,33 @@ static string buildHandRemovalAsk(const string& verb, bool byOpponent, bool relo
             q << " of " << (targetMin ? "exactly " : "up to ") << maxtargets;
     }
     q << " from the list below, and answer with the chosen card's row number."; //#W70-BL (E3)
+    //#W81-DM (V12, wave-80 engine-seat MED-3 / known-bugs V12). THE SEAM ASKS
+    //ONE CARD PER WINDOW AND NEVER SAID SO. `152` seqs 217 and 237 (Emrakul's
+    //Annihilator, sacrifice 6) answered `CHOICE: 1, 2, 7, 8, 9, 11 (Boulderloft
+    //Pathway, Forest, Plains #1, Plains #2, Plains #3, Hengegate Pathway)` and
+    //`CHOICE: 5, 6, 7, 8, 9, 10 (...)`; the parser stamped
+    //`parse_note: multi_answer_first_taken`, kept row 1, and the window said
+    //NOTHING - the model plainly believed it had chosen all six. "Choose card 1
+    //of exactly 6" is a true sentence a reader can take either way: as "pick the
+    //first of the six you are naming now", or as "this is the first of six
+    //windows". It is the second, and now it says which.
+    //
+    //The last clause states what the PARSER does with a longer list, because a
+    //model told only "one number" that still writes six loses five picks
+    //silently. Nothing is removed, capped or auto-answered: every row stays, the
+    //answer is still the model's, and a multi-number reply is still read - it is
+    //just described honestly. MULTI ASKS ONLY; the single-pick branch above is
+    //byte-identical, and so is every gain ask (a different builder).
+    if (multi)
+    {
+        q << " THIS WINDOW TAKES ONE ROW NUMBER, NOT A LIST: you are asked once"
+             " per card";
+        if (!unlimited)
+            q << " and this is window " << (pickIndex + 1) << " of " << maxtargets;
+        q << ", so the rest of your picks are made at the windows that follow this"
+             " one. If you write several numbers here, the FIRST is the one that"
+             " happens and the others are discarded.";
+    }
     return q.str();
 }
 
@@ -71932,10 +72461,28 @@ void AIPlayerGPT::runParseSelfTest()
         string row = repeatRowLine(sn, 2);
         CHECK(row.find("Create human with Thraben Doomsayer, repeated then stop") == 0,
               "#W48-F1 the row leads with the action and the shortcut, not the explanation");
-        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x<N>)\"") != string::npos,
-              "#W48-F1 the worked example carries THIS row's own index (#W50-Z: and the x<N> placeholder)");
-        CHECK(repeatRowLine(sn, 7).find("\"CHOICE: 7 (") != string::npos,
-              "#W48-F1 the example index follows the row, never a hard-coded number");
+        //#W81-DM (V17 / wave-80 LOW-2): the worked example is now U5's FORMAT
+        //template, not this row's live index and name. The two wave-48/50 pins
+        //that asserted the live quotation are inverted into MUST-NOT-MATCH, and
+        //the wave-48 "index follows the row" pin becomes "no index at all".
+        CHECK(row.find("\"CHOICE: <row number> (<that row's short name> x<N>)\"") != string::npos,
+              "#W81-DM V17 the worked example is the neutral format template (U5's literal)");
+        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x<N>)\"") == string::npos,
+              "#W81-DM V17 MUST-NOT-MATCH the 5 wave-80 prompts' live quotation is gone");
+        CHECK(repeatRowLine(sn, 7).find("\"CHOICE: 7 (") == string::npos
+              && repeatRowLine(sn, 7).find("\"CHOICE: <row number> (") != string::npos,
+              "#W81-DM V17 MUST-NOT-MATCH no row index reaches the example, at any index");
+        //#W81-DM (V17) KEY STABILITY: the example is a CONSTANT now, so two rows
+        //differing only in index and name carry byte-identical example text.
+        CHECK(repeatRowLine("Create vampire with Bloodline Keeper", 2).find(
+                  "\"CHOICE: <row number> (<that row's short name> x<N>)\"") != string::npos
+              && repeatRowLine(sn, 19).find(
+                  "\"CHOICE: <row number> (<that row's short name> x<N>)\"") != string::npos,
+              "#W81-DM V17 the example text is the same bytes on every repeat row");
+        //#W81-DM (V17) POSITIVE: the bracket's actual instruction is untouched.
+        CHECK(row.find("N is a DIGIT you choose") != string::npos
+              && row.find("names no count and is refused and re-asked") != string::npos,
+              "#W81-DM V17 the rule the bracket exists for still prints in full");
         CHECK(row.find("re-checking the cost each iteration and stopping early if it becomes unpayable") != string::npos
               && row.find("returns priority to you here") != string::npos,
               "#W48-F1 the row states the two facts that make the shortcut safe to take");
@@ -72828,9 +73375,10 @@ void AIPlayerGPT::runParseSelfTest()
         string row = repeatRowLine(sn, 2, 223);
         CHECK(row.find("Create human with Thraben Doomsayer, repeated then stop [you control 223 creatures right now; you name N") == 0,
               "#W50-Z D11 the row leads with the shortcut and then the CURRENT creature count");
-        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x<N>)\"") != string::npos
+        CHECK(row.find("\"CHOICE: <row number> (<that row's short name> x<N>)\"") != string::npos
               && row.find("x50") == string::npos,
-              "#W50-Z D11 the example is the x<N> placeholder; no literal count remains on the row");
+              "#W50-Z D11 / #W81-DM V17 the example is the x<N> placeholder in the NEUTRAL"
+              " template; no literal count and no live row remain on it");
         CHECK(repeatRowLine(sn, 3).find("you control") == string::npos,
               "#W50-Z D11 NEGATIVE a non-token action's repeat row prints no creature count");
         CHECK(repeatRowLine(sn, 3, 0).find("you control 0 creatures right now") != string::npos,
@@ -74826,9 +75374,10 @@ static const char * kW50Y_r94 =
               "#W53-N D12a 146v125 seq 163 -> 177: the docket's literal shape");
         //#W71-BR (L11): the same line in the non-label shape.
         string block = carriedPlanHeaderText(planAgeClauseText(45, 32), "", "nothing right now");
-        CHECK(block == "\nTHE PLAN YOU LAST STATED (as you stated it, 45 windows ago on turn 32) reads"
+        CHECK(block == "\nWHAT YOU LAST WROTE (as you wrote it, 45 windows ago on turn 32) reads"
                        " \"nothing right now\"\n",
-              "#W53-N D12a / #W71-BR L11 the whole header line, at the repro's own age");
+              "#W53-N D12a / #W71-BR L11 / #W81-DM V16 the whole header line, at the repro's"
+              " own age, with the caps word PLAN gone");
         // D12b: which coded line the engine latched
         {
             vector<string> menu;
@@ -76108,10 +76657,11 @@ static const char * kW50Y_r94 =
         string header = carriedPlanHeaderText(planAgeClauseText(1, 10),
                                               planMenuDiffClause("Master of the Feast"),
                                               "cast Master of the Feast.");
-        CHECK(header == "\nTHE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 10; "
+        CHECK(header == "\nWHAT YOU LAST WROTE (as you wrote it, 1 window ago on turn 10; "
                         "\"Master of the Feast\" is no longer on your menu) reads \"cast Master"
                         " of the Feast.\"\n",
-              "#W54-A D12b / #W71-BR L11 the whole header line, at the repro's own age");
+              "#W54-A D12b / #W71-BR L11 / #W81-DM V16 the whole header line, at the repro's"
+              " own age, with the menu-diff clause still inside the parenthesis");
         std::vector<string> mine;
         mine.push_back("Master of the Feast");
         mine.push_back("Gray Merchant of Asphodel");
@@ -76201,6 +76751,84 @@ static const char * kW50Y_r94 =
         CHECK(buildHandRemovalAsk("exile", false, false, "Path to Exile", false, false, false, 1, 0)
               .find("EXILE ONE OF YOUR OWN CARDS") == 0,
               "#W54-D D3 NEGATIVE the loss builder itself is untouched - only the gate moved");
+
+        //#W81-DM (V12, wave-80 engine-seat MED-3). THE ONE-CARD-PER-WINDOW
+        //SENTENCE. RED: `oppAsk` above is `152` seq 217's own ask, built with the
+        //corpus's own arguments (Emrakul's Annihilator, sacrifice, exactly 6,
+        //pick 0), and on base it ends at "answer with the chosen card's row
+        //number." - nothing on it says the six picks are six WINDOWS, and the
+        //reply named all six.
+        cout << "\n[#W81-DM] V12 the forced-sacrifice seam says one card per window\n";
+        {
+            cout << "     V12 ask:" << oppAsk.substr(oppAsk.find("Choose card")) << "\n";
+            CHECK(oppAsk.find("Choose card 1 of exactly 6 from the list below, and answer with"
+                              " the chosen card's row number. THIS WINDOW TAKES ONE ROW NUMBER,"
+                              " NOT A LIST: you are asked once per card and this is window 1 of"
+                              " 6, so the rest of your picks are made at the windows that follow"
+                              " this one. If you write several numbers here, the FIRST is the one"
+                              " that happens and the others are discarded.") != string::npos,
+                  "#W81-DM V12 REPRO 152 seq 217: the ask now names the window count and what a"
+                  " list costs");
+            //seq 237's window, the same game, a later pick index.
+            const string pick3 = buildHandRemovalAsk("sacrifice", true, false,
+                                                     "Emrakul, the Aeons Torn", true, false,
+                                                     true, 6, 2);
+            CHECK(pick3.find("this is window 3 of 6") != string::npos,
+                  "#W81-DM V12 the window number follows the pick index, never a constant");
+            //MUST-NOT-MATCH: the SINGLE-pick ask is byte-identical to wave 80 -
+            //there is no second window there and the sentence would be false.
+            CHECK(buildHandRemovalAsk("sacrifice", true, false, "Diabolic Edict", false, false,
+                                      false, 1, 0)
+                      .find("THIS WINDOW TAKES ONE ROW NUMBER") == string::npos,
+                  "#W81-DM V12 MUST-NOT-MATCH a one-card ask is byte-identical to wave 80");
+            //MUST-NOT-MATCH: the GAIN builder is a different seam and untouched.
+            CHECK(buildHandGainAsk("battlefield", "X", true, false, true, 2, 1)
+                      .find("THIS WINDOW TAKES ONE ROW NUMBER") == string::npos,
+                  "#W81-DM V12 MUST-NOT-MATCH the gain ask is untouched");
+            //An UNLIMITED multi ask has no N to name, so it names none - and still
+            //says the window takes one number.
+            const string unl = buildHandRemovalAsk("discard", false, false, "Loot", true, true,
+                                                  false, 0, 1);
+            CHECK(unl.find("THIS WINDOW TAKES ONE ROW NUMBER") != string::npos
+                  && unl.find("this is window") == string::npos,
+                  "#W81-DM V12 an unlimited ask claims no window count it cannot compute");
+            //ECHO: the multi-number reply the item is about STILL parses to its
+            //first row and STILL stamps the note - the parser is untouched, which
+            //is what makes the sentence true.
+            {
+                //The window's own eleven rows: the reply names rows 1, 2, 7, 8, 9
+                //and 11, so the list must be at least eleven long or the numbers
+                //fall outside the menu and the overrun is a different note.
+                vector<string> six;
+                six.push_back("Boulderloft Pathway [land]");
+                six.push_back("Forest [land]");
+                six.push_back("Island #1 [land]");
+                six.push_back("Island #2 [land]");
+                six.push_back("Mountain [land]");
+                six.push_back("Swamp [land]");
+                six.push_back("Plains #1 [land]");
+                six.push_back("Plains #2 [land]");
+                six.push_back("Plains #3 [land]");
+                six.push_back("Wastes [land]");
+                six.push_back("Hengegate Pathway [land]");
+                string note;
+                bool stale6 = false;
+                const int got = parseChoice("1, 2, 7, 8, 9, 11 (Boulderloft Pathway, Forest,"
+                                            " Plains #1, Plains #2, Plains #3,"
+                                            " Hengegate Pathway)",
+                                            (int) six.size(), &six, &stale6, NULL, &note);
+                cout << "     V12 echo: got=" << got << " note=" << note << "\n";
+                CHECK(got == 1 && note.find("multi_answer_first_taken") != string::npos,
+                      "#W81-DM V12 ECHO 152 seq 217's reply still takes row 1 and still stamps"
+                      " the note the census now counts");
+            }
+            //KEY STABILITY: the sentence is a function of (multi, unlimited,
+            //pickIndex, maxtargets) only - no board number enters it, so two
+            //boards differing only in a life total give identical ask bytes.
+            CHECK(buildHandRemovalAsk("sacrifice", true, false, "Emrakul, the Aeons Torn", true,
+                                      false, true, 6, 0) == oppAsk,
+                  "#W81-DM V12 KEY the ask is pure over its arguments");
+        }
     }
     {
         //#W54-D (D8a): the collapse reaches rows with NO instance ordinal.
@@ -76457,6 +77085,138 @@ static const char * kW50Y_r94 =
               " 15,000-byte one is not - on base neither was");
         CHECK(!narrationTrimNear(100, 100, 100),
               "audit-L L10b NEGATIVE a short log is nowhere near the cap");
+
+        //#W81-DM (V14, wave-80 known-bugs V14 / deck152 MED-2). THE BUDGET IS A
+        //FUNCTION OF THE WHOLE PROMPT. RED, `152v125` seq 215 verbatim: 15,298 B
+        //of narration under a 6,845 B situation block = 22,143 B total, and the
+        //growth trim is satisfied because 15,298 < 16,000. It never looks at the
+        //board.
+        cout << "\n[#W81-DM] V14 the narration budget reads the assembled prompt\n";
+        {
+            const string marker = "(...earlier events trimmed - graveyards at trim: ...)";
+            //A log of the repro's shape: 15,298 B of 40-byte lines.
+            string log;
+            while (log.size() < 15298)
+                log += "- Opponent's Katilda, Dawnhart Prime resolved\n";
+            const size_t otherAtRepro = 6845 + 1200; //situation + option list
+            CHECK(narrationTrimTrigger() == 16000 && log.size() < 16000,
+                  "#W81-DM V14 RED-ON-BASE the repro's log is UNDER the growth trigger, so the"
+                  " growth trim never fires on it");
+            const size_t budget = w81NarrationBudget(otherAtRepro);
+            CHECK(budget == kW81PromptByteTarget - otherAtRepro && budget < log.size(),
+                  "#W81-DM V14 the budget is what is left of the target after the rest of the"
+                  " prompt, and it bites on the repro");
+            const string cut = w81TrimNarrationToBudget(log, budget, marker);
+            cout << "     V14 log " << log.size() << " B -> " << cut.size()
+                 << " B under a " << budget << " B budget\n";
+            CHECK(cut.size() <= budget && cut.size() + otherAtRepro <= kW81PromptByteTarget,
+                  "#W81-DM V14 GREEN the assembled prompt lands at or under the 20 KB target");
+            //The cut is the growth trim's cut: same marker, line boundary, newest
+            //events kept, nothing summarised.
+            CHECK(cut.compare(0, marker.size(), marker) == 0
+                  && cut[marker.size()] == '\n'
+                  && cut.substr(cut.size() - 46) == log.substr(log.size() - 46),
+                  "#W81-DM V14 the cut is on a line boundary behind the same marker and the"
+                  " NEWEST events survive");
+            //MUST-NOT-MATCH: a prompt already under the target is byte-identical
+            //to wave 80. This is every prompt in five of the seven decks.
+            string small;
+            while (small.size() < 4000)
+                small += "- Opponent's Katilda, Dawnhart Prime resolved\n";
+            CHECK(w81TrimNarrationToBudget(small, w81NarrationBudget(3000), marker) == small,
+                  "#W81-DM V14 MUST-NOT-MATCH a prompt under the target trims nothing");
+            CHECK(w81TrimNarrationToBudget(log, w81NarrationBudget(0), marker).size()
+                      <= kW81PromptByteTarget,
+                  "#W81-DM V14 with nothing else on the window the log gets the whole target");
+            //THE FLOOR: a board block big enough to eat the target does not starve
+            //the log to nothing - it keeps the floor and the prompt goes over.
+            //The newest events are never worth less than the board.
+            CHECK(w81NarrationBudget(kW81PromptByteTarget + 5000) == kW81NarrationFloor
+                  && w81NarrationBudget(kW81PromptByteTarget - 100) == kW81NarrationFloor,
+                  "#W81-DM V14 the budget never falls below the floor, however large the board");
+            const string floored = w81TrimNarrationToBudget(log, kW81NarrationFloor, marker);
+            CHECK(floored.size() <= kW81NarrationFloor && floored.size() > marker.size() + 1,
+                  "#W81-DM V14 at the floor the log is short but never empty");
+            //MUST-NOT-MATCH: the DISABLE FLAG. WAGIC_GPT_TRIM_V1=1 turns this off
+            //with the rest of the wave-79 pair, so "was it me?" is one env var.
+            CHECK(narrationTrimV1()
+                      ? (w81TrimNarrationToBudget(log, 100, marker) == log)
+                      : (w81TrimNarrationToBudget(log, 100, marker) == log),
+                  "#W81-DM V14 a budget smaller than the marker itself cuts nothing");
+            //A log with no line boundary inside the budget is left alone rather
+            //than cut mid-line.
+            CHECK(w81TrimNarrationToBudget(string(9000, 'x'), 4000, marker)
+                      == string(9000, 'x'),
+                  "#W81-DM V14 MUST-NOT-MATCH no line boundary in the budget -> no cut");
+        }
+
+        //#W81-DM (V14, wave-80 known-bugs V14). THE COVER PARAGRAPH, ONCE PER
+        //PROMPT. RED, `162v146` seq 30: a 25,717-byte prompt carrying the SAME
+        //2,012-byte `{crack-back cover: ...}` paragraph on two rows.
+        cout << "\n[#W81-DM] V14 the cover paragraph folds when it repeats\n";
+        {
+            const string cover = " {crack-back cover: the CRACK-BACK NEXT TURN line above is 14"
+                                 " from 4 of their creatures PLUS the 3 that line's own ADD THOSE"
+                                 " UP sentence adds - 17 in total. This adds 1 body. Counting"
+                                 " those bodies AND the checked new ones you cover 8 of 17,"
+                                 " leaving 9 -> you would be at -2.}";
+            vector<string> rows;
+            rows.push_back("Cast Nadaar, Selfless Paladin {2}{w}" + cover);
+            rows.push_back("Cast Triumphant Adventurer {1}{b}" + cover);
+            rows.push_back("Cast nothing right now");
+            const size_t before = rows[0].size() + rows[1].size() + rows[2].size();
+            w81FoldDuplicateCoverParagraphs(rows);
+            const size_t after = rows[0].size() + rows[1].size() + rows[2].size();
+            cout << "     V14 rows " << before << " B -> " << after << " B\n";
+            CHECK(rows[0].find(cover) != string::npos,
+                  "#W81-DM V14 the FIRST row keeps the paragraph in full");
+            CHECK(rows[1].find(cover) == string::npos
+                  && rows[1].find("{crack-back cover: identical to the one printed in full on"
+                                  " row 1 above") != string::npos,
+                  "#W81-DM V14 REPRO 162v146 seq 30: the duplicate names the row that carries it");
+            CHECK(after < before,
+                  "#W81-DM V14 the fold is a byte saving, not a rewrite");
+            CHECK(rows[2] == "Cast nothing right now",
+                  "#W81-DM V14 MUST-NOT-MATCH a row with no cover is untouched");
+            //MUST-NOT-MATCH: covers that DIFFER both print in full - the
+            //difference IS the per-row delta and folding it would lose it.
+            vector<string> diff;
+            string coverB = cover;
+            coverB.replace(coverB.find("cover 8 of 17"), 13, "cover 4 of 17");
+            diff.push_back("Cast Nadaar, Selfless Paladin {2}{w}" + cover);
+            diff.push_back("Cast Triumphant Adventurer {1}{b}" + coverB);
+            const vector<string> diffBefore(diff);
+            w81FoldDuplicateCoverParagraphs(diff);
+            CHECK(diff == diffBefore,
+                  "#W81-DM V14 MUST-NOT-MATCH two DIFFERENT covers both print in full");
+            //A third identical row points at the FIRST, never at the second.
+            vector<string> three(3, string("Cast X {1}") + cover);
+            w81FoldDuplicateCoverParagraphs(three);
+            CHECK(three[1].find("on row 1 above") != string::npos
+                  && three[2].find("on row 1 above") != string::npos,
+                  "#W81-DM V14 every duplicate points at the one row that prints it in full");
+            //The fold is inside the annotation channel, so it is stripped from
+            //the narrated record and stays outside every key, exactly as the
+            //paragraph it replaces was.
+            CHECK(stripNarrationDecoration(three[1]) == "Cast X {1}",
+                  "#W81-DM V14 ECHO the fold leaves no residue in the narrated record");
+            {
+                vector<string> keyRows;
+                keyRows.push_back("Cast Nadaar, Selfless Paladin {2}{w}" + cover);
+                keyRows.push_back("Cast Triumphant Adventurer {1}{b}" + cover);
+                const string keyBefore = w77KeyTailOf(joinNumberedRows(keyRows, NULL));
+                w81FoldDuplicateCoverParagraphs(keyRows);
+                CHECK(w77KeyTailOf(joinNumberedRows(keyRows, NULL)) == keyBefore,
+                      "#W81-DM V14 KEY the fold cannot move an option-set key - the paragraph"
+                      " and its replacement are both `{...}` groups");
+            }
+            //MUST-NOT-MATCH: nothing is removed, capped or auto-answered - the
+            //row count, the row order and every row's action text are untouched.
+            CHECK(rows.size() == 3
+                  && rows[0].compare(0, 36, "Cast Nadaar, Selfless Paladin {2}{w}") == 0
+                  && rows[1].compare(0, 34, "Cast Triumphant Adventurer {1}{b}") != 0,
+                  "#W81-DM V14 every row stays, in order, with its own action text");
+        }
         //the composed effect: a heavy marker no longer leaves the log above the
         //cap after its own trim
         string log, ph;
@@ -77134,6 +77894,78 @@ static const char * kW50Y_r94 =
         CHECK(edictClause(0, "", 0, true) == "they control 0 creatures - at 0 this does nothing",
               "#W55-C D7 (a) NEGATIVE the opponent half is byte-identical to wave 49");
 
+        //#W81-DM (V13, wave-80 deck123 HIGH-2). THE ENGINE MARKER ON THE ROW THAT
+        //DECIDES THE CAST. RED, `125v123` seq 238 verbatim: the cast row named the
+        //Bloodline Keeper and did not mark it, while `162v123` seq 79's victim ASK
+        //marked the identical class of body. The seat spent its only engine.
+        cout << "\n[#W81-DM] V13 the edict's forced victim carries the engine marker\n";
+        {
+            //Bloodline Keeper's own script shape: an activated ability that makes
+            //a body (a cost head, so `repeatableTokenEngineLine` reads it as an
+            //engine) - the same detector the pick surface uses.
+            const char * keeperScript = "{t}:token(Vampire,Creature Vampire,1/1,flying)";
+            const string tail = string("; THIS IS NOT JUST A BODY: ")
+                                + engineKindForScript(keeperScript);
+            CHECK(tail == "; THIS IS NOT JUST A BODY: TOKEN ENGINE (it makes more permanents,"
+                          " one per activation)",
+                  "#W81-DM V13 the marker is the SAME literal the victim ask prints (#W66-AQ H10)");
+            //POSITIVE, the cast row's self half (`125v123` seq 238's shape).
+            const string selfMarked = edictSelfClause(1, "Bloodline Keeper", 3, true, 0, "", 0, tail);
+            cout << "     V13 cast row:" << selfMarked << "\n";
+            CHECK(selfMarked == "; YOU control 1 creature - targeting yourself sacrifices"
+                                " Bloodline Keeper, and you gain 3; THIS IS NOT JUST A BODY:"
+                                " TOKEN ENGINE (it makes more permanents, one per activation)",
+                  "#W81-DM V13 REPRO 125v123 seq 238: the cast row now marks the body it names");
+            //POSITIVE, the forced player-target ask (`125v123` seq 239's shape).
+            const string askMarked = w77EdictPlayerTargetTag(false, 1, "Bloodline Keeper", 3,
+                                                            0, 0, "", 0, tail);
+            cout << "     V13 target ask:" << askMarked << "\n";
+            CHECK(askMarked == " {right now: you sacrifice Bloodline Keeper and you gain 3 life"
+                               " (its toughness); THIS IS NOT JUST A BODY: TOKEN ENGINE (it makes"
+                               " more permanents, one per activation)}",
+                  "#W81-DM V13 REPRO 125v123 seq 239: the forced target ask marks it too");
+            //The marker is inside the `{right now: ...}` group on the ask surface,
+            //so it is stripped from the narrated record like every other annotation.
+            CHECK(stripNarrationDecoration("Yourself (player, life 8)" + askMarked)
+                      == "Yourself (player, life 8)",
+                  "#W81-DM V13 ECHO the ask marker leaves no residue in the narrated record");
+            //MUST-NOT-MATCH: a vanilla body is not marked, on either surface.
+            CHECK(w81EngineBodyTail(NULL).empty()
+                  && engineKindForScript("") == NULL,
+                  "#W81-DM V13 MUST-NOT-MATCH no card and no script -> no marker");
+            CHECK(edictSelfClause(1, "Grizzly Bears", 2, true, 0, "", 0, "")
+                      .find("THIS IS NOT JUST A BODY") == string::npos
+                  && w77EdictPlayerTargetTag(false, 1, "Grizzly Bears", 2, 0, 0, "", 0, "")
+                      .find("THIS IS NOT JUST A BODY") == string::npos,
+                  "#W81-DM V13 MUST-NOT-MATCH a vanilla victim is byte-identical to wave 80");
+            //MUST-NOT-MATCH: at N > 1 no row names a victim, so no row is marked -
+            //the caller passes an empty tail and the multi branch never emits one.
+            CHECK(edictSelfClause(58, "", 0, true, 4, "", 0, tail)
+                      .find("THIS IS NOT JUST A BODY") == string::npos
+                  && w77EdictPlayerTargetTag(false, 3, "", 0, 2, 4, "", 0, tail)
+                      .find("THIS IS NOT JUST A BODY") == string::npos,
+                  "#W81-DM V13 MUST-NOT-MATCH at N > 1 the victim is undetermined and unmarked");
+            //MUST-NOT-MATCH: the zero branch of both surfaces is untouched.
+            CHECK(edictSelfClause(0, "", 0, true, 0, "", 0, tail)
+                      == "; YOU control 0 creatures - targeting yourself does nothing"
+                  && w77EdictPlayerTargetTag(true, 0, "", 0, 0, 0, "", 0, tail)
+                      == " {right now: they control 0 creatures - at 0 this does nothing}",
+                  "#W81-DM V13 MUST-NOT-MATCH the zero branches are byte-identical to wave 80");
+            //SYMMETRY: their side of the same enumeration takes the same tail, so
+            //one enumeration cannot price the same class of body two ways.
+            CHECK(w77EdictPlayerTargetTag(true, 1, "Thraben Doomsayer", 2, 0, 0, "", 0, tail)
+                      .find("; THIS IS NOT JUST A BODY: TOKEN ENGINE") != string::npos,
+                  "#W81-DM V13 the opponent half of the ask carries the same marker");
+            //KEY STABILITY: the marker is a function of the victim's SCRIPT, not of
+            //any board number, so two boards differing only in a life total give the
+            //same marker bytes.
+            CHECK(edictSelfClause(1, "Bloodline Keeper", 3, true, 0, "", 0, tail)
+                      .substr(edictSelfClause(1, "Bloodline Keeper", 3, true, 0, "", 0, tail)
+                              .find("; THIS IS NOT"))
+                  == tail,
+                  "#W81-DM V13 KEY the marker bytes are the script's, unmixed with the board");
+        }
+
         // ---- D7 (b): does the row commit a target, or open a follow-up ask?
         CHECK(targetCommitClause(2)
               == " {this row does not pick a target yet - taking it asks you next which of the"
@@ -77648,6 +78480,95 @@ static const char * kW50Y_r94 =
               "#W56-B D10 NEGATIVE no colour clause is printed for a seat with no untapped source");
         CHECK(opponentOpenManaLine(5, "").find("(") == string::npos,
               "#W56-B D10 NEGATIVE an unknown colour set prints no empty parenthesis");
+
+        //#W81-DM (V13, wave-80 deck123 HIGH-3 - two makers died to it in one
+        //game). THE COUNTERSPELL INTEL LINE. RED, `125v123` seq 143: the prompt
+        //carried `Their untapped sources: 11 (colours they could make: {u}{w})`
+        //and a graveyard line naming Essence Scatter x2, Dream Fracture and
+        //Cancel, and NO rendered clause anywhere said a counter was live. The
+        //seat cast Thraben Doomsayer into it; at seq 190 the Bloodline Keeper
+        //went the same way.
+        cout << "\n[#W81-DM] V13 the counterspell intel line, beside the open-mana line\n";
+        {
+            vector<string> seen;
+            seen.push_back("Essence Scatter {1}{u}");
+            seen.push_back("Essence Scatter {1}{u}");
+            seen.push_back("Dream Fracture {1}{u}{u}");
+            seen.push_back("Cancel {1}{u}{u}");
+            const string line = w81CounterspellsSeenLine(2, seen, 11);
+            cout << "     V13 intel:" << line << "\n";
+            CHECK(line == "COUNTERSPELLS THEY HAVE USED: they have countered 2 of your spells"
+                          " this game, and their graveyard holds 4 counterspells - Essence"
+                          " Scatter {1}{u}, Essence Scatter {1}{u}, Dream Fracture {1}{u}{u},"
+                          " Cancel {1}{u}{u}. Read that against their 11 untapped sources on the"
+                          " line above. This is a record of what they have DONE and what is in a"
+                          " zone you can see; it is not a claim that they hold one now - their"
+                          " hand is not shown to you.",
+                  "#W81-DM V13 REPRO 125v123 seq 143: the two facts the prompt already held,"
+                  " stated as one line, with no claim about their hand");
+            //MUST-NOT-MATCH: an empty roster prints NOTHING. No counterspell has
+            //been seen, so there is no fact to state and no bytes are spent.
+            CHECK(w81CounterspellsSeenLine(0, vector<string>(), 11).empty()
+                  && w81CounterspellsSeenLine(5, vector<string>(), 0).empty(),
+                  "#W81-DM V13 MUST-NOT-MATCH no counterspell seen -> no line, at any count");
+            //POSITIVE: the zero-event face is the honest one, not a silence. They
+            //hold the cards and have used none - that is a different board and it
+            //says so.
+            vector<string> one;
+            one.push_back("Cancel {1}{u}{u}");
+            const string zero = w81CounterspellsSeenLine(0, one, 3);
+            CHECK(zero.find("they have countered none of your spells yet") != string::npos
+                  && zero.find("their graveyard holds 1 counterspell -") != string::npos
+                  && zero.find("counterspells -") == string::npos,
+                  "#W81-DM V13 the zero-event face and the singular both print correctly");
+            CHECK(w81CounterspellsSeenLine(1, one, 1).find("their 1 untapped source on the line")
+                      != string::npos,
+                  "#W81-DM V13 the untapped-source noun agrees with the number it quotes");
+            //MUST-NOT-MATCH, the trust-doctrine clause: the line never asserts a
+            //counter is HELD or LIVE - those are not derivable from a visible zone.
+            CHECK(line.find("they can counter") == string::npos
+                  && line.find("is live") == string::npos
+                  && line.find("hand is not shown to you") != string::npos,
+                  "#W81-DM V13 MUST-NOT-MATCH the line claims nothing about their hand");
+            //ECHO: it is a plain narration line, so it carries no brace channel.
+            CHECK(stripNarrationDecoration(line) == line,
+                  "#W81-DM V13 ECHO the intel line has no annotation channel to strip");
+            //#W74 LESSON (a board-derived NUMBER must be proven outside every
+            //key): the line is a NARRATION line, not a row - it never enters the
+            //option set, so two windows differing only in the counter count carry
+            //the same rows and the same option-set key.
+            {
+                //The line is emitted into the BOARD stream inside
+                //`serializeGameState` (`out`), never into the option-list stream
+                //`tail` that the ask key, the async slot key and the hold latch
+                //are all built from (`w77KeyTailOf(tailStr)`, AIPlayerGPT.cpp
+                //~46608 and ~47997). So the number it carries cannot reach a key,
+                //and the proof is that the OPTION LIST is byte-identical across
+                //two boards whose counter differs - the line is not a row and
+                //never joins the numbered list.
+                vector<string> menu;
+                menu.push_back("Cast Thraben Doomsayer {2}{w}");
+                menu.push_back(holdRowLine());
+                menu.push_back("Cast nothing right now");
+                const string tailA = joinNumberedRows(menu, NULL);
+                CHECK(w77KeyTailOf(tailA) == w77KeyTailOf(joinNumberedRows(menu, NULL)),
+                      "#W81-DM V13 KEY the option list the key is built from does not carry the"
+                      " intel line at any counter value");
+                CHECK(tailA.find("COUNTERSPELLS THEY HAVE USED") == string::npos
+                      && w77KeyTailOf(tailA).find("countered") == string::npos,
+                      "#W81-DM V13 KEY MUST-NOT-MATCH neither the option list nor its key tail"
+                      " can contain the clause or its number");
+                //And the line itself is not a numbered row: it opens with a
+                //capitalised label, so `joinNumberedRows` could never produce it
+                //and `w79ActionNormalisedKeyTail` has no row to reduce it to.
+                CHECK(line.compare(0, 1, "1") != 0 && line.find("\n") == string::npos,
+                      "#W81-DM V13 KEY the intel line is ONE narration line, not a row");
+            }
+            //The detector behind the roster is the one the hold seam already uses.
+            CHECK(w79CounterspellScript("@movedto(*|opponentstack):fizzle")
+                  || w79CounterspellScript("target(*[creature]|opponentstack) fizzle"),
+                  "#W81-DM V13 the roster is built with the engine's own counterspell detector");
+        }
 
         // ---- D9: the edict tie's quantifier is covered in the #W51-D block above.
 
@@ -78437,6 +79358,99 @@ static const char * kW50Y_r94 =
         CHECK(!everyCastRowDead(textTrap),
               "#W57-C D12 NEGATIVE the predicate reads the ROW VERDICT only - a card-text blob"
               " quoting \"does nothing\" or \"deals 0\" can never make a live row read as dead");
+
+        //#W81-DM (V13, wave-80 deck126 MED-3). THE FIVE MENUS THAT PRINTED
+        //NOTHING. `126v130` seqs 15/21/22/32/38, built as the live seam builds
+        //them: the whole menu is a dead Idyllic Tutor, a `[second copy:` half,
+        //and (on the live seam) the hold and decline rows that join AFTER this
+        //predicate runs. RED on base: neither row carries a `{right now:}`
+        //verdict, so `everyCastRowDead` returned false and the header - which
+        //printed 25 times at this same seat on verdict-dead menus - was silent
+        //on all five.
+        cout << "\n[#W81-DM] V13 the dead-cast header folds over the engine's own dead TAGS\n";
+        {
+            const string deadTutor =
+                "Cast Idyllic Tutor {2}{w} [finds only an enchantment card - every enchantment"
+                " left in your library is a copy of one you already control or hold: Sanguine Bond]";
+            const string deadCopy =
+                "Cast Exquisite Blood {4}{b} [second copy: you already control Exquisite Blood;"
+                " both stay on the battlefield - no legend rule, but its effect is already on the"
+                " battlefield and a second copy changes nothing]";
+            //REPRO seq 32: the tutor alone.
+            vector<string> s32;
+            s32.push_back(deadTutor);
+            bool tag32 = false;
+            CHECK(everyCastRowDead(s32, &tag32) && tag32,
+                  "#W81-DM V13 REPRO 126v130 seq 32: a menu whose only cast row is a dead tutor"
+                  " is dead, and the tag family is reported");
+            //REPRO seqs 22/38: the tutor plus the second copy.
+            vector<string> s22;
+            s22.push_back(deadTutor);
+            s22.push_back(deadCopy);
+            bool tag22 = false;
+            CHECK(everyCastRowDead(s22, &tag22) && tag22,
+                  "#W81-DM V13 REPRO 126v130 seqs 22/38: a dead tutor and a redundant second"
+                  " copy are both dead");
+            const string h22 = allCastRowsDeadNote(true, (int) s22.size(), 0, tag22);
+            cout << "     V13 header:" << h22 << "\n";
+            CHECK(h22.find("\nNO LIVE CAST ROW ON THIS MENU: all 2 cast rows below carry a mark"
+                           " this engine computed from the board that reads dead - a verdict"
+                           " reading zero, a second copy whose effect is already on your"
+                           " battlefield, or a search that can only find a copy of something you"
+                           " already control or hold - not one of them puts an effect on the board"
+                           " that is not already working for you.") == 0,
+                  "#W81-DM V13 the widened opening names the three dead shapes and claims nothing"
+                  " about numbers it cannot compute");
+            //The rest of the header - the nothing-withheld clause and the scope
+            //sentence - is untouched, so no option is removed or capped.
+            CHECK(h22.find("Nothing is withheld and no row is capped") != string::npos
+                  && h22.find("THIS IS THE CASTING SEAM ONLY") != string::npos,
+                  "#W81-DM V13 the widened header keeps the nothing-withheld and scope clauses");
+            //MUST-NOT-MATCH, byte-for-byte: a menu of verdict-dead rows only is
+            //IDENTICAL to wave 80 - the 25 renders that already worked pay nothing.
+            bool tagOld = true;
+            CHECK(everyCastRowDead(allDead, &tagOld) && !tagOld
+                  && allCastRowsDeadNote(true, (int) allDead.size(), 0, tagOld) == note,
+                  "#W81-DM V13 MUST-NOT-MATCH a verdict-only dead menu is byte-identical to wave 80");
+            //MUST-NOT-MATCH: the LIVE faces of both tag families never read dead.
+            vector<string> stacking;
+            stacking.push_back("Cast Sanguine Bond {3}{b}{b} [second copy: you already control"
+                               " Sanguine Bond; both stay on the battlefield - no legend rule]");
+            bool tagS = false;
+            CHECK(!everyCastRowDead(stacking, &tagS),
+                  "#W81-DM V13 MUST-NOT-MATCH the second-copy STACKING face is a live row");
+            vector<string> lords;
+            lords.push_back("Cast Intruder Alarm {2}{u} [second copy: you already control Intruder"
+                            " Alarm; both stay on the battlefield - no legend rule, but the effect"
+                            " it gives your OTHER permanents is already on - this copy adds only"
+                            " its own abilities]");
+            bool tagL = false;
+            CHECK(!everyCastRowDead(lords, &tagL),
+                  "#W81-DM V13 MUST-NOT-MATCH the 'adds only its own abilities' face is a live row");
+            vector<string> freshTutor;
+            freshTutor.push_back("Cast Idyllic Tutor {2}{w} [finds only an enchantment card -"
+                                 " still in your library, not on your battlefield or in your hand:"
+                                 " Sanguine Bond]");
+            bool tagF = false;
+            CHECK(!everyCastRowDead(freshTutor, &tagF),
+                  "#W81-DM V13 MUST-NOT-MATCH a tutor with a fresh target left is a live row");
+            //MUST-NOT-MATCH: a tag-dead row does NOT rescue a menu that also
+            //holds a live row - the fold is still over EVERY row.
+            vector<string> mixedTag;
+            mixedTag.push_back(deadTutor);
+            mixedTag.push_back("Cast Damnation {2}{b}{b}" + liveV);
+            bool tagM = false;
+            CHECK(!everyCastRowDead(mixedTag, &tagM),
+                  "#W81-DM V13 MUST-NOT-MATCH one live row and the header stays silent");
+            //KEY STABILITY: the header is a menu-level sentence with no
+            //board-derived number in it beyond the cast-row COUNT the wave-57
+            //header already carried, so two menus differing only in the dead
+            //shape carry the same header bytes at the same count.
+            CHECK(allCastRowsDeadNote(true, 2, 0, true) == allCastRowsDeadNote(true, 2, 0, true),
+                  "#W81-DM V13 KEY the widened header is pure over its four inputs");
+            CHECK(stripNarrationDecoration(h22) == h22,
+                  "#W81-DM V13 ECHO the widened header carries no brace channel to strip");
+        }
         CHECK(everyCastRowDead(vector<string>()) == false,
               "#W57-C D12 NEGATIVE an empty menu is not an all-dead menu");
     }
@@ -80429,7 +81443,7 @@ static const char * kW50Y_r94 =
                   "#W60-M B13a POSITIVE `126v125` s48: the plan says \"No Exquisite Blood\" while"
                   " the battlefield line prints Exquisite Blood - the echo is withdrawn");
             CHECK(planContradictedBlock("Exquisite Blood")
-                  == "\nTHE PLAN YOU LAST STATED was withdrawn: it says you have no \"Exquisite Blood\", and the"
+                  == "\nWHAT YOU LAST WROTE was withdrawn: it says you have no \"Exquisite Blood\", and the"
                      " CURRENT SITUATION below shows \"Exquisite Blood\" on your own battlefield."
                      " State a fresh plan from the board as it is now.\n",
                   "#W60-M B13a ECHO the withdrawal names the claim, the board and what to do -"
@@ -91370,17 +92384,43 @@ static const char * kW50Y_r94 =
         //the colon. 10 of 1,910 wave-72 replies still opened `YOUR PLAN:` after
         //L11 took the colon off - what is copied is the only all-caps token on
         //the screen that names a plan.
-        CHECK(h == "\nTHE PLAN YOU LAST STATED (as you stated it, 1 window ago on turn 10) reads"
+        CHECK(h == "\nWHAT YOU LAST WROTE (as you wrote it, 1 window ago on turn 10) reads"
                    " \"Pass priority.\"\n",
-              "#W71-BR L11 REPRO 125v146 seq 49's heading, in the shape that is not a label");
+              "#W71-BR L11 / #W81-DM V16 REPRO 125v146 seq 49's heading, in the shape that is"
+              " not a label and no longer names a plan in caps");
         CHECK(h.find("YOUR PLAN:") == string::npos && h.find("PLAN:") == string::npos,
               "#W71-BR L11 MUST-NOT-MATCH no `PLAN:` and no `YOUR PLAN:` anywhere in the heading");
         CHECK(h.find("YOUR PLAN") == string::npos,
               "#W73-CA N17 MUST-NOT-MATCH the phrase the 10 echoes copied is not on the screen");
         //#W73-CA (N17) POSITIVE: the heading still names a plan, still quotes it,
         //and the two WITHDRAWAL headings drop the phrase with it.
-        CHECK(h.find("THE PLAN YOU LAST STATED") != string::npos,
-              "#W73-CA N17 the heading still names what it carries");
+        CHECK(h.find("WHAT YOU LAST WROTE") != string::npos,
+              "#W73-CA N17 / #W81-DM V16 the heading still names what it carries");
+        //#W81-DM (V16) MUST-NOT-MATCH, the item's own criterion: the token `PLAN`
+        //- the caps word the four deck125 deviations copied into the label slot -
+        //appears on NONE of the three faces. `PLAN:` was already absent (#W71-BR
+        //L11); it is the bare word that produced `THE PLAN: Hold priority...`.
+        CHECK(h.find("PLAN") == string::npos,
+              "#W81-DM V16 MUST-NOT-MATCH the carry heading contains no `PLAN` at all");
+        CHECK(planContradictedBlock("Exquisite Blood").find("PLAN") == string::npos,
+              "#W81-DM V16 MUST-NOT-MATCH the denial withdrawal contains no `PLAN` at all");
+        CHECK(planAssertedAbsentBlock("Exquisite Blood").find("PLAN") == string::npos,
+              "#W81-DM V16 MUST-NOT-MATCH the assertion withdrawal contains no `PLAN` at all");
+        //#W81-DM (V16) REPRO of `152` seq 111, the clearest deviation: the whole
+        //reply was the render's own heading sentence. That sentence can no longer
+        //be built from this screen, because the screen no longer says it.
+        CHECK(h.find("THE PLAN YOU LAST STATED") == string::npos,
+              "#W81-DM V16 REPRO 152 seq 111's echoed sentence is not on the screen to copy");
+        //#W81-DM (V16) POSITIVE: the #W73-CA quotation shape survives - a verb,
+        //then the plan in quotes, never `<CAPS>: <text>`.
+        CHECK(h.find(" reads \"Pass priority.\"") != string::npos
+              && h.find("WHAT YOU LAST WROTE:") == string::npos,
+              "#W81-DM V16 the heading is still a quotation after a verb, not a label");
+        //#W81-DM (V16) all three faces share ONE constant, so none can drift back.
+        CHECK(h.find(kEchoHeadWord) != string::npos
+              && planContradictedBlock("X").find(kEchoHeadWord) != string::npos
+              && planAssertedAbsentBlock("X").find(kEchoHeadWord) != string::npos,
+              "#W81-DM V16 the carry and both withdrawals render the one heading word");
         CHECK(planContradictedBlock("X").find("YOUR PLAN") == string::npos
               && planAssertedAbsentBlock("X").find("YOUR PLAN") == string::npos,
               "#W73-CA N17 the two withdrawal headings lose the phrase too");
@@ -103141,6 +104181,57 @@ static const char * kW50Y_r94 =
                   && drawPriceRowTag(1, 1, "Underworld Dreams", 19, false, 1, 2, "") == red,
               "#W80-DF U6 MUST-NOT-MATCH no discard in the cost, no discard punisher, or an"
               " unnamed one, and every wave-79 byte stands");
+
+        //#W81-DM (V17, wave-80 LOW-1). THE CYCLE SAYS IT DISCARDS WITH NO
+        //PUNISHER OUT. RED, `162v130` seqs 76-103: all 9 priced cycling rows read
+        //the draw half and NOTHING about the discard, because #W80-DF gated the
+        //whole clause on a discard PUNISHER; `a CYCLING cost is a discard`
+        //rendered 0 times in the entire wave-80 corpus.
+        cout << "\n[#W81-DM] V17 a cycling row says it discards even with no punisher\n";
+        {
+            const string noPun = drawPriceRowTag(1, 1, "Fate Unraveler", 19, false,
+                                                 1, 0, "", true);
+            cout << "     V17 cycling row:" << noPun << "\n";
+            CHECK(noPun.find("a CYCLING cost is a discard as well as a draw") != string::npos,
+                  "#W81-DM V17 REPRO 162v130 seqs 76-103: the row now says the cycle discards");
+            CHECK(noPun.find("which nothing on this board charges you life for") != string::npos,
+                  "#W81-DM V17 and says outright that no punisher prices it (#W76 R3: a clause"
+                  " with no life event names none)");
+            //MUST-NOT-MATCH, the clause carries NO life figure of its own: the
+            //resulting life is the DRAW half's, unchanged from wave 80.
+            const string drawOnly = drawPriceRowTag(1, 1, "Fate Unraveler", 19);
+            CHECK(noPun.find("you would be at 18]") != string::npos
+                  && drawOnly.find("you would be at 18]") != string::npos,
+                  "#W81-DM V17 MUST-NOT-MATCH the mechanism clause moves no number - the"
+                  " resulting life is the draw half's, to the byte");
+            //MUST-NOT-MATCH: a cycling row WITH a punisher takes #W80-DF's branch
+            //and is byte-identical to wave 80 - the two clauses never both print.
+            CHECK(green.find("which nothing on this board charges you life for") == string::npos
+                  && green.find("for 2 more") != string::npos,
+                  "#W81-DM V17 MUST-NOT-MATCH a punished cycle is byte-identical to wave 80");
+            //MUST-NOT-MATCH: a NON-cycling draw row prints nothing new - the
+            //clause is gated on the cost actually being a discard.
+            CHECK(drawPriceRowTag(1, 1, "Fate Unraveler", 19, false, 1, 0, "", false) == drawOnly
+                  && drawPriceRowTag(1, 1, "Fate Unraveler", 19, false, 0, 0, "", true)
+                         == drawOnly,
+                  "#W81-DM V17 MUST-NOT-MATCH no cycling cost and no discard -> wave-80 bytes");
+            //MUST-NOT-MATCH: a row that printed NO tag at all still prints none -
+            //the early return is untouched, so this adds no new brackets anywhere.
+            CHECK(drawPriceRowTag(0, 0, "", 19, false, 1, 0, "", true).empty()
+                  && drawPriceRowTag(1, 0, "", 19, false, 1, 0, "", true).empty(),
+                  "#W81-DM V17 MUST-NOT-MATCH a row with no priced half prints no bracket");
+            //Plural, and the count is the cost's own.
+            CHECK(drawPriceRowTag(2, 1, "Fate Unraveler", 19, false, 2, 0, "", true)
+                      .find("DISCARDS 2 cards (a CYCLING cost") != string::npos,
+                  "#W81-DM V17 the discard count is the cost's own and pluralises");
+            //ECHO: the bracket is stripped from the narrated record as before.
+            CHECK(stripNarrationDecoration("Cycle Starstorm" + noPun)
+                      == stripNarrationDecoration("Cycle Starstorm" + drawOnly)
+                  && stripNarrationDecoration("Cycle Starstorm" + noPun)
+                         .find("CYCLING cost") == string::npos,
+                  "#W81-DM V17 ECHO the clause leaves no residue in the narrated record - the"
+                  " narrated row is the same with it and without it");
+        }
         CHECK(drawPriceRowTag(0, 3, "Underworld Dreams", 19).empty()
                   && drawPriceRowTag(1, 3, "", 19).empty()
                   && drawPriceRowTag(0, 0, "", 19, false, 0, 0, "").empty(),
@@ -103430,6 +104521,94 @@ static const char * kW50Y_r94 =
               " echo carried the hold and not the cast it was completing");
         CHECK(w80CarriedPlanSteps(plan125, 1, true) == plan125,
               "#W80-DG U1 GREEN ...and the same one entry restores it");
+
+        //#W81-DM (V11, wave-80 known-bugs V11 / deck152 MED-1). THE TWO WINDOWS
+        //THAT ARRIVE AFTER THE CAST LATCH HAS ALREADY CLOSED.
+        cout << "\n[#W81-DM] V11 the carry keeps the step naming THIS window's choice\n";
+        {
+            //(1) `152v125` seqs 15 -> 16, the valor-counter menu. RED on base:
+            //    the latch is 0 here (the Adversary is already on the stack, so
+            //    #W80-DH F5 closed the cast step), so the pointer trims step 1 -
+            //    the cast AND this window's own counter - exactly as recorded.
+            const string plan152 = "Cast Intrepid Adversary and add 1 valor counter."
+                                   " Attack with Elite Spellbinder only to survive"
+                                   " Lightmine Field. Tap Katilda for mana in main 2.";
+            const string wave80Echo = w80CarriedPlanSteps(plan152, 1, false);
+            cout << "     V11 RED echo: " << wave80Echo << "\n";
+            CHECK(wave80Echo == "Attack with Elite Spellbinder only to survive Lightmine Field."
+                                " Tap Katilda for mana in main 2.",
+                  "#W81-DM V11 RED-ON-BASE 152v125 seq 16's echo, byte-exact: the cast clause"
+                  " and this window's own step are both gone");
+            //GREEN through the SAME entry the live caller uses, with the window's
+            //own tail - the valor menu, whose rows name the Adversary.
+            const string valorTail =
+                "1. Intrepid Adversary: add 1 valor counter [cost: {1}]\n"
+                "2. Intrepid Adversary: add 2 valor counters [cost: {1}{1}]\n"
+                "3. don't add any counter\n";
+            const string green152 = w80CarriedPlanSteps(plan152, 1, false, valorTail);
+            cout << "     V11 GREEN echo: " << green152 << "\n";
+            CHECK(green152 == plan152,
+                  "#W81-DM V11 GREEN the step naming Intrepid Adversary survives at the window"
+                  " that adds its counter");
+            //(2) `152v126` seqs 19 -> 20, the ETB TARGET window. The dropped
+            //    clause is the one naming the target the window is picking.
+            const string plan126 = "Cast Brutal Cathar to exile a Perimeter Captain, then level"
+                                   " Ranger Class to 2 with the remaining {G}.";
+            CHECK(w80CarriedPlanSteps(plan126, 1, false)
+                      == "then level Ranger Class to 2 with the remaining {G}.",
+                  "#W81-DM V11 RED-ON-BASE 152v126 seq 20's echo, byte-exact");
+            const string etbTail = "1. Perimeter Captain #1 (0/4) [their battlefield]\n"
+                                   "2. Pride Guardian #1 (0/3) [their battlefield]\n";
+            CHECK(w80CarriedPlanSteps(plan126, 1, false, etbTail) == plan126,
+                  "#W81-DM V11 GREEN the clause naming the target survives at the target window");
+            //MUST-NOT-MATCH: a window that names NOTHING from the passed step is
+            //byte-identical to wave 80 - the carry does not grow on every window.
+            const string otherTail = "1. Play Plains\n2. Play no land right now\n";
+            CHECK(w80CarriedPlanSteps(plan152, 1, false, otherTail) == wave80Echo
+                  && w80CarriedPlanSteps(plan126, 1, false, otherTail)
+                         == "then level Ranger Class to 2 with the remaining {G}.",
+                  "#W81-DM V11 MUST-NOT-MATCH an unrelated window carries the wave-80 bytes");
+            //MUST-NOT-MATCH: an EMPTY tail cannot reclaim anything, so every
+            //non-prompt caller of this entry is unchanged.
+            CHECK(w80CarriedPlanSteps(plan152, 1, false, string()) == wave80Echo,
+                  "#W81-DM V11 MUST-NOT-MATCH no window text, no reclaim");
+            //BOUNDED AT ONE STEP: a window naming a card from TWO steps back does
+            //not walk the pointer back twice - only the step just passed.
+            const string three = "Cast Intrepid Adversary and add 1 valor counter."
+                                 " Attack with Elite Spellbinder."
+                                 " Tap Katilda for mana in main 2.";
+            const string back2 = w80CarriedPlanSteps(three, 2, false, valorTail);
+            CHECK(back2 == "Tap Katilda for mana in main 2."
+                  && back2.find("Intrepid Adversary") == string::npos,
+                  "#W81-DM V11 the reclaim is bounded at ONE step - no walking back through"
+                  " a plan");
+            //The VERB that opens a step is never a name, so a window whose text
+            //merely contains "Cast" or "Attack" reclaims nothing.
+            CHECK(w80CarriedPlanSteps(plan152, 1, false, "1. Cast nothing right now\n")
+                      == wave80Echo,
+                  "#W81-DM V11 MUST-NOT-MATCH the step's opening verb is not an object name");
+            //And the two PASSING wave-80 pairs stay passing: their plans are ONE
+            //comma-joined step, so nothing is trimmed with or without this rule.
+            const string onePass = "Cast Intrepid Adversary, add 1 counter, attack with Moonrage"
+                                   " Brute, level Ranger Class in main 2.";
+            CHECK(w80CarriedPlanSteps(onePass, 1, false, valorTail) == onePass
+                  && w80CarriedPlanSteps(onePass, 1, false, string()) == onePass,
+                  "#W81-DM V11 the two wave-80 PASS pairs are untouched");
+            //The name extractor itself: the object, not the verb, not a number.
+            {
+                vector<string> names;
+                w81StepNameCandidates("Cast Brutal Cathar to exile a Perimeter Captain", names);
+                bool hasCathar = false, hasCaptain = false, hasCast = false;
+                for (size_t i = 0; i < names.size(); i++)
+                {
+                    if (names[i] == "Brutal Cathar") hasCathar = true;
+                    if (names[i] == "Perimeter Captain") hasCaptain = true;
+                    if (names[i] == "Cast") hasCast = true;
+                }
+                CHECK(hasCathar && hasCaptain && !hasCast,
+                      "#W81-DM V11 the extractor takes both objects and never the leading verb");
+            }
+        }
         // The step index itself: bounded at 0, and unchanged when nothing is pending.
         CHECK(w80EchoStepIndex(0, true) == 0 && w80EchoStepIndex(0, false) == 0
                   && w80EchoStepIndex(3, false) == 3 && w80EchoStepIndex(3, true) == 2,

@@ -1,0 +1,37 @@
+#W81-DM (V6), the half the wave-80 corpus actually recorded. This is the
+#`130v126` board verbatim: BOTH loop halves are on the OPPONENT's battlefield
+#and the pilot's own creature deals the opponent COMBAT damage.
+#
+#Their Exquisite Blood reads "whenever an OPPONENT loses life" - its opponent is
+#P1, who lost nothing - so it does not fire, their Sanguine Bond behind it never
+#gains an event, and no total moves except the damage itself. Zero triggers on
+#11 points of damage was RULES-CORRECT; V6's engine claim is a REFUTE and the
+#defect was the seat's own side-reading, not the engine or the render (the
+#`LOOP COMPLETE` line on `130v126` seq 42 already read "Their chain starts only
+#from life YOU lose or life THEY gain - life THEY lose does not enter it").
+#
+#The chain is bounded structurally: the only Exquisite Blood is on the side that
+#never gains, so no payload can re-enter and the test cannot loop.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Exquisite Blood,Sanguine Bond
+life:20
+[DO]
+next
+next
+Hill Giant
+next
+next
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Exquisite Blood,Sanguine Bond
+life:17
+[END]

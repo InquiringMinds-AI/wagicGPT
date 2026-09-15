@@ -1653,6 +1653,22 @@ private:
     int mOppLifeEventLost;
     int mOppLifeGainedAt[3];
     int mOppLifeLostAt[3];
+    //#W81-DM (V13, wave-80 deck123 HIGH-3): how many spells of THIS SEAT'S the
+    //opponent has countered this game, counted at the zone-change observer where
+    //the engine itself decides a departure was a counter - never inferred from a
+    //graveyard, because a counterspell can reach one without countering. Feeds
+    //`w81CounterspellsSeenLine`. `mCounterIntelRendered` is that line's RENDER
+    //counter and is incremented AT the render (wave-79 LESSON 1).
+    int mOppCounteredSpells;
+    int mCounterIntelRendered;
+    //#W81-DM (V12, wave-80 engine-seat MED-3): how many records this game were
+    //parsed as a MULTI-ROW answer reduced to its first row. The note itself has
+    //been on the record since wave 36 (`parse_note: multi_answer_first_taken`);
+    //what was missing is the game-level total, so a corpus reader had to grep
+    //2,135 records to find the two at `152` seqs 217/237. Incremented where the
+    //note is stamped onto the record, so the counter and its per-record trace
+    //are the SAME event and the join is `parse_note` on that seq.
+    int mMultiAnswerFirstTaken;
     //#W72-BW (M11): the same samples, read as a RISE - the opponent's life now
     //minus the oldest sample, and the turns between. Returns false (and leaves
     //both outputs 0) unless there are at least two samples spanning at least one
