@@ -458,6 +458,10 @@ public:
     //lines (menus/choosers the decision seams answer) instead of the
     //heuristic dice-roll lines - but only while an endpoint is live; the
     //Baka fallback needs the heuristic lines intact.
+    //#W82-EE (audit-2026-09 item 6): this seat answers menus through
+    //DecisionManager::applyMenuChoice, so it is the seat that arms the
+    //declined-face latch and the one FindCardToPlay must consult.
+    virtual bool usesDeclinedFaceLatch() const { return true; }
     virtual bool isInteractiveAI() const
     {
         return !mEndpoint.empty();

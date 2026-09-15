@@ -1,0 +1,45 @@
+#NAME: The forced-pass fingerprint MOVES when the seat makes mana (#W82-ED, item 5)
+#DESC: Act's forced-pass floor may only fire on a PROVEN identical state, never on
+#DESC: a count of iterations: CR 117.3d makes a pass out of a player who "chooses
+#DESC: not to take any actions", so a pass forced over a state that actually moved
+#DESC: takes a window the seat was using.
+#DESC: The wave-71 fingerprint was turn/phase, both life totals, four zone counts
+#DESC: per seat, the stack depth and the armed menu's name - and nothing else.
+#DESC: Astra F05: "It omits mana, tapped state, counters, abilities, control, card
+#DESC: identities, exile, command zone, and reveal. Productive counter placement or
+#DESC: mana production can therefore look like NO PROGRESS." A repeat of a
+#DESC: fingerprint that cannot see the work IS a count of iterations in disguise.
+#DESC: The digest now carries every battlefield card's identity, tapped/phased/
+#DESC: summoning state, live P/T and counter total, both mana pools, the contents
+#DESC: of hand/graveyard/exile/command/reveal by id, and the seat's own LEGAL
+#DESC: ACTION SET from the engine's oracle.
+#DESC: WITNESS: tapping a Mountain for mana is exactly the "productive repeated
+#DESC: activation" the brief names. No fixture can pump the 200 identical ticks the
+#DESC: floor needs, but the property the floor rests on is checkable directly.
+#DESC: RED on base (wagic-fixaudit-base): the fingerprint is byte-identical after
+#DESC: the mana ability - "assertprobemoved: expected 1 got 0" (the base binary has
+#DESC: neither command, and nothing else in the fixture moves, so it fails on the
+#DESC: unchanged hand/battlefield assertion instead - see fix-lane.md).
+#DESC: GREEN: the fingerprint moves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Raging Goblin
+life:20
+[PLAYER2]
+life:20
+[DO]
+probesnap
+Mountain
+assertprobemoved 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Raging Goblin
+manapool:{R}
+life:20
+[PLAYER2]
+life:20
+[END]

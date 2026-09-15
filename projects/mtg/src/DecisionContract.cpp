@@ -529,6 +529,10 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
             continue;
         if (slot <= 0)
             continue;
+        //#W82-EF (audit-2026-09, crash A): never index mObjects with a row id
+        //that the layer no longer holds - see ActionLayer::getMenuControlId.
+        if ((size_t) slot >= object->mObjects.size())
+            continue;
         MTGAbility * ab = (MTGAbility *) object->mObjects[slot];
         req.optionTexts.push_back(ab ? ab->getMenuText() : string("(option)"));
         req.menuIndices.push_back((int) k);

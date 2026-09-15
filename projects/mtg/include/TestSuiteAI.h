@@ -234,6 +234,10 @@ public:
     //interactive AI so the reveal resolves the interactive way (aicode
     //substitute skipped, MTGRevealingCards display driven by
     //driveInteractiveReveal) - faithfully mirroring the live AIPlayerGPT path.
+    //#W82-EE (audit-2026-09 item 6): this seat answers menus through
+    //DecisionManager::applyMenuChoice, so it is the seat that arms the
+    //declined-face latch and the one FindCardToPlay must consult.
+    virtual bool usesDeclinedFaceLatch() const { return true; }
     virtual bool isInteractiveAI() const
     {
         //#W54-R: `aipending` latches this seat onto the live-LLM branch of the

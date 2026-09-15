@@ -1472,6 +1472,68 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action == "probesnap" || action.find("assertprobemoved ") == 0)
+    {
+        //#W82-ED (audit-2026-09 item 5): the forced-pass floor may only fire on a
+        //PROVEN identical state, so its fingerprint has to MOVE whenever the seat
+        //made progress. Astra F05: the wave-71 fingerprint "omits mana, tapped
+        //state, counters, abilities, control, card identities, exile, command zone,
+        //and reveal", so a mana ability used twice - real progress, CR 117.3d's
+        //"chooses not to take any actions" plainly false - looked like NO PROGRESS.
+        //No fixture can pump the 200 identical ticks the floor needs, but the
+        //property the floor RESTS ON is checkable directly: snapshot the
+        //fingerprint, do the productive thing, and require it to have changed.
+        //Syntax: `probesnap` then, after the action, `assertprobemoved <0|1>`.
+        static std::string sProbeSnap;
+        std::string now = this->menuPassProbe();
+        if (action == "probesnap")
+        {
+            sProbeSnap = now;
+        }
+        else
+        {
+            int expect = atoi(action.substr(17).c_str());
+            int got = (now != sProbeSnap) ? 1 : 0;
+            if (got != expect)
+            {
+                std::cerr << "TESTSUITE assertprobemoved: expected " << expect << " got " << got
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+        }
+    }
+    else if (action.find("assertedictchoice ") == 0)
+    {
+        //#W82-EA (audit-2026-09 item 1): was the stale-victim sacrifice RE-OPENED
+        //to the sacrificing player, and to WHICH seat? The engine used to pick the
+        //lowest-toughness body itself, which is a rules regression a human seat
+        //feels (CR 608.2d: the player announces the choice while the effect is
+        //applied) and which no zone assertion can see - the outcome of an
+        //auto-pick and of a seat that happens to agree with it are identical.
+        //Syntax: assertedictchoice <none|p1|p2> [count]
+        extern Player * gEdictRechoiceOwner;
+        extern int gEdictRechoicesOffered;
+        string rest = action.substr(18);
+        string want = rest;
+        int wantCount = -1;
+        size_t sp = rest.find(' ');
+        if (sp != string::npos)
+        {
+            want = rest.substr(0, sp);
+            wantCount = atoi(rest.substr(sp + 1).c_str());
+        }
+        Player * got = gEdictRechoiceOwner;
+        string gotName = !got ? "none" : (got == observer->players[0] ? "p1" : "p2");
+        if (gotName != want || (wantCount >= 0 && gEdictRechoicesOffered != wantCount))
+        {
+            std::cerr << "TESTSUITE assertedictchoice: expected owner '" << want
+                      << "' got '" << gotName << "'"
+                      << (wantCount >= 0 ? (", expected count " + std::to_string(wantCount)
+                                            + " got " + std::to_string(gEdictRechoicesOffered)) : "")
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertcantarget ") == 0)
     {
         //#W75-CK (P4): can the target chooser the engine is CURRENTLY waiting on
@@ -1671,6 +1733,184 @@ int TestSuiteAI::Act(float)
                       << " menu entries got " << gotCount << " [" << suite->filename << "]" << std::endl;
             for (size_t i = 0; i < gotTexts.size(); i++)
                 std::cerr << "TESTSUITE assertabilitycount:   '" << gotTexts[i] << "'" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
+    else if (action.find("assertdetachedcardland ") == 0)
+    {
+        //#W82-EH (audit-2026-09 item 8, crash B). The four cores - 393716 /
+        //395840 on master, 474128 / 478112 reproduced by this lane's own A/B run -
+        //are one frame: MayAbility::Update arms a menu on its source,
+        //ActionLayer::setMenuObject asks every element
+        //`isReactingToTargetClick(source)`, and a land's CAN_PLAY_LAND row
+        //reaches LegalActionsOracle::canPlayLandNow ->
+        //MTGCardInstance::StackIsEmptyandSorcerySpeed, whose FIRST line is
+        //`getObserver()->isInterrupting`. In core 478112 the subject is a card
+        //with an empty name and a NULL observer (the engine's own log calls it
+        //`StackAbility. (Source: )`).
+        //Ask exactly that question of a card detached from its observer. Before
+        //the rail this does not fail - it SEGFAULTS the run, which is the crash
+        //itself; after it, the honest answer is "no, that card is in no game".
+        //Syntax: assertdetachedcardland <card name>
+        string cname = action.substr(23);
+        MTGCardInstance * card = getCard(cname);
+        if (!card)
+        {
+            std::cerr << "TESTSUITE assertdetachedcardland: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        GameObserver * keep = card->getObserver();
+        card->setObserver(NULL);
+        bool got = LegalActionsOracle::canPlayLandNow(card, observer->currentlyActing());
+        card->setObserver(keep);
+        if (got)
+        {
+            std::cerr << "TESTSUITE assertdetachedcardland: '" << cname
+                      << "' answered PLAYABLE while attached to no game"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
+    else if (action.find("assertmultichoicestaleid ") == 0)
+    {
+        //#W82-EF (audit-2026-09, crash A - SIGABRT core 397278, heuristic seat):
+        //`vector::_M_range_check: __n (which is 248) >= this->size()` at
+        //AIPlayerBaka::selectMenuOption, `object->mObjects[slot]`, with `slot`
+        //taken from ActionLayer::getMenuControlId. A MULTIPLE-CHOICE menu's rows
+        //all carry the SAME id - `mObjects.size()-1` captured by
+        //setCustomMenuObject when the menu was armed - and getMenuControlId
+        //short-circuited on isMultipleChoice and handed that id back as a slot
+        //with no bounds test. The layer compacts under an armed menu (every
+        //removeFromGame erases from the middle), so the id outlives the vector
+        //it indexed. Reproduce exactly that and require the lookup to REFUSE.
+        //Syntax: assertmultichoicestaleid <card name>
+        string cname = action.substr(25);
+        MTGCardInstance * card = getCard(cname);
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (!card || al->mObjects.size() < 2)
+        {
+            std::cerr << "TESTSUITE assertmultichoicestaleid: no card '" << cname
+                      << "' or too few action-layer elements [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //One row, armed at the layer's current tail (what setCustomMenuObject does).
+        vector<MTGAbility *> opts;
+        opts.push_back((MTGAbility *) al->mObjects[al->mObjects.size() - 1]);
+        al->setCustomMenuObject(card, true, opts, "stale id witness");
+        size_t before = al->mObjects.size();
+        //Now shrink the layer under the armed menu: the captured id becomes a
+        //position the vector no longer has.
+        size_t removed = 0;
+        while (al->mObjects.size() > 1 && removed < 2)
+        {
+            if (!al->moveToGarbage((ActionElement *) al->mObjects[al->mObjects.size() - 1]))
+                break;
+            removed++;
+        }
+        if (!removed || al->mObjects.size() >= before)
+        {
+            std::cerr << "TESTSUITE assertmultichoicestaleid: could not shrink the action layer"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        int slot = -1;
+        bool accepted = al->getMenuControlId(0, slot);
+        if (accepted && slot >= 0 && (size_t) slot >= al->mObjects.size())
+        {
+            std::cerr << "TESTSUITE assertmultichoicestaleid: getMenuControlId accepted a stale"
+                      << " multiple-choice row id as slot " << slot << " with mObjects.size() "
+                      << al->mObjects.size() << " - indexing it is the F1 abort"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        al->menuObject = 0;
+        al->currentActionCard = NULL;
+        return 1;
+    }
+    else if (action.find("assertexpiredmenu ") == 0)
+    {
+        //#W82-EG (audit-2026-09 item 4; Astra F07). A MANDATORY menu is
+        //noncancelable by construction, so when every one of its rows leaves the
+        //game there is no answer left to give and the layer stays armed for ever
+        //- it holds priority, and with it the phase. Astra F07: "If all rows of a
+        //noncancelable menu expire, skipping/re-asking them does not reconstruct
+        //the underlying menu. The code leaves it armed."
+        //Build exactly that: arm a MUST menu on the card, remove every reacting
+        //ability, then pump one ActionLayer::Update - the tick on which the
+        //engine next looks at the menu. After the fix the menu is rebuilt from
+        //the current legal set, and when that set is empty it CLOSES.
+        //Syntax: assertexpiredmenu <card name>
+        string cname = action.substr(18);
+        MTGCardInstance * card = getCard(cname);
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (!card)
+        {
+            std::cerr << "TESTSUITE assertexpiredmenu: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        al->setMenuObject(card, true); //MANDATORY: no Cancel row exists
+        int armedRows = 0;
+        for (size_t i = 0; i < al->abilitiesMenu->mObjects.size(); i++)
+            if (al->abilitiesMenu->mObjects[i]->GetId() > 0)
+                armedRows++;
+        if (!armedRows)
+        {
+            std::cerr << "TESTSUITE assertexpiredmenu: '" << cname
+                      << "' armed no real ability row [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //Every row leaves the game - the shape a resolved trigger produces.
+        bool again = true;
+        while (again)
+        {
+            again = false;
+            for (size_t i = 0; i < al->abilitiesMenu->mObjects.size(); i++)
+            {
+                int slot = al->abilitiesMenu->mObjects[i]->GetId();
+                if (slot <= 0 || (size_t) slot >= al->mObjects.size())
+                    continue;
+                ActionElement * doomed = (ActionElement *) al->mObjects[slot];
+                if (!doomed || !doomed->isReactingToTargetClick(card))
+                    continue;
+                al->moveToGarbage(doomed);
+                again = true;
+                break;
+            }
+        }
+        //Is any answer reachable right now? (Before the tick: no.)
+        int answerable = 0;
+        for (size_t i = 0; al->abilitiesMenu && i < al->abilitiesMenu->mObjects.size(); i++)
+        {
+            int slot = 0;
+            if (al->getMenuControlId((int) i, slot))
+                answerable++;
+        }
+        al->Update(0);
+        int afterRows = 0;
+        for (size_t i = 0; al->menuObject && al->abilitiesMenu
+                           && i < al->abilitiesMenu->mObjects.size(); i++)
+        {
+            int slot = 0;
+            if (al->getMenuControlId((int) i, slot))
+                afterRows++;
+        }
+        const bool stuck = (al->menuObject != NULL) && (afterRows == 0);
+        if (stuck)
+        {
+            std::cerr << "TESTSUITE assertexpiredmenu: '" << cname
+                      << "' left a MANDATORY menu armed with no answerable row ("
+                      << armedRows << " row(s) armed, " << answerable
+                      << " answerable before the tick, " << afterRows << " after)"
+                      << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }
         return 1;
@@ -2370,6 +2610,11 @@ void TestSuite::initGame(GameObserver* g)
     //TestSuiteGame constructor's - flag it here too so the ASPHASES
     //auto-skips stay off for scripted cadences
     g->mSuiteGame = true;
+    //#W82-EA (audit-2026-09 item 1): the edict re-choice witness is per-GAME.
+    extern Player * gEdictRechoiceOwner;
+    extern int gEdictRechoicesOffered;
+    gEdictRechoiceOwner = NULL;
+    gEdictRechoicesOffered = 0;
     //Suite scripts encode MENU GEOMETRY: the kicker ask-first default adds a
     //"cast with kicker" entry to every kickable card's menu, shifting every
     //scripted `choice N` on those cards. Pin the legacy always-pay behaviour
@@ -3332,6 +3577,11 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     filename = _filename;
     observer = new GameObserver();
     observer->mSuiteGame = true; //keep ASPHASES auto-skips off even after `ai` flips playModes
+    //#W82-EA (audit-2026-09 item 1): the edict re-choice witness is per-GAME.
+    extern Player * gEdictRechoiceOwner;
+    extern int gEdictRechoicesOffered;
+    gEdictRechoiceOwner = NULL;
+    gEdictRechoicesOffered = 0;
     //same menu-geometry pin as the main-thread suite path (see TestSuite::initGame)
     options[Options::KICKERPAYMENT].number = OptionKicker::KICKER_ALWAYS;
 

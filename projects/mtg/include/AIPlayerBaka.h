@@ -304,6 +304,14 @@ public:
     int mDeclinedFaceLatches = 0; //observable count (translog / fixtures)
     void latchDeclinedFace(MTGCardInstance * card);
     bool faceDeclinedThisTurn(MTGCardInstance * card);
+    //#W82-EE (audit-2026-09 item 6): DOES THIS SEAT ARM THE DECLINE LATCH?
+    //Only a seat that answers menus through DecisionManager::applyMenuChoice can
+    //(the GPT seat and the scripted TestSuiteAI seat); ordinary Baka answers menus
+    //straight through ActionLayer and never reaches the latch, so it must not pay
+    //for it either - faceDeclinedThisTurn built a declineWindowProbe() string per
+    //land candidate per main-phase tick on a machine where that is the Vita's
+    //444 MHz ARM. Default is NO-OP; the arming seats override.
+    virtual bool usesDeclinedFaceLatch() const { return false; }
     //The window key: turn, phase and both seats' zone counts and life. Excludes the
     //menu name (the menu is open when the decline is given and closed when the
     //proposer asks again) and the stack, so the fingerprint is about the BOARD.

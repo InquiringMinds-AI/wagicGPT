@@ -7879,6 +7879,15 @@ MTGAbility::~MTGAbility()
     //MTGAbility::mRegistryCard
     if (mRegistryCard)
         mRegistryCard->unregisterAbility(this);
+    //#W82-EH (audit-2026-09 item 8, crash B). ...and leave the ACTION LAYER too.
+    //ActionLayer.h: "registration and ownership are decoupled (a parent's
+    //destructor deletes children that are still registered)" - so an ability can
+    //be freed while the layer is still holding and Updating it. Core 474128 is
+    //exactly that: a MayAbility at mObjects[i] whose storage had already been
+    //handed to another allocation, dereferenced through its stale `source`.
+    //See ActionLayer::forgetElement - bookkeeping only, no destroy().
+    if (game && game->mLayers && game->mLayers->actionLayer())
+        game->mLayers->actionLayer()->forgetElement(this);
     SAFE_DELETE(mCost);
 }
 

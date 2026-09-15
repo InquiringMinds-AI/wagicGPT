@@ -102,6 +102,12 @@ public:
     //stays armed and the engine re-asks); on success `slot` is the ability's
     //CURRENT index in mObjects, re-pointed if the vector was compacted.
     bool getMenuControlId(int menuIndex, int & slot);
+    //#W82-EG (audit-2026-09 item 4): a MANDATORY menu every one of whose rows has
+    //left the game is unanswerable - it is noncancelable by construction. Rebuild
+    //it from the abilities reacting to its subject NOW, and close it only when
+    //that set is empty (no legal answer exists to remove). Returns true when it
+    //acted. Ordinary cancelable menus are untouched.
+    bool rebuildExpiredMandatoryMenu();
     bool getLiveMenuSlot(int controlid, int & slot);
     TargetChooser * getCurrentTargetChooser();
     void setCurrentWaitingAction(ActionElement * ae);
@@ -132,6 +138,14 @@ public:
     //Called with the doomed cards still ALIVE, so an evicted ability's
     //destroy() contract runs exactly as it would have at any other time.
     int purgeDeadReferences(MTGGameZone * zone);
+    //#W82-EH (audit-2026-09 item 8): the same sweep for ONE card, for cards
+    //freed outside the garbage zone (the `previous` chain ~MTGCardInstance
+    //deletes itself).
+    int purgeDeadReferencesForCard(MTGCardInstance * doomed);
+    //#W82-EH (audit-2026-09 item 8, crash B): called from ~MTGAbility. Whatever
+    //deleted the ability, its pointer leaves every index this layer holds before
+    //the storage is reused - registration bookkeeping only, no destroy().
+    void forgetElement(ActionElement * e);
 
 protected:
     ActionElement * currentWaitingAction;

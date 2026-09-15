@@ -606,7 +606,13 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
     }
     if (JGE_BTN_SEC == key || JGE_BTN_PREV == key || JGE_BTN_NEXT == key || JGE_BTN_MENU == key)//android back button
     {
-        if (tc && (tc->targetMin == false || tc->maxtargets == TargetChooser::UNLITMITED_TARGETS))
+        //#W82-EC (audit-2026-09 item 3): ...or the pick is a SEARCH that may
+        //legally fail to find (CR 701.23b). Without this a `target(<1>enchant-
+        //ment|reveal)` search had no reachable "find nothing" answer at all:
+        //BTN_NEXT with zero targets fell through every branch below and the
+        //reveal sat until the stall guard voided the resolved spell.
+        if (tc && (tc->targetMin == false || tc->maxtargets == TargetChooser::UNLITMITED_TARGETS
+                   || searchMayFailToFind()))
         {
             tc->done = true;
             tc->autoChoice = false;
@@ -750,6 +756,52 @@ bool revealChooserCanDecline(bool targetMin, int maxtargets)
     return !targetMin || maxtargets == TargetChooser::UNLITMITED_TARGETS;
 }
 
+//#W82-EC (audit-2026-09 item 3, Astra F04). A SEARCH MAY LEGALLY FAIL TO FIND.
+//
+//  CR 701.23b: "If a player is searching a hidden zone for cards with a stated
+//  quality, such as a card with a certain card type or color, that player isn't
+//  required to find some or all of those cards even if they're present in that
+//  zone."
+//
+//Idyllic Tutor ("Search your library for an enchantment card, reveal it, and put
+//it into your hand. Then shuffle." - mtg.txt:57032, matching Scryfall) is exactly
+//that shape, and its own script carries the failed-search outcome: optiontwo is
+//`bottomoflibrary ... and!( all(*|reveal) bottomoflibrary and!(shuffle)! )!`, the
+//library put back and shuffled. The engine had no way to REACH it - the chooser
+//is `target(<1>enchantment|reveal)`, so targetMin is set and a zero-target
+//BTN_NEXT fell through every branch of CheckUserInput - and the wave-67 repair
+//answered that by clicking the first legal card for the player. That takes a card
+//the player may legally decline. The repair here is the other direction: make the
+//empty answer REACHABLE, which is the option the rules give and the engine was
+//missing.
+//
+//Both halves are required. An UNQUALIFIED search ("search your library for a
+//card") must find one if it is there (701.23a leaves no permission to fail), and
+//looking at a PUBLIC zone is not a search at all - so `*|reveal` over a revealed
+//hand keeps the old mandatory behaviour untouched.
+static bool revealSearchMayFailToFind(bool fromHiddenZone, bool statedQuality)
+{
+    return fromHiddenZone && statedQuality;
+}
+
+bool MTGRevealingCards::searchMayFailToFind()
+{
+    TargetChooser * tc = ownChooser();
+    if (!tc || !playerForZone || !playerForZone->game)
+        return false;
+    //Hidden zone the player is searching: their own library. (A revealed HAND is
+    //hidden too, but showing it is not a search - no `search` effect parks a hand
+    //in the reveal zone behind a qualified chooser.)
+    const bool fromHiddenZone = (RevealFromZone == playerForZone->game->library);
+    //A stated quality = the chooser names one. A bare `*` builds a plain
+    //TargetZoneChooser (TargetChooserFactory: `typeName.compare("*") == 0`);
+    //every qualified spec builds a type, descriptor or card chooser.
+    const bool statedQuality = (dynamic_cast<TypeTargetChooser *>(tc) != NULL)
+                               || (dynamic_cast<DescriptorTargetChooser *>(tc) != NULL)
+                               || (dynamic_cast<CardTargetChooser *>(tc) != NULL);
+    return revealSearchMayFailToFind(fromHiddenZone, statedQuality);
+}
+
 //#W54-F (D7a): the reveal driver's STALL GUARD.
 //
 //WHY. An open reveal display is held by GameObserver::OpenedDisplay and blocks
@@ -863,6 +915,49 @@ void MTGRevealingCards::forceCloseStalledReveal(const char * why)
             + std::to_string(stranded) + " revealed card"
             + (stranded == 1 ? "" : "s") + " to your library so the game could continue",
             stranded, "reveal_stall_forced");
+}
+
+//#W82-EB (audit-2026-09 item 2, Astra F03 / Fable G32). CLOSE A PARKED REVEAL.
+//
+//A reveal of the library physically MOVES its cards into the player's `reveal`
+//zone, which by the rules never happened - CR 701.20b: "Revealing a card doesn't
+//cause it to leave the zone it's in." The wave-69 repair papered over the
+//consequence at DRAW time (MTGGameZones::drawFromLibrary pulled one parked card
+//back so the draw would not read the emptied library as the deck-out of CR
+//704.5b). That is a symptom patch on a shared path: the stalled reveal - a
+//payload that never resolved - is still stalled afterwards, the library is still
+//mis-modelled for every other reader, and a genuine deck-out becomes silently
+//survivable for as long as any card sits parked.
+//
+//This is the resolution instead: the reveal that owns those cards is CLOSED
+//(its options leave the action layer and its cards go back where they came from,
+//through the reveal's own force-close path), and whatever the library then says
+//is the truth - including the deck-out, if the library really is empty.
+//Returns the number of reveals closed. Declared in MTGGameZones.cpp.
+int closeParkedRevealsInto(GameObserver * g, MTGGameZone * revealZone)
+{
+    if (!g || !revealZone || !g->mLayers)
+        return 0;
+    ActionLayer * al = g->mLayers->actionLayer();
+    if (!al)
+        return 0;
+    int closed = 0;
+    bool again = true;
+    while (again)
+    {
+        again = false;
+        for (size_t i = 0; i < al->mObjects.size(); i++)
+        {
+            MTGRevealingCards * r = dynamic_cast<MTGRevealingCards *>((ActionElement *) al->mObjects[i]);
+            if (!r || r->zone != revealZone || r->mAIForceClosed)
+                continue;
+            r->forceCloseStalledReveal("parked across a draw");
+            closed++;
+            again = true;
+            break;
+        }
+    }
+    return closed;
 }
 
 //#W55-E (D5a): the wall floor for the POLL-CHURN budget, sized off the seat's
@@ -1338,7 +1433,15 @@ void MTGRevealingCards::driveInteractiveRevealStep()
         //EVERY path into a zero-target mandatory chooser (the model seam's own
         //degrade lives in AIPlayerGPT::decideReveal); it is never reached while a
         //decline is legal, and it removes no window and no option.
-        if (!clicked && ownChooser()
+        //#W82-EC (audit-2026-09 item 3, Astra F04): ...EXCEPT where the rules
+        //give the player the empty answer. A search of a hidden zone for a card
+        //with a stated quality may fail to find (CR 701.23b), and the seat's
+        //refusal is then a legal outcome the engine must be able to COMPLETE,
+        //not one it may overrule. The finalize below now reaches option two
+        //(Idyllic Tutor's own `all(*|reveal) bottomoflibrary and!(shuffle)!`),
+        //which is precisely the failed search the rule describes. The floor
+        //stays for every mandatory chooser the rules really do compel.
+        if (!clicked && ownChooser() && !searchMayFailToFind()
             && !revealChooserCanDecline(ownChooser()->targetMin, ownChooser()->maxtargets))
         {
             for (int i = 0; i < zone->nb_cards; i++)
@@ -6752,6 +6855,13 @@ ActivatedAbility(observer, id, card, _cost, 0),type(type),effect(effect),who(who
     mainAbility = NULL;
 }
 
+//#W82-EA (audit-2026-09 item 1). The seat the last edict re-choice was handed to,
+//and how many have been handed out this process. Two words of state, written only
+//on the re-choice path; read by the test suite's `assertedictchoice`, which is the
+//only instrument that can see a choice OFFERED rather than an outcome taken.
+Player * gEdictRechoiceOwner = NULL;
+int gEdictRechoicesOffered = 0;
+
 int AADynamic::resolve()
 {
     Damageable * _target = (Damageable *) target;
@@ -6811,11 +6921,35 @@ int AADynamic::resolve()
         && amountsource == DYNAMIC_MYTGT_AMOUNT
         && dynamic_cast<AASacrificeCard *>(storedAbility)) //the EDICT shape, F1
     {
+        //#W82-EA (audit-2026-09 item 1, Astra F02 / Fable G17). THE RE-CHOICE IS
+        //THE SACRIFICING PLAYER'S, NOT THE ENGINE'S. The lowest-toughness pick
+        //this replaces was a rules regression with a HUMAN face on it: Tribute to
+        //Hunger's Oracle is "Target opponent sacrifices a creature OF THEIR
+        //CHOICE", and CR 608.2d - "If an effect of a spell or ability offers any
+        //choices other than choices already made as part of casting the spell ...
+        //the player announces these while applying the effect" - puts that choice
+        //in the sacrificing player's hands at resolution. An engine heuristic can
+        //take the owner's combo piece over the body they would have given up.
+        //So when the stored victim can no longer be sacrificed, the effect ARMS A
+        //REAL CHOOSER owned by that player (TargetChooser::Owner is the engine's
+        //own routing for "this pick belongs to that seat" - GameObserver::Update
+        //hands them the action) over a clone of this very payload: whoever they
+        //pick is sacrificed by activateStored and pays its own toughness, exactly
+        //as the ordinary single-copy case does. Human seats get the same chooser
+        //UI a plain `sacrifice` uses; AI seats answer it with their own
+        //chooseCard/chooseTarget. Nothing is removed and nothing is auto-answered.
+        //STALE is also wider than "not in play" (Astra F02): a victim that is
+        //phased out is treated as though it does not exist (CR 702.26b), and one
+        //that has become unsacrificeable cannot be sacrificed at all (CR 701.21a)
+        //- in both cases no sacrifice can be made from it, so the choice re-opens.
         MTGCardInstance * victim = dynamic_cast<MTGCardInstance *>(_target);
-        if (victim && game && !victim->isInPlay(game))
+        const bool victimUsable = victim && game && victim->isInPlay(game)
+                                  && !victim->isPhased
+                                  && !victim->has(Constants::CANTBESACRIFIED);
+        if (victim && game && !victimUsable)
         {
-            MTGCardInstance * replacement = NULL;
             Player * owner = victim->controller();
+            vector<MTGCardInstance *> cands;
             if (owner && owner->game && owner->game->battlefield)
             {
                 MTGGameZone * z = owner->game->battlefield;
@@ -6826,16 +6960,62 @@ int AADynamic::resolve()
                         continue;
                     if (cand->has(Constants::CANTBESACRIFIED))
                         continue;
-                    if (!replacement || cand->toughness < replacement->toughness)
-                        replacement = cand;
+                    if (cand->isPhased) //CR 702.26b
+                        continue;
+                    if (cand->mutation && cand->parentCards.size() > 0)
+                        continue; //AASacrificeCard refuses these outright
+                    cands.push_back(cand);
                 }
             }
-            if (!replacement)
+            if (cands.empty())
                 return 0; //nothing left to sacrifice: no life is owed
-            DebugTrace("W71-BS: edict re-chose " << replacement->getName()
-                       << " - its stored victim " << victim->getName() << " is already gone");
-            target = replacement;         //activateStored copies this into the sacrifice
-            _target = replacement;
+            if (cands.size() == 1)
+            {
+                //One legal answer. Asking would offer a menu with a single row;
+                //taking it removes no choice the player had.
+                DebugTrace("W82-EA: edict re-targets " << cands[0]->getName()
+                           << " - the only sacrifice its controller can make");
+                target = cands[0];        //activateStored copies this into the sacrifice
+                _target = cands[0];
+            }
+            else
+            {
+                TargetChooserFactory tcf(game);
+                TargetChooser * tc = tcf.createTargetChooser("creature|mybattlefield", cands[0]);
+                if (tc)
+                {
+                    if (tc->targetter)
+                        tc->targetter->bypassTC = true;
+                    tc->targetter = NULL;   //notaTarget: the edict does not target the creature
+                    tc->Owner = owner;      //...and THIS seat answers it
+                    AADynamic * again = this->clone();
+                    again->resolvingFromStackAbility = false; //the clone resolves with a live victim
+                    again->target = NULL;
+                    again->oneShot = 1;
+                    MTGAbility * choose = NEW GenericTargetAbility(game, "", "", this->GetId(),
+                                                                   source, tc, again);
+                    MTGAbility * armed = NEW MayAbility(game, this->GetId(), choose, source, true);
+                    armed->oneShot = 0;
+                    //The seat the choice was HANDED TO, for the suite's
+                    //assertedictchoice: "a real chooser was presented to the
+                    //sacrificing player" is the human-facing claim, and it is
+                    //invisible to every zone assertion (a human seat cannot be
+                    //driven headlessly, but the chooser it would answer is this
+                    //same object).
+                    gEdictRechoiceOwner = owner;
+                    gEdictRechoicesOffered++;
+                    DebugTrace("W82-EA: edict re-opens the sacrifice choice for "
+                               << owner->getDisplayName() << " (" << cands.size()
+                               << " legal creatures) - its stored victim "
+                               << victim->getName() << " can no longer be sacrificed");
+                    armed->addToGame();
+                    return 1;
+                }
+                //No chooser could be built: fall back to the only thing that is
+                //certainly legal rather than paying life for nothing.
+                target = cands[0];
+                _target = cands[0];
+            }
         }
     }
     if(amountsource == 2)

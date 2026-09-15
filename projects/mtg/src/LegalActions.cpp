@@ -248,6 +248,12 @@ bool LegalActionsOracle::canPlayLandNow(MTGCardInstance * card, Player * actor)
 {
     if (!card)
         return false;
+    //#W82-EH (audit-2026-09 item 8, crash B): a card that is attached to no game
+    //observer is not in a game - every gate below asks about ITS game. This is
+    //the outer half of the rail in MTGCardInstance::StackIsEmptyandSorcerySpeed;
+    //see the comment there for the four cores.
+    if (!card->getObserver())
+        return false;
     Player * ctrl = card->controller();
     if (!ctrl)
         return false;
