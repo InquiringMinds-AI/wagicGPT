@@ -30,7 +30,21 @@
 #DESC: RED with the engine hunk reverted (the wave-82 menuPassProbe body, this
 #DESC: lane's suite commands in place): "assertprobemoved: expected 1 got 0" on the
 #DESC: counter step.
-#DESC: GREEN: the fingerprint moves on both.
+#DESC: #W84-GE (review-2 item 3): AND ON THE PLAYER-LEVEL COUNTERS. AAAlterEnergy::
+#DESC: resolve moves `Player::energyCount` without touching a zone, a card or a mana
+#DESC: pool, so a second energy gain left the whole wave-83 fingerprint unchanged
+#DESC: and read as "no progress" - CR 117.3d makes a pass out of a player who
+#DESC: "chooses not to take any actions", which that player plainly did not. Energy,
+#DESC: experience and poison are now in the digest. The same pass also replaces the
+#DESC: activated-ability scan: it asked every layer element `isReactingToClick`,
+#DESC: which for a GenericTargetAbility is NOT a pure reader (it can allocate and
+#DESC: replace the ability's chooser), so the probe mutated the layer it was
+#DESC: measuring. It now asks LegalActionsOracle::usableAbilityCards, the engine's
+#DESC: own legality query, and records each usable ability's TARGET-SET SIZE.
+#DESC: The last step is that purity check: taking the probe twice with nothing
+#DESC: happening in between must give the same answer.
+#DESC: GREEN: the fingerprint moves on mana, on a counter, and on energy - and does
+#DESC: not move on itself.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -47,6 +61,11 @@ assertprobemoved 1
 probesnap
 addcounter Grizzly Bears
 assertprobemoved 1
+probesnap
+addenergy p1
+assertprobemoved 1
+probesnap
+assertprobemoved 0
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]

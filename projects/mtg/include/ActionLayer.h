@@ -152,11 +152,14 @@ public:
     //deleted the ability, its pointer leaves every index this layer holds before
     //the storage is reused - registration bookkeeping only, no destroy().
     void forgetElement(ActionElement * e);
-    //#W83-FF (fix-review item 7): true while cleanGarbage() is deleting the whole
-    //garbage vector. Every one of those destructors re-enters forgetElement, and
-    //each walk of `garbage` made the sweep quadratic; nothing that survives the
-    //sweep can name an entry of a vector that is being emptied wholesale.
-    bool mSweepingGarbage;
+    //#W84-GB (review-2 item 1): the garbage entry cleanGarbage() is deleting RIGHT
+    //NOW, and nothing else. That one object skips the `garbage` walk in
+    //forgetElement (its slot is nulled on the next statement and the vector is
+    //cleared straight after), which is the whole quadratic term; every other
+    //object - in particular an ability a garbage entry's destructor deletes
+    //recursively - is bookkept in full. The wave-83 version was a blanket flag and
+    //suppressed deregistration for those children, which is a lifetime hazard.
+    ActionElement * mGarbageEntryBeingDeleted;
 
 protected:
     ActionElement * currentWaitingAction;

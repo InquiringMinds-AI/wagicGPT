@@ -38,6 +38,16 @@ public:
     GamePhase newPhase;
     int modal;
     int waitingForAnswer;
+    //#W84-GB (review-2 item 1): has this element EVER been registered in a
+    //GuiLayer? Set once by GuiLayer::Add and never cleared - an element that has
+    //left mObjects can still sit in the action layer's `garbage`, so "not in
+    //mObjects" is not "not referenced". False therefore means "no container of
+    //any layer has ever held this pointer", which is the common case by a wide
+    //margin (every parse-time template and every clone deleted without being
+    //added), and lets ActionLayer::forgetElement answer in O(1) for it instead of
+    //walking the live layer. The old test was "all containers empty", which is
+    //never true during play.
+    bool mEverRegistered;
     virtual void Update(float){}
     virtual void Render(){}
     virtual int testDestroy()

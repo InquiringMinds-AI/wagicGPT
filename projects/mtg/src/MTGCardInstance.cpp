@@ -53,6 +53,7 @@ MTGCardInstance MTGCardInstance::NoCard = MTGCardInstance();
 MTGCardInstance::MTGCardInstance() :
     CardPrimitive(), MTGCard(), Damageable(0, 0), view(NULL)
 {
+    mRevealAboveCount = -1; //#W84-GD (review-2 item 4), also set by initMTGCI
     initMTGCI();
 }
 MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to) :
@@ -62,6 +63,7 @@ MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to
       if(arg_belongs_to->owner)
         observer = arg_belongs_to->owner->getObserver();
 
+    mRevealAboveCount = -1; //#W84-GD (review-2 item 4), also set by initMTGCI
     initMTGCI();
     model = card;
     attacker = 0;
@@ -388,6 +390,7 @@ void MTGCardInstance::initMTGCI()
     nb_damages = 0;
     X = 0;
     setX = -1;
+    mRevealAboveCount = -1; //#W84-GD (review-2 item 4): not parked
     sample = "";
     sampleResolved = false;
     model = NULL;

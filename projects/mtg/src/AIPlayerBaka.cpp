@@ -3199,6 +3199,13 @@ std::string AIPlayerBaka::menuPassProbe()
         if (!p || !p->game)
             continue;
         o << '|' << p->life;
+        //#W84-GE (review-2 item 3): the player-level counters the digest could not
+        //see. AAAlterEnergy::resolve moves `energyCount` and AAAlterExperience
+        //`experienceCount` without touching a zone, a card or a mana pool, so a
+        //second energy gain left the whole fingerprint unchanged and read as "no
+        //progress" - CR 117.3d makes a pass out of a player who "chooses not to
+        //take any actions", which that player plainly did not.
+        o << 'e' << p->energyCount << 'x' << p->experienceCount << 'p' << p->poisonCount;
         ManaCost * pool = p->getManaPool();
         o << ',' << (pool ? pool->getConvertedCost() : 0);
         if (pool)
@@ -3265,16 +3272,99 @@ std::string AIPlayerBaka::menuPassProbe()
         //ability becoming available (a creature losing summoning sickness, a cost
         //becoming payable, a limit resetting) is progress the zone digest cannot
         //see, and it is the class the floor most needs to respect.
+        //#W84-GE (review-2 item 3): read that through the ORACLE, not through
+        //`isReactingToClick`. GenericTargetAbility::isReactingToClick is not a pure
+        //reader - it can allocate and replace the ability's target chooser - so the
+        //wave-83 scan MUTATED the layer it was measuring, on every floor tick.
+        //LegalActionsOracle::usableAbilityCards is the engine's own legality query
+        //for exactly this question and answers it without touching anything.
+        //Each usable card also carries the SIZE OF ITS ABILITY'S TARGET SET, so an
+        //otherwise-unchanged ability whose legal targets grew or shrank counts as
+        //progress (the review's "available target sets ... for an otherwise
+        //unchanged ability").
         o << ";A";
-        if (al)
-            for (size_t k = 0; k < al->mObjects.size(); k++)
+        {
+            std::set<MTGCardInstance *> usable = LegalActionsOracle::usableAbilityCards(this);
+            for (std::set<MTGCardInstance *>::iterator it = usable.begin(); it != usable.end(); ++it)
             {
-                MTGAbility * a = dynamic_cast<MTGAbility *>(al->mObjects[k]);
-                if (!a || !a->source || a->source->controller() != this)
+                MTGCardInstance * c = *it;
+                o << ',' << (const void *) c;
+                if (!al)
                     continue;
-                if (a->isReactingToClick(a->source, NULL))
-                    o << ',' << (const void *) a;
+                for (size_t k = 0; k < al->mObjects.size(); k++)
+                {
+                    ActionElement * ae = (ActionElement *) al->mObjects[k];
+                    MTGAbility * ab = dynamic_cast<MTGAbility *>(ae);
+                    if (!ab || ab->source != c)
+                        continue;
+                    if (TargetChooser * atc = ae->chosenTargets())
+                        o << 't' << atc->countValidTargets();
+                }
             }
+        }
+    }
+    return o.str();
+}
+
+//#W84-GE (review-2 item 3). WHAT THE SEAT WAS OFFERED AND DID NOT TAKE.
+//
+//  CR 117.3d: "If a player has priority and chooses not to take any actions, that
+//  player passes."
+//
+//Fingerprint equality says the STATE did not move. It does not say the seat was
+//offered anything, nor that it refused what it was offered - and the floor's whole
+//justification is "passing removes nothing it was going to use". So the floor now
+//needs a second, independent fact: the same set of NON-MANA rows was on the table
+//on every tick of the stall and none of them was taken.
+//
+//Mana abilities are excluded deliberately. A tappable land is available on every
+//tick of every window; it is not an action a seat "declines", and counting it
+//would make every stall look like a refusal of something. What remains - castable
+//spells, land drops, and permanents with a usable non-mana activated ability - is
+//the set whose loss a forced pass would actually cost.
+//
+//The decline itself is not inferred from the fingerprint: this runs inside Act's
+//EMPTY-CLICKSTREAM branch, after computeActions has had its turn, so by
+//construction the seat queued no action this tick. A run of such ticks over an
+//unchanged offered set is a recorded refusal of every row in it.
+std::string AIPlayerBaka::menuPassOfferedSet()
+{
+    if (!observer)
+        return std::string();
+    std::ostringstream o;
+    BakaManaPolicy policy(this);
+    ManaCost * pool = getManaPool();
+    vector<LegalActionsOracle::Cast> casts = LegalActionsOracle::legalCasts(this, policy, pool, false);
+    vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
+    for (size_t i = 0; i < casts.size(); i++)
+        o << 'c' << (const void *) casts[i].card << (casts[i].viaAlternative ? 'a' : '.');
+    for (size_t i = 0; i < lands.size(); i++)
+        o << 'l' << (const void *) lands[i].card;
+    ActionLayer * al = observer->mLayers ? observer->mLayers->actionLayer() : NULL;
+    std::set<MTGCardInstance *> usable = LegalActionsOracle::usableAbilityCards(this);
+    for (std::set<MTGCardInstance *>::iterator it = usable.begin(); it != usable.end(); ++it)
+    {
+        MTGCardInstance * c = *it;
+        //Mana-only permanents are not a refusable row. `ActionLayer::manaObjects`
+        //is the engine's own index of abilities that make mana, so a card every
+        //one of whose layer abilities sits in that index makes mana and nothing
+        //else.
+        bool nonManaRow = false;
+        if (al)
+            for (size_t k = 0; k < al->mObjects.size() && !nonManaRow; k++)
+            {
+                MTGAbility * ab = dynamic_cast<MTGAbility *>(al->mObjects[k]);
+                if (!ab || ab->source != c)
+                    continue;
+                bool isMana = false;
+                for (size_t m = 0; m < al->manaObjects.size() && !isMana; m++)
+                    if (al->manaObjects[m] == al->mObjects[k])
+                        isMana = true;
+                if (!isMana)
+                    nonManaRow = true;
+            }
+        if (nonManaRow)
+            o << 'a' << (const void *) c;
     }
     return o.str();
 }
@@ -5918,12 +6008,39 @@ int AIPlayerBaka::Act(float dt)
         //advance the stall run - a menu being answered productively must not.
         bool stalled = false;
         if (menuAnswered && mMenuPassHold >= kMenuPassHoldMax)
-            stalled = menuPassNoProgress(menuPassProbe(), mMenuPassProbe, mMenuPassProbeRun,
-                                         kMenuPassNoProgressMax);
+        {
+            //#W84-GE (review-2 item 3): TWO independent facts, not one. The state
+            //has to be identical (the fingerprint) AND the same non-mana rows have
+            //to have been on the table, untaken, for the whole run (the offered
+            //set). Either one alone is not the property CR 117.3d describes.
+            const bool sameState = menuPassNoProgress(menuPassProbe(), mMenuPassProbe,
+                                                      mMenuPassProbeRun, kMenuPassNoProgressMax);
+            const std::string offered = menuPassOfferedSet();
+            bool sameRefusal;
+            if (offered.empty() || offered != mMenuPassOffered)
+            {
+                mMenuPassOffered = offered;
+                mMenuPassDeclineRun = 0;
+                sameRefusal = false;
+            }
+            else
+            {
+                mMenuPassDeclineRun++;
+                sameRefusal = (mMenuPassDeclineRun >= kMenuPassNoProgressMax);
+            }
+            //An EMPTY offered set is not a refusal of anything; that case is the
+            //hasAnyLegalAction arm's business, not the no-progress arm's.
+            stalled = sameState && sameRefusal;
+            if (sameState && !sameRefusal)
+                DebugTrace("AIPLAYER: the board fingerprint repeated but the offered"
+                           " non-mana rows did not - not treating this as a stall");
+        }
         else if (!menuAnswered)
         {
             mMenuPassProbe.clear();
             mMenuPassProbeRun = 0;
+            mMenuPassOffered.clear();
+            mMenuPassDeclineRun = 0;
         }
         if (!menuAnswered)
             mMenuPassHold = 0;

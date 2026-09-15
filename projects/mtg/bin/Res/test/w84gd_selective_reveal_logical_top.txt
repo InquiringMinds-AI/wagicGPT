@@ -1,0 +1,38 @@
+#NAME: A selectively parked card is not the logical top (#W84-GD, review-2 item 4)
+#DESC: The wave-83 draw took the FIRST card parked out of this library, which is
+#DESC: right only when the reveal parked a contiguous run from the top. A SELECTIVE
+#DESC: reveal does not: `revealtype(dwarf|mylibrary)` (Dwarven Recruiter,
+#DESC: mtg.txt:33376) walks the library and parks only the Dwarves, leaving every
+#DESC: non-Dwarf exactly where it was - including above the first parked Dwarf.
+#DESC:   CR 121.1 "A player draws a card by putting the top card of their library
+#DESC:   into their hand."
+#DESC:   CR 701.20b "Revealing a card doesn't cause it to leave the zone it's in."
+#DESC: So the draw was owed the non-Dwarf, and the wave-83 code handed it the Dwarf.
+#DESC: FIX: each parked card records how many library cards were still above it
+#DESC: when it was parked, and only a card with nothing above it is the logical
+#DESC: top; a physical draw brings the ones below it one step closer.
+#DESC: WITNESS: library is Dwarven Grunt with Grizzly Bears ON TOP of it. The peek
+#DESC: parks the Grunt and leaves the Bears. `drawcard 1 1` drives
+#DESC: MTGPlayerCards::drawFromLibrary directly.
+#DESC: RED on base (master + review commit): the parked Dwarf is drawn -
+#DESC: "Card ID not the same. Didn't find 155" (Grizzly Bears) in hand.
+#DESC: GREEN: Grizzly Bears is drawn and the Dwarf stays parked.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Selective Deadend Peek
+library:Craw Wurm,Dwarven Grunt,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Selective Deadend Peek
+drawcard 1 1
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Selective Deadend Peek
+hand:Grizzly Bears
+library:Craw Wurm
+reveal:Dwarven Grunt
+[PLAYER2]
+[END]

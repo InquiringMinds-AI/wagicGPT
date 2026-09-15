@@ -1426,3 +1426,6 @@ w83fa_edict_no_protection_bypass.txt
 w83fa_edict_unsacrificeable_never_pays.txt
 w83fb_mulch_is_not_a_search.txt
 w83fc_partial_library_logical_top.txt
+w84gb_garbage_child_deregistered.txt
+w84gc_edict_seat_is_the_targeted_player.txt
+w84gd_selective_reveal_logical_top.txt

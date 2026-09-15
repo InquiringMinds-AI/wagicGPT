@@ -32,6 +32,11 @@ void GuiLayer::Add(JGuiObject *object)
     if(!object)
         return;
     mObjects.push_back(object);
+    //#W84-GB (review-2 item 1): from here on this pointer may be held by a
+    //layer container, so its destructor has to un-register it. See
+    //ActionElement::mEverRegistered and ActionLayer::forgetElement.
+    if (ActionElement * ae = dynamic_cast<ActionElement *>(object))
+        ae->mEverRegistered = true;
     AbilityFactory af(observer);
 
     MTGAbility * a = dynamic_cast<MTGAbility*>(object);

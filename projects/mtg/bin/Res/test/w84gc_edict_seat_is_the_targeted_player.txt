@@ -1,0 +1,60 @@
+#NAME: An edict is sacrificed by the TARGETED player, not by whoever now controls
+#NAME: the pre-selected creature (#W84-GC, review-2 item 2)
+#DESC: The wave-83 gate took the sacrificing seat from `victim->controller()` and
+#DESC: then checked that the victim was controlled by that same player, which is
+#DESC: true by construction - the control test was circular and could not detect
+#DESC: "the targeted player no longer controls this creature".
+#DESC:   CR 701.21a "To sacrifice a permanent, its controller moves it from the
+#DESC:   battlefield directly to its owner's graveyard. A player can't sacrifice
+#DESC:   something that isn't a permanent, or something that's a permanent they
+#DESC:   don't control."
+#DESC: Tribute to Hunger (mtg.txt:124074) instructs the TARGET OPPONENT to
+#DESC: sacrifice. The engine fixes the victim when the granted ability goes on the
+#DESC: stack, and a battlefield-to-battlefield control change inside that window
+#DESC: keeps the same object and only moves `lastController` - which is exactly what
+#DESC: `controller()` returns - so nothing else in the effect notices.
+#DESC: FIX: the seat is the granted ability's own controller. ATargetedAbilityCreator
+#DESC: builds `ability$!...!$ targetedplayer` on a dummy card whose owner and
+#DESC: lastController ARE the targeted player, and this ability's `source` is that
+#DESC: dummy. The lifegain recipient likewise comes from the ability (its dummy's
+#DESC: storedSourceCard is the granter), not from the victim's current controller.
+#DESC: WITNESS: P1 casts Tribute at P2; P2's seat pre-selects Craw Wurm; P1 then
+#DESC: takes control of Craw Wurm before the ability resolves (`givecontrol`, which
+#DESC: does what the engine's own control change does).
+#DESC: RED on base (master + review commit): Craw Wurm is sacrificed off P1's
+#DESC: battlefield - "Card number not the same in player 0's battlefield, expected
+#DESC: 1, got 0" - and P2 keeps Grizzly Bears.
+#DESC: GREEN: P2 sacrifices from its OWN battlefield (Grizzly Bears), the stolen
+#DESC: Craw Wurm is untouched, and P1 - whose spell it is - gains the life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tribute to Hunger
+manapool:{2}{B}
+life:20
+[PLAYER2]
+inplay:Craw Wurm,Grizzly Bears
+life:20
+[DO]
+Tribute to Hunger
+p2
+ai
+givecontrol Craw Wurm
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Craw Wurm
+graveyard:Tribute to Hunger
+life:22
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

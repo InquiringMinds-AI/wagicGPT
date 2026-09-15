@@ -272,6 +272,15 @@ public:
     static bool menuPassNoProgress(const std::string & probe, std::string & lastProbe,
                                    int & run, int maxRun);
     std::string menuPassProbe(); //the fingerprint itself (visible state + armed menu)
+    //#W84-GE (review-2 item 3): the NON-MANA rows the seat is being offered right
+    //now - castable spells, land drops, permanents with a usable non-mana
+    //activated ability. The forced pass needs this as well as the fingerprint: an
+    //identical state proves nothing moved, an identical offered set across the
+    //whole run proves the seat was given those rows and took none of them, and
+    //only both together match CR 117.3d's "chooses not to take any actions".
+    std::string menuPassOfferedSet();
+    std::string mMenuPassOffered;
+    int mMenuPassDeclineRun = 0;
     int mMenuPassProbeRun = 0;
     int mMenuPassNoProgress = 0; //how many times the no-progress arm forced the pass
     static const int kMenuPassNoProgressMax = 200;

@@ -14,6 +14,7 @@ ActionElement::ActionElement(int id) :
     currentPhase = MTG_PHASE_INVALID;
     newPhase = MTG_PHASE_INVALID;
     tc = NULL;
+    mEverRegistered = false; //#W84-GB (review-2 item 1)
 }
 
 ActionElement::ActionElement(const ActionElement& a): JGuiObject(a)
@@ -24,6 +25,8 @@ ActionElement::ActionElement(const ActionElement& a): JGuiObject(a)
     newPhase = a.newPhase;
     modal = a.modal;
     waitingForAnswer = a.waitingForAnswer;
+    //#W84-GB: a CLONE has not been registered anywhere, whatever its template was.
+    mEverRegistered = false;
 }
 
 ActionElement::~ActionElement()

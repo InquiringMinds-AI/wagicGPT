@@ -232,29 +232,44 @@ void ActionLayer::forgetElement(ActionElement * e)
 {
     if (!e)
         return;
-    //#W83-FF (fix-review item 7): BOUND THE SCANS.
-    //(a) cleanGarbage() deletes every entry of `garbage`, and each of those
-    //destructors re-entered here and walked the whole `garbage` vector again -
-    //theta(G^2) on a shared path, on a 444 MHz Vita. While that sweep is running
-    //the vector is being emptied wholesale and no entry of it can be named by
-    //anything that survives, so the bookkeeping is skipped entirely.
-    //(b) an ability that was never registered (every parse-time template and
-    //every clone that is deleted without being added) is the common case by a
-    //wide margin, and an empty layer has nothing to un-register it from.
-    if (mSweepingGarbage)
+    //#W83-FF (fix-review item 7) / #W84-GB (review-2 item 1): BOUND THE SCANS
+    //WITHOUT SUPPRESSING THE BOOKKEEPING.
+    //
+    //The wave-83 bound was a GLOBAL flag held for the whole of cleanGarbage(),
+    //and that was a new lifetime hazard, not an optimisation. cleanGarbage runs
+    //during ordinary play (GameObserver::Update), and a garbage entry's
+    //destructor RECURSIVELY DELETES ABILITIES IT OWNS - MayAbility::~MayAbility
+    //frees its clone, GenericTargetAbility::~GenericTargetAbility its nested
+    //ability. Those children are not the entry being swept: one can still be in
+    //mObjects (its freed address then stays in the LIVE layer), can occupy a
+    //LATER garbage slot (which the sweep would then delete a second time), or can
+    //be the menu's row, a mana producer, or the waiting action. Suppressing their
+    //deregistration is precisely the class this facility exists to close.
+    //
+    //So the exemption is PER-OBJECT and covers exactly one container: while the
+    //sweep is deleting entry X, X itself skips the `garbage` walk - its own slot
+    //is being nulled by SAFE_DELETE on the very next statement and the vector is
+    //cleared straight after. That is the whole theta(G^2) term. Everything else
+    //X touches, and EVERYTHING a recursively deleted child touches, is bookkept
+    //normally.
+    //
+    //The second bound is the common case: an element that was never registered in
+    //any layer (every parse-time template, every clone deleted without being
+    //added) has nothing to un-register from, and says so in O(1). The wave-83
+    //version tested "all containers empty", which is never true during play.
+    if (!e->mEverRegistered)
         return;
-    if (mObjects.empty() && garbage.empty() && manaObjects.empty()
-        && menuRowElements.empty() && mDestroying.empty())
-        return;
+    const bool isSweptEntry = (e == mGarbageEntryBeingDeleted);
     for (size_t k = 0; k < menuRowElements.size(); k++)
         if (menuRowElements[k] == e)
             menuRowElements[k] = NULL;
     for (size_t k = 0; k < mDestroying.size(); k++)
         if (mDestroying[k] == e)
             mDestroying[k] = NULL;
-    for (size_t k = 0; k < garbage.size(); k++)
-        if (garbage[k] == e)
-            garbage[k] = NULL;
+    if (!isSweptEntry)
+        for (size_t k = 0; k < garbage.size(); k++)
+            if (garbage[k] == e)
+                garbage[k] = NULL;
     for (size_t k = 0; k < manaObjects.size(); k++)
         if (manaObjects[k] == e)
         {
@@ -281,15 +296,18 @@ void ActionLayer::forgetElement(ActionElement * e)
 
 void ActionLayer::cleanGarbage()
 {
-    //#W83-FF (fix-review item 7): see forgetElement. The whole vector is going
-    //away, so its entries' destructors must not each re-walk it.
-    mSweepingGarbage = true;
+    //#W84-GB (review-2 item 1): see forgetElement. Only the entry CURRENTLY being
+    //deleted skips the `garbage` walk - its slot is nulled by the SAFE_DELETE on
+    //this line and the vector is cleared below. Anything its destructor deletes
+    //recursively is a different object and is bookkept in full, including its own
+    //later garbage slot, which is what stops the sweep deleting it twice.
     for (size_t i = 0; i < garbage.size(); ++i)
     {
+        mGarbageEntryBeingDeleted = garbage[i];
         SAFE_DELETE(garbage[i]);
+        mGarbageEntryBeingDeleted = NULL;
     }
     garbage.clear();
-    mSweepingGarbage = false;
 }
 
 int ActionLayer::reactToClick(ActionElement * ability, MTGCardInstance * card)
@@ -998,7 +1016,7 @@ ActionLayer::ActionLayer(GameObserver *observer)
     stuffHappened = 0;
     currentWaitingAction = NULL;
     cantCancel = 0;
-    mSweepingGarbage = false; //#W83-FF (fix-review item 7)
+    mGarbageEntryBeingDeleted = NULL; //#W84-GB (review-2 item 1)
 }
 
 ActionLayer::~ActionLayer()

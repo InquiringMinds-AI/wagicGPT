@@ -1892,6 +1892,106 @@ int TestSuiteAI::Act(float)
         al->currentActionCard = NULL;
         return 1;
     }
+    else if (action.find("addenergy ") == 0)
+    {
+        //#W84-GE (review-2 item 3): move a player's ENERGY count and nothing else.
+        //AAAlterEnergy::resolve does exactly this; it touches no zone, no card and
+        //no mana pool, which is why the wave-83 pass fingerprint could not see it.
+        //Syntax: addenergy <p1|p2>
+        string who = action.substr(10);
+        Player * p = (who.find("p2") != string::npos) ? observer->players[1] : observer->players[0];
+        p->energyCount++;
+        DebugTrace("TESTSUITE addenergy: " << (p == observer->players[0] ? "p1" : "p2")
+                   << " energy is now " << p->energyCount);
+        return 1;
+    }
+    else if (action == "assertgarbagechildderegistered")
+    {
+        //#W84-GB (review-2 item 1). THE RECURSIVE-CHILD SHAPE, built from the
+        //engine's own destructors.
+        //cleanGarbage() runs during ordinary play (GameObserver::Update), and a
+        //garbage entry's destructor deletes abilities it OWNS - MayAbility's
+        //`SAFE_DELETE(ability)`, GenericTargetAbility's likewise. Those children are
+        //not the entry being swept, and they can still be registered in the LIVE
+        //layer. The wave-83 bound was a blanket flag held across the whole sweep, so
+        //forgetElement returned immediately for them too and their freed addresses
+        //stayed in mObjects.
+        //Build exactly that: a child ability registered in the layer, a MayAbility
+        //that owns it also registered, the parent moved to garbage, then the sweep.
+        //Then ask - by POINTER IDENTITY ONLY, never a dereference, because on the
+        //broken path that pointer is freed - whether the child left the layer.
+        ActionLayer * al = observer->mLayers->actionLayer();
+        MTGCardInstance * host = NULL;
+        for (int i = 0; i < observer->players[0]->game->inPlay->nb_cards && !host; i++)
+            host = observer->players[0]->game->inPlay->cards[i];
+        if (!host)
+        {
+            std::cerr << "TESTSUITE assertgarbagechildderegistered: no permanent to host the"
+                      << " witness abilities [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        AbilityFactory af(observer);
+        MTGAbility * child = af.parseMagicLine("{0}:name(child row) life:1 controller",
+                                               0, NULL, host);
+        if (!child)
+        {
+            std::cerr << "TESTSUITE assertgarbagechildderegistered: could not build the child"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        child->addToGame();                       //the child is REGISTERED
+        MayAbility * parent = NEW MayAbility(observer, 0, child, host, true);
+        parent->addToGame();
+        const void * childAddr = (const void *) child;
+        al->moveToGarbage(parent);                //parent leaves mObjects, enters garbage
+        al->cleanGarbage();                       //~MayAbility deletes the child
+        int stillRegistered = -1;
+        for (size_t k = 0; k < al->mObjects.size(); k++)
+            if ((const void *) al->mObjects[k] == childAddr)
+            {
+                stillRegistered = (int) k;
+                break;
+            }
+        if (stillRegistered >= 0)
+        {
+            std::cerr << "TESTSUITE assertgarbagechildderegistered: a garbage entry's"
+                      << " recursively deleted child is STILL registered at mObjects["
+                      << stillRegistered << "] - the layer is holding freed storage"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            //Do not leave the dangling pointer behind for the rest of the run.
+            al->mObjects.erase(al->mObjects.begin() + stillRegistered);
+        }
+        return 1;
+    }
+    else if (action.find("givecontrol ") == 0)
+    {
+        //#W84-GC (review-2 item 2): hand a battlefield permanent to the other
+        //player, keeping the same object - which is what the engine's own
+        //battlefield-to-battlefield control change does (it moves `lastController`
+        //and nothing else, and `MTGCardInstance::controller()` returns that field).
+        //That is the state an edict's pre-selected victim can be in when the effect
+        //finally resolves. Syntax: givecontrol <card name>
+        string cname = action.substr(12);
+        MTGCardInstance * c = getCard(cname);
+        if (!c || !c->controller())
+        {
+            std::cerr << "TESTSUITE givecontrol: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        Player * from = c->controller();
+        Player * to = from->opponent();
+        MTGCardInstance * moved = to->game->putInZone(c, from->game->inPlay, to->game->inPlay);
+        if (moved)
+            moved->lastController = to;
+        DebugTrace("TESTSUITE givecontrol: " << cname << " now controlled by "
+                   << (to == observer->players[0] ? "p1" : "p2"));
+        return 1;
+    }
     else if (action.find("addcounter ") == 0)
     {
         //#W83-FG (fix-review item 8): put ANOTHER counter of an existing kind on a
