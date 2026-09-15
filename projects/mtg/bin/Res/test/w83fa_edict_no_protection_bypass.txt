@@ -1,0 +1,73 @@
+#NAME: An edict re-choice must not leave a shroud bypass on a survivor (#W83-FA)
+#DESC: fix-review item 1. The wave-82 edict re-choice built its chooser with a
+#DESC: SURVIVING CREATURE as the chooser's card. TargetChooser's constructor sets
+#DESC: `targetter = card`, so the `targetter->bypassTC = true` used to express
+#DESC: "this chooser does not target" MUTATED THAT CREATURE, and clearing
+#DESC: `tc->targetter` afterwards does not undo it. TargetChooser.cpp then returns
+#DESC: `targetter->bypassTC` for shroud, protection and opposing hexproof:
+#DESC:   CR 702.18a "Shroud is a static ability. 'Shroud' means 'This permanent or
+#DESC:   player can't be the target of spells or abilities.'"
+#DESC:   CR 702.11b "'Hexproof' on a permanent means 'This permanent can't be the
+#DESC:   target of spells or abilities your opponents control.'"
+#DESC: So a creature the player did NOT sacrifice kept a permanent bypass of its
+#DESC: own shroud - a rules regression OUTSIDE the sacrifice effect, on the
+#DESC: human-facing seat.
+#DESC: FIX: EdictSacrificeChooser has no targetter at all (a sacrifice is not
+#DESC: targeting, CR 701.21a) and answers eligibility from the sacrificing player's
+#DESC: live battlefield, so no card is ever written to.
+#DESC: WITNESS: P2 holds Lexicon Tough Shroud Witness (7/7, shroud) FIRST on its
+#DESC: battlefield plus two plain creatures, so the second Tribute re-opens the
+#DESC: choice with three candidates. P1 has a Prodigal Sorcerer ({T}: 1 damage to
+#DESC: any target) whose own chooser is the opposing targeted ability the rules must
+#DESC: protect against. After the re-choice NO creature may carry bypassTC and the
+#DESC: shroud creature must be untargetable wherever it ended up.
+#DESC: RED: measured directly, not through this fixture. On the heuristic seat the
+#DESC: mutated card (`cands[0]`) is also the one the heuristic sacrifices, so a
+#DESC: scripted game cannot show a SURVIVING bypass - the mutation is only visible
+#DESC: at the moment the chooser is built. Measured on a build carrying the wave-82
+#DESC: construction plus one trace line, on this exact board:
+#DESC:   "W83-FA-PROBE: after building the wave-82 re-choice chooser,
+#DESC:    cands[0]='Hill Giant' bypassTC=1 (it is the chooser's targetter and a card
+#DESC:    the player may keep)"
+#DESC: This fixture is the standing REGRESSION PIN for that invariant: it fails the
+#DESC: moment any re-choice leaves a bypass behind on a card that is still around.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer
+hand:Tribute to Hunger,Tribute to Hunger
+manapool:{4}{B}{B}
+life:20
+[PLAYER2]
+inplay:Lexicon Tough Shroud Witness,Grizzly Bears,Hill Giant
+life:20
+[DO]
+Tribute to Hunger
+p2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+asserttargetbypass 0 Lexicon Tough Shroud Witness
+asserttargetbypass 0 Grizzly Bears
+asserttargetbypass 0 Hill Giant
+assertcantarget 0 lexicon tough shroud witness via Prodigal Sorcerer
+assertedictchoice p2 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer
+graveyard:Tribute to Hunger,Tribute to Hunger
+life:29
+[PLAYER2]
+inplay:*
+graveyard:*,*
+life:19
+[END]

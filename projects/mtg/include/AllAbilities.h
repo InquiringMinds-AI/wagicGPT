@@ -5621,6 +5621,9 @@ string menu;
     int resolve();
     int activateMainAbility(MTGAbility * toActivate,MTGCardInstance * source , Damageable * target);
     int activateStored();
+    //#W83-FA (fix-review item 5): the EDICT shape, in one place - a
+    //`mytgt toughnesslifegain` payload that carries its own sacrifice.
+    bool isEdictShape() const;
     const string getMenuText();
     AADynamic * clone() const;
     ~AADynamic();

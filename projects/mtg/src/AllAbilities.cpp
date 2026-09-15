@@ -756,32 +756,52 @@ bool revealChooserCanDecline(bool targetMin, int maxtargets)
     return !targetMin || maxtargets == TargetChooser::UNLITMITED_TARGETS;
 }
 
-//#W82-EC (audit-2026-09 item 3, Astra F04). A SEARCH MAY LEGALLY FAIL TO FIND.
+//#W82-EC (audit-2026-09 item 3, Astra F04) / #W83-FB (fix-review item 2).
+//A SEARCH MAY LEGALLY FAIL TO FIND - BUT ONLY A SEARCH.
 //
+//  CR 701.23a: "To search for a card in a zone, look at ALL cards in that zone
+//  (even if it's a hidden zone) and find a card that matches the given
+//  description."
 //  CR 701.23b: "If a player is searching a hidden zone for cards with a stated
-//  quality, such as a card with a certain card type or color, that player isn't
-//  required to find some or all of those cards even if they're present in that
-//  zone."
+//  quality ... that player isn't required to find some or all of those cards even
+//  if they're present in that zone."
+//  CR 701.23d: "If a player is searching a hidden zone simply for a quantity of
+//  cards, such as 'a card' or 'three cards,' that player must find that many
+//  cards (or as many as possible ...)."
 //
 //Idyllic Tutor ("Search your library for an enchantment card, reveal it, and put
-//it into your hand. Then shuffle." - mtg.txt:57032, matching Scryfall) is exactly
-//that shape, and its own script carries the failed-search outcome: optiontwo is
-//`bottomoflibrary ... and!( all(*|reveal) bottomoflibrary and!(shuffle)! )!`, the
-//library put back and shuffled. The engine had no way to REACH it - the chooser
-//is `target(<1>enchantment|reveal)`, so targetMin is set and a zero-target
-//BTN_NEXT fell through every branch of CheckUserInput - and the wave-67 repair
-//answered that by clicking the first legal card for the player. That takes a card
-//the player may legally decline. The repair here is the other direction: make the
-//empty answer REACHABLE, which is the option the rules give and the engine was
-//missing.
+//it into your hand. Then shuffle." - mtg.txt:57032, matching Scryfall) is that
+//shape, and its own script carries the failed outcome: optiontwo is
+//`bottomoflibrary ... and!( all(*|reveal) bottomoflibrary and!(shuffle)! )!`.
+//The engine could not REACH it - the chooser is `target(<1>enchantment|reveal)`,
+//so targetMin is set and a zero-target BTN_NEXT fell through every branch of
+//CheckUserInput - and the wave-67 repair answered that by clicking the first
+//legal card for the player, taking a card the rules let them decline.
 //
-//Both halves are required. An UNQUALIFIED search ("search your library for a
-//card") must find one if it is there (701.23a leaves no permission to fail), and
-//looking at a PUBLIC zone is not a search at all - so `*|reveal` over a revealed
-//hand keeps the old mandatory behaviour untouched.
-static bool revealSearchMayFailToFind(bool fromHiddenZone, bool statedQuality)
+//#W83-FB: THE FIRST PREDICATE WAS TOO WIDE. "Library origin + a qualified
+//chooser" is not a search. Mulch (mtg.txt:77098: "Reveal the top four cards of
+//your library. Put all land cards revealed this way into your hand and the rest
+//into your graveyard", scripted `reveal:4 optionone target(<4>land|reveal)
+//moveto(hand)`) satisfied it, so a player could finalize with zero lands selected
+//and send their own lands to the graveyard - CR 608.2c, the controller follows
+//the instruction as written, and "put all land cards revealed this way into your
+//hand" is not optional. Sensation Gorger (mtg.txt:102263, `reveal:1`) is the same
+//class.
+//
+//What separates them is CR 701.23a's "look at ALL cards in that zone". The script
+//says which reveal does that: `Reveal:type:<spec>:<zone>` walks the WHOLE zone
+//and parks every matching card, while `reveal:N` takes the top N. That is the
+//same discriminator the model-facing seat already uses for this question
+//(AIPlayerGPT.cpp: `abilityString.find("Reveal:type:")`), so the two cannot drift
+//apart. Three conditions, all required:
+//  - the reveal looked at the WHOLE zone           (CR 701.23a: a search)
+//  - that zone is the player's own library         (a hidden zone they search)
+//  - the chooser names a stated QUALITY, not a bare `*` or a bare quantity
+//                                                   (CR 701.23b vs 701.23d)
+static bool revealSearchMayFailToFind(bool wholeZoneLook, bool fromHiddenZone,
+                                      bool statedQuality)
 {
-    return fromHiddenZone && statedQuality;
+    return wholeZoneLook && fromHiddenZone && statedQuality;
 }
 
 bool MTGRevealingCards::searchMayFailToFind()
@@ -789,17 +809,26 @@ bool MTGRevealingCards::searchMayFailToFind()
     TargetChooser * tc = ownChooser();
     if (!tc || !playerForZone || !playerForZone->game)
         return false;
-    //Hidden zone the player is searching: their own library. (A revealed HAND is
-    //hidden too, but showing it is not a search - no `search` effect parks a hand
-    //in the reveal zone behind a qualified chooser.)
+    //CR 701.23a - "look at all cards in that zone". The script says which reveal
+    //does that: `Reveal:type:<spec>:<zone>` walks the WHOLE zone and parks every
+    //matching card, while `reveal:N` takes the top N. The parser strips the
+    //leading `reveal:` (MTGAbility.cpp's splitRevealx), so what survives into this
+    //ability's first token is `type:*:mylibrary` for the search form and a bare
+    //count for the other - and that first token is exactly `number`.
+    string head = number;
+    std::transform(head.begin(), head.end(), head.begin(), ::tolower);
+    const bool wholeZoneLook = (head.compare(0, 5, "type:") == 0);
+    //A hidden zone the player is searching: their own library. (A revealed HAND
+    //is hidden too, but showing it is not a search.)
     const bool fromHiddenZone = (RevealFromZone == playerForZone->game->library);
     //A stated quality = the chooser names one. A bare `*` builds a plain
-    //TargetZoneChooser (TargetChooserFactory: `typeName.compare("*") == 0`);
-    //every qualified spec builds a type, descriptor or card chooser.
+    //TargetZoneChooser (TargetChooserFactory: `typeName.compare("*") == 0`), which
+    //is CR 701.23d's quantity-only search and MUST find; every qualified spec
+    //builds a type, descriptor or card chooser.
     const bool statedQuality = (dynamic_cast<TypeTargetChooser *>(tc) != NULL)
                                || (dynamic_cast<DescriptorTargetChooser *>(tc) != NULL)
                                || (dynamic_cast<CardTargetChooser *>(tc) != NULL);
-    return revealSearchMayFailToFind(fromHiddenZone, statedQuality);
+    return revealSearchMayFailToFind(wholeZoneLook, fromHiddenZone, statedQuality);
 }
 
 //#W54-F (D7a): the reveal driver's STALL GUARD.
@@ -917,48 +946,16 @@ void MTGRevealingCards::forceCloseStalledReveal(const char * why)
             stranded, "reveal_stall_forced");
 }
 
-//#W82-EB (audit-2026-09 item 2, Astra F03 / Fable G32). CLOSE A PARKED REVEAL.
-//
-//A reveal of the library physically MOVES its cards into the player's `reveal`
-//zone, which by the rules never happened - CR 701.20b: "Revealing a card doesn't
-//cause it to leave the zone it's in." The wave-69 repair papered over the
-//consequence at DRAW time (MTGGameZones::drawFromLibrary pulled one parked card
-//back so the draw would not read the emptied library as the deck-out of CR
-//704.5b). That is a symptom patch on a shared path: the stalled reveal - a
-//payload that never resolved - is still stalled afterwards, the library is still
-//mis-modelled for every other reader, and a genuine deck-out becomes silently
-//survivable for as long as any card sits parked.
-//
-//This is the resolution instead: the reveal that owns those cards is CLOSED
-//(its options leave the action layer and its cards go back where they came from,
-//through the reveal's own force-close path), and whatever the library then says
-//is the truth - including the deck-out, if the library really is empty.
-//Returns the number of reveals closed. Declared in MTGGameZones.cpp.
-int closeParkedRevealsInto(GameObserver * g, MTGGameZone * revealZone)
-{
-    if (!g || !revealZone || !g->mLayers)
-        return 0;
-    ActionLayer * al = g->mLayers->actionLayer();
-    if (!al)
-        return 0;
-    int closed = 0;
-    bool again = true;
-    while (again)
-    {
-        again = false;
-        for (size_t i = 0; i < al->mObjects.size(); i++)
-        {
-            MTGRevealingCards * r = dynamic_cast<MTGRevealingCards *>((ActionElement *) al->mObjects[i]);
-            if (!r || r->zone != revealZone || r->mAIForceClosed)
-                continue;
-            r->forceCloseStalledReveal("parked across a draw");
-            closed++;
-            again = true;
-            break;
-        }
-    }
-    return closed;
-}
+//#W83-FC (fix-review item 3): the wave-82 `closeParkedRevealsInto` helper is
+//GONE. It closed every reveal sharing the drawing player's reveal zone without
+//proving any of them was stalled, so a legitimate in-effect draw (Sensation
+//Gorger's `discard:20 && draw:4` inside reveal option one, mtg.txt:102263)
+//cancelled a reveal that was resolving correctly. CR 117.2e forbids PRIORITY
+//during resolution, not instructed draws, so a draw is no evidence at all. The
+//only remaining close path is the driver's own stall guard
+//(forceCloseStalledReveal below), which is the only code that can prove a reveal
+//made no progress; MTGPlayerCards::drawFromLibrary now answers the draw with
+//logical-zone semantics instead (CR 701.20b) and closes nothing.
 
 //#W55-E (D5a): the wall floor for the POLL-CHURN budget, sized off the seat's
 //own deadline so raising WAGIC_GPT_TIMEOUT cannot turn a legitimately slow
@@ -6861,6 +6858,11 @@ ActivatedAbility(observer, id, card, _cost, 0),type(type),effect(effect),who(who
 //only instrument that can see a choice OFFERED rather than an outcome taken.
 Player * gEdictRechoiceOwner = NULL;
 int gEdictRechoicesOffered = 0;
+//#W83-FA (fix-review item 5): TRUE only once the re-choice has actually reached
+//the action layer, with its chooser owned by the sacrificing seat. The wave-82
+//witness was written BEFORE addToGame, so it proved an intention rather than an
+//armed decision; this is set from the far side of the registration.
+bool gEdictRechoiceArmed = false;
 
 int AADynamic::resolve()
 {
@@ -6915,93 +6917,85 @@ int AADynamic::resolve()
     //sacrificing player keeps the better body) and the least life this can pay.
     //Suppression survives only for the case that has no answer - no creature left, so
     //no sacrifice can happen and no life is owed.
-    if (resolvingFromStackAbility
-        && effect == DYNAMIC_ABILITY_EFFECT_LIFEGAIN
-        && type == DYNAMIC_ABILITY_TYPE_TOUGHNESS
-        && amountsource == DYNAMIC_MYTGT_AMOUNT
-        && dynamic_cast<AASacrificeCard *>(storedAbility)) //the EDICT shape, F1
+    if (resolvingFromStackAbility && isEdictShape())
     {
         //#W82-EA (audit-2026-09 item 1, Astra F02 / Fable G17). THE RE-CHOICE IS
-        //THE SACRIFICING PLAYER'S, NOT THE ENGINE'S. The lowest-toughness pick
-        //this replaces was a rules regression with a HUMAN face on it: Tribute to
-        //Hunger's Oracle is "Target opponent sacrifices a creature OF THEIR
-        //CHOICE", and CR 608.2d - "If an effect of a spell or ability offers any
-        //choices other than choices already made as part of casting the spell ...
-        //the player announces these while applying the effect" - puts that choice
-        //in the sacrificing player's hands at resolution. An engine heuristic can
+        //THE SACRIFICING PLAYER'S, NOT THE ENGINE'S. Tribute to Hunger's Oracle is
+        //"Target opponent sacrifices a creature OF THEIR CHOICE", and CR 608.2d -
+        //"If an effect of a spell or ability offers any choices other than choices
+        //already made as part of casting the spell ... the player announces these
+        //while applying the effect" - puts that choice in the sacrificing player's
+        //hands at resolution. The lowest-toughness autopick this replaced could
         //take the owner's combo piece over the body they would have given up.
-        //So when the stored victim can no longer be sacrificed, the effect ARMS A
-        //REAL CHOOSER owned by that player (TargetChooser::Owner is the engine's
-        //own routing for "this pick belongs to that seat" - GameObserver::Update
-        //hands them the action) over a clone of this very payload: whoever they
-        //pick is sacrificed by activateStored and pays its own toughness, exactly
-        //as the ordinary single-copy case does. Human seats get the same chooser
-        //UI a plain `sacrifice` uses; AI seats answer it with their own
-        //chooseCard/chooseTarget. Nothing is removed and nothing is auto-answered.
-        //STALE is also wider than "not in play" (Astra F02): a victim that is
-        //phased out is treated as though it does not exist (CR 702.26b), and one
-        //that has become unsacrificeable cannot be sacrificed at all (CR 701.21a)
-        //- in both cases no sacrifice can be made from it, so the choice re-opens.
+        //#W83-FA (fix-review items 1 and 5). THREE CORRECTIONS.
+        //(1) ONE eligibility, not two. The first cut asked "is the victim still in
+        //play, unphased and sacrificeable" in one place and built the replacement
+        //set from `creature|mybattlefield` in another, so the gate and the offered
+        //set could disagree - and that chooser admitted CANTBESACRIFIED permanents
+        //and mutated-down components, which CR 701.21a and AASacrificeCard::resolve
+        //both refuse. Now EdictSacrificeChooser::canTarget is the ONLY predicate:
+        //it answers the stale-victim gate, it filters the candidate scan, and it is
+        //the chooser the player answers.
+        //(2) NO CARD IS MUTATED to express "this is not targeting". The old chooser
+        //was built with a surviving creature as its `card`, so TargetChooser's ctor
+        //made that creature the `targetter` and `targetter->bypassTC = true` left a
+        //PERMANENT shroud/protection/hexproof bypass (CR 702.18a, 702.11b) on a
+        //creature the player never sacrificed. EdictSacrificeChooser has no
+        //targetter at all - a sacrifice is not targeting.
+        //(3) NO EXTRA RESPONSE WINDOW and NO AUTOPICK. The answer resolves in place
+        //(canBeInterrupted false, so MTGAbility::fireAbility resolves instead of
+        //adding another stack object), and if the chooser cannot be built the
+        //effect simply does nothing rather than choosing for the player.
         MTGCardInstance * victim = dynamic_cast<MTGCardInstance *>(_target);
-        const bool victimUsable = victim && game && victim->isInPlay(game)
-                                  && !victim->isPhased
-                                  && !victim->has(Constants::CANTBESACRIFIED);
-        if (victim && game && !victimUsable)
+        if (victim && game)
         {
             Player * owner = victim->controller();
-            vector<MTGCardInstance *> cands;
-            if (owner && owner->game && owner->game->battlefield)
+            //The eligibility test, once. `excluded` is NULL here: the question is
+            //whether the STORED victim itself could still be sacrificed.
+            EdictSacrificeChooser gate(game, owner, NULL, source);
+            if (!gate.canTarget(victim))
             {
-                MTGGameZone * z = owner->game->battlefield;
-                for (int c = 0; c < z->nb_cards; c++)
+                vector<MTGCardInstance *> cands;
+                EdictSacrificeChooser * tc = NEW EdictSacrificeChooser(game, owner, victim, source);
+                if (owner && owner->game && owner->game->battlefield)
                 {
-                    MTGCardInstance * cand = z->cards[c];
-                    if (!cand || cand == victim || !cand->isCreature())
-                        continue;
-                    if (cand->has(Constants::CANTBESACRIFIED))
-                        continue;
-                    if (cand->isPhased) //CR 702.26b
-                        continue;
-                    if (cand->mutation && cand->parentCards.size() > 0)
-                        continue; //AASacrificeCard refuses these outright
-                    cands.push_back(cand);
+                    MTGGameZone * z = owner->game->battlefield;
+                    for (int c = 0; c < z->nb_cards; c++)
+                        if (z->cards[c] && tc->canTarget(z->cards[c]))
+                            cands.push_back(z->cards[c]);
                 }
-            }
-            if (cands.empty())
-                return 0; //nothing left to sacrifice: no life is owed
-            if (cands.size() == 1)
-            {
-                //One legal answer. Asking would offer a menu with a single row;
-                //taking it removes no choice the player had.
-                DebugTrace("W82-EA: edict re-targets " << cands[0]->getName()
-                           << " - the only sacrifice its controller can make");
-                target = cands[0];        //activateStored copies this into the sacrifice
-                _target = cands[0];
-            }
-            else
-            {
-                TargetChooserFactory tcf(game);
-                TargetChooser * tc = tcf.createTargetChooser("creature|mybattlefield", cands[0]);
-                if (tc)
+                if (cands.empty())
                 {
-                    if (tc->targetter)
-                        tc->targetter->bypassTC = true;
-                    tc->targetter = NULL;   //notaTarget: the edict does not target the creature
-                    tc->Owner = owner;      //...and THIS seat answers it
+                    SAFE_DELETE(tc);
+                    return 0; //nothing can be sacrificed: no sacrifice, no life owed
+                }
+                if (cands.size() == 1)
+                {
+                    //One legal answer. Asking would present a one-row menu; taking
+                    //it removes no choice the player had.
+                    SAFE_DELETE(tc);
+                    DebugTrace("W82-EA: edict re-targets " << cands[0]->getName()
+                               << " - the only sacrifice its controller can make");
+                    target = cands[0];    //activateStored copies this into the sacrifice
+                    _target = cands[0];
+                }
+                else
+                {
+                    tc->Owner = owner;    //THIS seat answers it (GameObserver::Update routes it)
                     AADynamic * again = this->clone();
                     again->resolvingFromStackAbility = false; //the clone resolves with a live victim
                     again->target = NULL;
                     again->oneShot = 1;
                     MTGAbility * choose = NEW GenericTargetAbility(game, "", "", this->GetId(),
                                                                    source, tc, again);
+                    choose->canBeInterrupted = false; //resolve in place: no new window
                     MTGAbility * armed = NEW MayAbility(game, this->GetId(), choose, source, true);
+                    armed->canBeInterrupted = false;
                     armed->oneShot = 0;
-                    //The seat the choice was HANDED TO, for the suite's
-                    //assertedictchoice: "a real chooser was presented to the
-                    //sacrificing player" is the human-facing claim, and it is
-                    //invisible to every zone assertion (a human seat cannot be
-                    //driven headlessly, but the chooser it would answer is this
-                    //same object).
+                    //The seat the choice was HANDED TO, and the chooser object it
+                    //was handed as, for the suite's assertedictchoice - "a real
+                    //chooser was presented to the sacrificing player" is the
+                    //human-facing claim and no zone assertion can see it.
                     gEdictRechoiceOwner = owner;
                     gEdictRechoicesOffered++;
                     DebugTrace("W82-EA: edict re-opens the sacrifice choice for "
@@ -7009,12 +7003,15 @@ int AADynamic::resolve()
                                << " legal creatures) - its stored victim "
                                << victim->getName() << " can no longer be sacrificed");
                     armed->addToGame();
+                    //#W83-FA (fix-review item 5): the witness is stamped from the
+                    //FAR SIDE of the registration - the decision is armed in the
+                    //action layer, carrying a chooser this seat owns, or it is not
+                    //claimed at all.
+                    ActionLayer * al = game->mLayers ? game->mLayers->actionLayer() : NULL;
+                    gEdictRechoiceArmed = (al && al->getIndexOf(armed) != -1
+                                           && tc->Owner == owner);
                     return 1;
                 }
-                //No chooser could be built: fall back to the only thing that is
-                //certainly legal rather than paying life for nothing.
-                target = cands[0];
-                _target = cands[0];
             }
         }
     }
@@ -7262,10 +7259,36 @@ int AADynamic::resolve()
 
     return 0;
 }
+//#W83-FA (fix-review item 5): the one place that says what an EDICT is - the
+//`mytgt toughnesslifegain` family whose payload carries its own sacrifice. The
+//stale-victim re-choice and the pay-only-for-a-sacrifice-that-happened rail below
+//must agree on it, and before this they were two separate expressions.
+bool AADynamic::isEdictShape() const
+{
+    return effect == DYNAMIC_ABILITY_EFFECT_LIFEGAIN
+        && type == DYNAMIC_ABILITY_TYPE_TOUGHNESS
+        && amountsource == DYNAMIC_MYTGT_AMOUNT
+        && dynamic_cast<AASacrificeCard *>(storedAbility) != NULL;
+}
+
 int AADynamic::activateMainAbility(MTGAbility * toActivate,MTGCardInstance * , Damageable *)
 {
     if(storedAbility)
-        activateStored();
+    {
+        const int sacrificed = activateStored();
+        //#W83-FA (fix-review item 5). PAY FOR A SACRIFICE THAT HAPPENED.
+        //Tribute to Hunger's life is "equal to THAT creature's toughness" - the
+        //toughness of the body this effect just sacrificed. AASacrificeCard::resolve
+        //returns 0 when it takes nothing (CR 701.21a refuses a CANTBESACRIFIED
+        //permanent, and a mutated-down component follows its top card), and the
+        //lifegain used to be paid anyway. Scoped to the edict shape: every other
+        //`dynamicability<!...!>` payload keeps its existing behaviour.
+        if (!sacrificed && isEdictShape())
+        {
+            DebugTrace("W83-FA: edict paid no life - its sacrifice did not happen");
+            return 0;
+        }
+    }
     if(!toActivate)
         return 0;
     if(PTInstant * a = dynamic_cast<PTInstant *>(toActivate))
@@ -7286,13 +7309,14 @@ int AADynamic::activateStored()
     clonedStored->target = target;
     if (clonedStored->oneShot)
     {
-        clonedStored->resolve();
+        //#W83-FA (fix-review item 5): report what the stored ability actually did.
+        //AASacrificeCard::resolve returns 0 when nothing was sacrificed.
+        const int done = clonedStored->resolve();
         delete (clonedStored);
+        clonedStored = NULL;
+        return done;
     }
-    else
-    {
-        clonedStored->addToGame();
-    }
+    clonedStored->addToGame();
     return 1;
 }
 

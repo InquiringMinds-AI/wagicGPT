@@ -1,0 +1,50 @@
+#NAME: "Reveal the top four" is not a search and may not fail to find (#W83-FB)
+#DESC: fix-review item 2. The wave-82 fail-to-find predicate was "the revealed
+#DESC: cards came out of the library AND the chooser names a quality". Mulch
+#DESC: satisfies it and is not a search:
+#DESC:   mtg.txt:77098 text= "Reveal the top four cards of your library. Put all
+#DESC:   land cards revealed this way into your hand and the rest into your
+#DESC:   graveyard."
+#DESC:   mtg.txt:77097 auto= "reveal:4 optionone name(Get land) target(<4>land|
+#DESC:   reveal) moveto(hand) optiononeend optiontwo name(put in grave) all(*|
+#DESC:   reveal) moveto(mygraveyard) optiontwoend revealend"
+#DESC: So a seat could finalize with zero lands selected and send its own lands to
+#DESC: the graveyard. CR 608.2c: "The controller of the spell or ability follows
+#DESC: its instructions in the order written" - "put all land cards revealed this
+#DESC: way into your hand" is not optional.
+#DESC: The permission is narrower. CR 701.23a: "To search for a card in a zone,
+#DESC: look at ALL cards in that zone (even if it's a hidden zone) and find a card
+#DESC: that matches the given description." CR 701.23b gives the fail-to-find only
+#DESC: to such a search; CR 701.23d makes a quantity-only search find anyway.
+#DESC: FIX: the predicate now requires the reveal to have looked at the WHOLE zone,
+#DESC: which the script says - `Reveal:type:<spec>:<zone>` parks every matching
+#DESC: card of the zone, `reveal:N` takes the top N.
+#DESC: FIXTURE: `revealasync` opts this scripted seat into the real interactive-AI
+#DESC: driver and names a card that is not in the library, so the stub selects
+#DESC: NOTHING - the state a refused reply leaves. The mandatory floor must then
+#DESC: commit a legal land, because Mulch is not a search.
+#DESC: RED on base (583ae53c8): the empty answer is accepted, so option two sends
+#DESC: the revealed cards - Forest included - to the graveyard and the hand stays
+#DESC: empty.
+#DESC: GREEN: Forest reaches the hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mulch
+manapool:{1}{G}
+library:Craw Wurm,Grizzly Bears,Gray Ogre,Juggernaut,Forest
+[PLAYER2]
+[DO]
+revealasync zzznosuchcardzzz
+revealasyncticks 0
+revealstallbudget 10
+Mulch
+goto end
+[ASSERT]
+END
+[PLAYER1]
+hand:Forest
+graveyard:Mulch,*,*,*
+library:*
+[PLAYER2]
+[END]

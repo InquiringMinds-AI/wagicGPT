@@ -11,11 +11,22 @@
 #DESC: (removeFromGame erases from the middle), so the id outlives the positions
 #DESC: it named - this is the same class the W58-F row-identity map was built for,
 #DESC: on the one menu kind the map deliberately does not cover.
-#DESC: FIX: getMenuControlId refuses an id the layer no longer holds, and the
+#DESC: FIX (#W82-EF): the stale id never comes back as a LAYER INDEX, and the
 #DESC: three `mObjects[slot]` readers bounds-check as well.
-#DESC: RED with the engine hunk reverted: "getMenuControlId accepted a stale
-#DESC: multiple-choice row id as slot N with mObjects.size() M".
-#DESC: GREEN: the lookup refuses, so no reader can index with it.
+#DESC: FIX (#W83-FD, fix-review item 4): ...but the row must still be ANSWERABLE.
+#DESC: The wave-82 repair REFUSED the row, and doReactTo then returns without ever
+#DESC: reaching ButtonPressedOnMultipleChoice - so every legal mode of a live
+#DESC: MenuAbility became unreachable to the AI and to a script, while the human's
+#DESC: ButtonPressed (which dispatches multiple choice BEFORE slot resolution) kept
+#DESC: working. A row id is four different things - row IDENTITY, LAYER SLOT, MODE
+#DESC: INDEX and the sentinels - and a multiple-choice row is a MODE INDEX, which
+#DESC: no amount of compaction can invalidate. It now answers with the mode
+#DESC: sentinel and stays answerable.
+#DESC: RED with the engine hunk reverted: at wave 82, "getMenuControlId REFUSED a
+#DESC: live multiple-choice row after the layer compacted"; before wave 82,
+#DESC: "getMenuControlId accepted a stale multiple-choice row id as slot 105 with
+#DESC: mObjects.size() 104 - indexing it is the F1 abort".
+#DESC: GREEN: the row is answerable AND carries no usable index.
 [INIT]
 FIRSTMAIN
 [PLAYER1]

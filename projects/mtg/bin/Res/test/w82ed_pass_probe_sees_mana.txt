@@ -1,4 +1,5 @@
-#NAME: The forced-pass fingerprint MOVES when the seat makes mana (#W82-ED, item 5)
+#NAME: The forced-pass fingerprint MOVES on mana AND on a second counter
+#NAME: (#W82-ED item 5, #W83-FG fix-review item 8)
 #DESC: Act's forced-pass floor may only fire on a PROVEN identical state, never on
 #DESC: a count of iterations: CR 117.3d makes a pass out of a player who "chooses
 #DESC: not to take any actions", so a pass forced over a state that actually moved
@@ -16,27 +17,40 @@
 #DESC: WITNESS: tapping a Mountain for mana is exactly the "productive repeated
 #DESC: activation" the brief names. No fixture can pump the 200 identical ticks the
 #DESC: floor needs, but the property the floor rests on is checkable directly.
-#DESC: RED on base (wagic-fixaudit-base): the fingerprint is byte-identical after
-#DESC: the mana ability - "assertprobemoved: expected 1 got 0" (the base binary has
-#DESC: neither command, and nothing else in the fixture moves, so it fails on the
-#DESC: unchanged hand/battlefield assertion instead - see fix-lane.md).
-#DESC: GREEN: the fingerprint moves.
+#DESC: #W83-FG (fix-review item 8): THREE FIELDS THE WAVE-82 DIGEST STILL MISREAD.
+#DESC: `Counters::mCount` counts counter RECORDS, not counter QUANTITY - Counters.cpp
+#DESC: increments `Counter::nb` on an existing record - so a SECOND +1/+1 counter on
+#DESC: a creature that already has one was invisible. `MTGCard::getId()` is the
+#DESC: PRINTING's mtgid, so two copies of the same card were indistinguishable. And
+#DESC: the legal-action set covered casts and land plays but not ACTIVATED
+#DESC: abilities. The digest now carries each counter record's name, power/toughness
+#DESC: and `nb`, the instance POINTER, and the activatable-ability set.
+#DESC: WITNESS: tapping a Mountain for mana (the wave-82 half), then adding a second
+#DESC: +1/+1 counter to a creature that already carries one (the wave-83 half).
+#DESC: RED with the engine hunk reverted (the wave-82 menuPassProbe body, this
+#DESC: lane's suite commands in place): "assertprobemoved: expected 1 got 0" on the
+#DESC: counter step.
+#DESC: GREEN: the fingerprint moves on both.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Mountain
+inplay:Mountain,Grizzly Bears
 hand:Raging Goblin
 life:20
 [PLAYER2]
 life:20
 [DO]
+addcounter Grizzly Bears
 probesnap
 Mountain
+assertprobemoved 1
+probesnap
+addcounter Grizzly Bears
 assertprobemoved 1
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Mountain
+inplay:Mountain,Grizzly Bears
 hand:Raging Goblin
 manapool:{R}
 life:20

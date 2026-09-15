@@ -2671,6 +2671,62 @@ bool pairableChooser::equals(TargetChooser * tc)
 }
 
 //*Dredge targetchooser*//
+//#W83-FA (fix-review items 1 and 5): see TargetChooser.h. NO `targetter`, ever -
+//a sacrifice is not targeting (CR 701.21a moves the permanent; nothing targets
+//it), so no card's `bypassTC` is touched and the protection block below is not
+//consulted. Eligibility is answered LIVE from the sacrificing player's own
+//battlefield, so the offered set is exactly what AASacrificeCard could take.
+EdictSacrificeChooser::EdictSacrificeChooser(GameObserver *observer, Player * _sacrificer,
+                                             MTGCardInstance * _excluded,
+                                             MTGCardInstance * _edictSource) :
+    TargetZoneChooser(observer, _edictSource, 1, false, true),
+    sacrificer(_sacrificer), excluded(_excluded)
+{
+    int z[] = { MTGGameZone::BATTLEFIELD, };
+    init(z, 1);
+    //UNTARGETED. The base ctor set `targetter = card`; clearing it here is what
+    //says "a sacrifice is not targeting", and it is the whole reason no card's
+    //`bypassTC` is ever written (see the header). `source` stays the EDICT's own
+    //card - a spell, never one of the candidate creatures - so nothing the base
+    //class reads off it can touch a permanent the player may keep.
+    targetter = NULL;
+}
+
+bool EdictSacrificeChooser::targetsZone(MTGGameZone * z)
+{
+    return sacrificer && sacrificer->game && z == sacrificer->game->inPlay;
+}
+
+bool EdictSacrificeChooser::canTarget(Targetable * target, bool)
+{
+    MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(target);
+    if (!card || !sacrificer || !observer)
+        return false;
+    if (card == excluded)
+        return false;
+    //CR 701.21a: "A player can't sacrifice something that isn't a permanent, or
+    //something that's a permanent they don't control."
+    if (card->controller() != sacrificer)
+        return false;
+    if (!card->isInPlay(observer))
+        return false;
+    if (!card->isCreature())
+        return false;
+    //CR 702.26b: a phased-out permanent "is treated as though it does not exist".
+    if (card->isPhased)
+        return false;
+    if (card->has(Constants::CANTBESACRIFIED))
+        return false;
+    if (card->mutation && card->parentCards.size() > 0)
+        return false; //AASacrificeCard::resolve refuses these outright
+    return true;
+}
+
+EdictSacrificeChooser * EdictSacrificeChooser::clone() const
+{
+    return NEW EdictSacrificeChooser(*this);
+}
+
 bool dredgeChooser::canTarget(Targetable * target,bool)
 {
     if (MTGCardInstance * card = dynamic_cast<MTGCardInstance*>(target))
