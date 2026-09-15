@@ -51,6 +51,7 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/AIPlayer.cpp \
         $(MTG_PATH)/src/AIPlayerBaka.cpp \
         $(MTG_PATH)/src/AIPlayerGPT.cpp \
+        $(MTG_PATH)/src/AIPlayerGPTSelfTest.cpp \
         $(MTG_PATH)/src/Closest.cpp \
         $(MTG_PATH)/src/DecisionContract.cpp \
         $(MTG_PATH)/src/GptConfig.cpp \

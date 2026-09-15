@@ -50,6 +50,7 @@ WIN_OBJECTS = \
 	$(OBJDIR)/LegalActions.o \
 	$(OBJDIR)/DecisionContract.o \
 	$(OBJDIR)/AIPlayerGPT.o \
+	$(OBJDIR)/AIPlayerGPTSelfTest.o \
 	$(OBJDIR)/GptConfig.o \
 	$(OBJDIR)/qrcodegen.o \
 	$(OBJDIR)/OptionGpt.o \
@@ -245,6 +246,9 @@ $(OBJDIR)/DecisionContract.o: src/DecisionContract.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/AIPlayerGPT.o: src/AIPlayerGPT.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPTSelfTest.o: src/AIPlayerGPTSelfTest.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/GptConfig.o: src/GptConfig.cpp
