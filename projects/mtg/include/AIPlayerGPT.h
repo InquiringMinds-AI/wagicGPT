@@ -2270,13 +2270,14 @@ private:
         int  addBlockable;    //animator bodies - CR 510.1c, a block removes this
         int  addUnblockable;  //ability damage aimed at the player
         bool addUnsized;      //something listed carries no number at all
+        bool floorNamed;      //the header prints an ADD THOSE UP / FLOOR clause
         int  compulsoryDraw;  //not blockable and not declinable
         int  bestBlockFloor;  //-1 when the DP cannot prove one
         int  myLife;
         CrackBackFacts() : selfActive(false), due(false), attacksSettled(false),
                            attackers(0), rawCombat(0), addBlockable(0),
-                           addUnblockable(0), addUnsized(false), compulsoryDraw(0),
-                           bestBlockFloor(-1), myLife(0) {}
+                           addUnblockable(0), addUnsized(false), floorNamed(false),
+                           compulsoryDraw(0), bestBlockFloor(-1), myLife(0) {}
         int published() const { return rawCombat + addBlockable + addUnblockable
                                        + compulsoryDraw; }
         //what a best block cannot take away: the DP's floor over the creature
@@ -2285,6 +2286,13 @@ private:
         { return bestBlockFloor < 0 ? -1 : bestBlockFloor + addUnblockable + compulsoryDraw; }
     };
     const CrackBackFacts& crackBackFactsNow();
+    //#W82-A (C/X6, audit-2026-09): the ONE reader every `this`-side consumer of a
+    //crack-back number uses - the board header, the cast-row cover clauses, the
+    //attackers cover clause and the X-announce gate. It replaces eight separate
+    //`crackBackScreenTotal(this, opponent(), getObserver(), ...)` calls, each of
+    //which re-ran `crackBackTotalOver` and `crackBackFloorSources` over the whole
+    //opponent board; they now read the memoised struct. Same gate, same numbers.
+    bool crackBackScreenTotalNow(int& total, bool& isFloor);
     CrackBackFacts mCrackBackFacts;
     int mCrackBackFactsSeq;
     void w80CloseOpenCastStep(const char * why); //#W80-DH (F5)

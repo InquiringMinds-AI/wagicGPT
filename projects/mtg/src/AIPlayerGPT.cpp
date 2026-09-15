@@ -37380,6 +37380,7 @@ const AIPlayerGPT::CrackBackFacts& AIPlayerGPT::crackBackFactsNow()
     int sizeable = 0;
     const string floorSrc = crackBackFloorSources(opponent(), &sizeable, &f.addUnsized,
                                                   &f.addBlockable, &f.addUnblockable);
+    f.floorNamed = !floorSrc.empty();
     if (floorSrc.empty())
     {
         //the header prints no ADD THOSE UP sentence, so nothing is added
@@ -37399,6 +37400,18 @@ const AIPlayerGPT::CrackBackFacts& AIPlayerGPT::crackBackFactsNow()
 
 //#W81-DL (V5): the compulsory draw-step charge this seat is under right now,
 //read off the shared walk the blockers header prints its own sentence from.
+//#W82-A (C/X6, audit-2026-09): THE SHARED READER - see the header. It returns
+//byte-for-byte the verdict `crackBackScreenTotal(this, ...)` returned, off the
+//one memoised walk instead of re-running `crackBackTotalOver` and
+//`crackBackFloorSources` over the whole opponent board at each of eight sites.
+bool AIPlayerGPT::crackBackScreenTotalNow(int& total, bool& isFloor)
+{
+    const CrackBackFacts& f = crackBackFactsNow();
+    total = f.due ? f.rawCombat : 0;
+    isFloor = f.due && f.floorNamed;
+    return f.due;
+}
+
 int AIPlayerGPT::w81CompulsoryDrawLossNow()
 {
     return w81CompulsoryDrawStepLoss(this, opponent(), NULL, NULL, NULL);
@@ -43202,8 +43215,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                             {
                                 int cbTotal = 0;
                                 bool cbFloor = false;
-                                if (crackBackScreenTotal(this, opponent(), getObserver(),
-                                                         cbTotal, cbFloor))
+                                if (crackBackScreenTotalNow(cbTotal, cbFloor))
                                 {
                                     //#W79-DA (T9): and the blocker this row's own
                                     //cost spends, priced off the same cover.
@@ -43401,7 +43413,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             int cbT2 = 0;
             bool cbF2 = false;
             if (sacGive2 > 0
-                && crackBackScreenTotal(this, opponent(), getObserver(), cbT2, cbF2))
+                && crackBackScreenTotalNow(cbT2, cbF2))
                 out << w80SacrificeSpendsBlockerClause(cbT2, life, cbF2, sacGive2, sacBodies2);
         }
         //#W49-D11: what paying THIS row taps. (a) A `becomes` row on a source
@@ -50490,8 +50502,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             {
                                 int r6Total = 0;
                                 bool r6Floor = false;
-                                if (crackBackScreenTotal(this, opponent(), getObserver(),
-                                                         r6Total, r6Floor))
+                                if (crackBackScreenTotalNow(r6Total, r6Floor))
                                 {
                                     std::vector<W77RemovalVictim> r6v;
                                     int r6Bodies = 0;
@@ -50859,12 +50870,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             int cbTotal = 0;
             bool cbFloor = false;
             if (bodies <= 0 && cbRawBodies > 0 && cbSelfLeaves //#W80-DF (U3)
-                && crackBackScreenTotal(this, opponent(), getObserver(), cbTotal, cbFloor))
+                && crackBackScreenTotalNow(cbTotal, cbFloor))
                 o << w80SelfLeavesNoCoverClause(card->getDisplayName(), cbTotal);
             cbTotal = 0;
             cbFloor = false;
             if (bodies > 0
-                && crackBackScreenTotal(this, opponent(), getObserver(), cbTotal, cbFloor))
+                && crackBackScreenTotalNow(cbTotal, cbFloor))
             {
                 //#W64-AK (R4/R7): the cover is computed against each attacker's
                 //own block legality, and the bodies are split into checked and
@@ -50901,7 +50912,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             int cbTotal2 = 0;
             bool cbFloor2 = false;
-            if (crackBackScreenTotal(this, opponent(), getObserver(), cbTotal2, cbFloor2))
+            if (crackBackScreenTotalNow(cbTotal2, cbFloor2))
             {
                 int edT = 0, edMin = 0, edAt = 0;
                 edictFloorScan(opponent(), edT, edMin, edAt, NULL);
@@ -50930,7 +50941,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             int cbTotal3 = 0;
             bool cbFloor3 = false;
-            if (crackBackScreenTotal(this, opponent(), getObserver(), cbTotal3, cbFloor3))
+            if (crackBackScreenTotalNow(cbTotal3, cbFloor3))
             {
                 int bodies3 = 0;
                 MTGGameZone * obf3 = (opponent() && opponent()->game)
@@ -52920,7 +52931,7 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                     int cbxTotal = 0;
                     bool cbxFloor = false;
                     XVictimSurvey cbxSv;
-                    if (crackBackScreenTotal(this, opponent(), observer, cbxTotal, cbxFloor)
+                    if (crackBackScreenTotalNow(cbxTotal, cbxFloor)
                         && xSurveyBoard(ctx, this, cbxSv) && cbxSv.priceable)
                     {
                         int cbxBodies = 0;
@@ -58787,8 +58798,7 @@ int AIPlayerGPT::chooseAttackers()
         //now exactly the one the LINE itself is printed under: the cover clause
         //count and the crack-back header count are one figure on attackers
         //prompts.
-        if (w81AttackCoverDue(crackBackScreenTotal(this, opponent(), observer,
-                                                   cbTotal, cbFloor),
+        if (w81AttackCoverDue(crackBackScreenTotalNow(cbTotal, cbFloor),
                               !attackers.empty())) //#W81-DL (V10)
         {
             mW81PendingEventFace += "attackers_crackback_cover_clause;"; //#W81-DL (V10)
