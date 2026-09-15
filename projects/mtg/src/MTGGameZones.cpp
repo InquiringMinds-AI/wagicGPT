@@ -423,23 +423,71 @@ void MTGPlayerCards::drawFromLibrary()
     //physically present skipped over the parked cards that are logically above
     //them. The test is now "is anything parked out of this library", not "is the
     //library empty".
+    //#W84-GD (review-2 item 4): "FIRST PARKED" IS NOT "TOP".
+    //  CR 121.1: "A player draws a card by putting the top card of their library
+    //  into their hand."
+    //The wave-83 repair took the first card parked out of this library, which is
+    //right only when the reveal parked a contiguous run from the top. A SELECTIVE
+    //reveal (`Reveal:type:...`; Dwarven Recruiter parks only Dwarves) leaves
+    //non-matching cards ABOVE the first parked card, and drawing that card would
+    //skip them. So each parked card now carries how many library cards were still
+    //above it when it was parked (`mRevealAboveCount`, stamped at the three reveal
+    //move sites), and only a card with nothing above it is the logical top. When a
+    //physical draw removes one of the cards above, every parked card of this
+    //library moves one closer to the top - so a card parked under two others does
+    //become the logical top after those two are drawn, which is what CR 701.20b
+    //requires of a zone the cards never left.
+    MTGCardInstance * logicalTop = NULL;
     if (reveal && reveal->nb_cards && library)
     {
-        MTGCardInstance * logicalTop = NULL;
         for (int i = 0; i < reveal->nb_cards && !logicalTop; ++i)
             if (i < (int) reveal->cards.size() && reveal->cards[i]
-                && reveal->cards[i]->previousZone == library)
+                && reveal->cards[i]->previousZone == library
+                && reveal->cards[i]->mRevealAboveCount == 0)
                 logicalTop = reveal->cards[i];
-        if (logicalTop)
-        {
-            DebugTrace("MTGPlayerCards::drawFromLibrary: the library's logical top ("
-                       << logicalTop->getName() << ") is parked in the reveal zone - "
-                       << "revealing did not move it (CR 701.20b), so this draw takes it");
-            putInZone(logicalTop, reveal, library);
-        }
+    }
+    if (logicalTop)
+    {
+        DebugTrace("MTGPlayerCards::drawFromLibrary: the library's logical top ("
+                   << logicalTop->getName() << ") is parked in the reveal zone with"
+                   << " nothing above it - revealing did not move it (CR 701.20b),"
+                   << " so this draw takes it");
+        logicalTop->mRevealAboveCount = -1; //no longer parked
+        putInZone(logicalTop, reveal, library);
+    }
+    else if (library->nb_cards && reveal)
+    {
+        //A physical card is the logical top; everything parked under it comes one
+        //step closer once it is gone.
+        for (int i = 0; i < reveal->nb_cards; ++i)
+            if (i < (int) reveal->cards.size() && reveal->cards[i]
+                && reveal->cards[i]->previousZone == library
+                && reveal->cards[i]->mRevealAboveCount > 0)
+                reveal->cards[i]->mRevealAboveCount--;
     }
     if (!library->nb_cards)
     {
+        //#W84-GD (review-2 item 4): the LOGICAL library, not the physical one.
+        //Cards parked in the reveal zone never left the library (CR 701.20b), so
+        //an empty zone with parked cards still in it is not the CR 704.5b
+        //empty-library loss - the draw simply could not reach them this tick
+        //because something above them is still parked out of order. Losing the
+        //game over a library that is full by the rules is the defect this whole
+        //thread started from (corpus 20260906-134120: decked out at 19 life with
+        //42 cards left).
+        int parkedFromThisLibrary = 0;
+        if (reveal)
+            for (int i = 0; i < reveal->nb_cards; ++i)
+                if (i < (int) reveal->cards.size() && reveal->cards[i]
+                    && reveal->cards[i]->previousZone == library)
+                    parkedFromThisLibrary++;
+        if (parkedFromThisLibrary)
+        {
+            DebugTrace("MTGPlayerCards::drawFromLibrary: the physical library is empty but "
+                       << parkedFromThisLibrary << " of its card(s) are parked in the reveal"
+                       << " zone - by the rules the library is not empty, so no deck-out");
+            return;
+        }
         if (inPlay->hasAbility(Constants::CANTLOSE)
             || inPlay->hasAbility(Constants::CANTMILLLOSE)
             || owner->opponent()->game->inPlay->hasAbility(Constants::CANTWIN))

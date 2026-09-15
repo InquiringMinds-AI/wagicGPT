@@ -303,7 +303,18 @@ void MTGRevealingCards::Update(float dt)
                         if (rTc->canTarget(toMove, true))
                         {
                             CardViewBackup(toMove);
-                            playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                            //#W84-GD (review-2 item 4): HOW DEEP was this card.
+                            //A selective reveal skips the cards it does not match,
+                            //so the first card it parks is NOT the library's top -
+                            //Dwarven Recruiter parks only Dwarves and leaves every
+                            //non-Dwarf above them in place. The walk runs downward
+                            //from the top and removes as it goes, so everything
+                            //still above index i is exactly what stayed behind.
+                            const int above = (RevealFromZone->nb_cards - 1) - i;
+                            MTGCardInstance * parked =
+                                playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                            if (parked)
+                                parked->mRevealAboveCount = (above > 0) ? above : 0;
                             source->revealedLast = toMove;
                         }
                     }
@@ -336,7 +347,12 @@ void MTGRevealingCards::Update(float dt)
                     }
 
                     CardViewBackup(toMove);
-                    playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                    //#W84-GD (review-2 item 4): this branch always takes the
+                    //current top, so nothing is above the card it parks.
+                    MTGCardInstance * parked =
+                        playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                    if (parked)
+                        parked->mRevealAboveCount = 0;
                     source->revealedLast = toMove;
                 }
 
@@ -353,7 +369,12 @@ void MTGRevealingCards::Update(float dt)
                 if (toMove)
                 {
                     CardViewBackup(toMove);
-                    playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                    //#W84-GD (review-2 item 4): a top-N reveal takes the top each
+                    //time, so every card it parks had nothing above it when it left.
+                    MTGCardInstance * parked =
+                        playerForZone->game->putInZone(toMove, RevealFromZone, RevealZone);
+                    if (parked)
+                        parked->mRevealAboveCount = 0;
                     source->revealedLast = toMove;
                 }
 
@@ -6946,12 +6967,37 @@ int AADynamic::resolve()
         //(canBeInterrupted false, so MTGAbility::fireAbility resolves instead of
         //adding another stack object), and if the chooser cannot be built the
         //effect simply does nothing rather than choosing for the player.
+        //#W84-GC (review-2 item 2). THE SEAT IS THE TARGETED PLAYER, NOT WHOEVER
+        //CONTROLS THE PRE-SELECTED CREATURE.
+        //  CR 701.21a: "To sacrifice a permanent, its controller moves it from the
+        //  battlefield directly to its owner's graveyard. A player can't sacrifice
+        //  something that isn't a permanent, or something that's a permanent they
+        //  don't control."
+        //Tribute to Hunger instructs the TARGET OPPONENT to sacrifice. Deriving the
+        //seat from `victim->controller()` made the control test circular: the gate
+        //asked "is this creature controlled by the player who controls it", which
+        //is true by construction, so a victim that CHANGED CONTROL inside the
+        //granted ability's response window was accepted and sacrificed off the
+        //wrong battlefield - and if it was then unusable, the replacement scan ran
+        //over the wrong player's creatures too. The control change keeps the same
+        //object (MTGGameZones.cpp's battlefield-to-battlefield move) and only moves
+        //`lastController`, which is exactly what `controller()` returns, so nothing
+        //else in the effect notices.
+        //The targeted player is not a guess: `ability$!...!$ targetedplayer` is
+        //resolved by ATargetedAbilityCreator, which builds the granted ability on a
+        //dummy card whose owner and lastController ARE that player and whose
+        //storedSourceCard is the real granter. This ability's own `source` is that
+        //dummy, so its controller is the seat the card names.
         MTGCardInstance * victim = dynamic_cast<MTGCardInstance *>(_target);
         if (victim && game)
         {
-            Player * owner = victim->controller();
+            Player * owner = source ? source->controller() : NULL;
+            if (!owner)
+                owner = victim->controller(); //no granted-ability dummy: self-inflicted shape
             //The eligibility test, once. `excluded` is NULL here: the question is
-            //whether the STORED victim itself could still be sacrificed.
+            //whether the STORED victim itself could still be sacrificed BY THIS
+            //SEAT - which is now a real question, and answers false after a control
+            //change.
             EdictSacrificeChooser gate(game, owner, NULL, source);
             if (!gate.canTarget(victim))
             {
@@ -7029,7 +7075,27 @@ int AADynamic::resolve()
         secondaryTarget = ((MTGCardInstance *) _target)->controller();
         break;
     case DYNAMIC_ABILITY_WHO_TARGETOPPONENT:
-        secondaryTarget = ((MTGCardInstance *) _target)->controller()->opponent();
+        //#W84-GC (review-2 item 2): for an EDICT the life goes to the player whose
+        //effect it is, not to the opponent of whoever happens to control the body
+        //at this instant. Tribute to Hunger is "Target opponent sacrifices a
+        //creature of their choice. YOU gain life equal to that creature's
+        //toughness" - `you` is the spell's controller, and after a control change
+        //of the pre-selected creature the victim-derived reading pays the wrong
+        //seat. The granted ability's dummy card carries the granter in
+        //`storedSourceCard` (ATargetedAbilityCreator), and its own controller is
+        //the sacrificing seat, so either route names the right player. Scoped to
+        //the edict shape: every other `targetopponent` payload is untouched.
+        if (isEdictShape())
+        {
+            if (OriginalSrc && OriginalSrc->storedSourceCard)
+                secondaryTarget = OriginalSrc->storedSourceCard->controller();
+            else if (source)
+                secondaryTarget = source->controller()->opponent();
+            else
+                secondaryTarget = ((MTGCardInstance *) _target)->controller()->opponent();
+        }
+        else
+            secondaryTarget = ((MTGCardInstance *) _target)->controller()->opponent();
         break;
     case DYNAMIC_ABILITY_WHO_TOSOURCE:
         tosrc = true;
@@ -7286,6 +7352,16 @@ int AADynamic::activateMainAbility(MTGAbility * toActivate,MTGCardInstance * , D
         if (!sacrificed && isEdictShape())
         {
             DebugTrace("W83-FA: edict paid no life - its sacrifice did not happen");
+            //#W84-GA (review-2 item 5): ...and the lifegain this branch declines to
+            //run was ALREADY ALLOCATED by the caller (AADynamic::resolve's
+            //`mainAbility = NEW AALifer(...)`). Returning past the ordinary
+            //SAFE_DELETE below abandoned it: it is never registered with the game
+            //and ~AADynamic frees only `storedAbility`, so it leaked on exactly the
+            //failure path this rail introduced. `mainAbility` is a bare member
+            //pointer with no ownership contract, so it is cleared with it.
+            if (mainAbility == toActivate)
+                mainAbility = NULL;
+            SAFE_DELETE(toActivate);
             return 0;
         }
     }

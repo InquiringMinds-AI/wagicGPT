@@ -6481,3 +6481,12 @@ mana={0}
 type=Sorcery
 text=Test-only (#W83-FC): reveals the TOP CARD ONLY (`reveal:1`) and then stalls - option one is predicate-gated to a land, the fixture's library holds none, and there is no option two, so no chooser ever arms and that one card stays parked while the rest of the library is still physically there. That is the PARTIAL-library case: the parked card is the library's logical top (CR 701.20b), and a draw is owed it before any card still sitting in the library zone.
 [/card]
+[card]
+id=2100000623
+name=Lexicon Selective Deadend Peek
+rarity=R
+auto=name(peek) Reveal:type:*:mylibrary revealtype(dwarf|mylibrary) revealzone(mylibrary) optionone name(take a land) target(<1>land|reveal) moveto(hand) optiononeend revealend
+mana={0}
+type=Sorcery
+text=Test-only (#W84-GD): a SELECTIVE reveal - `revealtype(dwarf|mylibrary)` parks only the Dwarves of the library and leaves every other card where it is, which is Dwarven Recruiter's own shape. Option one is predicate-gated to a land the fixture's library does not hold and there is no option two, so the parked Dwarf stays parked. A non-Dwarf above it is still the library's logical top.
+[/card]

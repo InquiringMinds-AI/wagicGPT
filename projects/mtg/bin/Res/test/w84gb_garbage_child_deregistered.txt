@@ -1,0 +1,41 @@
+#NAME: A garbage entry's recursively deleted child leaves the layer (#W84-GB)
+#DESC: review-2 item 1. The wave-83 bound on ActionLayer::forgetElement was a
+#DESC: BLANKET flag held for the whole of cleanGarbage(), so EVERY deregistration
+#DESC: was suppressed for the duration of the sweep - not just the entry being
+#DESC: deleted. cleanGarbage() runs during ordinary play (GameObserver::Update),
+#DESC: and a garbage entry's destructor RECURSIVELY DELETES ABILITIES IT OWNS:
+#DESC: MayAbility::~MayAbility does `SAFE_DELETE(ability)`, and
+#DESC: GenericTargetAbility::~GenericTargetAbility the same. Those children are
+#DESC: different objects from the swept entry and can still be registered in the
+#DESC: LIVE layer, sit in a LATER garbage slot (which the same sweep would then
+#DESC: delete a second time), or be the menu's row, a mana producer or the waiting
+#DESC: action. Suppressing their deregistration re-opens exactly the freed-ability
+#DESC: class the facility was built to close (cores 393716 / 395840 / 474128).
+#DESC: FIX: the exemption is PER-OBJECT and covers ONE container - while the sweep
+#DESC: is deleting entry X, X itself skips the `garbage` walk (its slot is nulled
+#DESC: by that SAFE_DELETE and the vector is cleared straight after), which is the
+#DESC: whole quadratic term. Everything else, and everything a child touches, is
+#DESC: bookkept in full. The "never registered anywhere" short-circuit is now an
+#DESC: O(1) per-element flag instead of an all-containers-empty test that is never
+#DESC: true during play.
+#DESC: WITNESS: a child ability registered in the layer, a MayAbility that OWNS it
+#DESC: also registered, the parent moved to garbage, then the sweep. The check is
+#DESC: pointer identity only - never a dereference, because on the broken path that
+#DESC: pointer is freed.
+#DESC: RED with the engine hunk reverted: "a garbage entry's recursively deleted
+#DESC: child is STILL registered at mObjects[N] - the layer is holding freed
+#DESC: storage".
+#DESC: GREEN: the child is gone from the layer before its storage can be reused.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+[PLAYER2]
+[DO]
+assertgarbagechildderegistered
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+[PLAYER2]
+[END]

@@ -194,6 +194,15 @@ public:
     Player * previousController;
     MTGGameZone * getCurrentZone();
     MTGGameZone * previousZone;
+    //#W84-GD (review-2 item 4): while this card is PARKED in a reveal zone, how
+    //many cards were still above it in the library it came out of at the moment it
+    //was parked. Revealing does not move a card (CR 701.20b), so a parked card is
+    //still a library card; it is the library's LOGICAL TOP only when nothing was
+    //above it. A selective reveal (`Reveal:type:...`, Dwarven Recruiter parking
+    //only Dwarves) leaves non-matching cards above the first parked one, so
+    //"first parked" is not "top". -1 = not parked out of a library.
+    //MTGPlayerCards::drawFromLibrary decrements it as the cards above it are drawn.
+    int mRevealAboveCount;
     MTGCardInstance * tokCard;
     MTGCardInstance * previous;
     MTGCardInstance * next;
