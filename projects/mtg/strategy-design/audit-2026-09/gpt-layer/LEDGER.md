@@ -1,6 +1,10 @@
-# GPT-layer audit LEDGER (2026-09-15) — every finding with BOTH reviewers' verdicts
+# GPT-layer audit LEDGER (2026-09-15) — PROVISIONAL, superseded when Astra's own cross-review lands
 
-Sources in this directory: review-astra.md (Codex Astra first pass), review-fable.md (Fable first pass), cross-fable-seat.md (Fable verifying Astra's findings), cross-astra-seat.md (a second Fable instance standing in for Astra — Codex pool exhausted — verifying Fable's findings and defending Astra's). Owner's concern this answers: "possible that they will agree on findings with no overlap" — after the cross round every item below carries two verdicts. Verdict shorthand: C = confirmed by the other reviewer; R = refuted; ? = could not determine; the reviewer's own rank noted where they differ.
+OWNER RULING 2026-09-15 16:10: "Wait for 7pm. Have astra do it. I want the extra pov explicitly." — the Astra-seat cross-review below was written by a Fable instance standing in (cross-fable-as-astra-seat.md); it does NOT count as Astra's point of view. Astra runs its own cross-review of review-fable.md after the Codex pool resets (19:00 CDT); this ledger is then REBUILT from the two genuine cross-reviews. The cleanup lane that had started on this provisional ledger was STOPPED and its branch discarded; nothing from it is on master.
+
+# (provisional content follows)
+
+Sources in this directory: review-astra.md (Codex Astra first pass), review-fable.md (Fable first pass), cross-fable-seat.md (Fable verifying Astra's findings), cross-fable-as-astra-seat.md (a second Fable instance standing in for Astra while the Codex pool was exhausted — NOT Astra's POV; retained for the record only). Owner's concern this answers: "possible that they will agree on findings with no overlap" — after the cross round every item below carries two verdicts. Verdict shorthand: C = confirmed by the other reviewer; R = refuted; ? = could not determine; the reviewer's own rank noted where they differ.
 
 Corpus caveat (both): the wave-80 corpus predates the W81 lanes; every W81 mechanism is judged on code only.
 
