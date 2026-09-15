@@ -404,22 +404,46 @@ void MTGPlayerCards::drawFromLibrary()
     //the same `putInZone` the reveal's own force-close and option-two paths
     //use, and CardDisplay::Update re-inits an open display whose zone changed,
     //so this cannot strand the display either.
-    if (!library->nb_cards && reveal)
+    //#W82-EB (audit-2026-09 item 2, Astra F03 REVERT / Fable G32). THE RESCUE IS
+    //GONE; THE REVEAL IS CLOSED INSTEAD.
+    //What the rescue above did was take ONE card out of a still-open reveal and
+    //draw it. Astra F03 on why that is not the fix: it only recognises the
+    //logical top when the library is COMPLETELY empty, it never makes the stalled
+    //payload finish, it lets a later operation consume a card the reveal driver
+    //still references, and `previousZone` names a previous move rather than an
+    //active reveal transaction. Worse, it converted a visibly broken resolution
+    //into continued play - a deck-out with the whole library parked became
+    //silently survivable, which is CR 704.5b quietly switched off.
+    //A draw finding an empty library with cards parked out of it means a reveal
+    //is open that cannot complete (CR 117.2e: no player has priority while a
+    //spell or ability is resolving, so nothing should be drawing mid-reveal).
+    //Close it: its options leave the action layer and every parked card goes back
+    //to the library it never left (CR 701.20b). Then the draw proceeds against
+    //the real library - and if the library is genuinely empty, the deck-out
+    //stands.
+    if (!library->nb_cards && reveal && reveal->nb_cards)
     {
-        MTGCardInstance * parked = NULL;
-        for (int i = 0; i < reveal->nb_cards; ++i)
-        {
-            //The reveal takes the library's TOP first, so the first parked
-            //card in zone order is the one this draw is owed.
+        bool parked = false;
+        for (int i = 0; i < reveal->nb_cards && !parked; ++i)
             if (i < (int) reveal->cards.size() && reveal->cards[i]
                 && reveal->cards[i]->previousZone == library)
-            {
-                parked = reveal->cards[i];
-                break;
-            }
-        }
+                parked = true;
         if (parked)
-            putInZone(parked, reveal, library);
+        {
+            extern int closeParkedRevealsInto(GameObserver * g, MTGGameZone * revealZone);
+            GameObserver * obs = owner ? owner->getObserver() : NULL;
+            int closed = obs ? closeParkedRevealsInto(obs, reveal) : 0;
+            DebugTrace("MTGPlayerCards::drawFromLibrary: a draw found the library empty with "
+                       << reveal->nb_cards << " card(s) parked in the reveal zone - closed "
+                       << closed << " stalled reveal(s); the cards go back to the library "
+                       << "they never left (CR 701.20b)");
+            //An orphaned park (the reveal that made it is already gone) is still
+            //a library the rules say is full: put the cards back directly.
+            for (int i = reveal->nb_cards - 1; i >= 0; --i)
+                if (i < (int) reveal->cards.size() && reveal->cards[i]
+                    && reveal->cards[i]->previousZone == library)
+                    putInZone(reveal->cards[i], reveal, library);
+        }
     }
     if (!library->nb_cards)
     {

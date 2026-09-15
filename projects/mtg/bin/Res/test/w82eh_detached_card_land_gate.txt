@@ -1,0 +1,34 @@
+#NAME: A card attached to no game observer is not playable (#W82-EH, crash B)
+#DESC: audit-2026-09 item 8. Heuristic-seat SIGSEGV: cores 393716 and 395840 on
+#DESC: master 8826da7c9, and cores 474128 and 478112 reproduced by this lane's own
+#DESC: heuristic A/B run (games 146v152-r9 and 125v146-r10). One frame every time:
+#DESC: MayAbility::Update arms its menu with ActionLayer::setMenuObject(source),
+#DESC: setMenuObject walks the action layer asking every element
+#DESC: isReactingToTargetClick(source), and a land's CAN_PLAY_LAND row reaches
+#DESC: LegalActionsOracle::canPlayLandNow -> MTGCardInstance::
+#DESC: StackIsEmptyandSorcerySpeed, whose FIRST line is
+#DESC: `getObserver()->isInterrupting`. In core 478112 the subject is a card whose
+#DESC: name is empty and whose observer is NULL - the engine's own log calls it
+#DESC: `StackAbility. (Source: )`, in the untap step, exactly as the master cores
+#DESC: describe.
+#DESC: FIX: every gate in canPlayLandNow asks about THAT CARD'S game; with no game
+#DESC: the honest answer is no. Both halves of the rail refuse rather than
+#DESC: dereference.
+#DESC: RED with the rail reverted: this does not fail, it SEGFAULTS the run - which
+#DESC: is the crash under test.
+#DESC: GREEN: the gate answers "not playable" and the game continues.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mountain
+inplay:Mind Stone
+[PLAYER2]
+[DO]
+assertdetachedcardland Mountain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mountain
+inplay:Mind Stone
+[PLAYER2]
+[END]

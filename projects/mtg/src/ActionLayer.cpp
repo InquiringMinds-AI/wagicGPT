@@ -155,6 +155,106 @@ int ActionLayer::purgeDeadReferences(MTGGameZone * zone)
     return evicted;
 }
 
+//#W82-EH (audit-2026-09 item 8): the per-CARD form of the sweep above. Same
+//pointer-identity discipline (no dereference of the doomed card), same
+//ownership contract; see GameObserver::purgeDeadReferencesForCard for why the
+//zone-scoped sweep could not catch this class.
+int ActionLayer::purgeDeadReferencesForCard(MTGCardInstance * doomed)
+{
+    if (!doomed)
+        return 0;
+    int evicted = 0;
+    for (size_t i = 0; i < mObjects.size(); i++)
+    {
+        MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
+        if (a && a->target == (Targetable *) doomed)
+            a->target = NULL;
+    }
+    for (size_t i = 0; i < garbage.size(); i++)
+    {
+        MTGAbility * a = dynamic_cast<MTGAbility *>(garbage[i]);
+        if (a && a->target == (Targetable *) doomed)
+            a->target = NULL;
+    }
+    bool again = true;
+    while (again)
+    {
+        again = false;
+        for (size_t i = 0; i < mObjects.size(); i++)
+        {
+            MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
+            if (!a || a->source != doomed)
+                continue;
+            if (moveToGarbage(a))
+                evicted++;
+            again = true;
+            break;
+        }
+    }
+    if (currentActionCard == doomed)
+        currentActionCard = NULL;
+    if (menuObject == (Targetable *) doomed)
+        menuObject = NULL;
+    return evicted;
+}
+
+//#W82-EH (audit-2026-09 item 8, crash B). A DELETED ELEMENT MUST NOT STAY IN
+//THE LAYER.
+//
+//ActionLayer.h already names the hazard: "registration and ownership are
+//decoupled (a parent's destructor deletes children that are still registered)".
+//That is the crash: core 474128's MayAbility is at mObjects[i] in
+//ActionLayer::Update, it is NOT in `garbage`, and its own fields are ASCII
+//rubble ('0x3030303030303030', a fragment of another object's string) - freed
+//memory that the layer is still updating, whose `source` pointer therefore
+//reads as a card that is gone (LegalActionsOracle::canPlayLandNow ->
+//MTGCardInstance::StackIsEmptyandSorcerySpeed on freed storage). The two master
+//cores (393716 / 395840) are the same frame.
+//
+//Ownership is not fixable here without a refactor of who deletes whom, but
+//REGISTRATION is: whatever deletes an ability, ~MTGAbility calls this, and the
+//element leaves every index the layer holds before its storage is reused. No
+//destroy() is run (the object is already being destroyed and its owner has that
+//contract); this is pointer bookkeeping only. mObjects and manaObjects are
+//ERASED because their readers assume live non-null entries; garbage and
+//menuRowElements are NULLED because their readers index by position.
+void ActionLayer::forgetElement(ActionElement * e)
+{
+    if (!e)
+        return;
+    for (size_t k = 0; k < menuRowElements.size(); k++)
+        if (menuRowElements[k] == e)
+            menuRowElements[k] = NULL;
+    for (size_t k = 0; k < mDestroying.size(); k++)
+        if (mDestroying[k] == e)
+            mDestroying[k] = NULL;
+    for (size_t k = 0; k < garbage.size(); k++)
+        if (garbage[k] == e)
+            garbage[k] = NULL;
+    for (size_t k = 0; k < manaObjects.size(); k++)
+        if (manaObjects[k] == e)
+        {
+            manaObjects.erase(manaObjects.begin() + k);
+            break;
+        }
+    bool found = false;
+    for (size_t k = 0; k < mObjects.size(); k++)
+        if (mObjects[k] == e)
+        {
+            mObjects.erase(mObjects.begin() + k);
+            found = true;
+            break;
+        }
+    if (found)
+    {
+        mReactions.erase(e);
+        if (currentWaitingAction == e)
+            currentWaitingAction = NULL;
+        DebugTrace("ActionLayer: an element was DELETED while still registered - "
+                   "dropped it from the layer before its storage could be reused");
+    }
+}
+
 void ActionLayer::cleanGarbage()
 {
     for (size_t i = 0; i < garbage.size(); ++i)
@@ -225,6 +325,9 @@ void ActionLayer::Update(float dt)
     stuffHappened = 0;
     if (menuObject)
     {
+        rebuildExpiredMandatoryMenu(); //#W82-EG (audit-2026-09 item 4)
+        if (!menuObject)
+            return;                    //the menu had no legal row left and closed
         abilitiesMenu->Update(dt);
         return;
     }
@@ -612,8 +715,21 @@ bool ActionLayer::getMenuControlId(int menuIndex, int & slot)
     if (!abilitiesMenu || menuIndex < 0 || (size_t) menuIndex >= abilitiesMenu->mObjects.size())
         return false;
     slot = abilitiesMenu->mObjects[menuIndex]->GetId();
-    if (abilitiesMenu->isMultipleChoice || slot <= 0)
+    //A row id <= 0 is a SENTINEL, never a position: -1 is the cancel row and 0
+    //is the engine's "not a selectable option". It is handed back untouched and
+    //every caller is contractually forbidden to index mObjects with it.
+    if (slot <= 0)
         return true;
+    //#W82-EF (audit-2026-09, crash A - SIGABRT core 397278, heuristic seat).
+    //A MULTIPLE-CHOICE menu's rows carry no identity (setCustomMenuObject adds
+    //every row with the SAME id, `mObjects.size()-1`, captured at ARM time), so
+    //that id is a stale position the moment the layer shrinks under the armed
+    //menu - and AIPlayerBaka::selectMenuOption indexed mObjects with it:
+    //`vector::_M_range_check: __n (which is 248) >= this->size()`. The id can no
+    //longer be trusted as a slot, so say so rather than hand back an index that
+    //may name nothing (or the wrong ability).
+    if (abilitiesMenu->isMultipleChoice)
+        return ((size_t) slot < mObjects.size());
     ActionElement * armed = ((size_t) menuIndex < menuRowElements.size())
                             ? menuRowElements[menuIndex] : NULL;
     if (!armed)
@@ -648,6 +764,79 @@ bool ActionLayer::getLiveMenuSlot(int controlid, int & slot)
         return true;
     }
     return false;
+}
+
+//#W82-EG (audit-2026-09 item 4; Astra F07, Fable G8). A MANDATORY MENU WHOSE
+//ROWS HAVE VANISHED GETS A COMPLETION PATH.
+//
+//The W58-F row-identity map is the real fix for a real SIGABRT (an armed menu's
+//stored positions naming a different ability, or none, after removeFromGame
+//compacted the vector) and it stays. What it did not answer is the case where
+//EVERY row has gone: getMenuControlId then refuses every row, so no answer can
+//be given, and the menu is noncancelable by construction (`must`) - an
+//unanswerable decision that holds the action layer, and with it the phase.
+//Astra F07: "If all rows of a noncancelable menu expire, skipping/re-asking them
+//does not reconstruct the underlying menu. The code leaves it armed."
+//
+//So reconstruct it. setMenuObject builds the row set from the abilities that are
+//reacting to this object RIGHT NOW, which is the current legal set - the same
+//question the menu was armed to ask, asked again of the live game. Nothing is
+//removed and nothing is answered for anybody: a rebuild that still finds rows
+//re-presents them; a rebuild that finds NONE means there is no longer any legal
+//answer to give, and the menu closes rather than standing forever (CR 117.3d:
+//"If a player has priority and chooses not to take any actions, that player
+//passes" - a decision with no legal option is not a decision the player owes).
+//Ordinary (cancelable) menus are untouched: they already have an answer, Cancel.
+bool ActionLayer::rebuildExpiredMandatoryMenu()
+{
+    if (!menuObject || !abilitiesMenu || !cantCancel)
+        return false;
+    if (abilitiesMenu->isMultipleChoice)
+        return false; //custom menus carry no row identities to expire
+    bool anyLive = false;
+    for (size_t i = 0; i < abilitiesMenu->mObjects.size() && !anyLive; i++)
+    {
+        int slot = 0;
+        if (getMenuControlId((int) i, slot))
+            anyLive = true;
+    }
+    if (anyLive)
+        return false;
+    //The object itself may be what left the game. Nothing can be rebuilt on a
+    //card the game no longer holds, and reading it is the crash-B class.
+    MTGCardInstance * asCard = dynamic_cast<MTGCardInstance *>(menuObject);
+    if (asCard && observer && !observer->validateCardPointer(asCard))
+    {
+        DebugTrace("ActionLayer: mandatory menu closed - its subject has left the game");
+        menuObject = 0;
+        currentActionCard = NULL;
+        menuObjectName.clear();
+        menuObjectText.clear();
+        cantCancel = 0;
+        return true;
+    }
+    Targetable * subject = menuObject;
+    setMenuObject(subject, true);
+    bool rebuilt = false;
+    for (size_t i = 0; i < abilitiesMenu->mObjects.size() && !rebuilt; i++)
+    {
+        int slot = 0;
+        if (getMenuControlId((int) i, slot))
+            rebuilt = true;
+    }
+    if (rebuilt)
+    {
+        DebugTrace("ActionLayer: mandatory menu rebuilt from the current legal set ("
+                   << abilitiesMenu->mObjects.size() << " row(s))");
+        return true;
+    }
+    DebugTrace("ActionLayer: mandatory menu had no legal row left - closing it");
+    menuObject = 0;
+    currentActionCard = NULL;
+    menuObjectName.clear();
+    menuObjectText.clear();
+    cantCancel = 0;
+    return true;
 }
 
 void ActionLayer::doReactTo(int menuIndex)

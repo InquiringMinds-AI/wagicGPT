@@ -1,0 +1,48 @@
+#NAME: A library search may legally FAIL TO FIND (#W82-EC, audit-2026-09 item 3)
+#DESC: CR 701.23b: "If a player is searching a hidden zone for cards with a stated
+#DESC: quality, such as a card with a certain card type or color, that player isn't
+#DESC: required to find some or all of those cards even if they're present in that
+#DESC: zone." Idyllic Tutor (Scryfall / mtg.txt:57032: "Search your library for an
+#DESC: enchantment card, reveal it, and put it into your hand. Then shuffle.") is
+#DESC: exactly that search, and its own script carries the failed outcome -
+#DESC: optiontwo is `all(*|reveal) bottomoflibrary and!(shuffle)!`.
+#DESC: The engine could not REACH it: option one is `target(<1>enchantment|reveal)`,
+#DESC: so targetMin is set and CheckUserInput ignored a zero-target BTN_NEXT; the
+#DESC: wave-67 repair answered that by CLICKING THE FIRST LEGAL CARD for the seat,
+#DESC: which takes a card the rules let the player decline. The repair now goes the
+#DESC: other way: the empty answer is made reachable, which is the option the rules
+#DESC: give and the engine was missing. Nothing is removed - a mandatory chooser
+#DESC: that is NOT such a search still gets the wave-67 floor.
+#DESC: FIXTURE: `revealasync` opts this scripted seat into the real interactive-AI
+#DESC: driver and names a card that is not in the library, so the stub selects
+#DESC: NOTHING - the state a refused reply leaves. `revealstallbudget` shrinks only
+#DESC: the no-progress tick budget.
+#DESC: RED on base (wagic-fixaudit-base): the driver clicks Wild Growth for the
+#DESC: seat - hand:Wild Growth, library 4.
+#DESC: GREEN: the search finds nothing, all five cards go back to the library and
+#DESC: are shuffled, the hand is empty and the spell is in the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:plains,island,swamp
+hand:Idyllic Tutor
+library:Grizzly Bears,Gray Ogre,Wild Growth,Juggernaut,Craw Wurm
+[PLAYER2]
+[DO]
+revealasync zzznosuchcardzzz
+revealasyncticks 0
+revealstallbudget 10
+plains
+island
+swamp
+Idyllic Tutor
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:*,*,*
+hand:
+graveyard:Idyllic Tutor
+library:*,*,*,*,*
+[PLAYER2]
+[END]

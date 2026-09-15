@@ -1,0 +1,33 @@
+#NAME: A mandatory menu whose rows all left the game gets a completion path
+#DESC: (#W82-EG, audit-2026-09 item 4; Astra F07.)
+#DESC: The wave-58 row-identity map fixed a real SIGABRT (a stored row index
+#DESC: naming a different ability, or none, after removeFromGame compacted the
+#DESC: vector) and it stays. What it did not answer: a MANDATORY menu has no
+#DESC: Cancel row by construction, so once every row's ability has left the game
+#DESC: no answer can be given at all - the menu stays armed, holding the action
+#DESC: layer and with it the phase. Astra F07: "If all rows of a noncancelable
+#DESC: menu expire, skipping/re-asking them does not reconstruct the underlying
+#DESC: menu. The code leaves it armed."
+#DESC: FIX: on the next tick the menu is REBUILT from the abilities reacting to
+#DESC: its subject right now - the current legal set, the same question re-asked -
+#DESC: and closed only when that set is empty. CR 117.3d makes a pass out of a
+#DESC: player who "chooses not to take any actions"; a decision with no legal
+#DESC: option is not a decision the player owes. No legal option is removed:
+#DESC: a rebuild that finds rows re-presents every one of them.
+#DESC: WITNESS: the two-row test artifact, armed MUST, both rows removed.
+#DESC: RED on base (wagic-fixaudit-base): "left a MANDATORY menu armed with no
+#DESC: answerable row (2 row(s) armed, 0 answerable before the tick, 0 after)".
+#DESC: GREEN: the rebuild finds nothing legal and the menu closes.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[DO]
+assertexpiredmenu W58 Stale Menu Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[END]

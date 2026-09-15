@@ -1,0 +1,48 @@
+#NAME: A stale edict victim re-opens the SACRIFICE CHOICE (#W82-EA, audit item 1)
+#DESC: Tribute to Hunger (Scryfall/Gatherer Oracle, matching mtg.txt:124074's text=):
+#DESC: "Target opponent sacrifices a creature of their choice. You gain life equal
+#DESC: to that creature's toughness." CR 608.2d: choices an effect offers other
+#DESC: than those made when it was put on the stack are announced by THE PLAYER
+#DESC: while applying the effect. The engine binds the victim when the granted
+#DESC: ability goes on the stack, so a second copy can resolve against a body that
+#DESC: is already gone; the wave-71 repair then had the ENGINE pick the remaining
+#DESC: creature with the LOWEST TOUGHNESS. That is a human-facing rules regression
+#DESC: (on the Vita the player loses a creature they were never asked about).
+#DESC: WITNESS: P2 holds Llanowar Elves (1 toughness), Grizzly Bears (2) and
+#DESC: Hill Giant (3). Two Tributes resolve against the same stored victim; the
+#DESC: second re-opens the choice to P2, whose own seat answers it.
+#DESC: PRE-FIX the engine took the lowest-toughness body regardless of the seat.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tribute to Hunger,Tribute to Hunger
+manapool:{4}{B}{B}
+life:20
+[PLAYER2]
+inplay:Llanowar Elves,Grizzly Bears,Hill Giant
+life:20
+[DO]
+Tribute to Hunger
+p2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+assertedictchoice p2 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tribute to Hunger,Tribute to Hunger
+life:24
+[PLAYER2]
+inplay:Grizzly Bears
+graveyard:Llanowar Elves,Hill Giant
+life:20
+[END]

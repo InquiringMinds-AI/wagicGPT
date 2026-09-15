@@ -3087,6 +3087,14 @@ int AIPlayerBaka::selectMenuOption()
                     continue;
                 if(slot <= 0)
                     continue;
+                //#W82-EF (audit-2026-09, crash A - SIGABRT core 397278). The id
+                //a MULTIPLE-CHOICE row carries is a position captured when the
+                //menu was armed, and the action layer compacts under an armed
+                //menu: `vector::_M_range_check: __n (which is 248) >= size()`
+                //came through here. getMenuControlId now refuses an id the layer
+                //no longer holds; this is the belt to that braces.
+                if ((size_t) slot >= object->mObjects.size())
+                    continue;
 
                 MTGAbility * checkEff = (MTGAbility *)object->mObjects[slot];
                 int checked = getEfficiency(checkEff);
@@ -3148,23 +3156,90 @@ bool AIPlayerBaka::menuPassNoProgress(const std::string & probe, std::string & l
 //stack depth and the armed menu's own name. It is not a serialization and does
 //not need to be - a livelock is byte-identical in all of them, and any real
 //progress changes at least one.
+//#W82-ED (audit-2026-09 item 5, Astra F05 defects 1-3). THE FORCED PASS FIRES
+//ON A PROVEN IDENTICAL STATE, NEVER ON A COUNT.
+//
+//The wave-71 fingerprint was turn/phase, both life totals, four zone counts per
+//seat, the stack depth and the armed menu's name - and NOTHING else. Astra F05:
+//"It omits mana, tapped state, counters, abilities, control, card identities,
+//exile, command zone, and reveal. Productive counter placement or mana production
+//can therefore look like NO PROGRESS." A repeat of a fingerprint that cannot see
+//the work IS a count of iterations wearing a state's clothes, and passing on it
+//takes a window the seat was using: CR 117.3d only makes a pass out of a player
+//who "chooses not to take any actions".
+//
+//So the digest now moves whenever anything the seat could have acted on moved:
+//every card identity on both battlefields with its tapped/phased/summoning state,
+//its live power and toughness and its counter total; both mana pools; hand,
+//graveyard, exile, command and reveal contents by id; and - the second half of
+//the brief's test - the seat's own LEGAL ACTION SET, read from the engine's own
+//oracle, so an action becoming available (or ceasing to be) is progress even when
+//no zone moved. Built only on ticks already at the hold floor (see Act), so the
+//ordinary tick pays nothing for it.
 std::string AIPlayerBaka::menuPassProbe()
 {
     if (!observer)
         return std::string();
     std::ostringstream o;
-    o << observer->turn << ':' << observer->getCurrentGamePhase();
+    o << observer->turn << ':' << observer->getCurrentGamePhase()
+      << ':' << (int) observer->combatStep;
     for (int i = 0; i < 2; i++)
     {
         Player * p = observer->players[i];
-        if (!p)
+        if (!p || !p->game)
             continue;
-        o << '|' << p->life << ',' << p->game->hand->nb_cards << ',' << p->game->inPlay->nb_cards
-          << ',' << p->game->graveyard->nb_cards << ',' << p->game->library->nb_cards;
+        o << '|' << p->life;
+        ManaCost * pool = p->getManaPool();
+        o << ',' << (pool ? pool->getConvertedCost() : 0);
+        if (pool)
+            for (int c = 0; c < Constants::NB_Colors; c++)
+                o << '.' << pool->getCost(c);
+        MTGGameZone * zones[] = { p->game->inPlay, p->game->hand, p->game->graveyard,
+                                  p->game->exile, p->game->commandzone, p->game->reveal,
+                                  p->game->stack };
+        for (int z = 0; z < 7; z++)
+        {
+            MTGGameZone * zone = zones[z];
+            if (!zone)
+                continue;
+            o << '/' << zone->nb_cards;
+            for (int k = 0; k < zone->nb_cards; k++)
+            {
+                MTGCardInstance * c = zone->cards[k];
+                if (!c)
+                {
+                    o << ",-";
+                    continue;
+                }
+                o << ',' << c->getId();
+                if (zone == p->game->inPlay)
+                    o << ':' << (c->isTapped() ? 1 : 0)
+                      << (c->isPhased ? 'p' : '.')
+                      << (c->hasSummoningSickness() ? 's' : '.')
+                      << c->getCurrentPower() << '/' << c->getCurrentToughness()
+                      << '+' << (c->counters ? (int) c->counters->mCount : 0);
+            }
+        }
+        o << '/' << p->game->library->nb_cards; //hidden: count only
     }
     ActionLayer * al = observer->mLayers ? observer->mLayers->actionLayer() : NULL;
     o << '|' << (observer->mLayers ? (int) observer->mLayers->stackLayer()->mObjects.size() : -1)
       << '|' << (al ? al->menuObjectName : std::string());
+    //The legal-action SET, not its size: an action appearing or disappearing is
+    //progress even when every count above is unchanged.
+    {
+        BakaManaPolicy policy(this);
+        ManaCost * pool = getManaPool();
+        vector<LegalActionsOracle::Cast> casts = LegalActionsOracle::legalCasts(this, policy, pool, false);
+        vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
+        o << "|L";
+        for (size_t i = 0; i < casts.size(); i++)
+            o << ',' << (casts[i].card ? casts[i].card->getId() : 0)
+              << (casts[i].viaAlternative ? 'a' : '.');
+        o << ";";
+        for (size_t i = 0; i < lands.size(); i++)
+            o << ',' << (lands[i].card ? lands[i].card->getId() : 0);
+    }
     return o.str();
 }
 
@@ -3193,6 +3268,8 @@ void AIPlayerBaka::latchDeclinedFace(MTGCardInstance * card)
 {
     if (!card || !observer)
         return;
+    if (!usesDeclinedFaceLatch()) //#W82-EE (item 6): not this seat's mechanism
+        return;
     if (mDeclinedFaceTurn != observer->turn)
     {
         mDeclinedFaceCards.clear();
@@ -3215,6 +3292,19 @@ void AIPlayerBaka::latchDeclinedFace(MTGCardInstance * card)
 bool AIPlayerBaka::faceDeclinedThisTurn(MTGCardInstance * card)
 {
     if (!card || !observer)
+        return false;
+    //#W82-EE (audit-2026-09 item 6, Astra F05 defect 6 / Fable G20). THE LATCH
+    //IS THE DECLINING SEAT'S MECHANISM, AND ORDINARY BAKA IS NOT IT.
+    //latchDeclinedFace is only ever reached through
+    //DecisionManager::applyMenuChoice, which the heuristic seat never calls - it
+    //answers menus directly through ActionLayer. Yet this predicate ran for every
+    //LAND candidate on every FindCardToPlay call, building a declineWindowProbe()
+    //ostringstream each time, for a feature Baka cannot arm. On the owner's Vita
+    //that is an allocation per land per main-phase tick at 444 MHz. The seat that
+    //arms the latch says so (usesDeclinedFaceLatch, default false); the empty-set
+    //test underneath is the belt to that braces, so a seat that DOES arm it still
+    //pays nothing until it has.
+    if (!usesDeclinedFaceLatch() || mDeclinedFaceCards.empty())
         return false;
     if (mDeclinedFaceTurn != observer->turn)
     {

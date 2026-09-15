@@ -1,37 +1,29 @@
-#W69-BG (K1): a game that ended with no loss condition met.
-#
-#Corpus 20260906-134120, game-146v123-1788720096 stderr:1925-1952. deck123 cast
-#Idyllic Tutor (`Reveal:type:*:mylibrary revealzone(mylibrary)`), which MOVES the
-#whole library into that player's `reveal` zone; the seat answered option one,
-#the payload went on the stack as `StackAbility. (Source: Idyllic Tutor)` and
-#never resolved, so all 42 cards stayed parked. deck146 then cast Vision Skeins
-#(`all(player) draw:2`); the two `10DrawAction`s called
-#MTGPlayerCards::drawFromLibrary on a zone that read 0 cards, and the empty-
-#library branch set deck123 as the loser:
-#`WAGIC_SELFPLAY_RESULT winner=0 life0=19 life1=11 turn=17`, both players over 10
-#life, libraries 42/43. That is the loss check that fired, and why.
-#
-#By the rules revealing does not change a card's zone: those 42 cards were still
-#in the library, so the draw was owed one of them and there was no empty library
-#to lose to. The fix returns the first still-parked card (the library's own top -
-#the reveal takes the top first) and draws it; a genuinely empty library, and a
-#reveal of some OTHER zone (`revealzone(myhand)`), still deck out unchanged.
-#
-#FIXTURE. Lexicon Whole Library Deadend Peek is Idyllic Tutor's whole-library
-#reveal with option one predicate-gated to a land (this library has none) and no
-#option two, so no chooser ever arms and the three cards stay parked - the same
-#parked-library state, reached by a route a script can hold open. `drawcard 1 1`
-#drives MTGPlayerCards::drawFromLibrary directly, the exact call 10DrawAction and
-#the draw step make; no scripted click can reach it while a reveal display is
-#open, because an open display holds every phase advance.
-#
-#RED on base (measured, engine file reverted, everything else in place):
-#`==Card number not the same in player 0's hand==, expected 1, got 0` +
-#`==Card ID not the same. Didn't find 205` - drawFromLibrary set player 1 as the
-#loser and the duel left the play phase before the draw could happen (the log
-#reads `drawcard: player 1 draws 1 (library 0, reveal 3)` then `leaveduelphase`).
-#GREEN after: gameover none and Hill Giant (the library's top, revealed first)
-#in hand.
+#NAME: A draw with the library parked in the reveal zone CLOSES the reveal
+#DESC: (#W69-BG K1, rewritten by #W82-EB - audit-2026-09 item 2, Astra F03.)
+#DESC: Corpus 20260906-134120, game-146v123-1788720096: deck123 cast Idyllic Tutor
+#DESC: (`Reveal:type:*:mylibrary revealzone(mylibrary)`), which MOVES the whole
+#DESC: library into that player's `reveal` zone; the payload went on the stack as
+#DESC: `StackAbility. (Source: Idyllic Tutor)` and never resolved, so all 42 cards
+#DESC: stayed parked. deck146's Vision Skeins then drew on a library reading 0 and
+#DESC: deck123 lost with 42 cards left.
+#DESC: CR 701.20b: "Revealing a card doesn't cause it to leave the zone it's in." -
+#DESC: those cards were still in the library, so CR 704.5b's empty-library loss did
+#DESC: not apply. The wave-69 repair pulled ONE parked card back at draw time. That
+#DESC: is a symptom patch on a shared path: the stalled reveal is still stalled
+#DESC: afterwards, the library stays mis-modelled for every other reader, and a
+#DESC: genuine deck-out becomes silently survivable while any card sits parked.
+#DESC: FIX: the reveal that owns the parked cards is CLOSED (options out of the
+#DESC: action layer, every card back to the library it never left), and the draw
+#DESC: then runs against the real library - deck-out included, when it is real.
+#DESC: FIXTURE. Lexicon Whole Library Deadend Peek is Idyllic Tutor's whole-library
+#DESC: reveal with option one predicate-gated to a land (this library has none) and
+#DESC: no option two, so no chooser ever arms and the three cards stay parked.
+#DESC: `drawcard 1 1` drives MTGPlayerCards::drawFromLibrary directly, the exact
+#DESC: call 10DrawAction and the draw step make.
+#DESC: RED on base (wagic-fixaudit-base): the rescue returns ONE card and draws it -
+#DESC: library 0 with two cards still stranded in the reveal zone.
+#DESC: GREEN: the reveal is closed, all three cards are back, Hill Giant (the top,
+#DESC: revealed first) is drawn and TWO cards remain in the library.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -47,6 +39,6 @@ FIRSTMAIN
 [PLAYER1]
 graveyard:Lexicon Whole Library Deadend Peek
 hand:Hill Giant
-library:
+library:*,*
 [PLAYER2]
 [END]

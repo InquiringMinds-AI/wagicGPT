@@ -1,0 +1,31 @@
+#NAME: A multiple-choice row id is not a slot once the layer compacts (#W82-EF)
+#DESC: audit-2026-09, crash A. Heuristic-seat SIGABRT, core pid 397278:
+#DESC: `vector::_M_range_check: __n (which is 248) >= this->size()` at
+#DESC: AIPlayerBaka::selectMenuOption - `MTGAbility * checkEff =
+#DESC: (MTGAbility *)object->mObjects[slot];` with `slot` from
+#DESC: ActionLayer::getMenuControlId.
+#DESC: Every row of a MULTIPLE-CHOICE menu is added with the SAME id,
+#DESC: `mObjects.size()-1` captured by setCustomMenuObject at ARM time, and
+#DESC: getMenuControlId short-circuited on isMultipleChoice and handed that id
+#DESC: straight back as a slot. The action layer compacts under an armed menu
+#DESC: (removeFromGame erases from the middle), so the id outlives the positions
+#DESC: it named - this is the same class the W58-F row-identity map was built for,
+#DESC: on the one menu kind the map deliberately does not cover.
+#DESC: FIX: getMenuControlId refuses an id the layer no longer holds, and the
+#DESC: three `mObjects[slot]` readers bounds-check as well.
+#DESC: RED with the engine hunk reverted: "getMenuControlId accepted a stale
+#DESC: multiple-choice row id as slot N with mObjects.size() M".
+#DESC: GREEN: the lookup refuses, so no reader can index with it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[DO]
+assertmultichoicestaleid W58 Stale Menu Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:W58 Stale Menu Witness
+[PLAYER2]
+[END]

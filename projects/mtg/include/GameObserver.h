@@ -329,6 +329,10 @@ class GameObserver{
   //cards are about to be freed, then hand the same zone to the action layer.
   //Called while the cards are still alive.
   void purgeDeadReferences(MTGGameZone * zone);
+  //#W82-EH (audit-2026-09 item 8): the same sweep for ONE card, called from
+  //~MTGCardInstance so a card freed outside the garbage zone (the `previous`
+  //chain the destructor deletes itself) cannot leave an ability holding it.
+  void purgeDeadReferencesForCard(MTGCardInstance * doomed);
   //#W57-F (D34): free the armed chooser and the cast waiting on it together -
   //cardWaitingForTargets is protected, and the two are one state.
   void releaseTargetChooser();

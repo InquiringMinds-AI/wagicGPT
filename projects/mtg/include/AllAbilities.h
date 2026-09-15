@@ -163,6 +163,13 @@ public:
     //a seat's generic action pass must leave that reveal's chooser alone.
     static bool drivingFor(GameObserver * g, MTGCardInstance * card);
     TargetChooser * ownChooser();          //the current chooser iff it is THIS reveal's
+    //#W82-EC (audit-2026-09 item 3): CR 701.23b - "If a player is searching a
+    //hidden zone for cards with a stated quality ... that player isn't required
+    //to find some or all of those cards even if they're present in that zone."
+    //True when THIS reveal is such a search, so a zero-pick finalize is a LEGAL
+    //answer ("find nothing") instead of a button the engine has to press for the
+    //player. Reads the reveal's own source zone and its live chooser.
+    bool searchMayFailToFind();
     //Input arming. False from the moment the display opens until it has been
     //through one full Render, so no button can answer a display the player has
     //not been shown yet. See flushInputForNewDisplay() in AllAbilities.cpp.

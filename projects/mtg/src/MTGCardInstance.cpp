@@ -327,6 +327,12 @@ void MTGCardInstance::clearAbilityRegistry()
 
 MTGCardInstance::~MTGCardInstance()
 {
+    //#W82-EH (audit-2026-09 item 8, crash B). Whatever route freed this card,
+    //no ability may be left holding it. The zone sweep only ever sees the
+    //garbage zone; the `previous` chain below is deleted straight from here and
+    //is in no zone at all. See GameObserver::purgeDeadReferencesForCard.
+    if (getObserver())
+        getObserver()->purgeDeadReferencesForCard(this);
     //drop the back-links before the vector dies, or an ability outliving this
     //card would later try to erase itself from freed storage
     clearAbilityRegistry();
@@ -1300,6 +1306,19 @@ bool MTGCardInstance::canPlayFromLibrary()
 //check stack
 bool MTGCardInstance::StackIsEmptyandSorcerySpeed()
 {
+    //#W82-EH (audit-2026-09 item 8, crash B - SIGSEGV cores 393716 / 395840 on
+    //master, 474128 / 478112 reproduced in this lane's own A/B run). A CARD WITH
+    //NO OBSERVER IS NOT IN A GAME, AND NOTHING IS SORCERY-SPEED FOR IT.
+    //The frame is always the same: MayAbility::Update arms its menu with
+    //ActionLayer::setMenuObject(source, must), setMenuObject walks the layer
+    //asking every element `isReactingToTargetClick(source)`, and a land's
+    //CAN_PLAY_LAND row reaches LegalActionsOracle::canPlayLandNow -> here. In
+    //core 478112 the subject is a card whose `name` is empty and whose
+    //`observer` is NULL (the engine's own log calls it `StackAbility.
+    //(Source: )`), so the very first line dereferenced NULL. Every question
+    //below is about THIS card's game; with no game the honest answer is no.
+    if (!getObserver())
+        return false;
     Player * whoInterupts = getObserver()->isInterrupting;//leave this so we can actually debug who is interupting/current.
     Player * whoCurrent = getObserver()->currentPlayer;
     if((getObserver()->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0) &&

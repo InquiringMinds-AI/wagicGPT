@@ -534,6 +534,42 @@ void GameObserver::releaseTargetChooser()
     SAFE_DELETE(targetChooser);
 }
 
+//#W82-EH (audit-2026-09 item 8, crash B - SIGSEGV cores 393716 / 395840,
+//heuristic seat, and 474128 / 478112 reproduced by this lane's own A/B run).
+//A CARD ABOUT TO BE FREED MUST LEAVE NO ABILITY POINTING AT IT.
+//
+//The wave-57 sweep (purgeDeadReferences below) is handed the GARBAGE ZONE at
+//MTGPlayerCards::beforeBeginPhase, so it only ever sees cards that die through
+//that route. `~MTGCardInstance` frees its whole `previous` chain directly
+//(`SAFE_DELETE(previous)`), and those instances are in no zone at all: an
+//ability still holding one as its SOURCE was left dangling with nothing to
+//catch it, and the crash frame is that pointer being read - MayAbility::Update
+//arms its menu on `source`, ActionLayer::setMenuObject asks every element
+//`isReactingToTargetClick(source)`, and a land's CAN_PLAY_LAND gate reaches
+//LegalActionsOracle::canPlayLandNow -> MTGCardInstance::StackIsEmptyandSorcery-
+//Speed.
+//So the sweep now runs from the card's OWN destructor, whatever freed it. Same
+//contract as the zone sweep: the object is still intact in its destructor body,
+//an ability whose target is dying has that back-pointer cleared, and an ability
+//whose SOURCE is dying is removed through the layer's ordinary
+//removeFromGame/destroy path - it could not function without its source anyway.
+void GameObserver::purgeDeadReferencesForCard(MTGCardInstance * doomed)
+{
+    if (!doomed || wagicDeadRefSweepDisabled())
+        return;
+    if (cardWaitingForTargets == doomed)
+    {
+        cardWaitingForTargets = NULL;
+        SAFE_DELETE(targetChooser);
+    }
+    if (targetChooser && targetChooser->source == doomed)
+        SAFE_DELETE(targetChooser);
+    if (mExtraPayment && mExtraPayment->source == doomed)
+        mExtraPayment = NULL;
+    if (mLayers && mLayers->actionLayer())
+        mLayers->actionLayer()->purgeDeadReferencesForCard(doomed);
+}
+
 void GameObserver::purgeDeadReferences(MTGGameZone * zone)
 {
     if (!zone || wagicDeadRefSweepDisabled())
