@@ -1502,17 +1502,50 @@ int TestSuiteAI::Act(float)
             }
         }
     }
+    else if (action.find("asserttargetbypass ") == 0)
+    {
+        //#W83-FA (fix-review item 1). `MTGCardInstance::bypassTC` is the field
+        //TargetChooser.cpp consults for shroud, protection and opposing hexproof:
+        //`if (card->has(Constants::SHROUD)) return targetter->bypassTC;`. It is a
+        //property of a CARD, and the wave-82 edict chooser set it on a surviving
+        //creature to express "this chooser does not target" - a permanent bypass
+        //of CR 702.18a / 702.11b on a permanent the player never sacrificed.
+        //Syntax: asserttargetbypass <0|1> <card name>
+        string rest = action.substr(19);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        string cname = rest.size() > 2 ? rest.substr(2) : "";
+        MTGCardInstance * c = getCard(cname);
+        if (!c)
+        {
+            std::cerr << "TESTSUITE asserttargetbypass: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        int got = c->bypassTC ? 1 : 0;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE asserttargetbypass: '" << cname << "' expected bypassTC "
+                      << expect << " got " << got << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
     else if (action.find("assertedictchoice ") == 0)
     {
-        //#W82-EA (audit-2026-09 item 1): was the stale-victim sacrifice RE-OPENED
-        //to the sacrificing player, and to WHICH seat? The engine used to pick the
-        //lowest-toughness body itself, which is a rules regression a human seat
-        //feels (CR 608.2d: the player announces the choice while the effect is
-        //applied) and which no zone assertion can see - the outcome of an
-        //auto-pick and of a seat that happens to agree with it are identical.
+        //#W82-EA (audit item 1) / #W83-FA (fix-review item 5): was the stale-victim
+        //sacrifice RE-OPENED to the sacrificing player, ARMED in the action layer,
+        //and to WHICH seat? The engine used to pick the lowest-toughness body
+        //itself, which is a rules regression a human seat feels (CR 608.2d: the
+        //player announces the choice while the effect is applied) and which no
+        //zone assertion can see - the outcome of an auto-pick and of a seat that
+        //happens to agree with it are identical. The wave-82 witness was written
+        //BEFORE addToGame and so proved only an intention; `armed` is now stamped
+        //from the far side of the registration, with the chooser's Owner checked.
         //Syntax: assertedictchoice <none|p1|p2> [count]
         extern Player * gEdictRechoiceOwner;
         extern int gEdictRechoicesOffered;
+        extern bool gEdictRechoiceArmed;
         string rest = action.substr(18);
         string want = rest;
         int wantCount = -1;
@@ -1524,12 +1557,15 @@ int TestSuiteAI::Act(float)
         }
         Player * got = gEdictRechoiceOwner;
         string gotName = !got ? "none" : (got == observer->players[0] ? "p1" : "p2");
-        if (gotName != want || (wantCount >= 0 && gEdictRechoicesOffered != wantCount))
+        const bool wantArmed = (want != "none");
+        if (gotName != want || (wantCount >= 0 && gEdictRechoicesOffered != wantCount)
+            || (wantArmed && !gEdictRechoiceArmed))
         {
             std::cerr << "TESTSUITE assertedictchoice: expected owner '" << want
                       << "' got '" << gotName << "'"
                       << (wantCount >= 0 ? (", expected count " + std::to_string(wantCount)
                                             + " got " + std::to_string(gEdictRechoicesOffered)) : "")
+                      << ", armed-in-layer " << (gEdictRechoiceArmed ? 1 : 0)
                       << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }
@@ -1821,6 +1857,7 @@ int TestSuiteAI::Act(float)
         }
         int slot = -1;
         bool accepted = al->getMenuControlId(0, slot);
+        //#W82-EF: the stale arm-time id must never come back as a LAYER INDEX...
         if (accepted && slot >= 0 && (size_t) slot >= al->mObjects.size())
         {
             std::cerr << "TESTSUITE assertmultichoicestaleid: getMenuControlId accepted a stale"
@@ -1829,8 +1866,101 @@ int TestSuiteAI::Act(float)
                       << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }
+        //#W83-FD (fix-review item 4): ...and the row must still be ANSWERABLE. A
+        //multiple-choice row's meaning is its MODE INDEX, which the layer cannot
+        //invalidate; refusing it (the wave-82 answer) makes every legal mode of a
+        //live MenuAbility unreachable through doReactTo, which is the AI's and the
+        //script's only route to it - ActionLayer::ButtonPressed dispatches multiple
+        //choice BEFORE slot resolution, so the human seat kept working and the AI
+        //seat did not.
+        if (!accepted)
+        {
+            std::cerr << "TESTSUITE assertmultichoicestaleid: getMenuControlId REFUSED a live"
+                      << " multiple-choice row after the layer compacted - doReactTo returns"
+                      << " without ever reaching ButtonPressedOnMultipleChoice, so the menu's"
+                      << " legal modes are unreachable [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else if (slot >= 0)
+        {
+            std::cerr << "TESTSUITE assertmultichoicestaleid: a multiple-choice row answered with"
+                      << " slot " << slot << ", which reads as a layer index; it must answer with"
+                      << " the mode sentinel [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
         al->menuObject = 0;
         al->currentActionCard = NULL;
+        return 1;
+    }
+    else if (action.find("addcounter ") == 0)
+    {
+        //#W83-FG (fix-review item 8): put ANOTHER counter of an existing kind on a
+        //permanent. That is the exact move `Counters::mCount` cannot see -
+        //Counters.cpp increments `Counter::nb` on the existing RECORD and leaves
+        //the record count alone - so it is the move the wave-82 pass fingerprint
+        //read as "no progress". Syntax: addcounter <card name>
+        string cname = action.substr(11);
+        MTGCardInstance * c = getCard(cname);
+        if (!c || !c->counters)
+        {
+            std::cerr << "TESTSUITE addcounter: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //A NAMED 0/0 counter: it changes no power or toughness, so the only field
+        //that moves is the counter QUANTITY - which is the field under test.
+        c->counters->addCounter("charge", 0, 0);
+        Counter * ch = c->counters->hasCounter("charge", 0, 0);
+        DebugTrace("TESTSUITE addcounter: " << c->getName() << " now carries "
+                   << c->counters->mCount << " counter record(s), charge x"
+                   << (ch ? ch->nb : 0));
+        return 1;
+    }
+    else if (action.find("shrinkactionlayer ") == 0)
+    {
+        //#W83-FD (fix-review item 4): compact the action layer UNDER an armed
+        //menu, which is the condition every stale-row defect needs and which no
+        //scripted sequence can produce on demand. Removes up to N elements from
+        //the TAIL of mObjects - the positions a menu's captured row ids point at -
+        //and never touches a MayAbility/MenuAbility, so the armed menu itself
+        //stays live and answerable. Syntax: shrinkactionlayer <count>
+        int want = atoi(action.substr(18).c_str());
+        ActionLayer * al = observer->mLayers->actionLayer();
+        //Never remove the armed menu itself, nor any of the OPTIONS it offers -
+        //the point is to move the positions those options sit at, not to take the
+        //decision away. A MenuAbility's rows carry no identity at all, so they
+        //have to be identified through the ability that owns them.
+        std::set<ActionElement *> keep;
+        for (size_t k = 0; k < al->mObjects.size(); k++)
+        {
+            MenuAbility * ma = dynamic_cast<MenuAbility *>((ActionElement *) al->mObjects[k]);
+            if (!ma)
+                continue;
+            keep.insert(ma);
+            if (ma->mClone)
+                keep.insert((ActionElement *) ma->mClone);
+            for (size_t o = 0; o < ma->abilities.size(); o++)
+                keep.insert((ActionElement *) ma->abilities[o]);
+            for (size_t o = 0; o < ma->retiredOptions.size(); o++)
+                keep.insert((ActionElement *) ma->retiredOptions[o]);
+        }
+        for (size_t k = 0; k < al->menuRowElements.size(); k++)
+            if (al->menuRowElements[k])
+                keep.insert(al->menuRowElements[k]);
+        int removed = 0;
+        for (int k = (int) al->mObjects.size() - 1; k >= 0 && removed < want; k--)
+        {
+            if ((size_t) k >= al->mObjects.size())
+                continue;
+            ActionElement * e = (ActionElement *) al->mObjects[k];
+            if (!e || dynamic_cast<MayAbility *>(e) || keep.count(e))
+                continue;
+            if (al->moveToGarbage(e))
+                removed++;
+        }
+        DebugTrace("TESTSUITE shrinkactionlayer: removed " << removed
+                   << " element(s); layer is now " << al->mObjects.size());
         return 1;
     }
     else if (action.find("assertexpiredmenu ") == 0)
@@ -1886,6 +2016,21 @@ int TestSuiteAI::Act(float)
                 break;
             }
         }
+        //#W83-FE (fix-review item 6): the card now acquires a NEW voluntary
+        //activated ability - the shape a permanent has when an expired mandatory
+        //TRIGGER leaves it holding an ordinary activation. setMenuObject would
+        //gather it, and the wave-82 rebuild re-armed it WITH NO CANCEL ROW, so a
+        //voluntary action became mandatory. Nothing may be re-armed on it.
+        {
+            AbilityFactory af(observer);
+            MTGAbility * volunteer = af.parseMagicLine("{0}:name(Voluntary row) life:1 controller",
+                                                       0, NULL, card);
+            if (volunteer)
+                volunteer->addToGame();
+            else
+                std::cerr << "TESTSUITE assertexpiredmenu: could not grant the voluntary row"
+                          << " [" << suite->filename << "]" << std::endl;
+        }
         //Is any answer reachable right now? (Before the tick: no.)
         int answerable = 0;
         for (size_t i = 0; al->abilitiesMenu && i < al->abilitiesMenu->mObjects.size(); i++)
@@ -1912,6 +2057,22 @@ int TestSuiteAI::Act(float)
                       << " answerable before the tick, " << afterRows << " after)"
                       << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
+        }
+        //#W83-FE (fix-review item 6): and it must not have been REBUILT onto the
+        //voluntary ability granted above. A mandatory menu has no Cancel row, so
+        //re-arming it on an activation the player may decline REMOVES the option
+        //not to activate - the failure this whole lane exists to avoid.
+        if (al->menuObject != NULL)
+        {
+            std::cerr << "TESTSUITE assertexpiredmenu: '" << cname
+                      << "' REBUILT a mandatory menu after its own rows expired ("
+                      << afterRows << " answerable row(s), cantCancel="
+                      << al->checkCantCancel() << ") - a voluntary activation must not"
+                      " become a decision the player cannot decline"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            al->menuObject = 0; //leave the layer usable for the rest of the script
+            al->currentActionCard = NULL;
         }
         return 1;
     }
@@ -2613,8 +2774,10 @@ void TestSuite::initGame(GameObserver* g)
     //#W82-EA (audit-2026-09 item 1): the edict re-choice witness is per-GAME.
     extern Player * gEdictRechoiceOwner;
     extern int gEdictRechoicesOffered;
+    extern bool gEdictRechoiceArmed;
     gEdictRechoiceOwner = NULL;
     gEdictRechoicesOffered = 0;
+    gEdictRechoiceArmed = false;
     //Suite scripts encode MENU GEOMETRY: the kicker ask-first default adds a
     //"cast with kicker" entry to every kickable card's menu, shifting every
     //scripted `choice N` on those cards. Pin the legacy always-pay behaviour
@@ -3580,8 +3743,10 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     //#W82-EA (audit-2026-09 item 1): the edict re-choice witness is per-GAME.
     extern Player * gEdictRechoiceOwner;
     extern int gEdictRechoicesOffered;
+    extern bool gEdictRechoiceArmed;
     gEdictRechoiceOwner = NULL;
     gEdictRechoicesOffered = 0;
+    gEdictRechoiceArmed = false;
     //same menu-geometry pin as the main-thread suite path (see TestSuite::initGame)
     options[Options::KICKERPAYMENT].number = OptionKicker::KICKER_ALWAYS;
 

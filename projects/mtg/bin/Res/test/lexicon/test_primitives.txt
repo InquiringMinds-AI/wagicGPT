@@ -6448,3 +6448,36 @@ auto=destroy
 restriction=opponentendonly
 text=Test-only (#W72-BU M5): destroy target creature. Castable ONLY during the OPPONENT's end step, so it is cast if and only if this seat is given a response window in the opponent's end step.
 [/card]
+[card]
+id=2100000620
+name=Lexicon Tough Shroud Witness
+rarity=C
+mana={5}
+type=Creature
+subtype=Construct
+power=7
+toughness=7
+abilities=shroud
+text=Test-only (#W83-FA): a SHROUD creature the heuristic will not choose as a sacrifice (it sacrifices the lowest POWER), so an edict re-choice leaves it alive and its shroud can be asserted afterwards.
+[/card]
+[card]
+id=2100000621
+name=Lexicon Unsacrificeable Witness
+rarity=C
+mana={2}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=cantbesacrified
+text=Test-only (#W83-FA): a creature CR 701.21a forbids sacrificing, so an edict's re-choice must never offer it.
+[/card]
+[card]
+id=2100000622
+name=Lexicon Top Card Deadend Peek
+rarity=R
+auto=name(peek) reveal:1 optionone name(take a land) target(<1>land|reveal) moveto(hand) optiononeend revealend
+mana={0}
+type=Sorcery
+text=Test-only (#W83-FC): reveals the TOP CARD ONLY (`reveal:1`) and then stalls - option one is predicate-gated to a land, the fixture's library holds none, and there is no option two, so no chooser ever arms and that one card stays parked while the rest of the library is still physically there. That is the PARTIAL-library case: the parked card is the library's logical top (CR 701.20b), and a draw is owed it before any card still sitting in the library zone.
+[/card]

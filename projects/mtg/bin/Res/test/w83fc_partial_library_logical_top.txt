@@ -1,0 +1,35 @@
+#NAME: A draw takes the parked logical top even with a full library (#W83-FC)
+#DESC: fix-review item 3, second half. The wave-82 draw path only looked for
+#DESC: parked cards when the physical library was COMPLETELY empty, so a draw with
+#DESC: cards still physically present skipped over the revealed card that is
+#DESC: logically above them.
+#DESC:   CR 701.20b "Revealing a card doesn't cause it to leave the zone it's in."
+#DESC: A reveal takes the library's top first, so a card parked out of this library
+#DESC: is the library's logical top and the draw is owed it.
+#DESC: FIXTURE: Lexicon Top Card Deadend Peek reveals the TOP CARD only
+#DESC: (`reveal:1`), with option one predicate-gated to a land this library does not
+#DESC: hold and no option two, so that one card stays parked while four cards
+#DESC: remain physically in the library. `drawcard 1 1` drives
+#DESC: MTGPlayerCards::drawFromLibrary directly.
+#DESC: RED on base (583ae53c8): the library is not empty, so the parked card is
+#DESC: ignored and the draw takes Juggernaut, the physically top card - "Card ID
+#DESC: not the same. Didn't find 205" (Hill Giant, the logical top).
+#DESC: GREEN: Hill Giant is drawn and the reveal is left alone.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Top Card Deadend Peek
+library:Craw Wurm,Grizzly Bears,Gray Ogre,Juggernaut,Hill Giant
+[PLAYER2]
+[DO]
+Lexicon Top Card Deadend Peek
+drawcard 1 1
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Top Card Deadend Peek
+hand:Hill Giant
+library:*,*,*,*
+[PLAYER2]
+[END]

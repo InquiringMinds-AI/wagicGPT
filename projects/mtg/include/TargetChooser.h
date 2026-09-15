@@ -325,6 +325,42 @@ public:
     virtual bool equals(TargetChooser * tc);
 };
 
+//#W83-FA (fix-review item 1 / item 5). THE EDICT'S RESOLUTION-TIME SACRIFICE
+//CHOOSER.
+//
+//An edict whose stored victim can no longer be sacrificed re-opens the choice to
+//the sacrificing player (CR 608.2d). The first cut built that chooser out of
+//`creature|mybattlefield` with a surviving creature as the chooser's `card`,
+//which had two faults the review caught. (a) TargetChooser's ctor sets
+//`targetter = card`, so the `targetter->bypassTC = true` used to express "this is
+//not targeting" MUTATED THAT CREATURE - and TargetChooser.cpp's protection block
+//returns `targetter->bypassTC` for shroud, protection and opposing hexproof, so a
+//creature the player did NOT sacrifice kept a permanent bypass of CR 702.18a /
+//702.11b. (b) `creature|mybattlefield` is not the eligibility the effect has: it
+//admits CANTBESACRIFIED permanents and mutated-down components, which CR 701.21a
+//and AASacrificeCard::resolve both refuse.
+//
+//This chooser fixes both by construction. It never has a `targetter` (so no card
+//is ever mutated and the protection block is skipped - a sacrifice is not
+//targeting), and it answers `canTarget` from the LIVE sacrifice eligibility of
+//the sacrificing player rather than from a type/zone spec, so it can never offer
+//a body the effect could not take.
+class EdictSacrificeChooser: public TargetZoneChooser
+{
+public:
+    Player * sacrificer;          //the player who must sacrifice (CR 701.21a)
+    MTGCardInstance * excluded;   //the stored victim that can no longer be taken
+    EdictSacrificeChooser(GameObserver *observer, Player * _sacrificer,
+                          MTGCardInstance * _excluded, MTGCardInstance * _edictSource = NULL);
+    virtual bool canTarget(Targetable * target, bool withoutProtections = false);
+    //The only zone a sacrifice can come from is the sacrificing player's own
+    //battlefield (CR 701.21a). Answered directly rather than through
+    //intToZone(..., source), which would resolve "whose battlefield" from a
+    //source card this chooser deliberately does not use as a targetter.
+    virtual bool targetsZone(MTGGameZone * z);
+    virtual EdictSacrificeChooser * clone() const;
+};
+
 class dredgeChooser: public TypeTargetChooser
 {
 public:

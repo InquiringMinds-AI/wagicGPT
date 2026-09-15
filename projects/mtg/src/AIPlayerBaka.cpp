@@ -3156,8 +3156,8 @@ bool AIPlayerBaka::menuPassNoProgress(const std::string & probe, std::string & l
 //stack depth and the armed menu's own name. It is not a serialization and does
 //not need to be - a livelock is byte-identical in all of them, and any real
 //progress changes at least one.
-//#W82-ED (audit-2026-09 item 5, Astra F05 defects 1-3). THE FORCED PASS FIRES
-//ON A PROVEN IDENTICAL STATE, NEVER ON A COUNT.
+//#W82-ED (audit-2026-09 item 5, Astra F05 defects 1-3) / #W83-FG (fix-review
+//item 8). THE FORCED PASS FIRES ON A PROVEN IDENTICAL STATE, NEVER ON A COUNT.
 //
 //The wave-71 fingerprint was turn/phase, both life totals, four zone counts per
 //seat, the stack depth and the armed menu's name - and NOTHING else. Astra F05:
@@ -3168,14 +3168,24 @@ bool AIPlayerBaka::menuPassNoProgress(const std::string & probe, std::string & l
 //takes a window the seat was using: CR 117.3d only makes a pass out of a player
 //who "chooses not to take any actions".
 //
-//So the digest now moves whenever anything the seat could have acted on moved:
-//every card identity on both battlefields with its tapped/phased/summoning state,
-//its live power and toughness and its counter total; both mana pools; hand,
-//graveyard, exile, command and reveal contents by id; and - the second half of
-//the brief's test - the seat's own LEGAL ACTION SET, read from the engine's own
-//oracle, so an action becoming available (or ceasing to be) is progress even when
-//no zone moved. Built only on ticks already at the hold floor (see Act), so the
-//ordinary tick pays nothing for it.
+//#W83-FG: THREE FIELDS THE WAVE-82 DIGEST STILL MISREAD.
+//  - `Counters::mCount` counts counter RECORDS, not counter QUANTITY: a second
+//    charge counter on an existing record leaves it unchanged (Counters.cpp's
+//    addCounter increments `Counter::nb`). The digest now carries each record's
+//    NAME, its power/toughness and its `nb`, so proliferating is visible.
+//  - `MTGCard::getId()` is the PRINTING's mtgid, so two copies of the same card
+//    were indistinguishable and a swap between them read as no change. The digest
+//    now uses the instance POINTER, which is what identity means here.
+//  - the legal-action set covered casts and land plays but NOT activated
+//    abilities, so an ability becoming (or ceasing to be) activatable was
+//    invisible. The action layer is asked directly, which is the same question
+//    the seat's own ranking pass asks.
+//Built only on ticks already at the hold floor (see Act), so the ordinary tick
+//pays nothing for it.
+//
+//This is a fingerprint, not a proof of total state equality, and the honest claim
+//is bounded by that: it now moves on every input the review named, and the floor
+//remains a LAST RESORT behind a 24-tick hold and a 200-tick identical run.
 std::string AIPlayerBaka::menuPassProbe()
 {
     if (!observer)
@@ -3211,13 +3221,25 @@ std::string AIPlayerBaka::menuPassProbe()
                     o << ",-";
                     continue;
                 }
-                o << ',' << c->getId();
+                //#W83-FG: the INSTANCE, not the printing.
+                o << ',' << (const void *) c;
                 if (zone == p->game->inPlay)
+                {
                     o << ':' << (c->isTapped() ? 1 : 0)
                       << (c->isPhased ? 'p' : '.')
                       << (c->hasSummoningSickness() ? 's' : '.')
-                      << c->getCurrentPower() << '/' << c->getCurrentToughness()
-                      << '+' << (c->counters ? (int) c->counters->mCount : 0);
+                      << c->getCurrentPower() << '/' << c->getCurrentToughness();
+                    //#W83-FG: counter QUANTITY per record, not the record count.
+                    if (c->counters)
+                        for (size_t ct = 0; ct < c->counters->counters.size(); ct++)
+                        {
+                            Counter * cc = c->counters->counters[ct];
+                            if (!cc)
+                                continue;
+                            o << '+' << cc->name << cc->power << '/' << cc->toughness
+                              << 'x' << cc->nb;
+                        }
+                }
             }
         }
         o << '/' << p->game->library->nb_cards; //hidden: count only
@@ -3234,11 +3256,25 @@ std::string AIPlayerBaka::menuPassProbe()
         vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
         o << "|L";
         for (size_t i = 0; i < casts.size(); i++)
-            o << ',' << (casts[i].card ? casts[i].card->getId() : 0)
+            o << ',' << (const void *) casts[i].card
               << (casts[i].viaAlternative ? 'a' : '.');
         o << ";";
         for (size_t i = 0; i < lands.size(); i++)
-            o << ',' << (lands[i].card ? lands[i].card->getId() : 0);
+            o << ',' << (const void *) lands[i].card;
+        //#W83-FG: ...and the ACTIVATED abilities that are usable right now. An
+        //ability becoming available (a creature losing summoning sickness, a cost
+        //becoming payable, a limit resetting) is progress the zone digest cannot
+        //see, and it is the class the floor most needs to respect.
+        o << ";A";
+        if (al)
+            for (size_t k = 0; k < al->mObjects.size(); k++)
+            {
+                MTGAbility * a = dynamic_cast<MTGAbility *>(al->mObjects[k]);
+                if (!a || !a->source || a->source->controller() != this)
+                    continue;
+                if (a->isReactingToClick(a->source, NULL))
+                    o << ',' << (const void *) a;
+            }
     }
     return o.str();
 }

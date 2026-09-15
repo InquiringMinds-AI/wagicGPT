@@ -1,5 +1,6 @@
-#NAME: A draw with the library parked in the reveal zone CLOSES the reveal
-#DESC: (#W69-BG K1, rewritten by #W82-EB - audit-2026-09 item 2, Astra F03.)
+#NAME: A draw takes the library's LOGICAL top even when it is parked in a reveal
+#DESC: (#W69-BG K1, rewritten by #W82-EB, rewritten again by #W83-FC - fix-review
+#DESC: item 3.)
 #DESC: Corpus 20260906-134120, game-146v123-1788720096: deck123 cast Idyllic Tutor
 #DESC: (`Reveal:type:*:mylibrary revealzone(mylibrary)`), which MOVES the whole
 #DESC: library into that player's `reveal` zone; the payload went on the stack as
@@ -8,22 +9,29 @@
 #DESC: deck123 lost with 42 cards left.
 #DESC: CR 701.20b: "Revealing a card doesn't cause it to leave the zone it's in." -
 #DESC: those cards were still in the library, so CR 704.5b's empty-library loss did
-#DESC: not apply. The wave-69 repair pulled ONE parked card back at draw time. That
-#DESC: is a symptom patch on a shared path: the stalled reveal is still stalled
-#DESC: afterwards, the library stays mis-modelled for every other reader, and a
-#DESC: genuine deck-out becomes silently survivable while any card sits parked.
-#DESC: FIX: the reveal that owns the parked cards is CLOSED (options out of the
-#DESC: action layer, every card back to the library it never left), and the draw
-#DESC: then runs against the real library - deck-out included, when it is real.
+#DESC: not apply, and the draw was owed the logically TOP one (a reveal takes the
+#DESC: top first, so the first parked card in reveal order is it).
+#DESC: The wave-82 answer force-closed the reveal from the draw path. The review
+#DESC: rejected that: CR 117.2e forbids PRIORITY during resolution, not instructed
+#DESC: draws - Sensation Gorger (mtg.txt:102263) runs `discard:20 && draw:4` inside
+#DESC: reveal option one - so a draw is no evidence of a stall, and closing a live
+#DESC: reveal cancels an effect that is resolving correctly. It also only looked
+#DESC: when the physical library was COMPLETELY empty, so a partial library still
+#DESC: skipped its own logical top.
+#DESC: FIX: the draw takes the logical top and nothing is closed. A reveal that
+#DESC: truly cannot complete is closed by the driver's stall guard, which is the
+#DESC: only code that can prove it.
 #DESC: FIXTURE. Lexicon Whole Library Deadend Peek is Idyllic Tutor's whole-library
 #DESC: reveal with option one predicate-gated to a land (this library has none) and
 #DESC: no option two, so no chooser ever arms and the three cards stay parked.
 #DESC: `drawcard 1 1` drives MTGPlayerCards::drawFromLibrary directly, the exact
 #DESC: call 10DrawAction and the draw step make.
-#DESC: RED on base (wagic-fixaudit-base): the rescue returns ONE card and draws it -
-#DESC: library 0 with two cards still stranded in the reveal zone.
-#DESC: GREEN: the reveal is closed, all three cards are back, Hill Giant (the top,
-#DESC: revealed first) is drawn and TWO cards remain in the library.
+#DESC: RED on base (583ae53c8): the wave-82 close returns ALL THREE cards and kills
+#DESC: the reveal - "Card number not the same in player 0's reveal, expected 2,
+#DESC: got 0" plus a library of 2.
+#DESC: GREEN: Hill Giant (the top, revealed first) is drawn, the other two are
+#DESC: STILL PARKED in the reveal zone (the reveal is untouched and still live),
+#DESC: and no player has lost.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -39,6 +47,7 @@ FIRSTMAIN
 [PLAYER1]
 graveyard:Lexicon Whole Library Deadend Peek
 hand:Hill Giant
-library:*,*
+library:
+reveal:*,*
 [PLAYER2]
 [END]

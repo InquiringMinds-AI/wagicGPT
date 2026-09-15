@@ -176,20 +176,30 @@ int ActionLayer::purgeDeadReferencesForCard(MTGCardInstance * doomed)
         if (a && a->target == (Targetable *) doomed)
             a->target = NULL;
     }
-    bool again = true;
-    while (again)
+    //#W83-FF (fix-review item 7): RETRY ONLY ON PROGRESS. The first cut set
+    //`again = true` whether or not moveToGarbage succeeded, and removeFromGame
+    //returns false for an element already in `mDestroying` - a re-entrant sweep
+    //meeting such an element retried it for ever and the outer removal could
+    //never finish. The walk restarts only when an element actually LEFT (destroy()
+    //can cascade into further removals, so the indices are stale after one); an
+    //element that refuses to leave is skipped and the walk continues past it.
+    for (size_t i = 0; i < mObjects.size(); )
     {
-        again = false;
-        for (size_t i = 0; i < mObjects.size(); i++)
+        MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
+        if (!a || a->source != doomed)
         {
-            MTGAbility * a = dynamic_cast<MTGAbility *>(mObjects[i]);
-            if (!a || a->source != doomed)
-                continue;
-            if (moveToGarbage(a))
-                evicted++;
-            again = true;
-            break;
+            i++;
+            continue;
         }
+        if (moveToGarbage(a))
+        {
+            evicted++;
+            i = 0; //the cascade may have reshaped the vector - restart
+            continue;
+        }
+        DebugTrace("ActionLayer::purgeDeadReferencesForCard: an element sourced by a"
+                   " dying card could not be evicted (mid-destroy) - skipping it");
+        i++;
     }
     if (currentActionCard == doomed)
         currentActionCard = NULL;
@@ -221,6 +231,20 @@ int ActionLayer::purgeDeadReferencesForCard(MTGCardInstance * doomed)
 void ActionLayer::forgetElement(ActionElement * e)
 {
     if (!e)
+        return;
+    //#W83-FF (fix-review item 7): BOUND THE SCANS.
+    //(a) cleanGarbage() deletes every entry of `garbage`, and each of those
+    //destructors re-entered here and walked the whole `garbage` vector again -
+    //theta(G^2) on a shared path, on a 444 MHz Vita. While that sweep is running
+    //the vector is being emptied wholesale and no entry of it can be named by
+    //anything that survives, so the bookkeeping is skipped entirely.
+    //(b) an ability that was never registered (every parse-time template and
+    //every clone that is deleted without being added) is the common case by a
+    //wide margin, and an empty layer has nothing to un-register it from.
+    if (mSweepingGarbage)
+        return;
+    if (mObjects.empty() && garbage.empty() && manaObjects.empty()
+        && menuRowElements.empty() && mDestroying.empty())
         return;
     for (size_t k = 0; k < menuRowElements.size(); k++)
         if (menuRowElements[k] == e)
@@ -257,11 +281,15 @@ void ActionLayer::forgetElement(ActionElement * e)
 
 void ActionLayer::cleanGarbage()
 {
+    //#W83-FF (fix-review item 7): see forgetElement. The whole vector is going
+    //away, so its entries' destructors must not each re-walk it.
+    mSweepingGarbage = true;
     for (size_t i = 0; i < garbage.size(); ++i)
     {
         SAFE_DELETE(garbage[i]);
     }
     garbage.clear();
+    mSweepingGarbage = false;
 }
 
 int ActionLayer::reactToClick(ActionElement * ability, MTGCardInstance * card)
@@ -325,7 +353,7 @@ void ActionLayer::Update(float dt)
     stuffHappened = 0;
     if (menuObject)
     {
-        rebuildExpiredMandatoryMenu(); //#W82-EG (audit-2026-09 item 4)
+        closeUnanswerableMandatoryMenu(); //#W82-EG / #W83-FE
         if (!menuObject)
             return;                    //the menu had no legal row left and closed
         abilitiesMenu->Update(dt);
@@ -701,35 +729,52 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
     modal = 1;
 }
 
-//#W58-F (F1): menu row -> the ability it names, resolved by IDENTITY. `slot`
-//comes back as the ability's index in mObjects RIGHT NOW, which is the row's
-//stored id when nothing moved and the re-pointed index when the vector was
-//compacted under the armed menu. False = this row names nothing the layer
-//still holds: the caller must make no decision from it (readers skip the row,
-//the act path does nothing this tick and the menu stays armed to be re-asked).
-//A row id <= 0 is passed through untouched - -1 is the cancel row, and id 0
-//keeps the engine's own long-standing "not a selectable option" convention
-//that every reader here already applies.
+//#W58-F (F1) / #W83-FD (fix-review item 4): menu row -> the ability it names,
+//resolved by IDENTITY. FOUR DIFFERENT THINGS ride this one integer, and the
+//wave-82 bounds check conflated two of them. They are, in full:
+//
+//  ROW IDENTITY - which ABILITY an ordinary row was built from. Never the id:
+//      `menuRowElements[menuIndex]`, captured at arm time and nulled when that
+//      element leaves the game. This is what makes a compacted layer safe.
+//  LAYER SLOT   - the ability's index in mObjects RIGHT NOW. This is what `slot`
+//      returns for an ordinary row, re-pointed when the vector moved under the
+//      armed menu, and it is the ONLY value a caller may index mObjects with.
+//  MODE INDEX   - which OPTION of a MenuAbility a multiple-choice row is. That is
+//      `menuIndex` itself, never the id: setCustomMenuObject gives every row the
+//      SAME id (`mObjects.size()-1`, captured at arm time) and the answer is
+//      dispatched by ButtonPressedOnMultipleChoice, which finds the live
+//      MenuAbility by scanning for a triggered one. A multiple-choice row is
+//      therefore ALWAYS answerable while its menu stands, whatever the layer did
+//      to that stale id, and `slot` comes back as kMenuRowIsMode so no caller can
+//      mistake it for a position.
+//  SENTINEL     - kCancelMenuID (-1) is the cancel row and 0 is the engine's
+//      long-standing "not a selectable option"; both are handed back untouched.
+//      Note the honest scope of that: AIPlayerBaka::selectMenuOption and
+//      DecisionManager skip `slot <= 0`, but ActionLayer::ButtonPressed's ordinary
+//      branch does accept slot 0 as a layer index, and always has.
+//
+//False = this row names nothing the layer still holds: the caller must make no
+//decision from it (readers skip the row, the act path does nothing this tick and
+//the menu stays armed to be re-asked).
 bool ActionLayer::getMenuControlId(int menuIndex, int & slot)
 {
     if (!abilitiesMenu || menuIndex < 0 || (size_t) menuIndex >= abilitiesMenu->mObjects.size())
         return false;
+    //#W83-FD (fix-review item 4): a MULTIPLE-CHOICE row is a MODE INDEX, and it is
+    //answerable for as long as its menu stands. The wave-82 bounds check treated
+    //its stale arm-time id as a slot and REFUSED the row once the layer shrank
+    //past it - which made every legal mode of a live MenuAbility unreachable to
+    //doReactTo (the AI's only route; the human's ButtonPressed dispatches multiple
+    //choice BEFORE slot resolution, so the two seats disagreed). Answer first,
+    //before the id is looked at at all.
+    if (abilitiesMenu->isMultipleChoice)
+    {
+        slot = kMenuRowIsMode;
+        return true;
+    }
     slot = abilitiesMenu->mObjects[menuIndex]->GetId();
-    //A row id <= 0 is a SENTINEL, never a position: -1 is the cancel row and 0
-    //is the engine's "not a selectable option". It is handed back untouched and
-    //every caller is contractually forbidden to index mObjects with it.
     if (slot <= 0)
         return true;
-    //#W82-EF (audit-2026-09, crash A - SIGABRT core 397278, heuristic seat).
-    //A MULTIPLE-CHOICE menu's rows carry no identity (setCustomMenuObject adds
-    //every row with the SAME id, `mObjects.size()-1`, captured at ARM time), so
-    //that id is a stale position the moment the layer shrinks under the armed
-    //menu - and AIPlayerBaka::selectMenuOption indexed mObjects with it:
-    //`vector::_M_range_check: __n (which is 248) >= this->size()`. The id can no
-    //longer be trusted as a slot, so say so rather than hand back an index that
-    //may name nothing (or the wrong ability).
-    if (abilitiesMenu->isMultipleChoice)
-        return ((size_t) slot < mObjects.size());
     ActionElement * armed = ((size_t) menuIndex < menuRowElements.size())
                             ? menuRowElements[menuIndex] : NULL;
     if (!armed)
@@ -766,8 +811,8 @@ bool ActionLayer::getLiveMenuSlot(int controlid, int & slot)
     return false;
 }
 
-//#W82-EG (audit-2026-09 item 4; Astra F07, Fable G8). A MANDATORY MENU WHOSE
-//ROWS HAVE VANISHED GETS A COMPLETION PATH.
+//#W82-EG (audit-2026-09 item 4; Astra F07, Fable G8) / #W83-FE (fix-review item
+//6). A MANDATORY MENU WHOSE ROWS HAVE ALL VANISHED IS CLOSED.
 //
 //The W58-F row-identity map is the real fix for a real SIGABRT (an armed menu's
 //stored positions naming a different ability, or none, after removeFromGame
@@ -778,59 +823,41 @@ bool ActionLayer::getLiveMenuSlot(int controlid, int & slot)
 //Astra F07: "If all rows of a noncancelable menu expire, skipping/re-asking them
 //does not reconstruct the underlying menu. The code leaves it armed."
 //
-//So reconstruct it. setMenuObject builds the row set from the abilities that are
-//reacting to this object RIGHT NOW, which is the current legal set - the same
-//question the menu was armed to ask, asked again of the live game. Nothing is
-//removed and nothing is answered for anybody: a rebuild that still finds rows
-//re-presents them; a rebuild that finds NONE means there is no longer any legal
-//answer to give, and the menu closes rather than standing forever (CR 117.3d:
-//"If a player has priority and chooses not to take any actions, that player
-//passes" - a decision with no legal option is not a decision the player owes).
+//#W83-FE: THE WAVE-82 ANSWER REBUILT THE MENU, AND THAT WAS WORSE. setMenuObject
+//gathers every ability reacting to the subject NOW and keeps the triggered/free
+//rows if there are any, otherwise the ordinary cost-bearing ones. So an expired
+//mandatory TRIGGER on a permanent that also carries a voluntary activated ability
+//was rebuilt as "activate this other ability", WITH NO CANCEL ROW - a voluntary
+//action turned into a mandatory one, which is exactly the removed-legal-option
+//failure this whole lane exists to avoid. "Same card" is not "same decision".
+//
+//The decision that expired cannot be re-asked, because the options it offered
+//have left the game. So it is CLOSED, and nothing is put in its place. That
+//removes nothing (the rows were already gone) and it releases the layer, which is
+//the completion path Astra F07 asked for. CR 117.3d - "If a player has priority
+//and chooses not to take any actions, that player passes" - does not make a
+//voluntary activation mandatory, and nothing here makes one.
 //Ordinary (cancelable) menus are untouched: they already have an answer, Cancel.
-bool ActionLayer::rebuildExpiredMandatoryMenu()
+//Multiple-choice menus are untouched too, and no longer need to be excluded for
+//safety: since #W83-FD their rows stay answerable however the layer moved.
+bool ActionLayer::closeUnanswerableMandatoryMenu()
 {
     if (!menuObject || !abilitiesMenu || !cantCancel)
         return false;
     if (abilitiesMenu->isMultipleChoice)
-        return false; //custom menus carry no row identities to expire
-    bool anyLive = false;
-    for (size_t i = 0; i < abilitiesMenu->mObjects.size() && !anyLive; i++)
+        return false; //a mode row is answerable for as long as its menu stands
+    for (size_t i = 0; i < abilitiesMenu->mObjects.size(); i++)
     {
         int slot = 0;
-        if (getMenuControlId((int) i, slot))
-            anyLive = true;
+        //A row is an ANSWER only if it resolves to an ability the layer still
+        //holds. Slot 0 and the cancel sentinel are not answers to a `must` menu
+        //(a mandatory menu has no cancel row at all).
+        if (getMenuControlId((int) i, slot) && slot > 0)
+            return false;
     }
-    if (anyLive)
-        return false;
-    //The object itself may be what left the game. Nothing can be rebuilt on a
-    //card the game no longer holds, and reading it is the crash-B class.
-    MTGCardInstance * asCard = dynamic_cast<MTGCardInstance *>(menuObject);
-    if (asCard && observer && !observer->validateCardPointer(asCard))
-    {
-        DebugTrace("ActionLayer: mandatory menu closed - its subject has left the game");
-        menuObject = 0;
-        currentActionCard = NULL;
-        menuObjectName.clear();
-        menuObjectText.clear();
-        cantCancel = 0;
-        return true;
-    }
-    Targetable * subject = menuObject;
-    setMenuObject(subject, true);
-    bool rebuilt = false;
-    for (size_t i = 0; i < abilitiesMenu->mObjects.size() && !rebuilt; i++)
-    {
-        int slot = 0;
-        if (getMenuControlId((int) i, slot))
-            rebuilt = true;
-    }
-    if (rebuilt)
-    {
-        DebugTrace("ActionLayer: mandatory menu rebuilt from the current legal set ("
-                   << abilitiesMenu->mObjects.size() << " row(s))");
-        return true;
-    }
-    DebugTrace("ActionLayer: mandatory menu had no legal row left - closing it");
+    DebugTrace("ActionLayer: a MANDATORY menu on '" << menuObjectName
+               << "' has no answerable row left - closing it rather than leaving an"
+               " unanswerable decision holding the layer");
     menuObject = 0;
     currentActionCard = NULL;
     menuObjectName.clear();
@@ -971,6 +998,7 @@ ActionLayer::ActionLayer(GameObserver *observer)
     stuffHappened = 0;
     currentWaitingAction = NULL;
     cantCancel = 0;
+    mSweepingGarbage = false; //#W83-FF (fix-review item 7)
 }
 
 ActionLayer::~ActionLayer()

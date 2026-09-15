@@ -1,0 +1,58 @@
+#NAME: An edict pays no life when nothing can be sacrificed (#W83-FA, item 5)
+#DESC: fix-review item 5. Two defects in one board.
+#DESC: (a) THE GATE AND THE OFFERED SET DISAGREED. The wave-82 re-choice asked "is
+#DESC: the victim still in play, unphased and sacrificeable" in one place and built
+#DESC: its replacement set from `creature|mybattlefield` in another - a chooser
+#DESC: that admits CANTBESACRIFIED permanents and mutated-down components.
+#DESC:   CR 701.21a "To sacrifice a permanent, its controller moves it from the
+#DESC:   battlefield directly to its owner's graveyard. A player can't sacrifice
+#DESC:   something that isn't a permanent, or something that's a permanent they
+#DESC:   don't control."
+#DESC: (b) THE LIFE WAS PAID FOR A SACRIFICE THAT DID NOT HAPPEN.
+#DESC: AADynamic::activateMainAbility called activateStored() and IGNORED its
+#DESC: result; AASacrificeCard::resolve returns 0 for a CANTBESACRIFIED permanent.
+#DESC: Tribute to Hunger's Oracle (mtg.txt:124074, matching Scryfall) is "Target
+#DESC: opponent sacrifices a creature of their choice. You gain life equal to THAT
+#DESC: CREATURE'S toughness" - the toughness of a body this effect sacrificed.
+#DESC: FIX: EdictSacrificeChooser::canTarget is the single eligibility predicate for
+#DESC: the gate, the candidate scan and the chooser; and the lifegain is skipped
+#DESC: when the stored sacrifice reports that it took nothing.
+#DESC: WITNESS: P2's only creature is Lexicon Unsacrificeable Witness (2/2,
+#DESC: cantbesacrified). Two Tributes resolve against it.
+#DESC: RED on base (583ae53c8): "life problem for player 0. Expected 20, got 24" -
+#DESC: P1 gained 2 life twice for two sacrifices that never happened.
+#DESC: GREEN: nothing is sacrificed, no life is owed, the creature is untouched.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tribute to Hunger,Tribute to Hunger
+manapool:{4}{B}{B}
+life:20
+[PLAYER2]
+inplay:Lexicon Unsacrificeable Witness
+life:20
+[DO]
+Tribute to Hunger
+p2
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tribute to Hunger,Tribute to Hunger
+life:20
+[PLAYER2]
+inplay:Lexicon Unsacrificeable Witness
+life:20
+[END]

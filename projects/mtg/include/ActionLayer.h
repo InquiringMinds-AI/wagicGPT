@@ -102,12 +102,18 @@ public:
     //stays armed and the engine re-asks); on success `slot` is the ability's
     //CURRENT index in mObjects, re-pointed if the vector was compacted.
     bool getMenuControlId(int menuIndex, int & slot);
-    //#W82-EG (audit-2026-09 item 4): a MANDATORY menu every one of whose rows has
-    //left the game is unanswerable - it is noncancelable by construction. Rebuild
-    //it from the abilities reacting to its subject NOW, and close it only when
-    //that set is empty (no legal answer exists to remove). Returns true when it
-    //acted. Ordinary cancelable menus are untouched.
-    bool rebuildExpiredMandatoryMenu();
+    //#W82-EG / #W83-FE (fix-review item 6): a MANDATORY menu every one of whose
+    //rows has left the game is unanswerable - it is noncancelable by
+    //construction - so it is CLOSED. It is deliberately NOT rebuilt: rebuilding
+    //from "every ability reacting to this card now" can turn a voluntary
+    //activation into a mandatory one. Returns true when it acted. Ordinary
+    //cancelable and multiple-choice menus are untouched.
+    bool closeUnanswerableMandatoryMenu();
+    //#W83-FD (fix-review item 4): the `slot` a multiple-choice row answers with.
+    //Its meaning is MODE INDEX (the row's own position), never a layer index, and
+    //no caller may index mObjects with it. Distinct from kCancelMenuID and from
+    //the engine's "0 = not a selectable option".
+    static const int kMenuRowIsMode = -3;
     bool getLiveMenuSlot(int controlid, int & slot);
     TargetChooser * getCurrentTargetChooser();
     void setCurrentWaitingAction(ActionElement * ae);
@@ -146,6 +152,11 @@ public:
     //deleted the ability, its pointer leaves every index this layer holds before
     //the storage is reused - registration bookkeeping only, no destroy().
     void forgetElement(ActionElement * e);
+    //#W83-FF (fix-review item 7): true while cleanGarbage() is deleting the whole
+    //garbage vector. Every one of those destructors re-enters forgetElement, and
+    //each walk of `garbage` made the sweep quadratic; nothing that survives the
+    //sweep can name an entry of a vector that is being emptied wholesale.
+    bool mSweepingGarbage;
 
 protected:
     ActionElement * currentWaitingAction;

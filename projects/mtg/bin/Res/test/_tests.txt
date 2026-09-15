@@ -1422,3 +1422,7 @@ w82ed_pass_probe_sees_mana.txt
 w82eg_expired_mandatory_menu.txt
 w82ef_multichoice_stale_row_id.txt
 w82eh_detached_card_land_gate.txt
+w83fa_edict_no_protection_bypass.txt
+w83fa_edict_unsacrificeable_never_pays.txt
+w83fb_mulch_is_not_a_search.txt
+w83fc_partial_library_logical_top.txt
