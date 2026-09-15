@@ -780,7 +780,15 @@ bool DecisionManager::buildChooseTarget(Player * p, TargetChooser * tc, Decision
         for (int j = 0; j < 9; j++)
         {
             MTGGameZone * zone = zones[j];
-            for (int k = 0; k < zone->nb_cards && req.targetCandidates.size() < 40; k++)
+            //#W82-A (L1, audit-2026-09): the `req.targetCandidates.size() < 40`
+            //bound was DELETED. It stopped enumerating legal targets at 40 -
+            //across hand, library, graveyard and exile in ONE pass, so a big
+            //library silently emptied every later zone - and the owner's ruling
+            //forbids capping a legal option set: "you cant decide that a play is
+            //bad and therefore never offer it". The renderer already collapses
+            //byte-identical rows into label ranges, so a long list costs rows,
+            //not prompt bytes.
+            for (int k = 0; k < zone->nb_cards; k++)
             {
                 MTGCardInstance * t = zone->cards[k];
                 if (!tc->canTarget(t) || tc->alreadyHasTarget(t))

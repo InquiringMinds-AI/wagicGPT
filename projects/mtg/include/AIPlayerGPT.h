@@ -1219,36 +1219,10 @@ private:
     //re-prompt the creatures it chose to hold.
     int mAttacksDoneTurn;
 
-    //Priority-window decline memory: an activation line the model has
-    //pass-declined TWICE in the same turn stops being offered for the rest
-    //of that turn (a held fetch-crack was re-asked at 44-97 windows per
-    //game - each a model call once any event changed the board). Two
-    //declines keep a fresh look every turn plus one re-look; the map
-    //clears on turn change. Keyed by rendered option line.
-    std::map<string, int> mPassDeclineCount;
-    //#W65-AM (G7, deck123 HIGH-2, DOCTRINE): the BOARD the last decline of each
-    //line was made over. A two-decline cap with no re-opener is a hard cap on
-    //legal choices - 162 seq 66/69 retired the free {T} token-maker rows for the
-    //turn, and when Intruder Alarm resolved in main 1 (seq 73) the menu held
-    //only three equips, so the combo could not fire on the turn it assembled.
-    //A decline is an answer about the board it was given on: when that board
-    //moves, the allowance starts again. Nothing is cached blind and nothing is
-    //rendered from this map - it never enters mPromptTail, the ask key or the
-    //option-set key (the wave-61 livelock class is untouched).
-    std::map<string, string> mPassDeclineBoard;
-    int mPassDeclineTurn;
-
-    //Modal-DFC flip-thrash cap (R-DFC-FLIP, deck102 wave-22): the in-hand
-    //"Flip Side" pseudo-action is a no-op face toggle offered at every
-    //priority window, and it CHANGES board state (the presented face) so the
-    //no-progress deadlock breaker never catches it - deck102 flipped Tergrid
-    //11x. Cap flips per source card per turn: enough to reach the wanted face
-    //(and flip back once) but not to thrash. Keyed by the card INSTANCE
-    //pointer - getId()/mtgid TOGGLES with the presented face, so keying by id
-    //let each face accrue its own count (up to 4 flips/turn); the instance
-    //pointer is stable across flips. Clears on turn change alongside
-    //mPassDeclineCount.
-    std::map<MTGCardInstance *, int> mFlipDoneCount;
+    //#W82-A (L1): the turn this seam last opened on. It carried the decline and
+    //flip caps' per-turn reset (both DELETED - no legal row is withheld any
+    //more); what is left riding it is the repeat-N plan's turn-boundary expiry.
+    int mPriorityTurnSeen;
 
     //#W48-D13 (wave-47 docket D13) - the LOOP-SCOPED activation count.
     //`ActivatedAbility::counters` is the engine's own per-TURN number and is
@@ -1356,16 +1330,20 @@ private:
     std::map<std::pair<MTGCardInstance *, string>, int> mSelfActivationStamp;
 
     //Cast-seam livelock breaker (the priority seam's no-progress pass,
-    //mirrored): a consumed cast pick that leaves the board byte-identical
-    //did not execute (an unexecutable menu entry - e.g. a restricted cast
-    //mode - or an engine no-op). The cached ask would replay it every tick
-    //forever (135v133 wedged at turn 2 for 2400s, 903k re-picks). Suppress
-    //that option line for the turn and re-ask over the remaining options -
-    //self-healing when a sibling entry (the legal alternative mode) exists.
+    //mirrored): a consumed cast pick that leaves the board byte-identical did
+    //not execute (an unexecutable menu entry - e.g. a restricted cast mode - or
+    //an engine no-op). Left alone, the same window with the same board replays
+    //the same answer every tick forever (135v133 wedged at turn 2 for 2400s,
+    //903k re-picks).
+    //#W82-A (L1, audit-2026-09): it used to break the loop by WITHHOLDING the
+    //row for the turn, which is the thing the ruling forbids. It now breaks the
+    //loop at the WINDOW instead: the one window that follows a no-progress pick
+    //over an unchanged board is deferred to the heuristic (the same exit the
+    //validation re-ask budget already takes), and the marker is spent by that
+    //one deferral. Every row stays on every menu the model is shown.
     string mLastCastBoard;
     string mLastCastLine;
-    std::set<size_t> mStuckCastLines; //#W54-M (L6): std::hash of the line - equality is all that is tested
-    int mStuckCastTurn;
+    string mCastNoProgressBoard;
 
     //#W71-BQ (L5, wave-70 deck130 HIGH): the cast the model has ALREADY
     //committed to at this turn's casting ask. A card with an alternative hand
@@ -2292,7 +2270,41 @@ private:
     //#W80-DE (U2): the two verdict lines, rendered off the live board, and the
     //starter scan the proven-win face is gated on (U10).
     std::string w80CrackBackVerdictLineNow();
-    int w80CrackBackBestBlockFloorNow(); //#W80-DH (F4)
+    int w80CrackBackBestBlockFloorNow(bool attacksSettled); //#W80-DH (F4), #W82-A (L5)
+    //#W82-A (L5, audit-2026-09): THE ONE CRACK-BACK COMPUTATION PER WINDOW.
+    //The family had grown nine resident functions that each re-walked the board
+    //(`crackBackTotalOver` twice, `crackBackFloorSources` three times, the O(3^n)
+    //best-block DP once per caller), and the header, the row cover clause, the
+    //verdict line and the hold-latch marker each reached a total of their own -
+    //three "you would be at" numbers on one screen (`162v146` seq 30). Every one
+    //of them now reads THIS struct, computed once and memoised on the window seq.
+    struct CrackBackFacts
+    {
+        bool selfActive;      //the seat's own turn
+        bool due;             //crackBackNextTurnDue over the numbers below
+        bool attacksSettled;  //the seat's own attack declaration is behind it
+        int  attackers;
+        int  rawCombat;       //crackBackTotalOver
+        int  addBlockable;    //animator bodies - CR 510.1c, a block removes this
+        int  addUnblockable;  //ability damage aimed at the player
+        bool addUnsized;      //something listed carries no number at all
+        int  compulsoryDraw;  //not blockable and not declinable
+        int  bestBlockFloor;  //-1 when the DP cannot prove one
+        int  myLife;
+        CrackBackFacts() : selfActive(false), due(false), attacksSettled(false),
+                           attackers(0), rawCombat(0), addBlockable(0),
+                           addUnblockable(0), addUnsized(false), compulsoryDraw(0),
+                           bestBlockFloor(-1), myLife(0) {}
+        int published() const { return rawCombat + addBlockable + addUnblockable
+                                       + compulsoryDraw; }
+        //what a best block cannot take away: the DP's floor over the creature
+        //combat, plus only the shares no block touches.
+        int floorWithAddenda() const
+        { return bestBlockFloor < 0 ? -1 : bestBlockFloor + addUnblockable + compulsoryDraw; }
+    };
+    const CrackBackFacts& crackBackFactsNow();
+    CrackBackFacts mCrackBackFacts;
+    int mCrackBackFactsSeq;
     void w80CloseOpenCastStep(const char * why); //#W80-DH (F5)
     std::string w80StackDeathVerdictLineNow();
     std::string w80LiveLoopStarterName();
@@ -2594,6 +2606,14 @@ private:
     //the next translog record for this seat. Consumed when written, so a drop
     //is stamped exactly once.
     std::vector<std::string> mAsyncDropStamps;
+    //#W82-A (L10, audit-2026-09): the WINDOW each pending stamp belongs to.
+    //`mAsyncDropStamps` and `mAbandonedInFlightSecs` were consumed by the next
+    //record of ANY kind, so a `casting/...` drop landed on a `blockers` record
+    //and an abandonment rode to whatever was written next. A stamp is a fact
+    //about one window; it is emitted on that window's record and dropped when
+    //the window is gone.
+    int mAsyncDropStampsSeq;
+    int mAbandonedInFlightSeq;
     //#W69-BI (K7, engine MED-2): the game total of the above. The per-decision
     //field is consumed with its record, so a reader taking the game's drop
     //count off the gameend record read an ABSENT field as zero.

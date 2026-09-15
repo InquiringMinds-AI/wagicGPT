@@ -3526,7 +3526,12 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
         //Skipping it is the `held the land drop` shape: nothing is removed from the
         //seat (the land drop is still available for every other land, and the card
         //returns next turn), the refusal is simply not overridden by the proposer.
-        if (ci >= firstLandIdx && faceDeclinedThisTurn(card))
+        //#W82-A (L1, audit-2026-09): NEVER over a FORCED candidate. The GPT
+        //layer's own copy of this filter is deleted (a legal land play withheld
+        //for the turn on the strength of an answer to a different question), so
+        //the pilot can now name such a land - and this skip would silently
+        //discard that answer. The heuristic's own proposal keeps the skip.
+        if (ci >= firstLandIdx && !aiForcedCandidate && faceDeclinedThisTurn(card))
         {
             DebugTrace("AIPlayerBaka: land drop skips " << card->getName()
                        << " - its face menu was declined this turn");
