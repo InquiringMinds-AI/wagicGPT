@@ -443,6 +443,11 @@ enum W77LoopVerdict { kW77LoopIdle = 0, kW77LoopResolving = 1, kW77LoopThreatene
 
 class AIPlayerGPT : public AIPlayerBaka
 {
+    //The PARSETEST self-test corpus lived in AIPlayerGPT.cpp and reached this
+    //class's private statics as a member of it. Split into its own translation
+    //unit (src/AIPlayerGPTSelfTest.cpp), it keeps exactly that access - and only
+    //that access - through this one seam. See include/AIPlayerGPTSelfTestAccess.h.
+    friend struct AIPlayerGPTSelfTestAccess;
 public:
     //#W50-Y D7: the clean-line grammar and the rejection test for a coded
     //CHOICE line's payload (everything after the "CHOICE:" label). Public and
