@@ -303,7 +303,10 @@ void MTGRevealingCards::Update(float dt)
             //against the CURRENT library: a mill, a tutor or a bottom-of-library
             //that takes those cards away makes this one the top, and a count that
             //only a draw could decrement could not see that.
-            vector<MTGCardInstance *> skippedAbove;
+            //#W86-IC (bug list item 4): recorded as INSTANCE IDS, not addresses - an
+            //address the allocator hands to a later card would read as "still above"
+            //for one draw; a serial is never reused.
+            vector<unsigned int> skippedAbove;
             if (rTc)
                 for (int i = startingNumber; i > -1; i--)
                 {
@@ -322,7 +325,7 @@ void MTGRevealingCards::Update(float dt)
                             source->revealedLast = toMove;
                         }
                         else
-                            skippedAbove.push_back(toMove);
+                            skippedAbove.push_back(toMove->mInstanceId);
                     }
 
                 }
@@ -12839,7 +12842,9 @@ AACastCard::~AACastCard()
 //Tutorial Messaging
 
 ATutorialMessage::ATutorialMessage(GameObserver* observer, MTGCardInstance * source, string message, int limit)
-    : MTGAbility(observer, 0, source), IconButtonsController(observer->getInput(), 0, 0), mLimit(limit)
+    : MTGAbility(observer, 0, source), IconButtonsController(observer->getInput(), 0, 0), mLimit(limit),
+      mSH(0.0f), mSW(0.0f) //#W86-IE (bug list item 8): the tutorial popup's scaled height/width,
+      //written only inside `if (mIsImage)` in Render and read unconditionally by it.
 {
     mBgTex = NULL;
 

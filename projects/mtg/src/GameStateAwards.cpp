@@ -30,7 +30,8 @@ namespace GameStateAwardsConst
 static std::string kAwardFile = "";
 
 GameStateAwards::GameStateAwards(GameApp* parent) :
-    GameState(parent, "trophies")
+    GameState(parent, "trophies"),
+    mState(0), mDetailItem(0) //#W86-IE (bug list item 8)
 {
 
 }

@@ -13,7 +13,11 @@
 #include "WFont.h"
 #include "WResourceManager.h"
 
-SimpleButton::SimpleButton(int id): JGuiObject(id)
+SimpleButton::SimpleButton(int id): JGuiObject(id),
+    //#W86-IE (bug list item 8): the id-only constructor set nothing but the
+    //selection flag, and Render/Update read every one of these.
+    mScale(SCALE_NORMAL), mTargetScale(SCALE_NORMAL), mHasFocus(false),
+    mX(0.0f), mY(0.0f), mXOffset(0.0f), mYOffset(0.0f), mFontId(0)
 {
     mIsValidSelection = false;
 }

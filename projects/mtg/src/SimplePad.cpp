@@ -67,6 +67,7 @@ void SimplePad::linkKeys(int from, int to, int dir)
 }
 
 SimplePad::SimplePad()
+    : mX(0.0f), mY(0.0f) //#W86-IE (bug list item 8): Render reads both
 {
     nbitems = 0;
     bActive = false;

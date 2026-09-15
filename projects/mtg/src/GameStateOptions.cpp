@@ -83,7 +83,8 @@ void ModelFetchMain(void * p)
 static std::string kBgFile = "";
 
 GameStateOptions::GameStateOptions(GameApp* parent) :
-    GameState(parent, "options"), mReload(false), grabber(NULL), mResetTutorialsLabel(NULL), optionsMenu(NULL), optionsTabs(NULL)
+    GameState(parent, "options"), mReload(false), grabber(NULL), mResetTutorialsLabel(NULL), optionsMenu(NULL), optionsTabs(NULL),
+    mState(0) //#W86-IE (bug list item 8)
 {
 #ifdef WITH_GPT_AI
     gptTab = NULL;

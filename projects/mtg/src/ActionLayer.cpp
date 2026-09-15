@@ -70,7 +70,19 @@ bool ActionLayer::moveToGarbage(ActionElement * e)
 {
     if (removeFromGame(e))
     {
-        garbage.push_back(e);
+        //#W86-IB (audit-2026-09 bug list item 3): ONE ELEMENT, AT MOST ONE SLOT.
+        //cleanGarbage deletes every slot it walks, and forgetElement's per-object
+        //exemption (#W84-GB) only nulls the slot the sweep is on - so a SECOND slot
+        //for the same element would be deleted a second time, on storage already
+        //freed. A duplicate slot can only exist if the element came BACK into the
+        //layer after being garbaged (addToGame refuses that, below, but the two
+        //guards are independent on purpose: this one holds whatever route put it
+        //back). Pushing nothing is the whole fix - the element is already scheduled.
+        if (!isInGarbage(e))
+            garbage.push_back(e);
+        else
+            DebugTrace("ActionLayer::moveToGarbage: element is ALREADY in garbage -"
+                       " keeping its single slot rather than scheduling a second delete");
         return true;
     }
     return false;

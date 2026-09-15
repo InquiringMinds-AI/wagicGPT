@@ -51,7 +51,8 @@ MTGCardInstance MTGCardInstance::AnyCard = MTGCardInstance();
 MTGCardInstance MTGCardInstance::NoCard = MTGCardInstance();
 
 MTGCardInstance::MTGCardInstance() :
-    CardPrimitive(), MTGCard(), Damageable(0, 0), view(NULL)
+    CardPrimitive(), MTGCard(), Damageable(0, 0), view(NULL),
+    mPropertiesChangedSinceLastUpdate(false) //#W86-IE (bug list item 8)
 {
     initMTGCI();
 }
@@ -389,6 +390,14 @@ void MTGCardInstance::initMTGCI()
     X = 0;
     setX = -1;
     mRevealAbove.clear(); //#W85-HB (review-3 items 2/3): not parked
+    //#W86-IC (audit-2026-09 bug list item 4): one serial per instance, never
+    //reused. initMTGCI runs from every constructor and from nowhere else, so this
+    //is the one assignment site. The suite builds games on several worker threads,
+    //so the bump is atomic (a GCC builtin, which every toolchain this tree targets
+    //has - desktop, PSP and Vita alike): two instances sharing an id would be the
+    //very false positive this change removes. 0 stays reserved for "no id".
+    static unsigned int sNextInstanceId = 1;
+    mInstanceId = __sync_fetch_and_add(&sNextInstanceId, 1u);
     sample = "";
     sampleResolved = false;
     model = NULL;

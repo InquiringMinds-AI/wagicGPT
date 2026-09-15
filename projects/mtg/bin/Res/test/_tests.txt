@@ -1432,3 +1432,7 @@ w84gd_selective_reveal_logical_top.txt
 w85ha_pass_floor_cleanup_window.txt
 w85ha_pass_floor_blockers_window.txt
 w85hb_mill_above_parked_card.txt
+w86ia_multichoice_mode_after_compaction.txt
+w86ib_garbage_readd_refused.txt
+w86id_pass_floor_fires_on_rearming_menu.txt
+w86ic_reveal_above_identity.txt

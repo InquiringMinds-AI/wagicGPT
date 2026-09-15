@@ -243,7 +243,8 @@ int GameStateDuel::selectedAIDeckId = 0;
 static std::string kBgFile = "";
 
 GameStateDuel::GameStateDuel(GameApp* parent) :
-GameState(parent, "duel")
+GameState(parent, "duel"),
+    mTranscriptMenuDone(false) //#W86-IE (bug list item 8)
 {
 
     cnogmenu = NULL;
@@ -3047,6 +3048,7 @@ std::string TDeck::getDeckName()
 }
 
 Tournament::Tournament()
+    : mSpeed(0) //#W86-IE (bug list item 8): never written anywhere in the tree
 {
 
     for (int i = 0; i<NMB_PLAYERS; i ++)

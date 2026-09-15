@@ -95,6 +95,22 @@ protected:
     std::string mAiDeclineFace;
     int mAiDeclineBudget;   //0 = unbounded, >0 = remaining declines
     int mAiDeclineApplied;  //how many declines this command actually made
+    //#W86-ID (audit-2026-09 bug list item 5): `aideclineface <card> <budget> seam`
+    //reproduces the WAVE-70/71 RE-ARMING-MENU SHAPE, which the ordinary arm above
+    //cannot. Two differences, both needed and both faithful to the live hang:
+    //  (a) the decline is given from inside computeActions - where AIPlayerGPT's
+    //      menu seam gives it - instead of from TestSuiteAI::Act ahead of the base
+    //      Act. AIPlayerBaka::Act samples `menuOpenBefore` at its own entry and
+    //      calls the tick a menu-answering tick only if the menu was standing then
+    //      and is gone after computeActions. An answer given BEFORE that sample is
+    //      invisible to the pass floor, so the pre-Act arm resets mMenuPassHold
+    //      every tick and the floor can never accumulate - which is why four lanes
+    //      could not produce this shape.
+    //  (b) the declined-face LATCH is off, which is the pre-#W71-BP engine. The
+    //      latch is the fix for the hang; a fixture that pins the FLOOR has to run
+    //      the engine that hangs without it.
+    //Suite-only, and it changes nothing for a fixture that does not ask for it.
+    bool mAiDeclineSeam;
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);
@@ -237,7 +253,15 @@ public:
     //#W82-EE (audit-2026-09 item 6): this seat answers menus through
     //DecisionManager::applyMenuChoice, so it is the seat that arms the
     //declined-face latch and the one FindCardToPlay must consult.
-    virtual bool usesDeclinedFaceLatch() const { return true; }
+    //#W86-ID (bug list item 5): ...except under the `seam` decline mode, which
+    //exists to run the pre-latch engine so the pass floor can be observed firing.
+    virtual bool usesDeclinedFaceLatch() const { return !suite->mAiDeclineSeam; }
+    //#W86-ID: the seam-mode decline, given where the model's own menu seam gives
+    //it - inside computeActions, under AIPlayerBaka::Act's menuOpenBefore sample.
+    virtual int computeActions();
+    //The armed face decline itself, shared by both placements. Returns true when
+    //it actually answered a menu this tick.
+    bool applyArmedFaceDecline();
     virtual bool isInteractiveAI() const
     {
         //#W54-R: `aipending` latches this seat onto the live-LLM branch of the

@@ -85,7 +85,8 @@ enum ENUM_MENU_STATE_MINOR
 };
 
 GameStateMenu::GameStateMenu(GameApp* parent) :
-    GameState(parent, "menu")
+    GameState(parent, "menu"),
+    mPercentComplete(0), mCreditsYPos(0.0f), mCurrentSetFolderIndex(0), mReadConf(0) //#W86-IE (bug list item 8)
 {
     mGuiController = NULL;
     subMenuController = NULL;

@@ -15,7 +15,8 @@
 #include <iomanip>
 
 SimplePopup::SimplePopup(int id, JGuiListener* listener, const int fontId, const char * _title, DeckMetaData* deckMetaData, MTGAllCards * collection, float cancelX, float cancelY) :
-    JGuiController(JGE::GetInstance(), id, listener), mCollection(collection)
+    JGuiController(JGE::GetInstance(), id, listener), mCollection(collection),
+    mClosed(false) //#W86-IE (bug list item 8): isClosed() is read before Update runs
 {
     mX = 19;
     mY = 66;

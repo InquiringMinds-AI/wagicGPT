@@ -194,6 +194,16 @@ public:
     Player * previousController;
     MTGGameZone * getCurrentZone();
     MTGGameZone * previousZone;
+    //#W86-IC (audit-2026-09 bug list item 4): this INSTANCE's identity, as opposed
+    //to MTGCard::mtgid which identifies the PRINTING (two copies of a card in one
+    //library share it, so it cannot tell them apart) and as opposed to the object's
+    //address, which the allocator reuses. Assigned once in initMTGCI from a
+    //monotonic counter and never reused or written again; a zone move that COPIES
+    //the card builds a fresh instance and therefore a fresh id, which is the right
+    //answer for every consumer here (the copy is not the card that was recorded).
+    //In-class initialiser so the default value is a property of the type rather
+    //than of whichever of the four constructors ran.
+    unsigned int mInstanceId = 0;
     //#W84-GD (review-2 item 4) / #W85-HB (review-3 items 2 and 3): while this card
     //is PARKED in a reveal zone, WHICH library cards the reveal left behind ABOVE
     //it. Revealing does not move a card (CR 701.20b), so a parked card is still a
@@ -209,9 +219,17 @@ public:
     //cannot go stale, and a card parked by a route that records nothing (scry,
     //`moveto(myreveal)`) has an EMPTY set and is therefore eligible - which is the
     //right default and needs no per-site stamping.
-    //Pointer identity only: entries are compared against the live library and are
-    //never dereferenced.
-    vector<MTGCardInstance *> mRevealAbove;
+    //#W86-IC (audit-2026-09 bug list item 4): STABLE IDS, NOT RAW POINTERS.
+    //fix-lane-4's own weakest-evidence paragraph named the residual: the set held
+    //raw MTGCardInstance pointers compared against the live library, so a freed
+    //instance whose address was later reused by a card that IS in the library read
+    //as "still above" and held the parked card down for a draw. The printing id
+    //(MTGCard::mtgid) cannot be used - two copies of a card share it - so each
+    //instance carries its own serial, unique for the life of the process and never
+    //reused, and this set holds those. An entry whose card has left the library is
+    //simply not found; an entry whose STORAGE has been reused is not found either,
+    //because the new occupant has its own serial.
+    vector<unsigned int> mRevealAbove;
     MTGCardInstance * tokCard;
     MTGCardInstance * previous;
     MTGCardInstance * next;

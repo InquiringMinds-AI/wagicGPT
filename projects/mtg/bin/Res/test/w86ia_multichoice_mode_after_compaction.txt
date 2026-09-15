@@ -1,0 +1,40 @@
+#NAME: A multiple-choice menu selects a SURVIVING REAL MODE after the layer compacts (#W86-IA)
+#DESC: audit-2026-09 bug list item 2. The wave-83 lane built this fixture, could not
+#DESC: make it discriminate ("the scripted choice 0 did not reach doReactTo at all on
+#DESC: either binary once the layer had been shrunk") and dropped it. The cause was
+#DESC: the FIXTURE's click routing, not the engine: TestSuiteAI's menu-default guard
+#DESC: answers any armed menu whenever the PENDING command is not one of its named
+#DESC: exemptions, and `shrinkactionlayer` was never added to that list. So the
+#DESC: default answered the modal menu (first option, a mandatory menu has no Cancel)
+#DESC: and re-queued the shrink; the shrink then ran with no menu armed and the
+#DESC: following `choice N` reached doReactTo with menuObject == 0 and did nothing.
+#DESC: FIX (#W86-IA): `shrinkactionlayer` joins the exemption list and the keyword
+#DESC: list, so it runs UNDER the armed menu, which is the whole point of the command.
+#DESC: WITNESS: Inquisitor Exarch's enters-trigger is a real MenuAbility - mode 0
+#DESC: "you gain 2 life", mode 1 "target opponent loses 2 life" (mtg.txt:58485). The
+#DESC: layer is compacted under the armed menu, then mode 1 is selected.
+#DESC: RED on a binary without the exemption: the menu-default takes mode 0 instead,
+#DESC: so P1 is at 22 and P2 at 20 - "life is not the same for player 0, expected 20,
+#DESC: got 22" / "player 1, expected 18, got 20".
+#DESC: GREEN: P1 20, P2 18 - the mode the script chose, chosen after compaction.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Inquisitor Exarch
+manapool:{W}{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Inquisitor Exarch
+shrinkactionlayer 3
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Inquisitor Exarch
+manapool:{0}
+life:20
+[PLAYER2]
+life:18
+[END]

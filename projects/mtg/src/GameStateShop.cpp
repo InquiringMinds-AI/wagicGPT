@@ -53,7 +53,8 @@ bool BoosterDisplay::CheckUserInput(JButton key)
 }
 
 GameStateShop::GameStateShop(GameApp* parent) :
-    GameState(parent, "shop")
+    GameState(parent, "shop"),
+    mBuying(0), mStage(0) //#W86-IE (bug list item 8)
 {
     menu = NULL;
     boosterDisplay = NULL;
