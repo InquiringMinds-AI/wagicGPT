@@ -419,8 +419,9 @@ void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm);
 //#W75-CM (F5): the same swap with the seat's live armed flag carried through the
 //slot, so the arming/recording accounting is per arm and PARSETEST can replay the
 //exact interleaving (land arms and is parked; casting arms; both complete).
-void gptRetrySelectArmClose(GptRetrySlot& live, GptRetrySlot& park, bool landArm,
-                            bool& liveForceCloseArmed);
+//#W82-A (audit-2026-09): `gptRetrySelectArmClose` is folded into its one caller
+//- it existed only to thread `GptRetrySlot::forceCloseArmed`, a field of the
+//slot the swap already moves.
 
 //#W75-CM (F5): arming a close on the LIVE arm. Returns what the seat's
 //"unrecorded" counter must gain: a second arm on the SAME arm while the first is
@@ -731,8 +732,9 @@ private:
     //Pure, so it is pinned without a game: "this key has now been replayed maxRun
     //times running". Re-arms after firing, so a loop that survives one refusal is
     //named again rather than once.
-    static bool askReplayRefuse(const std::string & key, std::string & lastKey,
-                                int & run, int maxRun);
+    //#W82-A (audit-2026-09): the unscoped `askReplayRefuse` is DELETED - both
+    //live sites use `askReplayRefuseScoped` (#W72-BT) and only a PARSETEST pin
+    //still reached the old one.
     //#W72-BT (M22): the same predicate, scoped per window. `runs` holds one
     //counter per state+question key, so interleaving windows cannot reset one
     //another and each loop is named on its own. Fires and re-arms exactly as
@@ -845,7 +847,6 @@ private:
     //#W71-BS (F5): the one length-truncation re-ask a declaration seam may buy -
     //the SAME question with a bigger allowance, no added text.
     std::string mCeilingReaskDoneBase;
-    int mCeilingReasks = 0;
     //#W71-BS (F4): where a replay record goes - a sidecar beside the translog, so
     //re-serving an answer never advances the file the harness watchdog times.
     std::string askReplaySidecarPath() const;
@@ -974,31 +975,28 @@ private:
     //including an attempt recovered by the one retry. Joined into the
     //translog's `transport` field and consumed with that decision record.
     std::vector<std::string> mLastTransportOutcomes;
-    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                         bool hasReasoning, long httpStatus);
-    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                         bool hasReasoning, long httpStatus, long curlCode);
     //#W60-Q (R9): the transport delivered a body and the CLIENT could not make
     //an answer out of it - a 200 whose JSON does not parse, or parses to a
     //shape with no message content (`{"choices":[]}`). curl is 0, the status is
     //200 and the body was not empty, so every existing class was false: it
     //filed as `empty_reply` and read as "the model said nothing", hiding a
     //protocol/schema failure that no amount of retrying the same endpoint fixes.
+    //#W82-A (audit-2026-09): ONE ordered table - the 3/4/5-argument forwarders
+    //are folded into it (the order was their whole content).
     static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                         bool hasReasoning, long httpStatus, long curlCode,
-                                         bool badReply);
+                                         bool hasReasoning, long httpStatus = 0,
+                                         long curlCode = 0, bool badReply = false);
     static bool retryableTransportFailure(long curlCode, long httpStatus, bool emptyBody);
     static long remainingTransportRetryMs(long deadlineMs, long firstLatencyMs);
     //#W68-BC (J2): the wall arm's missing question. See the .cpp comment - a
     //wall miss has no remainder, so it buys no second attempt.
     static bool retryFitsInDeadline(long deadlineMs, long firstLatencyMs);
-    static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody);
     //#W61-U (C13): the same stamp plus the two facts that make the failure's
     //PHASE provable (the connect budget in force, the elapsed round trip), and
     //the phase verdict itself. "" when the numbers do not settle it.
     static std::string transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody,
-                                             long connectBudgetMs, long latencyMs,
-                                             long deadlineMs);
+                                             long connectBudgetMs = 0, long latencyMs = -1,
+                                             long deadlineMs = 0);
     static const char * transportPhaseFor(long curlCode, long latencyMs,
                                           long connectBudgetMs, long deadlineMs);
     //L4: one translog stream per seat, opened on the first record (after the
@@ -1290,7 +1288,6 @@ private:
     int mOwnTurnWindowsSkipped;
     //#W54-D (D8b): asks whose entire option list rendered as one
     //interchangeable, ordinal-free row and were answered without a model call.
-    int mIdenticalOptionAsksResolved;
     //#W59-J (K10, wave-58 deck126 HIGH-2): the REPEATED ask. While a decided
     //Sanguine Bond / Exquisite Blood drain resolved, the seat was handed the
     //same two-row menu 32 times in one turn's upkeep (20 more in a second
@@ -1573,7 +1570,6 @@ private:
     //- the wave-49 "5 echoes expire the carry" trigger is RETIRED; expiry is
     //keyed on the plan's CONTENT (gptcaveat::planOpensWithVerdict /
     //planNamesNoAction), never on how often the model re-states it.
-    int mPlanEchoCount;
     //W38 mutate host-intent carry (wave-37 validation #3, 139v152 s30-31):
     //the over/under placement and the host pick are SEPARATE model calls,
     //and the pilot's host intent did not survive the boundary (chose "over"
@@ -1771,7 +1767,6 @@ private:
     //Report/render values only: neither ever enters mPromptTail, an ask key or
     //an option-set key (the clause is a {...} group, stripped from all three).
     int mStatedStop;
-    int mStatedStopCount;
     //#W72-BX (F2): the turn the stop above was STATED on. mPlanSetTurn dates the
     //last plan LINE, whatever it says, so it cannot date a stop.
     int mStatedStopTurn;
@@ -1811,8 +1806,6 @@ private:
     //re-ask has already been spent on a different failure (123 s41 spent it on a
     //named_row miss and s43 then cast a Devour Flesh its own PLAN called dead,
     //at 7 life). Keyed exactly like the budget it is exempt from.
-    string mAskNoopReaskKey;
-    string mPriorityNoopReaskBoard;
     //#W60-M (B3): the cleanup-discard channel's own one re-ask. Keyed on the
     //ask TEXT (the hand and the count are in it), cleared when the discard
     //completes. The discard prompt states it is the only ask for those cards,
@@ -2029,7 +2022,9 @@ public:
     //#W66-AS (H3 second half): the auto-pass predicate and its board reader,
     //public so the test-suite driver command `assertloopautopass` can pin them
     //against a REAL board (the suite has no model seat, so nothing else could).
-    static bool loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction);
+    //#W82-A (L11, audit-2026-09): `loopAutoPassApplies` is DELETED - it equalled
+    //`chainAutoPassApplies(false, a, b)` and only the self-test called it; the
+    //cast-seam auto-pass it stood for is deleted too.
     //#W73-BY (N6): the same rule, generalised off the life loop onto ANY
     //resolving chain. Pure over (a chain is on the stack, the proven loop, this
     //seat has a legal action).
@@ -2123,7 +2118,6 @@ private:
     //#W79-DC (F2): hold-latch re-opens TAKEN because the verdict marker stayed at
     //the same danger rank but named a DIFFERENT threat than the one the hold was
     //taken over - the population #W79-CZ's rank clamp silently suppressed.
-    int mHoldReopenedNewThreat;
     //#W80-DE (U2, wave-79 engine-seat HIGH-2 - THE HOLD COUNTERS ARE UNAUDITABLE).
     //`hold_verdict_safer_ignored` 59 and `hold_reopened_new_threat` 0 carried no
     //DebugTrace and no record field, so neither the window, nor the held face, nor
@@ -2137,7 +2131,6 @@ private:
     int mHoldEvents; //every clamp and every re-open writes one `hold_event` record
     //#W80-DH (F3): a hold re-opened because a NEW lethal threat (different
     //objects, same top-rank face) replaced the one it was taken over.
-    int mHoldReopenedNewLethal;
     //#W80-DH (F3): WHICH OBJECTS made each lethal face lethal when the hold was
     //taken, per seam. Object identity, never text and never a number; internal
     //only - these enter no key, no row, no prompt and no record.
@@ -2180,7 +2173,6 @@ private:
     //of the same turn over a board the bracket itself certifies unchanged, served
     //from this seat's own answer instead of a full model call. Every replay is a
     //line in askreplay/ naming both phases, so the counter has a per-event trace.
-    int mCrossPhaseReplayed;
     //#W80-DE (U9): the replay population, split by PATH so the census sums.
     //`ask_replays_reserved` counted two paths under one name and the wave-79
     //population moved between them (953 latch / 391 cache -> 0 / 1,084), which
@@ -2190,18 +2182,12 @@ private:
     //#W79-DC (F1): the legal-continuation digest of the window about to be asked -
     //the other half of the ask key's board half, beside the seam scope. Set by the
     //seam that built the menu, read by the ask key and the async slot key.
-    std::string mContinuationDigest;
     //#W79-DC (F1): staged by a seam that builds its own menu, consumed by askModel
     //on entry (the #W53-N D2 swap discipline) so it cannot leak onto a later ask.
-    std::string mNextContinuationDigest;
-    std::string w79ContinuationDigestPriority(const std::vector<const OrderedAIAction *>& shown);
-    std::string w79ContinuationDigestCast(const std::vector<MTGCardInstance *>& cands);
     //#W79-DC (F1): asks that a scope-only key would have served from the cache and
     //this key does not, because a legal continuation moved under an unchanged menu.
-    int mAskKeyContinuationDiffers;
     //#W79-DC (F1): scope-plus-rows key -> the digest it last carried, so the
     //counter above names exactly the windows the scope-only key aliased.
-    std::map<std::string, std::string> mAskScopeDigest;
     //#W79-DC (F1): the board the last priority ACTION was taken over. The deadlock
     //breaker must never read a SUCCESSFUL, board-changing activation as "no
     //progress" - which a scope-plus-rows key cannot tell apart on its own.
@@ -2213,12 +2199,9 @@ private:
     //record carries. An ACTIVATING or CASTING cached answer stands at most once per
     //key; the option is never removed and never auto-answered - the MODEL decides
     //again. See `w81CachedReplayMustReask`.
-    std::string mCachedReplayKey;
-    int mCachedReplayRuns;
     //#W81-DI: how many replies the development-build offline stub has served
     //(WAGIC_GPT_STUB; see w81StubReplyNext). Unused in a release build.
     int mStubReplyIndex;
-    int mCachedReplayReasked;
     std::string mReaskReasonFace;
     //#W81-DK (V1): this askModel call is a STATE-BASED ACTION window (the legend
     //rule's "which copy goes to the graveyard"). Neither re-serve cache may answer
@@ -2397,8 +2380,12 @@ private:
     //gets so that first attempt plus retry never exceed one deadline.
     long mRetryBudgetMs;
     //#W74-CF (F1): the other arm's parked retry slot. Empty activePrompt = nothing
-    //parked. Swapped in and out by selectRetryArm(); never read anywhere else, so
-    //every existing reader of the live members keeps reading this arm's own leg.
+    //parked. Swapped in and out by selectRetryArm().
+    //#W82-A (audit-2026-09): the comment said "never read anywhere else"; it IS
+    //read - `mRetryPark.forceCloseArmed` at the force-close busy test, the defer
+    //decision, the forced-close record, the gameend outstanding count and the
+    //patience-cancel path. The invariant that holds is the narrower one: the LIVE
+    //members always describe THIS arm's leg, because selectRetryArm swaps first.
     GptRetrySlot mRetryPark;
     void selectRetryArm(bool landArm);
     bool mLastRetry;
@@ -2422,8 +2409,6 @@ private:
     //as an endpoint fault. Precedence: a livelock give-up first (the engine
     //stopped asking), then the deadline (an empty body cannot be reasoning),
     //then the transport/model split the wave-34 A/B is scored on.
-    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                         bool hasReasoning);
     //#W53-Q (D10): the last consumed reply came back EMPTY at the wall - the
     //worker's round trip reached the configured timeout. Set on consume,
     //cleared by any reply that carried a body, and read by noAnswerClass and
@@ -2643,7 +2628,6 @@ private:
     //per-window stamp, consumed by that window's own record so it can never
     //migrate onto a later one; the counter is the record count.
     bool mActionBeforePlanRejected;
-    int mActionBeforePlanRejects;
     int mPlanStepsDone;            //steps of the carried plan already executed
     //#W80-DG (U1, wave-79 HIGH-1): a CAST is one plan step spanning TWO windows
     //whenever the engine puts a completing menu behind it (the X ladder, the
@@ -2714,8 +2698,6 @@ private:
     int mForceCloseEvents;
     //#W80-DF (U13): menus answered by the engine because every row resolves to
     //one outcome, and their own record ordinal.
-    int mSingleOutcomeMenusAnswered;
-    int mSingleOutcomeRowsSpared;
     //#W76-CN (Q13): one ASKED window's list, keyed without its phase, so a
     //byte-identical re-put later in the same turn at another phase can be
     //counted and named. Measure + annotation only; no window is collapsed.
@@ -2759,11 +2741,8 @@ private:
     bool mWallMissPending;
     string mWallMissBase;
     long mWallMissLatencyMs; //#W61-U (C13): the round trip that missed the wall
-    int mWallMissEvents;
-    int mWallMissUnrecorded;
     //#W68-BC (J2): wall misses that were handed straight to the heuristic
     //because the deadline was spent (no second full deadline was bought).
-    int mWallMissNoRetry;
     //#W68-BC (J2): the two legs of a retried decision, kept past the sum so
     //the record can publish them (`attempt_ms`) and compute deadline_pct per
     //attempt. -1 = no such leg. Consumed with the record, like latency_ms.

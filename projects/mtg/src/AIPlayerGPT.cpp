@@ -11654,29 +11654,6 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
     return o.str();
 }
 
-//#W54-D (D8b): every row of this option list is BYTE-IDENTICAL and none of
-//them carries an instance ordinal, so the de-duplicated list has length ONE
-//and the render itself says the members are interchangeable. This is the
-//existing "one option = no decision" rule (askModel returns 0 without a model
-//call) applied to N indistinguishable outcomes rather than one: 16 asks / 147
-//rows / 2.9 min of the wave-53 corpus were this shape, and one of them
-//(152v123 s29) answered out of range and burned a fallback. The ordinal test is
-//what keeps it honest - if the engine prints anything that TELLS the rows
-//apart, this returns false and the model keeps the ask. Pure, so the boundary
-//is provable.
-bool identicalInterchangeableRows(const vector<string>& rows)
-{
-    if (rows.size() < 2)
-        return false;
-    string head, tail;
-    int rank = 0;
-    if (splitRowHandle(rows[0], head, tail, rank))
-        return false; //an instance ordinal distinguishes what the render prints
-    for (size_t i = 1; i < rows.size(); i++)
-        if (rows[i] != rows[0])
-            return false;
-    return true;
-}
 
 //#W47 (R7): does THIS window's option block already speak for the permanent
 //`name`? Substring, on the rendered option text: a permanent whose ability is on
@@ -11880,17 +11857,6 @@ static int repeatStopClampCount(int namedCount, int statedStop, int statedCurren
     return room > 0 ? room : 0;
 }
 
-//#W67-AZ (R2, codex review finding 2). THE BOUNDARY. Wave 66 executed the
-//clamp only when it left TWO or more repetitions and passed the window
-//otherwise - while the receipt it had already written said the engine "ran 1 of
-//them this window". One legal repetition became zero, narrated as one. There is
-//nothing to withhold: the repeat row family performs a SINGLE activation for any
-//count under two (the `repeat_count_under_two` branch), so a stop that leaves
-//one runs one. Only a stop with no room left executes nothing, and then the
-//receipt's own number is 0. Pure, so the boundary is provable without a board.
-//#W71-BO (R3, wave-70 census): `smallSeamTruncationReaskLine` and
-//`combatTruncationReaskLine` are DELETED with the truncation re-asks they
-//worded. 0 truncations in 2,119 decisions under reasoning-on.
 
 //#W68-BE (R3, codex review finding 3 - HIGH): WHICH takes the stated stop clamps.
 //J1 was right that a stated stop applies to ANY activation of the same ability -
@@ -19042,62 +19008,40 @@ bool AIPlayerGPT::reasoningRequested() const
 //had passed. "timeout" is its own class: the request was accepted, the model
 //was thinking or queued, and the CLOCK ran out. Pure over the three facts, so
 //the whole table is pinned in PARSETEST.
+//#W82-A (audit-2026-09): ONE table, not a four-deep chain of forwarders. The
+//four overloads (3-, 4-, 5- and 6-argument) each added one fact and delegated to
+//the one below it; the ORDER was the whole content and it is now written once,
+//top to bottom, in the order the comments already argued for:
+//  * a stale-livelock give-up consumed no round trip and outranks everything
+//    (every level of the old chain guarded on `!staleLivelock`);
+//  * a body that ARRIVED and could not be read is a protocol fault, not a
+//    silent model - ranked above the http/model split for exactly that reason;
+//  * a round trip that died BEFORE the deadline is transport (connect refused,
+//    DNS, TLS, reset). The `!timedOut` guard is load-bearing: a request killed
+//    at its own deadline ALSO reports a nonzero CURLcode (28,
+//    CURLE_OPERATION_TIMEDOUT), so without it every wall miss would be renamed
+//    `transport_error` and #W53-Q (D10)'s "the clock ran out" class - the one
+//    the seat reviews read - would vanish;
+//  * a server that ANSWERED 401/404/413/429/5xx is its own class EVEN AT THE
+//    WALL (audit-L A24: the server answered), so it precedes the deadline;
+//    0 and 200 carry nothing new and fall through;
+//  * then the deadline, then the three-fact table: reasoning-only vs empty.
+//Pure, so the whole table is pinned in PARSETEST.
 const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                           bool hasReasoning)
+                                           bool hasReasoning, long httpStatus,
+                                           long curlCode, bool badReply)
 {
     if (staleLivelock)
         return "stale_livelock";
+    if (badReply && !timedOut && curlCode <= 0 && (httpStatus == 0 || httpStatus == 200))
+        return "bad_reply";
+    if (!timedOut && curlCode > 0)
+        return "transport_error";
+    if (httpStatus != 0 && httpStatus != 200)
+        return "http_error";
     if (timedOut)
         return "timeout";
     return hasReasoning ? "reasoning_only" : "empty_reply";
-}
-
-//audit-L (A24): the same table with the HTTP status in front of the clock. A
-//server that ANSWERED with a 401/404/413/429/5xx is its own class - a wrong
-//key, a rejected model id, a prompt over the context window, a rate limit -
-//and none of those is "empty_reply" (the unreachable-endpoint word) nor
-//"timeout" (the clock ran out with no status at all). The breaker still wins:
-//a stale-livelock give-up consumed no round trip. 0 and 200 carry nothing new
-//and fall through to the three-fact table above.
-const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                           bool hasReasoning, long httpStatus)
-{
-    if (!staleLivelock && httpStatus != 0 && httpStatus != 200)
-        return "http_error";
-    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning);
-}
-
-//#W59-H (K1): a curl failure is transport, not a model's empty answer. HTTP
-//errors retain their existing, more specific class. Platforms without curl
-//report -1 and fall through to the HTTP/body facts.
-//ORDER MATTERS, and it is the reason this is a table and not an if-chain in
-//the caller: a request killed at its own deadline ALSO reports a nonzero
-//CURLcode (28, CURLE_OPERATION_TIMEDOUT), so the deadline fact is asked first
-//or every wall miss would be renamed "transport_error" and #W53-Q (D10)'s
-//"the clock ran out" class - the one the seat reviews read - would vanish.
-//What is left for transport_error is exactly the F3 shape: a round trip that
-//died BEFORE the deadline (connect refused/timed out, DNS, TLS, reset).
-const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                           bool hasReasoning, long httpStatus, long curlCode)
-{
-    if (!staleLivelock && !timedOut && curlCode > 0)
-        return "transport_error";
-    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning, httpStatus);
-}
-//#W60-Q (R9): a body ARRIVED and the client could not read an answer out of it.
-//Ranked below the livelock give-up, the deadline and a curl-level failure (all
-//of which explain the missing body outright) and ABOVE the http/model split,
-//because it is the only class that distinguishes "the endpoint answered with
-//something we cannot parse" from "the model returned nothing". A 200 with an
-//unparsable or empty-schema body is a protocol fault, not a silent model.
-const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
-                                           bool hasReasoning, long httpStatus, long curlCode,
-                                           bool badReply)
-{
-    if (badReply && !staleLivelock && !timedOut && curlCode <= 0
-        && (httpStatus == 0 || httpStatus == 200))
-        return "bad_reply";
-    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning, httpStatus, curlCode);
 }
 
 //#W59-H (K1): ONE retry is offered only for transport-shaped failures. A 4xx
@@ -19120,10 +19064,8 @@ long AIPlayerGPT::remainingTransportRetryMs(long deadlineMs, long firstLatencyMs
 
 //#W59-H (K1): stable scalar shape for the translog field. Keeping curl and
 //HTTP beside one another prevents a status 0 from erasing CURLE_OPERATION_TIMEDOUT.
-string AIPlayerGPT::transportOutcomeStamp(long curlCode, long httpStatus, bool emptyBody)
-{
-    return transportOutcomeStamp(curlCode, httpStatus, emptyBody, 0, -1, 0);
-}
+//#W82-A (audit-2026-09): the 3-argument forwarder is DELETED - both production
+//calls already pass the 6-argument form, and only a PARSETEST pin reached it.
 
 //#W61-U (C13): WHICH PHASE a curl failure died in. Both wave-60 transport
 //records read `curl=28,http=0,empty=1` at latency 900,024 / 900,027 ms against
@@ -19668,7 +19610,10 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 if (content.empty() && !fieldReasoning.empty())
                 {
                     string tail = answerTailFromReasoning(fieldReasoning);
-                    //#W71-BO (R7): `reasoning_tail_answers` DELETED (0 of 40).
+                    //#W71-BO (R7): the `reasoning_tail_answers` COUNTER is
+                    //DELETED (0 of 40). #W82-A (audit-2026-09): the branch
+                    //itself is NOT deleted - the tail is still taken below, and
+                    //the comment read as though it were.
                     if (forceClosePoll)
                     {
                         //Phase 2: the generation is the answer, wherever the
@@ -20222,11 +20167,12 @@ void AIPlayerGPT::flushWallMissRecord(const char * classOverride)
     mWallMissPending = false;
     mWallMissBase.clear();
     //#W68-BC (J2): a miss written down BECAUSE no retry was bought is not an
-    //"unrecorded" (abandoned) miss - it has its own counter and its own class.
-    if (classOverride)
-        mWallMissNoRetry++;
-    else
-        mWallMissUnrecorded++;
+    //"unrecorded" (abandoned) miss - it has its own CLASS, which the record
+    //carries. #W82-A (audit-2026-09): the three gameend COUNTERS that also
+    //carried it (`wall_miss_events`, `wall_miss_unrecorded`, `wall_miss_no_retry`)
+    //are deleted - every one was zero corpus-wide, nothing named them in any
+    //tool, and the `wall_miss` record beside them carries the class per event, so
+    //the number is a `grep -c`.
     //#W61-U (C13): the abandoned ask's OWN round trip, restored onto the record
     //that reports it. Without it the record read `latency_ms: -1` (a cache hit)
     //for a decision that had just spent the entire deadline, and carried no
@@ -20290,15 +20236,10 @@ void gptRetrySelectArm(GptRetrySlot& live, GptRetrySlot& park, bool landArm)
         std::swap(live, park); //theirs is live and ours is empty: park theirs
 }
 
-//#W75-CM (F5): the flag rides the slot, so nothing else has to remember it.
-void gptRetrySelectArmClose(GptRetrySlot& live, GptRetrySlot& park, bool landArm,
-                            bool& liveForceCloseArmed)
-{
-    live.forceCloseArmed = liveForceCloseArmed;
-    gptRetrySelectArm(live, park, landArm);
-    liveForceCloseArmed = live.forceCloseArmed;
-}
-
+//#W82-A (audit-2026-09): `gptRetrySelectArmClose` is FOLDED AWAY. It existed
+//only to thread one bool in and out of `gptRetrySelectArm`, and that bool is
+//already a field of the slot the swap moves (`GptRetrySlot::forceCloseArmed`) -
+//the caller does the two assignments itself now, in the one place they happen.
 int gptForceCloseArm(bool& liveArmed)
 {
     const int inc = liveArmed ? 1 : 0;
@@ -20397,7 +20338,10 @@ void AIPlayerGPT::selectRetryArm(bool landArm)
     live.phase1Length = mForceClosePhase1Length;
     live.forceCloseDeferred = mForceCloseDeferred;       //#W76-CQ (F2)
     live.forceCloseDeferTicks = mForceCloseDeferTicks;
-    gptRetrySelectArmClose(live, mRetryPark, landArm, mForceCloseArmed); //#W75-CM (F5)
+    //#W75-CM (F5): the flag rides the slot, so nothing else has to remember it.
+    live.forceCloseArmed = mForceCloseArmed; //#W82-A: was gptRetrySelectArmClose
+    gptRetrySelectArm(live, mRetryPark, landArm);
+    mForceCloseArmed = live.forceCloseArmed;
     mForceCloseDeferred = live.forceCloseDeferred;       //#W76-CQ (F2)
     mForceCloseDeferTicks = live.forceCloseDeferTicks;
     mRetryActivePrompt = live.activePrompt;
@@ -20446,8 +20390,11 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     //arm polls its own slot and leaves it alone, and the arm that owns it reaches
     //it on its next window.
     //#W74-CF (F1): selectRetryArm() above has already made this true - the live
-    //slot is this arm's or empty. Kept as an assertion of that invariant rather
-    //than as the gate it used to be.
+    //slot is this arm's or empty.
+    //#W82-A (audit-2026-09): the comment claimed this was "kept as an assertion
+    //rather than as the gate it used to be". It is still &&-ed into the gate one
+    //line below, so it IS the gate; what changed is that the invariant above
+    //makes it always true on the paths that reach here.
     const bool retryArmMatches = mRetryActivePrompt.empty()
         || mRetryArmLand == w74ThisArmIsLand;
     if (!mRetryActivePrompt.empty() && retryArmMatches)
@@ -20716,7 +20663,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     if (content.empty() && mLastTimeout && userMsg != mRetryDoneBase
         && !retryFitsInDeadline(mTimeoutMs, mLastLatencyMs))
     {
-        mWallMissEvents++;
         mWallMissLatencyMs = mLastLatencyMs;
         mWallMissPending = true;
         mWallMissBase = asyncSlotKey(userMsg); //#W82-A (L7)
@@ -20743,7 +20689,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
             mWallMissPending = true;
             mWallMissBase = asyncSlotKey(userMsg); //#W82-A (L7)
             mWallMissLatencyMs = mLastLatencyMs; //#W61-U (C13)
-            mWallMissEvents++;
             setNotice("no reply from the model - asking once more", 3.0f);
             DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
                        << "s - one retry");
@@ -20780,7 +20725,6 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         && userMsg != mRetryDoneBase && userMsg != mCeilingReaskDoneBase)
     {
         mCeilingReaskDoneBase = userMsg;
-        mCeilingReasks++;
         const long raised = (mLastRequestAnswerTokens > 0 ? mLastRequestAnswerTokens : 256) * 2;
         if (raised > mAnswerFloorTokens)
         {
@@ -20808,10 +20752,10 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
-       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mActionBeforePlanReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mHoldReopenedNewThreat(0), mAskKeyContinuationDiffers(0), mMenuPassNoProgressSuppressed(0), mCachedReplayRuns(0), mCachedReplayReasked(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mActionBeforePlanRejects(0), mHoldEvents(0), mHoldReopenedNewLethal(0), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
-        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mCrossPhaseReplayed(0), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), mSingleOutcomeMenusAnswered(0), mSingleOutcomeRowsSpared(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
+       mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mMenuPassNoProgressSuppressed(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
+        mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
        mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mAsyncDropStampsSeq(-1), mAbandonedInFlightSeq(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
@@ -20820,15 +20764,13 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false), mRevealStallDriverTicks(0), mRevealStallDriverSecs(0),
       mWallMissPending(false), mWallMissLatencyMs(-1), //#W61-U (C13)
-      mWallMissEvents(0), mWallMissUnrecorded(0),
-      mWallMissNoRetry(0), //#W68-BC (J2)
+      //#W68-BC (J2)
       mLastAttemptFirstMs(-1), mLastAttemptSecondMs(-1), //#W68-BC (J2)
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
       mReplyLabelAbsent(false), mRecoveryLabelAbsent(false), //#W79-DB (T1)
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
-      mPlanEchoCount(0),
-      mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0),
+            mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0),
       mRunLastCount(0), //#W57-D (D29)
       mInStateBasedActionAsk(false), mSbaWindowsCacheBypassed(0),
       mHoldReopenAnswerInvalidated(0),
@@ -20841,7 +20783,6 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 
 {
     mStatedStop = -1;      //#W67-AY (I6): nothing stated yet
-    mStatedStopCount = -1;
     mStatedStopTurn = -1;  //#W72-BX (F2)
     mStatedStopOppLife = -1; //#W74-CE (O7c)
     mCastDecisionOpen = 0; //#W72-BX (F3)
@@ -21012,25 +20953,6 @@ void AIPlayerGPT::noticeFallback(const string& text, float seconds)
     mDegradedTicks = 45 * 60; //~45s since the last one; lapses if it recovers
 }
 
-//#W71-BP (L1 c): the replay-refusal predicate. Pure and static so the fixture
-//cannot reach it but PARSETEST can: the live path needs a model, a cache hit and
-//a stalled board at once. Firing resets the run, so a loop that survives one
-//refusal is named on every subsequent cycle rather than once.
-bool AIPlayerGPT::askReplayRefuse(const std::string & key, std::string & lastKey,
-                                  int & run, int maxRun)
-{
-    if (key.empty() || key != lastKey)
-    {
-        lastKey = key;
-        run = 1;
-        return false;
-    }
-    run++;
-    if (run < maxRun)
-        return false;
-    run = 0;
-    return true;
-}
 
 //#W72-BT (M22, wave-71 engine-seat MED-2): the same predicate, PER WINDOW.
 //The single-slot version above is reset by ANY other key - including a window
@@ -21220,14 +21142,12 @@ void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
                                        const string& face, const string& reason,
                                        int answerInvalidated)
 {
-    mHoldEvents++;
     if (mTransLogPath.empty())
         return;
     ensureGameStartRecord();
     json rec = {
         {"seq", mTransSeq++},
         {"kind", "hold_event"},
-        {"event", mHoldEvents},
         {"what", event ? event : ""},
         {"seam", seam ? seam : ""},
         {"face", face},
@@ -21251,36 +21171,6 @@ void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
     transLogWrite(rec.dump());
 }
 
-//#W80-DF (U13): the per-event record. A counter with no per-record trace cannot
-//be adjudicated (the LESSON OF WAVE 79), so every engine-answered menu writes
-//down what it answered and the identity that made it one option - the common
-//number of repeat payments the seat's mana pays for, which is 0 exactly when
-//every rung is the same rung. Telemetry about a window that was never asked, so
-//it rides the window number the way `forced_close` does and takes no ask seq.
-void AIPlayerGPT::writeSingleOutcomeMenuRecord(const string& subject, int rows, int answered,
-                                               const string& answeredText, int commonPaid)
-{
-    mSingleOutcomeMenusAnswered++;
-    if (rows > 1)
-        mSingleOutcomeRowsSpared += rows - 1;
-    if (mTransLogPath.empty())
-        return;
-    ensureGameStartRecord();
-    json rec = {
-        {"seq", mTransSeq++},
-        {"kind", "menu_single_outcome"},
-        {"event", mSingleOutcomeMenusAnswered},
-        {"subject", subject},
-        {"rows", rows},
-        {"answered", answered},
-        {"answered_text", answeredText},
-        {"repeat_payments_paid", commonPaid},
-        {"window_seq", mWindowSeq},
-        {"turn", translogTurn(observer ? observer->turn : 0)},
-        {"phase", observer ? observer->getCurrentGamePhase() : -1},
-    };
-    transLogWrite(rec.dump());
-}
 
 //One header record per seat log: decks, names, and a game_id BOTH seats
 //share (the observer's address) - reviewers previously paired seat logs by
@@ -21569,16 +21459,6 @@ static long postAnswerOverrun(const string& reply)
     return (long) (last - lineEnd);
 }
 
-//#W70-BM (E2): `preAnswerOverrun` DELETED - see offProtocolBytes above. It
-//measured "bytes before the first label", which under PLAN-then-action is the
-//PLAN line on every compliant reply.
-//answer_replaced: the reply ended on a DIFFERENT answer than it began with -
-//the model answered, kept writing, and re-answered. 45/1,209 replies did this
-//in wave 33 (one the deciding play of a win, one a fatal reversal), and NO
-//shipped field could see it: commit_retracted only counts retractions that
-//reached the heuristic. Under the wave-34 protocol this population is
-//designed to vanish, so its going to zero is the change LANDING, not an
-//improvement - which is exactly why it has to be counted on both arms.
 static bool answerReplaced(const string& reply)
 {
     string first, last;
@@ -21775,13 +21655,6 @@ static bool recordLatchedLineSpan(json& rec, const string& reply, int ordinal)
     return inPlan;
 }
 
-//#W71-BO (R3, wave-70 census): `commitRetracted` / `commit_retracted` DELETED.
-//It was the disjunction of three retraction exits, two of which
-//(`truncated_abandoned`, `truncated_abandoned_heuristic`) no longer exist -
-//`truncatedBlockCommitmentAbandoned` went in W70-BN F1 - and the third
-//(`retracted_choice`) is already stamped verbatim in the record's own
-//`fallback` field, so the derived flag only restated what the record said.
-//0 of 2,119 records carried it.
 
 //#W53-Q (D24). A record with `choice: -1`, `chosen_text` absent and a fallback
 //class says the model did not answer - and then says NOTHING about what did.
@@ -22248,13 +22121,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W63-AD (E11): only where `choice` IS a row index (see recordChoiceIsRowIndex).
     if (recordChoiceIsRowIndex(kind) && latchedRowMismatch(reply, choice, optionCount, optionTexts))
         appendParseNote(&mLastParseNote, "latched_row_mismatch");
-    //#W71-BO (R4): the `plan_contradicts_noop_row` stamp is DELETED with
-    //`planArguesAgainstRow` - it required the reply's own words to agree with the
-    //row, which is a reading of prose the protocol forbids. The row's own zero
-    //verdict still earns its re-ask at both seams.
-    //#W69-BI (K7): the take of a row the engine has already marked as repeated
-    //this turn. Stamped only where the answer STANDS (a refusal record carries
-    //its own fallback and executed nothing), with the annotation's own number.
     if (recordChoiceIsRowIndex(kind) && (!fallback || !*fallback) && choice >= 1 && optionTexts
         && choice <= (int) optionTexts->size())
     {
@@ -22464,13 +22330,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["w81_render_events"] = mW81EventFace;
         mW81EventFace.clear();
     }
-    //#W80-DH (F11, Astra wave-80 finding 11 - MED): `hold_safer_ignored_face` and
-    //`hold_reopen_reason` are DELETED from the window record. They were ONE shared
-    //string each, overwritten by every clamp in the window and consumed by
-    //whichever writeTransLog came next - so a window that clamped both faces kept
-    //at most one of them, and an unrelated target or discard record inherited the
-    //survivor. The events are now their own records (`kind: hold_event`), written
-    //AT the event, and the counters reconcile against them by construction.
     if (holdCheckRefSeq > -2)
         rec["hold_check_ref_seq"] = holdCheckRefSeq;       //#W78-CV (S7): the RECORD seq
     if (holdCheckRefWindow > -2)
@@ -22564,10 +22423,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mAbandonedInFlightSeq = -1;
     }
     //#W50-Y D10 (iii): how many consecutive replies re-stated the carried plan
-    //verbatim. A REPORT field - nothing in the engine reads it (the wave-49
-    //echo-count expiry is retired). Present only when > 0.
-    if (mPlanEchoCount > 0)
-        rec["plan_echo_count"] = mPlanEchoCount;
+    //#W82-A (audit-2026-09): `plan_echo_count` is DELETED - a REPORT field with
+    //no engine consumer and no tool reader, reconstructible from the replies the
+    //same log already carries.
     //Parse-shape signature (W36 items 1-4): multi-answer overruns, echo/index
     //conflicts and blocker re-ask provenance - divergences between what the
     //reply said and what executed, none of which is a heuristic fallback.
@@ -22595,7 +22453,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //#W70-BM (E2): parsed, but not the shape asked for - stamped, never
         //silently accepted. The gameend census carries the game's total.
         rec["action_before_plan"] = true;
-        mActionBeforePlanReplies++;
     }
     //#W80-DH (F2): ...and whether the PARSER acted on it. `action_before_plan` is
     //the SHAPE meter (computed on the raw reply by offProtocolBytes);
@@ -22607,7 +22464,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (mActionBeforePlanRejected)
     {
         rec["action_before_plan_rejected"] = true;
-        mActionBeforePlanRejects++;
         mActionBeforePlanRejected = false;
     }
     //#W71-BO (L10, wave-70 MED-2). A MISSING PLAN LINE IS NOW VISIBLE. The
@@ -22698,10 +22554,6 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
     rec["post_answer_overrun"] = postAnswerOverrun(reply);
-    //#W70-BM (E2): `pre_answer_overrun` / `reply_overrun` DELETED with their
-    //meter - `off_protocol_bytes` above is the one two-sided quantity now.
-    //#W68-BA (J3): the cap this reply was decoded under, and whether it bit.
-    //A corpus that cannot see the cap cannot tell a short reply from a cut one.
     if (mLastRequestMaxTokens > 0 && !userMsg.empty())
     {
         rec["max_tokens"] = mLastRequestMaxTokens;
@@ -23059,7 +22911,6 @@ void AIPlayerGPT::logGameEnd()
         {"engine_reveal_floor_picks", mEngineRevealFloorPicks},
         //#W54-D (D8b): asks whose whole option list rendered as one
         //interchangeable row and were resolved without a model call.
-        {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
         //#W59-J (K10): asks answered from the seat's own last answer to the
         //byte-identical row list, in the same turn, phase and decision, with
         //the plan unchanged. A window the model answered once and was then
@@ -23069,26 +22920,23 @@ void AIPlayerGPT::logGameEnd()
         //many of them were abandoned before any decision record could consume
         //them. Written always, present or zero, so a seat review divides rather
         //than infers - the wave-54 answer to "2 events, 1 record" was silence.
-        {"wall_miss_events", mWallMissEvents},
-        {"wall_miss_unrecorded", mWallMissUnrecorded},
-        {"wall_miss_no_retry", mWallMissNoRetry}, //#W68-BC (J2)
         //#W70-BM (E2/E3): the reply-SHAPE census and the wave-70 VERIFY counters.
         //`protocol_replies` is the denominator every one of these divides by; a
         //zero beside a zero denominator is silence, not evidence, and that
         //distinction is exactly what the wave-70 audit could not make from code.
         {"protocol_replies", mProtocolReplies},
-        {"action_before_plan_replies", mActionBeforePlanReplies},
         //#W80-DH (F2): of those, the ones whose answer was refused and re-asked.
         //Equal, by construction, to the number of records carrying
         //`action_before_plan_rejected`.
-        {"action_before_plan_rejected_replies", mActionBeforePlanRejects},
         {"phase2_answer_recovered", mPhase2AnswerRecovered},
         {"phase2_answer_missing", mPhase2AnswerMissing},
         //#W75-CJ (P2c): closes that armed and never reached any record.
         {"forced_close_unrecorded", mForceCloseUnrecorded
              + gptForceCloseOutstanding(mForceCloseArmed, mRetryPark.forceCloseArmed)}, //#W75-CM (F5)
         {"force_close_arms_refused", mForceCloseArmsRefused}, //#W76-CN (Q8)
-        {"force_close_arms_deferred", mForceCloseArmsRefused}, //#W76-CQ (F2)
+        //#W82-A (audit-2026-09): the `force_close_arms_deferred` row is DELETED -
+        //it serialised the SAME member as `force_close_arms_refused` above it, a
+        //copy-paste artifact, so the two numbers could never differ.
         {"force_close_defer_bound_hits", mForceCloseDeferBoundHits}, //#W76-CQ (F2)
         //#W77-CR (R11 a): deferrals caused by THIS arm's own outstanding close.
         //Its own meter - the park's bound never fired in wave 76 and this one is
@@ -23097,8 +22945,6 @@ void AIPlayerGPT::logGameEnd()
         {"forced_close_events", mForceCloseEvents}, //#W78-CV (S11)
         //#W80-DF (U13): joins one-for-one with the `menu_single_outcome` records
         //in this same file - the census reconciles or the counter is wrong.
-        {"single_outcome_menus_answered", mSingleOutcomeMenusAnswered},
-        {"single_outcome_rows_spared", mSingleOutcomeRowsSpared},
         {"crossphase_identical_reputs", mCrossPhaseRePuts},   //#W76-CN (Q13)
         //#W77-CR (R8): of those, the ones whose ask-cache board key MATCHED -
         //i.e. the ones that printed `nothing on the board has changed`. Never
@@ -23110,18 +22956,14 @@ void AIPlayerGPT::logGameEnd()
         //#W79-CZ (T4): the same population, counted where the line is spliced.
         {"own_loop_verdict_lines_rendered", mOwnLoopVerdictLinesRendered},
         //#W79-DC (F1): the two figures the continuation digest is accountable for.
-        {"ask_key_continuation_differs", mAskKeyContinuationDiffers},
         //#W79-DC (F2): holds re-opened by a NEW threat at the same danger rank.
-        {"hold_reopened_new_threat", mHoldReopenedNewThreat},
         //#W80-DH (F3): ...and by a NEW LETHAL threat - a top-rank crack-back or
         //stack-death face over an object set the hold was not taken over. Astra's
         //second-Bolt board. Per-record trace: `kind: hold_event`, what =
         //`reopen_new_lethal`.
-        {"hold_reopened_new_lethal", mHoldReopenedNewLethal},
         //#W80-DH (F11): every clamp and every re-open, as its own record. This
         //equals the number of `kind: hold_event` records in the seat log, and the
         //three class counters above plus the rows-moved re-opens sum to it.
-        {"hold_events", mHoldEvents},
         //#W80-DH (F5): cast plan steps that closed on the CAST EVENT (or the turn
         //belt) instead of on the first completing menu. Per-record trace: the
         //stderr close line names which of the two closed it.
@@ -23134,7 +22976,6 @@ void AIPlayerGPT::logGameEnd()
         {"crackback_lethal_blocked_away", mCrackBackLethalBlockedAway},
         {"stack_death_verdict_lines_rendered", mStackDeathVerdictLinesRendered},
         //#W80-DE (U8): declined lists re-served across a phase on an unchanged board.
-        {"crossphase_replayed", mCrossPhaseReplayed},
         //#W80-DE (U9): the replay population SPLIT BY PATH, so the census sums and
         //is comparable across waves. `ask_replays_reserved` stays the total.
         {"ask_replays_cache", mAskReplaysCache},
@@ -23143,7 +22984,6 @@ void AIPlayerGPT::logGameEnd()
         //#W81-DI: windows the priority cache would have replayed an ACTIVATING or
         //CASTING answer into a second time and that went back to the model instead.
         //Per-record trace: `reask_reason`. > 0 whenever a loop engine is live.
-        {"cached_replay_reasked", mCachedReplayReasked},
         //#W81-DK (V1): SBA windows (the legend rule) that went to the model because
         //neither re-serve cache may answer one. Per-record trace:
         //`cache_bypass_reason: state_based_action`.
@@ -23218,11 +23058,8 @@ void AIPlayerGPT::logGameEnd()
                << observer->turn << ", " << (iWon ? "won" : (oppWon ? "lost" : "draw"))
                << ") - windows held by the model's own hold row: " << mHoldWindowsSkipped
                << "; mana-only windows auto-passed: " << mManaOnlyWindowsSkipped
-               << "; interchangeable-option asks resolved without a call: "
-               << mIdenticalOptionAsksResolved
                << "; repeated identical asks re-served from the seat's own answer: "
                << mRepeatAskAnswersReserved
-               << "; deadline misses: " << mWallMissEvents
                //#W79-CZ (T14, wave-78 known bugs T14): SAY WHOSE. This figure is the
                //DEADLINE-MISS population, and it printed `0 unrecorded` beside a wave
                //whose `forced_close_unrecorded` was 16 - two different "unrecorded"s,
@@ -23231,8 +23068,6 @@ void AIPlayerGPT::logGameEnd()
                //identity (armed = the stderr `unclosed <think>` lines; unrecorded =
                //`dropped_decision_moved`, the decision moving out from under a pending
                //retry) is printed here so it reconciles without a record join.
-               << " (" << mWallMissUnrecorded << " wall-miss unrecorded, "
-               << mWallMissNoRetry << " no-retry)" //#W68-BC (J2)
                << "; forced closes: " << mForceCloseEvents << " events, "
                << mForceCloseUnrecorded << " superseded (dropped_decision_moved)"
                << "; phase-2 answer recovery: " << mPhase2AnswerRecovered << " recovered, "
@@ -24301,7 +24136,6 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
             || gptcaveat::planNamesNoAction(mCurrentPlan, tail, planNames))
         {
             mCurrentPlan.clear();
-            mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
                                                   //cast step (#W80-DH F5: its name too)
@@ -24401,7 +24235,6 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         {
             u << planContradictedBlock(planDenied);
             mCurrentPlan.clear();
-            mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
                                                   //cast step (#W80-DH F5: its name too)
@@ -24411,7 +24244,6 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         {
             u << planAssertedAbsentBlock(planAsserted);
             mCurrentPlan.clear();
-            mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
                                                   //cast step (#W80-DH F5: its name too)
@@ -24421,7 +24253,6 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
         {
             u << planWithdrawnBlock(planAgeClause(), planAbsent);
             mCurrentPlan.clear();
-            mPlanEchoCount = 0;
             mPlanStepsDone = 0; //#W70-BM (E1): a cleared plan has no walked steps
             mPlanCastCompletionState = 0; mPlanCastOpenName.clear(); //#W80-DG (U1): and no open
                                                   //cast step (#W80-DH F5: its name too)
@@ -25495,8 +25326,6 @@ static bool planLineOpensWithConnective(const string& line)
     return false;
 }
 
-//#W71-BO (R9): `replyLabelMissing` is DELETED with the label-missing re-ask it
-//triggered (`label_missing_reask` appears in none of the 42 wave-70 seat logs).
 
 //#W64-AJ (F13, engine seat HIGH-1). A CODED ANSWER LINE ENDS THE PLAN
 //PARAGRAPH. `planParagraphBound`'s two terminators are a blank line and a
@@ -25589,8 +25418,6 @@ static size_t planBlockEndOffset(const string& text, size_t planPos)
 //coded line was inside the plan block, so the unbounded walk answered after all
 //and nothing was lost - the fail-safe, counted rather than assumed.
 static const int kPlanAnswerNoteNone = 0;
-//#W70-BM (E2): the two plan-block verdicts are DELETED with the demotion; the
-//one shape left to sign is a reply that wrote MORE THAN ONE answer line.
 static const int kPlanAnswerExtraLine = 1;
 
 //#W66-AR (H2c): the whole line beginning at `off`, right-trimmed. The refused
@@ -25690,10 +25517,12 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     //concluded a DIFFERENT option for the same window, the stale head
     //stayed locked in (intent-collapse: 4 seats across waves 8-9, one
     //game-losing false Keep). The answer label anchors the parse so plan
-    //prose full of numbers cannot hijack it - the reason head-first
-    //existed. Find the LAST label at a line start (a plan that quotes the
-    //protocol loses to the real trailing answer).
-    //Last line-leading answer-label line (template placeholders skipped, as
+    //prose full of numbers cannot hijack it - the reason head-first existed.
+    //#W82-A (audit-2026-09): the comment said "find the LAST label"; the live
+    //selector is `gptSelectAnswerIndex` and its rule is FIRST USABLE AND CLEAN,
+    //else first usable - first-clean, not last. (The header comment above that
+    //function states the rule correctly; this prose contradicted it.)
+    //Line-leading answer-label lines (template placeholders skipped, as
     //in the deck62 N7-template fix). `expectedLabel` restricts the match to
     //this decision's own label so a CoT combat line ("Attack: ...") inside a
     //CHOICE deliberation is not mistaken for the answer (stale-echo family B).
@@ -25705,16 +25534,14 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //walk first; if the plan block holds the reply's ONLY coded line the
         //unbounded walk still answers the window (the exclusion demotes, it
         //never deletes), and the seam signs which of the two happened.
-        const size_t planStart = firstLineLeadingPlanPos(text);
-        const size_t planEnd = (planStart == string::npos)
-                               ? string::npos : planBlockEndOffset(text, planStart);
         //#W70-BM (E2): the plan-block DEMOTION and its two-walk reconciliation
         //are DELETED. They existed because a reply could write a coded line
         //inside a rambling PLAN paragraph; a PLAN line that is a SEQUENCE OF
         //INTENDED ACTIONS cannot contain a line-leading answer label without
         //being a second answer line, which is a violation the scan now counts.
-        (void) planStart;
-        (void) planEnd;
+        //#W82-A (audit-2026-09): ...and so are the two locals that fed it. They
+        //were computed (one of them running `planBlockEndOffset`) and then
+        //explicitly discarded. `planBlockEndOffset` itself has other callers.
         size_t lastHead = string::npos;
         int extraLines = 0;
         //#W79-DD: the selector, labelled walk then the label-less action line.
@@ -25783,11 +25610,6 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //labeled) is still the decision.
         if (answerStart != string::npos)
             return text.substr(answerStart, answerEnd - answerStart);
-        //#W70-BM (E2): the LEGACY BARE-ANSWER path is DELETED. A reply with no
-        //label and no plan is not an answer of any length - it is a reply that
-        //did not follow the protocol, and `replyLabelMissing` earns it the ONE
-        //re-ask the seams run. Reading a bare 300-byte head as a decision is the
-        //prose-as-answer tolerance under a size limit.
         return string();
     }
 
@@ -25828,7 +25650,6 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         //be served as its first step and a half.
         plan = gptcaveat::planCarryComposeSteps(plan, kPlanCarryMaxSteps, kPlanCarryMaxChars);
         //#W49-U D7: count verbatim echoes of the plan already carried.
-        mPlanEchoCount = (plan == mCurrentPlan) ? mPlanEchoCount + 1 : 0;
         //#W70-BM (E1): STEP ONE IS CONSUMED BY THE ACTION. The action line IS
         //step one of the plan, so a window whose reply RESTATES the same plan has
         //already executed the step the previous window was served: the carry
@@ -25861,7 +25682,6 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
             if (repeatPlanStopAndCurrent(plan, &stStop, &stNow) && repeatPlanStopIsOwn(plan))
             {
                 mStatedStop = stStop;
-                mStatedStopCount = stNow;
                 //#W74-CE (O7c): and the life total it was computed against.
                 mStatedStopOppLife = (observer && opponent()) ? opponent()->life : -1;
                 //#W72-BX (F2): the stop carries its OWN date. `mPlanSetTurn` is
@@ -25871,8 +25691,11 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
                 //out of THIS reply's PLAN line is a stop stated this turn.
                 mStatedStopTurn = observer ? observer->turn : -1;
             }
-        }        mPlanSetTurn = observer ? observer->turn : 0;
-        mCurrentPlan = plan;
+        }
+        //#W82-A (audit-2026-09): the duplicate `mPlanSetTurn`/`mCurrentPlan`
+        //assignment that stood here (a verbatim repeat of the pair eleven lines
+        //above, left by an edit - the intervening block changes neither value)
+        //is DELETED.
     }
     //Labeled answer (the contract): the decision is the label line's
     //remainder, wherever the label sits relative to the plan. An answer
@@ -27661,20 +27484,6 @@ static void loopHalvesInZone(MTGGameZone * z, bool handles, string& converter, s
     }
 }
 
-//#W60-N (B6): the caution for whichever battlefield has the pair closed. The
-//opponent's is returned first: it is the half that ends the reader's own game.
-static string loopCautionForBoards(Player * me, Player * opp)
-{
-    string myConv, myMir, thConv, thMir;
-    if (me && me->game)
-        loopHalvesInZone(me->game->inPlay, true, myConv, myMir);
-    if (opp && opp->game)
-        loopHalvesInZone(opp->game->inPlay, true, thConv, thMir);
-    string s = loopCautionClause(thConv, thMir, true);
-    if (s.empty())
-        s = loopCautionClause(myConv, myMir, false);
-    return s;
-}
 
 //#W62-Y (D3): the same two boards, for a line that carries ONE life number.
 //`numberIsYourLoss` says whose life the number takes: true for "your next draw
@@ -29551,73 +29360,6 @@ static bool w75LegendTwinControlled(const std::vector<W75LegendBoardCard>& board
     return false;
 }
 
-//#W80-DF (U3, wave-79 deck146 HIGH-1). THE COVER CREDITED A BODY THE ROW DOES
-//NOT LEAVE. Acererak the Archlich's own untriggered enters-the-battlefield line
-//is `if <dungeon not completed> then name(Return to hand) moveTo(hand)`, and the
-//narration of the same prompt (`146v162` seq 32) already recorded the previous
-//copy arriving and being returned to hand - yet the row read `This adds 1 body`
-//and priced a crack-back cover with it, in 7 corpus windows. A cover is a claim
-//about the battlefield during THEIR attack; a card whose own resolution moves it
-//straight back off the battlefield is not there for it.
-//The predicate is the effect SHAPE, not a card name: a line with no trigger (a
-//permanent's own ETB) or an explicit `@movedto(this|battlefield):` trigger, which
-//moves to a zone that is not the battlefield or sacrifices, and which names NO
-//other object (no target/notatarget/all/foreach) - so the thing it moves is the
-//source itself, the engine's default. A conditional line (`if ... then`) counts
-//too: an UNDER-count of the cover is the conservative direction for a survival
-//verdict, which is the only direction that cannot lie. Pure over the script.
-//#W80-DH (F7, Astra wave-80 review finding 7 - HIGH). AN ACTIVATED BOUNCE IS NOT
-//AN ETB. Fleeting Image's whole script is `{1}{U}:moveto(hand)` - an ACTIVATED
-//ability whose cost its controller may simply not pay. The wave-80 test looked for
-//a trigger and, finding no `@`, treated the line as the permanent's own
-//enters-the-battlefield text: it subtracted the body from the crack-back cover and
-//printed that the card's "enters-the-battlefield text moves it straight back off
-//the battlefield as it resolves". Both halves are false - the flier stays and can
-//block - and the second is worse than the arithmetic, because it is a stated
-//MECHANISM the model is instructed to believe.
-//The engine's own shape for an activated ability is `<cost>:<effect>`, and a cost
-//is what sits before a TOP-LEVEL colon on a line with no trigger. So an untriggered
-//line that carries one is an activation, not an arrival. Colons inside (), [] or {}
-//belong to a spec (`this(variable{type:*:myhand}=0)`) and are not the split - the
-//scan is depth-aware for the same reason #W71-BR (L16)'s is. A triggered line keeps
-//its existing handling: the trigger must be this card's own arrival.
-static bool w80ScriptLineHasActivationCost(const string& low)
-{
-    //The split is the FIRST top-level `:`, and what makes the text before it a
-    //COST rather than an effect is a top-level `{...}` group - `{1}{U}:`, `{T}:`,
-    //`aslongas(*|myhand) {2}{T}:`. This is the same rule #W71-BR (L16) states for
-    //the draw scan, and it is why `draw:1`, `life:-4 controller` and
-    //`moveto(hand)` are effects: their colon has no cost in front of it. Braces
-    //inside (), [] or {} belong to a spec (`this(variable{type:*:myhand}=0)`) and
-    //are not a cost, so the group test is depth-aware too.
-    int depth = 0;
-    bool topLevelBraceGroup = false;
-    for (size_t i = 0; i < low.size(); i++)
-    {
-        const char c = low[i];
-        if (c == '(' || c == '[')
-            depth++;
-        else if (c == ')' || c == ']')
-        {
-            if (depth > 0)
-                depth--;
-        }
-        else if (c == '{')
-        {
-            if (depth == 0)
-                topLevelBraceGroup = true;
-            depth++;
-        }
-        else if (c == '}')
-        {
-            if (depth > 0)
-                depth--;
-        }
-        else if (c == ':' && depth == 0)
-            return topLevelBraceGroup; //a cost group stands in front of the split
-    }
-    return false;
-}
 
 static bool w80EtbSelfLeavesLine(const string& low)
 {
@@ -29626,7 +29368,10 @@ static bool w80EtbSelfLeavesLine(const string& low)
         return false; //some other trigger: not this card's own arrival
     //#W80-DH (F7): no trigger AND an activation cost -> an activated ability that
     //nobody has to pay for. The body is there to block.
-    if (at == string::npos && w80ScriptLineHasActivationCost(low))
+    //#W82-A (audit-2026-09): `w80ScriptLineHasActivationCost` was an EXACT
+    //duplicate of `lineIsActivatedCost` (same automaton, same brace/colon rules;
+    //only the flag's name and the comments differed). One scanner.
+    if (at == string::npos && lineIsActivatedCost(low))
         return false;
     if (low.find("target(") != string::npos || low.find("notatarget(") != string::npos
         || low.find("all(") != string::npos || low.find("foreach(") != string::npos)
@@ -33053,16 +32798,6 @@ static string w74XAbandonTraceLine(const string& cardName, int floating)
     return o.str();
 }
 
-//#W75-CI (P18, wave-74 deck146 MED 3). #W74-CD (O4)'s land-drop face NOTE is
-//DELETED: it said "the next window asks which face", and the next window then
-//asked it - one land drop, two model calls, and the second menu's own decline
-//row could un-make the first answer (9 repro pairs on deck146 alone, 18 of 322
-//decisions). Each face is a ROW on the FIRST menu now, and this is that row's
-//tag. Nothing is removed - both faces still reach the battlefield and the
-//decline row is untouched. Pure over the face's own facts, so PARSETEST proves
-//the text; it names the OTHER face too, so a reader of either row knows the
-//whole card and knows both faces spend the same land drop. O4's five PARSETEST
-//cases are replaced by the ones that pin these two rows.
 static string w75MdfcFaceRowTag(bool isBack, const string& frontName,
                                 const string& backName, const string& backMana)
 {
@@ -37089,7 +36824,7 @@ int w80StarterLineKind(const string& low)
         return kW80StarterNone;
     const size_t at = low.find('@');
     if (at == string::npos)
-        return w80ScriptLineHasActivationCost(low) ? kW80StarterActivated
+        return lineIsActivatedCost(low) ? kW80StarterActivated //#W82-A: one scanner
                                                    : kW80StarterCycleTrigger;
     //a trigger: which event?
     const size_t close = low.find(')', at);
@@ -37118,38 +36853,6 @@ bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter,
     return kind == kW80StarterCycleTrigger;
 }
 
-//#W80-DE (U8, wave-79 known-bugs U8 + Astra wave-79 F1). WHEN A DECLINED LIST MAY
-//CROSS A PHASE ON THE SEAT'S OWN ANSWER. `crossphase_board_unchanged` went 4 -> 26:
-//full model calls over a board the bracket ITSELF certifies unchanged, because the
-//ask key carries the phase, so one dead list crossed every phase of a turn at full
-//price (`123v130` seqs 72-80, nine windows, 746 s of inference for no board effect).
-//The replay is admissible only where nothing the model could decide has moved:
-//  (a) the seat's own last answer to this list DECLINED it (an ACTING answer is
-//      never replayed - it was executed, and the board it acted on is gone);
-//  (b) the board key the bracket compares is EQUAL, so the printed rows' prices,
-//      forecasts and targets are the same facts;
-//  (c) the list is byte-identical - that is what makes this the same list at all,
-//      and it is what proves the LEGAL OPTION SET is identical, so nothing is
-//      removed, capped or auto-answered: the seat is served its own answer to a
-//      screen it has already read;
-//  (d) and the window is not the one where PHASE-GATED legality changes. Astra's
-//      wave-79 F1 warning is exactly this: a sorcery-speed row becomes legal when
-//      the seat's own main phase opens, and a decline taken before that opened was
-//      taken over a strictly smaller set of plays. So a transition INTO a
-//      sorcery-speed window is always asked, however unchanged the board is.
-//Pure over the six facts, so PARSETEST drives both verdicts.
-bool w80CrossPhaseReplayable(bool declined, bool boardUnchanged, bool rowsIdentical,
-                             bool prevSorcerySpeed, bool nowSorcerySpeed,
-                             const string& prevPhase, const string& nowPhase)
-{
-    if (!declined || !boardUnchanged || !rowsIdentical)
-        return false;
-    if (prevPhase.empty() || nowPhase.empty() || prevPhase == nowPhase)
-        return false;
-    if (nowSorcerySpeed && !prevSorcerySpeed)
-        return false; //(d) the phase-gated window: always asked
-    return true;
-}
 
 //#W79-DC (F1): the deadlock breaker's premise, as a predicate PARSETEST can drive.
 //"The action did not progress the game" is a claim about the BOARD, so the board is
@@ -37160,38 +36863,6 @@ bool w79ForcePassNoProgress(bool keyUnchanged, int lastChoice, bool boardMoved)
     return keyUnchanged && lastChoice > 0 && !boardMoved;
 }
 
-//#W81-DI (wave-80 corpus HUNG game, `162v123` 3,641 s in a dead loop). THE OTHER
-//HALF OF #W79-DC (F1). That finding gated the deadlock breaker's FORCED PASS on
-//the board, correctly: an activation that moved the board is not a no-op and must
-//not be punished with a forced pass. It deliberately left the CACHE half ungated,
-//so an unchanged key still replays `mLastChoice` with no round trip. Put the two
-//together under Intruder Alarm and the seat has an unbounded engine loop: Thraben
-//Doomsayer taps for a token, the Alarm untaps it, the menu, the target identities
-//and the untapped-source count are all byte-identical, so the key is unchanged and
-//the same ACTIVATION is replayed - 3,659 times in the hung game, the model asked
-//exactly zero times after the one window that answered it.
-//The bound is not a cap on the option: the row stays on the menu, nothing is
-//removed and nothing is auto-answered. It is a bound on how many times ONE answer
-//may stand for a question the board has moved under. An answer that ACTIVATES or
-//CASTS is replayed at most ONCE per window key; the next identical offer goes back
-//to the model, which restates its plan, names a stop, or passes. A cached PASS or
-//HOLD is untouched - it commits nothing and progresses nothing, and #W79-CZ (T3)'s
-//whole finding is that re-asking those is waste.
-//A replay is also refused outright when the row it would take is already AT OR PAST
-//the stop the model itself stated (the wave-72 machinery, which until now bound only
-//windows that were ASKED): a stop the model wrote binds its cached answer too.
-//Pure over its four facts, so PARSETEST walks the whole loop without a board.
-bool w81CachedReplayMustReask(bool keyUnchanged, int lastChoice,
-                              int replaysThisKey, bool rowPastStatedStop)
-{
-    if (!keyUnchanged || lastChoice <= 0)
-        return false; //a fresh ask, or a cached pass/hold: not this bound's business
-    if (replaysThisKey < 0)
-        return true;  //a re-ask is already LATCHED for this key and in flight
-    if (rowPastStatedStop)
-        return true;  //(3) a replay never runs past the model's own stated stop
-    return replaysThisKey >= 1; //(1) one replay per key, then the model decides again
-}
 
 //#W81-DI: does taking this row CREATE or MOVE objects? A token maker, a zone
 //mover and a copier all change WHICH OBJECTS EXIST for the next activation, which
@@ -37230,37 +36901,6 @@ bool w81AskCacheUsable(bool stateBasedActionWindow)
     return !stateBasedActionWindow;
 }
 
-//#W81-DK (V4, wave-80 known-bugs V4 / engine-seat HIGH-2). THE CASTING DECISION
-//IS PER (phase, STACK STATE), not per phase. `152v125` seq 101: own Main phase 1,
-//`Fateful Absence {1}{w} [instant]` in hand, 6 untapped sources, the opponent's
-//Essence Scatter ON THE STACK targeting the seat's own Briarbridge Tracker - and
-//the hand line read `[no cast row now: you already answered this phase's Casting
-//decision ...]`. The casting menu's key (w79ContinuationDigestCast) carries the
-//rows and the source count and NOTHING about the stack, so the decline the model
-//gave over an EMPTY stack was replayed over a stack that now held a counterspell.
-//250 prompts carried that clause, 200 gating an INSTANT, 61 with a non-empty
-//stack; that window produced the corpus's only unparsed reply (the model tried to
-//respond and there was no row to respond with).
-//The term is the stack objects' IDENTITY - the handles the rows themselves address
-//objects by - never their rendered text, and it is admitted ONLY when the menu
-//offers at least one instant-speed row. A sorcery-speed-only menu keys byte for
-//byte as wave 79 keyed it (its stack is empty by CR 307.1 anyway), so no wave-79
-//key moves. Pure, so PARSETEST drives both faces without a board.
-string w81CastDigestStackTerm(bool anyInstantSpeedRow,
-                              const std::vector<string>& stackObjectHandles)
-{
-    //An EMPTY stack contributes nothing, byte for byte - so an instant-speed menu
-    //over an empty stack keys exactly as wave 79 keyed it, and the only windows this
-    //wave re-keys are the ones with an object on the stack, which is the whole
-    //population V4 names.
-    if (!anyInstantSpeedRow || stackObjectHandles.empty())
-        return string();
-    std::ostringstream o;
-    o << "; stack=";
-    for (size_t i = 0; i < stackObjectHandles.size(); i++)
-        o << (i ? "," : "") << stackObjectHandles[i];
-    return o.str();
-}
 
 //#W81-DK (V4): ...and the same fact on the RENDER side. The hand tag may only say
 //"you already answered this phase's Casting decision" while the stamp dates this
@@ -37348,93 +36988,8 @@ static string w79ChooserTargetTokens(TargetChooser * tc, GameObserver * obs)
     return o.str();
 }
 
-//#W79-DC (F1): the digest's own shape, pure, so PARSETEST drives the whole key
-//through the same formatter the live seams use. Rows with no chooser contribute
-//their label and an empty set, so a row APPEARING or LEAVING is visible here too
-//(the key tail already carries that; this keeps the two halves consistent).
-//#W81-DI: `objectCount` is the seat's battlefield object count and it enters the
-//digest ONLY when some offered row's own resolution creates or moves objects
-//(-1 = no such row, and the term is omitted byte for byte, so every window
-//without one keys exactly as wave 79 keyed it). The standing rule is that a board
-//NUMBER creating no row stays out of every key; this is the stated exception and
-//it is the same rule, not a hole in it - a row that MAKES an object makes the next
-//activation a different legal continuation, and the count is the only term that
-//says so. A life tick, a damage count and a clock still key EQUAL because none of
-//them is this number. It is a digest term only: `w79RePutCollapseIdentity`, the
-//hold latch (`holdActionKeyRow`) and the hold check are untouched.
-static string w79ContinuationDigestOf(const std::vector<string>& rowLabels,
-                                      const std::vector<string>& rowTargets,
-                                      int untappedSources,
-                                      int objectCount = -1)
-{
-    std::ostringstream o;
-    for (size_t i = 0; i < rowLabels.size(); i++)
-        o << (i ? "; " : "") << rowLabels[i] << "->[" << (i < rowTargets.size() ? rowTargets[i] : string()) << "]";
-    o << (rowLabels.empty() ? "" : "; ") << "sources=" << untappedSources;
-    if (objectCount >= 0)
-        o << "; objects=" << objectCount;
-    return o.str();
-}
 
-//#W79-DC (F1): the LIVE collector for the priority seam. One label and one
-//target set per offered action, in the menu's own order, off the abilities the
-//rows were built from - so the digest and the rows are the same window.
-string AIPlayerGPT::w79ContinuationDigestPriority(const std::vector<const OrderedAIAction *>& shown)
-{
-    if (!observer)
-        return string();
-    std::vector<string> labels, targets;
-    bool objectRow = false; //#W81-DI
-    for (size_t i = 0; i < shown.size(); i++)
-    {
-        const OrderedAIAction * a = shown[i];
-        if (!a || !a->ability)
-            continue;
-        MTGCardInstance * src = a->click ? a->click : a->ability->source;
-        std::ostringstream lab;
-        lab << (src ? src->getDisplayName() + instanceHandle(src) : string("?"));
-        labels.push_back(lab.str());
-        targets.push_back(w79ChooserTargetTokens(a->ability->getActionTc(), observer));
-        if (w81RowCreatesOrMovesObjects(a->ability))
-            objectRow = true; //#W81-DI: this window can change which objects exist
-    }
-    GptManaPolicy policy(this);
-    return w79ContinuationDigestOf(labels, targets,
-                                   ManaEngine::potentialColorReach(this, policy, NULL),
-                                   objectRow ? w81BattlefieldObjectCount(this) : -1); //#W81-DI
-}
 
-//#W79-DC (F1): ...and for the casting seam, where a row is a hand card and its
-//chooser is built from the card the way the engine builds it for the click.
-//The chooser is OURS (the factory mints it), so it is deleted here.
-string AIPlayerGPT::w79ContinuationDigestCast(const std::vector<MTGCardInstance *>& cands)
-{
-    if (!observer)
-        return string();
-    std::vector<string> labels, targets;
-    TargetChooserFactory tcf(observer);
-    for (size_t i = 0; i < cands.size(); i++)
-    {
-        MTGCardInstance * c = cands[i];
-        labels.push_back(c ? c->getDisplayName() + instanceHandle(c) : string("?"));
-        TargetChooser * tc = c ? tcf.createTargetChooser(c) : NULL;
-        targets.push_back(w79ChooserTargetTokens(tc, observer));
-        SAFE_DELETE(tc);
-    }
-    GptManaPolicy policy(this);
-    //#W81-DK (V4): the stack term, admitted only when at least one offered row can
-    //be cast at instant speed. A sorcery-speed-only menu keys byte for byte as
-    //wave 79 keyed it.
-    bool anyInstantSpeedRow = false;
-    for (size_t i = 0; i < cands.size() && !anyInstantSpeedRow; i++)
-        if (cands[i] && (cands[i]->hasType(Subtypes::TYPE_INSTANT)
-                         || cands[i]->has(Constants::FLASH)
-                         || cands[i]->has(Constants::ASFLASH)))
-            anyInstantSpeedRow = true;
-    return w79ContinuationDigestOf(labels, targets,
-                                   ManaEngine::potentialColorReach(this, policy, NULL))
-           + w81CastDigestStackTerm(anyInstantSpeedRow, w81StackObjectHandles());
-}
 
 //#W81-DK (V4): the live collector for the term above. Identity is the engine's own
 //object identity plus the object's class and its source's name - never the rendered
@@ -37841,17 +37396,6 @@ const AIPlayerGPT::CrackBackFacts& AIPlayerGPT::crackBackFactsNow()
     return mCrackBackFacts;
 }
 
-string AIPlayerGPT::w80CrackBackVerdictLineNow()
-{
-    const CrackBackFacts& f = crackBackFactsNow();
-    if (!f.due)
-        return string(); //#W82-A (L5 a): not the seat's own turn - silent, like the header
-    //#W80-DH (F4): the MARKER (threshold, for the latch) and the LINE (blocker-
-    //aware, for the model) are built from the same walk and say different things
-    //on purpose - the line may not claim a death a legal block prevents.
-    return w80CrackBackVerdictLine(crackBackVerdictKey(f.attackers, f.published(), f.myLife),
-                                   f.floorWithAddenda(), f.myLife);
-}
 
 //#W81-DL (V5): the compulsory draw-step charge this seat is under right now,
 //read off the shared walk the blockers header prints its own sentence from.
@@ -38369,7 +37913,6 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
             if (fam < 2 && w80NewLethalThreat(liveMarkers[fam], heldIds[fam], liveIds[fam]))
             {
                 w80NewLethalReopen = true;
-                mHoldReopenedNewLethal++;
                 //#W81-DK (V3): the retained answer for this window goes FIRST - the
                 //hold check below must not be able to read it back.
                 const bool w81Inv = w81InvalidateHeldAnswer(seam);
@@ -38417,7 +37960,6 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                      && w79VerdictDangerRank(heldMarker) == w79VerdictDangerRank(liveMarkers[fam])
                      && w79VerdictDangerRank(heldMarker) >= 0)
             {
-                mHoldReopenedNewThreat++;
                 //#W80-DE (U2): the counter's own record, naming the threat.
                 //#W80-DH (F11): per EVENT, at the event - not one shared string.
                 const string w80Reason = string("NEW threat at the same rank: held ")
@@ -38722,22 +38264,6 @@ void AIPlayerGPT::takeReserveDecline(const string& castSetKey, int untappedSourc
                   " while these rows and the untapped-source count do not change");
 }
 
-//#W66-AS (H3, second half; deck130 HIGH-2). A window with NO legal answer is
-//not a decision. Inside a proven-closed opponent life LOOP the engine re-puts
-//the same window once per link - `130v126` seqs 37-55 is nineteen of them - and
-//where the oracle says this seat can do NOTHING AT ALL (hasAnyLegalAction is
-//the engine's own phase-aware predicate: no cast, no activation, no land drop,
-//at this phase and this speed) the only legal answer is a pass. Asking a model
-//to choose between one row and itself is not "not constraining its choice"; it
-//is a round trip for a decision the rules have already made. Nothing is removed
-//from a window that HAS a legal row - a seat holding an instant-speed answer is
-//still asked, every link, and the LOOP RUNNING note tells it the hold row can
-//close the run. Fail CLOSED: any doubt (no observer, no opponent, any legal
-//action at all, no proven loop) and the ask goes out as before.
-bool AIPlayerGPT::loopAutoPassApplies(bool oppLoopProven, bool anyLegalAction)
-{
-    return oppLoopProven && !anyLegalAction;
-}
 
 //#W73-BY (N6, wave-72 deck130 HIGH). THE SAME RULE, OFF THE LIFE LOOP. The H3
 //collapse above was scoped to a proven opponent life loop; `130v162` turn 10 is
@@ -39573,8 +39099,6 @@ static string menuRowProseName(const string& row)
 //#W71-BO (R4): `replyProseAfterChoice` DELETED - dead since wave 70 and, by
 //construction, a scanner of a region invariant 000 does not permit.
 
-//#W70-BM (E4): `proseNamesOtherMenuRow` DELETED with the rival-row stamp it fed
-//- prose naming a rival row is prose, and the protocol no longer has any.
 
 //#W68-BA (J6): is this row the menu's own DECLINE? A reply whose prose says
 //"this window is a pass" CONFIRMS such a row rather than contradicting it - the
@@ -39601,22 +39125,6 @@ static bool rowIsDeclineRow(const string& row)
     return false;
 }
 
-//#W69-BH (K4c, deck125 HIGH-3): the predicate both re-ask seams now use. The
-//shipped one was `rowSaysNoOp(row) AND planArguesAgainstRow(reply, row)` - two
-//independent statements that the take is dead - and the wave-68 corpus took a
-//K=0 sweeper row 14 times over 12 distinct (game, turn) with the reply saying
-//nothing about it (146 s11/s20, 152 s39, 123 s10/s40/s41/s66/s104, 130
-//s28/s33/s56/s58, 162 s8/s61), against ONE fire of the plan form (130 s20,
-//where the re-ask worked and s21 declined). The ROW'S OWN zero is the engine's
-//own statement about the row and earns the same ONE re-ask by itself; the
-//reply's agreement is now only what the corrected question gets to quote. The
-//menu's own decline rows stay exempt: a pass verdict confirms a dead row, it
-//does not contradict it. Nothing is capped and no row is removed - the second
-//answer executes as given, whatever it is. Pure over the row.
-static bool noopRowEarnsReask(const string& row)
-{
-    return AIPlayerGPT::rowSaysNoOp(row) && !rowIsDeclineRow(row);
-}
 
 //#W71-BO (R4, wave-70 census): `planSaysPassThisWindow` is DELETED with the two
 //re-asks it drove. It read a PASS VERDICT out of the reply's own PLAN line and
@@ -39674,8 +39182,6 @@ static string menuRowShortName(const string& row)
     return (core.size() < 4) ? string() : core;
 }
 
-//#W71-BO (R4): `negationGovernsRowName` DELETED with the reversal predicate it
-//served - dead since wave 70.
 
 //#W70-BM (E4): `proseNegatesTakenRow` DELETED - it scanned the SENTENCES after
 //the CHOICE line for a negation naming the taken row. There are no sentences
@@ -45316,44 +44822,6 @@ static bool w72ProspectiveZeroOnAPermanent(const string& row)
     return false;
 }
 
-//#W72-BT (M2, deck125 A-1). THE RE-ASK NAMES THE VERDICT IT REFUSED. The
-//refusal re-served the identical prompt with one added sentence that said only
-//"its own note on this list says it does nothing right now" - the note itself
-//was stripped out of the quoted row by stripNarrationDecoration, so the model
-//was told a conclusion and never shown the words it was drawn from. It
-//re-derived the same choice: 2 of 3 re-asks came back with a wrong answer
-//(1 identical and ACCEPTED, 1 a different wrong row), 1 recovered. The row's own
-//`{right now: ...}` clause is the engine's statement about the row, so the
-//re-ask quotes it. Still ONE labelled line, still no prose read from the reply
-//and no new answer shape - invariant 000 is untouched.
-//#W73-BZ (N15, deck125 MED A-1): the re-ask has to quote the row the engine
-//MATCHED - number and short name - and, when the number the reply wrote is not
-//that number, say WHY it is being answered about a different row. 152v125 seq 62
-//wrote `CHOICE: 14 (becomes a 14/14 hydra)`, the short-name match rescued it to
-//row 6, and the re-ask opened "You chose row 6" - a sentence the reader cannot
-//reconcile with what it wrote, at the one seam whose whole job is to be learned
-//from. `nameMatched` is the parser's own `name_over_index` verdict; the written
-//line is quoted verbatim. Pure over its arguments.
-static string noopReaskLine(int choice, const string& renderedRow,
-                            bool nameMatched = false, const string& writtenLine = "")
-{
-    std::ostringstream corr;
-    corr << "[RE-ASK] ";
-    if (nameMatched && !writtenLine.empty())
-        corr << "Your line (\"" << writtenLine << "\") names a row by its short name, and that"
-                " short name is row " << choice << " on this list - not the number in the line -"
-                " so this is about row " << choice << ". ";
-    corr << "You chose row " << choice << " (\""
-         << stripNarrationDecoration(renderedRow) << "\")";
-    const string verdict = rowVerdictClause(renderedRow);
-    if (!verdict.empty())
-        corr << ", whose own verdict on this list reads zero: " << verdict;
-    else
-        corr << ", whose own note on this list says it does nothing right now";
-    corr << ". Answer again: that row if you meant it anyway, or the number of"
-            " the row you want instead.";
-    return corr.str();
-}
 
 bool AIPlayerGPT::rowSaysNoOp(const string& row)
 {
@@ -45377,9 +44845,6 @@ bool AIPlayerGPT::rowSaysNoOp(const string& row)
         return !w72ProspectiveZeroOnAPermanent(row);
     return false;
 }
-//#W71-BO (R4): `planArguesAgainstRow` is DELETED - it read the reply's own
-//words for an argument against the row it took. `plan_argues_against_row_seen`
-//fired 0 times in 2,119 decisions under reasoning-on.
 
 
 //All-digit tokens of a string ("add 5 counters" -> {"5"}). The alpha filter
@@ -46516,9 +45981,6 @@ static bool isExampleEchoLine(const string& line)
     return false;
 }
 
-//#W70-BM (E2): `salvageLoopedChoice` DELETED - the multi-answer tolerance. It
-//walked EVERY coded line of a reply and kept the last clean one, which is a
-//rule that only makes sense when a reply is allowed several answers.
 
 //#W49-S (D2): the FIRST line-leading CHOICE line that parses to an offered
 //option (same walk as salvageLoopedChoice, first-wins instead of last-wins).
@@ -47570,7 +47032,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     {
         mPriorityReaskBoard.clear();
         mPriorityReaskLine.clear();
-        mPriorityNoopReaskBoard.clear(); //#W68-BA (J6): its own one-shot, same board
         mPriorityReaskKind.clear();
     }
     if (!mPriorityReaskBoard.empty())
@@ -47803,9 +47264,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string parseNote;
         choice = parseChoice(decisionPart, index, &shownLines, &staleEcho, NULL, &parseNote,
                              true); //#W53-N (D9): row 0 = pass priority exists here
-        //#W70-BM (E2): `multi_answer_first_taken` DELETED with the adjacent-run
-        //fold. A run of answer lines is not a formatting habit to be folded, it
-        //is more than one answer - `extra_answer_line` names it.
+        //#W70-BM (E2): the adjacent-run FOLD is deleted. A run of answer lines is
+        //not a formatting habit to be folded, it is more than one answer -
+        //`extra_answer_line` names it. #W82-A (audit-2026-09): the
+        //`multi_answer_first_taken` note itself was RE-ADDED in #W81-DM and is
+        //emitted from parseChoice; the comment said it was deleted.
         if (rejectedLines > 0)
             appendParseNote(&parseNote, "rejected_line_skipped"); //#W50-Y D7
         //#W63-AD (E6b): sign which side of the plan bound this reply fell on.
@@ -47826,9 +47289,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //between the answer line and the PLAN line for a sentence taking the
         //answer back (and a coded index inside the plan block as a recode).
         //Under invariant 000 that region does not exist: the reply is a PLAN
-        //line and an action line. `retracted` stays as the fallback class name
-        //for the records that already carry it, and is now never set.
-        bool retracted = false;
+        //line and an action line.
+        //#W82-A (audit-2026-09): the `retracted` local and the `retracted_choice`
+        //fallback class it selected are DELETED with it - the variable was never
+        //assigned anywhere since #W70-BM, so the class was unwritable.
+
         //#W48-F1: N as the model named it (0 = this was not a repeat row, or no
         //count was named and the row collapses to a single activation).
         int repeatN = 0;
@@ -47869,9 +47334,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             namedCount = -1;
             appendParseNote(&mLastParseNote, "repeat_count_zero_pass");
         }
-        //#W71-BO (R6, wave-70 census): `repeatBaseTaken` is DELETED with the
-        //stop-guard re-ask it fed - see the repeatPastStop note below.
-        //#W56-C (D3): the notice quotes the LATCHED coded line.
         string latchedChoiceLine;
         size_t latchedFrom = 0;
         const bool haveLatchedLine = latchedCodedChoiceLine(content, choice, index, &shownLines,
@@ -47928,7 +47390,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 && repeatPlanStopIsOwn(protOnly)) //#W72-BX (F2)
             {
                 mStatedStop = stStop;
-                mStatedStopCount = stNow;
                 mStatedStopOppLife = (observer && opponent()) ? opponent()->life : -1; //#W74-CE (O7c)
                 mStatedStopTurn = observer ? observer->turn : -1; //#W72-BX (F2)
             }
@@ -47970,24 +47431,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //loop cycle, a "whenever you cast" trigger). The truthful no-effect
         //ANNOTATION on the row stays: the model is told, and the model decides.
         const bool noopRowZero = false;
-        //#W71-BO (R4, wave-70 census): `planArguesAgainstRow` and its census are
-        //DELETED - `plan_argues_against_row_seen` 0 of 2,119. The re-ask stands on
-        //the ROW'S OWN zero verdict, which is the engine's own statement about the
-        //row and needs no reading of the reply's words.
-        //#W71-BO (R3): `replyTruncated` is DELETED with the truncation re-ask.
-        //#W68-BA (J6, engine MED; 123 s41 -> s43): the no-op re-ask is EXEMPT from
-        //the board's single re-ask, because it is a different question. s41 spent
-        //the board's budget on a named_row miss; s43 then answered the corrected
-        //question with a Devour Flesh whose own row read "they control 0 creatures -
-        //at 0 this does nothing" over a PLAN that said the same, and it was cast at
-        //7 life. One extra ask per board, latched separately so it cannot loop.
         if (!content.empty() && mPriorityReaskBoard != boardKey
-            //#W70-BL (E5): planChoiceConflict is gone from the trigger with the
-            //re-ask it drove - it quoted the reply's prose back at the model,
-            //which is the one thing a reply may not contain.
-            //#W71-BO (R3/R5/R6/R9): the truncation, index/name, repeat-stop,
-            //repeat-count and label-missing arms are all DELETED - each fired 0
-            //times in 2,119 decisions. Three triggers are left.
             && (namedRowFail || planMissing || repeatCountMissing)) //#W82-A (L8): noopRowZero is gone
         {
             std::ostringstream corr;
@@ -48027,20 +47471,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "repeat_count_reask";
                 mPriorityReaskKind = "repeat_count";
             }
-            else //#W66-AR (H8) #W69-BH (K4c): noopRowZero, the last trigger left
-            {
-                corr << noopReaskLine(choice, shownLines[choice - 1], //#W72-BT (M2)
-                                      parseNote.find("name_over_index") != string::npos,
-                                      firstLabelledLine(content, "choice:")) //#W73-BZ (N15)
-                     << " (0 passes.)";
-                fb = "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
-                mPriorityReaskKind = "noop_plan";
-                //#W69-BJ (F8): the re-ask's own words are "that row if you meant
-                //it anyway", so the SAME answer coming back is the offer being
-                //accepted, not a budget running out. Remember what was taken.
-                mPriorityReaskPriorChoice = choice;
-                mPriorityNoopReaskBoard = boardKey; //#W68-BA (J6): one-shot, spent here
-            }
             mPriorityReaskBoard = boardKey;
             mPriorityReaskLine = corr.str();
             if (!parseNote.empty())
@@ -48060,22 +47490,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         }
         if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
         {
-            //the second answer for this state, whatever it is, is final
-            //#W71-BO (R3/R9): the truncation and label-missing arms are DELETED.
             if (mPriorityReaskKind == "named_row")
                 appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                               : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
-            //#W71-BO (R4): the `plan_choice` arm is DELETED with the reversal predicate.
             else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
                 appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
                                                              : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
-            //#W71-BO (R6): the `repeat_past_stop` arm and the stated-stop CLAMP it
-            //performed are DELETED (0 firings in 2,119). #W71-BO (R5): the
-            //`index_name` arm goes with its re-ask.
-            //#W69-BH (K4c) #W66-AR (H8) #W69-BJ (F8): a second answer that takes
-            //the SAME row the re-ask invited it to re-take is a RETAKE, not an
-            //exhausted budget - `_exhausted` reads as "the model could not answer
-            //the question" and would be false of the one shape the re-ask asks for.
             else if (mPriorityReaskKind == "noop_plan")
                 appendParseNote(&mLastParseNote,
                     (noopRowZero && choice >= 1 && choice == mPriorityReaskPriorChoice)
@@ -48083,20 +47503,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                        : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
                                                       : "plan_contradicts_noop_row_unanswered")));
-            //#W71-BO (R6): the `repeat_count_reask` stamp is DELETED with its re-ask.
-            //#W68-BC (MED, engine MED-1): the re-ask's SECOND answer is final
-            //here - stamp it onto the recovery record the first (failed) answer
-            //opened, before writeTransLog flushes that record. 0 is a pass and
-            //is stated as one; a second answer that still failed to parse
-            //(choice < 0) stamps nothing and leaves the heuristic's own site to
-            //speak.
             if (choice >= 0)
                 noteReaskExecuted("priority", choice,
                                   (choice >= 1 && choice <= (int) shownLines.size())
                                       ? shownLines[choice - 1] : string());
             mPriorityReaskKind.clear();
         }
-        //#W71-BO (R6): the stop-clamp receipt is DELETED with the clamp.
         mPrevWindowRows = shownLines; //#W51-C D3: this window is now the prior one
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
@@ -48199,8 +47611,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mLastAskKey = askKey;
         //#W81-DI: the model answered THIS key, so the latch is released and this
         //key's replay allowance starts again from nothing.
-        mCachedReplayKey = askKey;
-        mCachedReplayRuns = 0;
         //#W79-DC (F1): the board this decision was taken over, so the deadlock
         //breaker's next reading is "has the board moved SINCE the action", not
         //"do the rows still read the same".
@@ -48228,7 +47638,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             mLoopCount = 0;
         }
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content)))));
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content))));
             //#W49-S (D2): what executed IS the first coded line -> not replaced
             if (choice >= 0 && firstCodedChoice(content, index, &shownLines) == choice)
                 mAnswerReplacedFalse = true;
@@ -48687,8 +48097,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //exit path for the same reason - a digest staged for one menu must never key
     //a later ask at another seam (an unstaged seam keys on the scope alone, which
     //is #W79-CZ's shipped behaviour for it).
-    mContinuationDigest.clear();
-    mContinuationDigest.swap(mNextContinuationDigest);
     //#W80-DH (F10): THE SEND BOUNDARY IS IN HERE. The caller stages its verdict
     //faces and this guard applies them exactly once - `true` at the line that hands
     //the prompt over, and `false` on EVERY other way out of this function (the ask
@@ -48755,8 +48163,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     {
         mAskCache.clear();
         mAskCacheSeq.clear(); //#W71-BP (L2): the provenance map is the cache's shadow
-        mAskReplayKey.clear();
-        mAskReplayRun = 0;
         mAskReplayRuns.clear(); //#W72-BT (M22): the per-window runs die with the keys
         //#W73-CA (N8): the repeat latch's runs are turn-scoped too - its own key
         //embeds the turn, so they are dead keys from here on either way.
@@ -49142,7 +48548,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     string parseNote;
     int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho,
                              pendingSourceName.empty() ? NULL : &pendingSourceName, &parseNote);
-    //#W70-BM (E2): `multi_answer_first_taken` DELETED - see chooseOrderedAction.
+    //#W70-BM (E2) / #W82-A: the adjacent-run fold is deleted; the
+    //`multi_answer_first_taken` note is live again since #W81-DM - see
+    //chooseOrderedAction.
     if (rejectedLines > 0)
         appendParseNote(&parseNote, "rejected_line_skipped"); //#W50-Y D7
     //#W63-AD (E6b): sign which side of the plan bound this reply fell on.
@@ -49152,9 +48560,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mLastParseNote = parseNote;
     //#W71-BO (R9): the label-missing re-ask is DELETED here too.
     //#W70-BM (E2): the RETRACTION GATE is DELETED here too - see the priority
-    //seam. `retracted` is never set now; the fallback class name is kept for the
-    //records that already carry it.
-    bool retracted = false;
+    //seam. #W82-A (audit-2026-09): so are the `retracted` local and the
+    //`retracted_choice` class it selected - unassigned, therefore unwritable.
+
     bool namedRowFail = (choice < 0 && !content.empty()
                          && parseNote.find("named_row_not_offered") != string::npos);
     //#W51-C (D3): an in-range index naming a card no row offers (deck126
@@ -49177,48 +48585,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                                       mPrevWindowRows)
                             ? "prior_window_name_in_range" : "off_menu_name_in_range");
     }
-    //#W50-Y D9 (wave-49 ledger MED): a coded 0 on an ask with NO pass row is
-    //not an answer. First the reply's own coded siblings: the last clean
-    //line that names an OFFERED row is taken (deck123 vs130 seq 31 led with
-    //"CHOICE: 1 (Goblin (1/1))" and closed "CHOICE: 0 (Pass)" - the 1 is the
-    //model's decision about this menu, the 0 its wish for a row that does not
-    //exist). With no such sibling, the same one re-ask lane S built for an
-    //index past the menu, worded for this shape.
-    //#W70-BM (E2): the coded-SIBLING half is DELETED with salvageLoopedChoice -
-    //a reply has one answer line, so there is no sibling to take. The one
-    //re-ask lane below is unchanged and is now the whole handling.
     bool passOnNoPass = (choice == 0 && !content.empty());
-    //#W71-BO (R5): the index/name conflict re-ask is DELETED here too; the
-    //parser's own notes stay.
-    //#W66-AR (H8, deck126 HIGH-1 second half). THE STAMP THAT EXECUTED ANYWAY.
-    //`plan_contradicts_noop_row` (#W54-B D14) fires when the chosen row's OWN
-    //annotation says it does nothing AND the reply's plan says so too - two
-    //independent statements that this decision is a no-op - and it was a RECORD
-    //stamp only: 126v125 s34 wrote "The opponent has no creatures, so Tribute to
-    //Hunger does nothing" and cast it. Nothing about that needs the heuristic and
-    //nothing about it is ambiguous, so it earns the same ONE re-ask every other
-    //self-contradicting reply gets; the second answer executes as given, whatever
-    //it is. The predicate is the shipped one, unchanged - only its consequence.
-    //#W69-BH (K4c): the row's own zero, alone, is the trigger at this seam too -
-    //the PLAN half is only what the corrected question gets to quote back.
     const bool noopRowZero = false; //#W82-A (L8): the no-op re-ask is DELETED
-    //#W71-BO (R4): `planArguesAgainstRow`, the reversal predicate and the
-    //`decision_reversed_in_prose` / `plan_choice_conflict_seen` census are DELETED
-    //at this seam with the priority seam's - both read a verdict out of the
-    //reply's words. #W71-BO (R3): `replyTruncated` goes with the truncation
-    //re-ask.
-    //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
-    //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
-    //creatures)" over a 4-row Main-1 cast menu.
-    //#W68-BA (J6, engine MED; 123 s41 -> s43): the no-op re-ask is EXEMPT from
-    //this seam's one-per-ask budget, because it is a different question. s41 spent
-    //the budget on a named_row miss and s43 then cast a row whose own note said
-    //"at 0 creatures this does nothing" over a PLAN that said the same, at 7 life.
-    //One extra ask per ask key, latched separately so it cannot loop.
-    //#W70-BL (E5): askReversedInProse is gone from the trigger with the re-ask it
-    //drove - it read the reply's prose and quoted it back.
-    //#W71-BO (R3/R5/R9): the truncation, index/name and label-missing arms are
-    //DELETED - each fired 0 times in 2,119 decisions.
     if ((namedRowFail || passOnNoPass) && !reasked) //#W82-A (L8): noopRowZero is gone
     {
         std::ostringstream corr;
@@ -49236,28 +48604,14 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                  << options.size() << ".";
             mAskReaskKind = "no_pass";
         }
-        else //#W69-BH (K4c): noopRowZero, the last trigger left in the guard
-        {
-            //#W66-AR (H8): quote the row's OWN verdict and the reply's own
-            //sentence, so the contradiction the model must resolve is visible.
-            corr << noopReaskLine(choice, options[choice - 1], //#W72-BT (M2)
-                                  parseNote.find("name_over_index") != string::npos,
-                                  firstLabelledLine(content, "choice:")); //#W73-BZ (N15)
-            mAskReaskKind = "noop_plan";
-            mAskNoopReaskKey = askKey0; //#W68-BA (J6): one-shot, spent here
-            mAskReaskPriorChoice = choice; //#W69-BJ (F8): see the priority seam
-        }
-        const char * fb = namedRowFail ? "named_row_reask"
-                          : passOnNoPass ? "no_pass_reask"
-                                         : "noop_row_zero_reask"; //#W69-BH (K4c) #W71-BO (R4)
+        const char * fb = namedRowFail ? "named_row_reask" : "no_pass_reask";
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
         setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
-                  : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
-                                 : "the chosen row's own note says it does nothing - asking again", 5.0f);
+                               : "that answer passed an ask that has no pass - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
         //#W74-CG: the corrected leg's slot key is built from the same stripped
@@ -49269,8 +48623,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     if (reasked)
     {
-        //#W71-BO (R3/R4/R9): the truncation, reversal and label-missing arms are
-        //DELETED with their re-asks.
         if (mAskReaskKind == "no_pass")
             appendParseNote(&mLastParseNote, passOnNoPass ? "no_pass_reask_exhausted"
                                                           : (choice >= 1 ? "no_pass_reask_recovered" : "no_pass_reask_unanswered"));
@@ -49324,7 +48676,6 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
         mAskCacheSeq[askKey] = mTransSeq; //#W71-BP (L2): where a later replay was served FROM
     }
     mAskReplayKey.clear(); //a real model answer ends any replay run
-    mAskReplayRun = 0;
     //#W72-BT (M22): ...but only for THIS window. Wiping every window's run is
     //what let an interleaved answer hide an 18-deep replay loop.
     mAskReplayRuns.erase(askKey);
@@ -49367,7 +48718,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content)))));
+        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content))));
         //#W49-S (D2): what executed IS the first coded line -> not replaced
         if (choice >= 0 && firstCodedChoice(content, (int) options.size(), &options) == choice)
             mAnswerReplacedFalse = true;
@@ -50356,8 +49707,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //The legal cast set comes from the contract (oracle-backed: zone gates,
     //legendary rule, play restrictions, affordability, 601.2c target
     //validity); this seam only renders it for the model. The APPLY side of
-    //a cast still rides Baka's pricing machinery below (aiForcedCandidate)
-    //until c5 moves payment+clickstream into the manager.
+    //a cast still rides Baka's pricing machinery below (aiForcedCandidate).
+    //#W82-A (audit-2026-09): the comment said "until c5 moves payment+clickstream
+    //into the manager" as though that were pending - `DecisionManager::planCastSpell`
+    //exists (c5a) and this seam still does not use it. The sentence states the
+    //present fact instead of a promise.
     GptManaPolicy policy(this);
     DecisionRequest castReq;
     if (!DecisionManager::buildCastSpell(this, policy, pMana, instantWindow, castReq))
@@ -51982,9 +51336,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //no narration: a cast narrates itself as zone events, "nothing" is a non-action
         if (attempt == 0)
             mAskSituationPrefill = boardNow; //#W54-M (A19): the situation this call already rendered
-        //#W79-DC (F1): the legal-continuation digest of THIS casting menu, staged
-        //for the one askModel call below - see `mNextContinuationDigest`.
-        mNextContinuationDigest = w79ContinuationDigestCast(candidates);
+        //#W82-A (L2): the legal-continuation digest staged here is DELETED - the
+        //ask key is BOARD STATE + QUESTION, and the board carries every
+        //continuation the digest was standing in for.
         //#W81-DK (V4): the census of the defect. This window's casting decision was
         //already answered THIS turn and phase, and the stack has moved under it - so
         //the stack term above has just re-opened a decision wave 80 would have served
@@ -53156,51 +52510,6 @@ static string payRepeatBandRowTag(int bandPaid)
     return o.str();
 }
 
-//#W80-DF (U13, wave-79 deck152 HIGH-2). A MENU WHOSE ROWS ALL RESOLVE TO ONE
-//OUTCOME IS NOT A DECISION. `152v130` seqs 6 and 9, `152v123` seq 8, `152v162`
-//seq 10: twenty-one options on the Intrepid Adversary counter ask with ZERO
-//spendable mana, and the engine's own header already states the identity in
-//words - "With no spendable mana left, every option adds 0 counters" - while
-//row 21's clause states it in numbers ("your mana pays for 0 payments and
-//stops"). Every row adds 0 counters and spends 0 mana: they are not twenty-one
-//options, they are one option printed twenty-one times. Four of that seat's 207
-//model calls (~2%) went to it at ~100 s each.
-//THIS REMOVES NO LEGAL OPTION. The engine's option vector is untouched and every
-//row stays exactly as the engine built it; what changes is that the SEAT answers
-//it instead of paying for a model round trip to distinguish outcomes that are
-//the same outcome. The gate is proved ON THE ROW SET, not assumed: EVERY row
-//must be either an `add N counters` row the mana pays 0 of, or a `don't add any
-//counter` row - one unrecognised row, or one add-N row the mana reaches (paid >
-//0), and the menu is asked exactly as before. Returns the index to answer, or -1
-//to ask. Pure over the two vectors, so the whole table is provable without a
-//board.
-static int w80SingleOutcomeRepeatMenu(const vector<string>& optionTexts,
-                                      const vector<int>& paid)
-{
-    if (optionTexts.size() < 2 || optionTexts.size() != paid.size())
-        return -1;
-    int addRows = 0, zeroRow = -1;
-    for (size_t i = 0; i < optionTexts.size(); i++)
-    {
-        if (isAddNCountersOption(optionTexts[i]))
-        {
-            if (paid[i] != 0)
-                return -1; //this rung's mana reaches it, or was never priced
-            addRows++;
-            continue;
-        }
-        //the only other row this shape may carry is the engine's own no-op row.
-        const string low = toLowerCopy(optionTexts[i]);
-        if (low.find("don't add any counter") == string::npos
-            && low.find("dont add any counter") == string::npos)
-            return -1;
-        if (zeroRow < 0)
-            zeroRow = (int) i;
-    }
-    if (addRows < 2 || zeroRow < 0)
-        return -1;
-    return zeroRow;
-}
 
 static string payRepeatModeNote(const vector<string>& opts)
 {
@@ -57854,8 +57163,6 @@ static int salvageLoopedSubset(const string& content, const char * label, size_t
 //NOT extended to the cast menu, where reasoning prose about NOT casting a card
 //would read as casting it (the wave-10 "cast the condemned spell" trap).
 
-//#W71-BO (R3): `proseNegatedBefore` DELETED with `salvageProsePutList`, the only
-//caller it ever had.
 
 //#W70-BN (F1/F2, Astra review findings 1 and 2): THE COMBAT PROSE READERS ARE
 //GONE. `proseAttackerOrdinal`, `salvageProseBlocks` and `salvageProseAttackers`
@@ -58001,81 +57308,7 @@ static string stripAnnotationBrackets(const string& s)
 static bool combatLineIsClean(const string& line, const vector<string> * rosterA,
                               const vector<string> * rosterB); //#W62-Z (D9): defined below
 
-//#W62-Z (D9, deck146 HIGH-1). The three answer seams did not obey ONE rule.
-//A CHOICE ask has always honoured a coded index the model re-states in PROSE
-//after its answer line (#W48-E1: "So, CHOICE: 0 (pass)." at the end of a decode
-//spiral); the two COMBAT seams honoured only line-leading BLOCKS:/ATTACK: lines
-//and silently kept line 1 whatever the reply went on to say. `146v152` seq 54
-//is what that asymmetry costs: line 1 `BLOCKS: B2:A2, B1:none`, then the reply
-//derives `So BLOCKS: B2:A1.` and the engine sent line 1 - the seat died at -2 on
-//a header that had printed `best case with every blocker assigned: you would be
-//at 6`. This is the combat half of the CHOICE rule, with the SAME region bound
-//#W62-Z (D10) restores on the CHOICE side: a restatement counts where the
-//protocol still expects an answer - after the coded answer line and BEFORE the
-//first line-leading PLAN: marker - and never inside the PLAN, which is the block
-//the engine carries forward as a plan and quotes back verbatim. So the rule is
-//the same in all three seams and is stated to the model (kReplyRules).
-//Guards, in order: a token the model QUOTED (a preceding quote/backtick) is a
-//format string, not an answer; a payload that is not CLEAN by the roster grammar
-//(combatLineIsClean) is prose, not a declaration; and a payload byte-identical to
-//one of the protocol's own worked examples is an echo of the instructions.
-//Returns the payload of the LAST qualifying restatement, or "" when there is
-//none. Pure over (reply, label, rosters) so every branch is PARSETEST-provable.
-//#W62-AA (R2, wave-62 codex review finding 2): the prose IN FRONT of the
-//label decides whether the model was writing an answer or naming one it
-//refuses. `BLOCKS: B1:A1` then `I should not use BLOCKS: B2:A2.` carries a
-//payload that is perfectly clean by the roster grammar, so D9's last-clean-wins
-//rule executed precisely the assignment the reply rejected. The rule is the
-//narrow one the review states: a restatement is taken only when no NEGATION
-//token precedes the directive ON ITS OWN LINE. Line-scoped on purpose - a
-//rejection two lines up ("I should not chump. / So BLOCKS: B2:A1.") must not
-//disarm a later affirmative re-answer, which is the whole D9 recovery. The
-//payload itself is not scanned: the roster grammar already refuses prose there,
-//and "none" is a declension word, not a negation. Pure over the line prefix.
-static bool combatDirectiveNegatedOnLine(const string& lineLcBeforeLabel)
-{
-    static const char * kNegations[] = {
-        "not", "never", "avoid", "reject", "instead", "rather", "without",
-        "cannot", "cant", "dont", "doesnt", "wont", "shouldnt", "wouldnt",
-        "mustnt", "isnt", "arent", "wasnt", "refuse", "skip"
-    };
-    const string& s = lineLcBeforeLabel;
-    size_t i = 0;
-    while (i < s.size())
-    {
-        while (i < s.size() && !isalpha((unsigned char) s[i]))
-            i++;
-        size_t start = i;
-        string word;
-        while (i < s.size() && (isalpha((unsigned char) s[i]) || s[i] == '\''))
-        {
-            if (s[i] != '\'') //fold the apostrophe: don't -> dont
-                word += s[i];
-            i++;
-        }
-        if (i == start)
-            break;
-        for (size_t k = 0; k < sizeof(kNegations) / sizeof(kNegations[0]); k++)
-            if (word == kNegations[k])
-                return true;
-    }
-    return false;
-}
 
-static bool combatDirectiveExampleEcho(const string& payloadLc)
-{
-    static const char * kExamples[] = {
-        " b1:a2, b3:a1, b2:none", " a1, a3", " b4-b9:a2", " none",
-        "b1:a2, b3:a1, b2:none", "a1, a3", "b4-b9:a2"
-    };
-    string t = payloadLc;
-    size_t e = t.find_last_not_of(" \t\r.");
-    t = (e == string::npos) ? string() : t.substr(0, e + 1);
-    for (size_t k = 0; k < sizeof(kExamples) / sizeof(kExamples[0]); k++)
-        if (t == kExamples[k])
-            return true;
-    return false;
-}
 
 //#W70-BM (E2): `restatedCombatDirective` DELETED. It read a PROSE SENTENCE
 //after the last coded line ("So ATTACK: A1, A2.") as the declaration - the
@@ -58619,10 +57852,6 @@ static int gptAttackLineFromReply(const string& content, size_t nAttackers,
     vector<string> lines, prevLines;
     vector<vector<string> > windows; //#W66-AR (H2b)
     collectLabeledLines(stripped, "ATTACK:", lines, &prevLines, &windows);
-    //#W70-BM (E2): the prose-restatement candidate, the correction arms and the
-    //three-line announcement window are DELETED. A declaration is ONE ATTACK:
-    //line; a second one is a protocol violation the seam re-asks for, and a
-    //sentence that restates the declaration in prose is not a declaration at all.
     (void) prevLines;
     (void) windows;
     if (lines.empty())
@@ -59671,12 +58900,6 @@ int AIPlayerGPT::chooseAttackers()
                 " that attacker as A#>W# (e.g. \"ATTACK: A1>W1, A3\" sends A1 at W1"
                 " and A3 at them); an attacker written without a >W# attacks them";
     tail << ". Write nothing else."; //#W70-BL (E2)
-    //#W68-BA (J6, deck130 HIGH-3): this seam's ONE prose-reversal re-ask per turn.
-    //The correction is appended here on the tick that re-polls, exactly as the
-    //blockers seam does with its gang correction - the changed text is what makes
-    //the corrected question a fresh call instead of a replay of the answer that
-    //earned it. The latch is cleared when the turn moves on.
-    //#W71-BO (R3): the cap re-ask is DELETED, and with it its share of this line.
     if (mAttackReaskTurn != observer->turn)
         mAttackReaskLine.clear();
     const bool attackReasked = (mAttackReaskTurn == observer->turn && !mAttackReaskLine.empty());
@@ -59752,8 +58975,6 @@ int AIPlayerGPT::chooseAttackers()
         }
     }
 
-    //#W70-BN (F2): the prose-intent salvage is DELETED. A declaration comes from
-    //the ATTACK: line or it does not come.
     const char * attackSource = NULL;
 
     //#W71-BO (R3, wave-70 census): the truncation re-ask is DELETED at this seam
@@ -60140,9 +59361,6 @@ static bool gptBlocksLineFromReply(const string& content, const vector<string>& 
     vector<string> lines, prevLines;
     vector<vector<string> > windows; //#W66-AR (H2b)
     collectLabeledLines(stripped, "BLOCKS:", lines, &prevLines, &windows);
-    //#W70-BM (E2): the prose restatement, the correction arms and the
-    //announcement window are DELETED - see gptAttackLineFromReply. A declaration
-    //is ONE BLOCKS: line.
     (void) prevLines;
     (void) windows;
     if (lines.size() < 2)
@@ -60827,13 +60045,6 @@ int AIPlayerGPT::chooseBlockers()
     //instead of replaying the rejected answer.
     if (mBlockIllegalReaskTurn == observer->turn && mBlocksDoneTurn != observer->turn)
         tail << prunedPairsReaskClause(mBlockIllegalReaskPairs);
-    //#W68-BA (J6): this seam's own prose-reversal correction, on its own latch -
-    //a gang conflict, an all-illegal assignment and a reply that contradicts its
-    //own declaration are three different failures and none may spend another's
-    //single arm. 0 windows of this shape occurred at the blockers seam in the
-    //wave-67 corpus (33 records); it is wired because the predicate is one
-    //predicate, and its firing rate is a wave-68 measurement, not a claim.
-    //#W71-BO (R3): the cap re-ask is DELETED, and with it its share of this line.
     if (mBlockRevReaskTurn != observer->turn)
         mBlockRevReaskLine.clear();
     const bool blockRevReasked = (mBlockRevReaskTurn == observer->turn
@@ -61016,11 +60227,8 @@ int AIPlayerGPT::chooseBlockers()
         }
     }
 
-    //#W70-BN (F2): the prose-intent salvage is DELETED. An assignment comes from
-    //the BLOCKS: line or it does not come.
     const char * blockSource = NULL;
 
-    //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
@@ -61683,7 +60891,6 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                            revealSource == 0 && game->library->nb_cards == 0
                                && revealed.size() > 1,
                            &revealOrder, this); //#W72-BV (M17)
-    //#W71-BO (R3): the small-seam truncation re-ask is DELETED.
     string userMsg = assemblePrompt(revealAskText);
     if (revealOrder.size() != revealed.size())
     {
@@ -61702,10 +60909,6 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     //#W52-G (E-1): this ask's own label, so a trailing CHOICE: line (a cast
     //intent the model appended) is never taken as the PUT: answer.
     string decisionPart = consumePlan(content, "PUT:");
-    //#W70-BM (E6, audit B4.2): the "no PUT: line -> take any labeled answer"
-    //FALLBACK is DELETED. A reveal/discard/bottom window answered with a
-    //CHOICE: or ATTACK: line is not an answer to THIS question; it is a
-    //protocol violation, and the seam's own decline/re-ask path owns it.
     vector<bool> send;
     vector<string> names;
     names.reserve(revealed.size());
@@ -61729,7 +60932,6 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         }
     }
 
-    //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
     if (result < 0)
     {
         //#W67-AX (I5): where a decline is not a legal answer, an unusable reply
@@ -62047,10 +61249,6 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             buildSystemPrompt();
         mLogWindowKind = kAskWindowPregame; //#W57-H (D43): hand-only, no GAME LOG
         const string bottomAskText = buildPregameBottomAskText(hand, need, chosenSoFar);
-        //#W69-BF (K2, engine HIGH-1): this seam's one truncation re-ask, on the
-        //shared small-seam latch. A pregame bottom is as unrecoverable as a
-        //cleanup discard - it is the ONLY ask for those cards.
-        //#W71-BO (R3): the small-seam truncation re-ask is DELETED.
         string userMsg = assemblePrompt(bottomAskText);
         string content;
         setAnswerFloorForSeam("bottom", (long) hand.size(), kPutSlotAnswerBytes); //#W71-BS (F5)
@@ -62068,16 +61266,12 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             names.push_back(hand[j]->name);
         int result = content.empty() ? -1
                      : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
-        //#W70-BM (E5) / #W71-BO (R3): the PROSE reconciliation is DELETED, and so
-        //is the `if (false)` stub that was left where it stood. The PUT line is
-        //the answer at this seam, as at every other.
         if (result < 0 && !content.empty())
         {
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
             if (sal >= 1)
                 result = sal;
         }
-        //#W71-BO (R3): the truncation re-ask is DELETED here with every other seam.
         mPregameBottomQueue.clear();
         string chosen;
         if (result >= 0)
@@ -62760,7 +61954,6 @@ int AIPlayerGPT::cleanupDiscard(int over)
         //at the ask seam, applied to a channel that had no recovery window at
         //all - the prompt itself says "this is the ONLY ask for them").
         reasked = (!mDiscardReaskKey.empty() && mDiscardReaskKey == askText);
-        //#W71-BO (R3): the truncation latch is DELETED with the re-ask it held.
         userMsg = assemblePrompt(reasked ? askText + "\n" + mDiscardReaskLine : askText);
         if (discardOrder.size() != hand.size())
         {
@@ -62781,10 +61974,6 @@ int AIPlayerGPT::cleanupDiscard(int over)
         //Liliana's Caress)" as the reply's LAST coded line - the any-label walk
         //took the CHOICE line and the seat discarded Liliana's Caress.
         string decisionPart = consumePlan(content, "PUT:");
-        //#W70-BM (E6, audit B4.2): the "no PUT: line -> take any labeled answer"
-        //FALLBACK is DELETED. A reveal/discard/bottom window answered with a
-        //CHOICE: or ATTACK: line is not an answer to THIS question; it is a
-        //protocol violation, and the seam's own decline/re-ask path owns it.
         result = content.empty() ? -1
                  : parseAttackerSet(decisionPart, hand.size(), send, &names, true, &repeatedIdx);
         if (result < 0 && !content.empty())
@@ -63162,7 +62351,6 @@ int AIPlayerGPTSelfTestAccess::holdRowIndexOf(const std::vector<string> * option
 string AIPlayerGPTSelfTestAccess::holdRowLine(bool castSeam, bool activationLive) { return ::holdRowLine(castSeam, activationLive); }
 bool AIPlayerGPTSelfTestAccess::holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf) { return ::holdStillStands(heldRows, nowRows, whyOut, keyOf); }
 string AIPlayerGPTSelfTestAccess::hybridPipNoteText(const vector<string>& pips, int totalMana) { return ::hybridPipNoteText(pips, totalMana); }
-bool AIPlayerGPTSelfTestAccess::identicalInterchangeableRows(const vector<string>& rows) { return ::identicalInterchangeableRows(rows); }
 void AIPlayerGPTSelfTestAccess::improveAssignmentMaterial(const vector<vector<char> >& can, const vector<vector<int> >& rank, vector<int>& match) { ::improveAssignmentMaterial(can, rank, match); }
 string AIPlayerGPTSelfTestAccess::incomingCombatForecastLine(int ableAttackers, int maxDamage, int myLife) { return ::incomingCombatForecastLine(ableAttackers, maxDamage, myLife); }
 int AIPlayerGPTSelfTestAccess::incomingCombatForm(bool oppActive, int phase, int liveAttackers, int latchTurn, int turn, int ableAttackers) { return ::incomingCombatForm(oppActive, phase, liveAttackers, latchTurn, turn, ableAttackers); }
@@ -63298,8 +62486,6 @@ size_t AIPlayerGPTSelfTestAccess::narrationTrimTrigger() { return ::narrationTri
 bool AIPlayerGPTSelfTestAccess::narrationTrimV1() { return ::narrationTrimV1(); }
 bool AIPlayerGPTSelfTestAccess::naturalTextLess(const string& a, const string& b) { return ::naturalTextLess(a, b); }
 string AIPlayerGPTSelfTestAccess::noPotentialBlockersTag() { return ::noPotentialBlockersTag(); }
-string AIPlayerGPTSelfTestAccess::noopReaskLine(int choice, const string& renderedRow, bool nameMatched, const string& writtenLine) { return ::noopReaskLine(choice, renderedRow, nameMatched, writtenLine); }
-bool AIPlayerGPTSelfTestAccess::noopRowEarnsReask(const string& row) { return ::noopRowEarnsReask(row); }
 long AIPlayerGPTSelfTestAccess::offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut, std::vector<string> * offLinesOut) { return ::offProtocolBytes(replyIn, actionBeforePlanOut, offLinesOut); }
 string AIPlayerGPTSelfTestAccess::oneShotDrawGrantTag(const std::vector<OneShotDrawBranch>& branches, const std::vector<std::string>& converters, int minePerDraw, int theirsPerDraw, const string& theirPunishers, int life) { return ::oneShotDrawGrantTag(branches, converters, minePerDraw, theirsPerDraw, theirPunishers, life); }
 string AIPlayerGPTSelfTestAccess::oppLifeRaceClause(int dmg, int gain, int turns) { return ::oppLifeRaceClause(dmg, gain, turns); }
@@ -63600,7 +62786,6 @@ int AIPlayerGPTSelfTestAccess::w79BestBlockDamage(const vector<W79AtkFact>& atk,
 bool AIPlayerGPTSelfTestAccess::w79ClauseNeedsAntecedent(const string& clause) { return ::w79ClauseNeedsAntecedent(clause); }
 string AIPlayerGPTSelfTestAccess::w79ClausePrioritySnippet(const string& text, size_t maxLen) { return ::w79ClausePrioritySnippet(text, maxLen); }
 string AIPlayerGPTSelfTestAccess::w79CloseOpenUnits(const string& kept) { return ::w79CloseOpenUnits(kept); }
-string AIPlayerGPTSelfTestAccess::w79ContinuationDigestOf(const std::vector<string>& rowLabels, const std::vector<string>& rowTargets, int untappedSources, int objectCount) { return ::w79ContinuationDigestOf(rowLabels, rowTargets, untappedSources, objectCount); }
 bool AIPlayerGPTSelfTestAccess::w79CounterspellScript(const string& magicText, bool castableAtInstantSpeed) { return ::w79CounterspellScript(magicText, castableAtInstantSpeed); }
 int AIPlayerGPTSelfTestAccess::w79CoveredByBodies(std::vector<CrackBackAttackerFact> sorted, int bodies) { return ::w79CoveredByBodies(sorted, bodies); }
 bool AIPlayerGPTSelfTestAccess::w79DecisionBearingClause(const string& clause) { return ::w79DecisionBearingClause(clause); }
@@ -63626,7 +62811,6 @@ bool AIPlayerGPTSelfTestAccess::w80CountRenderedAtSend(bool sent, bool rendered,
 const char * AIPlayerGPTSelfTestAccess::w80CoverMechanismSentence(bool anyTrampler) { return ::w80CoverMechanismSentence(anyTrampler); }
 string AIPlayerGPTSelfTestAccess::w80CrackBackFaceOfLine(const string& line) { return ::w80CrackBackFaceOfLine(line); }
 string AIPlayerGPTSelfTestAccess::w80CrackBackVerdictLine(const string& face, int bestBlockFloor, int myLife) { return ::w80CrackBackVerdictLine(face, bestBlockFloor, myLife); }
-bool AIPlayerGPTSelfTestAccess::w80CrossPhaseReplayable(bool declined, bool boardUnchanged, bool rowsIdentical, bool prevSorcerySpeed, bool nowSorcerySpeed, const string& prevPhase, const string& nowPhase) { return ::w80CrossPhaseReplayable(declined, boardUnchanged, rowsIdentical, prevSorcerySpeed, nowSorcerySpeed, prevPhase, nowPhase); }
 string AIPlayerGPTSelfTestAccess::w82WindowKey(const string& boardKey, const string& question) { return ::w82WindowKey(boardKey, question); }
 bool AIPlayerGPTSelfTestAccess::w80DrawExtraIsOptional(const string& payloadLow) { return ::w80DrawExtraIsOptional(payloadLow); }
 size_t AIPlayerGPTSelfTestAccess::w80EchoStepIndex(int stepsDone, bool castPendingCompletion) { return ::w80EchoStepIndex(stepsDone, castPendingCompletion); }
@@ -63639,9 +62823,7 @@ bool AIPlayerGPTSelfTestAccess::w80NewLethalThreat(const string& liveMarker, con
 string AIPlayerGPTSelfTestAccess::w80OwnStackSpellTag(bool mine, const string& zoneName) { return ::w80OwnStackSpellTag(mine, zoneName); }
 string AIPlayerGPTSelfTestAccess::w80ProvenWinLoopLine(const string& starterName) { return ::w80ProvenWinLoopLine(starterName); }
 string AIPlayerGPTSelfTestAccess::w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies) { return ::w80SacrificeSpendsBlockerClause(total, myLife, floorTotal, give, bodies); }
-bool AIPlayerGPTSelfTestAccess::w80ScriptLineHasActivationCost(const string& low) { return ::w80ScriptLineHasActivationCost(low); }
 string AIPlayerGPTSelfTestAccess::w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal) { return ::w80SelfLeavesNoCoverClause(cardName, crackTotal); }
-int AIPlayerGPTSelfTestAccess::w80SingleOutcomeRepeatMenu(const vector<string>& optionTexts, const vector<int>& paid) { return ::w80SingleOutcomeRepeatMenu(optionTexts, paid); }
 string AIPlayerGPTSelfTestAccess::w80StackDeathVerdictLine(const string& face) { return ::w80StackDeathVerdictLine(face); }
 string AIPlayerGPTSelfTestAccess::w80StackNotEmptyReason(bool stackBlockRendered) { return ::w80StackNotEmptyReason(stackBlockRendered); }
 bool AIPlayerGPTSelfTestAccess::w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow) { return ::w80StarterIsLive(kind, abilityUsableNow, aCreatureCanEnter, thisBodyCanAttackNow); }
@@ -63649,7 +62831,6 @@ int AIPlayerGPTSelfTestAccess::w80StarterLineKind(const string& low) { return ::
 string AIPlayerGPTSelfTestAccess::w80TrimDanglingTail(const string& kept) { return ::w80TrimDanglingTail(kept); }
 bool AIPlayerGPTSelfTestAccess::w80VariableDrawIsHandSize(const string& script, const char * zone) { return ::w80VariableDrawIsHandSize(script, zone); }
 bool AIPlayerGPTSelfTestAccess::w81AttackCoverDue(bool crackBackLinePrinted, bool anyAttackerOffered) { return ::w81AttackCoverDue(crackBackLinePrinted, anyAttackerOffered); }
-bool AIPlayerGPTSelfTestAccess::w81CachedReplayMustReask(bool keyUnchanged, int lastChoice, int replaysThisKey, bool rowPastStatedStop) { return ::w81CachedReplayMustReask(keyUnchanged, lastChoice, replaysThisKey, rowPastStatedStop); }
 string AIPlayerGPTSelfTestAccess::w81CounterspellsSeenLine(int timesCountered, const vector<string>& names, int theirUntapped) { return ::w81CounterspellsSeenLine(timesCountered, names, theirUntapped); }
 string AIPlayerGPTSelfTestAccess::w81CrackBackTotalFace(const string& line) { return ::w81CrackBackTotalFace(line); }
 string AIPlayerGPTSelfTestAccess::w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized) { return ::w81CrackBackVerdictLine(face, rawCombat, addBlockable, addUnblockable, compulsoryDraw, bestBlockFloor, myLife, addUnsized); }

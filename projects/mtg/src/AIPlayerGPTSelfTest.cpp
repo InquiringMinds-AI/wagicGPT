@@ -39,6 +39,19 @@
 #include "DuelLayers.h"
 #include "PreGamePhase.h" //PreGamePhase::bottomTarget, driven by the self-test
 
+//#W82-A (audit-2026-09): `gptRetrySelectArmClose` was production code that
+//existed only to thread `GptRetrySlot::forceCloseArmed` in and out of
+//`gptRetrySelectArm` - a field of the slot the swap already moves. It is folded
+//into its one production caller; the three pins below keep their shape through
+//this local, which does exactly what that caller now does inline.
+static void gptRetrySelectArmClose(GptRetrySlot& live, GptRetrySlot& park, bool landArm,
+                                   bool& liveForceCloseArmed)
+{
+    live.forceCloseArmed = liveForceCloseArmed;
+    gptRetrySelectArm(live, park, landArm);
+    liveForceCloseArmed = live.forceCloseArmed;
+}
+
 #ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
 #endif
@@ -13997,33 +14010,12 @@ static const char * kW50Y_r94 =
         CHECK(string(kOptionRangeNote).find("carries NO #N ordinal") != string::npos,
               "#W54-D D8a the range note explains the ordinal-free form it now prints");
     }
-    {
-        //#W54-D (D8b): a de-duplicated option list of length ONE.
-        cout << "\n[W54-D] D8b interchangeable-option resolution\n";
-        vector<string> same;
-        for (int i = 0; i < 6; i++)
-            same.push_back("Vampire (2/2) [flying, doesn't untap during its controller's untap step]");
-        CHECK(identicalInterchangeableRows(same),
-              "#W54-D D8b the 152v123 s23-s37 damage-order menu has one distinguishable outcome");
-        vector<string> one(1, same[0]);
-        CHECK(!identicalInterchangeableRows(one),
-              "#W54-D D8b NEGATIVE a single row is the existing one-option rule, not this one");
-        vector<string> ordinals;
-        ordinals.push_back("Vampire #1 [opponent's battlefield]");
-        ordinals.push_back("Vampire #2 [opponent's battlefield]");
-        ordinals.push_back("Vampire #3 [opponent's battlefield]");
-        CHECK(!identicalInterchangeableRows(ordinals),
-              "#W54-D D8b NEGATIVE an instance ordinal tells the rows apart - the model keeps the ask");
-        vector<string> withDone(same);
-        withDone.push_back("Done - no further targets");
-        CHECK(!identicalInterchangeableRows(withDone),
-              "#W54-D D8b NEGATIVE a decline row is a second outcome and is never resolved away");
-        vector<string> nearly(same);
-        nearly[3] = "Vampire (2/2) [flying]";
-        CHECK(!identicalInterchangeableRows(nearly),
-              "#W54-D D8b NEGATIVE one differing row is a real choice");
-    }
-    // ---- #W54-F: D7b the engine-answered class ----
+    //#W54-D (D8b) / #W82-A (L1, audit-2026-09): the D8b block pinned
+    //`identicalInterchangeableRows`, the byte-identical-rows AUTO-ANSWER. Deleted
+    //with the shortcut it justified: string equality of two RENDERED rows is not
+    //equality of the engine consequences behind them, and the ruling carves out
+    //no "same outcome" exemption. The menu is asked.
+
     cout << "\n[#W54-F] D7b the engine-answered class\n";
     {
         //THE SHAPE. Wave-53 corpus 152v125 seq 28 - the only record in the whole
@@ -24668,32 +24660,13 @@ static const char * kW50Y_r94 =
     }
 
     // ---- #W66-AS (H3, second half): the auto-pass gate ----
-    cout << "\n[#W66-AS H3b] a window with no legal row is not a decision\n";
-    {
-        CHECK(AIPlayerGPT::loopAutoPassApplies(true, false),
-              "#W66-AS H3b POSITIVE proven loop + nothing legal = the engine passes for the seat");
-        CHECK(!AIPlayerGPT::loopAutoPassApplies(true, true),
-              "#W66-AS H3b MUST-NOT-MATCH a seat with ANY legal action is still asked (130v126's"
-              " Spark Spray row is a real decision, nineteen times over)");
-        CHECK(!AIPlayerGPT::loopAutoPassApplies(false, false),
-              "#W66-AS H3b MUST-NOT-MATCH no proven loop: a dead window is the seam's own business,"
-              " not this gate's - fail closed");
-        CHECK(!AIPlayerGPT::loopAutoPassApplies(false, true),
-              "#W66-AS H3b NEGATIVE neither input: nothing happens");
-        // The prompt-only note that carries the other half of H3b.
-        const string note = loopChainingNote(true, true, false, false);
-        CHECK(note.find("[LOOP RUNNING:") != string::npos
-              && note.find("the HOLD row answers all of them at once") != string::npos
-              && note.find("Nothing on this list stops the chain") != string::npos,
-              "#W66-AS H3b POSITIVE the note names the chain and the one row that closes the run");
-        CHECK(note.find_first_of("0123456789") == string::npos,
-              "#W66-AS H3b KEY the note carries no number, so no rebuild of one window can move it");
-        CHECK(loopChainingNote(false, true, false, false).empty()
-                  && loopChainingNote(true, false, false, false).empty(),
-              "#W66-AS H3b NEGATIVE no proven loop, or no hold row to point at: no note");
-    }
+    //#W82-A (L11, audit-2026-09): [#W66-AS H3b] pinned `loopAutoPassApplies`,
+    //which only the self-test ever called (it equals
+    //`chainAutoPassApplies(false, a, b)`), and the cast-seam auto-pass it stood
+    //for is deleted - it is reached only with a NON-EMPTY cast menu, so it is
+    //dead or it is a breach. The prompt-only LOOP RUNNING note it also pinned
+    //keeps its own section below.
 
-    // ---- #W66-AS (H7): the hold key stops breaking on a moved number ----
     cout << "\n[#W66-AS H7] a price moving with the board is not a different row\n";
     {
         // 152v162 seqs 42 -> 43, verbatim from the corpus record's options_text.
@@ -28216,28 +28189,11 @@ static const char * kW50Y_r94 =
         }
     }
 
-    cout << "\n[#W69-BH] K4c the no-op re-ask fires off the ROW'S OWN zero, plan or no plan\n";
-    {
-        //The 14 takes the wave-68 corpus counted (146 s11/s20, 152 s39,
-        //123 s10/s40/s41/s66/s104, 130 s28/s33/s56/s58, 162 s8/s61) share ONE
-        //shape: the row's own clause reads zero and the reply says nothing about
-        //it, so the shipped conjunction could not fire on any of them.
-        const string dead = "Cast Supreme Verdict {1}{u}{w}{w}"
-                            " {right now: destroys 0 of their creatures}";
-        const string silent = "CHOICE: 1 (Cast Supreme Verdict)\nPLAN: Stabilise the board"
-                              " and win with Elspeth.";
-        CHECK(AIPlayerGPT::rowSaysNoOp(dead) && !rowIsDeclineRow(dead),
-              "#W69-BH K4c REPRO the row's own clause reads zero and it is not a decline row");
-        //the predicate BOTH seams now call, exactly as they call it
-        CHECK(noopRowEarnsReask(dead),
-              "#W69-BH K4c POSITIVE the row-only predicate fires where the conjunction did not");
-        CHECK(!noopRowEarnsReask("Cast Damnation {2}{b}{b}"
-                                 " {right now: destroys 2 of their creatures}"),
-              "#W69-BH K4c MUST-NOT-MATCH a live magnitude is never a no-op");
-        CHECK(!noopRowEarnsReask("Cast nothing right now {right now: destroys 0 of their creatures}")
-                  && !noopRowEarnsReask("Hold priority - pass now, and do not ask me again"),
-              "#W69-BH K4c MUST-NOT-MATCH the decline rows are exempt - a pass is not a contradiction");
-    }
+    //#W82-A (L8, audit-2026-09): [#W69-BH K4c] pinned `noopRowEarnsReask`, the
+    //no-op RE-ASK's trigger. The re-ask is deleted: it recognised a valid chosen
+    //row, in range and legal, and demanded a different answer because the engine
+    //judged the row's local effect to be zero - a semantic veto of a legal
+    //choice. `rowSaysNoOp` stays and still ANNOTATES the row; the model decides.
 
     cout << "\n[#W69-BH] K6a the crack-back cover counts the bodies already standing\n";
     {
@@ -28998,44 +28954,11 @@ static const char * kW50Y_r94 =
             CHECK(!fired,
                   "#W71-BP L1b NEGATIVE an unavailable fingerprint never forces a pass");
         }
-        // (c) the ask-cache replay refusal. Same shape, keyed on the state+question.
-        {
-            std::string last;
-            int run = 0;
-            int fires = 0, firstAt = -1;
-            const std::string key = "board...\nChoose an option for Hengegate Pathway:";
-            for (int i = 0; i < 200; i++)
-                if (AIPlayerGPT::askReplayRefuse(key, last, run, 64))
-                {
-                    if (firstAt < 0)
-                        firstAt = i;
-                    fires++;
-                }
-            CHECK(firstAt == 63 && fires == 3,
-                  "#W71-BP L1c POSITIVE the 64th identical replay is refused, and the counter re-arms");
-        }
-        {
-            std::string last;
-            int run = 0;
-            bool fired = false;
-            for (int i = 0; i < 300; i++)
-            {
-                std::ostringstream k;
-                k << "state" << (i % 2) << "|question";
-                fired = fired || AIPlayerGPT::askReplayRefuse(k.str(), last, run, 64);
-            }
-            CHECK(!fired,
-                  "#W71-BP L1c NEGATIVE alternating windows within one tick are not a replay run");
-        }
-        {
-            std::string last;
-            int run = 0;
-            bool fired = false;
-            for (int i = 0; i < 63; i++)
-                fired = fired || AIPlayerGPT::askReplayRefuse("K", last, run, 64);
-            CHECK(!fired && run == 63,
-                  "#W71-BP L1c REGRESSION a long-but-finite legitimate re-serve run is still served");
-        }
+        // (c) #W82-A (audit-2026-09): the three cases here drove the UNSCOPED
+        // `askReplayRefuse`, which was superseded by `askReplayRefuseScoped`
+        // (#W72-BT) and kept alive only by this pin. Both live sites use the
+        // scoped twin; the unscoped one is deleted. The scoped twin's own
+        // bound is pinned in the #W72-BT section below.
     }
 
 
@@ -29735,23 +29658,11 @@ static const char * kW50Y_r94 =
                       "Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures}")),
                   "#W72-BT M2 REGRESSION the header still folds a genuine all-dead menu");
         }
-        // M2 second half: the re-ask NAMES the verdict it refused.
-        {
-            const string line = noopReaskLine(1, lightmine);
-            CHECK(line.find("[RE-ASK] You chose row 1 (\"Cast Lightmine Field {2}{w}{w}\")") == 0,
-                  "#W72-BT M2 the re-ask still opens by naming the row it refused");
-            CHECK(line.find("whose own verdict on this list reads zero: {right now: they control 0"
-                            " creatures able to attack") != string::npos,
-                  "#W72-BT M2 ...and now QUOTES that row's own verdict (deck125 A-1: the refused"
-                  " prompt never said why, and 2 of 3 re-asks came back wrong)");
-            CHECK(line.find('\n') == string::npos,
-                  "#W72-BT M2 ECHO the re-ask is ONE labelled line - invariant 000 licenses no"
-                  " prose and reads nothing outside the two reply lines");
-            CHECK(noopReaskLine(2, "Cast Bear {1}{g}").find("says it does nothing right now")
-                      != string::npos,
-                  "#W72-BT M2 MUST-NOT-MATCH a row with no {right now:} clause keeps the old"
-                  " wording rather than quoting an empty verdict");
-        }
+        //#W82-A (L8, audit-2026-09): M2's second half pinned `noopReaskLine`, the
+        //no-op RE-ASK's prompt text. The re-ask is deleted - it vetoed an
+        //unambiguous legal answer on the engine's judgment that the row does
+        //nothing - so there is no line left to name a verdict. `verdictReadsZero`
+        //and the header fold it drives, pinned above, are untouched.
     }
     {
         // M10: the reached-stop clause is the collapse's own condition, read off
@@ -29828,17 +29739,9 @@ static const char * kW50Y_r94 =
                   "#W72-BT M22 POSITIVE two INTERLEAVED windows each reach their own cap - the"
                   " single-slot counter reset on every alternation and could never fire");
         }
-        {
-            std::string last;
-            int run = 0;
-            bool fired = false;
-            for (int i = 0; i < 128; i++)
-                fired = AIPlayerGPT::askReplayRefuse(i % 2 ? a : b, last, run, 64) || fired;
-            CHECK(!fired,
-                  "#W72-BT M22 the wave-71 shape, stated: the single-slot predicate never fires"
-                  " on the same 128 interleaved replays (engine-seat MED-2, sidecar turn 36:"
-                  " an 18-deep run whose replay_run restarted at 1 midway)");
-        }
+        //#W82-A (audit-2026-09): the single-slot `askReplayRefuse` this case
+        //contrasted against is DELETED; the scoped twin's own behaviour on the
+        //same 128 interleaved replays is pinned by the map case below.
         {
             std::map<std::string, int> one;
             for (int i = 0; i < 30; i++)
@@ -30635,23 +30538,8 @@ static const char * kW50Y_r94 =
                   " to boardEffectSnippet unchanged");
         }
 
-        // ---- N15: the noop re-ask says WHICH row was matched and WHY ----
-        {
-            const string hydraRow = "becomes a 9/9 hydra with Lair of the Hydra [cost: {9}{g}]"
-                                    " {right now: does nothing this turn}";
-            const string withWhy = noopReaskLine(6, hydraRow, true,
-                                                 "CHOICE: 14 (becomes a 14/14 hydra)");
-            CHECK(withWhy.find("CHOICE: 14 (becomes a 14/14 hydra)") != string::npos
-                      && withWhy.find("short name is row 6") != string::npos,
-                  "#W73-BZ N15 REPRO 152v125 seq 62: the re-ask quotes what the reply WROTE and"
-                  " names the row the short name matched (base: a bare \"You chose row 6\")");
-            CHECK(withWhy.find("You chose row 6") != string::npos,
-                  "#W73-BZ N15 the matched row is still named by number and by its own text");
-            const string plain = noopReaskLine(6, hydraRow);
-            CHECK(plain.find("short name is row") == string::npos
-                      && plain.find("You chose row 6") != string::npos,
-                  "#W73-BZ N15 NEGATIVE an index answered as written gets no name-match clause");
-        }
+        // ---- N15 / #W82-A (L8): the noop re-ask and its `noopReaskLine` are
+        // DELETED - see the L8 note at [#W69-BH K4c].
     }
 
 
@@ -30944,8 +30832,10 @@ static const char * kW50Y_r94 =
         CHECK(!AIPlayerGPT::chainAutoPassApplies(false, false, false),
               "#W73-BY N6 MUST-NOT-MATCH no chain and no loop: an ordinary empty window is still"
               " asked, exactly as before");
-        CHECK(AIPlayerGPT::chainAutoPassApplies(false, true, false)
-                  && AIPlayerGPT::loopAutoPassApplies(true, false),
+        //#W82-A (L11): `loopAutoPassApplies` is DELETED (it equalled
+        //`chainAutoPassApplies(false, a, b)` and only this pin called it). The
+        //subset claim is stated directly against the surviving predicate.
+        CHECK(AIPlayerGPT::chainAutoPassApplies(false, true, false),
               "#W73-BY N6 the wave-66 life-loop arm is a strict SUBSET of the new rule - nothing"
               " that collapsed before stops collapsing");
         CHECK(!AIPlayerGPT::chainAutoPassApplies(true, true, true),
@@ -41315,75 +41205,12 @@ static const char * kW50Y_r94 =
               "#W80-DF U7 MUST-NOT-MATCH the marker's own gates are untouched");
     }
 
-    cout << "\n[#W80-DF] U13 a menu whose rows all resolve to one outcome is engine-answered\n";
-    {
-        // `152v130` seqs 6 and 9, `152v123` seq 8, `152v162` seq 10: 21 options,
-        // 0 spendable mana. The engine's own header already states the identity
-        // ("With no spendable mana left, every option adds 0 counters").
-        std::vector<string> menu;
-        std::vector<int> paid;
-        menu.push_back("don't add any counter");
-        paid.push_back(-1);
-        for (int n = 1; n <= 20; n++)
-        {
-            std::ostringstream r;
-            r << "add " << n << " counter" << (n == 1 ? "" : "s");
-            menu.push_back(r.str());
-            paid.push_back(0);
-        }
-        CHECK(menu.size() == 21 && payRepeatModeNote(menu)
-                                       .find("every option adds 0 counters") != string::npos,
-              "#W80-DF U13 the corpus menu is rebuilt from the engine's own labels - 21 rows,"
-              " and the header that already says they are one outcome");
-        CHECK(w80SingleOutcomeRepeatMenu(menu, paid) == 0,
-              "#W80-DF U13 GREEN the engine answers it, on row 1 - the rows are one option"
-              " printed twenty-one times, so no legal option is lost");
-        // `152v146` seq 13: 3 mana spendable, the annotation reads `pays for 1 of
-        // them` - that window IS a decision and must still be asked.
-        {
-            std::vector<int> payOne(paid);
-            for (size_t i = 1; i < payOne.size(); i++)
-                payOne[i] = 1;
-            CHECK(w80SingleOutcomeRepeatMenu(menu, payOne) == -1,
-                  "#W80-DF U13 MUST-NOT-MATCH `152v146` seq 13 - one payment affordable means"
-                  " row 1 (0 counters) and the rest (1 counter) differ, so the seat is asked");
-        }
-        {
-            std::vector<int> mixed(paid);
-            mixed[3] = 2;
-            CHECK(w80SingleOutcomeRepeatMenu(menu, mixed) == -1,
-                  "#W80-DF U13 MUST-NOT-MATCH one rung the mana reaches, and the whole menu"
-                  " is asked - the gate is proved on the ROW SET, never on a majority");
-        }
-        {
-            std::vector<string> extra(menu);
-            std::vector<int> extraPaid(paid);
-            extra.push_back("Cast Intrepid Adversary {1}{w}");
-            extraPaid.push_back(-1);
-            CHECK(w80SingleOutcomeRepeatMenu(extra, extraPaid) == -1,
-                  "#W80-DF U13 MUST-NOT-MATCH one row this gate cannot read as the same"
-                  " outcome, and it declines to answer - it never guesses at a row's effect");
-        }
-        {
-            std::vector<string> two;
-            std::vector<int> twoPaid;
-            two.push_back("don't add any counter"); twoPaid.push_back(-1);
-            two.push_back("add 1 counter"); twoPaid.push_back(0);
-            CHECK(w80SingleOutcomeRepeatMenu(two, twoPaid) == -1,
-                  "#W80-DF U13 MUST-NOT-MATCH fewer than two rungs is not the collapsed shape"
-                  " this gate was proved on, and it is asked");
-            std::vector<string> noZero;
-            std::vector<int> noZeroPaid;
-            noZero.push_back("add 1 counter"); noZeroPaid.push_back(0);
-            noZero.push_back("add 2 counters"); noZeroPaid.push_back(0);
-            CHECK(w80SingleOutcomeRepeatMenu(noZero, noZeroPaid) == -1,
-                  "#W80-DF U13 MUST-NOT-MATCH with no engine row to answer ON, the seat asks"
-                  " rather than picking a rung of its own");
-        }
-        CHECK(w80SingleOutcomeRepeatMenu(menu, std::vector<int>(3, 0)) == -1,
-              "#W80-DF U13 MUST-NOT-MATCH a paid vector that does not line up with the rows"
-              " proves nothing and answers nothing");
-    }
+    //#W82-A (L1, audit-2026-09): [#W80-DF U13] pinned
+    //`w80SingleOutcomeRepeatMenu`, the single-outcome repeat-pay AUTO-ANSWER.
+    //"Every rung priced at 0 payments" was the MANA PLANNER's word, not the
+    //engine's - when `GptManaPolicy` refuses a producer the rows only LOOK
+    //identical - and the record it wrote carried a literal 0 with no source
+    //count, so no reviewer could check it afterwards. The menu is asked.
 
     cout << "\n[#W80-DF] U14 the blockers verdict includes the compulsory draw-step charge\n";
     {
@@ -42127,9 +41954,12 @@ static const char * kW50Y_r94 =
               " #W80-DF U3 case the detector was built for is untouched");
         CHECK(w80EtbSelfLeavesLine("@movedto(this|battlefield):moveto(hand)"),
               "#W80-DH F7 POSITIVE an explicit enters-trigger keeps its colon and counts");
-        CHECK(w80ScriptLineHasActivationCost("this(variable{type:*:myhand}=0) {t}:draw:1")
-                  && !w80ScriptLineHasActivationCost("this(variable{type:*:myhand}=0) draw:1")
-                  && !w80ScriptLineHasActivationCost("life:-4 controller moveto(hand)"),
+        //#W82-A (audit-2026-09): `w80ScriptLineHasActivationCost` was an EXACT
+        //duplicate of `lineIsActivatedCost` and is deleted; the pin runs the
+        //surviving scanner, which is what the W80 caller now calls.
+        CHECK(lineIsActivatedCost("this(variable{type:*:myhand}=0) {t}:draw:1")
+                  && !lineIsActivatedCost("this(variable{type:*:myhand}=0) draw:1")
+                  && !lineIsActivatedCost("life:-4 controller moveto(hand)"),
               "#W80-DH F7 the cost split is DEPTH-AWARE and needs a top-level COST group -"
               " a colon inside a spec, and an effect's own `draw:`/`life:` colon, are not"
               " activations and do not disqualify an untriggered line");
