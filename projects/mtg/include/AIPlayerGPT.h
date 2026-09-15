@@ -2128,7 +2128,6 @@ private:
     //#W80-DH (F11): the two shared strings are DELETED. One string per class,
     //overwritten by every clamp and consumed by the next record of ANY kind, is
     //not per-event accounting - see writeHoldEventRecord.
-    int mHoldEvents; //every clamp and every re-open writes one `hold_event` record
     //#W80-DH (F3): a hold re-opened because a NEW lethal threat (different
     //objects, same top-rank face) replaced the one it was taken over.
     //#W80-DH (F3): WHICH OBJECTS made each lethal face lethal when the hold was
@@ -2620,7 +2619,6 @@ private:
     //often each mechanism the wave-70 audit left standing (its VERIFY rows) fired,
     //so the probe corpus decides them from counts instead of from code reading.
     int mProtocolReplies;          //replies that carried a body (the denominator)
-    int mActionBeforePlanReplies;  //...that wrote the action line above the plan
     //#W80-DH (F2): ...and the ones whose answer was REFUSED for it. The shape
     //meter above says the model wrote the two lines the wrong way round; this
     //says the parser dropped the answer and the seam re-asked the window (owner
