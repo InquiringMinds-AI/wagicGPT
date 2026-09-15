@@ -13,7 +13,8 @@
 
 DeckMetaData::DeckMetaData(const string& filename, bool isAI)
     : mFilename(filename), mGamesPlayed(0), mVictories(0), mPercentVictories(0), mDifficulty(0),
-      mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI), mAvatarChecked(false), mAvatarFound(false)
+      mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI), mAvatarChecked(false), mAvatarFound(false),
+      mDeckId(0), mCommanderDeck(false) //#W86-IE (bug list item 8)
 {
     // TODO, figure out how we can defer this to later - currently, 
     // there's a catch 22, as we sort the deck list alphabetically, so we need to open the deck file

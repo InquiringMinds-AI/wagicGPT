@@ -1,0 +1,39 @@
+#NAME: A garbaged element must not be re-registered, and must hold one garbage slot (#W86-IB)
+#DESC: audit-2026-09 bug list item 3, the fix-review-3 E5 caveat: "If any path calls
+#DESC: addToGame on an element already in garbage, the swept-entry exemption leaves
+#DESC: its second slot live and the sweep deletes it twice; the pre-W83 walk was
+#DESC: immune. Not shown reachable; worth a getIndexOf-style guard in moveToGarbage
+#DESC: if it ever is."
+#DESC: MECHANISM: ActionLayer::forgetElement (#W84-GB) exempts exactly the entry
+#DESC: cleanGarbage is deleting from the `garbage` walk, because that entry's own
+#DESC: slot is nulled by the SAFE_DELETE on the next statement. A SECOND slot for
+#DESC: the same element is not nulled, so the sweep frees it again - a double delete
+#DESC: on a shared path. The only way to get a second slot is to bring the element
+#DESC: back into the layer after garbaging it, and with 221 addToGame call sites the
+#DESC: honest close is a guard rather than a proof about all of them.
+#DESC: FIX: MTGAbility::addToGame refuses an element the action layer has garbaged
+#DESC: (it is about to be freed - re-registering it leaves freed storage in the live
+#DESC: layer, the #W82-EH/core-474128 shape), and ActionLayer::moveToGarbage never
+#DESC: pushes a duplicate slot. The two are independent on purpose: the second holds
+#DESC: whatever route put the element back.
+#DESC: RED on the base binary: "addToGame ACCEPTED an element already in the layer's
+#DESC: garbage (returned 1, mObjects index N)" and "the element holds 2 garbage
+#DESC: slot(s); cleanGarbage would delete it 2 time(s)".
+#DESC: GREEN: refused, one slot, swept once.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertgarbagereaddrefused
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[END]

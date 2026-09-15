@@ -471,11 +471,16 @@ void MTGPlayerCards::drawFromLibrary()
             bool blocked = false;
             for (size_t a = 0; a < parked->mRevealAbove.size() && !blocked; ++a)
             {
-                //Pointer identity only - never a dereference. An entry that has
-                //left the library (drawn, milled, tutored, bottomed, shuffled out)
-                //is simply not found, and this card moves up.
+                //#W86-IC (bug list item 4): compared by INSTANCE ID. An entry that
+                //has left the library (drawn, milled, tutored, bottomed, shuffled
+                //out) is simply not found and this card moves up - and an entry
+                //whose storage has since been handed to a different card is not
+                //found either, because ids are never reused. The wave-85 form
+                //compared raw addresses and read a recycled address as "still
+                //above", holding the parked card down for a draw.
                 for (int k = 0; k < library->nb_cards && !blocked; ++k)
-                    if (library->cards[k] == parked->mRevealAbove[a])
+                    if (library->cards[k]
+                        && library->cards[k]->mInstanceId == parked->mRevealAbove[a])
                         blocked = true;
             }
             if (!blocked)

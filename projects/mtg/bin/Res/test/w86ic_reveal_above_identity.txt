@@ -1,0 +1,37 @@
+#NAME: mRevealAbove is keyed on INSTANCE identity, not the printing id or an address (#W86-IC)
+#DESC: audit-2026-09 bug list item 4. fix-lane-4 shipped the parked-card eligibility
+#DESC: set as raw MTGCardInstance POINTERS compared against the live library, and
+#DESC: named the residual in its own weakest-evidence paragraph: "a freed instance
+#DESC: whose address is later reused by a card that IS in the library would read as
+#DESC: 'still above' and hold the parked card down for one draw ... an identity
+#DESC: assumption, not a proof."
+#DESC: FIX: MTGCardInstance::mInstanceId - one serial per instance, stamped in
+#DESC: initMTGCI (the single path every constructor runs through), never reused, and
+#DESC: never written again. mRevealAbove holds those ids and the draw compares them.
+#DESC: An entry whose card left the library is not found; an entry whose STORAGE was
+#DESC: recycled is not found either, because the new occupant has its own serial.
+#DESC: WHY NOT MTGCard::getId(): that is the PRINTING id, shared by every copy of a
+#DESC: card - and a library of copies is the normal case, so it cannot key an
+#DESC: above-set at all. This fixture pins both halves against a library holding
+#DESC: four Mind Stones: one printing id, four distinct instance ids, none of them 0
+#DESC: (a 0 would mean initMTGCI stopped stamping). The behavioural half of item 4 is
+#DESC: pinned by w85hb_mill_above_parked_card / w84gd / w83fc / w69bg, all unchanged.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertinstanceidentity Mind Stone
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[END]

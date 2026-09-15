@@ -9,7 +9,8 @@
 #include "OptionItem.h"
 
 TransitionBase::TransitionBase(GameApp* parent, GameState* _from, GameState* _to, float duration) :
-    GameState(parent, "transition")
+    GameState(parent, "transition"),
+    mElapsed(0.0f) //#W86-IE (bug list item 8)
 {
     from = _from;
     to = _to;

@@ -113,10 +113,32 @@ def header_scalar_members(header_path, class_name):
         raw = open(header_path, 'rb').read().decode('cp1252', 'replace')
     except Exception:
         return None
-    at = raw.find('class ' + class_name)
-    if at < 0:
+    #W86-IE (bug list item 8): EXACT class name. `raw.find('class CardSelector')`
+    #also matches `class CardSelectorBase`, so the base class's members (which ARE
+    #initialised, in its own ctor) were reported against the derived class.
+    m = re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', raw)
+    if not m:
         return None
-    body = raw[at:]
+    at = m.start()
+    #W86-IE (audit-2026-09 bug list item 8): STOP AT THE END OF THE CLASS. The
+    #original scan took everything from `class X` to end-of-file, so in a header
+    #that declares several classes (TestSuiteAI.h declares TestSuiteAI, TestSuite
+    #and TestSuiteGame) the members of every LATER class were reported against the
+    #FIRST one's constructor - a finding no edit to that constructor can clear,
+    #because the members are not its own. Match the class's own braces instead.
+    brace = raw.find('{', at)
+    if brace < 0:
+        return None
+    depth, end = 0, len(raw)
+    for i in range(brace, len(raw)):
+        if raw[i] == '{':
+            depth += 1
+        elif raw[i] == '}':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    body = raw[at:end]
     out = []
     for line in body.split('\n'):
         if 'static' in line or 'typedef' in line:
@@ -171,6 +193,16 @@ def ctor_init_and_body(raw, class_name):
 # counters are read before they are written.
 ENFORCED_CLASSES = ('AIPlayerGPT',)
 
+#W86-IE (audit-2026-09 bug list item 8). THE DEBT IS PAID, SO THE GATE IS THE
+#WHOLE TREE. The 55 "pre-existing uninitialised scalars" this comment used to
+#describe were three different things: 27 were members of OTHER classes declared
+#in the same header (the scan ran to end-of-file), a few more were a base class's
+#members matched by name prefix, and the rest - 40 of them - were real, and are
+#now initialised in their own constructors. A count printed on every build is a
+#number people stop reading; an empty set that FAILS the build the day it stops
+#being empty is not. Set this false to fall back to the named-class gate.
+ENFORCE_ALL_CLASSES = True
+
 
 def scan_missing(path, header_dir, enforced_only=True):
     try:
@@ -179,11 +211,22 @@ def scan_missing(path, header_dir, enforced_only=True):
         return 0
     bad = 0
     for class_name in sorted(set(re.findall(r'^(\w+)::\1\s*\(', raw, re.M))):
-        if enforced_only and class_name not in ENFORCED_CLASSES:
+        if enforced_only and not ENFORCE_ALL_CLASSES and class_name not in ENFORCED_CLASSES:
             continue
         header = os.path.join(header_dir, class_name + '.h')
         if not os.path.isfile(header):
-            continue
+            #W86-IE (bug list item 8): a .cpp routinely defines helper classes that
+            #live in the header named after the FILE, not after themselves
+            #(TextScroller.h declares WScrollbar and TextScroller; TestSuiteAI.h
+            #declares TestSuiteAI, TestSuite and TestSuiteGame). Before the
+            #class-scope fix above those members were reported - wrongly - against
+            #the first class in the header; without this fallback they would simply
+            #stop being checked, which would be a silent loss of coverage rather
+            #than a fix.
+            header = os.path.join(header_dir,
+                                  os.path.splitext(os.path.basename(path))[0] + '.h')
+            if not os.path.isfile(header):
+                continue
         members = header_scalar_members(header, class_name)
         if not members:
             continue
@@ -311,7 +354,8 @@ def main():
     if unenforced > missing:
         note = ("; %d uninitialised scalar(s) outside the enforced classes %s - "
                 "pre-existing debt, run with --notes to list them"
-                % (unenforced - missing, ", ".join(ENFORCED_CLASSES)))
+                % (unenforced - missing, "ALL" if ENFORCE_ALL_CLASSES
+                   else ", ".join(ENFORCED_CLASSES)))
     print("check-ctor-init: OK (%d file(s))%s" % (len(files), note))
     return 0
 

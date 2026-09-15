@@ -112,7 +112,11 @@ GameObserver::~GameObserver()
 }
 
 GameObserver::GameObserver(WResourceManager *output, JGE* input)
-    : mSeed((unsigned int)time(0)), randomGenerator(mSeed, true), aiRandomGenerator(aiSeedFrom(mSeed), false), mResourceManager(output), mJGE(input)
+    : mSeed((unsigned int)time(0)), randomGenerator(mSeed, true), aiRandomGenerator(aiSeedFrom(mSeed), false), mResourceManager(output), mJGE(input),
+      mAbilityEpoch(1) //#W86-IE (bug list item 8): 1, NOT 0 - cleanup() states the
+      //invariant ("never equals a fresh ability's 0") because MTGAbility::mConditionEpoch
+      //starts at 0 and a match is a CACHE HIT: an epoch of 0 would make every ability
+      //skip its first condition evaluation. Uninitialised, it was whatever the stack held.
 
 {
     mAdvanceRefusalSecs = 0;
@@ -3351,7 +3355,7 @@ void GameObserver::loadPlayer(int playerId, PlayerType playerType, int decknb, b
 
 #ifdef NETWORK_SUPPORT
 NetworkGameObserver::NetworkGameObserver(JNetwork* pNetwork, WResourceManager* output, JGE* input)
-    : GameObserver(output, input), mpNetworkSession(pNetwork),     mSynchronized(false)
+    : GameObserver(output, input), mpNetworkSession(pNetwork),     mSynchronized(false), mForwardAction(false) //#W86-IE (bug list item 8)
 {
     mpNetworkSession->registerCommand("loadPlayer", this, loadPlayer, ignoreResponse);
     mpNetworkSession->registerCommand("synchronize", this, synchronize, checkSynchro);

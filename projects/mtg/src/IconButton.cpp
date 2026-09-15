@@ -20,7 +20,12 @@ void IconButtonsController::SetColor(PIXEL_TYPE color)
             ((IconButton *)mObjects[i])->SetColor(color);
 }
 
-IconButton::IconButton(int id, IconButtonsController * parent, string texture, float x, float y, float scale, int fontId, string text, float textRelativeX, float textRelativeY, bool hasFocus): JGuiObject(id)
+IconButton::IconButton(int id, IconButtonsController * parent, string texture, float x, float y, float scale, int fontId, string text, float textRelativeX, float textRelativeY, bool hasFocus): JGuiObject(id),
+    //#W86-IE (bug list item 8): init() below sets every one of these from the
+    //arguments, but a helper call is not an initializer - state the defaults here
+    //so the object is never indeterminate between the two.
+    mX(0.0f), mY(0.0f), mHasFocus(false), mFontId(0), mScale(1.0f), mCurrentScale(1.0f),
+    mTargetScale(1.0f), mTextRelativeX(0.0f), mTextRelativeY(0.0f)
 {
     mQuad = NULL;
     mTex = WResourceManager::Instance()->RetrieveTexture(texture, RETRIEVE_LOCK);

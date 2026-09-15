@@ -7893,6 +7893,26 @@ MTGAbility::~MTGAbility()
 
 int MTGAbility::addToGame()
 {
+    //#W86-IB (audit-2026-09 bug list item 3). A GARBAGED ELEMENT IS NOT A LIVE ONE.
+    //ActionLayer::moveToGarbage takes an element OUT of mObjects and schedules its
+    //deletion for the next cleanGarbage(); re-registering it between those two
+    //moments puts a pointer the sweep is about to free back into the live layer
+    //(the mObjects entry then survives the delete as freed storage - the exact
+    //shape #W82-EH/core 474128 exists to stop) and, if the caller garbages it
+    //again, gives the sweep a second slot for one object. The fix-review-3 caveat
+    //E5 called this "not shown reachable ... worth a getIndexOf-style guard in
+    //moveToGarbage if it ever is"; there are 221 addToGame call sites, so the
+    //honest answer is a guard at the one place all of them pass through rather
+    //than a proof about all of them. Refusing costs nothing where it never
+    //happens, and says so loudly where it does.
+    if (game && game->mLayers && game->mLayers->actionLayer()
+        && game->mLayers->actionLayer()->isInGarbage(this))
+    {
+        DebugTrace("MTGAbility::addToGame REFUSED: this element is in the action"
+                   " layer's garbage and is about to be deleted - re-registering it"
+                   " would leave freed storage in the live layer");
+        return 0;
+    }
     game->addObserver(this);
     return 1;
 }

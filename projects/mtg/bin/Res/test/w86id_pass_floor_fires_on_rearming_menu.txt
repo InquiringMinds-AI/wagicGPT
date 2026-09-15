@@ -1,0 +1,77 @@
+#NAME: The forced-pass floor FIRES on the wave-71 re-arming-menu shape (#W86-ID)
+#DESC: audit-2026-09 bug list item 5: "the wave-71 re-arming-menu shape has not been
+#DESC: produced on demand in four lanes; the floor's firing is pinned by predicate
+#DESC: only. If a heuristic hang ever recurs, this arm is the first suspect."
+#DESC: THE SHAPE (wave-70 engine-seat HIGH-0, the one hung game of that corpus):
+#DESC: the model answers a modal-double-faced land's face menu with its decline row,
+#DESC: the decline changes NOTHING - the card is still in hand, the land drop still
+#DESC: unused - AIPlayerBaka re-proposes the same card next tick and the identical
+#DESC: menu re-arms. 2,584,190 iterations, 3,641 s, 1.23 GB of stderr, and
+#DESC: "menu pass floor reached ... not passing" logged 2,584,166 times.
+#DESC: WHY FOUR LANES COULD NOT REPRODUCE IT: the suite's `aideclineface` arm gave
+#DESC: the decline from TestSuiteAI::Act, BEFORE AIPlayerBaka::Act samples
+#DESC: `menuOpenBefore`. The floor only counts a tick as menu-answering if the menu
+#DESC: was standing at that sample and is gone after computeActions, so every tick
+#DESC: read as "had nothing to do" and mMenuPassHold reset - the hold run could
+#DESC: never reach 24, let alone the 200 identical ticks after it. The live seam
+#DESC: (AIPlayerGPT::chooseMenuAction) answers from INSIDE computeActions, which is
+#DESC: why the live game logged 2.58M held ticks and no fixture logged any.
+#DESC: `aideclineface <card> <budget> seam` (#W86-ID) gives the decline where the
+#DESC: model seam gives it and turns the declined-face latch off (the latch is the
+#DESC: #W71-BP fix; a fixture that pins the FLOOR has to run the engine that hangs
+#DESC: without it). No engine behaviour is changed by this fixture's machinery.
+#DESC: RED, same fixture with `seam` dropped: "expected at least 1 NO-PROGRESS
+#DESC: forced pass(es), got 0 (forced passes of any kind: 0)".
+#DESC: GREEN: "menu pass floor fired at 224 on NO PROGRESS (a legal action remains
+#DESC: and has been refused every tick of the stall)" - 24 hold ticks plus the 200
+#DESC: identical ticks, over a board that never moved, with the land drop and the
+#DESC: Goblin both still legal and both refused every tick. CR 117.3d: "If a player
+#DESC: has priority and chooses not to take any actions, that player passes."
+#DESC: END STATE: the seat never plays anything (the decline consumes every tick it
+#DESC: gets a menu on), but it no longer holds the phase - the game reaches `end`
+#DESC: instead of standing still in main phase 1, which is the whole property.
+FORCEABILITY
+AICALLS 4000
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+aideclineface Branchloft Pathway 0 seam
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+assertpassfloorfired 1 1
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mountain
+hand:Branchloft Pathway,Raging Goblin
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[END]

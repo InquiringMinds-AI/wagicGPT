@@ -296,7 +296,8 @@ Task* Task::createFromStr(const string params, bool rand)
 /*---------------- TaskList -----------------*/
 
 TaskList::TaskList(string _fileName):
-    fileName(_fileName), vPos(-SCREEN_HEIGHT), vPosInEasing(vPos), vPosOutEasing(vPos)
+    fileName(_fileName), vPos(-SCREEN_HEIGHT), vPosInEasing(vPos), vPosOutEasing(vPos),
+    mState(0) //#W86-IE (bug list item 8)
 {
 
     if (fileName == "")

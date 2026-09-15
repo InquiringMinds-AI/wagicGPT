@@ -292,6 +292,55 @@ int TestSuiteAI::displayStack()
     return 1;
 }
 
+//#W71-BP (L1, engine-seat HIGH-0): the armed face DECLINE, driven through
+//DecisionManager exactly as AIPlayerGPT::chooseMenuAction drives it, so what a
+//fixture reproduces is the seam's own behaviour and not a suite shortcut.
+//#W86-ID (bug list item 5): factored out of Act so `seam` mode can give the same
+//answer from inside computeActions, where the model seam gives it.
+bool TestSuiteAI::applyArmedFaceDecline()
+{
+    if (suite->mAiDeclineFace.empty())
+        return false;
+    if (suite->mAiDeclineBudget != 0 && suite->mAiDeclineApplied >= suite->mAiDeclineBudget)
+        return false;
+    if (!observer || !observer->mLayers)
+        return false;
+    ActionLayer * dal = observer->mLayers->actionLayer();
+    if (!dal->menuObject || !dal->abilitiesMenu || !dal->abilitiesMenu->mObjects.size())
+        return false;
+    DecisionRequest req;
+    if (!DecisionManager::buildMenuChoice(this, req) || !req.contextCard)
+        return false;
+    //the pump lowercases every command; compare in that space (the engine's own
+    //getLCName, the same key getCard() matches on)
+    if (req.contextCard->getLCName() != suite->mAiDeclineFace)
+        return false;
+    DecisionAction dact;
+    dact.choice = -1; //the model's "Decline - do nothing" row
+    DecisionManager::applyMenuChoice(req, dact);
+    suite->mAiDeclineApplied++;
+    DebugTrace("TESTSUITE aideclineface: declined menu for '"
+               << suite->mAiDeclineFace << "' (" << suite->mAiDeclineApplied
+               << " so far) [" << suite->filename << "]");
+    return true;
+}
+
+//#W86-ID (bug list item 5). THE RE-ARMING-MENU SHAPE, ON DEMAND.
+//The wave-70 hang is: the model answers a face menu with its decline row, the
+//decline changes NOTHING, AIPlayerBaka re-proposes the same card on the next
+//tick, and the identical menu re-arms - 2,584,190 times. `menu pass floor
+//reached ... not passing` logged 2,584,166 of those ticks, so the floor DID see
+//them as menu-answering ticks: the answer was given inside computeActions, under
+//AIPlayerBaka::Act's menuOpenBefore sample. The pre-Act arm cannot produce that
+//(it answers before the sample is taken, so every tick reads as "had nothing to
+//do" and mMenuPassHold resets), which is why no lane had reproduced the shape.
+int TestSuiteAI::computeActions()
+{
+    if (suite->mAiDeclineSeam && applyArmedFaceDecline())
+        return 1;
+    return AIPlayerBaka::computeActions();
+}
+
 int TestSuiteAI::Act(float)
 {
     if (observer->didWin())
@@ -360,30 +409,11 @@ int TestSuiteAI::Act(float)
     //the menu, then computeActions sees no menu and proposes again). Driven through
     //DecisionManager exactly as AIPlayerGPT::chooseMenuAction drives it, so what a
     //fixture reproduces is the seam's own behaviour and not a suite shortcut.
-    if (playMode == MODE_AI && !suite->mAiDeclineFace.empty()
-        && (suite->mAiDeclineBudget == 0 || suite->mAiDeclineApplied < suite->mAiDeclineBudget))
-    {
-        ActionLayer * dal = observer->mLayers->actionLayer();
-        if (dal->menuObject && dal->abilitiesMenu && dal->abilitiesMenu->mObjects.size())
-        {
-            DecisionRequest req;
-            if (DecisionManager::buildMenuChoice(this, req)
-                && req.contextCard
-                //the pump lowercases every command; compare in that space (the
-                //engine's own getLCName, the same key getCard() matches on)
-                && req.contextCard->getLCName() == suite->mAiDeclineFace)
-            {
-                DecisionAction dact;
-                dact.choice = -1; //the model's "Decline - do nothing" row
-                DecisionManager::applyMenuChoice(req, dact);
-                suite->mAiDeclineApplied++;
-                DebugTrace("TESTSUITE aideclineface: declined menu for '"
-                           << suite->mAiDeclineFace << "' (" << suite->mAiDeclineApplied
-                           << " so far) [" << suite->filename << "]");
-                return 1;
-            }
-        }
-    }
+    //#W86-ID (bug list item 5): in `seam` mode the decline is given from
+    //TestSuiteAI::computeActions instead, so AIPlayerBaka::Act's menuOpenBefore
+    //sample sees the menu standing and the pass floor can accumulate.
+    if (playMode == MODE_AI && !suite->mAiDeclineSeam && applyArmedFaceDecline())
+        return 1;
 
     if (playMode == MODE_AI && suite->aiMaxCalls && !atAssertPhase)
     {
@@ -531,6 +561,21 @@ int TestSuiteAI::Act(float)
             //#W69-BG (K1): the draw driver is not a menu answer.
             && action.compare(0, 9, "drawcard ") != 0
             && action.compare(0, 9, "millcard ") != 0 //#W85-HB (review-3 item 2)
+            //#W86-IA (audit-2026-09 bug list item 2). THE COMPACTION COMMAND IS NOT A
+            //MENU ANSWER, AND LEAVING IT OFF THIS LIST IS WHY THE WAVE-83 MODE FIXTURE
+            //COULD NOT BE EXPLAINED. `shrinkactionlayer` exists to compact the action
+            //layer UNDER an armed menu; the default below answered the menu first
+            //(first option - a mandatory modal menu has no Cancel row) and re-queued
+            //the command, so the shrink ran with menuObject == 0 and the script's own
+            //`choice N` then reached doReactTo with no menu to answer and did nothing.
+            //That is the "the scripted choice 0 never reached doReactTo on either
+            //binary" signal fix-lane-2 could not account for: the fixture's click
+            //routing, not the mode-menu dispatch.
+            && action.compare(0, 18, "shrinkactionlayer ") != 0
+            //#W86-IB / #W86-ID: layer/floor probes, not menu answers.
+            && action.compare("assertgarbagereaddrefused") != 0
+            && action.compare(0, 23, "assertinstanceidentity ") != 0 //#W86-IC
+            && action.compare(0, 21, "assertpassfloorfired ") != 0
             //#W71-BP: the decline ARM is not a menu answer - it must reach its own
             //handler, which arms a standing decline the AI seat applies on its own
             //ticks. Pre-answering it with the suite default would answer ONE menu
@@ -558,6 +603,10 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 12, "assertxrows ") == 0 //#W63-AF (R1)
                 || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                 || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
+                || action.compare(0, 18, "shrinkactionlayer ") == 0 //#W86-IA: never a card click
+                || action.compare("assertgarbagereaddrefused") == 0 //#W86-IB
+                || action.compare(0, 23, "assertinstanceidentity ") == 0 //#W86-IC
+                || action.compare(0, 21, "assertpassfloorfired ") == 0 //#W86-ID
                 || action.compare(0, 14, "aideclineface ") == 0 //#W71-BP
                 || action.compare(0, 22, "assertdeclinesapplied ") == 0 //#W71-BP
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
@@ -1337,9 +1386,19 @@ int TestSuiteAI::Act(float)
         //row, and the model seam needs a live endpoint. The arm is standing, not a
         //one-shot, because the DEFECT is what the seat does after the decline - it
         //re-proposes the same card and re-opens the same menu, for ever.
-        //Syntax: aideclineface <card name>[ <budget>]   (budget 0/absent = for ever)
+        //Syntax: aideclineface <card name>[ <budget>][ seam]  (budget 0/absent = for
+        //ever; #W86-ID `seam` = give the decline from inside computeActions and turn
+        //the declined-face latch off, i.e. the pre-#W71-BP engine that hangs - the
+        //only arrangement in which the wave-70/71 re-arming-menu shape occurs)
         string arg = action.substr(14);
         while (arg.size() && arg[0] == ' ') arg.erase(0, 1);
+        bool seam = false;
+        if (arg.size() >= 5 && arg.compare(arg.size() - 5, 5, " seam") == 0)
+        {
+            seam = true;
+            arg = arg.substr(0, arg.size() - 5);
+            while (arg.size() && arg[arg.size() - 1] == ' ') arg.erase(arg.size() - 1);
+        }
         int budget = 0;
         size_t sp = arg.rfind(' ');
         if (sp != string::npos && arg.size() > sp + 1
@@ -1359,7 +1418,9 @@ int TestSuiteAI::Act(float)
         suite->mAiDeclineFace = arg;
         suite->mAiDeclineBudget = budget;
         suite->mAiDeclineApplied = 0;
+        suite->mAiDeclineSeam = seam; //#W86-ID
         DebugTrace("TESTSUITE aideclineface '" << arg << "' budget=" << budget
+                   << (seam ? " seam(no latch, answered inside computeActions)" : "")
                    << " [" << suite->filename << "]");
         return 1;
     }
@@ -2054,6 +2115,185 @@ int TestSuiteAI::Act(float)
             //Do not leave the dangling pointer behind for the rest of the run.
             al->mObjects.erase(al->mObjects.begin() + stillRegistered);
         }
+        return 1;
+    }
+    else if (action.find("assertinstanceidentity ") == 0)
+    {
+        //#W86-IC (audit-2026-09 bug list item 4). THE IDENTITY mRevealAbove USES.
+        //fix-lane-4 recorded the residual itself: the parked-card eligibility set
+        //held raw MTGCardInstance POINTERS compared against the live library, "so a
+        //freed instance whose address is later reused by a card that IS in the
+        //library would read as 'still above' and hold the parked card down for one
+        //draw ... an identity assumption, not a proof". The set now holds
+        //MTGCardInstance::mInstanceId. The two things that could silently undo that
+        //are (a) going back to addresses and (b) reaching for MTGCard::getId(), the
+        //PRINTING id - which cannot tell two copies of one card apart, and a library
+        //full of copies is the normal case. Pin both: every copy of this card in the
+        //library shares a printing id and has its own instance id.
+        //Syntax: assertinstanceidentity <card name>
+        string cname = action.substr(23);
+        std::transform(cname.begin(), cname.end(), cname.begin(), ::tolower);
+        MTGGameZone * lib = observer->players[0]->game->library;
+        vector<MTGCardInstance *> copies;
+        for (int k = 0; k < lib->nb_cards; k++)
+            if (lib->cards[k] && lib->cards[k]->getLCName() == cname)
+                copies.push_back(lib->cards[k]);
+        if (copies.size() < 2)
+        {
+            std::cerr << "TESTSUITE assertinstanceidentity: need at least two copies of '"
+                      << cname << "' in player 1's library, found " << copies.size()
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        for (size_t a = 0; a < copies.size(); a++)
+        {
+            if (!copies[a]->mInstanceId)
+            {
+                std::cerr << "TESTSUITE assertinstanceidentity: a library copy of '" << cname
+                          << "' carries instance id 0 - initMTGCI did not stamp it"
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+            for (size_t b = a + 1; b < copies.size(); b++)
+            {
+                if (copies[a]->getId() != copies[b]->getId())
+                {
+                    std::cerr << "TESTSUITE assertinstanceidentity: two copies of '" << cname
+                              << "' have DIFFERENT printing ids (" << copies[a]->getId()
+                              << " vs " << copies[b]->getId() << ") - this fixture cannot"
+                              << " show what the printing id fails to distinguish"
+                              << " [" << suite->filename << "]" << std::endl;
+                    suite->commandAssertFailures++;
+                }
+                if (copies[a]->mInstanceId == copies[b]->mInstanceId)
+                {
+                    std::cerr << "TESTSUITE assertinstanceidentity: two copies of '" << cname
+                              << "' share instance id " << copies[a]->mInstanceId
+                              << " - mRevealAbove cannot tell them apart"
+                              << " [" << suite->filename << "]" << std::endl;
+                    suite->commandAssertFailures++;
+                }
+            }
+        }
+        DebugTrace("TESTSUITE assertinstanceidentity: " << copies.size() << " copies of '"
+                   << cname << "', printing id " << copies[0]->getId()
+                   << ", distinct instance ids");
+        return 1;
+    }
+    else if (action == "assertgarbagereaddrefused")
+    {
+        //#W86-IB (audit-2026-09 bug list item 3). AN ELEMENT MUST NOT COME BACK
+        //FROM THE GARBAGE, AND MUST NEVER HOLD TWO SLOTS IN IT.
+        //fix-review-3 caveat E5: forgetElement's per-object exemption (#W84-GB)
+        //nulls only the slot the sweep is currently on, so a SECOND garbage slot
+        //for the same element survives the delete and cleanGarbage frees it again.
+        //A second slot needs the element to be re-registered after being garbaged,
+        //which nothing was shown to do - and with 221 addToGame call sites the
+        //honest close is a guard, not a proof. Two guards, tested here together:
+        //MTGAbility::addToGame REFUSES an element the layer has garbaged, and
+        //ActionLayer::moveToGarbage never pushes a duplicate slot.
+        ActionLayer * al = observer->mLayers->actionLayer();
+        MTGCardInstance * host = NULL;
+        for (int i = 0; i < observer->players[0]->game->inPlay->nb_cards && !host; i++)
+            host = observer->players[0]->game->inPlay->cards[i];
+        if (!host)
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: no permanent to host the"
+                      << " witness ability [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        AbilityFactory af(observer);
+        MTGAbility * witness = af.parseMagicLine("{0}:name(re-add witness) life:1 controller",
+                                                 0, NULL, host);
+        if (!witness || !witness->addToGame() || !al->moveToGarbage(witness))
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: could not register and"
+                      << " garbage the witness [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //It is now in `garbage` and out of mObjects. Ask for it back.
+        const int readded = witness->addToGame();
+        const int liveIndex = al->getIndexOf(witness);
+        //...and ask for it to be garbaged a second time, the other half of the shape.
+        al->moveToGarbage(witness);
+        int slots = 0;
+        for (size_t k = 0; k < al->garbage.size(); k++)
+            if (al->garbage[k] == (ActionElement *) witness)
+                slots++;
+        if (readded || liveIndex >= 0)
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: addToGame ACCEPTED an element"
+                      << " already in the layer's garbage (returned " << readded
+                      << ", mObjects index " << liveIndex << ") - the sweep is about to free"
+                      << " it and the layer would keep updating freed storage"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            if (liveIndex >= 0)
+                al->mObjects.erase(al->mObjects.begin() + liveIndex);
+        }
+        if (slots != 1)
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: the element holds " << slots
+                      << " garbage slot(s); cleanGarbage would delete it " << slots
+                      << " time(s) [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            //Leave exactly one live slot so the sweep below is safe either way.
+            bool kept = false;
+            for (size_t k = 0; k < al->garbage.size(); k++)
+                if (al->garbage[k] == (ActionElement *) witness)
+                {
+                    if (kept)
+                        al->garbage[k] = NULL;
+                    kept = true;
+                }
+        }
+        al->cleanGarbage();
+        DebugTrace("TESTSUITE assertgarbagereaddrefused: witness swept once, layer is now "
+                   << al->mObjects.size());
+        return 1;
+    }
+    else if (action.find("assertpassfloorfired ") == 0)
+    {
+        //#W86-ID (audit-2026-09 bug list item 5). THE FLOOR FIRING, OBSERVED.
+        //Four lanes pinned this arm by PREDICATE only ("nobody in four lanes has
+        //produced the re-arming-menu shape on demand"). With `aideclineface <card>
+        //seam` the shape is reproducible: the decline is given from inside
+        //computeActions, so AIPlayerBaka::Act counts each tick as a menu-answering
+        //tick, the board never moves, and the floor's hold + no-progress runs
+        //complete. AIPlayerBaka::mMenuPassForced counts every forced pass and
+        //mMenuPassNoProgress the subset the NO-PROGRESS arm forced - which is the
+        //one this fixture is about (CR 117.3d).
+        //Syntax: assertpassfloorfired <1|2> <minimum no-progress firings>
+        string rest = action.substr(21);
+        size_t sp = rest.find(' ');
+        int who = atoi(rest.c_str());
+        int want = (sp == string::npos) ? 1 : atoi(rest.c_str() + sp + 1);
+        AIPlayerBaka * seat = dynamic_cast<AIPlayerBaka *>(
+            observer->players[(who == 2) ? 1 : 0]);
+        if (!seat)
+        {
+            std::cerr << "TESTSUITE assertpassfloorfired: player " << who
+                      << " is not a heuristic seat [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        if (seat->mMenuPassNoProgress < want)
+        {
+            std::cerr << "TESTSUITE assertpassfloorfired: player " << who << " expected at"
+                      << " least " << want << " NO-PROGRESS forced pass(es), got "
+                      << seat->mMenuPassNoProgress << " (forced passes of any kind: "
+                      << seat->mMenuPassForced << ") - the seat answered the same re-armed"
+                      << " menu over an unchanged board and never passed"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else
+            DebugTrace("TESTSUITE assertpassfloorfired: player " << who << " forced "
+                       << seat->mMenuPassNoProgress << " no-progress pass(es) of "
+                       << seat->mMenuPassForced << " forced passes");
         return 1;
     }
     else if (action.find("givecontrol ") == 0)
