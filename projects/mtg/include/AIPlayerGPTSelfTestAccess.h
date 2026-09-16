@@ -414,7 +414,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch);
     static string dayNightChangeNarration(const string& designation);
     static string dayNightStateLine(const string& designation);
-    static string declineBoardScope(const string& boardKey);
     static string declineFactForMenu(const vector<string>& options, bool callerSaysDecline);
     static int declineRowIndexOf(const vector<string>& options);
     static string declineRowReaskTag(int n);
@@ -463,7 +462,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string exileHostageRowTag(const vector<string> & held);
     static string feedsRowTag(int perTurn, bool variable, int perCast, const std::vector<std::string>& converters, const std::vector<std::string>& handConverters= std::vector<std::string>(), const std::vector<std::string>& discardConverters= std::vector<std::string>(), const std::vector<std::string>& handDiscardConverters= std::vector<std::string>(), int selfPerTurn= 0, int variableHandSize= -1);
     static string fetchLandColorsClause(const bool adds[5], const bool canMake[5], const int sourceCounts[5]= NULL);
-    static string fetchLineKey(const string& line);
     static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped, const string& colorsClause);
     static bool findAnswerLabelLine(const string& text, const char * expectedLabel, size_t& segStart, size_t& segEnd, size_t& labelLineStart, int * extraAnswerLines= NULL, int * rejectedLines= NULL, size_t * lastHeadLineStart= NULL);
     static size_t findPlanMarker(const string& text, size_t labelLineStart, size_t * firstOut);
@@ -517,7 +515,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string holdRowLine(bool castSeam= false, bool activationLive= false);
     static bool holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf= holdKeyRow);
     static string hybridPipNoteText(const vector<string>& pips, int totalMana);
-    static bool identicalInterchangeableRows(const vector<string>& rows);
     static void improveAssignmentMaterial(const vector<vector<char> >& can, const vector<vector<int> >& rank, vector<int>& match);
     static string incomingCombatForecastLine(int ableAttackers, int maxDamage, int myLife);
     static int incomingCombatForm(bool oppActive, int phase, int liveAttackers, int latchTurn, int turn, int ableAttackers);
@@ -544,7 +541,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string landEntersTappedTag(const string& script, const string& printedText);
     static string landTapMana(const string& text);
     static string landTapTagFor(const string& script, const string& printedText, int myLands, const vector<string>& witness, const vector<char> * witnessPrinted= NULL);
-    static string lastOfferClause(bool retiresOnPass);
     static string laterStepRouteClause(const string& offendingName, const std::vector<string> * rows);
     static string leavesFloatingTag(int poolTotal, int spent);
     static string leavesUntappedTag(int untappedSources, int sourcesUsed);
@@ -654,8 +650,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool narrationTrimV1();
     static bool naturalTextLess(const string& a, const string& b);
     static string noPotentialBlockersTag();
-    static string noopReaskLine(int choice, const string& renderedRow, bool nameMatched= false, const string& writtenLine= "");
-    static bool noopRowEarnsReask(const string& row);
     static long offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut= NULL, std::vector<string> * offLinesOut= NULL);
     static string oneShotDrawGrantTag(const std::vector<OneShotDrawBranch>& branches, const std::vector<std::string>& converters, int minePerDraw, int theirsPerDraw, const string& theirPunishers, int life= -1);
     static string oppLifeRaceClause(int dmg, int gain, int turns);
@@ -822,7 +816,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string tapOutCrackBackClause(int leftAfter, int crackTotal, int crackAttackers);
     static string tapUntapBranchTag(const string& script, const string& optionLabel, int candidatesCanBlockTapped= 0, int candidatesDoNotUntap= 0);
     static bool tappedAnimateNeedsVerdict(const string& row);
-    static string tappedCreatureTag(bool canBlockTapped, bool attacking, const string& blockedName);
+    static string tappedCreatureTag(bool canBlockTapped, bool attacking, const string& blockedName, bool activeSide= true);
     static string tappedSourceAnimateClause();
     static string tappedSourceAnimateVerdict();
     static string targetChoiceNarration(const string& target, const string& source, const string& ability);
@@ -844,7 +838,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string uniqueNamedIn(const string& text, const vector<string>& names);
     static void unpermuteSelection(const vector<size_t>& order, size_t n, vector<bool>& send);
     static string unreachableAttackerTag(int canBlockCount, int totalBlockers, bool flyingExplains);
-    static string upkeepAnimationClause(bool lastOffer);
+    static string upkeepAnimationClause();
     static string ventureSourceDungeonTag(const string& sourceName, const string& sentence);
     static string ventureSourceSilentTag(const string& sourceName);
     static string ventureStepLine(bool mine, const string& dungeonName, int step);
@@ -957,7 +951,6 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool w79ClauseNeedsAntecedent(const string& clause);
     static string w79ClausePrioritySnippet(const string& text, size_t maxLen);
     static string w79CloseOpenUnits(const string& kept);
-    static string w79ContinuationDigestOf(const std::vector<string>& rowLabels, const std::vector<string>& rowTargets, int untappedSources, int objectCount= -1);
     static bool w79CounterspellScript(const string& magicText, bool castableAtInstantSpeed= true);
     static int w79CoveredByBodies(std::vector<CrackBackAttackerFact> sorted, int bodies);
     static bool w79DecisionBearingClause(const string& clause);
@@ -983,7 +976,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static const char * w80CoverMechanismSentence(bool anyTrampler);
     static string w80CrackBackFaceOfLine(const string& line);
     static string w80CrackBackVerdictLine(const string& face, int bestBlockFloor= -1, int myLife= 0);
-    static bool w80CrossPhaseReplayable(bool declined, bool boardUnchanged, bool rowsIdentical, bool prevSorcerySpeed, bool nowSorcerySpeed, const string& prevPhase, const string& nowPhase);
+    static string w82WindowKey(const string& boardKey, const string& question); //#W82-A (L2)
     static bool w80DrawExtraIsOptional(const string& payloadLow);
     static size_t w80EchoStepIndex(int stepsDone, bool castPendingCompletion);
     static bool w80EtbSelfLeavesLine(const string& low);
@@ -995,9 +988,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string w80OwnStackSpellTag(bool mine, const string& zoneName);
     static string w80ProvenWinLoopLine(const string& starterName);
     static string w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies);
-    static bool w80ScriptLineHasActivationCost(const string& low);
     static string w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal);
-    static int w80SingleOutcomeRepeatMenu(const vector<string>& optionTexts, const vector<int>& paid);
     static string w80StackDeathVerdictLine(const string& face);
     static string w80StackNotEmptyReason(bool stackBlockRendered);
     static bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow= false);
@@ -1005,10 +996,10 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string w80TrimDanglingTail(const string& kept);
     static bool w80VariableDrawIsHandSize(const string& script, const char * zone);
     static bool w81AttackCoverDue(bool crackBackLinePrinted, bool anyAttackerOffered);
-    static bool w81CachedReplayMustReask(bool keyUnchanged, int lastChoice, int replaysThisKey, bool rowPastStatedStop);
     static string w81CounterspellsSeenLine(int timesCountered, const vector<string>& names, int theirUntapped);
     static string w81CrackBackTotalFace(const string& line);
-    static string w81CrackBackVerdictLine(const string& face, int rawCombat, int addUp, int compulsoryDraw, int bestBlockFloor, int myLife);
+    static string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized= false, bool attacksSettled= false);
+    static int crackBackRungConvertedCost(const string& rung); //#W82-A (L5)
     static string w81EngineBodyTail(MTGCardInstance * c);
     static void w81FoldDuplicateCoverParagraphs(std::vector<std::string>& rows);
     static size_t w81NarrationBudget(size_t otherBytes);
@@ -1088,7 +1079,10 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static const char * kLandDropDeclineRow;
     static const char * kBlockerRangeNote;
     static const size_t kVictimRosterGroupCap;
+    static void w82PutOrderFromReply(const string& text, size_t handSize, std::vector<int>& order); //#W82-A R4
     static const char * kOptionRangeNote;
+    static const char * kW82StayHomeScenarioLabel; //#W82-A R3
+    static const char * kW82CoverScenarioLabel;    //#W82-A R3
     static const size_t kSharedCardTextMinLen;
     static const int kEventRunCollapseFloor;
     static const int kXNetNotSupplied;
