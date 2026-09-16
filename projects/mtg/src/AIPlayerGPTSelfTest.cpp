@@ -14086,6 +14086,105 @@ static const char * kW50Y_r94 =
               "audit-L A24 413/429/5xx likewise");
         CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 504)) == "http_error",
               "audit-L A24 a status at the wall names the status - the server answered");
+        // ---- #W82-A R2 (LEDGER v2, Astra genuine): THE FOLD IS EQUIVALENT ----
+        // Astra REFUTES C11's "pure forwarding" premise: the 4- and 5-argument
+        // forms add HTTP and transport CLASSIFICATION, and "consolidation must
+        // preserve precedence". This lane folded the four overloads into one
+        // ordered table, so the claim that needs an instrument is exactly that
+        // precedence. The original chain is rebuilt here, verbatim from the base
+        // commit, and the two are compared over the WHOLE truth table - 864
+        // combinations - rather than over a handful of sampled cases. If the fold
+        // ever drifts, this pin names the first input that diverges.
+        {
+            struct W82R2
+            {
+                // the base chain, exactly as it was: 3-arg table, 4-arg HTTP,
+                // 5-arg transport, 6-arg bad-reply, each guarding on !stale.
+                static const char * three(bool st, bool to, bool hr)
+                {
+                    if (st) return "stale_livelock";
+                    if (to) return "timeout";
+                    return hr ? "reasoning_only" : "empty_reply";
+                }
+                static const char * four(bool st, bool to, bool hr, long http)
+                {
+                    if (!st && http != 0 && http != 200) return "http_error";
+                    return three(st, to, hr);
+                }
+                static const char * five(bool st, bool to, bool hr, long http, long curl)
+                {
+                    if (!st && !to && curl > 0) return "transport_error";
+                    return four(st, to, hr, http);
+                }
+                static const char * six(bool st, bool to, bool hr, long http, long curl, bool bad)
+                {
+                    if (bad && !st && !to && curl <= 0 && (http == 0 || http == 200))
+                        return "bad_reply";
+                    return five(st, to, hr, http, curl);
+                }
+            };
+            const long httpv[9] = { 0, 200, 401, 404, 413, 429, 500, 503, 504 };
+            const long curlv[6] = { -1, 0, 7, 28, 35, 56 };
+            int combos = 0, diverged = 0;
+            string firstBad;
+            for (int a0 = 0; a0 < 2; a0++)
+              for (int b0 = 0; b0 < 2; b0++)
+                for (int c0 = 0; c0 < 2; c0++)
+                  for (int h = 0; h < 9; h++)
+                    for (int cu = 0; cu < 6; cu++)
+                      for (int bd = 0; bd < 2; bd++)
+                      {
+                          const bool st = (a0 != 0), to = (b0 != 0);
+                          const bool hr = (c0 != 0), bad = (bd != 0);
+                          combos++;
+                          const string want = W82R2::six(st, to, hr, httpv[h], curlv[cu], bad);
+                          const string got = AIPlayerGPT::noAnswerClassFor(st, to, hr, httpv[h],
+                                                                          curlv[cu], bad);
+                          if (want != got)
+                          {
+                              diverged++;
+                              if (firstBad.empty())
+                              {
+                                  std::ostringstream fb;
+                                  fb << "stale=" << st << " timedOut=" << to << " reasoning=" << hr
+                                     << " http=" << httpv[h] << " curl=" << curlv[cu]
+                                     << " bad=" << bad << " chain=" << want << " folded=" << got;
+                                  firstBad = fb.str();
+                              }
+                          }
+                      }
+            CHECK(combos == 864,
+                  "#W82-A R2 INSTRUMENT the truth table really is walked: 2x2x2 x 9 statuses"
+                  " x 6 curl results x 2 bad-reply = 864 combinations");
+            if (!firstBad.empty())
+                cout << "     R2 first divergence: " << firstBad << "\n";
+            CHECK(diverged == 0,
+                  "#W82-A R2 GREEN the ONE ordered table returns the base chain's class on"
+                  " EVERY input - the HTTP and transport classification the 4-/5-arg forms"
+                  " added is preserved, precedence included");
+            // ...and the four precedence edges Astra's refutation turns on, named
+            // one by one so a reader does not have to trust the loop alone.
+            CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 200, 7, false))
+                      == "transport_error",
+                  "#W82-A R2 a curl-level failure before the deadline is TRANSPORT, not an"
+                  " empty reply");
+            CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0, 28, false))
+                      == "timeout",
+                  "#W82-A R2 a request killed at its own deadline reports curl 28 too - the"
+                  " `!timedOut` guard is what keeps it `timeout` and not `transport_error`");
+            CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 504, 28, false))
+                      == "http_error",
+                  "#W82-A R2 ...and a STATUS at the wall still outranks the clock: the server"
+                  " answered");
+            CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 200, 0, true))
+                      == "bad_reply"
+                  && string(AIPlayerGPT::noAnswerClassFor(false, false, false, 503, 0, true))
+                      == "http_error"
+                  && string(AIPlayerGPT::noAnswerClassFor(true, false, false, 200, 0, true))
+                      == "stale_livelock",
+                  "#W82-A R2 decode garbage on a 200 is `bad_reply`; on a 5xx the status wins;"
+                  " and the livelock give-up outranks both - it consumed no round trip");
+        }
         CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, true, 400)) == "http_error",
               "audit-L A24 reasoning text beside a 4xx does not hide the status");
         CHECK(string(AIPlayerGPT::noAnswerClassFor(true, false, false, 401)) == "stale_livelock",
@@ -35784,7 +35883,8 @@ static const char * kW50Y_r94 =
                             " covers 9 of that 17, leaving 8 -> you would be at -3, which"
                             " still KILLS you. Every attacker you declare without vigilance"
                             " removes its own body from that cover."
-                            + string(w80CoverMechanismSentence(false)) + "}", //#W80-DF (U3)
+                            + string(w80CoverMechanismSentence(false))
+                            + string(kW82StayHomeScenarioLabel) + "}", //#W80-DF (U3), #W82-A R3
                       "#W77-CS R6c REPRO/GREEN the attackers menu's stay-home side now"
                       " carries the cover family's NUMBER - RED on base, where the"
                       " CRACK-BACK COST OF ATTACKING paragraph was prose only and the"
@@ -42453,6 +42553,52 @@ static const char * kW50Y_r94 =
             CHECK(v.find("still lets 10 through") != string::npos,
                   "#W82-A L5 GREEN the block floor the line prints is the DP's floor - the"
                   " blockable addendum raised the published total and not the floor");
+            // ---- #W82-A R3 (LEDGER v2, Astra genuine F4(c)) ----
+            // Astra REFUTES the "three totals is a contradiction" reading: "cover
+            // after casting an additional blocker" and "best block with existing
+            // blockers" are DIFFERENT SCENARIOS whose life totals may legitimately
+            // differ. The first L5 pass narrowed the block DP's body set to match
+            // the cover clause's prospective-attacker exclusion so the numbers
+            // would agree - which states one scenario's figure under the other's
+            // name. That is reverted. What the screen owes is a LABEL per figure,
+            // and the pins below are that: the same seq-30 board, both labels
+            // present, and the two numbers explicitly NOT forced equal.
+            CHECK(v.find("[scenario: BEST BLOCK WITH YOUR EXISTING BLOCKERS") != string::npos,
+                  "#W82-A R3 GREEN the verdict line names ITS scenario - best block with the"
+                  " bodies untapped right now");
+            CHECK(v.find("have NOT declared your attack yet") != string::npos
+                      && v.find("answers to two questions, not two answers to one") != string::npos,
+                  "#W82-A R3 GREEN ...and, before the seat's attack is declared, says that a"
+                  " body sent as an attacker leaves this figure AND that the cast rows price a"
+                  " different scenario - the caveat is stated, not silently applied");
+            {
+                // the same board with the attack already declared: same figure,
+                // the label drops the not-yet-declared half rather than the number
+                // changing under the reader.
+                const string vSettled = w81CrackBackVerdictLine(
+                                            crackBackVerdictKey(4, rawCombat + addUp, myLife),
+                                            rawCombat, addUp, 0, 0, dpFloor, myLife, false, true);
+                CHECK(vSettled.find("still lets 10 through") != string::npos
+                          && vSettled.find("[scenario: BEST BLOCK WITH YOUR EXISTING BLOCKERS")
+                             != string::npos
+                          && vSettled.find("have NOT declared your attack yet") == string::npos,
+                      "#W82-A R3 the NUMBER does not move with the label - `attacksSettled`"
+                      " chooses which caveat is true, it does not narrow the blocker set");
+            }
+            // the COVER clause carries its own, different label, and the two label
+            // texts are not the same string - a reader can tell the scenarios apart.
+            CHECK(string(kW82CoverScenarioLabel).find("COVER AFTER CASTING THIS ROW'S BODY")
+                      != string::npos
+                  && string(kW82StayHomeScenarioLabel).find("KEEPING EVERY BODY HOME")
+                      != string::npos
+                  && string(kW82CoverScenarioLabel) != string(kW82StayHomeScenarioLabel),
+                  "#W82-A R3 GREEN all THREE cover figures on this layer's screens name their"
+                  " own scenario - cast-row cover, stay-home cover, and the verdict's best"
+                  " block - and no two of them share a label");
+            CHECK(string(kW82CoverScenarioLabel).find("not required to agree") != string::npos
+                  && string(kW82StayHomeScenarioLabel).find("not required to agree") != string::npos,
+                  "#W82-A R3 MUST-NOT-MATCH no label claims the figures agree - a forced-equal"
+                  " number would be a new lie, which is exactly Astra's refutation");
         }
     }
 
@@ -42780,6 +42926,56 @@ static const char * kW50Y_r94 =
         CHECK(discardSpareLandClause(2, 5, true, "", 0, -1, "{B}", 3, 0).find("spare")
                   == string::npos,
               "#W81-DL V13 the COUNT gate (#W61-T C11) still refuses the word on its own");
+    }
+
+    cout << "\n[#W82-A R4] the pregame bottom order is the order the answer gave\n";
+    {
+        // LEDGER v2 / Astra genuine: "The text promises model order, but Boolean
+        // membership followed by hand-order traversal discards it. That loses a
+        // legal choice, not merely wording quality." CR 103.5 (cr.txt:591) makes
+        // the bottoming order the player's, so it is a legal choice and the
+        // ruling says a legal choice is never removed. The engine now reads the
+        // order; this pins the reader that recovers it.
+        std::vector<int> ord;
+        w82PutOrderFromReply("PUT: 6, 2", 7, ord);
+        CHECK(ord.size() == 2 && ord[0] == 6 && ord[1] == 2,
+              "#W82-A R4 GREEN `PUT: 6, 2` reads as 6 THEN 2 - the ledger's own example,"
+              " and the shape a membership mask cannot carry");
+        // RED ON BASE: a mask over the same answer is hand-ordered, so 2 went first.
+        {
+            bool mask[7] = { false, true, false, false, false, true, false }; //cards 2 and 6
+            std::vector<int> handOrder;
+            for (int j = 0; j < 7; j++)
+                if (mask[j]) handOrder.push_back(j + 1);
+            CHECK(handOrder.size() == 2 && handOrder[0] == 2 && handOrder[1] == 6,
+                  "#W82-A R4 RED-ON-BASE the membership mask walked in hand order bottoms"
+                  " card 2 FIRST - the exact inversion of what the reply asked for");
+            CHECK(handOrder[0] != ord[0],
+                  "#W82-A R4 ...and the two orders really do differ on this answer");
+        }
+        w82PutOrderFromReply("PLAN: keep the removal.\nPUT: 3", 7, ord);
+        CHECK(ord.size() == 1 && ord[0] == 3,
+              "#W82-A R4 a single pick reads as itself, and the PLAN line's words carry no"
+              " digits to confuse it");
+        w82PutOrderFromReply("PUT: 2, 2, 5, 2", 7, ord);
+        CHECK(ord.size() == 2 && ord[0] == 2 && ord[1] == 5,
+              "#W82-A R4 a repeated index is taken once, at its FIRST mention");
+        w82PutOrderFromReply("PUT: 2-4, 1", 7, ord);
+        CHECK(ord.size() == 4 && ord[0] == 2 && ord[1] == 3 && ord[2] == 4 && ord[3] == 1,
+              "#W82-A R4 an ascending range expands WHERE IT APPEARS, ahead of what follows"
+              " it - the same grammar the menus already teach");
+        w82PutOrderFromReply("PUT: 9, 0, 6", 7, ord);
+        CHECK(ord.size() == 1 && ord[0] == 6,
+              "#W82-A R4 MUST-NOT-MATCH an index outside 1..handSize is not an order term -"
+              " the MASK decides which cards go, this decides only their order");
+        w82PutOrderFromReply("PUT: Dream Fracture, Cancel", 7, ord);
+        CHECK(ord.empty(),
+              "#W82-A R4 MUST-NOT-MATCH a NAME-only answer yields no order, so the seam keeps"
+              " its previous hand-order fill and nothing is lost by reading this");
+        w82PutOrderFromReply("", 7, ord);
+        CHECK(ord.empty(), "#W82-A R4 NEGATIVE an empty reply yields nothing");
+        w82PutOrderFromReply("PUT: 3", 0, ord);
+        CHECK(ord.empty(), "#W82-A R4 NEGATIVE an empty hand yields nothing");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

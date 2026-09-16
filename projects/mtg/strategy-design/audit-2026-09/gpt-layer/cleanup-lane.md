@@ -633,3 +633,272 @@ have to be revisited, and what it would cost:
   removal risks a hang. Flagged, not touched.
 * **X1, X5, X8, X9, X10** and the typed-verdict / render-at-the-boundary shape:
   §D by the ledger's disposition.
+
+---
+
+# R1–R4 — the revisions on LEDGER v2 (Astra's genuine cross-review)
+
+`LEDGER.md` was PROVISIONAL when sections A/B/C were built; `LEDGER-v2.md`
+rebuilds it on `cross-astra-genuine.md`. Astra refutes three times as much as the
+stand-in did, and §2 of v2 names four revisions for this branch. Sections A, B
+and C otherwise stand — every A item now carries **two genuine confirmations**.
+All four are in one commit, `R1-R4 per LEDGER v2`.
+
+## R1 — the gameend counters come back
+
+**Astra's refutation, which holds.** Section B deleted eight gameend rows under a
+rule with two premises, and Astra refutes both:
+
+* *"no consumer"* — `tools/corpus-stats.py:465` iterates and aggregates EVERY
+  integer gameend key. That is a consumer. The absence of a counter's literal
+  name in a tool is not the absence of a reader.
+* *"zero corpus-wide"* — several were not zero. `hold_events` was **180**,
+  `hold_reopened_new_lethal` **7**, `forced_close_events` **26** /
+  `forced_close_unrecorded` **13**, single-outcome **3/60**. And a zero is an
+  observation, not dead code.
+
+Astra's principle, adopted: **deleting a mechanism and deleting a consumed
+counter are separate decisions.**
+
+### Restored (8 rows, with their members, increments and the stderr summary)
+
+`wall_miss_events`, `wall_miss_unrecorded`, `wall_miss_no_retry`,
+`action_before_plan_replies`, `action_before_plan_rejected_replies`,
+`hold_reopened_new_threat`, `hold_reopened_new_lethal`, `hold_events`.
+
+Restoring `mHoldEvents` also repaired something the deletion had broken silently:
+it is the **`event` sequence number on every `hold_event` record**
+(`src/AIPlayerGPT.cpp:21108`), the field a reviewer joins those records on. The
+section-B sweep took the field out with the counter. The new probe shows it back
+and consistent — `hold_events: 14` against 14 `hold_event` records, and the census
+check reconciles *using* that 14.
+
+### Stayed gone — with the mechanism, not under the counter rule
+
+| row | mechanism deleted in |
+|---|---|
+| `identical_option_asks_resolved` | L1 — the byte-identical-row auto-answer |
+| `single_outcome_menus_answered`, `single_outcome_rows_spared` | L1 — the single-outcome repeat-pay auto-answer (and `writeSingleOutcomeMenuRecord` with it) |
+| `crossphase_replayed` | L2 — the cross-phase replay branch |
+| `cached_replay_reasked` | L2 — the #W81-DI cached-replay bound |
+| `ask_key_continuation_differs` | L2 — the legal-continuation digest census |
+| `force_close_arms_deferred` | **C22, the duplicate alias** — it serialised `mForceCloseArmsRefused`, the same member as the row above it. The one counter v2 confirms removable. |
+
+Two more stay deleted and are NOT gameend rows, so they are outside R1's scope,
+but they are named here so the list is complete: `plan_echo_count` (a per-record
+field, and Astra's OWN named delete candidate in `review-astra.md` §1.1, not
+refuted in v2) and `mCeilingReasks` / `mStatedStopCount` (members that were never
+emitted anywhere — C18/C19, confirmed).
+
+The force-close counters were never deleted by this lane (section B kept them
+because the gameend accounting identity is pinned on them), so R1 has nothing to
+restore there.
+
+## R2 — `noAnswerClassFor`: VERIFIED, the fold stands
+
+Astra refutes C11's premise: the 4- and 5-argument forms **add HTTP and transport
+classification** — they are not pure forwarders — and "consolidation must preserve
+precedence". That makes precedence the claim needing an instrument, so the
+instrument is exhaustive rather than sampled.
+
+The base chain is rebuilt verbatim inside PARSETEST (`W82R2::three/four/five/six`)
+and compared against the folded table over the **whole truth table**: stale ×
+timedOut × hasReasoning × 9 HTTP statuses (0, 200, 401, 404, 413, 429, 500, 503,
+504) × 6 curl results (−1, 0, 7, 28, 35, 56) × badReply = **864 combinations**.
+
+**Result: 0 divergences.** The fold returns the base chain's class on every input.
+The pin also names the four precedence edges individually, so a reader need not
+trust the loop alone: a curl failure before the deadline is `transport_error`; a
+request killed at its own deadline reports curl 28 and is still `timeout` (the
+`!timedOut` guard is what keeps #W53-Q's class alive); a **status** at the wall
+outranks the clock (`audit-L A24`); and decode garbage on a 200 is `bad_reply`,
+on a 5xx the status wins, and the livelock give-up outranks both.
+
+**Verdict: the overloads are NOT restored.** Had the loop diverged, the pin prints
+the first divergent input and the fix would have been to restore the chain.
+
+Worth recording: the first attempt at this fold DID break the precedence — it put
+`timeout` above `http_error` — and the existing `audit-L A24` pin caught it during
+section B. R2's contribution is that the property is now pinned over the whole
+input space instead of over the handful of cases that happened to exist.
+
+## R3 — CrackBackFacts: the forced-equal number is REVERTED, the scenarios are LABELLED
+
+Astra **refutes F4(c) as an unconditional contradiction**: "cover after casting an
+additional blocker" and "best block with existing blockers" are different
+scenarios under different assumptions, and "it needs consistently explicit labels,
+not necessarily equal numbers."
+
+The L5 first pass did the opposite. It narrowed the best-block DP's blocker set to
+match `crackBackCoverFacts`'s prospective-attacker exclusion **so the two numbers
+would agree** — which states one scenario's figure under the other's name. That is
+a new lie, not a repaired one. It is reverted:
+
+* `w80CrackBackBestBlockFloorNow` again takes every currently untapped
+  `canBlock()` body. `attacksSettled` no longer filters; it now selects the
+  **label**.
+* Three clauses on this layer's screens quote a cover figure, and they price three
+  different scenarios. Each names itself now, and no two share a label:
+  * the verdict line — `[scenario: BEST BLOCK WITH YOUR EXISTING BLOCKERS …]`,
+    which before the seat's attack is declared adds that any body sent as an
+    attacker leaves this figure, and that the cast rows price a different
+    scenario;
+  * the cast-row cover — `[scenario: COVER AFTER CASTING THIS ROW'S BODY …]`;
+  * the attackers-menu stay-home cover — `[scenario: KEEPING EVERY BODY HOME …]`.
+* Both label texts end "…are not required to agree", so no clause claims the
+  figures match.
+
+Pinned on the `162v146` seq-30 board with both labels present, plus: the same
+board with the attack already declared returns the **same number** under a
+shortened label (`attacksSettled` chooses the caveat, it does not narrow the
+blocker set), and the two label strings differ.
+
+The rest of L5 is untouched and Astra confirms it: (a) the marker, (b) the unsized
+parameter, (d) the `none` short-circuit — and Astra's own F5 subcase, adding
+blockable animated-body power to a blocking floor, is the L5(e) split, which it
+notes "a shared struct alone does not repair".
+
+## R4 — the pregame bottom order is honoured in the ENGINE
+
+Astra **confirms the loss and ranks it MED, not LOW**: "Boolean membership followed
+by hand-order traversal discards it. That loses a legal choice, not merely wording
+quality." CR 103.5 (`cr.txt:591`) puts the bottoming order in the player's hands,
+and the owner's ruling is that a legal choice is never removed.
+
+The L9 pass had made the TEXT match the engine (it said the cards go in hand
+order). That is the wrong direction. R4 fixes the engine:
+
+* `w82PutOrderFromReply(text, handSize, order)` — a pure walk that recovers every
+  integer in `1..handSize` **in the order the reply wrote it**, de-duplicated,
+  with an ascending `a-b` range expanded where it appears.
+* `pregameChooseBottomInner` fills `mPregameBottomQueue` in that order, restricted
+  to the set the membership mask proved. **The mask still decides WHICH cards go;
+  the walk decides only their ORDER**, so a name-only or malformed answer yields
+  nothing here and the previous hand-order fill stands unchanged. A tail loop
+  appends anything the walk missed, so no card can be lost.
+* The ask text says what now happens: "…bottomed one at a time in the ORDER YOU
+  NAME THEM: `PUT: 6, 2` puts card 6 on the bottom first and card 2 under it."
+
+Pinned, including the RED-on-base shape: over the same answer a membership mask
+walked in hand order yields 2 then 6 — the exact inversion of what the reply asked
+for — while the walk yields 6 then 2. Also pinned: a repeated index is taken once
+at its first mention; a range expands where it appears; an out-of-range index is
+not an order term; a name-only answer yields nothing; empty reply and empty hand
+yield nothing.
+
+**Honest limit:** no `bottom` record occurred in either probe game (no mulligan
+went deep enough), so R4 is pin-verified and not live-exercised. The `cleanupDiscard`
+over-pick trim still keeps the lowest hand positions; Astra explicitly retains LOW
+for that separate subcase and it is untouched.
+
+## R5 — verify only: confirmed untouched
+
+Astra keeps `cannotPayNowClause`, `paymentNoLifeCostClause`, the `menuFitTag`
+empty-`lostRows` branch, the six refuted helpers (`declineRowAtFact`,
+`shortDecodeGarbage`, `w72HeldMenuShowedEveryRow`, `w71EveryBranchIsANoOp`,
+`wagicGptParseSelfTest`, `revealSinglePickDeclineLegal`), the stripper's retired
+spellings, the hold twins, and the parser's name/word tolerance. Confirmed by diff:
+this lane touched none of them. The only parser changes were the two **semantic
+vetoes** Astra agrees should go — the no-op re-ask and the label-less answer
+rejected for trailing prose.
+
+---
+
+# Gates after R1–R4
+
+All re-run on a `make -B` binary.
+
+| gate | result |
+|---|---|
+| (a) suite, THREADS=1, detached, foreground until-loop | **1312 tests (0 failed), 81 AI tests (0 failed)** — baseline matched; `Test Failed` 0, `FAILED` 0; no flakes, no solo rerun |
+| (b) PARSETEST | **7,231 passed, 0 failed** (was 7,210 before R1–R4: +21 for the R2 truth-table block, the R3 scenario-label pins and the R4 order-reader pins) |
+| (c) check-ctor-init | OK (119 files) |
+| (c) check-reply-instructions | OK (1 source file, 37 guides) |
+| (c) `git diff \| grep -c $'\357\277\275'` | **0** |
+| (d) heuristic A/B, 10 reps vs `archives/baka-ab/62a5733ec` | **PASS, 210 games, 0 unfinished, no deck flagged** |
+| (e) LLM live probe | **PASS** — see below |
+
+A/B after R1–R4 (`~/.gatelogs/gpt-cleanup2-baka`): 123 +1.42 · 125 −0.23 ·
+126 +0.23 · 130 +0.25 · 146 −0.52 · 152 −1.10 · 162 −0.08. Deck 146, the one that
+flagged at −2.09 in the first of the three earlier samples, sits at −0.52 here —
+a fourth sample of a provably-identical heuristic path, and the fourth different
+figure. Nothing is flagged.
+
+Line counts after R1–R4: `src/AIPlayerGPT.cpp` 63,671 → **63,151** (−520);
+`include/AIPlayerGPT.h` 2,813 → **2,834** (+21 — R1 put eight members back and R3
+added the label constants); `src/AIPlayerGPTSelfTest.cpp` 43,140 → **43,000**.
+
+## The probe
+
+Two games, `qwen36-35b-a3b`, `--thinking on`, each a detached unit waited on with
+a foreground until-loop. Key re-fetched into a fresh scratchpad file, never
+printed, deleted afterwards. Regime gate passed on both.
+
+| | game 1 | game 2 |
+|---|---|---|
+| result | deck152 wins | **deck125 wins** |
+| life at end | 22 vs **−6** | **−8** vs 29 |
+| turn | 14 | 38 |
+| natural end? | yes | yes |
+
+```
+dirs 4 clean seat logs 4 = games 2
+ALL KINDS {'gamestart': 4, 'system': 4, 'ask': 259, 'gameend': 4,
+           'forced_close': 5, 'attackers': 17, 'priority': 48, 'reveal': 5,
+           'hold_event': 14, 'discard': 6}
+RECORD KINDS SUM 354  ...of which forced_close 5, hold_event 14
+  ...of which engine_answered 0
+fallbacks ALL kinds {}
+fallbacks (ask seam) {} total 0
+ask records 259 model decisions 259
+with reasoning 259 thinking values {'on'}
+CORPUS-WIDE: model decisions 335 plan_line_missing 10 latency p50 34.2 s
+protocol_deviation classes {'compliant': 325, 'unlabelled_plan': 10}
+decisions/turn 2.49
+CENSUS CHECK: gameend protocol_replies 335 vs record-kind sum 354
+              (difference 19 = forced_close 5, hold_event 14)
+CENSUS CHECK RECONCILES.
+WINS per deck: deck152 1/2 deck125 1/2
+```
+
+Against the gate's four conditions: **0 ask-seam fallbacks** (0 of any kind);
+**259/259 records carry reasoning**, `thinking: on`; **`plan_line_missing`
+10/335 = 3.0 %** (wave-80: 2.9 %); **0 unparsed** — the only deviation class is
+`unlabelled_plan` ×10, a PLAN-line shape, all of them answered.
+
+This is a much heavier probe than the first: 335 model decisions against 175, a
+38-turn game, and seams the first pair never reached (`discard` 6, `hold_event`
+14, `forced_close` 5). Three things it exercises that the first could not:
+
+* **R1 is visible and correct.** All eight restored rows are present, and
+  `hold_events: 14` equals the 14 `hold_event` records — the census check
+  reconciles *through* the restored counter. `wall_miss_*` and
+  `action_before_plan_*` are present at 0, which is the observation Astra says a
+  zero is.
+* **L5 is exercised live for the first time.** `crackback_verdict_folded_total:
+  40` (0 in the first probe) and `crackback_verdict_lines_rendered: 62` — the
+  folded ONE TOTAL line, with its R3 scenario label, rendered on 40 real windows.
+* **L7 again, three times.** `phase2_answer_recovered: 3`,
+  `phase2_answer_missing: 0`, against 5 `forced_close` events. On base this pair
+  was 0/0 by construction.
+
+Also worth naming: `menu_pass_no_progress: 0` and
+`menu_pass_no_progress_suppressed: 0` over a 38-turn game with 121 reserved ask
+replays (`ask_replays_cache` 70, `identical_ask_answers_reserved` 51) — the
+livelock question hanging over L1's removal of `mStuckCastLines` and L2's
+board-in-key, asked over twice the decisions of the first probe, still answered
+clean. `crossphase_identical_reputs: 10` / `crossphase_board_unchanged: 2` are the
+prompt-only NOTE this lane deliberately kept when it deleted the replay branch.
+
+## What R1–R4 change in the "weakest evidence" picture
+
+The L1 livelock argument is unchanged but better supported: a 38-turn game at 2.49
+decisions/turn with zero no-progress passes is a stronger sample than the first
+probe's 14- and 30-turn pair, and it still is not a corpus.
+
+Two new honest limits, both stated above and repeated here so they are not buried:
+**R4 is pin-verified but never fired live** (no `bottom` record in either game),
+and **R3's labels are pinned on a reconstructed board, not observed on a live
+one** — the 40 folded verdict lines in this probe carry the label, but no record
+in these two games put a cast-row cover clause and a verdict line on one screen
+with differing numbers, which is the exact pair the labels exist to disambiguate.

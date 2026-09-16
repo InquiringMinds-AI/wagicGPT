@@ -20167,12 +20167,17 @@ void AIPlayerGPT::flushWallMissRecord(const char * classOverride)
     mWallMissPending = false;
     mWallMissBase.clear();
     //#W68-BC (J2): a miss written down BECAUSE no retry was bought is not an
-    //"unrecorded" (abandoned) miss - it has its own CLASS, which the record
-    //carries. #W82-A (audit-2026-09): the three gameend COUNTERS that also
-    //carried it (`wall_miss_events`, `wall_miss_unrecorded`, `wall_miss_no_retry`)
-    //are deleted - every one was zero corpus-wide, nothing named them in any
-    //tool, and the `wall_miss` record beside them carries the class per event, so
-    //the number is a `grep -c`.
+    //"unrecorded" (abandoned) miss - it has its own counter and its own class.
+    //#W82-A R1 (LEDGER v2, Astra genuine): these three counters were deleted
+    //under a "no consumer / per-record join" rule that Astra REFUTES -
+    //`corpus-stats.py:465` iterates EVERY integer gameend key, so every counter
+    //is consumed, and a zero is an observation rather than dead code. Restored
+    //byte-for-byte. Deleting a MECHANISM and deleting a consumed COUNTER are
+    //separate decisions; the wall-miss mechanism was never deleted.
+    if (classOverride)
+        mWallMissNoRetry++;
+    else
+        mWallMissUnrecorded++;
     //#W61-U (C13): the abandoned ask's OWN round trip, restored onto the record
     //that reports it. Without it the record read `latency_ms: -1` (a cache hit)
     //for a decision that had just spent the entire deadline, and carried no
@@ -20663,6 +20668,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
     if (content.empty() && mLastTimeout && userMsg != mRetryDoneBase
         && !retryFitsInDeadline(mTimeoutMs, mLastLatencyMs))
     {
+        mWallMissEvents++; //#W82-A R1: restored (LEDGER v2)
         mWallMissLatencyMs = mLastLatencyMs;
         mWallMissPending = true;
         mWallMissBase = asyncSlotKey(userMsg); //#W82-A (L7)
@@ -20689,6 +20695,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
             mWallMissPending = true;
             mWallMissBase = asyncSlotKey(userMsg); //#W82-A (L7)
             mWallMissLatencyMs = mLastLatencyMs; //#W61-U (C13)
+            mWallMissEvents++; //#W82-A R1: restored (LEDGER v2)
             setNotice("no reply from the model - asking once more", 3.0f);
             DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
                        << "s - one retry");
@@ -20764,6 +20771,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false), mRevealStallDriverTicks(0), mRevealStallDriverSecs(0),
       mWallMissPending(false), mWallMissLatencyMs(-1), //#W61-U (C13)
+      mWallMissEvents(0), mWallMissUnrecorded(0), mWallMissNoRetry(0), //#W82-A R1
+      mActionBeforePlanReplies(0), mActionBeforePlanRejects(0),        //#W82-A R1
+      mHoldReopenedNewThreat(0), mHoldReopenedNewLethal(0), mHoldEvents(0), //#W82-A R1
       //#W68-BC (J2)
       mLastAttemptFirstMs(-1), mLastAttemptSecondMs(-1), //#W68-BC (J2)
       mLastTimeout(false), mLastBadReply(false), mRecoverySeq(-1),
@@ -21142,12 +21152,18 @@ void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
                                        const string& face, const string& reason,
                                        int answerInvalidated)
 {
+    //#W82-A R1 (LEDGER v2): restored. Deleting `mHoldEvents` also silently
+    //removed the `event` SEQUENCE NUMBER from every hold_event record - the
+    //field a reviewer joins the 180 records on. `hold_events` was NOT zero in
+    //the wave-80 corpus (180), which is the second half of Astra's refutation.
+    mHoldEvents++;
     if (mTransLogPath.empty())
         return;
     ensureGameStartRecord();
     json rec = {
         {"seq", mTransSeq++},
         {"kind", "hold_event"},
+        {"event", mHoldEvents}, //#W82-A R1: restored
         {"what", event ? event : ""},
         {"seam", seam ? seam : ""},
         {"face", face},
@@ -22453,6 +22469,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         //#W70-BM (E2): parsed, but not the shape asked for - stamped, never
         //silently accepted. The gameend census carries the game's total.
         rec["action_before_plan"] = true;
+        mActionBeforePlanReplies++; //#W82-A R1: restored (LEDGER v2)
     }
     //#W80-DH (F2): ...and whether the PARSER acted on it. `action_before_plan` is
     //the SHAPE meter (computed on the raw reply by offProtocolBytes);
@@ -22464,6 +22481,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (mActionBeforePlanRejected)
     {
         rec["action_before_plan_rejected"] = true;
+        mActionBeforePlanRejects++; //#W82-A R1: restored (LEDGER v2)
         mActionBeforePlanRejected = false;
     }
     //#W71-BO (L10, wave-70 MED-2). A MISSING PLAN LINE IS NOW VISIBLE. The
@@ -22920,11 +22938,27 @@ void AIPlayerGPT::logGameEnd()
         //many of them were abandoned before any decision record could consume
         //them. Written always, present or zero, so a seat review divides rather
         //than infers - the wave-54 answer to "2 events, 1 record" was silence.
+        //#W55-E (D23): deadline misses that spent this seat's one retry, and how
+        //many of them were abandoned before any decision record could consume
+        //them. Written always, present or zero, so a seat review divides rather
+        //than infers - the wave-54 answer to "2 events, 1 record" was silence.
+        //#W82-A R1 (LEDGER v2): restored - see flushWallMissRecord.
+        {"wall_miss_events", mWallMissEvents},
+        {"wall_miss_unrecorded", mWallMissUnrecorded},
+        {"wall_miss_no_retry", mWallMissNoRetry}, //#W68-BC (J2)
         //#W70-BM (E2/E3): the reply-SHAPE census and the wave-70 VERIFY counters.
         //`protocol_replies` is the denominator every one of these divides by; a
         //zero beside a zero denominator is silence, not evidence, and that
         //distinction is exactly what the wave-70 audit could not make from code.
         {"protocol_replies", mProtocolReplies},
+        //#W82-A R1 (LEDGER v2): restored. Astra: "these record the binding order
+        //rule; zero violations do not make the counters unconsumed or the path
+        //unreachable."
+        {"action_before_plan_replies", mActionBeforePlanReplies},
+        //#W80-DH (F2): of those, the ones whose answer was refused and re-asked.
+        //Equal, by construction, to the number of records carrying
+        //`action_before_plan_rejected`.
+        {"action_before_plan_rejected_replies", mActionBeforePlanRejects},
         //#W80-DH (F2): of those, the ones whose answer was refused and re-asked.
         //Equal, by construction, to the number of records carrying
         //`action_before_plan_rejected`.
@@ -22964,6 +22998,20 @@ void AIPlayerGPT::logGameEnd()
         //#W80-DH (F11): every clamp and every re-open, as its own record. This
         //equals the number of `kind: hold_event` records in the seat log, and the
         //three class counters above plus the rows-moved re-opens sum to it.
+        //#W79-DC (F2): holds re-opened by a NEW threat at the same danger rank.
+        //#W82-A R1 (LEDGER v2): restored, all three - `hold_events` was 180 and
+        //`hold_reopened_new_lethal` 7 in the wave-80 corpus, so the "zero
+        //corpus-wide" half of the deletion rule was simply wrong about them.
+        {"hold_reopened_new_threat", mHoldReopenedNewThreat},
+        //#W80-DH (F3): ...and by a NEW LETHAL threat - a top-rank crack-back or
+        //stack-death face over an object set the hold was not taken over. Astra's
+        //second-Bolt board. Per-record trace: `kind: hold_event`, what =
+        //`reopen_new_lethal`.
+        {"hold_reopened_new_lethal", mHoldReopenedNewLethal},
+        //#W80-DH (F11): every clamp and every re-open, as its own record. This
+        //equals the number of `kind: hold_event` records in the seat log, and the
+        //three class counters above plus the rows-moved re-opens sum to it.
+        {"hold_events", mHoldEvents},
         //#W80-DH (F5): cast plan steps that closed on the CAST EVENT (or the turn
         //belt) instead of on the first completing menu. Per-record trace: the
         //stderr close line names which of the two closed it.
@@ -23058,6 +23106,7 @@ void AIPlayerGPT::logGameEnd()
                << observer->turn << ", " << (iWon ? "won" : (oppWon ? "lost" : "draw"))
                << ") - windows held by the model's own hold row: " << mHoldWindowsSkipped
                << "; mana-only windows auto-passed: " << mManaOnlyWindowsSkipped
+               << "; deadline misses: " << mWallMissEvents //#W82-A R1: restored
                << "; repeated identical asks re-served from the seat's own answer: "
                << mRepeatAskAnswersReserved
                //#W79-CZ (T14, wave-78 known bugs T14): SAY WHOSE. This figure is the
@@ -23068,6 +23117,8 @@ void AIPlayerGPT::logGameEnd()
                //identity (armed = the stderr `unclosed <think>` lines; unrecorded =
                //`dropped_decision_moved`, the decision moving out from under a pending
                //retry) is printed here so it reconciles without a record join.
+               << " (" << mWallMissUnrecorded << " wall-miss unrecorded, "
+               << mWallMissNoRetry << " no-retry)" //#W68-BC (J2), #W82-A R1
                << "; forced closes: " << mForceCloseEvents << " events, "
                << mForceCloseUnrecorded << " superseded (dropped_decision_moved)"
                << "; phase-2 answer recovery: " << mPhase2AnswerRecovered << " recovered, "
@@ -29607,6 +29658,30 @@ static int w79SacrificeBlockerGiveBack(Player * me, Player * opp, MTGAbility * a
 //it can do is tell the truth about which rule applies and stop claiming survival
 //where the arithmetic it has does not prove it (the same discipline #W65-AL G4
 //applied to a FLOOR total). Pure over the one fact.
+//#W82-A R3 (LEDGER v2, Astra genuine F4(c)): SCENARIO LABELS.
+//THREE clauses on this layer's screens quote a crack-back cover figure, and they
+//price THREE different scenarios: this row's body plus the bodies an attack
+//cannot tap (the cast rows); keeping every body home (the attackers menu); and
+//best block with every body untapped right now (the verdict line). Astra refutes
+//the reading that their differing life totals are an arithmetic contradiction -
+//"prospective-attacker exclusion versus all currently untapped blockers is a
+//difference in assumptions. It needs consistently explicit labels, not
+//necessarily equal numbers." So none is narrowed to match another and each names
+//its own assumption.
+static const char * kW82CoverScenarioLabel =
+    " [scenario: COVER AFTER CASTING THIS ROW'S BODY - this figure counts the body"
+    " this row puts onto the battlefield plus the bodies of yours an attack of"
+    " your own cannot tap (vigilance, defender, cannot-attack). The"
+    " `[crack-back verdict:]` line prices a DIFFERENT scenario - your best block"
+    " with every creature you have untapped right now - so the two numbers answer"
+    " two questions and are not required to agree.]";
+static const char * kW82StayHomeScenarioLabel =
+    " [scenario: KEEPING EVERY BODY HOME - this figure counts every one of your"
+    " creatures as a blocker because this menu is asking whether to attack at all."
+    " The `[crack-back verdict:]` line prices your best block with the bodies"
+    " untapped right now, and a cast row's cover prices the body that row adds:"
+    " three questions, three figures, and they are not required to agree.]";
+
 static const char * w80CoverMechanismSentence(bool anyTrampler)
 {
     if (anyTrampler)
@@ -29852,7 +29927,8 @@ static string crackBackBlockerRowTag(int total, int myLife,
         o << ", which still KILLS you";
     }
     o << ". Removal or a trick they draw is excluded either way - read the"
-         " per-attacker tags above for the rest.}";
+         " per-attacker tags above for the rest."
+      << kW82CoverScenarioLabel << "}"; //#W82-A R3
     return o.str();
 }
 
@@ -29938,7 +30014,7 @@ static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
         o << ". THIS IS NOT A SURVIVAL VERDICT: the total above is a FLOOR, so a"
              " larger crack-back is on the table - what this establishes is what"
              " the bodies are worth if none of them attacks."
-          << w80CoverMechanismSentence(anyTrampler) << "}"; //#W80-DF (U3), #W80-DH (F8)
+          << w80CoverMechanismSentence(anyTrampler) << kW82StayHomeScenarioLabel << "}"; //#W80-DF (U3), #W80-DH (F8)
     else if (myLife - left > 0 && anyTrampler)
         //#W80-DH (F8): a blocked trampler is not fully absorbed, so the same
         //arithmetic on the same bodies proves no survival here either.
@@ -29947,13 +30023,13 @@ static string w77StayHomeCoverTag(int total, int myLife, bool totalIsFloor,
              " the " << (myLife - left) << " it would leave you at is a best case."
              " Every attacker you declare without vigilance removes its own body"
              " from that cover."
-          << w80CoverMechanismSentence(anyTrampler) << "}";
+          << w80CoverMechanismSentence(anyTrampler) << kW82StayHomeScenarioLabel << "}";
     else
         o << " -> you would be at " << (myLife - left)
           << (myLife - left > 0 ? ", which you SURVIVE" : ", which still KILLS you")
           << ". Every attacker you declare without vigilance removes its own body"
              " from that cover."
-          << w80CoverMechanismSentence(anyTrampler) << "}"; //#W80-DF (U3)
+          << w80CoverMechanismSentence(anyTrampler) << kW82StayHomeScenarioLabel << "}"; //#W80-DF (U3)
     return o.str();
 }
 
@@ -36560,9 +36636,15 @@ string w80CrackBackVerdictLine(const string& face, int bestBlockFloor = -1, int 
 //the hold latch's key and no hold's behaviour changes here.
 //With no addenda at all this delegates to the wave-80 line, byte for byte.
 //Pure over its five numbers, so every branch is provable without a board.
+//#W82-A R3 (LEDGER v2, Astra F4(c)): `attacksSettled` selects this line's own
+//SCENARIO LABEL. The floor is computed over every body untapped RIGHT NOW; if
+//the seat has not yet declared its attack, sending one of those bodies as an
+//attacker takes it out of the block - so the label names the assumption rather
+//than the number being quietly narrowed to a different scenario's.
 string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable,
                                int addUnblockable, int compulsoryDraw,
-                               int bestBlockFloor, int myLife, bool addUnsized)
+                               int bestBlockFloor, int myLife, bool addUnsized,
+                               bool attacksSettled)
 {
     if (face.find("[crack-back verdict:") != 0)
         return string();
@@ -36607,6 +36689,18 @@ string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockab
         ? " (and something listed above adds power this render cannot size, so the"
           " real figure can be higher)"
         : "";
+    //#W82-A R3: the label, stated wherever a block floor is quoted.
+    const char * scenarioTail = attacksSettled
+        ? " [scenario: BEST BLOCK WITH YOUR EXISTING BLOCKERS - every creature you"
+          " have untapped right now blocks; your attack for this turn is already"
+          " declared, so no further body of yours leaves the block]"
+        : " [scenario: BEST BLOCK WITH YOUR EXISTING BLOCKERS - every creature you"
+          " have untapped right now blocks. You have NOT declared your attack yet:"
+          " any of those bodies you send as an attacker is tapped through their"
+          " turn and is not in this figure. The cast rows' own cover clauses price"
+          " a DIFFERENT scenario - cover after casting the body on that row - so"
+          " their number and this one are answers to two questions, not two"
+          " answers to one]";
     std::ostringstream o;
     if (myLife - published > 0)
     {
@@ -36623,11 +36717,10 @@ string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockab
           << " damage still gets through, leaving you at " << (myLife - floorNow)
           << ". So passing this window does NOT hand them the game: you still get the"
              " blockers decision on their turn, and that assignment is what this figure"
-             " is computed from. It does assume those blockers are still there and"
-             " untapped when they attack. " << parts.str();
+             " is computed from. " << parts.str();
         if (unblockableAdd > 0)
             o << ", and " << unblockableAdd << " of it is damage no block removes";
-        o << unsizedTail << "]";
+        o << unsizedTail << scenarioTail << "]"; //#W82-A R3
         return o.str();
     }
     if (floorNow >= 0)
@@ -36639,7 +36732,7 @@ string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockab
           << parts.str();
         if (unblockableAdd > 0)
             o << ", and " << unblockableAdd << " of it is damage no block removes";
-        o << unsizedTail << "]";
+        o << unsizedTail << scenarioTail << "]"; //#W82-A R3
         return o.str();
     }
     o << "\n[crack-back verdict: LETHAL if it is UNBLOCKED - if you pass this window"
@@ -37273,11 +37366,20 @@ bool w80NewLethalThreat(const string& liveMarker, const string& heldIdentity,
 //indestructible, wither/infect - `w79CombatAbilityOutsideModel`), or a combat too
 //wide for the search. A -1 leaves the wave-80 wording standing, so this can only
 //ever withdraw a false death claim, never manufacture a false survival one.
-//#W82-A (L5, audit-2026-09): `attacksSettled` is the SAME body rule
-//`crackBackCoverFacts` (#W69-BJ F2) applies. The floor used every `canBlock()`
-//body while the row cover excluded the non-vigilance bodies the seat may still
-//send as attackers this turn, so the verdict and the cover clause on one screen
-//could name different blockers. One rule, both places.
+//#W82-A R3 (LEDGER v2, Astra genuine F4(c)): REVERTED to every currently
+//untapped `canBlock()` body, and the reason is the point. The L5 first pass made
+//this filter match `crackBackCoverFacts`'s prospective-attacker exclusion
+//(#W69-BJ F2) so that the two numbers on one screen would agree. Astra refutes
+//that as a fix: "cover after casting an additional blocker" and "best block with
+//existing blockers" are DIFFERENT SCENARIOS under different assumptions, and
+//their life totals differing is not an arithmetic contradiction - forcing them
+//equal states one scenario's number under the other's name, which is a NEW lie,
+//not a repaired one. What the two owe each other is a consistent, explicit
+//LABEL, and that is what the renderers now carry (see the `[scenario:` clauses).
+//So: this figure is BEST BLOCK WITH THE BODIES YOU HAVE UNTAPPED RIGHT NOW.
+//`attacksSettled` no longer filters; it is kept as the fact the LABEL is chosen
+//from, because before the seat's own attack is declared the caveat is live and
+//after it the bodies are already committed.
 int AIPlayerGPT::w80CrackBackBestBlockFloorNow(bool attacksSettled)
 {
     Player * opp = opponent();
@@ -37295,14 +37397,10 @@ int AIPlayerGPT::w80CrackBackBestBlockFloorNow(bool attacksSettled)
         MTGCardInstance * bc = game->inPlay->cards[i];
         if (!bc || !bc->isCreature() || bc->isPhased || !bc->canBlock())
             continue;
-        //#W82-A (L5): before the seat's own attack is declared, a body without
-        //vigilance may be sent and is then tapped through the whole crack-back
-        //turn - it is not cover, and the row clause already says so.
-        if (!attacksSettled
-            && !bc->basicAbilities[(int) Constants::VIGILANCE]
-            && !bc->basicAbilities[(int) Constants::DEFENDER]
-            && !bc->basicAbilities[(int) Constants::CANTATTACK])
-            continue;
+        //#W82-A R3: NO prospective-attacker exclusion here - see the header note.
+        //The scenario this figure prices is "every body you have untapped right
+        //now blocks"; the caveat that sending one as an attacker removes it from
+        //that set is stated in the LINE, under this scenario's own label.
         blkCards.push_back(bc);
     }
     if (atkCards.empty() || blkCards.empty())
@@ -37433,7 +37531,7 @@ string AIPlayerGPT::w81CrackBackVerdictLineNow()
     return w81CrackBackVerdictLine(crackBackVerdictKey(f.attackers, f.published(), f.myLife),
                                    f.rawCombat, f.addBlockable, f.addUnblockable,
                                    f.compulsoryDraw, f.bestBlockFloor, f.myLife,
-                                   f.addUnsized);
+                                   f.addUnsized, f.attacksSettled); //#W82-A R3
 }
 
 //#W81-DL (V5/V8/V10): the send boundary for this lane's render events. Same
@@ -37926,6 +38024,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
             if (fam < 2 && w80NewLethalThreat(liveMarkers[fam], heldIds[fam], liveIds[fam]))
             {
                 w80NewLethalReopen = true;
+                mHoldReopenedNewLethal++; //#W82-A R1: restored (nonzero: 7)
                 //#W81-DK (V3): the retained answer for this window goes FIRST - the
                 //hold check below must not be able to read it back.
                 const bool w81Inv = w81InvalidateHeldAnswer(seam);
@@ -37973,6 +38072,7 @@ bool AIPlayerGPT::holdHonoured(const char * seam,
                      && w79VerdictDangerRank(heldMarker) == w79VerdictDangerRank(liveMarkers[fam])
                      && w79VerdictDangerRank(heldMarker) >= 0)
             {
+                mHoldReopenedNewThreat++; //#W82-A R1: restored (LEDGER v2)
                 //#W80-DE (U2): the counter's own record, naming the threat.
                 //#W80-DH (F11): per EVENT, at the event - not one shared string.
                 const string w80Reason = string("NEW threat at the same rank: held ")
@@ -61154,6 +61254,57 @@ int AIPlayerGPT::pregameLeylineDecision(MTGCardInstance * card)
 
 //Build the tail for the ONE bundled BOTTOM-N ask (reuses the reveal PUT: reply
 //shape; parsed by parseAttackerSet / salvageLoopedSubset like decideReveal).
+//#W82-A R4 (LEDGER v2, Astra genuine): THE ORDER THE ANSWER GAVE.
+//`parseAttackerSet` returns a MEMBERSHIP MASK, and the queue was then filled by
+//walking the hand - so `PUT: 6, 2` bottomed card 2 first and the model's stated
+//order was discarded. CR 103.5 puts the bottoming order in the player's hands
+//("in any order"), which makes it a LEGAL CHOICE, and the owner's ruling is that
+//a legal choice is never removed; Astra ranks the loss MED for exactly that
+//reason. This walk recovers the order: every integer in 1..handSize, in the order
+//the reply wrote it, de-duplicated, with an ascending `a-b` range expanded where
+//it appears. It decides ORDER ONLY - the mask stays the authority on WHICH cards
+//go - so a malformed or name-only answer simply yields nothing here and the
+//previous hand-order behaviour stands. Pure, so PARSETEST pins it.
+void w82PutOrderFromReply(const string& text, size_t handSize, std::vector<int>& order)
+{
+    order.clear();
+    if (handSize == 0)
+        return;
+    std::set<int> seen;
+    size_t i = 0;
+    while (i < text.size())
+    {
+        if (!isdigit((unsigned char) text[i]))
+        {
+            i++;
+            continue;
+        }
+        size_t k = i;
+        long lo = 0;
+        while (k < text.size() && isdigit((unsigned char) text[k]) && lo < 100000)
+            lo = lo * 10 + (text[k++] - '0');
+        long hi = lo;
+        //an ascending `a-b` range, expanded where it appears
+        if (k < text.size() && text[k] == '-' && k + 1 < text.size()
+            && isdigit((unsigned char) text[k + 1]))
+        {
+            size_t k2 = k + 1;
+            long v = 0;
+            while (k2 < text.size() && isdigit((unsigned char) text[k2]) && v < 100000)
+                v = v * 10 + (text[k2++] - '0');
+            if (v > lo)
+            {
+                hi = v;
+                k = k2;
+            }
+        }
+        for (long v = lo; v <= hi; v++)
+            if (v >= 1 && v <= (long) handSize && seen.insert((int) v).second)
+                order.push_back((int) v);
+        i = k;
+    }
+}
+
 string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need,
                                              int alreadyBottomed)
 {
@@ -61180,18 +61331,15 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     if (alreadyBottomed > 0)
         tail << " (" << alreadyBottomed << " already bottomed; " << remaining << " to go)";
     tail << ". Name EXACTLY " << remaining << " card" << (remaining == 1 ? "" : "s")
-         //#W82-A (L9, audit-2026-09): the ask PROMISED "in the order you give" and
-         //the engine does not honour it - the bottom queue is filled in HAND
-         //order (the reply is parsed into a membership mask, so the naming order
-         //is not carried), and an over-pick is trimmed to the lowest hand
-         //positions rather than the model's first-named. CR 103.5 makes the order
-         //a real choice ("in any order"), so the promise is the kind of statement
-         //the trust doctrine says the surface must not make unless it is true.
-         //Until the reply is parsed as an ORDERED list, the ask states what the
-         //engine actually does.
-         << " now - this is the ONLY ask for them. They are bottomed in the order"
-            " they appear in the list below, not in the order you name them, so"
-            " name the SET and do not plan around its order. ";;
+         //#W82-A R4 (LEDGER v2): the ENGINE now honours the order (see
+         //`w82PutOrderFromReply`), so the promise this sentence makes is true
+         //again. The L9 pass had made the TEXT match a hand-order engine; Astra
+         //ranks that MED because CR 103.5 ("in any order") makes the order a LEGAL
+         //CHOICE and the ruling is that a legal choice is never removed. Fixing
+         //the engine keeps the choice and keeps the sentence honest.
+         << " now - this is the ONLY ask for them, and they will be bottomed one at"
+            " a time in the ORDER YOU NAME THEM: `PUT: 6, 2` puts card 6 on the"
+            " bottom first and card 2 under it. ";;
     if (keep <= 0)
         tail << "Your ENTIRE hand goes to the bottom, so order them worst-first.\n";
     else
@@ -61285,12 +61433,33 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
         mPregameBottomQueue.clear();
         string chosen;
         if (result >= 0)
+        {
+            //#W82-A R4: the ORDER the answer gave, over the SET the mask proved.
+            //`w82PutOrderFromReply` decides order only; `send` still decides which
+            //cards go, so an order the scan cannot read costs nothing - the tail
+            //loop below appends whatever it missed in the old hand order.
+            std::vector<int> putOrder;
+            w82PutOrderFromReply(decisionPart.empty() ? content : decisionPart,
+                                 hand.size(), putOrder);
+            std::vector<bool> queued(hand.size(), false);
+            for (size_t oi = 0; oi < putOrder.size()
+                                && (int) mPregameBottomQueue.size() < remaining; oi++)
+            {
+                const size_t j = (size_t) (putOrder[oi] - 1);
+                if (j >= hand.size() || j >= send.size() || !send[j] || queued[j])
+                    continue;
+                queued[j] = true;
+                mPregameBottomQueue.push_back(hand[j]);
+                chosen += (chosen.empty() ? "" : ", ") + hand[j]->name;
+            }
             for (size_t j = 0; j < hand.size() && (int) mPregameBottomQueue.size() < remaining; j++)
-                if (j < send.size() && send[j])
+                if (j < send.size() && send[j] && !queued[j])
                 {
+                    queued[j] = true;
                     mPregameBottomQueue.push_back(hand[j]);
                     chosen += (chosen.empty() ? "" : ", ") + hand[j]->name;
                 }
+        }
         //Enforce EXACTLY the owed count: the model under-picked or failed ->
         //fill with the highest-cost cards not already chosen (the heuristic
         //policy). We already capped above, so over-picks are trimmed.
@@ -62843,7 +63012,7 @@ bool AIPlayerGPTSelfTestAccess::w80VariableDrawIsHandSize(const string& script, 
 bool AIPlayerGPTSelfTestAccess::w81AttackCoverDue(bool crackBackLinePrinted, bool anyAttackerOffered) { return ::w81AttackCoverDue(crackBackLinePrinted, anyAttackerOffered); }
 string AIPlayerGPTSelfTestAccess::w81CounterspellsSeenLine(int timesCountered, const vector<string>& names, int theirUntapped) { return ::w81CounterspellsSeenLine(timesCountered, names, theirUntapped); }
 string AIPlayerGPTSelfTestAccess::w81CrackBackTotalFace(const string& line) { return ::w81CrackBackTotalFace(line); }
-string AIPlayerGPTSelfTestAccess::w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized) { return ::w81CrackBackVerdictLine(face, rawCombat, addBlockable, addUnblockable, compulsoryDraw, bestBlockFloor, myLife, addUnsized); }
+string AIPlayerGPTSelfTestAccess::w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized, bool attacksSettled) { return ::w81CrackBackVerdictLine(face, rawCombat, addBlockable, addUnblockable, compulsoryDraw, bestBlockFloor, myLife, addUnsized, attacksSettled); }
 int AIPlayerGPTSelfTestAccess::crackBackRungConvertedCost(const string& rung) { return ::crackBackRungConvertedCost(rung); }
 string AIPlayerGPTSelfTestAccess::w81EngineBodyTail(MTGCardInstance * c) { return ::w81EngineBodyTail(c); }
 void AIPlayerGPTSelfTestAccess::w81FoldDuplicateCoverParagraphs(std::vector<std::string>& rows) { ::w81FoldDuplicateCoverParagraphs(rows); }
@@ -62922,7 +63091,10 @@ const char * AIPlayerGPTSelfTestAccess::kLandDropConsequence = ::kLandDropConseq
 const char * AIPlayerGPTSelfTestAccess::kLandDropDeclineRow = ::kLandDropDeclineRow;
 const char * AIPlayerGPTSelfTestAccess::kBlockerRangeNote = ::kBlockerRangeNote;
 const size_t AIPlayerGPTSelfTestAccess::kVictimRosterGroupCap = ::kVictimRosterGroupCap;
+void AIPlayerGPTSelfTestAccess::w82PutOrderFromReply(const string& text, size_t handSize, std::vector<int>& order) { ::w82PutOrderFromReply(text, handSize, order); }
 const char * AIPlayerGPTSelfTestAccess::kOptionRangeNote = ::kOptionRangeNote;
+const char * AIPlayerGPTSelfTestAccess::kW82StayHomeScenarioLabel = ::kW82StayHomeScenarioLabel;
+const char * AIPlayerGPTSelfTestAccess::kW82CoverScenarioLabel = ::kW82CoverScenarioLabel;
 const size_t AIPlayerGPTSelfTestAccess::kSharedCardTextMinLen = ::kSharedCardTextMinLen;
 const int AIPlayerGPTSelfTestAccess::kEventRunCollapseFloor = ::kEventRunCollapseFloor;
 const int AIPlayerGPTSelfTestAccess::kXNetNotSupplied = ::kXNetNotSupplied;

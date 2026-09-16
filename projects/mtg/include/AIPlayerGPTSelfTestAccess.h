@@ -998,7 +998,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool w81AttackCoverDue(bool crackBackLinePrinted, bool anyAttackerOffered);
     static string w81CounterspellsSeenLine(int timesCountered, const vector<string>& names, int theirUntapped);
     static string w81CrackBackTotalFace(const string& line);
-    static string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized= false);
+    static string w81CrackBackVerdictLine(const string& face, int rawCombat, int addBlockable, int addUnblockable, int compulsoryDraw, int bestBlockFloor, int myLife, bool addUnsized= false, bool attacksSettled= false);
     static int crackBackRungConvertedCost(const string& rung); //#W82-A (L5)
     static string w81EngineBodyTail(MTGCardInstance * c);
     static void w81FoldDuplicateCoverParagraphs(std::vector<std::string>& rows);
@@ -1079,7 +1079,10 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static const char * kLandDropDeclineRow;
     static const char * kBlockerRangeNote;
     static const size_t kVictimRosterGroupCap;
+    static void w82PutOrderFromReply(const string& text, size_t handSize, std::vector<int>& order); //#W82-A R4
     static const char * kOptionRangeNote;
+    static const char * kW82StayHomeScenarioLabel; //#W82-A R3
+    static const char * kW82CoverScenarioLabel;    //#W82-A R3
     static const size_t kSharedCardTextMinLen;
     static const int kEventRunCollapseFloor;
     static const int kXNetNotSupplied;

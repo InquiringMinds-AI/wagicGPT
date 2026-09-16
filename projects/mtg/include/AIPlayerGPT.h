@@ -2598,6 +2598,22 @@ private:
     //the next translog record for this seat. Consumed when written, so a drop
     //is stamped exactly once.
     std::vector<std::string> mAsyncDropStamps;
+    //#W82-A R1 (LEDGER v2, Astra genuine cross-review): these eight counters were
+    //deleted under a "no named consumer / a per-record field carries the fact"
+    //rule. Astra refutes the premise: `tools/corpus-stats.py:465` iterates EVERY
+    //integer gameend key, so every one of them IS consumed, and a zero is an
+    //observation, not dead code. Several were not even zero (`hold_events` 180,
+    //`hold_reopened_new_lethal` 7). Restored. The rule that survives is narrower:
+    //a counter whose MECHANISM this lane deleted goes with the mechanism.
+    int mWallMissEvents;
+    int mWallMissUnrecorded;
+    int mWallMissNoRetry;          //#W68-BC (J2)
+    int mActionBeforePlanReplies;  //...that wrote the action line above the plan
+    int mActionBeforePlanRejects;  //#W80-DH (F2): ...and were refused for it
+    int mHoldReopenedNewThreat;
+    int mHoldReopenedNewLethal;
+    int mHoldEvents; //every clamp and every re-open writes one `hold_event` record
+
     //#W82-A (L10, audit-2026-09): the WINDOW each pending stamp belongs to.
     //`mAsyncDropStamps` and `mAbandonedInFlightSecs` were consumed by the next
     //record of ANY kind, so a `casting/...` drop landed on a `blockers` record
