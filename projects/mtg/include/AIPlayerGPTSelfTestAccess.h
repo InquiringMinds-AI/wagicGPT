@@ -644,6 +644,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draws, int life);
     static void narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta= NULL);
     static string narrationBucketRuns(const string& body);
+    static string compactNarration(const string& log);
     static string narrationFoldPaidSources(const string& body);
     static string narrationShapeKey(const string& line);
     static size_t narrationTrimKeep(size_t markerLen);

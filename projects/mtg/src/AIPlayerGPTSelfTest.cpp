@@ -103,6 +103,18 @@ string AIPlayerGPTSelfTestAccess::answerSegmentStatic(const string& content, con
 
 void AIPlayerGPTSelfTestAccess::run()
 {
+    //#W82-P5: the narration-compaction instrument for the byte census - a
+    //recorded event log in, the compact render out (desktop PARSETEST builds
+    //only, like the corpus this file is). WAGIC_GPT_COMPACT_FILE=<path>.
+    if (const char * cf = getenv("WAGIC_GPT_COMPACT_FILE"))
+    {
+        std::ifstream in(cf);
+        std::stringstream ss;
+        ss << in.rdbuf();
+        cout << compactNarration(ss.str()) << "\n";
+        cout.flush();
+        return;
+    }
     using std::cout;
     int passed = 0, failed = 0;
     #define CHECK(cond, label) do { \
@@ -43323,6 +43335,160 @@ static const char * kW50Y_r94 =
             joinNumberedRows(none, &used, &forms);
             CHECK(!used && forms == 0, "#W82-P8 no range printed: no form recorded");
         }
+    }
+
+    cout << "\n[#W82-P5] narration compaction: the owner's sample, and every line family has a rule\n";
+    {
+        // The owner-approved sample (LEDGER-v2 section 5): a real wave-80 prompt,
+        // 152v125 seq 15, turns 6-8, in the recorded grammar...
+        const string before =
+            "=== Turn 6 - opponent's turn ===\n"
+            "- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Phase: Main phase 1\n"
+            "- Opponent played Seachrome Coast\n"
+            "=== Turn 7 - YOUR turn ===\n"
+            "- Phase: Draw\n"
+            "- You drew Brutal Cathar\n"
+            "- Phase: Main phase 1\n"
+            "- You played Overgrown Farmland\n"
+            "- Paid {2}{w} for Elite Spellbinder (3 sources)\n"
+            "- You cast Elite Spellbinder\n"
+            "- Your Elite Spellbinder resolved and entered the battlefield\n"
+            "- You targeted Supreme Verdict with Elite Spellbinder's ability (exile a non-land card)\n"
+            "- You used: exile a non-land card with Elite Spellbinder targeting Supreme Verdict\n"
+            "- Opponent's Supreme Verdict was exiled from the opponent's hand\n"
+            "- Phase: Attackers\n"
+            "- You declared attackers: Katilda, Dawnhart Prime\n"
+            "- Phase: Combat damage\n"
+            "- Your Katilda, Dawnhart Prime dealt 1 damage to the opponent (now 18)\n"
+            "=== Turn 8 - opponent's turn ===\n"
+            "- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Phase: Main phase 1\n"
+            "- Opponent played Plains\n"
+            "- Phase: Main phase 2\n"
+            "- Opponent cast Lightmine Field\n"
+            "- Opponent's Lightmine Field resolved and entered the battlefield\n";
+        // ...and the text the owner approved, byte for byte.
+        const string want =
+            "T6 (opp): drew; played Seachrome Coast.\n"
+            "T7 (you): drew Brutal Cathar; played Overgrown Farmland.\n"
+            "  Main 1: cast Elite Spellbinder ({2}{w}, 3 sources) -> resolved; its ETB exiled Supreme Verdict from their hand.\n"
+            "  Attack: Katilda, Dawnhart Prime -> 1 damage, opp 18.\n"
+            "T8 (opp): drew; played Plains.\n"
+            "  Main 2: cast Lightmine Field -> resolved.";
+        const string got = compactNarration(before);
+        cout << "     " << before.size() << " B -> " << got.size() << " B\n" << got << "\n";
+        CHECK(got == want, "#W82-P5 the owner's sample renders to the approved text, byte for byte");
+        CHECK(got.size() * 2 < before.size(), "#W82-P5 the sample is under half the recorded bytes");
+        // ORDER PRESERVED: a land played AFTER a cast in the same phase stays in
+        // the phase line, after the cast - it is not hoisted to the turn line.
+        CHECK(compactNarration("=== Turn 3 - YOUR turn ===\n- Phase: Main phase 1\n- You cast Bear\n"
+                               "- Your Bear resolved and entered the battlefield\n- You played Forest\n")
+                  == "T3 (you):\n  Main 1: cast Bear -> resolved; played Forest.",
+              "#W82-P5 a land after a cast keeps its place in the phase");
+        // A draw outside the draw step (an upkeep engine) is not the turn's draw.
+        CHECK(compactNarration("=== Turn 3 - opponent's turn ===\n- Phase: Upkeep\n"
+                               "- Opponent drew 2 cards\n- Phase: Draw\n- Opponent drew a card\n")
+                  == "T3 (opp):\n  Upkeep: opp drew 2 cards.\n  Draw: drew.",
+              "#W82-P5 an upkeep draw stays in its phase; the draw-step draw then follows it in order");
+        // NO FACT DROPPED: every line family the wave-80 corpus narrated has a
+        // rule - folded, or rendered in its phase in the log's own words. One
+        // line of each family through the compactor: the family's facts survive.
+        const char * families[] = {
+            "Opponent discarded Arcane Sanctum",
+            "Opponent gained 2 life (now 22)",
+            "Opponent's Intrepid Adversary died",
+            "Your Vision Skeins resolved and went to your graveyard",
+            "Your Pyrite Spellbomb dealt 2 damage to Luminarch Aspirant",
+            "You used: Deal 1 damage with Staff of Nin targeting the opponent",
+            "You ventured into Lost Mine of Phandelver: venture step 1 of that run",
+            "You lost 1 life (now 19)",
+            "Opponent used: Boulderloft Pathway with Branchloft Pathway",
+            "You revealed your Briarbridge Tracker from your library",
+            "You cast Vision Skeins (that Vision Skeins was 1 of 2 copies in your hand; the other 1 is still there)",
+            "Your Marsh Flats was put into your graveyard from the battlefield",
+            "Opponent put the revealed Fateful Absence into their library",
+            "Cleanup discard (hand 8, limit 7): you chose Arcane Sanctum",
+            "You kept your opening hand (7 cards)",
+            "It became Day",
+            "Opponent's Tovolar's Huntmaster created 2 2/2 Wolf tokens",
+            "Opponent's Moonrage Brute was exiled from the battlefield",
+            "Your Goblin (token) ceased to exist and left your graveyard",
+            "Opponent's Luminarch Aspirant was COUNTERED by Essence Scatter and went to the opponent's graveyard",
+            "Opponent's Intrepid Adversary got a +1/+1 counter from Luminarch Aspirant (now 4/2)",
+            "You targeted Overgrown Farmland with Lay Waste",
+            "Your Tundra entered the battlefield from your library",
+            "You chose Cast Card Normally for Lay Waste",
+            "You declared blockers: Siege-Gang Commander blocks Tovolar's Huntmaster; Goblin blocks Lair of the Hydra",
+            "You announced X = 4 for Sphinx's Revelation",
+            "Opponent's Tovolar's Huntmaster transformed into Tovolar's Packleader (now 8/8 nightbound)",
+            "You shuffled your graveyard (9 cards) into your library with Elixir of Immortality",
+            "Your Hammer of Bogardan was returned to your hand from your graveyard",
+            "You put 1 card on the bottom of your library: Staff of Nin",
+            "Sphinx's Revelation was NOT cast: you declined after the payment above, so it is back in your hand",
+            "You assigned Lair of the Hydra's combat damage to Goblin (1/1) in position 1 (x3)",
+            "Paid {1}{u} for Vision Skeins with Underground Sea; Tundra",
+            NULL };
+        int kept = 0, total = 0;
+        for (int fi = 0; families[fi]; fi++)
+        {
+            total++;
+            const string one = string("=== Turn 5 - YOUR turn ===\n- Phase: Main phase 1\n- ") + families[fi] + "\n";
+            const string r = compactNarration(one);
+            // the family's proper nouns and numbers all survive
+            bool ok = r.find("T5 (you):") == 0 && r.find("  Main 1: ") != string::npos;
+            const string f(families[fi]);
+            for (size_t i = 0; i < f.size() && ok; i++)
+            {
+                if (isupper((unsigned char) f[i]) && i > 0 && f[i - 1] == ' ')
+                {
+                    size_t e = i;
+                    while (e < f.size() && f[e] != ' ' && f[e] != ',' && f[e] != ';' && f[e] != ':' && f[e] != ')')
+                        e++;
+                    const string word = f.substr(i, e - i);
+                    if (word == "Opponent" || word == "Opponent's" || word == "You" || word == "Your"
+                        || word == "NOT" || word == "COUNTERED" || word == "Day" || word == "X")
+                        continue;
+                    if (r.find(word) == string::npos)
+                        ok = false;
+                }
+                if (isdigit((unsigned char) f[i]) && r.find(f[i]) == string::npos)
+                    ok = false;
+            }
+            if (ok)
+                kept++;
+            else
+                cout << "     FAMILY NOT PRESERVED: " << families[fi] << "\n        -> " << r << "\n";
+        }
+        CHECK(kept == total, "#W82-P5 every corpus line family renders with its names and numbers intact");
+        // a family with no fold rule is the log's own line, seat voice shortened
+        CHECK(compactNarration("=== Turn 5 - YOUR turn ===\n- Phase: Upkeep\n- It became Day\n")
+                  == "T5 (you):\n  Upkeep: It became Day.",
+              "#W82-P5 an unknown family passes through verbatim in its phase");
+        // the trim marker and the pregame lines are untouched, in place
+        CHECK(compactNarration("- Your opening hand (7 cards): A; B\n- You kept your opening hand (7 cards)\n"
+                               "=== Turn 1 - YOUR turn ===\n- Phase: Main phase 1\n- You played Plains\n")
+                  == "- Your opening hand (7 cards): A; B\n- You kept your opening hand (7 cards)\n"
+                     "T1 (you): played Plains.",
+              "#W82-P5 pregame lines stay verbatim ahead of the first turn");
+        CHECK(compactNarration("(...earlier events trimmed - graveyards at trim: you - X; opponent - Y)\n"
+                               "=== Turn 9 - opponent's turn ===\n- Phase: Draw\n- Opponent drew a card\n")
+                  == "(...earlier events trimmed - graveyards at trim: you - X; opponent - Y)\nT9 (opp): drew.",
+              "#W82-P5 the trim marker stays verbatim ahead of the turns it precedes");
+        // a payment with no cast after it is not lost
+        CHECK(compactNarration("=== Turn 4 - YOUR turn ===\n- Phase: Main phase 1\n"
+                               "- Paid {3} for Staff of Nin (3 sources)\n- Sphinx's Revelation was NOT cast: back in your hand\n")
+                  .find("paid ({3}, 3 sources) for Staff of Nin; Sphinx's Revelation was NOT cast") != string::npos,
+              "#W82-P5 an unmatched payment renders on its own");
+        // an empty turn says so
+        CHECK(compactNarration("=== Turn 2 - opponent's turn ===\n- Phase: Untap\n") == "T2 (opp): (no events)",
+              "#W82-P5 a turn in which nothing happened is one short line");
+        CHECK(compactNarration("").empty(), "#W82-P5 NEGATIVE empty in, empty out");
+        CHECK(compactNarration("=== Turn 1 - YOUR turn ===\n- Your opening hand (7 cards): A; B\n- Phase: Untap\n- You mulliganed to 6\n")
+                  == "T1 (you):\n  Pregame: your opening hand (7 cards): A; B.\n  Untap: you mulliganed to 6.",
+              "#W82-P5 events under a turn header before its first phase marker are labelled Pregame");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

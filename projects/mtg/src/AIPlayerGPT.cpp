@@ -12213,6 +12213,518 @@ string narrationFoldPaidSources(const string& body)
     return out.str();
 }
 
+//#W82-P5: NARRATION COMPACTION (owner-approved sample, LEDGER-v2 section 5/6).
+//The GAME LOG the model reads is re-rendered from the append-only event log
+//into a denser register: one line per turn carrying the draw and the first
+//land drop, then one line per phase in which something happened ("  Main 1:
+//..."), the combat phases merged into one "  Attack:" line; a cast's payment,
+//cast and resolution fold into one event ("cast X ({2}{w}, 3 sources) ->
+//resolved"); an ability's target/use/result fold into one ("its ETB exiled
+//Supreme Verdict from their hand"); damage carries the new life total. The
+//order of events within a phase is preserved and NO FACT IS DROPPED: every
+//line family without a fold rule renders in the same phase group in the log's
+//own words (the seat-voice prefix shortened), never skipped. The recorded
+//event log (mNarration, the translog `events` delta) is untouched - this is a
+//render over it, so a reviewer's tools still read the old grammar and
+//WAGIC_GPT_NARRATION_V1=1 restores the wave-81 render byte for byte. Pure, so
+//PARSETEST pins the owner's sample and the family coverage.
+namespace gptcompact
+{
+    static string shortPhase(const string& p)
+    {
+        if (p.empty()) return "Pregame"; //the opening hand and mulligans sit under turn 1's header, before Untap
+        if (p == "Main phase 1") return "Main 1";
+        if (p == "Main phase 2") return "Main 2";
+        if (p == "Combat begins" || p == "Attackers" || p == "Blockers"
+            || p == "Combat damage" || p == "Combat ends")
+            return "Attack";
+        return p; //Untap, Upkeep, Draw, End, Cleanup, and anything new
+    }
+    //the seat-voice prefix, shortened: "Your X" -> "your X", "Opponent's X" ->
+    //"their X", "You did" -> "you did", "Opponent did" -> "opp did"
+    static string voice(const string& s)
+    {
+        if (s.compare(0, 5, "Your ") == 0) return "your " + s.substr(5);
+        if (s.compare(0, 11, "Opponent's ") == 0) return "their " + s.substr(11);
+        if (s.compare(0, 4, "You ") == 0) return "you " + s.substr(4);
+        if (s.compare(0, 9, "Opponent ") == 0) return "opp " + s.substr(9);
+        return s;
+    }
+    static string zoneVoice(const string& z)
+    {
+        if (z == "the opponent's hand") return "their hand";
+        if (z.compare(0, 15, "the opponent's ") == 0) return "their " + z.substr(15);
+        return z;
+    }
+    static bool startsWith(const string& s, const char * head)
+    {
+        return s.compare(0, strlen(head), head) == 0;
+    }
+    static bool startsWith(const string& s, const string& head)
+    {
+        return s.compare(0, head.size(), head) == 0;
+    }
+    static string joinEv(const vector<string>& v)
+    {
+        string o;
+        for (size_t i = 0; i < v.size(); i++)
+            o += (i ? "; " : "") + v[i];
+        return o;
+    }
+    struct Group
+    {
+        string label;
+        vector<string> ev;
+        vector<string> damage;   //combat: "N damage, opp L" parts appended to the attack line
+        bool attackLine;         //ev[0] is the attackers declaration
+        Group() : attackLine(false) {}
+    };
+    struct State
+    {
+        std::ostringstream out;
+        bool turnOpen;
+        string turnHead;
+        vector<string> turnLine;
+        vector<Group> groups;
+        string phase;            //the current "- Phase: X" (full engine name)
+        //pending folds
+        string paidCard, paidText;               //"Paid {C} for X ..." waiting for "cast X"
+        string tgtTarget, tgtSource;             //"targeted T with S" waiting for "used:"
+        string useActor, useAbility, useTarget;  //"used: A with S targeting T" waiting for a result
+        bool usePending;
+        string lastCast;                         //name on the last "cast X" event of the open group
+        string attackers;                        //this turn's declared attackers, the log's own list
+        State() : turnOpen(false), usePending(false) {}
+
+        Group& group()
+        {
+            const string lbl = shortPhase(phase);
+            if (groups.empty() || groups.back().label != lbl)
+            {
+                groups.push_back(Group());
+                groups.back().label = lbl;
+                lastCast.clear();
+            }
+            return groups.back();
+        }
+        void push(const string& e) { group().ev.push_back(e); }
+        void flushPending()
+        {
+            if (!paidCard.empty())
+            {
+                push("paid " + paidText + " for " + paidCard);
+                paidCard.clear(); paidText.clear();
+            }
+            if (!tgtTarget.empty())
+            {
+                push("targeted " + tgtTarget + " with " + tgtSource);
+                tgtTarget.clear(); tgtSource.clear();
+            }
+            if (usePending)
+            {
+                push("used " + useAbility + " with " + useActor
+                     + (useTarget.empty() ? string() : " -> " + useTarget));
+                usePending = false;
+                useActor.clear(); useAbility.clear(); useTarget.clear();
+            }
+        }
+        void flushTurn()
+        {
+            flushPending();
+            if (!turnOpen)
+                return;
+            out << turnHead;
+            if (!turnLine.empty())
+                out << " " << joinEv(turnLine) << ".";
+            else if (groups.empty())
+                out << " (no events)";
+            out << "\n";
+            for (size_t g = 0; g < groups.size(); g++)
+            {
+                Group& G = groups[g];
+                if (G.attackLine && !G.damage.empty() && !G.ev.empty())
+                    G.ev[0] += " -> " + joinEv(G.damage);
+                else if (!G.damage.empty())
+                    G.ev.insert(G.ev.end(), G.damage.begin(), G.damage.end());
+                if (G.ev.empty())
+                    continue;
+                out << "  " << G.label << ": " << joinEv(G.ev) << ".\n";
+            }
+            turnOpen = false;
+            turnHead.clear();
+            turnLine.clear();
+            groups.clear();
+            phase.clear();
+            lastCast.clear();
+            attackers.clear();
+        }
+        bool nothingPlacedYet() const { return groups.empty(); }
+        bool inCombat() const { return shortPhase(phase) == "Attack"; }
+        //names can carry commas ("Katilda, Dawnhart Prime"), so the list is
+        //matched as text at ", " boundaries, never split on the comma
+        bool isDeclaredAttacker(const string& name) const
+        {
+            if (attackers.empty() || name.empty())
+                return false;
+            if (attackers == name)
+                return true;
+            const string padded = ", " + attackers + ", ";
+            return padded.find(", " + name + ", ") != string::npos;
+        }
+
+    };
+
+    //"X dealt N damage to <target>[ (now L)]" with the owner prefix already
+    //stripped; returns false when the line is not a damage line.
+    static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now)
+    {
+        const size_t d = ev.find(" dealt ");
+        if (d == string::npos) return false;
+        const size_t dm = ev.find(" damage to ", d);
+        if (dm == string::npos) return false;
+        src = ev.substr(0, d);
+        n = ev.substr(d + 7, dm - (d + 7));
+        string rest = ev.substr(dm + 11);
+        const size_t nw = rest.rfind(" (now ");
+        now.clear();
+        if (nw != string::npos && !rest.empty() && rest[rest.size() - 1] == ')')
+        {
+            now = rest.substr(nw + 6, rest.size() - 1 - (nw + 6));
+            rest = rest.substr(0, nw);
+        }
+        target = rest;
+        return true;
+    }
+
+    static void event(State& st, const string& raw)
+    {
+        const bool mine = startsWith(raw, "You ") || startsWith(raw, "Your ");
+        const bool theirs = startsWith(raw, "Opponent ") || startsWith(raw, "Opponent's ");
+        //1. the draw step's draw, on the turn line
+        if (st.phase == "Draw" && st.nothingPlacedYet()
+            && (startsWith(raw, "You drew ") || startsWith(raw, "Opponent drew ")))
+        {
+            st.flushPending();
+            if (startsWith(raw, "You drew "))
+                st.turnLine.push_back("drew " + raw.substr(9));
+            else
+            {
+                const string rest = raw.substr(14); //after "Opponent drew "
+                st.turnLine.push_back(rest == "a card" ? string("drew")
+                                      : "drew " + rest.substr(0, rest.find(' ')));
+            }
+            return;
+        }
+        //1b. a draw-step draw that could not be hoisted (something already sits
+        //in an earlier phase group) keeps the short form in its own group
+        if (st.phase == "Draw" && (startsWith(raw, "You drew ") || startsWith(raw, "Opponent drew ")))
+        {
+            st.flushPending();
+            if (startsWith(raw, "You drew "))
+                st.push("drew " + raw.substr(9));
+            else
+            {
+                const string rest = raw.substr(14);
+                st.push(rest == "a card" ? string("drew") : "drew " + rest.substr(0, rest.find(' ')));
+            }
+            return;
+        }
+        //2. the first land drop, on the turn line - only while nothing else has
+        //been placed in a phase group this turn (order preserved); otherwise
+        //"played X" in its phase, in order
+        if (startsWith(raw, "You played ") || startsWith(raw, "Opponent played "))
+        {
+            const string land = raw.substr(raw.find(" played ") + 8);
+            if ((st.phase == "Main phase 1" || st.phase == "Main phase 2")
+                && st.nothingPlacedYet() && st.paidCard.empty() && st.tgtTarget.empty() && !st.usePending)
+            {
+                st.turnLine.push_back("played " + land);
+                return;
+            }
+            st.flushPending();
+            st.push("played " + land);
+            return;
+        }
+        //3. payment: held for the cast line that follows it
+        if (startsWith(raw, "Paid ") && raw.find(" for ") != string::npos)
+        {
+            st.flushPending();
+            const size_t f = raw.find(" for ");
+            const string cost = raw.substr(5, f - 5);
+            string rest = raw.substr(f + 5);
+            string card = rest, sources;
+            const size_t ps = rest.rfind(" (");
+            const size_t ws = rest.find(" with ");
+            if (ps != string::npos && rest[rest.size() - 1] == ')' && rest.find(" source", ps) != string::npos)
+            {
+                card = rest.substr(0, ps);
+                sources = rest.substr(ps + 2, rest.size() - 1 - (ps + 2)); //"3 sources"
+            }
+            else if (ws != string::npos)
+            {
+                card = rest.substr(0, ws);
+                const string names = rest.substr(ws + 6);
+                int n = 1;
+                for (size_t i = 0; i + 1 < names.size(); i++)
+                    if (names[i] == ';' && names[i + 1] == ' ')
+                        n++;
+                std::ostringstream s;
+                s << n << " source" << (n == 1 ? "" : "s") << ": " << names;
+                sources = s.str();
+            }
+            st.paidCard = card;
+            st.paidText = "(" + cost + (sources.empty() ? "" : ", " + sources) + ")";
+            return;
+        }
+        //4. the cast, taking its payment
+        if (startsWith(raw, "You cast ") || startsWith(raw, "Opponent cast "))
+        {
+            string rest = raw.substr(raw.find(" cast ") + 6);
+            string name = rest, tail;
+            const size_t par = rest.find(" (that ");
+            if (par != string::npos)
+            {
+                name = rest.substr(0, par);
+                tail = rest.substr(par);
+            }
+            string e = "cast " + name;
+            if (!st.paidCard.empty() && st.paidCard == name)
+            {
+                e += " " + st.paidText;
+                st.paidCard.clear(); st.paidText.clear();
+            }
+            else
+                st.flushPending();
+            e += tail;
+            st.push(e);
+            st.lastCast = name;
+            return;
+        }
+        //5. the resolution, onto the cast line it completes
+        {
+            const size_t r = raw.find(" resolved and ");
+            if (r != string::npos && (mine || theirs))
+            {
+                const string owner = mine ? "Your " : "Opponent's ";
+                const string name = raw.substr(owner.size(), r - owner.size());
+                const string how = raw.substr(r + 14); //"entered the battlefield" / "went to X"
+                string suffix;
+                if (how == "entered the battlefield")
+                    suffix = " -> resolved";
+                else if (startsWith(how, "went to "))
+                {
+                    const string z = how.substr(8);
+                    suffix = (z.find("graveyard") != string::npos) ? string(" -> resolved (graveyard)")
+                                                                   : " -> resolved (" + zoneVoice(z) + ")";
+                }
+                else
+                    suffix = " -> resolved (" + how + ")";
+                Group& G = st.group();
+                if (!st.lastCast.empty() && st.lastCast == name && !G.ev.empty()
+                    && startsWith(G.ev.back(), "cast " + name))
+                {
+                    st.flushPending();
+                    G.ev.back() += suffix;
+                    return;
+                }
+            }
+        }
+        //6. target -> use -> result
+        if ((startsWith(raw, "You targeted ") || startsWith(raw, "Opponent targeted "))
+            && raw.find(" with ") != string::npos)
+        {
+            st.flushPending();
+            const size_t t0 = raw.find(" targeted ") + 10;
+            const size_t w = raw.find(" with ", t0);
+            st.tgtTarget = raw.substr(t0, w - t0);
+            string src = raw.substr(w + 6);
+            const size_t ab = src.find("'s ability");
+            if (ab != string::npos)
+                src = src.substr(0, ab);
+            st.tgtSource = src;
+            return;
+        }
+        if (startsWith(raw, "You used: ") || startsWith(raw, "Opponent used: "))
+        {
+            const string body = raw.substr(raw.find("used: ") + 6);
+            const size_t w = body.rfind(" with ");
+            string ability = body, source, target;
+            if (w != string::npos)
+            {
+                ability = body.substr(0, w);
+                source = body.substr(w + 6);
+                const size_t tg = source.find(" targeting ");
+                if (tg != string::npos)
+                {
+                    target = source.substr(tg + 11);
+                    source = source.substr(0, tg);
+                }
+            }
+            //the held "targeted T with S" is the same fact
+            if (!st.tgtTarget.empty() && (target.empty() || st.tgtTarget == target)
+                && (source.empty() || st.tgtSource == source))
+            {
+                if (target.empty()) target = st.tgtTarget;
+                if (source.empty()) source = st.tgtSource;
+                st.tgtTarget.clear(); st.tgtSource.clear();
+            }
+            st.flushPending();
+            Group& G = st.group();
+            const bool etb = !st.lastCast.empty() && source == st.lastCast && !G.ev.empty()
+                             && startsWith(G.ev.back(), "cast " + source)
+                             && G.ev.back().find(" -> resolved") != string::npos;
+            st.useActor = etb ? "its ETB" : source;
+            st.useAbility = ability;
+            st.useTarget = target;
+            st.usePending = true;
+            return;
+        }
+        if (st.usePending && !st.useTarget.empty())
+        {
+            //the result the use produced on its target
+            const string owner = mine ? "Your " : (theirs ? "Opponent's " : "");
+            const string bare = owner.empty() ? raw : raw.substr(owner.size());
+            if (startsWith(bare, st.useTarget + " was exiled from "))
+            {
+                const string z = bare.substr(st.useTarget.size() + 17);
+                st.push(st.useActor + " exiled " + st.useTarget + " from " + zoneVoice(z));
+                st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
+                return;
+            }
+            if (bare == st.useTarget + " died" || bare == st.useTarget + " was destroyed")
+            {
+                st.push(st.useActor + " killed " + st.useTarget);
+                st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
+                return;
+            }
+            string src, n, target, now;
+            if (splitDamage(bare, src, n, target, now) && (target == st.useTarget
+                || (st.useTarget == "the opponent" && target == "the opponent")
+                || (st.useTarget == "you" && target == "you")))
+            {
+                string e = st.useActor + " -> " + n + " damage";
+                if (target == "the opponent" || target == "you")
+                    e += ", " + string(target == "you" ? "you" : "opp") + (now.empty() ? "" : " " + now);
+                else
+                    e += " to " + target + (now.empty() ? "" : " (now " + now + ")");
+                st.push(e);
+                st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
+                return;
+            }
+            st.flushPending();
+        }
+        else
+            st.flushPending();
+        //7. combat: the declaration, and damage that carries the new life total
+        if (startsWith(raw, "You declared attackers: ") || startsWith(raw, "Opponent declared attackers: "))
+        {
+            const string list = raw.substr(raw.find(": ") + 2);
+            st.attackers = list;
+            Group& G = st.group();
+            G.ev.push_back(mine ? list : "they attack with " + list);
+            G.attackLine = (G.ev.size() == 1);
+            return;
+        }
+        if (startsWith(raw, "You declared blockers: ") || startsWith(raw, "Opponent declared blockers: "))
+        {
+            string list = raw.substr(raw.find(": ") + 2);
+            for (size_t p = list.find("; "); p != string::npos; p = list.find("; ", p + 2))
+                list.replace(p, 2, ", ");
+            st.push((mine ? "you block: " : "they block: ") + list);
+            return;
+        }
+        {
+            string src, n, target, now;
+            const string owner = mine ? (startsWith(raw, "Your ") ? "Your " : "You ")
+                                      : (theirs ? (startsWith(raw, "Opponent's ") ? "Opponent's " : "Opponent ") : "");
+            const string bare = raw.substr(owner.size());
+            if ((mine || theirs) && splitDamage(bare, src, n, target, now))
+            {
+                const bool toPlayer = (target == "the opponent" || target == "you");
+                string e;
+                if (toPlayer)
+                {
+                    const string who = (target == "you") ? "you" : "opp";
+                    const string part = n + " damage, " + who + (now.empty() ? "" : " " + now);
+                    if (st.inCombat() && st.isDeclaredAttacker(src))
+                    {
+                        Group& G = st.group();
+                        G.damage.push_back(st.attackers == src ? part : src + ": " + part);
+                        return;
+                    }
+                    e = src + " -> " + part;
+                }
+                else
+                    e = src + " -> " + n + " damage to " + target + (now.empty() ? "" : " (now " + now + ")");
+                st.push(e);
+                return;
+            }
+        }
+        //8. everything else: the log's own words, seat voice shortened
+        st.push(voice(raw));
+    }
+}
+
+static bool narrationV1()
+{
+    static int v1 = -1;
+    if (v1 < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_NARRATION_V1");
+        v1 = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v1 == 1;
+}
+
+string compactNarration(const string& log)
+{
+    using namespace gptcompact;
+    if (log.empty())
+        return log;
+    State st;
+    size_t at = 0;
+    while (at < log.size())
+    {
+        size_t nl = log.find('\n', at);
+        const string line = log.substr(at, nl == string::npos ? string::npos : nl - at);
+        at = (nl == string::npos) ? log.size() : nl + 1;
+        if (line.empty())
+            continue;
+        if (startsWith(line, "=== Turn "))
+        {
+            st.flushTurn();
+            const size_t d = 9;
+            size_t e = d;
+            while (e < line.size() && isdigit((unsigned char) line[e]))
+                e++;
+            st.turnOpen = true;
+            st.turnHead = "T" + line.substr(d, e - d)
+                          + (line.find("YOUR turn") != string::npos ? " (you):" : " (opp):");
+            continue;
+        }
+        if (startsWith(line, "- Phase: "))
+        {
+            st.flushPending();
+            st.phase = line.substr(9);
+            continue;
+        }
+        if (!st.turnOpen || !startsWith(line, "- "))
+        {
+            //pregame lines, trim markers, log-window summaries: verbatim, on
+            //their own line, in place
+            st.flushTurn();
+            st.out << line << "\n";
+            continue;
+        }
+        event(st, line.substr(2));
+    }
+    st.flushTurn();
+    string o = st.out.str();
+    if (!o.empty() && o[o.size() - 1] == '\n')
+        o.erase(o.size() - 1);
+    return o;
+}
+
 string narrationBucketRuns(const string& body)
 {
     if (body.empty())
@@ -24338,6 +24850,9 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation,
                            zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
                            zoneNameDigest(game ? game->removedFromGame : NULL),
                            zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL)));
+        //#W82-P5: the compact register, unless WAGIC_GPT_NARRATION_V1=1 (A/B)
+        if (!narrationV1())
+            body = compactNarration(body);
         u << logWindowLogHeader(elided > 0, wturns) << "\n" << body << "\n";
     }
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
@@ -62942,6 +63457,7 @@ bool AIPlayerGPTSelfTestAccess::namedCastPenaltyScan(const string& magicText, in
 string AIPlayerGPTSelfTestAccess::namedCastPriceTag(const string& sourceName, int lifeLoss, int draws, int life) { return ::namedCastPriceTag(sourceName, lifeLoss, draws, life); }
 void AIPlayerGPTSelfTestAccess::narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta) { ::narrationAppend(narration, pendingPhase, line, trimMarker, delta); }
 string AIPlayerGPTSelfTestAccess::narrationBucketRuns(const string& body) { return ::narrationBucketRuns(body); }
+string AIPlayerGPTSelfTestAccess::compactNarration(const string& log) { return ::compactNarration(log); }
 string AIPlayerGPTSelfTestAccess::narrationFoldPaidSources(const string& body) { return ::narrationFoldPaidSources(body); }
 string AIPlayerGPTSelfTestAccess::narrationShapeKey(const string& line) { return ::narrationShapeKey(line); }
 size_t AIPlayerGPTSelfTestAccess::narrationTrimKeep(size_t markerLen) { return ::narrationTrimKeep(markerLen); }
