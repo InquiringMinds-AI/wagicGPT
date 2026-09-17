@@ -43530,6 +43530,28 @@ static const char * kW50Y_r94 =
               "#W82-P10 the protocol names the ORDER: label and its form - the one approved extension");
     }
 
+    cout << "\n[#W82-P11] the record shape: one `window` kind per decision, the seam as a field\n";
+    {
+        string k, sm;
+        const char * seams[] = { "ask", "priority", "attackers", "blockers", "discard", "reveal",
+                                 "bottom", "order", NULL };
+        bool all = true;
+        for (int i = 0; seams[i]; i++)
+        {
+            translogRecordShape(seams[i], k, sm);
+            if (k != "window" || sm != seams[i])
+                all = false;
+        }
+        CHECK(all, "#W82-P11 every seam that asks the model writes kind=window with seam=<the seam>");
+        translogRecordShape("defer", k, sm);
+        CHECK(k == "defer" && sm.empty(), "#W82-P11 a defer (no window of its own) keeps its kind");
+        translogRecordShape("wall_miss", k, sm);
+        CHECK(k == "wall_miss" && sm.empty(),
+              "#W82-P11 a wall miss whose window wrote no record stays a side record");
+        translogRecordShape("", k, sm);
+        CHECK(k.empty() && sm.empty(), "#W82-P11 NEGATIVE an empty kind maps to nothing");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

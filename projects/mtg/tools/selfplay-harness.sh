@@ -374,7 +374,9 @@ for f in runmanifest.own_logs(logdir, own):
             #`recovery` is bookkeeping written BESIDE the failed decision (which
             #arm answered it), not a decision of its own - counting it as an
             #answer hides the very tail this predicate exists to read.
-            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery"):
+            #W82-P11: side records carry no answer and no fallback - not evidence
+            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery",
+                                 "hold_event", "forced_close"):
                 continue
             recs.append(r)
     except OSError:
@@ -552,7 +554,9 @@ for f in runmanifest.own_logs(logdir, own):
             if r.get("kind") == "gameend":
                 ended = True
                 continue
-            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery"):
+            #W82-P11: side records carry no answer and no fallback - not evidence
+            if r.get("kind") in ("gamestart", "system", "ask_replay", "recovery",
+                                 "hold_event", "forced_close"):
                 continue
             recs.append(r)
     except OSError:
@@ -770,6 +774,15 @@ pilot_stall_selftest() {
     rm -f "$tmp/9999999999-ai_baka_deck1-a.jsonl" "$tmp/9999999999-ai_baka_deck2-b.jsonl"
     v=$(pilot_stall_verdict "$tmp" 1 4)
     case "$v" in STALL\ 4) ;; *) echo "pilot-stall-selftest FAIL: the wave-73 tail shape gave '$v', want 'STALL 4'" >&2; fails=1;; esac
+    #W82-P11: the same tail in the window shape (kind=window, seam as a field) reads
+    #the same; a hold_event side record between them is bookkeeping, not an answer.
+    printf '%s\n' \
+      '{"kind":"wall_miss","seq":1,"fallback":"wall_miss_no_retry"}' \
+      '{"kind":"hold_event","seq":2,"what":"clamped"}' \
+      '{"kind":"window","seam":"priority","seq":3,"fallback":"timeout"}' > "$tmp/9999999999-ai_baka_deck3-c.jsonl"
+    cp "$tmp/9999999999-ai_baka_deck3-c.jsonl" "$tmp/9999999999-ai_baka_deck4-d.jsonl"
+    v=$(pilot_stall_verdict "$tmp" 1 4)
+    case "$v" in STALL\ 4) ;; *) echo "pilot-stall-selftest FAIL: the window-shaped tail gave '$v', want 'STALL 4' (#W82-P11)" >&2; fails=1;; esac
     #g: a FINISHED game's tail is not evidence of a wedge - only a live game can be
     #wedged, and pooling finished seats dilutes the live ones out of the verdict.
     printf '%s\n' \
@@ -1574,7 +1587,8 @@ for f in files:
     for line in open(f):
         try: r = json.loads(line)
         except: continue
-        kinds[r.get("kind","?")] += 1; n += 1
+        #W82-P11: a `window` record's seam is the kind the census names
+        kinds[r.get("seam") or r.get("kind","?")] += 1; n += 1
 print(f"\n== harvested {len(files)} player-game logs, {n} decisions ==")
 for k, c in kinds.most_common(): print(f"  {k:10s} {c}")
 # win tally per deck

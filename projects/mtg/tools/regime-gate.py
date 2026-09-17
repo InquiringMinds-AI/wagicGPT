@@ -402,6 +402,20 @@ def selftest():
               and run_records(logdir, 1789238538, 5, runmanifest.own_seatlogs(out))[2] == 2,
               '#W81-DJ an outdir with NO announcement channel degrades to the old epoch scan')
 
+    #W82-P11: the window shape (kind=window, seam as a field) is gated like any
+    # decision record - only gamestart/gameend are skipped by kind.
+    with tempfile.TemporaryDirectory() as td:
+        pth = os.path.join(td, '2000000000-ai_baka_deck44-0xc-vs-ai_baka_deck9.jsonl')
+        with open(pth, 'w') as fh:
+            fh.write(json.dumps({'kind': 'gamestart'}) + '\n')
+            for i in range(3):
+                fh.write(json.dumps({'kind': 'window', 'seam': 'ask', 'seq': i, 'thinking': 'on',
+                                     'prompt': 'p', 'reply': 'PLAN: a\nCHOICE: 1 (x)',
+                                     'reasoning_chars': 5, 'max_tokens_reasoning': 100}) + '\n')
+        per, unst, _f = run_records(td, 2000000000, 3)
+        v, why, _ = gate(per, unst, 'on', 50.0, 3)
+        check(v == 'PASS' and '3 records' in why, 'window-shaped records are gated (#W82-P11): %s %s' % (v, why))
+
     print('regime-gate selftest: %d checks, %d failed' % (n[0], len(fails)))
     return 1 if fails else 0
 

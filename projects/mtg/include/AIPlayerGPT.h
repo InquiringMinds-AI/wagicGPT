@@ -1400,6 +1400,18 @@ private:
     //new one, written the moment the deadline is spent).
     void flushWallMissRecord(const char * classOverride = NULL);
     void writeForceCloseRecord(const char * outcome, bool landArm); //#W78-CV (S11)
+    //#W82-P11: a forced-close event waiting for the window record it joins.
+public:
+    struct ForceCloseEvent
+    {
+        int event, windowSeq, parkArmed, deferTicks, unrecordedSoFar, turn, phase;
+        std::string outcome, arm;
+        ForceCloseEvent() : event(0), windowSeq(-1), parkArmed(0), deferTicks(0),
+                            unrecordedSoFar(0), turn(0), phase(-1) {}
+    };
+private:
+    std::vector<ForceCloseEvent> mForceCloseFold;
+    std::vector<ForceCloseEvent> flushForceCloseFold(int joinWindowSeq); //returns the joined ones
     //#W80-DH (F11): one record per hold clamp / hold re-open, written at the event.
     void writeHoldEventRecord(const char * event, const char * seam,
                               const std::string& face, const std::string& reason,

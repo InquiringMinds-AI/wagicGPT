@@ -21791,20 +21791,20 @@ void AIPlayerGPT::writeForceCloseRecord(const char * outcome, bool landArm)
     if (mTransLogPath.empty())
         return;
     ensureGameStartRecord();
-    json rec = {
-        {"seq", mTransSeq++},
-        {"kind", "forced_close"},
-        {"event", mForceCloseEvents},
-        {"outcome", outcome ? outcome : ""},
-        {"arm", landArm ? "land" : "cast"},
-        {"window_seq", mWindowSeq},
-        {"park_armed", mRetryPark.forceCloseArmed ? 1 : 0},
-        {"defer_ticks", mForceCloseDeferTicks},
-        {"unrecorded_so_far", mForceCloseUnrecorded},
-        {"turn", translogTurn(observer ? observer->turn : 0)},
-        {"phase", observer ? observer->getCurrentGamePhase() : -1},
-    };
-    transLogWrite(rec.dump());
+    //#W82-P11: held until the window record it joins (same window ordinal) is
+    //written, and folded onto it; a window that never writes a record leaves
+    //this as a side record instead (flushForceCloseFold).
+    ForceCloseEvent e;
+    e.event = mForceCloseEvents;
+    e.outcome = outcome ? outcome : "";
+    e.arm = landArm ? "land" : "cast";
+    e.windowSeq = mWindowSeq;
+    e.parkArmed = mRetryPark.forceCloseArmed ? 1 : 0;
+    e.deferTicks = mForceCloseDeferTicks;
+    e.unrecordedSoFar = mForceCloseUnrecorded;
+    e.turn = translogTurn(observer ? observer->turn : 0);
+    e.phase = observer ? observer->getCurrentGamePhase() : -1;
+    mForceCloseFold.push_back(e);
 }
 
 //#W80-DH (F11, Astra wave-80 review finding 11 - MED). ONE RECORD PER HOLD EVENT.
@@ -22632,6 +22632,64 @@ static int w77ConsumeWindowSeq(int& windowSeq, const char * kind)
     return windowSeq++;
 }
 
+//#W82-P11: THE RECORD SHAPE. One record kind per decision the model was asked -
+//`window` - with the seam as a FIELD (`seam`: ask, priority, attackers,
+//blockers, discard, reveal, bottom, order) and the window's ordinal
+//(`window_seq`), so a reader joins side events to it by number instead of by
+//guessing from a kind word. Side records exist only for events with no window:
+//`hold_event`, `recovery`, `gamestart`/`gameend`/`system`, `defer` (an answer
+//the engine could not execute, no prompt), `ask_replay` (the sidecar), and a
+//`forced_close` or `wall_miss` whose window never wrote a record. A forced close
+//or wall miss whose window DOES write a record rides that record as a field
+//(`forced_close`: the events; `wall_miss`: class + latency). Every counter is
+//kept - this is a shape change, not a deletion. Pure: the (kind, seam) a
+//writer call maps to.
+static void translogRecordShape(const char * kind, string& outKind, string& outSeam)
+{
+    outKind = kind ? kind : "";
+    outSeam.clear();
+    if (!kind || !*kind)
+        return;
+    if (strcmp(kind, "defer") == 0 || strcmp(kind, "wall_miss") == 0)
+        return; //side kinds: no window of their own
+    outSeam = kind;
+    outKind = "window";
+}
+
+//#W82-P11: the forced-close events that have not yet joined a window record.
+//Joined = the same window ordinal as the record being written.
+static json forceCloseEventJson(const AIPlayerGPT::ForceCloseEvent& e)
+{
+    return json{
+        {"event", e.event}, {"outcome", e.outcome}, {"arm", e.arm},
+        {"window_seq", e.windowSeq}, {"park_armed", e.parkArmed},
+        {"defer_ticks", e.deferTicks}, {"unrecorded_so_far", e.unrecordedSoFar},
+        {"turn", e.turn}, {"phase", e.phase},
+    };
+}
+std::vector<AIPlayerGPT::ForceCloseEvent> AIPlayerGPT::flushForceCloseFold(int joinWindowSeq)
+{
+    std::vector<ForceCloseEvent> keep, joined;
+    for (size_t i = 0; i < mForceCloseFold.size(); i++)
+    {
+        const ForceCloseEvent& e = mForceCloseFold[i];
+        if (joinWindowSeq >= 0 && e.windowSeq == joinWindowSeq)
+            joined.push_back(e);
+        else if (joinWindowSeq < 0 || e.windowSeq < joinWindowSeq)
+        {
+            //its window is gone without a record: a side record, in file order
+            json j = forceCloseEventJson(e);
+            j["seq"] = mTransSeq++;
+            j["kind"] = "forced_close";
+            transLogWrite(j.dump());
+        }
+        else
+            keep.push_back(e); //a later window's event: still pending
+    }
+    mForceCloseFold.swap(keep);
+    return joined;
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -22760,9 +22818,11 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     const int recordSeqNow = mTransSeq++;
     if (holdSeamForRecord)
         w78HoldWindowRecordSeq(mHoldMemory, holdSeamForRecord, recordWindowSeq, recordSeqNow);
+    string recKind, recSeam;
+    translogRecordShape(kind, recKind, recSeam); //#W82-P11
     json rec = {
         {"seq", recordSeqNow},
-        {"kind", kind},
+        {"kind", recKind},
         {"model", mModel},
         {"prompt", userMsg},
         {"reply", reply},
@@ -22774,6 +22834,19 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"opp_life", opponent() ? opponent()->life : 0},
         {"latency_ms", mLastLatencyMs},
     };
+    if (!recSeam.empty()) //#W82-P11: the seam is a field; the window its ordinal
+    {
+        rec["seam"] = recSeam;
+        rec["window_seq"] = recordWindowSeq;
+        const std::vector<ForceCloseEvent> fc = flushForceCloseFold(recordWindowSeq);
+        if (!fc.empty())
+        {
+            json arr = json::array();
+            for (size_t i = 0; i < fc.size(); i++)
+                arr.push_back(forceCloseEventJson(fc[i]));
+            rec["forced_close"] = arr;
+        }
+    }
     //#W64-AK (R2): the menu-pass floor's firings, on the first record after
     //they happened. Written only when nonzero, and cleared with the record, so
     //a livelock breaker that fires is visible in the corpus rather than silent.
@@ -23452,7 +23525,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //#W82-A (L7): same slot-keying as the forced-close leg above.
     if (mWallMissPending && !userMsg.empty() && asyncSlotKey(userMsg) == mWallMissBase)
     {
-        rec["wall_miss"] = 1;
+        //#W82-P11: the miss rides the window record it joins, with its facts
+        string wmPhase;
+        for (size_t i = 0; i < mLastTransportOutcomes.size() && wmPhase.empty(); i++)
+            wmPhase = transportStampPhase(mLastTransportOutcomes[i]);
+        rec["wall_miss"] = json{{"class", wallMissClassFor(wmPhase)},
+                                {"latency_ms", mWallMissLatencyMs}};
         mWallMissPending = false;
         mWallMissBase.clear();
         mWallMissLatencyMs = -1; //#W61-U (C13): this record consumed it
@@ -23559,6 +23637,7 @@ void AIPlayerGPT::logGameEnd()
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
     bool oppWon = opponent() ? observer->didWin(opponent()) : false;
+    flushForceCloseFold(-1); //#W82-P11: nothing left pending at the end
     json rec = {
         {"seq", mTransSeq++},
         {"kind", "gameend"},
@@ -63754,6 +63833,7 @@ string AIPlayerGPTSelfTestAccess::namedCastPriceTag(const string& sourceName, in
 void AIPlayerGPTSelfTestAccess::narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta) { ::narrationAppend(narration, pendingPhase, line, trimMarker, delta); }
 string AIPlayerGPTSelfTestAccess::narrationBucketRuns(const string& body) { return ::narrationBucketRuns(body); }
 string AIPlayerGPTSelfTestAccess::compactNarration(const string& log) { return ::compactNarration(log); }
+void AIPlayerGPTSelfTestAccess::translogRecordShape(const char * kind, string& outKind, string& outSeam) { ::translogRecordShape(kind, outKind, outSeam); }
 bool AIPlayerGPTSelfTestAccess::gptOrderLineFromReply(const string& content, size_t n, vector<int>& order, string * takenText) { return ::gptOrderLineFromReply(content, n, order, takenText); }
 string AIPlayerGPTSelfTestAccess::narrationFoldPaidSources(const string& body) { return ::narrationFoldPaidSources(body); }
 string AIPlayerGPTSelfTestAccess::narrationShapeKey(const string& line) { return ::narrationShapeKey(line); }

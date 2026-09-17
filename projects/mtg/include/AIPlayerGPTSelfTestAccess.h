@@ -645,6 +645,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static void narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta= NULL);
     static string narrationBucketRuns(const string& body);
     static string compactNarration(const string& log);
+    static void translogRecordShape(const char * kind, string& outKind, string& outSeam);
     static bool gptOrderLineFromReply(const string& content, size_t n, vector<int>& order, string * takenText);
     static string narrationFoldPaidSources(const string& body);
     static string narrationShapeKey(const string& line);
