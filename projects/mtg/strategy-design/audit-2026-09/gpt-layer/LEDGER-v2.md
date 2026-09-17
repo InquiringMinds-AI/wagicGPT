@@ -44,3 +44,5 @@ T7 (you): drew Brutal Cathar; played Overgrown Farmland.
 T8 (opp): drew; played Plains.
   Main 2: cast Lightmine Field -> resolved.
 Rules of the fold: a phase marker prints only when something happened in it; draw + land in the turn header line; "paid X for Y / cast Y / Y resolved" become one line with the cost in parentheses; "targeted … / used … / was exiled" become one ETB line; damage carries the new life total. Lost: nothing factual; the order of events within a phase is preserved. Judged by the owner's criterion on the composed document, then by the same A/B instrument as P1/P2.
+
+## 6. OWNER RULINGS 2026-09-16 (cont.): P5 sample — "That looks good. Ok." → P5 APPROVED as specified in §5. "Use fable agents to code. Make it so." → the proposals lane runs on Fable (the Opus lane was stopped before it had made any change).
