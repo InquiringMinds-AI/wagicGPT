@@ -63,6 +63,11 @@ public:
     //ActionElement the row was built from, so every id -> mObjects mapping can
     //be resolved by identity instead of position. Entries are nulled when their
     //element leaves the game; a row whose element is gone yields no decision.
+    //#W87-JA (audit-2026-09 bug list item 11): for a MULTIPLE-CHOICE menu every
+    //row - each mode and the cancel row - names the element that OWNS the menu
+    //(the MenuAbility whose Update armed it, or the rule that armed it by hand).
+    //The row's position is the mode; its identity is the owner. That is what
+    //ButtonPressedOnMultipleChoice dispatches on - never a scan of mObjects.
     vector<ActionElement *> menuRowElements;
     int stuffHappened;
     //destroy()-in-progress stack: an element's destroy() can cascade into
@@ -93,7 +98,10 @@ public:
     int reactToTargetClick(ActionElement * ability, Targetable * card);
     int stillInUse(MTGCardInstance * card);
     void setMenuObject(Targetable * object, bool must = false);
-    void setCustomMenuObject(Targetable * object, bool must = false,vector<MTGAbility*>abilities = vector<MTGAbility*>(),string customName = "");
+    //#W87-JA: `owner` is the element the multiple-choice menu belongs to - the
+    //one whose reactToChoiceClick answers it. Every arming site passes it; a
+    //menu armed without one has no answerable owner (kNoLiveMenuElement).
+    void setCustomMenuObject(Targetable * object, bool must = false,vector<MTGAbility*>abilities = vector<MTGAbility*>(),string customName = "", ActionElement * owner = NULL);
     void ButtonPressed(int controllerid, int controlid);
     void ButtonPressedOnMultipleChoice(int choice = -1);
     void doReactTo(int menuIndex);
@@ -114,6 +122,17 @@ public:
     //no caller may index mObjects with it. Distinct from kCancelMenuID and from
     //the engine's "0 = not a selectable option".
     static const int kMenuRowIsMode = -3;
+    //#W87-JA (audit-2026-09 bug list item 11): the multiple-choice dispatcher's
+    //"this row names no element the layer still holds". It used to be a bare -1,
+    //which is ALSO kCancelMenuID, so "not found" and "cancel" were one branch by
+    //accident. Distinct from kCancelMenuID (-1), from 0 (the engine's "not a
+    //selectable option") and from kMenuRowIsMode (-3); never an index.
+    static const int kNoLiveMenuElement = -4;
+    //#W87-JA: the element that owns the armed multiple-choice menu, resolved by
+    //identity through menuRowElements and confirmed live in mObjects; NULL when
+    //no multiple-choice menu is armed or its owner has left the game. The one
+    //way any seat should find "the MenuAbility this menu belongs to".
+    ActionElement * armedMenuOwner();
     bool getLiveMenuSlot(int controlid, int & slot);
     TargetChooser * getCurrentTargetChooser();
     void setCurrentWaitingAction(ActionElement * ae);

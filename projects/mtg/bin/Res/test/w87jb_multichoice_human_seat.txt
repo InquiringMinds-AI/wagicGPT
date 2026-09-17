@@ -1,0 +1,31 @@
+#NAME: The HUMAN seat's OK press on a mode menu selects that mode (#W87-JB)
+#DESC: audit-2026-09 bug list item 11. ButtonPressedOnMultipleChoice is ONE shared
+#DESC: dispatcher with three entries: the human's SimpleMenu OK press (ButtonPressed
+#DESC: -> ButtonPressedOnMultipleChoice() reading the menu cursor), the script's /
+#DESC: replay's `choice N` (doReactTo -> ButtonPressedOnMultipleChoice(N)), and the
+#DESC: AI seats' ButtonPressedOnMultipleChoice(doThis). This fixture drives the HUMAN
+#DESC: entry through the real key path (`humanmenu`): cursor moved to row 1, OK.
+#DESC: WITNESS: Inquisitor Exarch's enters-trigger, mode 0 "you gain 2 life", mode 1
+#DESC: "target opponent loses 2 life" (mtg.txt). Mode 1 is chosen: P1 20, P2 18.
+#DESC: The `choice N` entry is pinned by w86ia (after compaction) and the AI entry by
+#DESC: w87jc; all three must keep answering the same way.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Inquisitor Exarch
+manapool:{W}{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Inquisitor Exarch
+humanmenu 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Inquisitor Exarch
+manapool:{0}
+life:20
+[PLAYER2]
+life:18
+[END]

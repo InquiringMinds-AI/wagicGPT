@@ -1,6 +1,7 @@
 #include "PrecompiledHeader.h"
 
 #include "MTGAbility.h"
+#include <typeinfo>
 #include "ManaCost.h"
 #include "ManaEngine.h"
 #include "MTGGameZones.h"
@@ -7891,6 +7892,8 @@ MTGAbility::~MTGAbility()
     SAFE_DELETE(mCost);
 }
 
+int MTGAbility::garbageReaddRefused = 0; //#W87-JB
+
 int MTGAbility::addToGame()
 {
     //#W86-IB (audit-2026-09 bug list item 3). A GARBAGED ELEMENT IS NOT A LIVE ONE.
@@ -7911,6 +7914,22 @@ int MTGAbility::addToGame()
         DebugTrace("MTGAbility::addToGame REFUSED: this element is in the action"
                    " layer's garbage and is about to be deleted - re-registering it"
                    " would leave freed storage in the live layer");
+        //#W87-JB (audit-2026-09 bug list item 12): THE GUARD IS OBSERVABLE. The
+        //static enumeration (tools/enum-addtogame.py) reduces every addToGame
+        //receiver to a fresh allocation, a base-chain `this`, or a handful of
+        //pointer re-adds that go through removeFromGame (never the garbage) - but
+        //the `this`-receivers (resolve() on stack clones, MenuAbility::resolve)
+        //are dynamic dispatch a static walk cannot close. So the guard stays, and
+        //when it fires it says WHICH element and WHOSE, on stderr in development
+        //builds, so a corpus stderr names the path to read - and it counts, so a
+        //fixture can pin the firing.
+        garbageReaddRefused++;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+        fprintf(stderr, "WAGIC addToGame REFUSED a garbaged element: class=%s source=%s menu='%s' (refusal #%d)\n",
+                typeid(*this).name(),
+                source ? source->getName().c_str() : "(none)",
+                getMenuText().c_str(), garbageReaddRefused);
+#endif
         return 0;
     }
     game->addObserver(this);

@@ -496,6 +496,8 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 9, "millcard ") == 0 //#W85-HB (review-3 item 2)
                              || action.compare(0, 14, "aideclineface ") == 0 //#W71-BP
                              || action.compare(0, 22, "assertdeclinesapplied ") == 0 //#W71-BP
+                             || action.compare(0, 10, "humanmenu ") == 0 //#W87-JA: a menu answer
+                             || action.compare("assertmultichoiceidentity") == 0 //#W87-JA
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -572,6 +574,10 @@ int TestSuiteAI::Act(float)
             //binary" signal fix-lane-2 could not account for: the fixture's click
             //routing, not the mode-menu dispatch.
             && action.compare(0, 18, "shrinkactionlayer ") != 0
+            //#W87-JA (audit-2026-09 bug list item 11): the human seat's OK press IS a
+            //menu answer - it must reach the armed menu, never be pre-answered.
+            && action.compare(0, 10, "humanmenu ") != 0
+            && action.compare("assertmultichoiceidentity") != 0
             //#W86-IB / #W86-ID: layer/floor probes, not menu answers.
             && action.compare("assertgarbagereaddrefused") != 0
             && action.compare(0, 23, "assertinstanceidentity ") != 0 //#W86-IC
@@ -604,6 +610,8 @@ int TestSuiteAI::Act(float)
                 || action.compare(0, 19, "assertpendingdraws ") == 0 //#W63-AF (R8)
                 || action.compare(0, 9, "drawcard ") == 0 //#W69-BG (K1)
                 || action.compare(0, 18, "shrinkactionlayer ") == 0 //#W86-IA: never a card click
+                || action.compare(0, 10, "humanmenu ") == 0 //#W87-JA
+                || action.compare("assertmultichoiceidentity") == 0 //#W87-JA
                 || action.compare("assertgarbagereaddrefused") == 0 //#W86-IB
                 || action.compare(0, 23, "assertinstanceidentity ") == 0 //#W86-IC
                 || action.compare(0, 21, "assertpassfloorfired ") == 0 //#W86-ID
@@ -2043,6 +2051,162 @@ int TestSuiteAI::Act(float)
         al->currentActionCard = NULL;
         return 1;
     }
+    else if (action.find("humanmenu ") == 0)
+    {
+        //#W87-JA (audit-2026-09 bug list item 11). THE HUMAN SEAT'S MENU CLICK, EXACTLY.
+        //A human answers an armed menu through SimpleMenu: the d-pad moves the
+        //menu's own cursor, OK runs JGuiController::CheckUserInput ->
+        //ActionLayer::ButtonPressed(id, rowId), and a multiple-choice menu then
+        //dispatches ButtonPressedOnMultipleChoice() with NO row argument - it reads
+        //the menu's cursor. That is a different entry from the script's `choice N`
+        //(doReactTo -> ButtonPressedOnMultipleChoice(N)) and from the AI seats'
+        //(ButtonPressedOnMultipleChoice(doThis)); this command drives the human one
+        //through the real key path so one fixture can hold all three entries to the
+        //same answer. Syntax: humanmenu <row>
+        int row = atoi(action.substr(10).c_str());
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (!al->menuObject || !al->abilitiesMenu || row < 0
+            || (size_t) row >= al->abilitiesMenu->mObjects.size())
+        {
+            std::cerr << "TESTSUITE humanmenu: no armed menu row " << row
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        int guard = 0;
+        while (al->abilitiesMenu->getmCurr() != row && guard++ < 64)
+            al->abilitiesMenu->CheckUserInput(al->abilitiesMenu->getmCurr() < row ? JGE_BTN_DOWN : JGE_BTN_UP);
+        if (al->abilitiesMenu->getmCurr() != row)
+        {
+            std::cerr << "TESTSUITE humanmenu: could not move the menu cursor to row " << row
+                      << " (at " << al->abilitiesMenu->getmCurr() << ") [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        //The focused item is what the OK press acts on (SimpleButton::ButtonPressed
+        //answers mIsValidSelection, set by Entering) - the same thing the pointer
+        //hover / cursor arrival does in the real UI.
+        al->abilitiesMenu->mObjects[row]->Entering();
+        DebugTrace("TESTSUITE humanmenu: OK on row " << row << " [" << suite->filename << "]");
+        al->abilitiesMenu->CheckUserInput(JGE_BTN_OK);
+        return 1;
+    }
+    else if (action == "assertmultichoiceidentity")
+    {
+        //#W87-JA (audit-2026-09 bug list item 11). A MULTIPLE-CHOICE ANSWER GOES TO
+        //THE MenuAbility THAT OWNS THE ARMED MENU, NOT TO WHICHEVER TRIGGERED
+        //MenuAbility SITS HIGHEST IN THE LAYER.
+        //ButtonPressedOnMultipleChoice used to find its MenuAbility by scanning
+        //mObjects from the top for one with `triggered` set (slot 0 never examined,
+        //"not found" read as kCancelMenuID). `triggered` is never cleared by an
+        //answer: a MenuAbility whose chosen mode is a MAY hands a MayAbility clone to
+        //the layer and LINGERS, processed and still triggered, until that clone is
+        //answered (MenuAbility::testDestroy: getIndexOf(mClone) != -1). If a second,
+        //lower MenuAbility then arms ITS menu, the scan finds the lingering one first
+        //and hands it the answer - MenuAbility::reactToChoiceClick re-clones the
+        //already-chosen mode, processAbility returns 0 on `processed`, and the answer
+        //is EATEN: the armed menu's owner never processes, stays triggered, and re-arms
+        //the same question on the next tick, for ever (the re-arming-menu shape the
+        //pass floor exists to survive). Build exactly that:
+        //  A: modes on the host, armed second (lower index);
+        //  B: modes that are MAYs, sourced by a second permanent, answered first so
+        //     its clone keeps it in the layer above A.
+        //Then answer A's menu with mode 0 and require A to be the one that processed it.
+        ActionLayer * al = observer->mLayers->actionLayer();
+        MTGCardInstance * host = NULL;
+        MTGCardInstance * host2 = NULL;
+        for (int i = 0; i < observer->players[0]->game->inPlay->nb_cards; i++)
+        {
+            MTGCardInstance * c = observer->players[0]->game->inPlay->cards[i];
+            if (!host) host = c;
+            else if (!host2) host2 = c;
+        }
+        if (!host || !host2)
+        {
+            std::cerr << "TESTSUITE assertmultichoiceidentity: needs two permanents to host the"
+                      << " witness menus [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        AbilityFactory af(observer);
+        vector<MTGAbility *> optsA;
+        optsA.push_back(af.parseMagicLine("counter(1/1,1)", 0, NULL, host));
+        optsA.push_back(af.parseMagicLine("counter(3/3,1)", 0, NULL, host));
+        vector<MTGAbility *> optsB;
+        optsB.push_back(af.parseMagicLine("may counter(0/1,1)", 0, NULL, host2));
+        optsB.push_back(af.parseMagicLine("may counter(0/3,1)", 0, NULL, host2));
+        if (!optsA[0] || !optsA[1] || !optsB[0] || !optsB[1])
+        {
+            std::cerr << "TESTSUITE assertmultichoiceidentity: could not parse the witness"
+                      << " modes [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        const int powerBefore = host->getPower();
+        const int toughnessBefore = host->getToughness();
+        //Both MenuAbilities target the host (one whose target differs from the layer's
+        //currentActionCard drops `triggered` on Update); B and its modes are SOURCED
+        //by host2 so B's may-clone cannot arm over A's menu (a MayAbility arms only
+        //when no menu is up or the menu is on its own source).
+        MenuAbility * menuA = NEW MenuAbility(observer, al->getMaxId(), host, host, true, optsA, NULL, "identity witness A");
+        MenuAbility * menuB = NEW MenuAbility(observer, al->getMaxId(), host, host2, true, optsB, NULL, "identity witness B");
+        menuA->resolve(); //triggered + registered, A below B in the layer
+        menuB->resolve();
+        al->currentActionCard = NULL; //a stale one from an earlier menu would untrigger both
+        al->Update(0);                //A arms, then B re-arms over it: B's menu is the one shown
+        bool shape = al->menuObject && al->abilitiesMenu && al->abilitiesMenu->isMultipleChoice;
+        if (shape)
+        {
+            al->ButtonPressedOnMultipleChoice(0); //answer B: its MAY mode hands a clone to the layer
+            shape = menuB->processed && !menuA->processed && al->getIndexOf(menuB->mClone) >= 0;
+        }
+        if (shape)
+        {
+            al->Update(0); //B lingers (its clone is live); A arms its own menu below it
+            shape = al->menuObject && al->abilitiesMenu && al->abilitiesMenu->isMultipleChoice
+                    && al->getIndexOf(menuB) > al->getIndexOf(menuA) && al->getIndexOf(menuA) >= 0
+                    && !menuA->processed;
+        }
+        if (!shape)
+        {
+            std::cerr << "TESTSUITE assertmultichoiceidentity: could not build the shape"
+                      << " (menu armed=" << (al->menuObject ? 1 : 0)
+                      << " A idx=" << al->getIndexOf(menuA) << " B idx=" << al->getIndexOf(menuB)
+                      << " A processed=" << menuA->processed << " B processed=" << menuB->processed
+                      << " B clone live=" << (al->getIndexOf(menuB->mClone) >= 0)
+                      << ") [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        else
+        {
+            //The answer to A's menu, through the shared dispatcher, as every seat gives it.
+            al->ButtonPressedOnMultipleChoice(0);
+            const int powerAfter = host->getPower();
+            const int toughnessAfter = host->getToughness();
+            if (!menuA->processed || powerAfter != powerBefore + 1 || toughnessAfter != toughnessBefore + 1)
+            {
+                std::cerr << "TESTSUITE assertmultichoiceidentity: the answer to the ARMED menu (A) was"
+                          << " not processed by A (A processed=" << menuA->processed
+                          << ", host " << powerBefore << "/" << toughnessBefore << " -> "
+                          << powerAfter << "/" << toughnessAfter << ", expected +1/+1 from A's mode 0)"
+                          << " - the lingering, already-processed MenuAbility B above it took the"
+                          << " answer, and A would re-arm the same question on the next tick"
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+        }
+        //Leave the layer as it was.
+        al->menuObject = 0;
+        al->currentActionCard = NULL;
+        if (menuB->mClone && al->getIndexOf(menuB->mClone) >= 0)
+            observer->removeObserver(menuB->mClone);
+        menuB->mClone = NULL; //game-owned (see ~MenuAbility); it is in the garbage now
+        if (al->getIndexOf(menuB) >= 0)
+            observer->removeObserver(menuB);
+        if (al->getIndexOf(menuA) >= 0)
+            observer->removeObserver(menuA);
+        return 1;
+    }
     else if (action.find("addenergy ") == 0)
     {
         //#W84-GE (review-2 item 3): move a player's ENERGY count and nothing else.
@@ -2215,8 +2379,21 @@ int TestSuiteAI::Act(float)
             return 1;
         }
         //It is now in `garbage` and out of mObjects. Ask for it back.
+        const int refusalsBefore = MTGAbility::garbageReaddRefused;
         const int readded = witness->addToGame();
         const int liveIndex = al->getIndexOf(witness);
+        //#W87-JB (audit-2026-09 bug list item 12): the refusal must be OBSERVED, not
+        //just effective - the counter moves by exactly one (and the dev build's
+        //stderr line "WAGIC addToGame REFUSED a garbaged element: class=... source=..."
+        //is in the suite log for this fixture).
+        const int refusalsSeen = MTGAbility::garbageReaddRefused - refusalsBefore;
+        if (!readded && refusalsSeen != 1)
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: the guard refused silently -"
+                      << " MTGAbility::garbageReaddRefused moved by " << refusalsSeen
+                      << ", expected 1 [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
         //...and ask for it to be garbaged a second time, the other half of the shape.
         al->moveToGarbage(witness);
         int slots = 0;

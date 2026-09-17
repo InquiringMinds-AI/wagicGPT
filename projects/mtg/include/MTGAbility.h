@@ -239,6 +239,14 @@ public:
     virtual MTGAbility* clone() const = 0; 
     virtual ostream& toString(ostream& out) const;
     virtual int addToGame();
+    //#W87-JB (audit-2026-09 bug list item 12): how many times addToGame has REFUSED
+    //an element the action layer had already garbaged, process-wide. The refusal
+    //(#W86-IB) is a GUARD, not a proof that no path re-adds a garbaged element
+    //(see the enumeration in tools/enum-addtogame.py and step1-lane.md); this
+    //counter plus the dev-build stderr line make its firing OBSERVABLE: a corpus
+    //stderr names the element's class, source and menu text, and the suite pins
+    //the count (assertgarbagereaddrefused).
+    static int garbageReaddRefused;
     virtual int removeFromGame();
     //#W54-G (A10): the address-keyed `deletedpointers` double-delete guard is
     //gone - IfThenAbility::clone() deep-copies BOTH branches now, so there is

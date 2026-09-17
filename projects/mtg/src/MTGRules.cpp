@@ -578,7 +578,8 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
             //setCustomMenuObject is what MenuAbility::Update itself calls, every
             //tick it is armed, with these same arguments - doing it once here is
             //idempotent, and the Update that follows re-arms exactly as before.
-            game->mLayers->actionLayer()->setCustomMenuObject(card, false, selection);
+            //#W87-JA: the announcement menu is OWNED by a1 - its answer returns to it by identity.
+            game->mLayers->actionLayer()->setCustomMenuObject(card, false, selection, "", a1);
         }
         return 0;
     }

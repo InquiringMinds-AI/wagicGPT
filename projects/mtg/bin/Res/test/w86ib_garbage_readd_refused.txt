@@ -20,6 +20,14 @@
 #DESC: garbage (returned 1, mObjects index N)" and "the element holds 2 garbage
 #DESC: slot(s); cleanGarbage would delete it 2 time(s)".
 #DESC: GREEN: refused, one slot, swept once.
+#DESC: #W87-JB (audit-2026-09 bug list item 12): the guard is a guard, not a proof
+#DESC: (tools/enum-addtogame.py reduces the 170 call sites to fresh allocations,
+#DESC: base-chain `this`, removeFromGame round-trips and dynamic resolve() on
+#DESC: `this` - the last is what a static walk cannot close), so its firing must be
+#DESC: OBSERVABLE: MTGAbility::garbageReaddRefused counts every refusal and the
+#DESC: development build prints "WAGIC addToGame REFUSED a garbaged element:
+#DESC: class=<RTTI name> source=<card> menu='<text>'" on stderr, so a corpus stderr
+#DESC: names the path. This fixture now also requires the counter to move by one.
 [INIT]
 FIRSTMAIN
 [PLAYER1]

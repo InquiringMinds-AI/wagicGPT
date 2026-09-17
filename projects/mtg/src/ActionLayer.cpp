@@ -715,7 +715,7 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
     modal = 1;
 }
 
-void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGAbility*>abilities,string customName)
+void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGAbility*>abilities,string customName, ActionElement * owner)
 {
     if (!object)
     {
@@ -735,7 +735,9 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, customName.size()?customName.c_str():object->getDisplayName().c_str());
     menuRowElements.clear(); //#W58-F (F1): the rows of a multiple-choice menu
     //carry no mObjects index at all (every row is added with the same id); the
-    //resolvers below short-circuit on isMultipleChoice before reading this.
+    //slot resolvers short-circuit on isMultipleChoice before reading this.
+    //#W87-JA: what they DO carry is the menu's OWNER, one entry per row, so the
+    //answer is dispatched to the element that armed the menu by identity.
     currentActionCard = NULL;
     abilitiesMenu->isMultipleChoice = false;
     if(abilities.size())
@@ -746,17 +748,38 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
             ActionElement* currentAction = (ActionElement*)abilities[w];
             currentActionCard = (MTGCardInstance*)abilities[0]->target;
             abilitiesMenu->Add(mObjects.size()-1, currentAction->getMenuText(),"",false);
-            menuRowElements.push_back(NULL); //#W58-F (F1)
+            menuRowElements.push_back(owner); //#W87-JA: this mode row belongs to `owner`
         }
+        if (!owner)
+            DebugTrace("ActionLayer::setCustomMenuObject: a multiple-choice menu on '"
+                       << menuObjectName << "' was armed with NO owner - no element can"
+                       " answer it (its rows resolve to kNoLiveMenuElement)");
     }
     if (!must)
     {
         abilitiesMenu->Add(kCancelMenuID, "Cancel");
-        menuRowElements.push_back(NULL); //#W58-F (F1)
+        //#W87-JA: a multiple-choice menu's cancel row is answered by the owner too
+        //(MenuAbility::reactToChoiceClick treats an out-of-range mode as the
+        //decline); an ordinary custom menu's cancel row names no ability.
+        menuRowElements.push_back(abilitiesMenu->isMultipleChoice ? owner : NULL); //#W58-F (F1)
     }
     else
         cantCancel = 1;
     modal = 1;
+}
+
+//#W87-JA (audit-2026-09 bug list item 11): the owner of the armed multiple-choice
+//menu, by identity. The W58-F map holds it per row (nulled by removeFromGame /
+//forgetElement the moment the owner leaves the game); the index is looked up
+//LIVE, so a layer that compacted under the menu cannot mislead this.
+ActionElement * ActionLayer::armedMenuOwner()
+{
+    if (!menuObject || !abilitiesMenu || !abilitiesMenu->isMultipleChoice)
+        return NULL;
+    ActionElement * owner = menuRowElements.empty() ? NULL : menuRowElements[0];
+    if (!owner || getIndexOf(owner) < 0)
+        return NULL;
+    return owner;
 }
 
 //#W58-F (F1) / #W83-FD (fix-review item 4): menu row -> the ability it names,
@@ -772,11 +795,12 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
 //  MODE INDEX   - which OPTION of a MenuAbility a multiple-choice row is. That is
 //      `menuIndex` itself, never the id: setCustomMenuObject gives every row the
 //      SAME id (`mObjects.size()-1`, captured at arm time) and the answer is
-//      dispatched by ButtonPressedOnMultipleChoice, which finds the live
-//      MenuAbility by scanning for a triggered one. A multiple-choice row is
-//      therefore ALWAYS answerable while its menu stands, whatever the layer did
-//      to that stale id, and `slot` comes back as kMenuRowIsMode so no caller can
-//      mistake it for a position.
+//      dispatched by ButtonPressedOnMultipleChoice, which resolves the row to
+//      the element that OWNS the menu through menuRowElements (#W87-JA) - by
+//      identity, at its live index, never by scanning mObjects. A multiple-choice
+//      row is therefore ALWAYS answerable while its menu stands and its owner is
+//      in the game, whatever the layer did to that stale id, and `slot` comes
+//      back as kMenuRowIsMode so no caller can mistake it for a position.
 //  SENTINEL     - kCancelMenuID (-1) is the cancel row and 0 is the engine's
 //      long-standing "not a selectable option"; both are handed back untouched.
 //      Note the honest scope of that: AIPlayerBaka::selectMenuOption and
@@ -986,30 +1010,60 @@ void ActionLayer::ButtonPressed(int, int controlid)
     }
 }
 
+//#W87-JA (audit-2026-09 bug list item 11; buglist-lane.md item 2's residual).
+//THE ANSWER GOES TO THE ELEMENT THAT OWNS THE MENU, RESOLVED BY IDENTITY.
+//
+//This is the ONE dispatcher every seat's mode answer passes through: the human's
+//SimpleMenu OK press (ButtonPressed -> here with no row, reading the menu's
+//cursor), the script's / replay's `choice N` (doReactTo -> here with the row),
+//the heuristic seat (AIPlayerBaka::computeActions), the LLM seat
+//(AIPlayerGPT seams, and DecisionManager::applyMenuChoice for CHOOSE_MODE /
+//ANNOUNCE_X). It used to find the MenuAbility to answer by scanning mObjects from
+//the top for one with `triggered` set: slot 0 was never examined (a convention
+//that the first element registered is a game rule, enforced by nothing), a
+//scan that found nothing left the index at -1 and the next branch read that -1
+//as kCancelMenuID, and `triggered` is never cleared by an answer - a MenuAbility
+//whose chosen mode is a MAY lingers in the layer, processed and still
+//triggered, until its clone is answered; a second MenuAbility below it that arms
+//ITS menu then had its answer handed to the lingering one (reactToChoiceClick
+//re-clones the chosen mode, processAbility returns on `processed`, the answer is
+//eaten, the armed menu re-asks every tick) - w87ja is that shape.
+//
+//Now: the answered row's identity is the menu's owner, captured when the menu
+//was armed (setCustomMenuObject's `owner`, one entry per row in the W58-F map,
+//nulled when the owner leaves the game); its index is looked up live. No scan,
+//no raw slot, no dependence on what sits at mObjects[0]. A row with no live
+//owner is kNoLiveMenuElement - a named case, distinct from cancel: the menu is
+//unanswerable (its owner has left the game), so it is closed and the interrupt
+//window it held is released, exactly what the unnamed -1 branch always did.
 void ActionLayer::ButtonPressedOnMultipleChoice(int choice)
 {
-    int currentMenuObject = -1;
-    for(int i = int(mObjects.size()-1);i > 0;i--)
+    const int row = (choice > -1) ? choice : (abilitiesMenu ? abilitiesMenu->getmCurr() : -1);
+    ActionElement * owner = (row >= 0 && (size_t) row < menuRowElements.size())
+                            ? menuRowElements[row] : NULL;
+    int live = kNoLiveMenuElement;
+    if (owner)
     {
-        //the currently displayed menu is not always the currently listenning action object
-        //find the menu which is displayed.
-        MenuAbility * ma = dynamic_cast<MenuAbility *>(mObjects[i]);//find the active menu
-        if(ma && ma->triggered)
-        {
-            currentMenuObject = i;
-            break;
-        }
+        const int index = getIndexOf(owner);
+        if (index >= 0)
+            live = index;
     }
-    if (currentMenuObject >= 0 && currentMenuObject < static_cast<int>(mObjects.size()))
+    if (live >= 0)
     {
-        ActionElement * currentAction = (ActionElement *) mObjects[currentMenuObject];
-        currentAction->reactToChoiceClick(menuObject,choice > -1?choice:this->abilitiesMenu->getmCurr(),currentMenuObject);
-        MenuAbility * ma = dynamic_cast<MenuAbility *>(mObjects[currentMenuObject]);
-        if(ma)
+        ActionElement * currentAction = (ActionElement *) mObjects[live];
+        currentAction->reactToChoiceClick(menuObject, row, live);
+        //The click may have reshaped the layer (a processed mode resolves at
+        //once); re-resolve the owner by identity before touching it.
+        const int again = getIndexOf(owner);
+        MenuAbility * ma = (again >= 0) ? dynamic_cast<MenuAbility *>(mObjects[again]) : NULL;
+        if (ma)
             ma->removeMenu = true;//we clicked something, close menu now.
     }
-    else if (currentMenuObject == kCancelMenuID)
+    else
     {
+        DebugTrace("ActionLayer::ButtonPressedOnMultipleChoice: row " << row << " of the menu on '"
+                   << menuObjectName << "' names no live element (kNoLiveMenuElement) - closing the"
+                   " unanswerable menu and releasing its interrupt window");
         observer->mLayers->stackLayer()->endOfInterruption(false);
     }
     menuObject = 0;
