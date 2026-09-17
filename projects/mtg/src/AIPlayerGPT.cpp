@@ -21482,7 +21482,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mOrderDoneTurn(-1), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mOrderDoneTurn(-1), mCastMenuAsked(false), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
        mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mMenuPassNoProgressSuppressed(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
@@ -50387,6 +50387,86 @@ static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
     return landEntersTappedTagFrom(g, land->text, res, evidence);
 }
 
+//#W82-P9: the revert switch. Compile-time default ON; WAGIC_GPT_LAND_SEPARATE=1
+//at runtime restores the separate land-drop ask (the pre-P9 behaviour).
+static const bool kLandDropInCastMenu = true;
+static bool landDropInCastMenu()
+{
+    static int v = -1;
+    if (v < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_LAND_SEPARATE");
+        v = (e && *e && *e != '0') ? 0 : (kLandDropInCastMenu ? 1 : 0);
+    }
+    return v == 1;
+}
+
+//The land-drop rows, one per playable land (two for an MDFC: front face and
+//back face), the same text on the separate land ask and on the combined
+//casting menu (#W82-P9).
+void AIPlayerGPT::buildLandDropRows(const vector<LegalActionsOracle::Cast>& lands,
+                                    vector<string>& opts, vector<size_t>& rowLand,
+                                    vector<bool>& rowBackFace)
+{
+    for (size_t li = 0; li < lands.size(); li++)
+    {
+        string backMana;
+        const string backFace = w74MdfcLandBackFace(this, lands[li].card, backMana);
+        const string base = "Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel
+                       //#W61-T (C7): the tapped-land fact, on the row that plays it.
+                       //#W62-W (D1): resolved against the battlefield this
+                       //same prompt prints, where the gate is decidable.
+                       + landEntersTappedTagResolved(lands[li].card, this)
+                       //#W66-AT (deck146 MED): and the half the mana clause
+                       //never priced - this land is also a creature.
+                       + landDropThreatTag(lands[li].card->magicText);
+        if (backFace.empty())
+        {
+            opts.push_back(base);
+            rowLand.push_back(li);
+            rowBackFace.push_back(false);
+            continue;
+        }
+        opts.push_back(base + w75MdfcFaceRowTag(false, lands[li].card->getDisplayName(),
+                                                backFace, backMana));
+        rowLand.push_back(li);
+        rowBackFace.push_back(false);
+        opts.push_back("Play " + backFace + lands[li].zoneLabel
+                       + w75MdfcFaceRowTag(true, lands[li].card->getDisplayName(),
+                                           backFace, backMana));
+        rowLand.push_back(li);
+        rowBackFace.push_back(true);
+    }
+}
+
+//#W82-P9: a land row on the combined menu was taken - the same commit the
+//separate ask makes (MDFC face pre-answer, forced-candidate validation).
+MTGCardInstance * AIPlayerGPT::commitLandDropPick(ManaCost * pMana, MTGCardInstance * chosenLand,
+                                                  bool backFace)
+{
+    {
+        string preBackMana;
+        const string preBack = w74MdfcLandBackFace(this, chosenLand, preBackMana);
+        if (!preBack.empty())
+        {
+            mLandFacePreCard = chosenLand;
+            mLandFacePreTurn = observer->turn;
+            mLandFacePreBack = backFace;
+            mLandFacePreBackName = preBack;
+        }
+    }
+    aiForcedCandidate = chosenLand;
+    MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "land");
+    aiForcedCandidate = NULL;
+    if (validated)
+        return validated;
+    DebugTrace("AIPlayerGPT: model chose land " << chosenLand->name
+               << " but it fails validation; deferring to heuristic");
+    writeTransLog("defer", "", "", -1, 0, chosenLand->name, "deferred_to_heuristic");
+    gotPayments.clear();
+    return AIPlayerBaka::FindCardToPlay(pMana, "land");
+}
+
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
 {
     //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
@@ -50460,38 +50540,35 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //not through a second land play), so the two rows carry the same land
         //entry and only the FACE differs; the answer is carried into the face
         //menu below instead of being asked twice.
+        //#W82-P9 (owner: "try it. Revert if it degrades behavior"): on the seat's
+        //own main phase the land rows ride the CASTING menu instead of a menu
+        //of their own. The heuristic asks for the land first and the casts
+        //second in the same tick, so this branch delegates to the cast branch
+        //with the land rows staged; if that branch ASKED (a menu reached the
+        //model, or is in flight), its answer is this branch's answer - a land
+        //the model named comes back as the card to play, a spell as the card
+        //to cast, and the cast question re-puts on the changed board after a
+        //land enters. If the cast branch did NOT ask (no castable spell, a hold
+        //standing, a no-progress marker), the separate land ask below runs as
+        //before, so the land drop is never lost. WAGIC_GPT_LAND_SEPARATE=1
+        //restores the separate ask unconditionally (the revert switch).
+        if (landDropInCastMenu() && observer && observer->currentPlayer == this
+            && mLandRowsForCast.empty() && mRepeatRemaining <= 0)
+        {
+            mLandRowsForCast = lands;
+            mCastMenuAsked = false;
+            MTGCardInstance * viaCast = FindCardToPlay(pMana,
+                "planeswalker,creature,enchantment,artifact,sorcery,instant,battle");
+            mLandRowsForCast.clear();
+            if (mCastMenuAsked)
+                return viaCast;
+            //fall through: the cast branch never put a menu to the model
+        }
+
         vector<string> opts;
         vector<size_t> rowLand;   //which lands[] entry this row plays
         vector<bool> rowBackFace; //...and which face of it
-        for (size_t li = 0; li < lands.size(); li++)
-        {
-            string backMana;
-            const string backFace = w74MdfcLandBackFace(this, lands[li].card, backMana);
-            const string base = "Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel
-                           //#W61-T (C7): the tapped-land fact, on the row that plays it.
-                           //#W62-W (D1): resolved against the battlefield this
-                           //same prompt prints, where the gate is decidable.
-                           + landEntersTappedTagResolved(lands[li].card, this)
-                           //#W66-AT (deck146 MED): and the half the mana clause
-                           //never priced - this land is also a creature.
-                           + landDropThreatTag(lands[li].card->magicText);
-            if (backFace.empty())
-            {
-                opts.push_back(base);
-                rowLand.push_back(li);
-                rowBackFace.push_back(false);
-                continue;
-            }
-            opts.push_back(base + w75MdfcFaceRowTag(false, lands[li].card->getDisplayName(),
-                                                    backFace, backMana));
-            rowLand.push_back(li);
-            rowBackFace.push_back(false);
-            opts.push_back("Play " + backFace + lands[li].zoneLabel
-                           + w75MdfcFaceRowTag(true, lands[li].card->getDisplayName(),
-                                               backFace, backMana));
-            rowLand.push_back(li);
-            rowBackFace.push_back(true);
-        }
+        buildLandDropRows(lands, opts, rowLand, rowBackFace);
         opts.push_back(kLandDropDeclineRow);
         //#W77-CR (R2 a): the land drop's own hold-check memory. It is a `kind:
         //ask` record like the casting menu, so wave 76 filed it in the casting
@@ -51957,6 +52034,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             w81AllDead, (int) menu.size(),
             (int) LegalActionsOracle::legalLandPlays(this).size(),
             w81AnyTagDead); //#W68-BD (MED); #W81-DM (V13)
+        //#W82-P9: the staged land rows, after the cast rows and before the
+        //decline/hold rows. They are not cast candidates - `landRowFirst` says
+        //where they start and `landRowLand`/`landRowBack` say what each plays.
+        const int landRowFirst = (int) menu.size();
+        vector<size_t> landRowLand;
+        vector<bool> landRowBack;
+        if (!mLandRowsForCast.empty())
+        {
+            vector<string> landRows;
+            buildLandDropRows(mLandRowsForCast, landRows, landRowLand, landRowBack);
+            for (size_t lr = 0; lr < landRows.size(); lr++)
+                menu.push_back(landRows[lr]);
+        }
+        const int landRowCount = (int) menu.size() - landRowFirst;
         int declineRowIdx = -1; //#W66-AS (H7 second half): the decline's own row number
         //#W65-AL (G9, deck125 HIGH-1): and its PRICE, where it has one. The
         //cleanup step this clause prices is THIS turn's, so the clause is
@@ -51967,6 +52058,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             string declineRow = castDeclineRow(observer->currentPlayer == this
                                                && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN);
+            if (landRowCount > 0) //#W82-P9: the decline covers the land rows on this menu too
+                declineRow += " - and play no land in this window";
             int cuHand = -1, cuLimit = -1, cuPer = 0, cuStacked = 0;
             string cuPunishers;
             forcedCleanupInputs(NULL, this, opponent(), cuHand, cuLimit, cuPer,
@@ -52223,6 +52316,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
           << "): which card do you cast now, if any?";
         q << deadMenuNote; //#W57-C (D12)
         q << kCastNoRowZeroFact; //#W66-AS (deck123 MED)
+        if (landRowCount > 0) //#W82-P9
+            q << " The \"Play <land>\" rows play that land instead of casting this window; you"
+                 " have one land drop this turn, and this casting decision is asked again after"
+                 " the land enters.";
         if (attempt > 0)
             q << "\n[RE-ASK " << attempt << "] The engine could not actually complete: "
               << rejectedSoFar << " - its cost or its targets cannot be satisfied right"
@@ -52274,9 +52371,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mNextSendCrackBack = w80PendingCastCrackBack;
         mNextSendStackDeath = w80PendingCastStackDeath;
         mNextSendDrain = w80PendingCastDrain;
+        mCastMenuAsked = true; //#W82-P9: a menu reached the model (or is in flight)
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
+        if (landRowCount > 0 && pick >= landRowFirst && pick < landRowFirst + landRowCount)
+        {
+            //#W82-P9: a land row - play it; the casting decision stays OPEN and is
+            //asked again on the changed board (nothing is marked answered here).
+            const size_t lr = (size_t) (pick - landRowFirst);
+            DebugTrace("AIPlayerGPT: land drop taken from the casting menu: "
+                       << mLandRowsForCast[landRowLand[lr]].card->name);
+            return commitLandDropPick(pMana, mLandRowsForCast[landRowLand[lr]].card, landRowBack[lr]);
+        }
         //#W49-S (D8): the priority ask after this can say so.
         //#W72-BT (M13): set AFTER the window is answered, not before it is put.
         //#W72-BX (F3): and after VALIDATION, at the exits that actually close the

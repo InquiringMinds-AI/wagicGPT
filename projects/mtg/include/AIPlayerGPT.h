@@ -44,6 +44,7 @@
 #ifdef WITH_GPT_AI
 
 #include "AIPlayerBaka.h"
+#include "LegalActions.h" //#W82-P9: LegalActionsOracle::Cast
 
 #include <set>
 #include <utility>
@@ -1221,6 +1222,14 @@ private:
     int mOrderDoneTurn;
     std::set<MTGCardInstance *> mOrderDone;
     std::set<MTGCardInstance *> mOrderPerPick;
+    //#W82-P9: the land rows staged onto the casting menu by the land branch, and
+    //whether the cast branch put a menu to the model on this delegation.
+    std::vector<LegalActionsOracle::Cast> mLandRowsForCast;
+    bool mCastMenuAsked;
+    void buildLandDropRows(const std::vector<LegalActionsOracle::Cast>& lands,
+                           std::vector<std::string>& opts, std::vector<size_t>& rowLand,
+                           std::vector<bool>& rowBackFace);
+    MTGCardInstance * commitLandDropPick(ManaCost * pMana, MTGCardInstance * chosenLand, bool backFace);
 
     //#W82-A (L1): the turn this seam last opened on. It carried the decline and
     //flip caps' per-turn reset (both DELETED - no legal row is withheld any
