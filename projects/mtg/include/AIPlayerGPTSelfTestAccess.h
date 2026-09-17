@@ -496,6 +496,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static void groupNumberedRows(const vector<string>& rows, vector<size_t>& order);
     static string handAboutToBeReplacedLine(const string& sourceName);
     static string handCastabilityTag(int verdict, int need, int sources, const string& cost, const string& timingWhy= "", int floating= 0, bool instantSpeed= false);
+    static string handTagLegend(bool anySorcerySpeed, const string& timingWhy, bool anyHeld);
     static string handRemovalVerb(const string& lc, bool& relocate, const string& gainDest= "");
     static int handleRank(const string& handle);
     static bool hasCodedAnswerLine(const string& content);

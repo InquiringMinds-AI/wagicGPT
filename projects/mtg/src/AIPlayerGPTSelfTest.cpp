@@ -26548,26 +26548,32 @@ static const char * kW50Y_r94 =
         // now: sorcery speed - only in your own main phase with an empty stack]`
         // under `Casting decision (Main phase 1, YOUR turn)` with a cycling
         // ability on the stack. 7,212 characters of argument, no coded line.
+        // #W82-P4 INVERTED: the failing half now prints ONCE per hand line, in
+        // the legend, and the per-card tag is the short head. The s52 fact (which
+        // half failed) is still on the screen - on the legend line.
         CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}",
                                  "the stack is not empty (see ON THE STACK above)")
-                  == " [no cast row now: sorcery speed - only in your own main phase with an empty"
-                     " stack; right now the stack is not empty (see ON THE STACK above)]",
-              "#W67-AW M2 REPRO the s52 bracket names the half that actually failed");
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}",
-                                 "it is the opponent's turn and the phase is Upkeep, not a main phase")
+                  == " [no cast row now: sorcery speed]",
+              "#W67-AW M2 / #W82-P4 the per-card tag is the short head; the failing half"
+              " moved to the legend");
+        CHECK(handTagLegend(true, "the stack is not empty (see ON THE STACK above)", false)
+                  == "\nHand tags: [sorcery speed] = a cast row only in your own main phase with"
+                     " an empty stack; right now the stack is not empty (see ON THE STACK above).",
+              "#W67-AW M2 REPRO the s52 half that actually failed is named on the legend line");
+        CHECK(handTagLegend(true, "it is the opponent's turn and the phase is Upkeep, not a main phase", false)
                   .find("right now it is the opponent's turn and the phase is Upkeep, not a main"
                         " phase") != string::npos,
               "#W67-AW M2 POSITIVE two failing halves are both named, in the order the rule reads"
               " them");
         // MUST-NOT-MATCH: the full rule is still printed - nothing the model
-        // relies on is deleted - and an empty reason is byte-identical to wave 66.
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty")
+        // relies on is deleted - once per line.
+        CHECK(handTagLegend(true, "the stack is not empty", false)
                   .find("only in your own main phase with an empty stack") != string::npos,
               "#W67-AW M2 the rule itself is still printed beside the failing half");
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}")
-                  == " [no cast row now: sorcery speed - only in your own main phase with an empty"
-                     " stack]",
-              "#W67-AW M2 MUST-NOT-MATCH no reason supplied leaves the wave-66 string byte-identical");
+        CHECK(handTagLegend(true, "", false)
+                  == "\nHand tags: [sorcery speed] = a cast row only in your own main phase with"
+                     " an empty stack.",
+              "#W67-AW M2 no reason supplied prints the rule alone");
         CHECK(handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}", "the stack is not empty")
                   .find("right now") == string::npos,
               "#W67-AW M2 MUST-NOT-MATCH the reason reaches no other verdict");
@@ -38869,14 +38875,22 @@ static const char * kW50Y_r94 =
                                                "", 0, true);
         const string corpusRow =
             "Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]";
+        // #W82-P4 INVERTED: the sorcery-speed no-target tag names the STACK too (a
+        // counterspell's legal target is a stack object - "on the board" alone was a
+        // wrong-scope statement), and the HELD explanation prints once per hand
+        // line in the legend; the per-card tag keeps the head and the word HELD.
         CHECK(base == " [no cast row now: it must have a target and there is no legal"
-                      " target on the board]",
-              "#W79-DB T8 RED-ON-BASE the wave-78 tag, byte-exact - it says only that THIS"
-              " window has no row, and `125v162` seq 52 read it as a fact about the hand");
-        CHECK(held != base && held.find("HELD: this is an instant") != string::npos
-              && held.find("castable the moment a legal target appears") != string::npos,
-              "#W79-DB T8 GREEN an instant with no legal target now reads as HELD");
-        CHECK(held.compare(0, base.size() - 1, base, 0, base.size() - 1) == 0,
+                      " target on the board or the stack]",
+              "#W79-DB T8 / #W82-P4 the no-target tag names the board AND the stack");
+        CHECK(held == " [no cast row now: no legal target - HELD]",
+              "#W79-DB T8 GREEN an instant with no legal target now reads as HELD, short");
+        CHECK(handTagLegend(false, "", true).find("HELD] = an instant with no legal target on the"
+                                                  " board or the stack right now") != string::npos
+              && handTagLegend(false, "", true).find("castable the moment a legal target appears")
+                     != string::npos
+              && handTagLegend(false, "", true).find("never about your hand") != string::npos,
+              "#W79-DB T8 the HELD scope lesson is on the legend line, once");
+        CHECK(held.compare(0, 18, base, 0, 18) == 0 && held.compare(0, 18, " [no cast row now:") == 0,
               "#W79-DB T8 the literal head every guide keys on is byte-identical");
         CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, false) == base,
               "#W79-DB T8 MUST-NOT-MATCH a sorcery-speed card with no target is unchanged");
@@ -43073,6 +43087,46 @@ static const char * kW50Y_r94 =
             CHECK(joinZoneEntries(n5, h5, t5, false) == "Plains x2 (land)",
                   "#W82-P3 a two-card hand of one name is one entry saying x2");
         }
+    }
+
+    cout << "\n[#W82-P4] the two dominant hand tags: short per-card tag + one legend per line\n";
+    {
+        CHECK(handTagLegend(false, "", false).empty(),
+              "#W82-P4 a hand carrying neither tag adds no legend byte");
+        const string both = handTagLegend(true, "the phase is Upkeep, not a main phase", true);
+        CHECK(both.compare(0, 11, "\nHand tags:") == 0,
+              "#W82-P4 the legend is its own line under the hand line");
+        CHECK(both.find("[sorcery speed] =") != string::npos && both.find("[HELD] =") != string::npos
+              && both.find("[sorcery speed] =") < both.find("[HELD] ="),
+              "#W82-P4 both halves print when both tags are on the line, sorcery first");
+        CHECK(both.find("right now the phase is Upkeep, not a main phase.") != string::npos,
+              "#W82-P4 the failing half of the timing rule is named once, in the legend");
+        // The per-card tags carry no board number (KEY STABILITY, the wave-74
+        // lesson): the sorcery tag no longer varies with timingWhy at all.
+        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty")
+                  == handCastabilityTag(kHandSorcerySpeed, 1, 0, "{w}", "", 9),
+              "#W82-P4 KEY the per-card sorcery tag is one string whatever the window");
+        // Bytes: a five-sorcery hand in an upkeep, before and after.
+        {
+            const string why = "it is the opponent's turn and the phase is Upkeep, not a main phase";
+            const string oldTag = " [no cast row now: sorcery speed - only in your own main phase"
+                                  " with an empty stack; right now " + why + "]";
+            const size_t before = 5 * oldTag.size();
+            const size_t after = 5 * handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", why).size()
+                                 + handTagLegend(true, why, false).size();
+            cout << "     five sorceries in an upkeep: " << before << " B -> " << after << " B\n";
+            CHECK(after < before, "#W82-P4 five tagged sorceries cost fewer bytes with the legend");
+        }
+        // ECHO SHAPE: brackets, dropped from history wholesale like every hand verdict.
+        CHECK(stripNarrationDecoration("Talisman of Impulse {2} [artifact]"
+                  + handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty"))
+                  == "Talisman of Impulse {2}",
+              "#W82-P4 ECHO the short bracket never enters history");
+        // The guide head: deck125's guide quotes `[no cast row now: ...` for a held
+        // counterspell; the head and the words "no legal target" both survive.
+        CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, true)
+                  .find("[no cast row now: no legal target") != string::npos,
+              "#W82-P4 the held-counterspell tag keeps the head and `no legal target`");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

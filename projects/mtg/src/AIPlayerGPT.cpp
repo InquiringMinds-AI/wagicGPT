@@ -31345,12 +31345,13 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
           << " cannot pay it]";
         return o.str();
     case kHandSorcerySpeed:
-        o << " [no cast row now: sorcery speed - only in your own main phase"
-             " with an empty stack";
-        if (!timingWhy.empty())
-            o << "; right now " << timingWhy; //#W67-AW (M2)
-        o << "]";
-        return o.str();
+        //#W82-P4: the rule and the failing half (#W67-AW M2's `timingWhy`) print
+        //ONCE per hand line, in `handTagLegend`, not once per card - a hand of
+        //five sorceries in an upkeep carried the same 130-byte sentence five
+        //times (2,251 renders x ~400 B in the wave-80 corpus). The per-card tag
+        //keeps the head every guide keys on and the verdict's name.
+        (void) timingWhy;
+        return " [no cast row now: sorcery speed]";
     case kHandNoLegalTarget:
         //#W79-DB (T8, wave-78 deck125 A-2 - the game). `125v162` seq 52 printed
         //this tag twice, on two Fall of the Gavel, and the reply reasoned "I have
@@ -31362,20 +31363,46 @@ string handCastabilityTag(int verdict, int need, int sources, const string& cost
         //guide keys on it); what is added says what an instant with no target NOW
         //actually is. Conditioned on the card's TYPE, which is static, so no
         //board number enters the bracket and no key can move on it.
+        //#W82-P4: the HELD explanation prints once per hand line (handTagLegend);
+        //the per-card tag keeps the head and the word HELD (T8's scope lesson).
+        //"on the board or the stack": a counterspell's legal target is a stack
+        //object, and "on the board" alone was a wrong-scope statement for it.
         if (instantSpeed)
-            return " [no cast row now: it must have a target and there is no legal"
-                   " target on the board - HELD: this is an instant, so it is in"
-                   " your hand and castable the moment a legal target appears,"
-                   " including on their turn; this tag is about THIS window, never"
-                   " about your hand]";
+            return " [no cast row now: no legal target - HELD]";
         return " [no cast row now: it must have a target and there is no legal"
-               " target on the board]";
+               " target on the board or the stack]";
     case kHandRestricted:
         return " [no cast row now: a play restriction forbids casting it]";
     default:
         break;
     }
     return "";
+}
+
+//#W82-P4: the ONE-PER-HAND-LINE explanation of the two dominant hand tags. Each
+//half prints only when a card on the line carries that tag, so a hand with
+//neither adds no byte. `timingWhy` is #W67-AW (M2)'s failing half (or halves) of
+//the sorcery-speed rule, named from the same three facts the gate is built from.
+//Pure. It states the RULE and the WINDOW, never a board number, so the ask key
+//(whose board half this line is) moves on exactly what the per-card tag moved on.
+string handTagLegend(bool anySorcerySpeed, const string& timingWhy, bool anyHeld)
+{
+    if (!anySorcerySpeed && !anyHeld)
+        return "";
+    std::ostringstream o;
+    o << "\nHand tags:";
+    if (anySorcerySpeed)
+    {
+        o << " [sorcery speed] = a cast row only in your own main phase with an empty stack";
+        if (!timingWhy.empty())
+            o << "; right now " << timingWhy;
+        o << ".";
+    }
+    if (anyHeld)
+        o << " [HELD] = an instant with no legal target on the board or the stack right now;"
+             " it is in your hand and castable the moment a legal target appears, including on"
+             " their turn - the tag is about THIS window, never about your hand.";
+    return o.str();
 }
 
 namespace
@@ -31767,6 +31794,8 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     //disagree, and with the reason PRINTED rather than implied. Lands are left
     //alone: the land drop is its own decision with its own row (C7's other half).
     std::map<string, string> handCastTags;
+    bool handAnySorcerySpeed = false, handAnyHeld = false; //#W82-P4
+    string handSorceryWhy;
     if (game && game->hand && game->hand->nb_cards > 0 && observer && observer->mLayers)
     {
         const int phase = observer->getCurrentGamePhase();
@@ -31821,6 +31850,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 sw << sep << w80StackNotEmptyReason(stackBlockRendered); //#W80-DG (U11)
             sorceryWhy = sw.str();
         }
+        handSorceryWhy = sorceryWhy; //#W82-P4
         GptManaPolicy castPolicy(this);
         ManaCost * castPool = ManaEngine::potentialMana(this, castPolicy);
         //#W68-BB (J5): `potentialMana` is the UNTAPPED PRODUCERS only; the
@@ -31873,6 +31903,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
                 //Every gate the oracle checks before its name dedupe has passed,
                 //so the remaining one is 601.2c: a mandatory target, none legal.
                 verdict = kHandNoLegalTarget;
+            const bool hcInstant = hc->hasType(Subtypes::TYPE_INSTANT)
+                || hc->has(Constants::FLASH) || hc->has(Constants::ASFLASH);
+            if (verdict == kHandSorcerySpeed)
+                handAnySorcerySpeed = true; //#W82-P4
+            if (verdict == kHandNoLegalTarget && hcInstant)
+                handAnyHeld = true; //#W82-P4
             string tag = handCastabilityTag(verdict, need, sources, costStr,
                                             sorceryWhy, handFloating, //#W67-AW (M2) / #W68-BB (J5)
                                             //#W79-DB (T8): instant speed, from the card's
@@ -31901,6 +31937,7 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
     }
     describeZoneCards(out, game->hand, false, "your hand", false, NULL, &handCastTags);
     out << yourHandDisplacedClause(myHandInReveal);
+    out << handTagLegend(handAnySorcerySpeed, handSorceryWhy, handAnyHeld); //#W82-P4
     //Surfaced creature COUNTS: a cluttered board line studded with
     //artifacts and [tapped] flags gets miscounted (wave-7 deck140: every
     //sweeper mistiming stood on a wrong creature tally). An integer at the
@@ -62552,6 +62589,7 @@ void AIPlayerGPTSelfTestAccess::groupCombatCandidates(const vector<string>& name
 void AIPlayerGPTSelfTestAccess::groupNumberedRows(const vector<string>& rows, vector<size_t>& order) { ::groupNumberedRows(rows, order); }
 string AIPlayerGPTSelfTestAccess::handAboutToBeReplacedLine(const string& sourceName) { return ::handAboutToBeReplacedLine(sourceName); }
 string AIPlayerGPTSelfTestAccess::handCastabilityTag(int verdict, int need, int sources, const string& cost, const string& timingWhy, int floating, bool instantSpeed) { return ::handCastabilityTag(verdict, need, sources, cost, timingWhy, floating, instantSpeed); }
+string AIPlayerGPTSelfTestAccess::handTagLegend(bool anySorcerySpeed, const string& timingWhy, bool anyHeld) { return ::handTagLegend(anySorcerySpeed, timingWhy, anyHeld); }
 string AIPlayerGPTSelfTestAccess::handRemovalVerb(const string& lc, bool& relocate, const string& gainDest) { return ::handRemovalVerb(lc, relocate, gainDest); }
 int AIPlayerGPTSelfTestAccess::handleRank(const string& handle) { return ::handleRank(handle); }
 bool AIPlayerGPTSelfTestAccess::hasCodedAnswerLine(const string& content) { return ::hasCodedAnswerLine(content); }
