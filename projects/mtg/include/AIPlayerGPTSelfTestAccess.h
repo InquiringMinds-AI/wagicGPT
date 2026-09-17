@@ -532,7 +532,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool isRenderVocabWord(const string& w);
     static bool isReservedHoldEcho(const string& echoLc);
     static string joinBlockerRows(const vector<string>& names, const vector<string>& handles, const vector<string>& rests, bool * rangeUsed, const char * label= "B");
-    static string joinNumberedRows(const vector<string>& rows, bool * rangeUsed);
+    static string joinNumberedRows(const vector<string>& rows, bool * rangeUsed, unsigned * formsUsed = NULL);
+    static string optionRangeNote(unsigned forms);
     static string joinTargetEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, const std::map<string, string>& notes);
     static string joinVictimRoster(const std::vector<std::string>& entries);
     static string joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse);

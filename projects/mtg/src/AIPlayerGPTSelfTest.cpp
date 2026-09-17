@@ -43252,6 +43252,79 @@ static const char * kW50Y_r94 =
         }
     }
 
+    cout << "\n[#W82-P8] the range note says only what this menu's rows used\n";
+    {
+        CHECK(optionRangeNote(127) == string(kOptionRangeNote),
+              "#W82-P8 every form set composes the whole kOptionRangeNote byte for byte (the"
+              " constant is the union, and the order and words are its own)");
+        CHECK(optionRangeNote(0).empty(), "#W82-P8 no form used: no note");
+        const string h = optionRangeNote(1);
+        CHECK(h.find("An option whose number is a RANGE") == 0
+              && h.find("printed #N range") != string::npos
+              && h.find("NO #N ordinal") == string::npos && h.find("copies 3-6") == string::npos
+              && h.find("The same 4 options") == string::npos && h.find("X = ") == string::npos
+              && h.find("Answer with ONE number from inside the range") != string::npos,
+              "#W82-P8 the #N form alone: opening, the #N decode, the answer rule - nothing else");
+        cout << "     #N-only note " << h.size() << " B vs the union " << strlen(kOptionRangeNote) << " B\n";
+        CHECK(h.size() * 3 < strlen(kOptionRangeNote),
+              "#W82-P8 the one-form note is under a third of the union");
+        const string xu = optionRangeNote(32);
+        CHECK(xu.find("is one option per X in that range, smallest X first") != string::npos
+              && xu.find("down to") == string::npos && xu.find("RANGE (\"5-430.\")") == string::npos
+              && xu.find("two ENDS of that run") != string::npos,
+              "#W82-P8 the climbing X form alone reads as its own sentence, no descending twin,"
+              " no label-range opening");
+        const string xd = optionRangeNote(16);
+        CHECK(xd.find("largest X first") != string::npos && xd.find("up to") == string::npos,
+              "#W82-P8 the descending X form alone");
+        const string xb = optionRangeNote(48);
+        CHECK(xb.find("is the same run the other way, smallest X first") != string::npos
+              && xb.find("Read which of the two the row says") != string::npos,
+              "#W82-P8 both X forms: the wave-75 pair, verbatim");
+        CHECK(optionRangeNote(64) == "Answer with ONE number from inside the range exactly as you"
+                                     " would any other option number.\n",
+              "#W82-P8 the repeat-pay band explains itself on its row: only the answer rule");
+        // the renderer records what it printed - on the recorded reveal list
+        // (Thraben Doomsayer x4, `copies 1-4 of 4 in this list`) and on plain and
+        // #N runs.
+        {
+            vector<string> rows;
+            for (int i = 1; i <= 4; i++)
+            {
+                std::ostringstream r;
+                r << "Thraben Doomsayer (copy " << i << " of 4 in this list) (2/2 creature)"
+                     " [does NOT qualify - goes to \"shuffle\"]";
+                rows.push_back(r.str());
+            }
+            bool used = false; unsigned forms = 0;
+            const string out = joinNumberedRows(rows, &used, &forms);
+            CHECK(used && forms == 4 && out.find("(copies 1-4 of 4 in this list)") != string::npos,
+                  "#W82-P8 a copy-tag run records the copies form and nothing else");
+            const string n = optionRangeNote(forms);
+            CHECK(n.find("copies 3-6") != string::npos && n.find("#N range") == string::npos
+                  && n.find("X = ") == string::npos,
+                  "#W82-P8 ...and the note for that menu explains the copy notation only");
+            vector<string> plain(5, "Search for Mountain (land)");
+            forms = 0;
+            joinNumberedRows(plain, &used, &forms);
+            CHECK(used && forms == 2, "#W82-P8 a plain byte-identical run records the no-ordinal form");
+            vector<string> hs;
+            for (int i = 1; i <= 5; i++)
+            {
+                std::ostringstream r; r << "Attack with Vampire #" << i << " (2/2)";
+                hs.push_back(r.str());
+            }
+            forms = 0;
+            joinNumberedRows(hs, &used, &forms);
+            CHECK(used && forms == 1, "#W82-P8 a #N run records the handle form");
+            vector<string> none;
+            none.push_back("Cast A"); none.push_back("Cast B");
+            forms = 99;
+            joinNumberedRows(none, &used, &forms);
+            CHECK(!used && forms == 0, "#W82-P8 no range printed: no form recorded");
+        }
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

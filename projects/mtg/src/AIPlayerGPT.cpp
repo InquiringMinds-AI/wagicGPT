@@ -11172,6 +11172,70 @@ const char * kOptionRangeNote =
     " Answer with ONE number from inside the range"
     " exactly as you would any other option number.\n";
 
+//#W82-P8: the note says only what THIS menu's rows used. `joinNumberedRows`
+//records which shorthand forms it printed (the bits below) and this composes
+//the matching sentences of kOptionRangeNote, in kOptionRangeNote's own order and
+//words - with every bit set the two are byte-identical (pinned). The wave-80
+//corpus put the whole 1,675-byte paragraph on 99 prompts of which 0 used an X
+//form and most used exactly one grammar.
+const unsigned kRangeFormHandle = 1;      //"5-9. Name #1-#5 ... x5"
+const unsigned kRangeFormPlain = 2;       //"5-9. Name ... x5" (no ordinal: interchangeable)
+const unsigned kRangeFormCopies = 4;      //"(copies 3-6 of 6 in this list)"
+const unsigned kRangeFormSourceBlock = 8; //"The same 4 options as 8-11, with <source> #2 ..."
+const unsigned kRangeFormXDown = 16;      //"X = 12 down to X = 2"
+const unsigned kRangeFormXUp = 32;        //"X = 2 up to X = 12"
+const unsigned kRangeFormNoOpBand = 64;   //the repeat-pay band row (explains itself on the row)
+const unsigned kRangeFormAll = 127;
+string optionRangeNote(unsigned forms)
+{
+    if (forms == 0)
+        return "";
+    std::ostringstream o;
+    if (forms & (kRangeFormHandle | kRangeFormPlain | kRangeFormCopies))
+        o << "An option whose number is a RANGE (\"5-430.\") is that many SEPARATE options"
+             " whose text was identical apart from the instance ordinal, printed once.";
+    if (forms & kRangeFormHandle)
+        o << " Every number in the range is a real, separately choosable option: 5 is the"
+             " option for the first instance of the printed #N range, 6 the next, and so on"
+             " to the last.";
+    if (forms & kRangeFormPlain)
+        o << " When the collapsed row carries NO #N ordinal, the options in"
+             " the range are interchangeable copies of the same thing and any number in"
+             " the range picks one of them.";
+    if (forms & kRangeFormCopies)
+        o << " A range whose row reads \"(copies 3-6 of 6 in this list)\" is the same"
+             " thing in that list's own copy notation: each number in the range is one of"
+             " those copies, in order.";
+    if (forms & kRangeFormSourceBlock)
+        o << " A line reading \"The same 4 options as 8-11, with <source> #2 as the source"
+             " instead of #1\" is that many SEPARATE options that pair up ONE FOR ONE with"
+             " the options in the range it names: its first number is the same choice as"
+             " the first number of that range, its second the same as the second, and so"
+             " on - the only difference is which copy of the source does it. Nothing is"
+             " hidden: read the option you want off the range it names.";
+    if (forms & kRangeFormXDown)
+        o << " A row reading \"X = 12 down to X = 2\" is one option per X in that range,"
+             " largest X first: its first number is X = 12, the next X = 11, and so on to"
+             " X = 2.";
+    if (forms & kRangeFormXUp)
+        o << " A row reading \"X = 2 up to X = 12\" is "
+          << ((forms & kRangeFormXDown) ? "the same run the other way" : "one option per X in that range")
+          << ", smallest X first: its first number is X = 2, the next X = 3, and so on to"
+             " X = 12.";
+    if ((forms & kRangeFormXDown) && (forms & kRangeFormXUp))
+        o << " Read which of the two the row says - \"down to\" counts down and"
+             " \"up to\" counts up.";
+    if (forms & (kRangeFormXDown | kRangeFormXUp))
+        o << " The two options it quotes in full are the two ENDS of"
+             " that run, and every option between them reads the same line with its own X.";
+    //the sentence a first word needs: with only the band or X forms, the paragraph
+    //opens on the answer rule
+    o << (o.str().empty() ? "" : " ")
+      << "Answer with ONE number from inside the range"
+         " exactly as you would any other option number.\n";
+    return o.str();
+}
+
 //#W48 (D2 + D12's lesson): the numbered lists are ordered by the engine, and
 //that order is LEXICOGRAPHIC on the target name - "Vampire #1, #10, #100, #101,
 //... #11, #110" - so 424 rows that are the same activation 424 times hold
@@ -11552,10 +11616,12 @@ static string w78HoistSharedCardText(vector<string>& rows)
     return head.str();
 }
 
-string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
+string joinNumberedRows(const vector<string>& rows, bool * rangeUsed, unsigned * formsUsed = NULL)
 {
     if (rangeUsed)
         *rangeUsed = false;
+    if (formsUsed)
+        *formsUsed = 0; //#W82-P8
     //#W78-CW (S13): the shared blob comes out first, so the numbers the header
     //names are the numbers this function is about to print.
     vector<string> hoisted(rows.begin(), rows.end());
@@ -11668,6 +11734,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
               << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed)
+                *formsUsed |= kRangeFormSourceBlock; //#W82-P8
             i += L;
             continue;
         }
@@ -11720,6 +11788,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
             o << (i + 1) << "-" << j << ". " << hoisted[i] << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed)
+                *formsUsed |= kRangeFormPlain; //#W82-P8
             i = j;
         }
         else if (form[i] == 1 && rank[i] > 0 && run >= kBattlefieldCollapseFloor)
@@ -11729,6 +11799,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
               << expandRowHandleFold(tail[i], rank[i], rank[i] + (int) run - 1) << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed)
+                *formsUsed |= kRangeFormHandle; //#W82-P8
             i = j;
         }
         else if (form[i] == 3 && run >= kMonotoneXCollapseFloor)
@@ -11736,6 +11808,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
             o << monotoneXRangeRow(i + 1, j, rank[i], rank[j - 1], hoisted[i], hoisted[j - 1]) << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed) //#W82-P8: the direction the row itself prints
+                *formsUsed |= (rank[j - 1] > rank[i]) ? kRangeFormXUp : kRangeFormXDown;
             i = j;
         }
         else if (form[i] == 4 && run >= kMonotoneXCollapseFloor)
@@ -11743,6 +11817,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
             o << noOpBandRangeRow(i + 1, j, rank[i], rank[j - 1], hoisted[i], hoisted[j - 1]) << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed)
+                *formsUsed |= kRangeFormNoOpBand; //#W82-P8
             i = j;
         }
         else if (form[i] == 2 && run >= kBattlefieldCollapseFloor)
@@ -11752,6 +11828,8 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
               << tail[i] << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
+            if (formsUsed)
+                *formsUsed |= kRangeFormCopies; //#W82-P8
             i = j;
         }
         else
@@ -46810,9 +46888,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (allSelf)
             tail << kSelfOnlyWindowNote;
         bool anyOptionRangeRow = false;
-        tail << joinNumberedRows(renderRows, &anyOptionRangeRow);
+        unsigned rangeForms = 0; //#W82-P8
+        tail << joinNumberedRows(renderRows, &anyOptionRangeRow, &rangeForms);
         if (anyOptionRangeRow)
-            tail << kOptionRangeNote;
+            tail << optionRangeNote(rangeForms);
     }
     //#W82-A (L1): the "every distinct action is suppressed as already-declined"
     //auto-pass is DELETED with the cap that could produce it. Nothing suppresses
@@ -48534,9 +48613,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     //untouched by the render.
     {
         bool anyOptionRangeRow = false;
-        tail << joinNumberedRows(options, &anyOptionRangeRow);
+        unsigned rangeForms = 0; //#W82-P8
+        tail << joinNumberedRows(options, &anyOptionRangeRow, &rangeForms);
         if (anyOptionRangeRow)
-            tail << kOptionRangeNote;
+            tail << optionRangeNote(rangeForms);
     }
     //#W53-N (D2): where the option list ends - the prompt-only decline note is
     //spliced in here, after the list it is about and out of the ask key.
@@ -61099,9 +61179,10 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         for (size_t k = 0; k < revealOrder.size(); k++)
             shownReveal.push_back(revealRows[revealOrder[k]]);
         bool revealRanged = false;
-        tail << joinNumberedRows(shownReveal, &revealRanged);
+        unsigned revealForms = 0; //#W82-P8
+        tail << joinNumberedRows(shownReveal, &revealRanged, &revealForms);
         if (revealRanged)
-            tail << kOptionRangeNote;
+            tail << optionRangeNote(revealForms);
         if (outOrder)
             *outOrder = revealOrder;
     }
@@ -62276,11 +62357,12 @@ string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& h
         vector<size_t> discardOrder;
         composeRowOrder(dispOrder, groupOrder, discardOrder);
         bool discardRanged = false;
+        unsigned discardForms = 0; //#W82-P8
         tail << headerText;
         tail << discardSpareDefaultLine(spareRows, over); //#W66-AT (H5)
-        tail << joinNumberedRows(shownDiscard, &discardRanged);
+        tail << joinNumberedRows(shownDiscard, &discardRanged, &discardForms);
         if (discardRanged)
-            tail << kOptionRangeNote;
+            tail << optionRangeNote(discardForms);
         tail << discardVerdictLegend(anyVerdict); //#W57-C (D8)
         if (outOrder)
             *outOrder = discardOrder;
@@ -62748,7 +62830,8 @@ bool AIPlayerGPTSelfTestAccess::isRemovalDestination(const string& destination) 
 bool AIPlayerGPTSelfTestAccess::isRenderVocabWord(const string& w) { return ::isRenderVocabWord(w); }
 bool AIPlayerGPTSelfTestAccess::isReservedHoldEcho(const string& echoLc) { return ::isReservedHoldEcho(echoLc); }
 string AIPlayerGPTSelfTestAccess::joinBlockerRows(const vector<string>& names, const vector<string>& handles, const vector<string>& rests, bool * rangeUsed, const char * label) { return ::joinBlockerRows(names, handles, rests, rangeUsed, label); }
-string AIPlayerGPTSelfTestAccess::joinNumberedRows(const vector<string>& rows, bool * rangeUsed) { return ::joinNumberedRows(rows, rangeUsed); }
+string AIPlayerGPTSelfTestAccess::joinNumberedRows(const vector<string>& rows, bool * rangeUsed, unsigned * formsUsed) { return ::joinNumberedRows(rows, rangeUsed, formsUsed); }
+string AIPlayerGPTSelfTestAccess::optionRangeNote(unsigned forms) { return ::optionRangeNote(forms); }
 string AIPlayerGPTSelfTestAccess::joinTargetEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, const std::map<string, string>& notes) { return ::joinTargetEntries(names, handles, tails, notes); }
 string AIPlayerGPTSelfTestAccess::joinVictimRoster(const std::vector<std::string>& entries) { return ::joinVictimRoster(entries); }
 string AIPlayerGPTSelfTestAccess::joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse) { return ::joinZoneEntries(names, handles, tails, collapse); }
