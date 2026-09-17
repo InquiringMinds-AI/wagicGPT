@@ -7668,17 +7668,23 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
              " from this damage, so no amount of it is a clock.\n";
         return o.str();
     }
+    //#W82-P6: ONE sentence carries the total, the resulting life and the
+    //verdict; the floor sentence names its own number only when it differs
+    //from the total (guaranteed == totalPower means every point lands, and the
+    //resulting life is the figure already printed). Three sentences that each
+    //restated the same life total ("puts them at 13. ... they survive at 13
+    //... they would be at 13") are one clause per number now.
     o << "ATTACK TOTAL: " << attackers << " attacker"
       << (attackers == 1 ? "" : "s") << " listed, " << totalPower
       << " total combat damage to a player - declaring all of them with none"
-         " blocked puts them at " << (oppLife - totalPower) << ".";
+         " blocked puts them at " << (oppLife - totalPower);
     if (infectExcluded > 0)
-        o << " " << infectExcluded << " of them "
+        o << " (" << infectExcluded << " of them "
           << (infectExcluded == 1 ? "has" : "have")
           << " infect and "
           << (infectExcluded == 1 ? "is" : "are")
           << " NOT counted in that number or in the floor below: infect damage to"
-             " a player is poison counters, it does not reduce their life at all.";
+             " a player is poison counters, it does not reduce their life at all)";
     //#W67-AW (M1, deck146 MED): the line gave both numbers and left the
     //comparison to the model, which got it backwards three times on one seat -
     //`130` s20 called "lethal" a declaration leaving them at 3, and `162` s21 /
@@ -7703,15 +7709,16 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
     //none-of-them-blocked assumption the sentence already states.
     const int convFigure = oppLife - totalPower - selfConverterLifelink;
     if (selfConverterLifelink > 0)
-        o << " " << selfConverterLifelink << " of that damage is LIFELINK, and your"
+        o << " - " << selfConverterLifelink << " of that damage is LIFELINK, and your"
              " LIFE-TO-DAMAGE CONVERTER turns the life it gains you into that much"
              " life off them as well, so with none of them blocked they are at "
-          << convFigure << ", not " << (oppLife - totalPower) << ".";
+          << convFigure << ", not " << (oppLife - totalPower);
     if (convFigure > 0)
-        o << " That is NOT lethal: they survive at " << convFigure
-          << " even with none of them blocked.";
+        o << " - NOT lethal.";
     else if (attackPunishers.empty())
-        o << " That IS lethal - but only if none of them is blocked.";
+        o << " - LETHAL, but only if none of them is blocked.";
+    else
+        o << ".";
     if (guaranteed >= 0)
     {
         if (guaranteed <= 0)
@@ -7743,14 +7750,25 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             //true footnote does not repair a false verdict. The floor is a
             //floor over their BLOCKS ONLY, and the sentence now says so where
             //a punisher is on the board, in the same clause as the number.
+            //#W82-P6: a floor equal to the total is the total - say so without
+            //a second copy of the number (or of the life it leaves, below).
+            const bool floorIsTotal = (guaranteed == totalPower);
             if (!attackPunishers.empty())
-                o << " At least " << guaranteed << " damage lands whatever they BLOCK,"
-                     " but that floor is over their BLOCKS ONLY: " << attackPunishers
+                o << (floorIsTotal ? " All of it lands whatever they BLOCK,"
+                                   : " At least ")
+                  << (floorIsTotal ? string() : std::to_string(guaranteed) + " damage lands whatever they BLOCK,")
+                  << " but that floor is over their BLOCKS ONLY: " << attackPunishers
                   << " fires on your declaration, before any combat damage, and can"
                      " remove attackers from that total - so it is NOT a floor on what"
                      " lands -";
+            else if (floorIsTotal)
+                o << " All of it lands whatever they block";
             else
                 o << " At least " << guaranteed << " damage lands whatever they block -";
+            //the life the floor leaves is the figure already printed when the
+            //floor is the total (and no converter moved it): print it once.
+            const bool floorLifeStated = floorIsTotal && selfConverterLifelink == 0
+                                         && attackPunishers.empty();
             //#W61-R (C1a): the damage is a floor; the LIFE it leaves is not,
             //because the blocks that let it through are the same blocks that
             //pay them. Both numbers, in the order the combat produces them.
@@ -7765,8 +7783,11 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             const int gainCeiling = blockGain + (blockLifelink > 0 ? blockLifelink : 0);
             if (gainCeiling > 0)
             {
-                o << " that damage alone puts them at " << (oppLife - guaranteed)
-                  << ", but ";
+                if (floorLifeStated)
+                    o << ", but ";
+                else
+                    o << " that damage alone puts them at " << (oppLife - guaranteed)
+                      << ", but ";
                 if (blockGain > 0)
                     o << "every blocker they declare also fires the blocking"
                          " triggers tagged on the rows above";
@@ -7809,11 +7830,13 @@ static string attackTotalLine(int attackers, int totalPower, int oppLife,
             }
             else
             {
-                o << " they would be at " << (oppLife - guaranteed);
+                if (!floorLifeStated)
+                    o << " they would be at " << (oppLife - guaranteed);
                 //#W61-R (C1b): no kill claim survives an unpriced punisher.
                 if (oppLife - guaranteed <= 0 && attackPunishers.empty())
                 {
-                    o << "; that KILLS them whatever they block";
+                    o << (floorLifeStated ? " - that KILLS them whatever they block"
+                                          : "; that KILLS them whatever they block");
                     if (outKillClaim) //#W65-AN (G6)
                         *outKillClaim = true;
                 }
@@ -8478,26 +8501,71 @@ static string leavesUntappedTag(int untappedSources, int sourcesUsed)
 //count. Nothing is added or dropped: the bytes of both bodies survive, joined by
 //"; ". Pure over the row text, so PARSETEST proves the fold and the negatives
 //(a row with only one of the two, and a row where they are not adjacent).
+//#W82-P6: ...and the strand clause too. `{spends K of your M untapped mana
+//sources this turn; NAME COST in your hand needs N}` (strandsHandCardTag) sat
+//BETWEEN the leaves group and the taps group on every cast row that carried
+//all three, so the O14 fold above never fired on exactly the rows it was built
+//for, and M was printed twice. One mana bill, one bracket, each number once:
+//the spends group folds in as `; spends K this turn - NAME COST in your hand
+//needs N` (M is already in the leaves count), and the taps group folds in after
+//it as before. Groups are absorbed in whichever order they were emitted, but
+//only while ADJACENT to the bill - a clause about another window never joins.
+//#W82-P6: the close of the `{...}` group opened at `open`, brace-balanced - a
+//strand clause carries a mana cost (`{2}{b}`) inside it, so the first '}' is
+//not the group's end. npos when unbalanced.
+static size_t manaGroupEnd(const string& row, size_t open)
+{
+    int depth = 0;
+    for (size_t i = open; i < row.size(); i++)
+    {
+        if (row[i] == '{')
+            depth++;
+        else if (row[i] == '}' && --depth == 0)
+            return i;
+    }
+    return string::npos;
+}
 static string foldManaBillClauses(const string& row)
 {
     static const char * kLeaves = " {leaves ";
     static const char * kTaps = " {paying this taps: ";
+    static const char * kSpends = " {spends ";
     const size_t a = row.find(kLeaves);
     if (a == string::npos)
         return row;
-    const size_t aEnd = row.find('}', a);
+    const size_t aEnd = manaGroupEnd(row, a + 1);
     if (aEnd == string::npos)
         return row;
-    if (row.compare(aEnd + 1, strlen(kTaps), kTaps) != 0)
-        return row; //not adjacent: two facts about two different windows
-    const size_t b = aEnd + 1;
-    const size_t bEnd = row.find('}', b);
-    if (bEnd == string::npos)
+    string body = row.substr(a + 2, aEnd - (a + 2));
+    size_t cursor = aEnd + 1;
+    bool folded = false;
+    for (;;)
+    {
+        bool isTaps = row.compare(cursor, strlen(kTaps), kTaps) == 0;
+        bool isSpends = !isTaps && row.compare(cursor, strlen(kSpends), kSpends) == 0;
+        if (!isTaps && !isSpends)
+            break; //not adjacent: two facts about two different windows
+        const size_t bEnd = manaGroupEnd(row, cursor + 1);
+        if (bEnd == string::npos)
+            break;
+        string gBody = row.substr(cursor + 2, bEnd - (cursor + 2));
+        if (isSpends)
+        {
+            //"spends K of your M untapped mana source(s) this turn; REST" ->
+            //"spends K this turn - REST"; any other shape is kept verbatim.
+            const size_t ofYour = gBody.find(" of your ");
+            const size_t thisTurn = gBody.find(" this turn; ");
+            if (ofYour != string::npos && thisTurn != string::npos && ofYour < thisTurn)
+                gBody = gBody.substr(0, ofYour) + " this turn - "
+                        + gBody.substr(thisTurn + strlen(" this turn; "));
+        }
+        body += "; " + gBody;
+        cursor = bEnd + 1;
+        folded = true;
+    }
+    if (!folded)
         return row;
-    const string leavesBody = row.substr(a + 2, aEnd - (a + 2));
-    const string tapsBody = row.substr(b + 2, bEnd - (b + 2));
-    return row.substr(0, a) + " {" + leavesBody + "; " + tapsBody + "}"
-           + row.substr(bEnd + 1);
+    return row.substr(0, a) + " {" + body + "}" + row.substr(cursor);
 }
 
 //#W62-Z (D14, deck125 HIGH-3). `leavesUntappedTag` is suppressed for every {X}
@@ -13945,12 +14013,34 @@ static bool sourceDealsPoisonInsteadOfDamage(MTGCardInstance * c)
 //withdrawal is said, and the take-the-damage-while-ahead hint goes with it
 //(#W54-E D21's own reasoning - it is the inverse of correct play when the rest of
 //the cycle kills you). `forcedCycleLoss` 0 leaves every wave-79 byte in place.
+//#W82-P6: `figureOnFrame` - the CURRENT SITUATION's INCOMING THIS COMBAT line
+//already printed this same life, this same unblocked total and the life it
+//leaves (the seam checks the latched frame figures against its own before
+//setting it). Then the plain branch prints its VERDICT only, without the
+//numbers, and the lethal case prints nothing (the frame line already says
+//"this KILLS you" and what blocking does about it). The poison, life-loop and
+//compulsory-draw branches are untouched: those facts live only here.
 static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming,
                                    int oppLife, bool oppLoopLive = false, //#W76-CO (Q3 a)
                                    int forcedCycleLoss = 0, //#W80-DF (U14)
-                                   const string& forcedCycleSource = "")
+                                   const string& forcedCycleSource = "",
+                                   bool figureOnFrame = false) //#W82-P6
 {
     std::ostringstream o;
+    if (figureOnFrame && poisonIncoming <= 0 && !(oppLoopLive && lifeIncoming > 0)
+        && !(forcedCycleLoss > 0 && life - lifeIncoming > 0
+             && life - lifeIncoming - forcedCycleLoss <= 0))
+    {
+        if (life - lifeIncoming <= 0)
+            return ""; //the INCOMING THIS COMBAT line above carries the figures and the verdict
+        o << "Unblocked this is NOT lethal (the INCOMING THIS COMBAT line above has the"
+             " figures): block only where the trade favors you";
+        if (life > oppLife)
+            o << "; taking damage while ahead on LIFE is often correct (your strategy"
+                 " guide's blocking rules override this general hint)";
+        o << ".\n";
+        return o.str();
+    }
     o << "Your life: " << life << ".";
     if (poisonIncoming <= 0)
     {
@@ -40670,9 +40760,26 @@ static bool isRemovalDestination(const string& destination)
 //already use - so it is true by construction and says nothing about colour.
 //Pure over (sources left after this row, the rows that need more, how many
 //other rows were priceable at all).
+//#W82-P6: printed ONLY when a row is lost (owner ruling, LEDGER-v2 P6). The
+//empty-lostRows sentence ("no other row on this menu needs more than N") restated
+//a number the row's own `{leaves N of your M ...}` count already carries; a row
+//with no fit clause now means no other row is lost after it.
+static string menuFitRowList(const std::vector<int>& lostRows)
+{
+    std::ostringstream o;
+    o << "row" << (lostRows.size() == 1 ? " " : "s ");
+    for (size_t i = 0; i < lostRows.size(); i++)
+    {
+        if (i)
+            o << (i + 1 == lostRows.size() ? " and " : ", ");
+        o << lostRows[i];
+    }
+    o << (lostRows.size() == 1 ? " needs" : " need");
+    return o.str();
+}
 static string menuFitTag(int leftAfter, const std::vector<int>& lostRows, int otherPricedRows)
 {
-    if (otherPricedRows <= 0)
+    if (otherPricedRows <= 0 || lostRows.empty())
         return "";
     std::ostringstream o;
     o << " {";
@@ -40680,21 +40787,17 @@ static string menuFitTag(int leftAfter, const std::vector<int>& lostRows, int ot
         o << "taps you out - ";
     else
         o << "leaves " << leftAfter << " source" << (leftAfter == 1 ? "" : "s") << " - ";
-    if (lostRows.empty())
-        o << "no other row on this menu needs more than " << leftAfter << "}";
-    else
-    {
-        o << "row" << (lostRows.size() == 1 ? " " : "s ");
-        for (size_t i = 0; i < lostRows.size(); i++)
-        {
-            if (i)
-                o << (i + 1 == lostRows.size() ? " and " : ", ");
-            o << lostRows[i];
-        }
-        o << (lostRows.size() == 1 ? " needs" : " need")
-          << " more mana sources than the " << leftAfter << " this leaves}";
-    }
+    o << menuFitRowList(lostRows) << " more mana sources than the " << leftAfter << " this leaves}";
     return o.str();
+}
+//#W82-P6: the same fact INSIDE a row's existing mana bill (`{leaves L of your M
+//...}`), where L is already printed - so the clause names the rows and not the
+//number again. Empty when nothing is lost.
+static string menuFitInsideClause(const std::vector<int>& lostRows)
+{
+    if (lostRows.empty())
+        return "";
+    return "; " + menuFitRowList(lostRows) + " more mana sources than that";
 }
 
 //The pass itself: each priced row is told what its own payment leaves and
@@ -41285,7 +41388,14 @@ static void applyMenuFitTags(std::vector<std::string>& rows, const std::vector<i
         for (size_t j = 0; j < uses.size(); j++)
             if (j != i && uses[j] >= 0 && uses[j] > left)
                 lost.push_back((int) j + 1);
-        rows[i] += menuFitTag(left, lost, priced - 1);
+        //#W82-P6: into the row's own mana bill when it has one (one clause per
+        //number), else the standalone tag; both are empty when no row is lost.
+        const size_t bill = rows[i].find(" {leaves ");
+        const size_t billEnd = (bill == string::npos) ? string::npos : manaGroupEnd(rows[i], bill + 1);
+        if (billEnd != string::npos && priced - 1 > 0)
+            rows[i].insert(billEnd, menuFitInsideClause(lost));
+        else
+            rows[i] += menuFitTag(left, lost, priced - 1);
         rows[i] += tapOutCrackBackClause(left, crackTotal, crackAttackers); //#W72-BV (M18b)
     }
 }
@@ -59710,10 +59820,17 @@ int AIPlayerGPT::chooseBlockers()
             }
         }
         //#W54-E (D21): the opponent's life is what makes "ahead" a fact.
+        //#W82-P6: the board frame's INCOMING THIS COMBAT line is latched for
+        //this combat; when its figures are this seam's figures the header
+        //prints once and this line carries only what the frame does not.
+        const bool figureOnFrame = observer && mIncomingCombatTurn == observer->turn
+                                   && mIncomingCombatAttackers == (int) attackers.size()
+                                   && mIncomingCombatDamage == lifeIncoming;
         tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming,
                                      opponent() ? opponent()->life : life,
                                      lifeLoopProvenWin(opponent()), //#W76-CO (Q3 a)
-                                     w80CycleLoss, w80CycleSrc); //#W80-DF (U14)
+                                     w80CycleLoss, w80CycleSrc, //#W80-DF (U14)
+                                     figureOnFrame); //#W82-P6
     }
     //#W57-B (D22): and the OTHER total this window turns on - what the seat
     //gains, and (under a converter of its own) takes off them, simply for
@@ -60061,6 +60178,7 @@ int AIPlayerGPT::chooseBlockers()
         //`pn` collects it in place of the row stream.
         vector<int> mbLabels;
         vector<string> mbParens;
+        bool rowBlockerDies = false; //#W82-P6
         for (size_t k = 0; k < attackers.size(); k++)
             for (size_t j = 0; j < legal[i].size(); j++)
                 if (attackers[k] == legal[i][j])
@@ -60136,8 +60254,11 @@ int AIPlayerGPT::chooseBlockers()
                         pn << " {" << ownLifelink << "}";
                     if (!theirLifelink.empty())
                         pn << " {" << theirLifelink << "}";
+                    //#W82-P6: the standing cost is a ROW fact (the body this seat
+                    //stops owning does not depend on which attacker it blocks), so
+                    //it prints once per row below the pairing list, not per pairing.
                     if (blockerDies)
-                        pn << " {" << afterCombatBlockerCostText((int) blockers.size()) << "}";
+                        rowBlockerDies = true;
                     mbParens.push_back(pn.str());
                     break;
                 }
@@ -60147,6 +60268,8 @@ int AIPlayerGPT::chooseBlockers()
             if (mbRange)
                 anyMayBlockRange = true;
         }
+        if (rowBlockerDies) //#W82-P6: once per row (was once per pairing)
+            ln << " {" << afterCombatBlockerCostText((int) blockers.size()) << "}";
         //#W60-P (B9): the fact the `152v146` s35 chump had no way to know -
         //this body is holding one of theirs in exile, and losing it here gives
         //it back. A ROW-level clause, not a per-attacker one: the return does
@@ -62469,7 +62592,7 @@ bool AIPlayerGPTSelfTestAccess::codedAnswerLinePlanSpan(const string& reply, int
 string AIPlayerGPTSelfTestAccess::collapsedRunNarration(const string& line, int count, int total) { return ::collapsedRunNarration(line, count, total); }
 void AIPlayerGPTSelfTestAccess::collectLabeledLines(const string& content, const char * label, vector<string>& out, vector<string> * prevOut, vector<vector<string> > * windowOut) { ::collectLabeledLines(content, label, out, prevOut, windowOut); }
 void AIPlayerGPTSelfTestAccess::collectXDamageClauses(const string& magicText, std::vector<string>& sweepSpecs, std::vector<string>& targetSpecs, bool& implicitTarget) { ::collectXDamageClauses(magicText, sweepSpecs, targetSpecs, implicitTarget); }
-string AIPlayerGPTSelfTestAccess::combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive, int forcedCycleLoss, const string& forcedCycleSource) { return ::combatDamageForecast(life, poison, lifeIncoming, poisonIncoming, oppLife, oppLoopLive, forcedCycleLoss, forcedCycleSource); }
+string AIPlayerGPTSelfTestAccess::combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive, int forcedCycleLoss, const string& forcedCycleSource, bool figureOnFrame) { return ::combatDamageForecast(life, poison, lifeIncoming, poisonIncoming, oppLife, oppLoopLive, forcedCycleLoss, forcedCycleSource, figureOnFrame); }
 bool AIPlayerGPTSelfTestAccess::combatLineIsClean(const string& line, const vector<string> * rosterA, const vector<string> * rosterB) { return ::combatLineIsClean(line, rosterA, rosterB); }
 string AIPlayerGPTSelfTestAccess::combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a, int preventAtoB, int preventBtoA, int preventAtoFace, bool attackerSeat, int bRemaining, bool bGainConverted, string * outBlockTrigger, bool * outBlockerDies, string * outBlockerLifelink, string * outAttackerLifelink, bool * outAttackerDies, bool foeLifeLoop) { return ::combatTradePreviewStats(b, a, preventAtoB, preventBtoA, preventAtoFace, attackerSeat, bRemaining, bGainConverted, outBlockTrigger, outBlockerDies, outBlockerLifelink, outAttackerLifelink, outAttackerDies, foeLifeLoop); }
 void AIPlayerGPTSelfTestAccess::composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner, std::vector<size_t>& out) { ::composeRowOrder(outer, inner, out); }

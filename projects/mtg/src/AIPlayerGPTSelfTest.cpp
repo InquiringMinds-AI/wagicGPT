@@ -13264,9 +13264,10 @@ static const char * kW50Y_r94 =
 
         // ================= D18: which rows fit together =================
         {
-            CHECK(menuFitTag(0, std::vector<int>(), 2)
-                  == " {taps you out - no other row on this menu needs more than 0}",
-                  "#W54-C D18 tapping out is still stated when nothing else was affordable anyway");
+            // #W82-P6 INVERTED: the fit clause prints ONLY when a row is lost; the
+            // tap-out itself is on the row's own `{leaves 0 of your M ...}` count.
+            CHECK(menuFitTag(0, std::vector<int>(), 2).empty(),
+                  "#W54-C D18 / #W82-P6 nothing lost after a tap-out prints no fit clause");
             std::vector<int> lost1; lost1.push_back(2);
             CHECK(menuFitTag(0, lost1, 2)
                   == " {taps you out - row 2 needs more mana sources than the 0 this leaves}",
@@ -13279,9 +13280,8 @@ static const char * kW50Y_r94 =
             CHECK(menuFitTag(1, lost3, 4)
                   == " {leaves 1 source - rows 2, 3 and 5 need more mana sources than the 1 this leaves}",
                   "#W54-C D18 three lost rows use commas then 'and'; one source is singular");
-            CHECK(menuFitTag(5, std::vector<int>(), 2)
-                  == " {leaves 5 sources - no other row on this menu needs more than 5}",
-                  "#W54-C D18 the POSITIVE form: a {0} blocker keeps the whole menu open");
+            CHECK(menuFitTag(5, std::vector<int>(), 2).empty(),
+                  "#W54-C D18 / #W82-P6 a {0} blocker that loses no row prints no fit clause");
             CHECK(menuFitTag(3, lost1, 0).empty(),
                   "#W54-C D18 NEGATIVE a menu with no other priced row makes no fit claim");
         }
@@ -13300,9 +13300,8 @@ static const char * kW50Y_r94 =
             CHECK(rows[1] == "Cast Master of the Feast {1}{b}{b} (5/5)"
                              " {leaves 2 sources - row 1 needs more mana sources than the 2 this leaves}",
                   "#W54-C D18 the row the seat took states what it strands");
-            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6)"
-                             " {leaves 5 sources - no other row on this menu needs more than 5}",
-                  "#W54-C D18 the free blocker is marked as costing the seat nothing on this menu");
+            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6)",
+                  "#W54-C D18 / #W82-P6 the free blocker loses no row and carries no fit clause");
             vector<string> one;
             one.push_back("Cast Shield Sphere {0} (0/6)");
             std::vector<int> u1; u1.push_back(0);
@@ -18327,17 +18326,16 @@ static const char * kW50Y_r94 =
         //count line as the whole of the arithmetic offered.
         CHECK(attackTotalLine(5, 20, 22, 3, 6)
               == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 2. That is NOT lethal: they survive at 2 even"
-                 " with none of them blocked. At least 6 damage lands whatever they"
+                 " with none blocked puts them at 2 - NOT lethal. At least 6 damage lands whatever they"
                  " block - they would be at 16.\n",
-              "#W60-L B11 the ceiling and the proven floor, in that order (+#W67-AW M1 verdict)");
+              "#W60-L B11 the ceiling and the proven floor, in that order (+#W67-AW M1 verdict,"
+              " #W82-P6 one clause per number)");
         CHECK(attackTotalLine(5, 20, 5, 3, 6).find("they would be at -1; that KILLS them"
                                                    " whatever they block.") != string::npos,
               "#W60-L B11 a floor at or past their life is a kill no block prevents");
         CHECK(attackTotalLine(2, 4, 20, 3, 0)
               == "ATTACK TOTAL: 2 attackers listed, 4 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 16. That is NOT lethal: they survive at 16 even"
-                 " with none of them blocked. Their 3 untapped blockers that can legally"
+                 " with none blocked puts them at 16 - NOT lethal. Their 3 untapped blockers that can legally"
                  " block at least one of these attackers can cover"
                  " every attacker you could send, so none of that damage is guaranteed.\n",
               "#W60-L B11 a fully coverable attack promises nothing (+#W67-AW M1 verdict,"
@@ -18350,17 +18348,17 @@ static const char * kW50Y_r94 =
         //"At most 3 of them can be blocked at all" - a true count offered as the
         //reason for a floor it did not cause. The floor now names no cause at all.
         CHECK(attackTotalLine(1, 3, 23, 3, 3).find("can be blocked at all") == string::npos
-              && attackTotalLine(1, 3, 23, 3, 3).find("At least 3 damage lands whatever they"
-                                                      " block - they would be at 20.") != string::npos,
-              "#W60-L B11 NEGATIVE the floor states the number, never a cause for it");
+              && attackTotalLine(1, 3, 23, 3, 3).find("puts them at 20 - NOT lethal. All of it lands"
+                                                      " whatever they block.") != string::npos,
+              "#W60-L B11 NEGATIVE the floor states the number, never a cause for it (#W82-P6: a"
+              " floor equal to the total names no second number)");
         //NEGATIVE: nothing to declare, or no known opponent life, says nothing;
         //and an uncomputed floor prints the ceiling alone.
         CHECK(attackTotalLine(0, 0, 20, 3, 6).empty() && attackTotalLine(5, 20, -1, 3, 6).empty(),
               "#W60-L B11 NEGATIVE no attackers or no known life prints nothing");
         CHECK(attackTotalLine(5, 20, 22, 3, -1)
               == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 2. That is NOT lethal: they survive at 2 even"
-                 " with none of them blocked.\n",
+                 " with none blocked puts them at 2 - NOT lethal.\n",
               "#W60-L B11 NEGATIVE an uncomputed floor claims no floor (+#W67-AW M1 verdict)");
         //ECHO SHAPE: a prompt line, not an annotation - no brace, no bracket.
         //#W60-Q (R4): power is not life loss.
@@ -18995,12 +18993,13 @@ static const char * kW50Y_r94 =
         // Perimeter Captains + Pride Guardian among 5 blockers. The floor said
         // 43; the combat ended at 66.
         const string base = attackTotalLine(3, 9, 52, 5, 9);
-        CHECK(base.find("At least 9 damage lands whatever they block - they would be at 43")
+        CHECK(base.find("puts them at 43 - NOT lethal. All of it lands whatever they block.")
                   != string::npos,
-              "#W61-R C1 REGRESSION with no blocking trigger on their board the floor is the"
-              " wave-60 line, byte for byte");
+              "#W61-R C1 REGRESSION with no blocking trigger on their board the floor is stated"
+              " once (#W82-P6: the floor is the total, so the life it leaves is the figure"
+              " already printed)");
         const string gained = attackTotalLine(3, 9, 52, 5, 9, 0, false, 23);
-        CHECK(gained.find("that damage alone puts them at 43, but every blocker they declare"
+        CHECK(gained.find("All of it lands whatever they block, but every blocker they declare"
                           " also fires the blocking triggers tagged on the rows above - up to"
                           " 23 life back across their 5 blockers, so blocking can leave them"
                           " as high as 66") != string::npos,
@@ -26512,11 +26511,10 @@ static const char * kW50Y_r94 =
         // the reply wrote "which is lethal" of a line leaving them at 3. Same
         // word over 4 (`162` s21) and 6 (`126` s23).
         const string s20 = attackTotalLine(4, 11, 14, 2, 7);
-        CHECK(s20.find("puts them at 3. That is NOT lethal: they survive at 3 even with none of"
-                       " them blocked.") != string::npos,
+        CHECK(s20.find("puts them at 3 - NOT lethal.") != string::npos,
               "#W67-AW M1 REPRO the s20 line now answers the question the model got backwards");
         CHECK(attackTotalLine(5, 20, 5, 3, 6)
-                  .find("puts them at -15. That IS lethal - but only if none of them is blocked.")
+                  .find("puts them at -15 - LETHAL, but only if none of them is blocked.")
                   != string::npos,
               "#W67-AW M1 POSITIVE a genuinely lethal unblocked total says so, scoped to the"
               " assumption it is computed under");
@@ -26524,13 +26522,13 @@ static const char * kW50Y_r94 =
         // the declaration, so no positive kill claim survives it - the same gate
         // every other kill claim on this line rides.
         CHECK(attackTotalLine(5, 20, 5, 3, 6, 0, false, 0, "Lightmine Field")
-                  .find("That IS lethal") == string::npos,
+                  .find("LETHAL, but only") == string::npos,
               "#W67-AW M1 MUST-NOT-MATCH an attack punisher withholds the positive verdict");
         // ... while the NEGATIVE verdict needs no gate: a block, a blocking
         // trigger and a life loop can only make a survivable total MORE
         // survivable, so it is true whatever else is on the board.
         CHECK(attackTotalLine(2, 4, 20, 3, 0, 0, false, 3, "Lightmine Field", true)
-                  .find("That is NOT lethal: they survive at 16") != string::npos,
+                  .find("puts them at 16 - NOT lethal") != string::npos,
               "#W67-AW M1 POSITIVE the survivable verdict holds under a punisher and a loop");
         CHECK(attackTotalLine(0, 0, 20, 3, 6).empty()
                   && attackTotalLine(5, 20, -1, 3, 6).empty(),
@@ -31408,11 +31406,11 @@ static const char * kW50Y_r94 =
         CHECK(s43.find("2 of that damage is LIFELINK") != string::npos
                   && s43.find("they are at 1, not 3") != string::npos,
               "#W74-CC O5 REPRO the converted figure is printed beside the combat-only one");
-        CHECK(s43.find("That is NOT lethal: they survive at 1") != string::npos
+        CHECK(s43.find("they are at 1, not 3 - NOT lethal") != string::npos
                   && s43.find("survive at 3") == string::npos,
               "#W74-CC O5 the verdict is computed from the figure the converter makes true");
         const string s43lethal = attackTotalLine(1, 2, 4, 0, 2, 0, false, 0, "", false, NULL, 0, 2);
-        CHECK(s43lethal.find("That IS lethal") != string::npos,
+        CHECK(s43lethal.find("LETHAL, but only if none of them is blocked") != string::npos,
               "#W74-CC O5 and a converted total that reaches 0 is named lethal, scoped to"
               " none-of-them-blocked as every other claim on this line is");
         CHECK(attackTotalLine(1, 2, 5, 0, 2, 0, false, 0, "", false, NULL, 0, 0)
@@ -33307,8 +33305,8 @@ static const char * kW50Y_r94 =
                 // RED ON BASE: the seeded tree prints the categorical floor whatever
                 // is on their board - the punisher clause only ever followed it.
                 CHECK(attackTotalLine(100, 401, 97, 0, 401)
-                          .find("At least 401 damage lands whatever they block - they would"
-                                " be at -304") != string::npos,
+                          .find("All of it lands whatever they block - that KILLS them"
+                                " whatever they block") != string::npos,
                       "#W76-CO Q4b RED-ON-BASE the sentence deck123 seq 1208 read, verbatim,"
                       " over two Lightmine Fields - and their life did not move from 97");
                 const string pun = attackTotalLine(100, 401, 97, 0, 401, 0, false, 0,
@@ -43127,6 +43125,131 @@ static const char * kW50Y_r94 =
         CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, true)
                   .find("[no cast row now: no legal target") != string::npos,
               "#W82-P4 the held-counterspell tag keeps the head and `no legal target`");
+    }
+
+    cout << "\n[#W82-P6] one clause per number: the mana bill, the fit clause, ATTACK TOTAL, the blockers header\n";
+    {
+        // (a) the recorded 152v130 row shape: leaves + spends + taps were THREE
+        // groups and M printed twice; the O14 fold never fired because the strand
+        // group sat between the two it joins.
+        const string row3 =
+            "Cast Exquisite Blood {4}{b} {leaves 2 of your 7 untapped mana sources untapped}"
+            " {spends 5 of your 7 untapped mana sources this turn; Tribute to Hunger {2}{b} in your"
+            " hand needs 3} {paying this taps: Overgrown Battlement - it cannot block on their turn}"
+            " {card text: \"Whenever an opponent loses life, you gain that much life.\"}";
+        const string folded3 = foldManaBillClauses(row3);
+        cout << "     folded: " << folded3 << "\n";
+        CHECK(folded3 ==
+              "Cast Exquisite Blood {4}{b} {leaves 2 of your 7 untapped mana sources untapped;"
+              " spends 5 this turn - Tribute to Hunger {2}{b} in your hand needs 3;"
+              " paying this taps: Overgrown Battlement - it cannot block on their turn}"
+              " {card text: \"Whenever an opponent loses life, you gain that much life.\"}",
+              "#W82-P6 leaves + spends + taps fold into ONE bill; 7 is printed once, 2 (left) and"
+              " 5 (spent) both survive, the strand and the taps keep their words");
+        CHECK(folded3.size() < row3.size(), "#W82-P6 the folded bill is shorter");
+        // the O14 pair alone still folds byte-identically to wave 74
+        CHECK(foldManaBillClauses("X {leaves 0 of your 3 untapped mana sources untapped - casting this"
+                                  " taps you out} {paying this taps: A, B}")
+                  == "X {leaves 0 of your 3 untapped mana sources untapped - casting this taps you"
+                     " out; paying this taps: A, B}",
+              "#W82-P6 the wave-74 leaves+taps fold is unchanged");
+        // NEGATIVE: a spends group that is NOT adjacent to the bill is another
+        // window's fact and stays where it is.
+        CHECK(foldManaBillClauses("X {leaves 1 of your 2 untapped mana sources untapped} {kills: Y}"
+                                  " {spends 1 of your 2 untapped mana sources this turn; Z {1} in your hand needs 1}")
+                  == "X {leaves 1 of your 2 untapped mana sources untapped} {kills: Y}"
+                     " {spends 1 of your 2 untapped mana sources this turn; Z {1} in your hand needs 1}",
+              "#W82-P6 NEGATIVE a non-adjacent spends group does not join the bill");
+        // an ability row (no leaves bill) keeps the standalone strand clause verbatim
+        CHECK(strandsHandCardTag(2, 3, "Hammer of Bogardan", "{1}{r}{r}", 3)
+                  == " {spends 2 of your 3 untapped mana sources this turn; Hammer of Bogardan {1}{r}{r}"
+                     " in your hand needs 3}",
+              "#W82-P6 the ability row's strand clause is untouched");
+        // (b) the fit clause goes INSIDE the bill and names rows, not the number again
+        {
+            vector<string> rows;
+            rows.push_back("Cast Ob Nixilis {3}{b}{b} {leaves 0 of your 5 untapped mana sources untapped"
+                           " - casting this taps you out}");
+            rows.push_back("Cast Master of the Feast {1}{b}{b} (5/5) {leaves 2 of your 5 untapped mana"
+                           " sources untapped}");
+            rows.push_back("Cast Shield Sphere {0} (0/6) {leaves 5 of your 5 untapped mana sources untapped}");
+            std::vector<int> uses; uses.push_back(5); uses.push_back(3); uses.push_back(0);
+            applyMenuFitTags(rows, uses, 5);
+            CHECK(rows[0] == "Cast Ob Nixilis {3}{b}{b} {leaves 0 of your 5 untapped mana sources untapped"
+                             " - casting this taps you out; row 2 needs more mana sources than that}",
+                  "#W82-P6 the lost row is named inside the bill; 0 and 5 print once");
+            CHECK(rows[1] == "Cast Master of the Feast {1}{b}{b} (5/5) {leaves 2 of your 5 untapped mana"
+                             " sources untapped; row 1 needs more mana sources than that}",
+                  "#W82-P6 ...on the row the seat took too");
+            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6) {leaves 5 of your 5 untapped mana sources untapped}",
+                  "#W82-P6 a row that loses nothing gets no fit clause at all");
+            CHECK(rows[0].find("{leaves 0 of your 5") != string::npos
+                  && rows[0].find(" {", rows[0].find(" {leaves ") + 1) == string::npos,
+                  "#W82-P6 one group: the bill is still the row's only mana bracket");
+            // a strand clause carrying a mana cost inside the bill: the fit clause
+            // lands at the bill's balanced close, not inside the cost's braces
+            vector<string> r2;
+            r2.push_back("Cast A {3} {leaves 0 of your 3 untapped mana sources untapped; spends 3"
+                         " this turn - B {2}{b} in your hand needs 3}");
+            r2.push_back("Cast C {1} {leaves 2 of your 3 untapped mana sources untapped}");
+            std::vector<int> u2; u2.push_back(3); u2.push_back(1);
+            applyMenuFitTags(r2, u2, 3);
+            CHECK(r2[0] == "Cast A {3} {leaves 0 of your 3 untapped mana sources untapped; spends 3"
+                           " this turn - B {2}{b} in your hand needs 3; row 2 needs more mana sources than that}",
+                  "#W82-P6 the fit clause lands at the BALANCED close of a bill holding a cost");
+        }
+        // (c) ATTACK TOTAL: three sentences, one life total (pinned above in the
+        // inverted #W60-L / #W61-R / #W67-AW / #W74-CC / #W76-CO blocks); here the
+        // count of the figure on the folded line.
+        {
+            const string a = attackTotalLine(1, 7, 20, 2, 7);
+            CHECK(a == "ATTACK TOTAL: 1 attacker listed, 7 total combat damage to a player - declaring"
+                       " all of them with none blocked puts them at 13 - NOT lethal. All of it lands"
+                       " whatever they block.\n",
+                  "#W82-P6 the recorded 152v130 seq-33 line: 13 printed once, 7 printed once");
+            size_t n13 = 0;
+            for (size_t i = a.find("13"); i != string::npos; i = a.find("13", i + 1))
+                n13++;
+            CHECK(n13 == 1, "#W82-P6 the resulting life appears exactly once on the line");
+            CHECK(attackTotalLine(2, 6, 20, 2, 4)
+                      == "ATTACK TOTAL: 2 attackers listed, 6 total combat damage to a player - declaring"
+                         " all of them with none blocked puts them at 14 - NOT lethal. At least 4 damage"
+                         " lands whatever they block - they would be at 16.\n",
+                  "#W82-P6 a floor BELOW the total keeps its own life figure (a different number)");
+            CHECK(attackTotalLine(1, 7, 7, 0, 7).find("puts them at 0 - LETHAL, but only if none of"
+                                                        " them is blocked. All of it lands whatever they"
+                                                        " block - that KILLS them whatever they block.")
+                      != string::npos,
+                  "#W82-P6 the kill claim on a floor equal to the total names no second life figure");
+        }
+        // (d) the blockers header once: when the frame's INCOMING line carries the
+        // figures, the tail's plain branch is a verdict without numbers, the lethal
+        // case is silent, and every branch the frame lacks prints in full.
+        {
+            const string full = combatDamageForecast(13, 0, 14, 0, 22);
+            CHECK(full.find("Your life: 13. Unblocked, these attackers deal up to 14 - you would be at -1")
+                      != string::npos,
+                  "#W82-P6 with no frame figure the tail is the wave-80 line (default argument)");
+            CHECK(combatDamageForecast(13, 0, 14, 0, 22, false, 0, "", true).empty(),
+                  "#W82-P6 lethal + figure on frame: the tail prints nothing (the INCOMING line has"
+                  " the figures and the verdict)");
+            const string nl = combatDamageForecast(13, 0, 4, 0, 22, false, 0, "", true);
+            CHECK(nl == "Unblocked this is NOT lethal (the INCOMING THIS COMBAT line above has the"
+                        " figures): block only where the trade favors you.\n",
+                  "#W82-P6 not lethal + figure on frame: the verdict, no number");
+            CHECK(combatDamageForecast(30, 0, 4, 0, 22, false, 0, "", true)
+                      .find("taking damage while ahead on LIFE is often correct") != string::npos,
+                  "#W82-P6 ...and the ahead-on-life hint survives, still without numbers");
+            CHECK(combatDamageForecast(13, 2, 4, 3, 22, false, 0, "", true)
+                      .find("POISON COUNTER") != string::npos,
+                  "#W82-P6 poison incoming: the full tail prints (the frame has no poison figure)");
+            CHECK(combatDamageForecast(13, 0, 4, 0, 22, true, 0, "", true)
+                      .find("NO survival verdict is given") != string::npos,
+                  "#W82-P6 their life loop live: the full tail prints");
+            CHECK(combatDamageForecast(13, 0, 4, 0, 22, false, 9, "your next draw step", true)
+                      .find("COMPULSORY") != string::npos,
+                  "#W82-P6 compulsory draw-step loss kills: the full tail prints");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

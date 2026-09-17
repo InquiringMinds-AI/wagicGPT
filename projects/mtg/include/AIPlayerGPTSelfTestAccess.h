@@ -376,7 +376,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string collapsedRunNarration(const string& line, int count, int total);
     static void collectLabeledLines(const string& content, const char * label, vector<string>& out, vector<string> * prevOut= NULL, vector<vector<string> > * windowOut= NULL);
     static void collectXDamageClauses(const string& magicText, std::vector<string>& sweepSpecs, std::vector<string>& targetSpecs, bool& implicitTarget);
-    static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive= false, int forcedCycleLoss= 0, const string& forcedCycleSource= "");
+    static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive= false, int forcedCycleLoss= 0, const string& forcedCycleSource= "", bool figureOnFrame= false);
     static bool combatLineIsClean(const string& line, const vector<string> * rosterA, const vector<string> * rosterB);
     static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a, int preventAtoB= kPreventNone, int preventBtoA= kPreventNone, int preventAtoFace= kPreventNone, bool attackerSeat= false, int bRemaining= -1, bool bGainConverted= false, string * outBlockTrigger= NULL, bool * outBlockerDies= NULL, string * outBlockerLifelink= NULL, string * outAttackerLifelink= NULL, bool * outAttackerDies= NULL, bool foeLifeLoop= false);
     static void composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner, std::vector<size_t>& out);
