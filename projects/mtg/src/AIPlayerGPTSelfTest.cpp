@@ -42978,6 +42978,103 @@ static const char * kW50Y_r94 =
         CHECK(ord.empty(), "#W82-A R4 NEGATIVE an empty hand yields nothing");
     }
 
+    // ==== audit 2026-09 gpt-layer proposals lane (LEDGER-v2 section D) ====
+
+    cout << "\n[#W82-P3] hand line: identical hand entries fold to `Name xN` + tail\n";
+    {
+        // The recorded hand of 123v126 seq 4 (matchups-20260912-074153-final), entry
+        // by entry, exactly as describeZoneCards built it: name, copyOfTag handle,
+        // fact tail. Eight cards, three names doubled.
+        const string cp1 = " (copy 1 of 2 in your hand)", cp2 = " (copy 2 of 2 in your hand)";
+        const string tTutor = " {2}{w} [sorcery] [cannot pay now: needs 3 mana, you have 1 untapped source]";
+        const string tDamn = " {2}{b}{b} [sorcery] [cannot pay now: needs 4 mana, you have 1 untapped source]";
+        const string tSkein = " {1}{u} [instant] [cannot pay now: needs 2 mana, you have 1 untapped source]";
+        const string tSanct = " (land: taps for {W}{U}{B})";
+        const string tFlats = " (land)";
+        vector<string> n, h, t;
+        n.push_back("Idyllic Tutor");  h.push_back("");  t.push_back(tTutor);
+        n.push_back("Damnation");      h.push_back("");  t.push_back(tDamn);
+        n.push_back("Vision Skeins");  h.push_back(cp1); t.push_back(tSkein);
+        n.push_back("Arcane Sanctum"); h.push_back(cp1); t.push_back(tSanct);
+        n.push_back("Marsh Flats");    h.push_back(cp1); t.push_back(tFlats);
+        n.push_back("Vision Skeins");  h.push_back(cp2); t.push_back(tSkein);
+        n.push_back("Marsh Flats");    h.push_back(cp2); t.push_back(tFlats);
+        n.push_back("Arcane Sanctum"); h.push_back(cp2); t.push_back(tSanct);
+        const string before =
+            "Idyllic Tutor" + tTutor + "; Damnation" + tDamn + "; Vision Skeins" + cp1 + tSkein
+            + "; Arcane Sanctum" + cp1 + tSanct + "; Marsh Flats" + cp1 + tFlats
+            + "; Vision Skeins" + cp2 + tSkein + "; Marsh Flats" + cp2 + tFlats
+            + "; Arcane Sanctum" + cp2 + tSanct;
+        const string after = joinZoneEntries(n, h, t, false);
+        cout << "     recorded hand (" << before.size() << " B): " << before << "\n";
+        cout << "     folded hand   (" << after.size() << " B): " << after << "\n";
+        CHECK(after == "Idyllic Tutor" + tTutor + "; Damnation" + tDamn
+                       + "; Vision Skeins x2" + tSkein + "; Arcane Sanctum x2" + tSanct
+                       + "; Marsh Flats x2" + tFlats,
+              "#W82-P3 three doubled names fold to `Name x2` + the shared tail, at the FIRST"
+              " copy's position, singletons untouched, order otherwise the hand's");
+        CHECK(after.size() < before.size(),
+              "#W82-P3 the folded line is shorter than the recorded one");
+        CHECK(after.find("(copy ") == string::npos,
+              "#W82-P3 no copy ordinal survives when every copy folded");
+        // NEGATIVE - identity is name AND fact tail. Two copies whose LIVE facts
+        // differ (one copy carries a back-face land tag the other cannot - the
+        // shape a stolen or set-mixed hand produces) keep their own entries and
+        // their copy ordinals; a shared line would state one copy's fact about
+        // the other.
+        {
+            vector<string> n2(n), h2(h), t2(t);
+            t2[5] = tSkein + " [back face: Island (land)]";
+            const string a2 = joinZoneEntries(n2, h2, t2, false);
+            CHECK(a2.find("Vision Skeins" + cp1 + tSkein + ";") != string::npos,
+                  "#W82-P3 NEGATIVE a copy whose tail differs from its namesake keeps its"
+                  " `(copy 1 of 2 ...)` entry verbatim");
+            CHECK(a2.find("Vision Skeins" + cp2 + tSkein + " [back face") != string::npos,
+                  "#W82-P3 NEGATIVE ...and so does the differing copy");
+            CHECK(a2.find("Vision Skeins x") == string::npos,
+                  "#W82-P3 NEGATIVE no `xN` is printed for a name whose copies disagree");
+            CHECK(a2.find("Arcane Sanctum x2") != string::npos,
+                  "#W82-P3 the other doubled names still fold on the same line");
+        }
+        // NEGATIVE - a three-copy name where two agree and one differs: all three
+        // keep their ordinals (the count on a partial fold would be a lie).
+        {
+            vector<string> n3, h3, t3;
+            n3.push_back("Swamp"); h3.push_back(" (copy 1 of 3 in your hand)"); t3.push_back(" (land)");
+            n3.push_back("Swamp"); h3.push_back(" (copy 2 of 3 in your hand)"); t3.push_back(" (land) [tapped]");
+            n3.push_back("Swamp"); h3.push_back(" (copy 3 of 3 in your hand)"); t3.push_back(" (land)");
+            const string a3 = joinZoneEntries(n3, h3, t3, false);
+            CHECK(a3 == "Swamp (copy 1 of 3 in your hand) (land); Swamp (copy 2 of 3 in your hand)"
+                        " (land) [tapped]; Swamp (copy 3 of 3 in your hand) (land)",
+                  "#W82-P3 NEGATIVE a partial agreement folds nothing - every copy keeps its"
+                  " ordinal and its own tail");
+        }
+        // The battlefield path is untouched: same inputs with collapse == true
+        // still take the "#N" range grammar and never the hand fold.
+        {
+            vector<string> n4, h4, t4;
+            for (int i = 1; i <= 3; i++)
+            {
+                std::ostringstream hh; hh << " #" << i;
+                n4.push_back("Vampire"); h4.push_back(hh.str()); t4.push_back(" (2/2)");
+            }
+            CHECK(joinZoneEntries(n4, h4, t4, true) == "Vampire #1-#3 (2/2) x3",
+                  "#W82-P3 the battlefield collapse is byte-identical to before");
+            CHECK(joinZoneEntries(n4, h4, t4, false) == "Vampire #1 (2/2); Vampire #2 (2/2); Vampire #3 (2/2)",
+                  "#W82-P3 ...and with collapse off but `#N` handles (no hand list carries"
+                  " these) the fold does not fire on handles it does not own");
+        }
+        // The count header is the engine's card count, so the hand line's entry
+        // count no longer equals it - the `xN` is what carries the difference.
+        {
+            vector<string> n5, h5, t5;
+            n5.push_back("Plains"); h5.push_back(" (copy 1 of 2 in your hand)"); t5.push_back(" (land)");
+            n5.push_back("Plains"); h5.push_back(" (copy 2 of 2 in your hand)"); t5.push_back(" (land)");
+            CHECK(joinZoneEntries(n5, h5, t5, false) == "Plains x2 (land)",
+                  "#W82-P3 a two-card hand of one name is one entry saying x2");
+        }
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

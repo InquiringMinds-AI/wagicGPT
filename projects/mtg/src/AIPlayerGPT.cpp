@@ -10262,8 +10262,9 @@ int handleRank(const string& handle)
 //PURE (so PARSETEST can prove both the positive and the must-NOT-merge
 //negatives without a game): the zone line assembled from per-entry
 //(name, handle, fact-tail) triples. `collapse` is the battlefield-only switch -
-//hand lines keep one entry per card, their copyOfTag notation is deliberately
-//NOT an identity handle, and a hand is never long enough to pay for a range.
+//hand lines fold IDENTICAL cards to "Name xN" (#W82-P3, below) and otherwise keep
+//one entry per card; their copyOfTag notation is deliberately NOT an identity
+//handle, and a hand is never long enough to pay for a range.
 string joinZoneEntries(const vector<string>& names, const vector<string>& handles,
                        const vector<string>& tails, bool collapse)
 {
@@ -10333,11 +10334,51 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
             }
         }
     }
+    //#W82-P3: HAND lines (collapse == false) fold identical entries to ONE entry
+    //"Name xN" + tail. Identity is the NAME and the byte-identical FACT TAIL
+    //(cost, type, castability tag, back-face tag ...) - a hand card whose live
+    //facts differ from its namesakes keeps its own "(copy R of N in your hand)"
+    //entry and so do its namesakes, because a shared line would state one copy's
+    //fact about another (the wrong-scope lie). The count is printed ("x2"), so
+    //the N-166a defect this notation exists for - a duplicate read as a render
+    //fault and dropped from the model's hand - cannot return: the entry SAYS
+    //there are two. Seams that pick ONE instance (discard, bottom, reveal,
+    //hand-removal rows) build their own numbered rows through listCopyRank and
+    //are untouched; this is the descriptive line only.
+    std::map<string, int> handKeyCount, handNameCount;
+    std::set<string> handKeyDone;
+    if (!collapse)
+        for (size_t k = 0; k < names.size(); k++)
+        {
+            handKeyCount[names[k] + "\x01" + tails[k]]++;
+            handNameCount[names[k]]++;
+        }
     std::ostringstream o;
     bool first = true;
     size_t i = 0;
     while (i < ord.size())
     {
+        if (!collapse)
+        {
+            const string key = names[ord[i]] + "\x01" + tails[ord[i]];
+            const int nameCopies = handNameCount[names[ord[i]]];
+            //only over copyOfTag / empty handles - a "#N" battlefield handle is an
+            //identity this fold must never erase (and no hand list carries one)
+            if (nameCopies >= 2 && handKeyCount[key] == nameCopies
+                && handleRank(handles[ord[i]]) < 0)
+            {
+                //every copy of this name carries the same facts: one entry
+                if (handKeyDone.insert(key).second)
+                {
+                    if (!first)
+                        o << "; ";
+                    first = false;
+                    o << names[ord[i]] << " x" << nameCopies << tails[ord[i]];
+                }
+                i++;
+                continue;
+            }
+        }
         size_t j = i + 1;
         int rank = handleRank(handles[ord[i]]);
         if (collapse && rank > 0)
