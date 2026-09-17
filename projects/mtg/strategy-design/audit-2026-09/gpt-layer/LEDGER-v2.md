@@ -25,3 +25,22 @@ Everything the stand-in confirmed that Astra also confirms (F1 opp-turn verdict 
 Sections A (the eleven flaws) and B/C otherwise stand: every A item has two genuine confirmations.
 
 ## 3. Owner's review list — unchanged from LEDGER.md §D except: I9 (fold land drop into the cast menu) — Astra REFUTES the "halves calls" claim (a combined menu still returns one action; the cast question re-puts after the land enters); the unification can still be proposed on other grounds. I13 (hand-only discard frame) — Astra: needs a deliberately different frame, the pregame flag drops the board.
+
+## 4. OWNER RULINGS on §D (2026-09-16, verbatim where he spoke)
+- P1 (invariants → system prompt) and P2 (stop re-shipping card text): "1 and 2 seem like they might negatively impact the play quality. I think we didnt originally restate the card text? Well, worth a try maybe, but definitely needs ab testing if we do it." FACT: per-row card-text glosses entered 2026-08-19/20 (5c6d66183, 6a54e87e6 — waves 34/35); the 2026-07-09 prompt design did not restate card text; `{effect:}` on permanents is wave 77 (a7a77683b). → A/B ONLY: two binaries from one commit differing only by P1+P2, same 21-game round-robin, judged by blind-seat misplay counts (the census's experiment), never win rate. Not before the loop resumes.
+- P3 collapse hand entries: yes. P4 shorten hand tags: sure. P6 one clause per number: yes. P8 range grammar: yes. P10 whole-order blocker answer: yes (a reply-shape extension for ORDERING only; the golden protocol text otherwise untouched; the lane states the exact added text in its report). P11 telemetry schema: yes. P12 navigable by responsibility: yes. P13 re-measure the W81 folds: yes.
+- P5 narration compaction: "Im definitely interested in making this more compact and efficient. Id like to see a sample of what that would read like." → sample presented 2026-09-16 (below, §5); awaiting his read before any lane.
+- P7 cleanup-discard without the log: "try it. Revert if it degrades behavior."
+- P9 land drop folded into the cast menu: "No, this can be an important tactical step, especially in a graveyard shenanigans deck." → CLOSED, do not re-propose.
+
+## 5. P5 sample (from a real wave-80 prompt, 152v125 seq 15, turns 6-8; 26 lines / ~1,040 B → 9 lines / ~430 B; every fact kept, phase markers only where a decision or event needs them)
+BEFORE (verbatim):
+=== Turn 6 - opponent's turn === / - Phase: Draw / - Opponent drew a card / - Phase: Main phase 1 / - Opponent played Seachrome Coast / === Turn 7 - YOUR turn === / - Phase: Draw / - You drew Brutal Cathar / - Phase: Main phase 1 / - You played Overgrown Farmland / - Paid {2}{w} for Elite Spellbinder (3 sources) / - You cast Elite Spellbinder / - Your Elite Spellbinder resolved and entered the battlefield / - You targeted Supreme Verdict with Elite Spellbinder's ability (exile a non-land card) / - You used: exile a non-land card with Elite Spellbinder targeting Supreme Verdict / - Opponent's Supreme Verdict was exiled from the opponent's hand / - Phase: Attackers / - You declared attackers: Katilda, Dawnhart Prime / - Phase: Combat damage / - Your Katilda, Dawnhart Prime dealt 1 damage to the opponent (now 18) / === Turn 8 - opponent's turn === / - Phase: Draw / - Opponent drew a card / - Phase: Main phase 1 / - Opponent played Plains / - Phase: Main phase 2 / - Opponent cast Lightmine Field / - Opponent's Lightmine Field resolved and entered the battlefield
+AFTER (proposed):
+T6 (opp): drew; played Seachrome Coast.
+T7 (you): drew Brutal Cathar; played Overgrown Farmland.
+  Main 1: cast Elite Spellbinder ({2}{w}, 3 sources) -> resolved; its ETB exiled Supreme Verdict from their hand.
+  Attack: Katilda, Dawnhart Prime -> 1 damage, opp 18.
+T8 (opp): drew; played Plains.
+  Main 2: cast Lightmine Field -> resolved.
+Rules of the fold: a phase marker prints only when something happened in it; draw + land in the turn header line; "paid X for Y / cast Y / Y resolved" become one line with the cost in parentheses; "targeted … / used … / was exiled" become one ETB line; damage carries the new life total. Lost: nothing factual; the order of events within a phase is preserved. Judged by the owner's criterion on the composed document, then by the same A/B instrument as P1/P2.
