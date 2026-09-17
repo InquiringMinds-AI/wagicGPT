@@ -10,7 +10,8 @@ Every wave from 66 to 69 re-litigated that in text (a three-sentence budget for
 ran with thinking OFF and the reply was the only place to think. This guard makes
 the regression loud at link time instead of one corpus later.
 
-WHAT IT SCANS: production statements in src/AIPlayerGPT.cpp (everything BEFORE the
+WHAT IT SCANS: production statements in src/AIPlayerGPT*.cpp except the PARSETEST
+corpus file (in AIPlayerGPT.cpp everything BEFORE the
 `#if defined(WAGIC_GPT_PARSETEST_BUILD)` corpus, which legitimately quotes the
 deleted wordings as MUST-NOT-MATCH cases) whose concatenated string literals talk
 about the reply form - i.e. carry a reply LABEL (CHOICE:/ATTACK:/BLOCKS:/PUT:/
@@ -25,7 +26,7 @@ import sys
 
 FORBIDDEN = ["working", "reasoning", "first line", "correction", "announce",
              "then a plan", "only if"]
-LABELS = ("CHOICE:", "ATTACK:", "BLOCKS:", "PUT:", "PLAN:")
+LABELS = ("CHOICE:", "ATTACK:", "BLOCKS:", "PUT:", "PLAN:", "ORDER:")
 # Identifier-shaped tokens (translog classes, parse notes, json keys) are DATA the
 # corpus reader consumes, never text the model is shown. They are excused by shape,
 # not by name: a stamp has no spaces.
@@ -178,8 +179,12 @@ def main(argv):
     for t in targets:
         if os.path.isdir(t):
             for root, _, names in os.walk(t):
+                #W82-P12: the layer is five translation units now (AIPlayerGPT.cpp,
+                # ...Transport/Translog/Parse/Seams.cpp); the PARSETEST corpus is the one
+                # AIPlayerGPT*.cpp file that legitimately quotes deleted wordings.
                 files += [os.path.join(root, f) for f in names
-                          if f == "AIPlayerGPT.cpp"]
+                          if f.startswith("AIPlayerGPT") and f.endswith(".cpp")
+                          and f != "AIPlayerGPTSelfTest.cpp"]
                 guides += [os.path.join(root, f) for f in names
                            if f.endswith(GUIDE_SUFFIX)]
         elif t.endswith(GUIDE_SUFFIX):

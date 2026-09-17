@@ -36,7 +36,7 @@ NON_DECISION_KINDS = ("gamestart", "system", "gameend")
 #round trip, whether this tool has heard of it or not - which is the point: the
 #wave-78 `forced_close` needed no edit to be explained, and neither will the next one.
 ROUNDTRIP_KINDS = ("ask", "priority", "attackers", "blockers", "discard",
-                   "reveal", "bottom")
+                   "reveal", "bottom", "order")  #W82-P10: the whole-order damage seam
 
 
 #W79-DB (T17, wave-78 engine-seat CY F12 FAIL): A ROUND-TRIP KIND THAT MADE NO
@@ -198,6 +198,21 @@ def selftest():
             or w80_pearson([1], [1]) is not None:
         print("SELFTEST FAIL: pearson")
         ok = False
+    #W82-P11: the window shape reads as its seam, and the folded events are counted.
+    w = normalize({"kind": "window", "seam": "attackers", "forced_close": [{"event": 1}, {"event": 2}],
+                   "wall_miss": {"class": "wall_miss_unrecorded", "latency_ms": 120000}})
+    if w["kind"] != "attackers" or not w.get("_window") \
+            or normalize({"kind": "hold_event"})["kind"] != "hold_event" \
+            or normalize({"kind": "ask"}).get("_window"):
+        print("SELFTEST FAIL: window-shape normalization %r" % (w,))
+        ok = False
+    fe = folded_events([w, {"kind": "ask", "wall_miss": 1}])
+    if fe != _c.Counter({"forced_close": 2, "wall_miss": 1}):
+        print("SELFTEST FAIL: folded events %r" % (fe,))
+        ok = False
+    if engine_answered_records([normalize({"kind": "window", "seam": "reveal", "latency_ms": -1})]) != 1:
+        print("SELFTEST FAIL: a window-shaped reveal with no round trip is engine-answered")
+        ok = False
     print("corpus-stats selftest: %s" % ("OK" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -290,6 +305,29 @@ def turn_gap_note(record_turns, results_turns, seat_logs):
             % (gap, seat_logs, gap - seat_logs))
 
 
+def normalize(r):
+    """#W82-P11: one record kind per decision - `window` - with the seam as a field.
+    Older corpora wrote the seam as the kind; this reads both shapes into one: the
+    census, ROUNDTRIP_KINDS and every per-seam line below key on the SEAM."""
+    if r.get("kind") == "window" and r.get("seam"):
+        r["kind"] = r["seam"]
+        r["_window"] = True
+    return r
+
+
+def folded_events(records):
+    """#W82-P11: the forced_close / wall_miss events that ride window records as
+    fields (they joined a window that wrote a record), counted for the census."""
+    c = collections.Counter()
+    for r in records:
+        fc = r.get("forced_close")
+        if isinstance(fc, list):
+            c["forced_close"] += len(fc)
+        if isinstance(r.get("wall_miss"), dict):
+            c["wall_miss"] += 1
+    return c
+
+
 def load(dirs):
     """basename -> records, with the two exclusions applied."""
     seen = {}
@@ -304,7 +342,7 @@ def load(dirs):
                 if not line:
                     continue
                 try:
-                    recs.append(json.loads(line))
+                    recs.append(normalize(json.loads(line)))  #W82-P11
                 except ValueError:
                     pass
             gameend = [r for r in recs if r.get("kind") == "gameend"]
@@ -352,6 +390,11 @@ def main(argv):
     engine_answered = engine_answered_records(allrecs)
     print("  ...of which %-13s %d (round-trip kinds the engine answered itself, or"
           " whose latency_ms is -1)" % ("engine_answered", engine_answered))
+    folded = folded_events(allrecs)  #W82-P11
+    print("FOLDED EVENTS on window records (joined by window_seq): %s"
+          % (dict(folded) if folded else "(none)"))
+    print("window-shaped records (kind=window + seam): %d"
+          % sum(1 for r in allrecs if r.get("_window")))
 
     # ---- fallbacks, by kind and flat.
     fbk = collections.Counter((r.get("kind"), r.get("fallback"))

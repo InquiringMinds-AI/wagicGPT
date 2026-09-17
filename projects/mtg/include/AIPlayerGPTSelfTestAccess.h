@@ -376,7 +376,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string collapsedRunNarration(const string& line, int count, int total);
     static void collectLabeledLines(const string& content, const char * label, vector<string>& out, vector<string> * prevOut= NULL, vector<vector<string> > * windowOut= NULL);
     static void collectXDamageClauses(const string& magicText, std::vector<string>& sweepSpecs, std::vector<string>& targetSpecs, bool& implicitTarget);
-    static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive= false, int forcedCycleLoss= 0, const string& forcedCycleSource= "");
+    static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming, int oppLife, bool oppLoopLive= false, int forcedCycleLoss= 0, const string& forcedCycleSource= "", bool figureOnFrame= false);
     static bool combatLineIsClean(const string& line, const vector<string> * rosterA, const vector<string> * rosterB);
     static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a, int preventAtoB= kPreventNone, int preventBtoA= kPreventNone, int preventAtoFace= kPreventNone, bool attackerSeat= false, int bRemaining= -1, bool bGainConverted= false, string * outBlockTrigger= NULL, bool * outBlockerDies= NULL, string * outBlockerLifelink= NULL, string * outAttackerLifelink= NULL, bool * outAttackerDies= NULL, bool foeLifeLoop= false);
     static void composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner, std::vector<size_t>& out);
@@ -496,6 +496,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static void groupNumberedRows(const vector<string>& rows, vector<size_t>& order);
     static string handAboutToBeReplacedLine(const string& sourceName);
     static string handCastabilityTag(int verdict, int need, int sources, const string& cost, const string& timingWhy= "", int floating= 0, bool instantSpeed= false);
+    static string handTagLegend(bool anySorcerySpeed, const string& timingWhy, bool anyHeld);
     static string handRemovalVerb(const string& lc, bool& relocate, const string& gainDest= "");
     static int handleRank(const string& handle);
     static bool hasCodedAnswerLine(const string& content);
@@ -531,7 +532,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool isRenderVocabWord(const string& w);
     static bool isReservedHoldEcho(const string& echoLc);
     static string joinBlockerRows(const vector<string>& names, const vector<string>& handles, const vector<string>& rests, bool * rangeUsed, const char * label= "B");
-    static string joinNumberedRows(const vector<string>& rows, bool * rangeUsed);
+    static string joinNumberedRows(const vector<string>& rows, bool * rangeUsed, unsigned * formsUsed = NULL);
+    static string optionRangeNote(unsigned forms);
     static string joinTargetEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, const std::map<string, string>& notes);
     static string joinVictimRoster(const std::vector<std::string>& entries);
     static string joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse);
@@ -642,6 +644,9 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string namedCastPriceTag(const string& sourceName, int lifeLoss, int draws, int life);
     static void narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta= NULL);
     static string narrationBucketRuns(const string& body);
+    static string compactNarration(const string& log);
+    static void translogRecordShape(const char * kind, string& outKind, string& outSeam);
+    static bool gptOrderLineFromReply(const string& content, size_t n, vector<int>& order, string * takenText);
     static string narrationFoldPaidSources(const string& body);
     static string narrationShapeKey(const string& line);
     static size_t narrationTrimKeep(size_t markerLen);

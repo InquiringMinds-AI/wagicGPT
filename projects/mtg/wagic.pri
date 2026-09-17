@@ -65,6 +65,10 @@ SOURCES += \
         src/DecisionContract.cpp\
         src/AIPlayerGPT.cpp\
         src/AIPlayerGPTSelfTest.cpp\
+        src/AIPlayerGPTTransport.cpp\
+        src/AIPlayerGPTTranslog.cpp\
+        src/AIPlayerGPTParse.cpp\
+        src/AIPlayerGPTSeams.cpp\
         src/GptConfig.cpp\
         src/qrcodegen.cpp\
         src/OptionGpt.cpp\
@@ -189,6 +193,7 @@ HEADERS  += \
         include/DecisionContract.h\
         include/AIPlayerGPT.h\
         include/AIPlayerGPTSelfTestAccess.h\
+        include/AIPlayerGPTInternal.h\
         include/GptConfig.h\
         include/qrcodegen.hpp\
         include/OptionGpt.h\

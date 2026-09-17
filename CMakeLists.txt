@@ -258,6 +258,10 @@ set(MTG_SOURCES
   # deliberately NOT built - same open question as the PSP network leg.
   projects/mtg/src/AIPlayerGPT.cpp
   projects/mtg/src/AIPlayerGPTSelfTest.cpp
+  projects/mtg/src/AIPlayerGPTTransport.cpp
+  projects/mtg/src/AIPlayerGPTTranslog.cpp
+  projects/mtg/src/AIPlayerGPTParse.cpp
+  projects/mtg/src/AIPlayerGPTSeams.cpp
   projects/mtg/src/GptConfig.cpp
   projects/mtg/src/qrcodegen.cpp
   projects/mtg/src/OptionGpt.cpp

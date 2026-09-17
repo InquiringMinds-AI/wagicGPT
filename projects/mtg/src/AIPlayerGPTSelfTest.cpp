@@ -103,6 +103,18 @@ string AIPlayerGPTSelfTestAccess::answerSegmentStatic(const string& content, con
 
 void AIPlayerGPTSelfTestAccess::run()
 {
+    //#W82-P5: the narration-compaction instrument for the byte census - a
+    //recorded event log in, the compact render out (desktop PARSETEST builds
+    //only, like the corpus this file is). WAGIC_GPT_COMPACT_FILE=<path>.
+    if (const char * cf = getenv("WAGIC_GPT_COMPACT_FILE"))
+    {
+        std::ifstream in(cf);
+        std::stringstream ss;
+        ss << in.rdbuf();
+        cout << compactNarration(ss.str()) << "\n";
+        cout.flush();
+        return;
+    }
     using std::cout;
     int passed = 0, failed = 0;
     #define CHECK(cond, label) do { \
@@ -13264,9 +13276,10 @@ static const char * kW50Y_r94 =
 
         // ================= D18: which rows fit together =================
         {
-            CHECK(menuFitTag(0, std::vector<int>(), 2)
-                  == " {taps you out - no other row on this menu needs more than 0}",
-                  "#W54-C D18 tapping out is still stated when nothing else was affordable anyway");
+            // #W82-P6 INVERTED: the fit clause prints ONLY when a row is lost; the
+            // tap-out itself is on the row's own `{leaves 0 of your M ...}` count.
+            CHECK(menuFitTag(0, std::vector<int>(), 2).empty(),
+                  "#W54-C D18 / #W82-P6 nothing lost after a tap-out prints no fit clause");
             std::vector<int> lost1; lost1.push_back(2);
             CHECK(menuFitTag(0, lost1, 2)
                   == " {taps you out - row 2 needs more mana sources than the 0 this leaves}",
@@ -13279,9 +13292,8 @@ static const char * kW50Y_r94 =
             CHECK(menuFitTag(1, lost3, 4)
                   == " {leaves 1 source - rows 2, 3 and 5 need more mana sources than the 1 this leaves}",
                   "#W54-C D18 three lost rows use commas then 'and'; one source is singular");
-            CHECK(menuFitTag(5, std::vector<int>(), 2)
-                  == " {leaves 5 sources - no other row on this menu needs more than 5}",
-                  "#W54-C D18 the POSITIVE form: a {0} blocker keeps the whole menu open");
+            CHECK(menuFitTag(5, std::vector<int>(), 2).empty(),
+                  "#W54-C D18 / #W82-P6 a {0} blocker that loses no row prints no fit clause");
             CHECK(menuFitTag(3, lost1, 0).empty(),
                   "#W54-C D18 NEGATIVE a menu with no other priced row makes no fit claim");
         }
@@ -13300,9 +13312,8 @@ static const char * kW50Y_r94 =
             CHECK(rows[1] == "Cast Master of the Feast {1}{b}{b} (5/5)"
                              " {leaves 2 sources - row 1 needs more mana sources than the 2 this leaves}",
                   "#W54-C D18 the row the seat took states what it strands");
-            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6)"
-                             " {leaves 5 sources - no other row on this menu needs more than 5}",
-                  "#W54-C D18 the free blocker is marked as costing the seat nothing on this menu");
+            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6)",
+                  "#W54-C D18 / #W82-P6 the free blocker loses no row and carries no fit clause");
             vector<string> one;
             one.push_back("Cast Shield Sphere {0} (0/6)");
             std::vector<int> u1; u1.push_back(0);
@@ -18327,17 +18338,16 @@ static const char * kW50Y_r94 =
         //count line as the whole of the arithmetic offered.
         CHECK(attackTotalLine(5, 20, 22, 3, 6)
               == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 2. That is NOT lethal: they survive at 2 even"
-                 " with none of them blocked. At least 6 damage lands whatever they"
+                 " with none blocked puts them at 2 - NOT lethal. At least 6 damage lands whatever they"
                  " block - they would be at 16.\n",
-              "#W60-L B11 the ceiling and the proven floor, in that order (+#W67-AW M1 verdict)");
+              "#W60-L B11 the ceiling and the proven floor, in that order (+#W67-AW M1 verdict,"
+              " #W82-P6 one clause per number)");
         CHECK(attackTotalLine(5, 20, 5, 3, 6).find("they would be at -1; that KILLS them"
                                                    " whatever they block.") != string::npos,
               "#W60-L B11 a floor at or past their life is a kill no block prevents");
         CHECK(attackTotalLine(2, 4, 20, 3, 0)
               == "ATTACK TOTAL: 2 attackers listed, 4 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 16. That is NOT lethal: they survive at 16 even"
-                 " with none of them blocked. Their 3 untapped blockers that can legally"
+                 " with none blocked puts them at 16 - NOT lethal. Their 3 untapped blockers that can legally"
                  " block at least one of these attackers can cover"
                  " every attacker you could send, so none of that damage is guaranteed.\n",
               "#W60-L B11 a fully coverable attack promises nothing (+#W67-AW M1 verdict,"
@@ -18350,17 +18360,17 @@ static const char * kW50Y_r94 =
         //"At most 3 of them can be blocked at all" - a true count offered as the
         //reason for a floor it did not cause. The floor now names no cause at all.
         CHECK(attackTotalLine(1, 3, 23, 3, 3).find("can be blocked at all") == string::npos
-              && attackTotalLine(1, 3, 23, 3, 3).find("At least 3 damage lands whatever they"
-                                                      " block - they would be at 20.") != string::npos,
-              "#W60-L B11 NEGATIVE the floor states the number, never a cause for it");
+              && attackTotalLine(1, 3, 23, 3, 3).find("puts them at 20 - NOT lethal. All of it lands"
+                                                      " whatever they block.") != string::npos,
+              "#W60-L B11 NEGATIVE the floor states the number, never a cause for it (#W82-P6: a"
+              " floor equal to the total names no second number)");
         //NEGATIVE: nothing to declare, or no known opponent life, says nothing;
         //and an uncomputed floor prints the ceiling alone.
         CHECK(attackTotalLine(0, 0, 20, 3, 6).empty() && attackTotalLine(5, 20, -1, 3, 6).empty(),
               "#W60-L B11 NEGATIVE no attackers or no known life prints nothing");
         CHECK(attackTotalLine(5, 20, 22, 3, -1)
               == "ATTACK TOTAL: 5 attackers listed, 20 total combat damage to a player - declaring all of them"
-                 " with none blocked puts them at 2. That is NOT lethal: they survive at 2 even"
-                 " with none of them blocked.\n",
+                 " with none blocked puts them at 2 - NOT lethal.\n",
               "#W60-L B11 NEGATIVE an uncomputed floor claims no floor (+#W67-AW M1 verdict)");
         //ECHO SHAPE: a prompt line, not an annotation - no brace, no bracket.
         //#W60-Q (R4): power is not life loss.
@@ -18995,12 +19005,13 @@ static const char * kW50Y_r94 =
         // Perimeter Captains + Pride Guardian among 5 blockers. The floor said
         // 43; the combat ended at 66.
         const string base = attackTotalLine(3, 9, 52, 5, 9);
-        CHECK(base.find("At least 9 damage lands whatever they block - they would be at 43")
+        CHECK(base.find("puts them at 43 - NOT lethal. All of it lands whatever they block.")
                   != string::npos,
-              "#W61-R C1 REGRESSION with no blocking trigger on their board the floor is the"
-              " wave-60 line, byte for byte");
+              "#W61-R C1 REGRESSION with no blocking trigger on their board the floor is stated"
+              " once (#W82-P6: the floor is the total, so the life it leaves is the figure"
+              " already printed)");
         const string gained = attackTotalLine(3, 9, 52, 5, 9, 0, false, 23);
-        CHECK(gained.find("that damage alone puts them at 43, but every blocker they declare"
+        CHECK(gained.find("All of it lands whatever they block, but every blocker they declare"
                           " also fires the blocking triggers tagged on the rows above - up to"
                           " 23 life back across their 5 blockers, so blocking can leave them"
                           " as high as 66") != string::npos,
@@ -26512,11 +26523,10 @@ static const char * kW50Y_r94 =
         // the reply wrote "which is lethal" of a line leaving them at 3. Same
         // word over 4 (`162` s21) and 6 (`126` s23).
         const string s20 = attackTotalLine(4, 11, 14, 2, 7);
-        CHECK(s20.find("puts them at 3. That is NOT lethal: they survive at 3 even with none of"
-                       " them blocked.") != string::npos,
+        CHECK(s20.find("puts them at 3 - NOT lethal.") != string::npos,
               "#W67-AW M1 REPRO the s20 line now answers the question the model got backwards");
         CHECK(attackTotalLine(5, 20, 5, 3, 6)
-                  .find("puts them at -15. That IS lethal - but only if none of them is blocked.")
+                  .find("puts them at -15 - LETHAL, but only if none of them is blocked.")
                   != string::npos,
               "#W67-AW M1 POSITIVE a genuinely lethal unblocked total says so, scoped to the"
               " assumption it is computed under");
@@ -26524,13 +26534,13 @@ static const char * kW50Y_r94 =
         // the declaration, so no positive kill claim survives it - the same gate
         // every other kill claim on this line rides.
         CHECK(attackTotalLine(5, 20, 5, 3, 6, 0, false, 0, "Lightmine Field")
-                  .find("That IS lethal") == string::npos,
+                  .find("LETHAL, but only") == string::npos,
               "#W67-AW M1 MUST-NOT-MATCH an attack punisher withholds the positive verdict");
         // ... while the NEGATIVE verdict needs no gate: a block, a blocking
         // trigger and a life loop can only make a survivable total MORE
         // survivable, so it is true whatever else is on the board.
         CHECK(attackTotalLine(2, 4, 20, 3, 0, 0, false, 3, "Lightmine Field", true)
-                  .find("That is NOT lethal: they survive at 16") != string::npos,
+                  .find("puts them at 16 - NOT lethal") != string::npos,
               "#W67-AW M1 POSITIVE the survivable verdict holds under a punisher and a loop");
         CHECK(attackTotalLine(0, 0, 20, 3, 6).empty()
                   && attackTotalLine(5, 20, -1, 3, 6).empty(),
@@ -26548,26 +26558,32 @@ static const char * kW50Y_r94 =
         // now: sorcery speed - only in your own main phase with an empty stack]`
         // under `Casting decision (Main phase 1, YOUR turn)` with a cycling
         // ability on the stack. 7,212 characters of argument, no coded line.
+        // #W82-P4 INVERTED: the failing half now prints ONCE per hand line, in
+        // the legend, and the per-card tag is the short head. The s52 fact (which
+        // half failed) is still on the screen - on the legend line.
         CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}",
                                  "the stack is not empty (see ON THE STACK above)")
-                  == " [no cast row now: sorcery speed - only in your own main phase with an empty"
-                     " stack; right now the stack is not empty (see ON THE STACK above)]",
-              "#W67-AW M2 REPRO the s52 bracket names the half that actually failed");
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}",
-                                 "it is the opponent's turn and the phase is Upkeep, not a main phase")
+                  == " [no cast row now: sorcery speed]",
+              "#W67-AW M2 / #W82-P4 the per-card tag is the short head; the failing half"
+              " moved to the legend");
+        CHECK(handTagLegend(true, "the stack is not empty (see ON THE STACK above)", false)
+                  == "\nHand tags: [sorcery speed] = a cast row only in your own main phase with"
+                     " an empty stack; right now the stack is not empty (see ON THE STACK above).",
+              "#W67-AW M2 REPRO the s52 half that actually failed is named on the legend line");
+        CHECK(handTagLegend(true, "it is the opponent's turn and the phase is Upkeep, not a main phase", false)
                   .find("right now it is the opponent's turn and the phase is Upkeep, not a main"
                         " phase") != string::npos,
               "#W67-AW M2 POSITIVE two failing halves are both named, in the order the rule reads"
               " them");
         // MUST-NOT-MATCH: the full rule is still printed - nothing the model
-        // relies on is deleted - and an empty reason is byte-identical to wave 66.
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty")
+        // relies on is deleted - once per line.
+        CHECK(handTagLegend(true, "the stack is not empty", false)
                   .find("only in your own main phase with an empty stack") != string::npos,
               "#W67-AW M2 the rule itself is still printed beside the failing half");
-        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}")
-                  == " [no cast row now: sorcery speed - only in your own main phase with an empty"
-                     " stack]",
-              "#W67-AW M2 MUST-NOT-MATCH no reason supplied leaves the wave-66 string byte-identical");
+        CHECK(handTagLegend(true, "", false)
+                  == "\nHand tags: [sorcery speed] = a cast row only in your own main phase with"
+                     " an empty stack.",
+              "#W67-AW M2 no reason supplied prints the rule alone");
         CHECK(handCastabilityTag(kHandNeedsMana, 5, 3, "{3}{b}{b}", "the stack is not empty")
                   .find("right now") == string::npos,
               "#W67-AW M2 MUST-NOT-MATCH the reason reaches no other verdict");
@@ -31402,11 +31418,11 @@ static const char * kW50Y_r94 =
         CHECK(s43.find("2 of that damage is LIFELINK") != string::npos
                   && s43.find("they are at 1, not 3") != string::npos,
               "#W74-CC O5 REPRO the converted figure is printed beside the combat-only one");
-        CHECK(s43.find("That is NOT lethal: they survive at 1") != string::npos
+        CHECK(s43.find("they are at 1, not 3 - NOT lethal") != string::npos
                   && s43.find("survive at 3") == string::npos,
               "#W74-CC O5 the verdict is computed from the figure the converter makes true");
         const string s43lethal = attackTotalLine(1, 2, 4, 0, 2, 0, false, 0, "", false, NULL, 0, 2);
-        CHECK(s43lethal.find("That IS lethal") != string::npos,
+        CHECK(s43lethal.find("LETHAL, but only if none of them is blocked") != string::npos,
               "#W74-CC O5 and a converted total that reaches 0 is named lethal, scoped to"
               " none-of-them-blocked as every other claim on this line is");
         CHECK(attackTotalLine(1, 2, 5, 0, 2, 0, false, 0, "", false, NULL, 0, 0)
@@ -33301,8 +33317,8 @@ static const char * kW50Y_r94 =
                 // RED ON BASE: the seeded tree prints the categorical floor whatever
                 // is on their board - the punisher clause only ever followed it.
                 CHECK(attackTotalLine(100, 401, 97, 0, 401)
-                          .find("At least 401 damage lands whatever they block - they would"
-                                " be at -304") != string::npos,
+                          .find("All of it lands whatever they block - that KILLS them"
+                                " whatever they block") != string::npos,
                       "#W76-CO Q4b RED-ON-BASE the sentence deck123 seq 1208 read, verbatim,"
                       " over two Lightmine Fields - and their life did not move from 97");
                 const string pun = attackTotalLine(100, 401, 97, 0, 401, 0, false, 0,
@@ -38869,14 +38885,22 @@ static const char * kW50Y_r94 =
                                                "", 0, true);
         const string corpusRow =
             "Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]";
+        // #W82-P4 INVERTED: the sorcery-speed no-target tag names the STACK too (a
+        // counterspell's legal target is a stack object - "on the board" alone was a
+        // wrong-scope statement), and the HELD explanation prints once per hand
+        // line in the legend; the per-card tag keeps the head and the word HELD.
         CHECK(base == " [no cast row now: it must have a target and there is no legal"
-                      " target on the board]",
-              "#W79-DB T8 RED-ON-BASE the wave-78 tag, byte-exact - it says only that THIS"
-              " window has no row, and `125v162` seq 52 read it as a fact about the hand");
-        CHECK(held != base && held.find("HELD: this is an instant") != string::npos
-              && held.find("castable the moment a legal target appears") != string::npos,
-              "#W79-DB T8 GREEN an instant with no legal target now reads as HELD");
-        CHECK(held.compare(0, base.size() - 1, base, 0, base.size() - 1) == 0,
+                      " target on the board or the stack]",
+              "#W79-DB T8 / #W82-P4 the no-target tag names the board AND the stack");
+        CHECK(held == " [no cast row now: no legal target - HELD]",
+              "#W79-DB T8 GREEN an instant with no legal target now reads as HELD, short");
+        CHECK(handTagLegend(false, "", true).find("HELD] = an instant with no legal target on the"
+                                                  " board or the stack right now") != string::npos
+              && handTagLegend(false, "", true).find("castable the moment a legal target appears")
+                     != string::npos
+              && handTagLegend(false, "", true).find("never about your hand") != string::npos,
+              "#W79-DB T8 the HELD scope lesson is on the legend line, once");
+        CHECK(held.compare(0, 18, base, 0, 18) == 0 && held.compare(0, 18, " [no cast row now:") == 0,
               "#W79-DB T8 the literal head every guide keys on is byte-identical");
         CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, false) == base,
               "#W79-DB T8 MUST-NOT-MATCH a sorcery-speed card with no target is unchanged");
@@ -42976,6 +43000,556 @@ static const char * kW50Y_r94 =
         CHECK(ord.empty(), "#W82-A R4 NEGATIVE an empty reply yields nothing");
         w82PutOrderFromReply("PUT: 3", 0, ord);
         CHECK(ord.empty(), "#W82-A R4 NEGATIVE an empty hand yields nothing");
+    }
+
+    // ==== audit 2026-09 gpt-layer proposals lane (LEDGER-v2 section D) ====
+
+    cout << "\n[#W82-P3] hand line: identical hand entries fold to `Name xN` + tail\n";
+    {
+        // The recorded hand of 123v126 seq 4 (matchups-20260912-074153-final), entry
+        // by entry, exactly as describeZoneCards built it: name, copyOfTag handle,
+        // fact tail. Eight cards, three names doubled.
+        const string cp1 = " (copy 1 of 2 in your hand)", cp2 = " (copy 2 of 2 in your hand)";
+        const string tTutor = " {2}{w} [sorcery] [cannot pay now: needs 3 mana, you have 1 untapped source]";
+        const string tDamn = " {2}{b}{b} [sorcery] [cannot pay now: needs 4 mana, you have 1 untapped source]";
+        const string tSkein = " {1}{u} [instant] [cannot pay now: needs 2 mana, you have 1 untapped source]";
+        const string tSanct = " (land: taps for {W}{U}{B})";
+        const string tFlats = " (land)";
+        vector<string> n, h, t;
+        n.push_back("Idyllic Tutor");  h.push_back("");  t.push_back(tTutor);
+        n.push_back("Damnation");      h.push_back("");  t.push_back(tDamn);
+        n.push_back("Vision Skeins");  h.push_back(cp1); t.push_back(tSkein);
+        n.push_back("Arcane Sanctum"); h.push_back(cp1); t.push_back(tSanct);
+        n.push_back("Marsh Flats");    h.push_back(cp1); t.push_back(tFlats);
+        n.push_back("Vision Skeins");  h.push_back(cp2); t.push_back(tSkein);
+        n.push_back("Marsh Flats");    h.push_back(cp2); t.push_back(tFlats);
+        n.push_back("Arcane Sanctum"); h.push_back(cp2); t.push_back(tSanct);
+        const string before =
+            "Idyllic Tutor" + tTutor + "; Damnation" + tDamn + "; Vision Skeins" + cp1 + tSkein
+            + "; Arcane Sanctum" + cp1 + tSanct + "; Marsh Flats" + cp1 + tFlats
+            + "; Vision Skeins" + cp2 + tSkein + "; Marsh Flats" + cp2 + tFlats
+            + "; Arcane Sanctum" + cp2 + tSanct;
+        const string after = joinZoneEntries(n, h, t, false);
+        cout << "     recorded hand (" << before.size() << " B): " << before << "\n";
+        cout << "     folded hand   (" << after.size() << " B): " << after << "\n";
+        CHECK(after == "Idyllic Tutor" + tTutor + "; Damnation" + tDamn
+                       + "; Vision Skeins x2" + tSkein + "; Arcane Sanctum x2" + tSanct
+                       + "; Marsh Flats x2" + tFlats,
+              "#W82-P3 three doubled names fold to `Name x2` + the shared tail, at the FIRST"
+              " copy's position, singletons untouched, order otherwise the hand's");
+        CHECK(after.size() < before.size(),
+              "#W82-P3 the folded line is shorter than the recorded one");
+        CHECK(after.find("(copy ") == string::npos,
+              "#W82-P3 no copy ordinal survives when every copy folded");
+        // NEGATIVE - identity is name AND fact tail. Two copies whose LIVE facts
+        // differ (one copy carries a back-face land tag the other cannot - the
+        // shape a stolen or set-mixed hand produces) keep their own entries and
+        // their copy ordinals; a shared line would state one copy's fact about
+        // the other.
+        {
+            vector<string> n2(n), h2(h), t2(t);
+            t2[5] = tSkein + " [back face: Island (land)]";
+            const string a2 = joinZoneEntries(n2, h2, t2, false);
+            CHECK(a2.find("Vision Skeins" + cp1 + tSkein + ";") != string::npos,
+                  "#W82-P3 NEGATIVE a copy whose tail differs from its namesake keeps its"
+                  " `(copy 1 of 2 ...)` entry verbatim");
+            CHECK(a2.find("Vision Skeins" + cp2 + tSkein + " [back face") != string::npos,
+                  "#W82-P3 NEGATIVE ...and so does the differing copy");
+            CHECK(a2.find("Vision Skeins x") == string::npos,
+                  "#W82-P3 NEGATIVE no `xN` is printed for a name whose copies disagree");
+            CHECK(a2.find("Arcane Sanctum x2") != string::npos,
+                  "#W82-P3 the other doubled names still fold on the same line");
+        }
+        // NEGATIVE - a three-copy name where two agree and one differs: all three
+        // keep their ordinals (the count on a partial fold would be a lie).
+        {
+            vector<string> n3, h3, t3;
+            n3.push_back("Swamp"); h3.push_back(" (copy 1 of 3 in your hand)"); t3.push_back(" (land)");
+            n3.push_back("Swamp"); h3.push_back(" (copy 2 of 3 in your hand)"); t3.push_back(" (land) [tapped]");
+            n3.push_back("Swamp"); h3.push_back(" (copy 3 of 3 in your hand)"); t3.push_back(" (land)");
+            const string a3 = joinZoneEntries(n3, h3, t3, false);
+            CHECK(a3 == "Swamp (copy 1 of 3 in your hand) (land); Swamp (copy 2 of 3 in your hand)"
+                        " (land) [tapped]; Swamp (copy 3 of 3 in your hand) (land)",
+                  "#W82-P3 NEGATIVE a partial agreement folds nothing - every copy keeps its"
+                  " ordinal and its own tail");
+        }
+        // The battlefield path is untouched: same inputs with collapse == true
+        // still take the "#N" range grammar and never the hand fold.
+        {
+            vector<string> n4, h4, t4;
+            for (int i = 1; i <= 3; i++)
+            {
+                std::ostringstream hh; hh << " #" << i;
+                n4.push_back("Vampire"); h4.push_back(hh.str()); t4.push_back(" (2/2)");
+            }
+            CHECK(joinZoneEntries(n4, h4, t4, true) == "Vampire #1-#3 (2/2) x3",
+                  "#W82-P3 the battlefield collapse is byte-identical to before");
+            CHECK(joinZoneEntries(n4, h4, t4, false) == "Vampire #1 (2/2); Vampire #2 (2/2); Vampire #3 (2/2)",
+                  "#W82-P3 ...and with collapse off but `#N` handles (no hand list carries"
+                  " these) the fold does not fire on handles it does not own");
+        }
+        // The count header is the engine's card count, so the hand line's entry
+        // count no longer equals it - the `xN` is what carries the difference.
+        {
+            vector<string> n5, h5, t5;
+            n5.push_back("Plains"); h5.push_back(" (copy 1 of 2 in your hand)"); t5.push_back(" (land)");
+            n5.push_back("Plains"); h5.push_back(" (copy 2 of 2 in your hand)"); t5.push_back(" (land)");
+            CHECK(joinZoneEntries(n5, h5, t5, false) == "Plains x2 (land)",
+                  "#W82-P3 a two-card hand of one name is one entry saying x2");
+        }
+    }
+
+    cout << "\n[#W82-P4] the two dominant hand tags: short per-card tag + one legend per line\n";
+    {
+        CHECK(handTagLegend(false, "", false).empty(),
+              "#W82-P4 a hand carrying neither tag adds no legend byte");
+        const string both = handTagLegend(true, "the phase is Upkeep, not a main phase", true);
+        CHECK(both.compare(0, 11, "\nHand tags:") == 0,
+              "#W82-P4 the legend is its own line under the hand line");
+        CHECK(both.find("[sorcery speed] =") != string::npos && both.find("[HELD] =") != string::npos
+              && both.find("[sorcery speed] =") < both.find("[HELD] ="),
+              "#W82-P4 both halves print when both tags are on the line, sorcery first");
+        CHECK(both.find("right now the phase is Upkeep, not a main phase.") != string::npos,
+              "#W82-P4 the failing half of the timing rule is named once, in the legend");
+        // The per-card tags carry no board number (KEY STABILITY, the wave-74
+        // lesson): the sorcery tag no longer varies with timingWhy at all.
+        CHECK(handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty")
+                  == handCastabilityTag(kHandSorcerySpeed, 1, 0, "{w}", "", 9),
+              "#W82-P4 KEY the per-card sorcery tag is one string whatever the window");
+        // Bytes: a five-sorcery hand in an upkeep, before and after.
+        {
+            const string why = "it is the opponent's turn and the phase is Upkeep, not a main phase";
+            const string oldTag = " [no cast row now: sorcery speed - only in your own main phase"
+                                  " with an empty stack; right now " + why + "]";
+            const size_t before = 5 * oldTag.size();
+            const size_t after = 5 * handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", why).size()
+                                 + handTagLegend(true, why, false).size();
+            cout << "     five sorceries in an upkeep: " << before << " B -> " << after << " B\n";
+            CHECK(after < before, "#W82-P4 five tagged sorceries cost fewer bytes with the legend");
+        }
+        // ECHO SHAPE: brackets, dropped from history wholesale like every hand verdict.
+        CHECK(stripNarrationDecoration("Talisman of Impulse {2} [artifact]"
+                  + handCastabilityTag(kHandSorcerySpeed, 3, 9, "{2}{b}", "the stack is not empty"))
+                  == "Talisman of Impulse {2}",
+              "#W82-P4 ECHO the short bracket never enters history");
+        // The guide head: deck125's guide quotes `[no cast row now: ...` for a held
+        // counterspell; the head and the words "no legal target" both survive.
+        CHECK(handCastabilityTag(kHandNoLegalTarget, 5, 6, "{3}{u}{w}", "", 0, true)
+                  .find("[no cast row now: no legal target") != string::npos,
+              "#W82-P4 the held-counterspell tag keeps the head and `no legal target`");
+    }
+
+    cout << "\n[#W82-P6] one clause per number: the mana bill, the fit clause, ATTACK TOTAL, the blockers header\n";
+    {
+        // (a) the recorded 152v130 row shape: leaves + spends + taps were THREE
+        // groups and M printed twice; the O14 fold never fired because the strand
+        // group sat between the two it joins.
+        const string row3 =
+            "Cast Exquisite Blood {4}{b} {leaves 2 of your 7 untapped mana sources untapped}"
+            " {spends 5 of your 7 untapped mana sources this turn; Tribute to Hunger {2}{b} in your"
+            " hand needs 3} {paying this taps: Overgrown Battlement - it cannot block on their turn}"
+            " {card text: \"Whenever an opponent loses life, you gain that much life.\"}";
+        const string folded3 = foldManaBillClauses(row3);
+        cout << "     folded: " << folded3 << "\n";
+        CHECK(folded3 ==
+              "Cast Exquisite Blood {4}{b} {leaves 2 of your 7 untapped mana sources untapped;"
+              " spends 5 this turn - Tribute to Hunger {2}{b} in your hand needs 3;"
+              " paying this taps: Overgrown Battlement - it cannot block on their turn}"
+              " {card text: \"Whenever an opponent loses life, you gain that much life.\"}",
+              "#W82-P6 leaves + spends + taps fold into ONE bill; 7 is printed once, 2 (left) and"
+              " 5 (spent) both survive, the strand and the taps keep their words");
+        CHECK(folded3.size() < row3.size(), "#W82-P6 the folded bill is shorter");
+        // the O14 pair alone still folds byte-identically to wave 74
+        CHECK(foldManaBillClauses("X {leaves 0 of your 3 untapped mana sources untapped - casting this"
+                                  " taps you out} {paying this taps: A, B}")
+                  == "X {leaves 0 of your 3 untapped mana sources untapped - casting this taps you"
+                     " out; paying this taps: A, B}",
+              "#W82-P6 the wave-74 leaves+taps fold is unchanged");
+        // NEGATIVE: a spends group that is NOT adjacent to the bill is another
+        // window's fact and stays where it is.
+        CHECK(foldManaBillClauses("X {leaves 1 of your 2 untapped mana sources untapped} {kills: Y}"
+                                  " {spends 1 of your 2 untapped mana sources this turn; Z {1} in your hand needs 1}")
+                  == "X {leaves 1 of your 2 untapped mana sources untapped} {kills: Y}"
+                     " {spends 1 of your 2 untapped mana sources this turn; Z {1} in your hand needs 1}",
+              "#W82-P6 NEGATIVE a non-adjacent spends group does not join the bill");
+        // an ability row (no leaves bill) keeps the standalone strand clause verbatim
+        CHECK(strandsHandCardTag(2, 3, "Hammer of Bogardan", "{1}{r}{r}", 3)
+                  == " {spends 2 of your 3 untapped mana sources this turn; Hammer of Bogardan {1}{r}{r}"
+                     " in your hand needs 3}",
+              "#W82-P6 the ability row's strand clause is untouched");
+        // (b) the fit clause goes INSIDE the bill and names rows, not the number again
+        {
+            vector<string> rows;
+            rows.push_back("Cast Ob Nixilis {3}{b}{b} {leaves 0 of your 5 untapped mana sources untapped"
+                           " - casting this taps you out}");
+            rows.push_back("Cast Master of the Feast {1}{b}{b} (5/5) {leaves 2 of your 5 untapped mana"
+                           " sources untapped}");
+            rows.push_back("Cast Shield Sphere {0} (0/6) {leaves 5 of your 5 untapped mana sources untapped}");
+            std::vector<int> uses; uses.push_back(5); uses.push_back(3); uses.push_back(0);
+            applyMenuFitTags(rows, uses, 5);
+            CHECK(rows[0] == "Cast Ob Nixilis {3}{b}{b} {leaves 0 of your 5 untapped mana sources untapped"
+                             " - casting this taps you out; row 2 needs more mana sources than that}",
+                  "#W82-P6 the lost row is named inside the bill; 0 and 5 print once");
+            CHECK(rows[1] == "Cast Master of the Feast {1}{b}{b} (5/5) {leaves 2 of your 5 untapped mana"
+                             " sources untapped; row 1 needs more mana sources than that}",
+                  "#W82-P6 ...on the row the seat took too");
+            CHECK(rows[2] == "Cast Shield Sphere {0} (0/6) {leaves 5 of your 5 untapped mana sources untapped}",
+                  "#W82-P6 a row that loses nothing gets no fit clause at all");
+            CHECK(rows[0].find("{leaves 0 of your 5") != string::npos
+                  && rows[0].find(" {", rows[0].find(" {leaves ") + 1) == string::npos,
+                  "#W82-P6 one group: the bill is still the row's only mana bracket");
+            // a strand clause carrying a mana cost inside the bill: the fit clause
+            // lands at the bill's balanced close, not inside the cost's braces
+            vector<string> r2;
+            r2.push_back("Cast A {3} {leaves 0 of your 3 untapped mana sources untapped; spends 3"
+                         " this turn - B {2}{b} in your hand needs 3}");
+            r2.push_back("Cast C {1} {leaves 2 of your 3 untapped mana sources untapped}");
+            std::vector<int> u2; u2.push_back(3); u2.push_back(1);
+            applyMenuFitTags(r2, u2, 3);
+            CHECK(r2[0] == "Cast A {3} {leaves 0 of your 3 untapped mana sources untapped; spends 3"
+                           " this turn - B {2}{b} in your hand needs 3; row 2 needs more mana sources than that}",
+                  "#W82-P6 the fit clause lands at the BALANCED close of a bill holding a cost");
+        }
+        // (c) ATTACK TOTAL: three sentences, one life total (pinned above in the
+        // inverted #W60-L / #W61-R / #W67-AW / #W74-CC / #W76-CO blocks); here the
+        // count of the figure on the folded line.
+        {
+            const string a = attackTotalLine(1, 7, 20, 2, 7);
+            CHECK(a == "ATTACK TOTAL: 1 attacker listed, 7 total combat damage to a player - declaring"
+                       " all of them with none blocked puts them at 13 - NOT lethal. All of it lands"
+                       " whatever they block.\n",
+                  "#W82-P6 the recorded 152v130 seq-33 line: 13 printed once, 7 printed once");
+            size_t n13 = 0;
+            for (size_t i = a.find("13"); i != string::npos; i = a.find("13", i + 1))
+                n13++;
+            CHECK(n13 == 1, "#W82-P6 the resulting life appears exactly once on the line");
+            CHECK(attackTotalLine(2, 6, 20, 2, 4)
+                      == "ATTACK TOTAL: 2 attackers listed, 6 total combat damage to a player - declaring"
+                         " all of them with none blocked puts them at 14 - NOT lethal. At least 4 damage"
+                         " lands whatever they block - they would be at 16.\n",
+                  "#W82-P6 a floor BELOW the total keeps its own life figure (a different number)");
+            CHECK(attackTotalLine(1, 7, 7, 0, 7).find("puts them at 0 - LETHAL, but only if none of"
+                                                        " them is blocked. All of it lands whatever they"
+                                                        " block - that KILLS them whatever they block.")
+                      != string::npos,
+                  "#W82-P6 the kill claim on a floor equal to the total names no second life figure");
+        }
+        // (d) the blockers header once: when the frame's INCOMING line carries the
+        // figures, the tail's plain branch is a verdict without numbers, the lethal
+        // case is silent, and every branch the frame lacks prints in full.
+        {
+            const string full = combatDamageForecast(13, 0, 14, 0, 22);
+            CHECK(full.find("Your life: 13. Unblocked, these attackers deal up to 14 - you would be at -1")
+                      != string::npos,
+                  "#W82-P6 with no frame figure the tail is the wave-80 line (default argument)");
+            CHECK(combatDamageForecast(13, 0, 14, 0, 22, false, 0, "", true).empty(),
+                  "#W82-P6 lethal + figure on frame: the tail prints nothing (the INCOMING line has"
+                  " the figures and the verdict)");
+            const string nl = combatDamageForecast(13, 0, 4, 0, 22, false, 0, "", true);
+            CHECK(nl == "Unblocked this is NOT lethal (the INCOMING THIS COMBAT line above has the"
+                        " figures): block only where the trade favors you.\n",
+                  "#W82-P6 not lethal + figure on frame: the verdict, no number");
+            CHECK(combatDamageForecast(30, 0, 4, 0, 22, false, 0, "", true)
+                      .find("taking damage while ahead on LIFE is often correct") != string::npos,
+                  "#W82-P6 ...and the ahead-on-life hint survives, still without numbers");
+            CHECK(combatDamageForecast(13, 2, 4, 3, 22, false, 0, "", true)
+                      .find("POISON COUNTER") != string::npos,
+                  "#W82-P6 poison incoming: the full tail prints (the frame has no poison figure)");
+            CHECK(combatDamageForecast(13, 0, 4, 0, 22, true, 0, "", true)
+                      .find("NO survival verdict is given") != string::npos,
+                  "#W82-P6 their life loop live: the full tail prints");
+            CHECK(combatDamageForecast(13, 0, 4, 0, 22, false, 9, "your next draw step", true)
+                      .find("COMPULSORY") != string::npos,
+                  "#W82-P6 compulsory draw-step loss kills: the full tail prints");
+        }
+    }
+
+    cout << "\n[#W82-P8] the range note says only what this menu's rows used\n";
+    {
+        CHECK(optionRangeNote(127) == string(kOptionRangeNote),
+              "#W82-P8 every form set composes the whole kOptionRangeNote byte for byte (the"
+              " constant is the union, and the order and words are its own)");
+        CHECK(optionRangeNote(0).empty(), "#W82-P8 no form used: no note");
+        const string h = optionRangeNote(1);
+        CHECK(h.find("An option whose number is a RANGE") == 0
+              && h.find("printed #N range") != string::npos
+              && h.find("NO #N ordinal") == string::npos && h.find("copies 3-6") == string::npos
+              && h.find("The same 4 options") == string::npos && h.find("X = ") == string::npos
+              && h.find("Answer with ONE number from inside the range") != string::npos,
+              "#W82-P8 the #N form alone: opening, the #N decode, the answer rule - nothing else");
+        cout << "     #N-only note " << h.size() << " B vs the union " << strlen(kOptionRangeNote) << " B\n";
+        CHECK(h.size() * 3 < strlen(kOptionRangeNote),
+              "#W82-P8 the one-form note is under a third of the union");
+        const string xu = optionRangeNote(32);
+        CHECK(xu.find("is one option per X in that range, smallest X first") != string::npos
+              && xu.find("down to") == string::npos && xu.find("RANGE (\"5-430.\")") == string::npos
+              && xu.find("two ENDS of that run") != string::npos,
+              "#W82-P8 the climbing X form alone reads as its own sentence, no descending twin,"
+              " no label-range opening");
+        const string xd = optionRangeNote(16);
+        CHECK(xd.find("largest X first") != string::npos && xd.find("up to") == string::npos,
+              "#W82-P8 the descending X form alone");
+        const string xb = optionRangeNote(48);
+        CHECK(xb.find("is the same run the other way, smallest X first") != string::npos
+              && xb.find("Read which of the two the row says") != string::npos,
+              "#W82-P8 both X forms: the wave-75 pair, verbatim");
+        CHECK(optionRangeNote(64) == "Answer with ONE number from inside the range exactly as you"
+                                     " would any other option number.\n",
+              "#W82-P8 the repeat-pay band explains itself on its row: only the answer rule");
+        // the renderer records what it printed - on the recorded reveal list
+        // (Thraben Doomsayer x4, `copies 1-4 of 4 in this list`) and on plain and
+        // #N runs.
+        {
+            vector<string> rows;
+            for (int i = 1; i <= 4; i++)
+            {
+                std::ostringstream r;
+                r << "Thraben Doomsayer (copy " << i << " of 4 in this list) (2/2 creature)"
+                     " [does NOT qualify - goes to \"shuffle\"]";
+                rows.push_back(r.str());
+            }
+            bool used = false; unsigned forms = 0;
+            const string out = joinNumberedRows(rows, &used, &forms);
+            CHECK(used && forms == 4 && out.find("(copies 1-4 of 4 in this list)") != string::npos,
+                  "#W82-P8 a copy-tag run records the copies form and nothing else");
+            const string n = optionRangeNote(forms);
+            CHECK(n.find("copies 3-6") != string::npos && n.find("#N range") == string::npos
+                  && n.find("X = ") == string::npos,
+                  "#W82-P8 ...and the note for that menu explains the copy notation only");
+            vector<string> plain(5, "Search for Mountain (land)");
+            forms = 0;
+            joinNumberedRows(plain, &used, &forms);
+            CHECK(used && forms == 2, "#W82-P8 a plain byte-identical run records the no-ordinal form");
+            vector<string> hs;
+            for (int i = 1; i <= 5; i++)
+            {
+                std::ostringstream r; r << "Attack with Vampire #" << i << " (2/2)";
+                hs.push_back(r.str());
+            }
+            forms = 0;
+            joinNumberedRows(hs, &used, &forms);
+            CHECK(used && forms == 1, "#W82-P8 a #N run records the handle form");
+            vector<string> none;
+            none.push_back("Cast A"); none.push_back("Cast B");
+            forms = 99;
+            joinNumberedRows(none, &used, &forms);
+            CHECK(!used && forms == 0, "#W82-P8 no range printed: no form recorded");
+        }
+    }
+
+    cout << "\n[#W82-P5] narration compaction: the owner's sample, and every line family has a rule\n";
+    {
+        // The owner-approved sample (LEDGER-v2 section 5): a real wave-80 prompt,
+        // 152v125 seq 15, turns 6-8, in the recorded grammar...
+        const string before =
+            "=== Turn 6 - opponent's turn ===\n"
+            "- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Phase: Main phase 1\n"
+            "- Opponent played Seachrome Coast\n"
+            "=== Turn 7 - YOUR turn ===\n"
+            "- Phase: Draw\n"
+            "- You drew Brutal Cathar\n"
+            "- Phase: Main phase 1\n"
+            "- You played Overgrown Farmland\n"
+            "- Paid {2}{w} for Elite Spellbinder (3 sources)\n"
+            "- You cast Elite Spellbinder\n"
+            "- Your Elite Spellbinder resolved and entered the battlefield\n"
+            "- You targeted Supreme Verdict with Elite Spellbinder's ability (exile a non-land card)\n"
+            "- You used: exile a non-land card with Elite Spellbinder targeting Supreme Verdict\n"
+            "- Opponent's Supreme Verdict was exiled from the opponent's hand\n"
+            "- Phase: Attackers\n"
+            "- You declared attackers: Katilda, Dawnhart Prime\n"
+            "- Phase: Combat damage\n"
+            "- Your Katilda, Dawnhart Prime dealt 1 damage to the opponent (now 18)\n"
+            "=== Turn 8 - opponent's turn ===\n"
+            "- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Phase: Main phase 1\n"
+            "- Opponent played Plains\n"
+            "- Phase: Main phase 2\n"
+            "- Opponent cast Lightmine Field\n"
+            "- Opponent's Lightmine Field resolved and entered the battlefield\n";
+        // ...and the text the owner approved, byte for byte.
+        const string want =
+            "T6 (opp): drew; played Seachrome Coast.\n"
+            "T7 (you): drew Brutal Cathar; played Overgrown Farmland.\n"
+            "  Main 1: cast Elite Spellbinder ({2}{w}, 3 sources) -> resolved; its ETB exiled Supreme Verdict from their hand.\n"
+            "  Attack: Katilda, Dawnhart Prime -> 1 damage, opp 18.\n"
+            "T8 (opp): drew; played Plains.\n"
+            "  Main 2: cast Lightmine Field -> resolved.";
+        const string got = compactNarration(before);
+        cout << "     " << before.size() << " B -> " << got.size() << " B\n" << got << "\n";
+        CHECK(got == want, "#W82-P5 the owner's sample renders to the approved text, byte for byte");
+        CHECK(got.size() * 2 < before.size(), "#W82-P5 the sample is under half the recorded bytes");
+        // ORDER PRESERVED: a land played AFTER a cast in the same phase stays in
+        // the phase line, after the cast - it is not hoisted to the turn line.
+        CHECK(compactNarration("=== Turn 3 - YOUR turn ===\n- Phase: Main phase 1\n- You cast Bear\n"
+                               "- Your Bear resolved and entered the battlefield\n- You played Forest\n")
+                  == "T3 (you):\n  Main 1: cast Bear -> resolved; played Forest.",
+              "#W82-P5 a land after a cast keeps its place in the phase");
+        // A draw outside the draw step (an upkeep engine) is not the turn's draw.
+        CHECK(compactNarration("=== Turn 3 - opponent's turn ===\n- Phase: Upkeep\n"
+                               "- Opponent drew 2 cards\n- Phase: Draw\n- Opponent drew a card\n")
+                  == "T3 (opp):\n  Upkeep: opp drew 2 cards.\n  Draw: drew.",
+              "#W82-P5 an upkeep draw stays in its phase; the draw-step draw then follows it in order");
+        // NO FACT DROPPED: every line family the wave-80 corpus narrated has a
+        // rule - folded, or rendered in its phase in the log's own words. One
+        // line of each family through the compactor: the family's facts survive.
+        const char * families[] = {
+            "Opponent discarded Arcane Sanctum",
+            "Opponent gained 2 life (now 22)",
+            "Opponent's Intrepid Adversary died",
+            "Your Vision Skeins resolved and went to your graveyard",
+            "Your Pyrite Spellbomb dealt 2 damage to Luminarch Aspirant",
+            "You used: Deal 1 damage with Staff of Nin targeting the opponent",
+            "You ventured into Lost Mine of Phandelver: venture step 1 of that run",
+            "You lost 1 life (now 19)",
+            "Opponent used: Boulderloft Pathway with Branchloft Pathway",
+            "You revealed your Briarbridge Tracker from your library",
+            "You cast Vision Skeins (that Vision Skeins was 1 of 2 copies in your hand; the other 1 is still there)",
+            "Your Marsh Flats was put into your graveyard from the battlefield",
+            "Opponent put the revealed Fateful Absence into their library",
+            "Cleanup discard (hand 8, limit 7): you chose Arcane Sanctum",
+            "You kept your opening hand (7 cards)",
+            "It became Day",
+            "Opponent's Tovolar's Huntmaster created 2 2/2 Wolf tokens",
+            "Opponent's Moonrage Brute was exiled from the battlefield",
+            "Your Goblin (token) ceased to exist and left your graveyard",
+            "Opponent's Luminarch Aspirant was COUNTERED by Essence Scatter and went to the opponent's graveyard",
+            "Opponent's Intrepid Adversary got a +1/+1 counter from Luminarch Aspirant (now 4/2)",
+            "You targeted Overgrown Farmland with Lay Waste",
+            "Your Tundra entered the battlefield from your library",
+            "You chose Cast Card Normally for Lay Waste",
+            "You declared blockers: Siege-Gang Commander blocks Tovolar's Huntmaster; Goblin blocks Lair of the Hydra",
+            "You announced X = 4 for Sphinx's Revelation",
+            "Opponent's Tovolar's Huntmaster transformed into Tovolar's Packleader (now 8/8 nightbound)",
+            "You shuffled your graveyard (9 cards) into your library with Elixir of Immortality",
+            "Your Hammer of Bogardan was returned to your hand from your graveyard",
+            "You put 1 card on the bottom of your library: Staff of Nin",
+            "Sphinx's Revelation was NOT cast: you declined after the payment above, so it is back in your hand",
+            "You assigned Lair of the Hydra's combat damage to Goblin (1/1) in position 1 (x3)",
+            "Paid {1}{u} for Vision Skeins with Underground Sea; Tundra",
+            NULL };
+        int kept = 0, total = 0;
+        for (int fi = 0; families[fi]; fi++)
+        {
+            total++;
+            const string one = string("=== Turn 5 - YOUR turn ===\n- Phase: Main phase 1\n- ") + families[fi] + "\n";
+            const string r = compactNarration(one);
+            // the family's proper nouns and numbers all survive
+            bool ok = r.find("T5 (you):") == 0 && r.find("  Main 1: ") != string::npos;
+            const string f(families[fi]);
+            for (size_t i = 0; i < f.size() && ok; i++)
+            {
+                if (isupper((unsigned char) f[i]) && i > 0 && f[i - 1] == ' ')
+                {
+                    size_t e = i;
+                    while (e < f.size() && f[e] != ' ' && f[e] != ',' && f[e] != ';' && f[e] != ':' && f[e] != ')')
+                        e++;
+                    const string word = f.substr(i, e - i);
+                    if (word == "Opponent" || word == "Opponent's" || word == "You" || word == "Your"
+                        || word == "NOT" || word == "COUNTERED" || word == "Day" || word == "X")
+                        continue;
+                    if (r.find(word) == string::npos)
+                        ok = false;
+                }
+                if (isdigit((unsigned char) f[i]) && r.find(f[i]) == string::npos)
+                    ok = false;
+            }
+            if (ok)
+                kept++;
+            else
+                cout << "     FAMILY NOT PRESERVED: " << families[fi] << "\n        -> " << r << "\n";
+        }
+        CHECK(kept == total, "#W82-P5 every corpus line family renders with its names and numbers intact");
+        // a family with no fold rule is the log's own line, seat voice shortened
+        CHECK(compactNarration("=== Turn 5 - YOUR turn ===\n- Phase: Upkeep\n- It became Day\n")
+                  == "T5 (you):\n  Upkeep: It became Day.",
+              "#W82-P5 an unknown family passes through verbatim in its phase");
+        // the trim marker and the pregame lines are untouched, in place
+        CHECK(compactNarration("- Your opening hand (7 cards): A; B\n- You kept your opening hand (7 cards)\n"
+                               "=== Turn 1 - YOUR turn ===\n- Phase: Main phase 1\n- You played Plains\n")
+                  == "- Your opening hand (7 cards): A; B\n- You kept your opening hand (7 cards)\n"
+                     "T1 (you): played Plains.",
+              "#W82-P5 pregame lines stay verbatim ahead of the first turn");
+        CHECK(compactNarration("(...earlier events trimmed - graveyards at trim: you - X; opponent - Y)\n"
+                               "=== Turn 9 - opponent's turn ===\n- Phase: Draw\n- Opponent drew a card\n")
+                  == "(...earlier events trimmed - graveyards at trim: you - X; opponent - Y)\nT9 (opp): drew.",
+              "#W82-P5 the trim marker stays verbatim ahead of the turns it precedes");
+        // a payment with no cast after it is not lost
+        CHECK(compactNarration("=== Turn 4 - YOUR turn ===\n- Phase: Main phase 1\n"
+                               "- Paid {3} for Staff of Nin (3 sources)\n- Sphinx's Revelation was NOT cast: back in your hand\n")
+                  .find("paid ({3}, 3 sources) for Staff of Nin; Sphinx's Revelation was NOT cast") != string::npos,
+              "#W82-P5 an unmatched payment renders on its own");
+        // an empty turn says so
+        CHECK(compactNarration("=== Turn 2 - opponent's turn ===\n- Phase: Untap\n") == "T2 (opp): (no events)",
+              "#W82-P5 a turn in which nothing happened is one short line");
+        CHECK(compactNarration("").empty(), "#W82-P5 NEGATIVE empty in, empty out");
+        CHECK(compactNarration("=== Turn 1 - YOUR turn ===\n- Your opening hand (7 cards): A; B\n- Phase: Untap\n- You mulliganed to 6\n")
+                  == "T1 (you):\n  Pregame: your opening hand (7 cards): A; B.\n  Untap: you mulliganed to 6.",
+              "#W82-P5 events under a turn header before its first phase marker are labelled Pregame");
+    }
+
+    cout << "\n[#W82-P10] the whole damage order in one answer\n";
+    {
+        vector<int> ord; string taken;
+        CHECK(gptOrderLineFromReply("PLAN: chump the big one last.\nORDER: B2, B1, B3", 3, ord, &taken)
+              && ord.size() == 3 && ord[0] == 2 && ord[1] == 1 && ord[2] == 3,
+              "#W82-P10 a full permutation after the PLAN is read, in order");
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: b3 b1 b2", 3, ord, &taken)
+              && ord[0] == 3 && ord[1] == 1 && ord[2] == 2,
+              "#W82-P10 lower-case labels and spaces read the same");
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: 2, 1", 2, ord, &taken) && ord[0] == 2 && ord[1] == 1,
+              "#W82-P10 bare numbers read as the labels");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2, B1", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 PARTIAL (one blocker missing) yields no order - the per-pick asks take over");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2, B2, B1", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 a repeated label is malformed - no order");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B4, B1, B2", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 an out-of-range label is malformed - no order");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2 then B1 and B3", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 prose inside the line is not a permutation - no order");
+        CHECK(!gptOrderLineFromReply("", 3, ord, &taken), "#W82-P10 NEGATIVE an empty reply yields nothing");
+        // ROBUST PARSER: a label-less line that is nothing but the permutation is
+        // read when it FOLLOWS the plan, and not when it precedes it.
+        CHECK(gptOrderLineFromReply("PLAN: keep the wall alive.\nB3, B1, B2", 3, ord, &taken)
+              && ord[0] == 3 && ord[1] == 1 && ord[2] == 2 && taken == "B3, B1, B2",
+              "#W82-P10 a label-less permutation after the PLAN is read");
+        CHECK(!gptOrderLineFromReply("B3, B1, B2\nPLAN: keep the wall alive.", 3, ord, &taken),
+              "#W82-P10 an answer BEFORE the plan is not read (the ruling)");
+        // first clean usable ORDER: line wins over a later one
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: B1, B2, B3\nORDER: B3, B2, B1", 3, ord, &taken)
+              && ord[0] == 1,
+              "#W82-P10 the first usable ORDER: line is the answer");
+        // the golden text carries the ONE approved extension, in both editions
+        const string proto = kReplyProtocol;
+        CHECK(proto.find("PUT: for the card-number seams, ORDER: for the combat damage order)") != string::npos
+              && proto.find("ORDER: takes the B# labels of that one attacker's blockers, all of them, in the"
+                            " order damage is dealt (\"ORDER: B2, B1, B3\").") != string::npos,
+              "#W82-P10 the protocol names the ORDER: label and its form - the one approved extension");
+    }
+
+    cout << "\n[#W82-P11] the record shape: one `window` kind per decision, the seam as a field\n";
+    {
+        string k, sm;
+        const char * seams[] = { "ask", "priority", "attackers", "blockers", "discard", "reveal",
+                                 "bottom", "order", NULL };
+        bool all = true;
+        for (int i = 0; seams[i]; i++)
+        {
+            translogRecordShape(seams[i], k, sm);
+            if (k != "window" || sm != seams[i])
+                all = false;
+        }
+        CHECK(all, "#W82-P11 every seam that asks the model writes kind=window with seam=<the seam>");
+        translogRecordShape("defer", k, sm);
+        CHECK(k == "defer" && sm.empty(), "#W82-P11 a defer (no window of its own) keeps its kind");
+        translogRecordShape("wall_miss", k, sm);
+        CHECK(k == "wall_miss" && sm.empty(),
+              "#W82-P11 a wall miss whose window wrote no record stays a side record");
+        translogRecordShape("", k, sm);
+        CHECK(k.empty() && sm.empty(), "#W82-P11 NEGATIVE an empty kind maps to nothing");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

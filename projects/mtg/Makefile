@@ -28,7 +28,7 @@ OBJS	= objs/InteractiveButton.o objs/AbilityParser.o objs/ActionElement.o\
 	objs/Trash.o objs/utils.o objs/WEvent.o objs/WResourceManager.o\
 	objs/WCachedResource.o objs/WDataSrc.o objs/WGui.o objs/WFilter.o objs/Tasks.o\
 	objs/WFont.o objs/WParsedInt.o objs/CarouselDeckView.o objs/GridDeckView.o objs/DeckView.o\
-	objs/AIPlayerGPT.o objs/AIPlayerGPTSelfTest.o objs/Closest.o objs/DecisionContract.o\
+	objs/AIPlayerGPT.o objs/AIPlayerGPTSelfTest.o objs/AIPlayerGPTTransport.o objs/AIPlayerGPTTranslog.o objs/AIPlayerGPTParse.o objs/AIPlayerGPTSeams.o objs/Closest.o objs/DecisionContract.o\
 	objs/GptConfig.o objs/qrcodegen.o objs/LegalActions.o objs/ManaEngine.o objs/OptionGpt.o objs/PreGamePhase.o
 DEPS = $(patsubst objs/%.o, deps/%.d, $(OBJS))
 
