@@ -2379,8 +2379,21 @@ int TestSuiteAI::Act(float)
             return 1;
         }
         //It is now in `garbage` and out of mObjects. Ask for it back.
+        const int refusalsBefore = MTGAbility::garbageReaddRefused;
         const int readded = witness->addToGame();
         const int liveIndex = al->getIndexOf(witness);
+        //#W87-JB (audit-2026-09 bug list item 12): the refusal must be OBSERVED, not
+        //just effective - the counter moves by exactly one (and the dev build's
+        //stderr line "WAGIC addToGame REFUSED a garbaged element: class=... source=..."
+        //is in the suite log for this fixture).
+        const int refusalsSeen = MTGAbility::garbageReaddRefused - refusalsBefore;
+        if (!readded && refusalsSeen != 1)
+        {
+            std::cerr << "TESTSUITE assertgarbagereaddrefused: the guard refused silently -"
+                      << " MTGAbility::garbageReaddRefused moved by " << refusalsSeen
+                      << ", expected 1 [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
         //...and ask for it to be garbaged a second time, the other half of the shape.
         al->moveToGarbage(witness);
         int slots = 0;
