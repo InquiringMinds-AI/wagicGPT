@@ -25,7 +25,7 @@ import sys
 
 FORBIDDEN = ["working", "reasoning", "first line", "correction", "announce",
              "then a plan", "only if"]
-LABELS = ("CHOICE:", "ATTACK:", "BLOCKS:", "PUT:", "PLAN:")
+LABELS = ("CHOICE:", "ATTACK:", "BLOCKS:", "PUT:", "PLAN:", "ORDER:")
 # Identifier-shaped tokens (translog classes, parse notes, json keys) are DATA the
 # corpus reader consumes, never text the model is shown. They are excused by shape,
 # not by name: a stamp has no spaces.

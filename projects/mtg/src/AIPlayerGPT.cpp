@@ -253,7 +253,8 @@ const char * kReplyProtocol =
     "\"Therefore,\": the line's first characters are the label itself, and the label appears "
     "exactly ONCE in the whole reply. Only the answer line has to come from the list.\n"
     "Use exactly the label the decision asks for (CHOICE: for numbered choices, ATTACK: for "
-    "attack declarations, BLOCKS: for block assignments, PUT: for the card-number seams). For "
+    "attack declarations, BLOCKS: for block assignments, PUT: for the card-number seams, ORDER: "
+    "for the combat damage order). For "
     "CHOICE: write the label, then the NUMBER of your choice FROM THE LIST, then that "
     "option's SHORT NAME in parentheses - CHOICE: <number> (<short name>). The SHORT NAME is "
     "the action and card name only, i.e. the option text up to the first \"{\": never copy "
@@ -265,7 +266,8 @@ const char * kReplyProtocol =
     "- always copy the real number and short name from the options in front of you, never "
     "this example's). On a TARGET menu the short name is the target's name. ATTACK: and "
     "BLOCKS: are different: they take the A#/B# LABELS only, with no names and no parentheses "
-    "(\"ATTACK: A1, A3\", \"BLOCKS: B1:A2, B3:A1\").\n"
+    "(\"ATTACK: A1, A3\", \"BLOCKS: B1:A2, B3:A1\"). ORDER: takes the B# labels of that one "
+    "attacker's blockers, all of them, in the order damage is dealt (\"ORDER: B2, B1, B3\").\n"
     "Write the PLAN as INTENT - the actions you mean to take - not as a description of the "
     "board. The line you write is stored and re-served to you VERBATIM at later decisions, "
     "unchanged and unchecked, so any board fact you put in it (\"both combo pieces are on the "
@@ -21480,7 +21482,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mOrderDoneTurn(-1), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
        mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mMenuPassNoProgressSuppressed(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
@@ -52422,12 +52424,132 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     }
 }
 
+//#W82-P10: the WHOLE damage order in one answer. `ORDER: B2, B1, B3` names every
+//blocker of one attacker in the order damage is dealt. A line is usable only
+//when it is a full permutation of 1..n (each B# once, none missing, none out of
+//range); the first clean usable ORDER: line wins (gptSelectAnswerIndex, the
+//rule the other seams share), and a label-less line that is nothing but the
+//permutation is read after the PLAN (the robust-parser ruling). Anything
+//partial or malformed returns an empty order and the seam falls back to the
+//per-pick asks - no blocker and no ordering is ever lost to the parse. Pure.
+static void collectLabeledLines(const string& content, const char * label, vector<string>& out,
+                                vector<string> * prevOut, vector<vector<string> > * windowOut);
+static bool gptParseOrderPermutation(const string& line, size_t n, vector<int>& order)
+{
+    order.clear();
+    vector<bool> seen(n + 1, false);
+    size_t i = 0;
+    while (i < line.size())
+    {
+        char c = line[i];
+        if (c == 'B' || c == 'b')
+        {
+            i++;
+            continue;
+        }
+        if (isdigit((unsigned char) c))
+        {
+            int v = 0;
+            while (i < line.size() && isdigit((unsigned char) line[i]))
+                v = v * 10 + (line[i++] - '0');
+            if (v < 1 || (size_t) v > n || seen[(size_t) v])
+            {
+                order.clear();
+                return false;
+            }
+            seen[(size_t) v] = true;
+            order.push_back(v);
+            continue;
+        }
+        if (c == ',' || c == ' ' || c == '\t' || c == ';' || c == '.' || c == '\r')
+        {
+            i++;
+            continue;
+        }
+        order.clear();
+        return false; //a word or another token: not a bare permutation line
+    }
+    if (order.size() != n)
+    {
+        order.clear();
+        return false;
+    }
+    return true;
+}
+static bool gptOrderLineFromReply(const string& content, size_t n, vector<int>& order,
+                                  string * takenText)
+{
+    order.clear();
+    if (takenText)
+        takenText->clear();
+    if (content.empty() || n < 2)
+        return false;
+    string stripped = content;
+    const size_t te = stripped.rfind("</think>");
+    if (te != string::npos)
+        stripped = stripped.substr(te + 8);
+    vector<string> lines;
+    collectLabeledLines(stripped, "ORDER:", lines, NULL, NULL);
+    vector<bool> usable(lines.size(), false), clean(lines.size(), false);
+    vector<vector<int> > perms(lines.size());
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        usable[i] = gptParseOrderPermutation(lines[i], n, perms[i]);
+        clean[i] = usable[i];
+    }
+    const int idx = lines.empty() ? -1 : gptSelectAnswerIndex(usable, clean);
+    if (idx >= 0)
+    {
+        order = perms[(size_t) idx];
+        if (takenText)
+            *takenText = lines[(size_t) idx];
+        return true;
+    }
+    //label-less: the line after the PLAN that is nothing but the permutation
+    size_t at = 0;
+    bool pastPlan = false;
+    while (at < stripped.size())
+    {
+        const size_t nl = stripped.find('\n', at);
+        string line = stripped.substr(at, nl == string::npos ? string::npos : nl - at);
+        at = (nl == string::npos) ? stripped.size() : nl + 1;
+        size_t b = 0;
+        while (b < line.size() && (line[b] == ' ' || line[b] == '\t'))
+            b++;
+        line = line.substr(b);
+        if (line.empty())
+            continue;
+        if (line.compare(0, 5, "PLAN:") == 0 || line.compare(0, 5, "plan:") == 0)
+        {
+            pastPlan = true;
+            continue;
+        }
+        if (!pastPlan)
+            continue; //an answer BEFORE the plan is not read
+        vector<int> perm;
+        if (gptParseOrderPermutation(line, n, perm))
+        {
+            order = perm;
+            if (takenText)
+                *takenText = line;
+            return true;
+        }
+    }
+    return false;
+}
+
 int AIPlayerGPT::orderBlockers()
 {
     if (mEndpoint.empty())
         return AIPlayerBaka::orderBlockers();
     if (!(ORDER == observer->combatStep && observer->currentPlayer == this))
         return 0;
+    if (mOrderDoneTurn != observer->turn)
+    {
+        mOrderDoneTurn = observer->turn;
+        mOrderDone.clear();
+        mOrderPerPick.clear();
+    }
 
     //Damage is assigned lethal-first down each attacker's blockers vector
     //(GuiCombat::autoaffectDamage), so ordering damage = permuting that
@@ -52441,6 +52563,72 @@ int AIPlayerGPT::orderBlockers()
         AttackerDamaged * atk = gc->attackers[a];
         if (!atk->card || atk->card->controller() != this || atk->blockers.size() < 2)
             continue;
+        if (mOrderDone.count(atk->card))
+            continue; //ordered earlier this combat (the per-attacker asks re-enter each tick)
+
+        //#W82-P10: ONE ask for the whole permutation. Falls through to the
+        //per-pick asks below on a partial or malformed answer.
+        if (!mOrderPerPick.count(atk->card))
+        {
+            const size_t n = atk->blockers.size();
+            std::ostringstream tail;
+            tail << "Combat damage order: your attacker " << atk->card->getDisplayName()
+                 << " (" << atk->card->power << "/" << atk->card->toughness << ")"
+                 << (atk->card->has(Constants::TRAMPLE) ? " with trample" : "")
+                 << (atk->card->has(Constants::DEATHTOUCH) ? " with deathtouch" : "")
+                 << " is blocked by " << n << " creatures. Damage is assigned in order, up to"
+                    " each blocker's toughness. Its blockers:\n";
+            vector<string> shownLines;
+            for (size_t b = 0; b < n; b++)
+            {
+                std::ostringstream o;
+                o << "B" << (b + 1) << ". " << atk->blockers[b]->card->getDisplayName()
+                  << " (" << atk->blockers[b]->card->power << "/"
+                  << atk->blockers[b]->card->toughness << ")";
+                const string kw = keywordList(atk->blockers[b]->card);
+                if (!kw.empty())
+                    o << " [" << kw << "]";
+                shownLines.push_back(o.str());
+                tail << o.str() << "\n";
+            }
+            tail << kPlanFirstLead
+                 << "on a line of its own ORDER: followed by ALL " << n << " of those B# labels"
+                    " in the order damage is dealt, first to last, comma-separated (e.g."
+                    " \"ORDER: B2, B1, B3\"). Write nothing else.";
+            mLogWindowKind = kAskWindowCombat;
+            const string userMsg = assemblePrompt(tail.str());
+            string content;
+            setAnswerFloorForSeam("order", (long) n, kPutSlotAnswerBytes);
+            if (pollCompletionRetry(userMsg, content, "order") == kChoicePending)
+                return 1; //in flight; stay in the ORDER step and re-poll next tick
+            vector<int> order;
+            string takenText;
+            if (gptOrderLineFromReply(content, n, order, &takenText))
+            {
+                vector<DefenserDamaged *> ordered;
+                string names;
+                for (size_t k = 0; k < order.size(); k++)
+                {
+                    ordered.push_back(atk->blockers[(size_t) order[k] - 1]);
+                    names += (k ? ", " : "") + ordered.back()->card->getDisplayName();
+                }
+                atk->blockers = ordered;
+                mOrderDone.insert(atk->card);
+                writeTransLog("order", userMsg, content, (int) order.size(), (int) n,
+                              names, NULL, &shownLines);
+                narrateDecision("You ordered " + atk->card->getDisplayName()
+                                + "'s combat damage: " + names);
+                DebugTrace("AIPlayerGPT: whole damage order for " << atk->card->getDisplayName()
+                           << ": " << names);
+                continue;
+            }
+            //partial or malformed: recorded, then the per-pick asks take over
+            writeTransLog("order", userMsg, content, -1, (int) n, "",
+                          content.empty() ? noAnswerClass() : "order_incomplete_per_pick",
+                          &shownLines);
+            mOrderPerPick.insert(atk->card);
+            setNotice("damage order reply incomplete - asking one position at a time", 5.0f);
+        }
 
         vector<DefenserDamaged *> ordered;
         vector<DefenserDamaged *> remaining = atk->blockers;
@@ -52502,6 +52690,7 @@ int AIPlayerGPT::orderBlockers()
             DebugTrace("AIPlayerGPT: damage order for " << atk->card->getDisplayName()
                        << " set, first: " << ordered[0]->card->getDisplayName());
         }
+        mOrderDone.insert(atk->card); //#W82-P10: whichever path decided it
     }
 
     observer->userRequestNextGamePhase();
@@ -63458,6 +63647,7 @@ string AIPlayerGPTSelfTestAccess::namedCastPriceTag(const string& sourceName, in
 void AIPlayerGPTSelfTestAccess::narrationAppend(string& narration, string& pendingPhase, const string& line, const string& trimMarker, string * delta) { ::narrationAppend(narration, pendingPhase, line, trimMarker, delta); }
 string AIPlayerGPTSelfTestAccess::narrationBucketRuns(const string& body) { return ::narrationBucketRuns(body); }
 string AIPlayerGPTSelfTestAccess::compactNarration(const string& log) { return ::compactNarration(log); }
+bool AIPlayerGPTSelfTestAccess::gptOrderLineFromReply(const string& content, size_t n, vector<int>& order, string * takenText) { return ::gptOrderLineFromReply(content, n, order, takenText); }
 string AIPlayerGPTSelfTestAccess::narrationFoldPaidSources(const string& body) { return ::narrationFoldPaidSources(body); }
 string AIPlayerGPTSelfTestAccess::narrationShapeKey(const string& line) { return ::narrationShapeKey(line); }
 size_t AIPlayerGPTSelfTestAccess::narrationTrimKeep(size_t markerLen) { return ::narrationTrimKeep(markerLen); }

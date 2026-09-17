@@ -1216,6 +1216,11 @@ private:
     //in ONE reply, so the seam commits once per turn's combat and does not
     //re-prompt the creatures it chose to hold.
     int mAttacksDoneTurn;
+    //#W82-P10: the attackers whose combat damage order is settled this combat,
+    //and those whose whole-order answer was incomplete (per-pick asks instead).
+    int mOrderDoneTurn;
+    std::set<MTGCardInstance *> mOrderDone;
+    std::set<MTGCardInstance *> mOrderPerPick;
 
     //#W82-A (L1): the turn this seam last opened on. It carried the decline and
     //flip caps' per-turn reset (both DELETED - no legal row is withheld any

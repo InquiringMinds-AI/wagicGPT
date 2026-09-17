@@ -36,7 +36,7 @@ NON_DECISION_KINDS = ("gamestart", "system", "gameend")
 #round trip, whether this tool has heard of it or not - which is the point: the
 #wave-78 `forced_close` needed no edit to be explained, and neither will the next one.
 ROUNDTRIP_KINDS = ("ask", "priority", "attackers", "blockers", "discard",
-                   "reveal", "bottom")
+                   "reveal", "bottom", "order")  #W82-P10: the whole-order damage seam
 
 
 #W79-DB (T17, wave-78 engine-seat CY F12 FAIL): A ROUND-TRIP KIND THAT MADE NO

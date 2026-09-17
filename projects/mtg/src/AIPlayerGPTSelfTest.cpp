@@ -43491,6 +43491,45 @@ static const char * kW50Y_r94 =
               "#W82-P5 events under a turn header before its first phase marker are labelled Pregame");
     }
 
+    cout << "\n[#W82-P10] the whole damage order in one answer\n";
+    {
+        vector<int> ord; string taken;
+        CHECK(gptOrderLineFromReply("PLAN: chump the big one last.\nORDER: B2, B1, B3", 3, ord, &taken)
+              && ord.size() == 3 && ord[0] == 2 && ord[1] == 1 && ord[2] == 3,
+              "#W82-P10 a full permutation after the PLAN is read, in order");
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: b3 b1 b2", 3, ord, &taken)
+              && ord[0] == 3 && ord[1] == 1 && ord[2] == 2,
+              "#W82-P10 lower-case labels and spaces read the same");
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: 2, 1", 2, ord, &taken) && ord[0] == 2 && ord[1] == 1,
+              "#W82-P10 bare numbers read as the labels");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2, B1", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 PARTIAL (one blocker missing) yields no order - the per-pick asks take over");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2, B2, B1", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 a repeated label is malformed - no order");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B4, B1, B2", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 an out-of-range label is malformed - no order");
+        CHECK(!gptOrderLineFromReply("PLAN: x\nORDER: B2 then B1 and B3", 3, ord, &taken) && ord.empty(),
+              "#W82-P10 prose inside the line is not a permutation - no order");
+        CHECK(!gptOrderLineFromReply("", 3, ord, &taken), "#W82-P10 NEGATIVE an empty reply yields nothing");
+        // ROBUST PARSER: a label-less line that is nothing but the permutation is
+        // read when it FOLLOWS the plan, and not when it precedes it.
+        CHECK(gptOrderLineFromReply("PLAN: keep the wall alive.\nB3, B1, B2", 3, ord, &taken)
+              && ord[0] == 3 && ord[1] == 1 && ord[2] == 2 && taken == "B3, B1, B2",
+              "#W82-P10 a label-less permutation after the PLAN is read");
+        CHECK(!gptOrderLineFromReply("B3, B1, B2\nPLAN: keep the wall alive.", 3, ord, &taken),
+              "#W82-P10 an answer BEFORE the plan is not read (the ruling)");
+        // first clean usable ORDER: line wins over a later one
+        CHECK(gptOrderLineFromReply("PLAN: x\nORDER: B1, B2, B3\nORDER: B3, B2, B1", 3, ord, &taken)
+              && ord[0] == 1,
+              "#W82-P10 the first usable ORDER: line is the answer");
+        // the golden text carries the ONE approved extension, in both editions
+        const string proto = kReplyProtocol;
+        CHECK(proto.find("PUT: for the card-number seams, ORDER: for the combat damage order)") != string::npos
+              && proto.find("ORDER: takes the B# labels of that one attacker's blockers, all of them, in the"
+                            " order damage is dealt (\"ORDER: B2, B1, B3\").") != string::npos,
+              "#W82-P10 the protocol names the ORDER: label and its form - the one approved extension");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
