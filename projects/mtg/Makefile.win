@@ -51,6 +51,10 @@ WIN_OBJECTS = \
 	$(OBJDIR)/DecisionContract.o \
 	$(OBJDIR)/AIPlayerGPT.o \
 	$(OBJDIR)/AIPlayerGPTSelfTest.o \
+	$(OBJDIR)/AIPlayerGPTTransport.o \
+	$(OBJDIR)/AIPlayerGPTTranslog.o \
+	$(OBJDIR)/AIPlayerGPTParse.o \
+	$(OBJDIR)/AIPlayerGPTSeams.o \
 	$(OBJDIR)/GptConfig.o \
 	$(OBJDIR)/qrcodegen.o \
 	$(OBJDIR)/OptionGpt.o \
@@ -249,6 +253,18 @@ $(OBJDIR)/AIPlayerGPT.o: src/AIPlayerGPT.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/AIPlayerGPTSelfTest.o: src/AIPlayerGPTSelfTest.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPTTransport.o: src/AIPlayerGPTTransport.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPTTranslog.o: src/AIPlayerGPTTranslog.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPTParse.o: src/AIPlayerGPTParse.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPTSeams.o: src/AIPlayerGPTSeams.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/GptConfig.o: src/GptConfig.cpp
