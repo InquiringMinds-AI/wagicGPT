@@ -9427,7 +9427,9 @@ void MenuAbility::Update(float dt)
     }
     if(triggered && !game->mExtraPayment && !processed)
     {
-        game->mLayers->actionLayer()->setCustomMenuObject(source, must,abilities,newNameString.size()?newNameString.c_str():"");
+        //#W87-JA: this MenuAbility OWNS the menu it arms - the answer comes back
+        //to it by identity, never to whichever triggered MenuAbility sits highest.
+        game->mLayers->actionLayer()->setCustomMenuObject(source, must,abilities,newNameString.size()?newNameString.c_str():"", this);
         previousInterrupter = game->isInterrupting;
         game->mLayers->stackLayer()->setIsInterrupting(source->controller(), false);
     }

@@ -1436,3 +1436,6 @@ w86ia_multichoice_mode_after_compaction.txt
 w86ib_garbage_readd_refused.txt
 w86id_pass_floor_fires_on_rearming_menu.txt
 w86ic_reveal_above_identity.txt
+w87ja_multichoice_identity.txt
+w87jb_multichoice_human_seat.txt
+w87jc_multichoice_ai_seat.txt

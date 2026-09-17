@@ -224,19 +224,15 @@ void DecisionManager::applyDeclareBlockers(const DecisionRequest & req, const De
 
 namespace
 {
-    //The latest armed MenuAbility on the action layer - the one the open
-    //multiple-choice menu belongs to (mirrors the AI's historical lookup).
+    //The MenuAbility the open multiple-choice menu belongs to.
+    //#W87-JA (audit-2026-09 bug list item 11): by IDENTITY - the owner recorded
+    //when the menu was armed, the same element ButtonPressedOnMultipleChoice
+    //dispatches the answer to - so the modes rendered are the modes answered.
+    //(The historical walk, size-1 .. 1 for a triggered MenuAbility, could return
+    //a different triggered MenuAbility than the armed one, and skipped slot 0.)
     MenuAbility * currentMenuAbility(ActionLayer * object)
     {
-        //#W54-I (L18): `size()-1` underflowed on an empty layer; same walk
-        //(indices size-1 .. 1, index 0 skipped as before), no underflow.
-        for (size_t m = object->mObjects.size(); m-- > 1;)
-        {
-            MenuAbility * ability = dynamic_cast<MenuAbility *>(object->mObjects[m]);
-            if (ability && ability->triggered)
-                return ability;
-        }
-        return NULL;
+        return dynamic_cast<MenuAbility *>(object->armedMenuOwner());
     }
 
     //ActionLayer::currentActionCard is a raw pointer with no zone-change

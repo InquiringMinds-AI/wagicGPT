@@ -1,0 +1,40 @@
+#NAME: A multiple-choice answer goes to the MenuAbility that owns the armed menu, by identity (#W87-JA)
+#DESC: audit-2026-09 bug list item 11 (buglist-lane.md item 2's residual).
+#DESC: ActionLayer::ButtonPressedOnMultipleChoice found the MenuAbility to answer by
+#DESC: scanning mObjects from the top for one with `triggered` set: index 0 was never
+#DESC: examined, "not found" was the same -1 as kCancelMenuID, and the FIRST
+#DESC: triggered MenuAbility from the top won - whether or not its menu was the one
+#DESC: armed. `triggered` survives an answer: a MenuAbility whose chosen mode is a
+#DESC: MAY hands its clone to the layer and lingers (processed, still triggered)
+#DESC: until the clone is answered. A second MenuAbility below it then arms ITS
+#DESC: menu, the scan hands the answer to the lingering one, reactToChoiceClick
+#DESC: re-clones the already-chosen mode and processAbility returns on `processed`
+#DESC: - the answer is eaten and the armed menu re-asks the same question every
+#DESC: tick (the re-arming-menu shape the pass floor exists to survive).
+#DESC: FIX: setCustomMenuObject records the element that OWNS the menu in the
+#DESC: W58-F row-identity map (every mode row names it; nulled when the element
+#DESC: leaves the game); the dispatcher resolves the answered row to its owner's
+#DESC: LIVE index through that map - never a scan, never a raw slot, no dependence
+#DESC: on what sits at mObjects[0] - and a row with no live owner is the named
+#DESC: sentinel kNoLiveMenuElement, not -1. The AI's and DecisionManager's
+#DESC: "which MenuAbility is this menu" readers use the same identity.
+#DESC: RED on the base engine: "the answer to the ARMED menu (A) was not processed
+#DESC: by A (A processed=0, host 2/2 -> 2/2, expected +1/+1 from A's mode 0)".
+#DESC: GREEN: A processed, host 2/2 -> 3/3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Runeclaw Bear
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertmultichoiceidentity
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Runeclaw Bear
+life:20
+[PLAYER2]
+life:20
+[END]

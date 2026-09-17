@@ -1,0 +1,41 @@
+#NAME: The HEURISTIC AI seat's mode answer selects a real mode through the shared dispatcher (#W87-JC)
+#DESC: audit-2026-09 bug list item 11. The AI seats answer a multiple-choice menu with
+#DESC: ButtonPressedOnMultipleChoice(doThis) from AIPlayerBaka::computeActions (the
+#DESC: GPT seat's fallback and DecisionManager::applyMenuChoice take the same entry).
+#DESC: The dispatcher now resolves the answered row to the MenuAbility that OWNS the
+#DESC: menu, by identity; this fixture holds the AI entry to the same outcome the
+#DESC: human (w87jb) and scripted (w86ia) entries produce: a real mode executes.
+#DESC: WITNESS: the heuristic seat casts Inquisitor Exarch (FORCEABILITY) and ranks
+#DESC: its two modes by efficiency and takes mode 0 ("you gain 2 life"): P1 22, P2 20.
+FORCEABILITY
+AICALLS 60
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains
+hand:Inquisitor Exarch
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains,Inquisitor Exarch
+life:22
+[PLAYER2]
+life:20
+[END]

@@ -2999,16 +2999,11 @@ int AIPlayerBaka::selectMenuOption()
         int checkedLast = 0;
         if(object->abilitiesMenu->isMultipleChoice && object->currentActionCard)
         {
-            MenuAbility * currentMenu = NULL;
-            for(size_t m = object->mObjects.size()-1;m > 0;m--)
-            {
-                MenuAbility * ability = dynamic_cast<MenuAbility *>(object->mObjects[m]);
-                if(ability && ability->triggered)
-                {
-                    currentMenu = (MenuAbility *)object->mObjects[m];
-                    break;
-                }
-            }
+            //#W87-JA (audit-2026-09 bug list item 11): the menu's OWNER by identity -
+            //the same element ButtonPressedOnMultipleChoice will hand the answer to.
+            //The old top-down scan for a triggered MenuAbility could rank the modes
+            //of a DIFFERENT triggered MenuAbility than the one whose menu is armed.
+            MenuAbility * currentMenu = dynamic_cast<MenuAbility *>(object->armedMenuOwner());
             if(currentMenu)
                 for (unsigned int mk = 0; mk < currentMenu->abilities.size(); mk++)
                 {
