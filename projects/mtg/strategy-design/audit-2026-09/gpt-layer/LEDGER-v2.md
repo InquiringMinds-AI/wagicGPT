@@ -46,3 +46,10 @@ T8 (opp): drew; played Plains.
 Rules of the fold: a phase marker prints only when something happened in it; draw + land in the turn header line; "paid X for Y / cast Y / Y resolved" become one line with the cost in parentheses; "targeted … / used … / was exiled" become one ETB line; damage carries the new life total. Lost: nothing factual; the order of events within a phase is preserved. Judged by the owner's criterion on the composed document, then by the same A/B instrument as P1/P2.
 
 ## 6. OWNER RULINGS 2026-09-16 (cont.): P5 sample — "That looks good. Ok." → P5 APPROVED as specified in §5. "Use fable agents to code. Make it so." → the proposals lane runs on Fable (the Opus lane was stopped before it had made any change).
+
+## 7. CORRECTION 2026-09-16 (owner: "There's been more miscommunication") — §4 recorded three rulings against the WRONG items. The owner's numbered rulings were keyed to a message whose numbering was already swapped. Corrected mapping, CONFIRMED by the owner ("Yes"):
+- P7 CLEANUP-DISCARD WITHOUT THE GAME LOG = **NO** ("this can be an important tactical step, especially in a graveyard shenanigans deck" — the log is what says what is in the graveyards). CLOSED; do not re-propose. The §4 line attributing "try it" to P7 is void.
+- P9 LAND DROP FOLDED INTO THE CASTING MENU = **"try it. Revert if it degrades behavior."** — build it behind a switch; the probe/corpus judges it. The §4 line attributing "No" to P9 is void.
+- P8 EMIT ONLY THE RANGE GRAMMAR USED = **yes** (his "10 yes" pointed at this item).
+- P10 WHOLE-ORDER BLOCKER ANSWER = **yes** (ruled explicitly on the corrected table, 2026-09-16).
+All other §4/§6 rulings stand: P1+P2 A/B only; P3, P4, P6, P11, P12, P13 yes; P5 approved on the sample. Lane runs on Fable.
