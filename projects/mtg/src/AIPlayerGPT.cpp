@@ -12440,6 +12440,9 @@ namespace gptcompact
         return s.compare(0, head.size(), head) == 0;
     }
 
+    //#W82-EC (M6): the compact register's own face of the not-combat marker.
+    static const char * const kAbilityDamageSuffix = " (by its ability, not combat damage)";
+
     static string joinEv(const vector<string>& v)
     {
         string o;
@@ -12590,9 +12593,15 @@ namespace gptcompact
     //#W82-EC (M8): `outcome` receives a creature's trailing outcome parenthesis
     //(" (survives, 4 marked)" / " (dies)" / " (lethal, ...)") so the target
     //compares clean and the clause is carried onto whatever line renders it.
+    //#W82-EC (M6): `ability` is set when the line carries the not-combat-damage
+    //marker (a creature's ability firing during combat); the marker is removed
+    //from the target so the reader binds it, and the caller keeps it OFF the
+    //`Attack:` line.
     static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now,
-                            string * outcome = NULL)
+                            string * outcome = NULL, bool * ability = NULL)
     {
+        if (ability)
+            *ability = false;
         const size_t d = ev.find(" dealt ");
         if (d == string::npos) return false;
         const size_t dm = ev.find(" damage to ", d);
@@ -12619,6 +12628,16 @@ namespace gptcompact
                 if (outcome)
                     *outcome = rest.substr(op);
                 rest = rest.substr(0, op);
+            }
+        }
+        {
+            const string mark = " by its ability (not combat damage)";
+            if (rest.size() > mark.size()
+                && rest.compare(rest.size() - mark.size(), mark.size(), mark) == 0)
+            {
+                rest = rest.substr(0, rest.size() - mark.size());
+                if (ability)
+                    *ability = true;
             }
         }
         target = rest;
@@ -12805,6 +12824,33 @@ namespace gptcompact
             }
             st.flushPending();
             Group& G = st.group();
+            //#W82-EC (M6): the ability's damage can be logged BEFORE the activation
+            //line (`130v123` s67: the ping, then "used Deal 2 damage with
+            //Siege-Gang Commander -> the opponent", then the payment). When the
+            //group's last event is that marked ping from this source at this
+            //target, the activation line takes it as its result.
+            if (!G.ev.empty() && !source.empty())
+            {
+                const string& last = G.ev.back();
+                const string suffix(kAbilityDamageSuffix);
+                const string head = source + " -> ";
+                if (startsWith(last, head) && last.size() > suffix.size()
+                    && last.compare(last.size() - suffix.size(), suffix.size(), suffix) == 0)
+                {
+                    const string tail = last.substr(head.size(), last.size() - head.size() - suffix.size());
+                    const bool binds = target.empty()
+                        || (target == "the opponent" && tail.find(", opp") != string::npos)
+                        || (target == "you" && tail.find(", you") != string::npos)
+                        || tail.find(" damage to " + target) != string::npos;
+                    if (binds)
+                    {
+                        G.ev.pop_back();
+                        st.push("used " + ability + " with " + source
+                                + (target.empty() ? string() : " -> " + target) + ": " + tail);
+                        return;
+                    }
+                }
+            }
             const bool etb = !st.lastCast.empty() && source == st.lastCast && !G.ev.empty()
                              && State::isCastOf(G.ev.back(), source) //#W82-EC (M2)
                              && G.ev.back().find(" -> resolved") != string::npos;
@@ -12833,7 +12879,8 @@ namespace gptcompact
                 return;
             }
             string src, n, target, now, outcome;
-            if (splitDamage(bare, src, n, target, now, &outcome) && (target == st.useTarget
+            bool abilityDmg = false;
+            if (splitDamage(bare, src, n, target, now, &outcome, &abilityDmg) && (target == st.useTarget
                 || (st.useTarget == "the opponent" && target == "the opponent")
                 || (st.useTarget == "you" && target == "you")))
             {
@@ -12870,10 +12917,11 @@ namespace gptcompact
         }
         {
             string src, n, target, now, outcome;
+            bool abilityDmg = false;
             const string owner = mine ? (startsWith(raw, "Your ") ? "Your " : "You ")
                                       : (theirs ? (startsWith(raw, "Opponent's ") ? "Opponent's " : "Opponent ") : "");
             const string bare = raw.substr(owner.size());
-            if ((mine || theirs) && splitDamage(bare, src, n, target, now, &outcome))
+            if ((mine || theirs) && splitDamage(bare, src, n, target, now, &outcome, &abilityDmg))
             {
                 const bool toPlayer = (target == "the opponent" || target == "you");
                 string e;
@@ -12881,7 +12929,8 @@ namespace gptcompact
                 {
                     const string who = (target == "you") ? "you" : "opp";
                     const string part = n + " damage, " + who + (now.empty() ? "" : " " + now);
-                    if (st.inCombat() && st.isDeclaredAttacker(src))
+                    //#W82-EC (M6): only COMBAT damage rides the Attack line.
+                    if (!abilityDmg && st.inCombat() && st.isDeclaredAttacker(src))
                     {
                         Group& G = st.group();
                         G.damage.push_back(st.attackers == src ? part : src + ": " + part);
@@ -12892,6 +12941,8 @@ namespace gptcompact
                 else
                     e = src + " -> " + n + " damage to " + target + outcome //#W82-EC (M8)
                         + (now.empty() ? "" : " (now " + now + ")");
+                if (abilityDmg)
+                    e += kAbilityDamageSuffix; //#W82-EC (M6)
                 st.push(e);
                 return;
             }
@@ -14489,6 +14540,11 @@ string damageNarration(bool sourceMine, const string& sourceName, int amount,
 //register's rule is "damage carries the new life total"; a creature's equivalent
 //is whether it lives and what is marked on it. Read AFTER Damage::resolve has
 //subtracted (the WEventDamage fires last), so `life` is the remaining toughness.
+//#W82-EC (M6): the marker on a creature's NON-combat damage dealt during combat.
+//One literal, shared by the raw emitter and the compact register's reader.
+const char * const kAbilityDamageNote = " by its ability (not combat damage)";
+
+
 string creatureDamageOutcomeNote(int toughness, int life, bool indestructible)
 {
     if (life > 0)
@@ -22140,6 +22196,16 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         if (dc && dc->isCreature() && dc->isInPlay(observer))
             note = creatureDamageOutcomeNote(dc->toughness, dc->life,
                                              dc->has(Constants::INDESTRUCTIBLE));
+        //#W82-EC (M6, deck130 MED-2): NON-combat damage from a creature during
+        //combat is marked as such, so the compact register cannot fold it onto
+        //the `Attack:` line. `130v123` s67 T18: Siege-Gang Commander was BLOCKED
+        //and its sacrifice ping printed as "Siege-Gang Commander: 2 damage, opp 4"
+        //on the attack line, while the activation line carried no result.
+        if (dsrc && dsrc->isCreature() && observer
+            && e->damage->typeOfDamage != Damage::DAMAGE_COMBAT
+            && (int) observer->getCurrentGamePhase() >= (int) MTG_PHASE_COMBATBEGIN
+            && (int) observer->getCurrentGamePhase() <= (int) MTG_PHASE_COMBATEND)
+            note = kAbilityDamageNote + note;
         out << damageNarration(dsrcMine, dsrc ? dsrc->getDisplayName() : string(),
                                e->damage->damage, dtarget, haveResult, settled, note);
         if (dp && dsrc && dsrc->getToxicity() > 0)

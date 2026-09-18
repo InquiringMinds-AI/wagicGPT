@@ -43962,6 +43962,68 @@ static const char * kW50Y_r94 =
               "#W82-EC M8 the outcome does not break the exact-line bucket");
     }
 
+    // ---------------- #W82-EC (M6): an ability's damage never rides the Attack line.
+    // `130v123` s67 T18: "Attack: Siege-Gang Commander, Goblin, Goblin -> Siege-Gang
+    // Commander: 2 damage, opp 4; ... used Deal 2 damage with Siege-Gang Commander -> the
+    // opponent" - Siege-Gang was BLOCKED; the 2 came from its sacrifice ping.
+    {
+        cout << "  #W82-EC M6 activation damage stays off the Attack line and lands on its own line\n";
+        CHECK(damageNarration(true, "Siege-Gang Commander", 2, "the opponent", true, 4,
+                              " by its ability (not combat damage)")
+                  == "Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not"
+                     " combat damage) (now 4)",
+              "#W82-EC M6 the raw line carries the marker before the life total");
+        // The corpus order: the ping is logged BEFORE the activation line.
+        const string s67 = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander, Goblin, Goblin\n"
+            "- Phase: Blockers\n"
+            "- Opponent declared blockers: Bloodline Keeper blocks Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n"
+            "- You used: Deal 2 damage with Siege-Gang Commander targeting the opponent\n"
+            "- Paid {1}{r} for Siege-Gang Commander with Mountain #1; Mountain #2\n"
+            "- Your Goblin died\n"
+            "- Phase: Combat damage\n"
+            "- Your Goblin dealt 1 damage to the opponent (now 3)\n"
+            "- Opponent's Bloodline Keeper dealt 3 damage to Siege-Gang Commander (dies)\n"
+            "- Your Siege-Gang Commander died\n");
+        cout << "     " << s67 << "\n";
+        CHECK(s67.find("Attack: Siege-Gang Commander, Goblin, Goblin -> Goblin: 1 damage, opp 3; they"
+                       " block: Bloodline Keeper blocks Siege-Gang Commander; used Deal 2 damage with"
+                       " Siege-Gang Commander -> the opponent: 2 damage, opp 4; paid ({1}{r}, 2 sources:"
+                       " Mountain #1; Mountain #2) for Siege-Gang Commander; your Goblin died; Bloodline"
+                       " Keeper -> 3 damage to Siege-Gang Commander (dies); your Siege-Gang Commander"
+                       " died.") != string::npos,
+              "#W82-EC M6 the activation line carries its own result and the Attack line carries only"
+              " combat damage");
+        CHECK(s67.find("Siege-Gang Commander: 2 damage") == string::npos,
+              "#W82-EC M6 NEGATIVE the blocked attacker's ping is not on the attack line");
+        // The other order: activation first, then its damage - the existing fold.
+        const string first = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander\n"
+            "- You used: Deal 2 damage with Siege-Gang Commander targeting the opponent\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n");
+        CHECK(first.find("Attack: Siege-Gang Commander; Siege-Gang Commander -> 2 damage, opp 4.") != string::npos,
+              "#W82-EC M6 activation-first order folds the result onto the activation as before");
+        // NEGATIVE: unmarked (combat) damage from a declared attacker still rides the Attack line.
+        const string combat = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Rorix Bladewing\n"
+            "- Phase: Combat damage\n"
+            "- Your Rorix Bladewing dealt 6 damage to the opponent (now 10)\n");
+        CHECK(combat == "T18 (you):\n  Attack: Rorix Bladewing -> 6 damage, opp 10.",
+              "#W82-EC M6 NEGATIVE combat damage from the declared attacker is the attack line, byte-identical");
+        // A marked ping with no activation line nearby keeps its marker in the register.
+        const string lone = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n");
+        CHECK(lone.find("Attack: Siege-Gang Commander; Siege-Gang Commander -> 2 damage, opp 4 (by its"
+                        " ability, not combat damage).") != string::npos,
+              "#W82-EC M6 a marked ping with no activation line says what it was");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
