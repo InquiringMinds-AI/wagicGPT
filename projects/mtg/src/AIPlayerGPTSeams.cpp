@@ -3505,7 +3505,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             w79ApplyLoopFaceAtSend(false, string(), mOwnLoopVerdictFace, w80c);
             w80ApplyVerdictFacesAtSend(false, string(), string(), false);
         }
+        //#W82-EB (H2, wave-81 H2): ONE regime. Under #W82-P9 this separate ask is
+        //the fold's DEGENERATE case - it runs only when the cast branch above put
+        //no menu to the model this window (nothing castable, a hold standing, a
+        //no-progress marker, or the phase's casting decision already closed) - and
+        //its `Land drop:` status line says so (kLandShapeFoldStandalone). Under
+        //WAGIC_GPT_LAND_SEPARATE=1 it is the old regime and says the old thing.
+        //Either way the record it writes carries `land_shape`, so the P9 revert
+        //criterion is read off counts of the two shapes, not off a half-shipped mix.
+        mLandShapeForPrompt = landDropInCastMenu() ? kLandShapeFoldStandalone : kLandShapeSeparate;
         int pick = askModel(q.str(), opts, false, string(), false, true); //the play narrates itself as a zone event
+        mLandShapeForPrompt = 0;
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick

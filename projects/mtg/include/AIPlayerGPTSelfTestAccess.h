@@ -540,6 +540,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse);
     static string landDropAskText(size_t landCount);
     static string landDropStatusLine(bool myTurn, bool playable, bool haveLand, int landShape = 0); //#W82-EB (H1/H2)
+    static const char * w82LandShapeField(const string& seam, bool landDropKind, int landShape, bool foldRegime); //#W82-EB (H2)
     static string landDropThreatTag(const string& rawScript);
     static string landEntersTappedTag(const string& script, const string& printedText);
     static string landTapMana(const string& text);

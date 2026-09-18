@@ -47,6 +47,7 @@ enum {
     kLandShapeFoldStandalone = 3  //P9 regime; a `Land drop:` ask of its own (no casting menu this window)
 };
 bool landDropInCastMenu(); //#W82-P9 revert switch, read by the situation block and the translog
+const char * w82LandShapeField(const string& seam, bool landDropKind, int landShape, bool foldRegime); //#W82-EB (H2)
 extern const char * kHoldPriorityRowText;
 extern const char * kLandDropConsequence;
 extern const char * kLandDropDeclineRow;

@@ -43677,6 +43677,30 @@ static const char * kW50Y_r94 =
               "#W82-EB H1 NEGATIVE the separate-regime paragraph is left alone by the key");
     }
 
+    cout << "\n[#W82-EB] H2 one land regime: the standalone ask is the fold's degenerate case, and every land window is tagged\n";
+    {
+        //#W82-EB (H2, wave-81 H2): `123v152` seq 34/37 - a standalone `Land drop:` ask
+        //(['Play Marsh Flats', 'Play no land right now']) reachable in every game beside
+        //the folded rows. The owner reads the P9 revert criterion off the next corpus,
+        //so each window says which shape it was: the record field and the header.
+        CHECK(string(w82LandShapeField("ask", false, 2, true)) == "folded",
+              "#W82-EB H2 a casting menu that carried the Play <land> rows records land_shape=folded");
+        CHECK(string(w82LandShapeField("ask", true, 3, true)) == "standalone",
+              "#W82-EB H2 REPRO 123v152 seq 34: the separate ask under the P9 regime records"
+              " land_shape=standalone");
+        CHECK(string(w82LandShapeField("ask", true, 0, false)) == "separate",
+              "#W82-EB H2 the same ask under WAGIC_GPT_LAND_SEPARATE=1 records land_shape=separate");
+        CHECK(w82LandShapeField("ask", false, 1, true) == NULL
+                  && w82LandShapeField("ask", false, 0, true) == NULL
+                  && w82LandShapeField("priority", false, 2, true) == NULL
+                  && w82LandShapeField("discard", true, 3, true) == NULL,
+              "#W82-EB H2 NEGATIVE a window with no land rows, and every other seam, carries no field");
+        CHECK(landDropStatusLine(true, true, true, 3).find("no casting menu is being put to you") != string::npos
+                  && landDropStatusLine(true, true, true, 3).find("rows"
+                     " below ARE this turn's land drop") != string::npos,
+              "#W82-EB H2 the standalone ask's own header names it as the degenerate case of the fold");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
