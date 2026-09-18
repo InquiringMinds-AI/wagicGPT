@@ -28372,6 +28372,8 @@ string stripNarrationDecoration(const string& in)
                 //the moment the spell resolves.
                 || (in.compare(i, 8, "{kills: ") == 0)
                 || (in.compare(i, 7, "{kills ") == 0)
+                //#W82-EB (H10): the same clause, opened by its verdict lead.
+                || (in.compare(i, 28, "{every legal target SURVIVES") == 0)
                 //#W54-C: D11's removal victim list, D4's player-only summary,
                 //D18's menu-fit clause and D5's per-mode live/dead clause are
                 //all the same species - true of THIS window's offer and false
@@ -35038,14 +35040,32 @@ string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife,
 //#W55-C (D15), same defect on the magnitude emitter: a `{kills: ...}` list that
 //mixes sides reads as a consequence of the cast, not of the pick. `killedMine`
 //empty keeps every wave-54 string byte-identical.
+//#W82-EB (H10, wave-81 deck130 HIGH-2): THE VERDICT LEADS, ON THE ROW THAT CAN
+//STILL DECLINE. `130v162` seq 11: the cast row read `{kills 0 of the 1 CREATURE
+//target at 3 damage - and 3 to the opponent at life 20 leaves them at 17}`, the
+//row was taken, and the TARGET ask that followed printed `(this ask has no pass
+//row)` over three rows that all survive - every "decline" rule in the guide was
+//unreachable by then. The same numbers now open with the fact they add up to,
+//stated where a decline exists: `every legal target SURVIVES - casting this
+//kills nothing:`. Claimed ONLY when it is proven - no creature dies on either
+//side, the player tail names no win, and `unpricedTargets` (legal targets this
+//enumeration did not price: planeswalkers, battles) is 0. Everything after the
+//colon is the wave-54 wording, byte for byte.
+static const char * kEveryTargetSurvivesLead = "every legal target SURVIVES - casting this kills nothing: ";
+
 string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
                                  const string& magnitude, const string& playerTail,
-                                 const std::vector<std::string>& killedMine)
+                                 const std::vector<std::string>& killedMine,
+                                 int unpricedTargets) //#W82-EB (H10)
 {
     if (magnitude.empty())
         return "";
+    const bool everySurvives = killed.empty() && killedMine.empty() && unpricedTargets <= 0
+                               && playerTail.find("WINS THE GAME") == string::npos;
     if (creatureTargets <= 0)
-        return playerTail.empty() ? string("") : " {no creature target" + playerTail + "}";
+        return playerTail.empty() ? string("")
+             : string(" {") + (everySurvives ? kEveryTargetSurvivesLead : "")
+               + "no creature target" + playerTail + "}";
     std::ostringstream o;
     if (!killedMine.empty())
     {
@@ -35069,7 +35089,8 @@ string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTa
         return o.str();
     }
     if (killed.empty())
-        o << " {kills 0 of the " << creatureTargets << " CREATURE target"
+        o << " {" << (everySurvives ? kEveryTargetSurvivesLead : "")
+          << "kills 0 of the " << creatureTargets << " CREATURE target"
           << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << playerTail << "}";
     else
     {
@@ -39595,7 +39616,7 @@ string AIPlayerGPTSelfTestAccess::castAbandonedNarration(const string& card, int
 int AIPlayerGPTSelfTestAccess::castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinControlled, bool selfLeavesOnResolution) { return ::castBodiesNetOfOwnText(bodies, cardIsCreature, legendTwinControlled, selfLeavesOnResolution); }
 string AIPlayerGPTSelfTestAccess::castDeclineRow(bool combatNext) { return ::castDeclineRow(combatNext); }
 string AIPlayerGPTSelfTestAccess::castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life, int priorCharge) { return ::castDrawPriceRowTag(perCast, castNames, perDraw, punishers, life, priorCharge); }
-string AIPlayerGPTSelfTestAccess::castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail, const std::vector<std::string>& killedMine) { return ::castKillSummaryTag(killed, creatureTargets, magnitude, playerTail, killedMine); }
+string AIPlayerGPTSelfTestAccess::castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail, const std::vector<std::string>& killedMine, int unpricedTargets) { return ::castKillSummaryTag(killed, creatureTargets, magnitude, playerTail, killedMine, unpricedTargets); }
 string AIPlayerGPTSelfTestAccess::castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife, int lifeLossFirst, int oppLifeGain, int oppGainTurns) { return ::castPlayerDamageTail(dmg, oppTargetable, oppLife, myLife, lifeLossFirst, oppLifeGain, oppGainTurns); }
 string AIPlayerGPTSelfTestAccess::castSetKeyOf(const std::vector<string>& castNames) { return ::castSetKeyOf(castNames); }
 int AIPlayerGPTSelfTestAccess::castTriggerDrawCount(const string& magicText) { return ::castTriggerDrawCount(magicText); }

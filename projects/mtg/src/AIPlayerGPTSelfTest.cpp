@@ -12114,11 +12114,12 @@ static const char * kW50Y_r94 =
         }
         {
             std::vector<std::string> none;
-            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {kills 0 of the 3 CREATURE targets at -1/-1}", //#W54-C (D4)
+            //#W82-EB (H10): the no-kill shape now LEADS with the verdict it adds up to.
+            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 3 CREATURE targets at -1/-1}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 deck123 vs146 seq 18: Tragic Slip's cast row prices its three survivors");
-            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {kills 0 of the 1 CREATURE target at -1/-1}", //#W54-C (D4)
+            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 1 CREATURE target at -1/-1}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 one target reads singular");
-            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {kills 0 of the 2 CREATURE targets at 2 damage}", //#W54-C (D4)
+            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 2 CREATURE targets at 2 damage}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 the damage rows carry the same summary in their own magnitude");
             std::vector<std::string> one;
             one.push_back("Elite Spellbinder");
@@ -13164,7 +13165,7 @@ static const char * kW50Y_r94 =
             CHECK(castKillSummaryTag(none, 0, "3 damage").empty(),
                   "#W54-C D4 NEGATIVE no creature target and no player tail: still nothing");
             CHECK(castKillSummaryTag(none, 2, "3 damage")
-                  == " {kills 0 of the 2 CREATURE targets at 3 damage}",
+                  == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 2 CREATURE targets at 3 damage}",
                   "#W54-C D4 REGRESSION the four-argument shape with no tail is the three-argument one");
             std::vector<std::string> one;
             one.push_back("Rorix Bladewing");
@@ -43699,6 +43700,48 @@ static const char * kW50Y_r94 =
                   && landDropStatusLine(true, true, true, 3).find("rows"
                      " below ARE this turn's land drop") != string::npos,
               "#W82-EB H2 the standalone ask's own header names it as the degenerate case of the fold");
+    }
+
+    cout << "\n[#W82-EB] H10 the cast row leads with the target verdict when every legal target survives\n";
+    {
+        //#W82-EB (H10, wave-81 deck130 HIGH-2): `130v162` seq 11 - Hammer of Bogardan's
+        //cast row priced `kills 0 of the 1 CREATURE target at 3 damage - and 3 to the
+        //opponent at life 20 leaves them at 17`; the target ask that followed had no
+        //decline and every row survived. The decision is made where a decline exists.
+        std::vector<std::string> none, mine;
+        const string tail = castPlayerDamageTail(3, true, 20);
+        const string hammer = castKillSummaryTag(none, 1, "3 damage", tail, mine, 0);
+        cout << "     " << hammer << "\n";
+        CHECK(hammer == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 1"
+                        " CREATURE target at 3 damage - and 3 to the opponent at life 20 leaves them at 17}",
+              "#W82-EB H10 REPRO 130v162 seq 11: the row opens with the verdict; the wave-54 numbers follow");
+        CHECK(castKillSummaryTag(none, 0, "3 damage", tail, mine, 0)
+                  == " {every legal target SURVIVES - casting this kills nothing: no creature target"
+                     " - and 3 to the opponent at life 20 leaves them at 17}",
+              "#W82-EB H10 a burn row whose only legal targets are players carries the same lead");
+        CHECK(castKillSummaryTag(none, 2, "3 damage", castPlayerDamageTail(3, true, 1), mine, 0)
+                  == " {kills 0 of the 2 CREATURE targets at 3 damage"
+                     " - and 3 to the opponent at life 1 WINS THE GAME}",
+              "#W82-EB H10 MUST-NOT-MATCH a lethal player tail is not 'kills nothing'");
+        CHECK(castKillSummaryTag(none, 1, "3 damage", tail, mine, 1).find("every legal target") == string::npos
+                  && castKillSummaryTag(none, 1, "3 damage", tail, mine, 1).find("kills 0 of the 1 CREATURE target") != string::npos,
+              "#W82-EB H10 MUST-NOT-MATCH an unpriced legal target (a planeswalker) withholds the claim; the count stays");
+        std::vector<std::string> one;
+        one.push_back("Master of the Feast");
+        CHECK(castKillSummaryTag(one, 1, "5 damage", tail, mine, 0).find("every legal target") == string::npos
+                  && castKillSummaryTag(none, 1, "5 damage", tail, one, 0).find("every legal target") == string::npos,
+              "#W82-EB H10 MUST-NOT-MATCH a kill on either side withholds the claim");
+        CHECK(stripNarrationDecoration("Cast Hammer of Bogardan {1}{r}{r}" + hammer) == "Cast Hammer of Bogardan {1}{r}{r}"
+                  && stripRenderAnnotationsLc("Cast Hammer of Bogardan {1}{r}{r}" + hammer)
+                     == stripRenderAnnotationsLc("Cast Hammer of Bogardan {1}{r}{r}"),
+              "#W82-EB H10 ECHO/KEY the lead rides the {...} channel: out of the narration and out of every key");
+        std::vector<string> menu;
+        menu.push_back("Cast Starstorm {r}{r}{x}");
+        menu.push_back("Cast Hammer of Bogardan {1}{r}{r}" + hammer);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        CHECK(parseChoice("PLAN: burn face.\nCHOICE: 2 (Cast Hammer of Bogardan)", 3, &menu, &st, NULL, NULL, true) == 2 && !st,
+              "#W82-EB H10 ECHO the annotated row still binds by its short name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

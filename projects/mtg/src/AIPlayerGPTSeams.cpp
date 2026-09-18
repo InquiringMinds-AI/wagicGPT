@@ -4361,8 +4361,16 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             string playerTail = castPlayerDamageTail(
                                 castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1,
                                 life, rowSelfLifeCost, m11Gain, m11Turns); //#W60-L (B1), #W72-BW (M11)
+                            //#W82-EB (H10): legal targets this walk did not price - a
+                            //planeswalker or a battle among `tgtCards` - so the
+                            //"every legal target survives" lead is never claimed over
+                            //a target whose death was not tested.
+                            int unpricedTargets = 0;
+                            for (size_t ui = 0; ui < tgtCards.size(); ui++)
+                                if (tgtCards[ui] && !tgtCards[ui]->isCreature())
+                                    unpricedTargets++;
                             o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
-                                                    killedMine); //#W55-C (D15)
+                                                    killedMine, unpricedTargets); //#W55-C (D15); #W82-EB (H10)
                             //#W77-CS (R6 a): and what each of those victims is
                             //worth off the CRACK-BACK NEXT TURN line above.
                             //Gated through the same crackBackScreenTotal as

@@ -350,7 +350,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinControlled, bool selfLeavesOnResolution= false);
     static string castDeclineRow(bool combatNext);
     static string castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life= -1, int priorCharge= 0);
-    static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail= "", const std::vector<std::string>& killedMine= std::vector<std::string>());
+    static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail= "", const std::vector<std::string>& killedMine= std::vector<std::string>(), int unpricedTargets = 0); //#W82-EB (H10)
     static string castModeAltPriceTag(const std::vector<std::string>& labels, const std::vector<std::string>& costs, const std::vector<int>& draws);
     static string castModeCastPriceTag(const string& castCost, const string& castClause, int legalTargets);
     static string castModeCommitmentNote(bool castModeMenu, const string& ctxName, const string& committedName, bool sameTurn);

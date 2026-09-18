@@ -118,7 +118,7 @@ int castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinContr
 bool castBodyEntersTapped(MTGCardInstance * card);
 string castDeclineRow(bool combatNext);
 string castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life = -1, int priorCharge = 0);
-string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail = "", const std::vector<std::string>& killedMine = std::vector<std::string>());
+string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail = "", const std::vector<std::string>& killedMine = std::vector<std::string>(), int unpricedTargets = 0); //#W82-EB (H10)
 string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card, int oppLifeGain = 0, int oppGainTurns = 0);
 string castModeCommitmentNote(bool castModeMenu, const string& ctxName, const string& committedName, bool sameTurn);
 string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife = -1, int lifeLossFirst = 0, int oppLifeGain = 0, int oppGainTurns = 0);
