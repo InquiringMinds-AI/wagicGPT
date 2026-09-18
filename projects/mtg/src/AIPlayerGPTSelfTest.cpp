@@ -7005,8 +7005,8 @@ void AIPlayerGPTSelfTestAccess::run()
         //#W46-9 UPDATED: the gain is still the attacker's full power; the tail
         //now names the branch it belongs to (see the #W46-9 block at the end).
         CHECK(combatTradePreviewStats(vanB22, llAtk55)
-              == "your blocker dies, attacker lives (lifelink: they gain 5 from this"
-                 " block only, and this attacker deals nothing to your life)",
+              == "your blocker dies, attacker lives (lifelink: they gain 5,"
+                 " and this attacker deals nothing to your life)", //#W82-EC (H4)
               "#W44-LOW a lifelink ATTACKER's gain is its full power, trample or not");
         // NEGATIVE: no lifelink anywhere, no clause. The control for all of it.
         CHECK(combatTradePreviewStats(vanB22, vanA22).find("lifelink") == string::npos,
@@ -7937,15 +7937,15 @@ void AIPlayerGPTSelfTestAccess::run()
         string seq28 = combatTradePreviewStats(blk34, llAtk32, kPreventNone, kPreventNone,
                                                kPreventNone, true);
         cout << "     seq-28 shape: \"" << seq28 << "\"\n";
-        CHECK(seq28 == "your attacker dies, their blocker lives (lifelink: you gain 3 from"
-                       " this block only, and this attacker deals nothing to their life)",
+        CHECK(seq28 == "your attacker dies, their blocker lives (lifelink: you gain 3,"
+                       " and this attacker deals nothing to their life)", //#W82-EC (H4)
               "#W46-9 the gain is bound to the block, and the un-dealt face damage is stated");
         CHECK(seq28.find("deals nothing to their life") != string::npos,
               "#W46-9 the restriction that refutes the +face reading is present in words");
         // The blockers chair reads the same fight about YOUR life.
         CHECK(combatTradePreviewStats(blk34, llAtk32)
-              == "you kill it, your blocker lives (lifelink: they gain 3 from this block"
-                 " only, and this attacker deals nothing to your life)",
+              == "you kill it, your blocker lives (lifelink: they gain 3,"
+                 " and this attacker deals nothing to your life)", //#W82-EC (H4)
               "#W46-9 the defender's chair is told whose life is spared, in its own voice");
         // TRAMPLE: some damage DOES reach the face, so the no-face restriction
         // would be a lie - the honest alternative says the gain already counts
@@ -7954,8 +7954,8 @@ void AIPlayerGPTSelfTestAccess::run()
                                             kPreventNone, true);
         cout << "     trampling lifelinker: \"" << tr << "\"\n";
         CHECK(tr.find("3 tramples through to them") != string::npos
-              && tr.find("you gain 5 from this block only - that number already counts the"
-                         " damage it tramples through") != string::npos,
+              && tr.find("you gain 5 - that number already counts the"
+                         " damage it tramples through") != string::npos, //#W82-EC (H4): clause dropped
               "#W46-9 a trampler's gain names the carry-over it already includes");
         CHECK(tr.find("deals nothing to") == string::npos,
               "#W46-9 NEGATIVE the no-face restriction is never claimed over live trample damage");
@@ -7963,7 +7963,7 @@ void AIPlayerGPTSelfTestAccess::run()
         // neither is printed (the omit-when-unprovable rung).
         string trP = combatTradePreviewStats(blk22, llTr55, kPreventNone, kPreventNone,
                                              kPreventPartial, true);
-        CHECK(trP.find("lifelink: you gain 5 from this block only)") != string::npos
+        CHECK(trP.find("lifelink: you gain 5)") != string::npos //#W82-EC (H4): clause dropped
               && trP.find("deals nothing to") == string::npos
               && trP.find("already counts") == string::npos,
               "#W46-9 an uncomputable carry-over gets the bare binding and no claim either way");
@@ -8366,7 +8366,12 @@ void AIPlayerGPTSelfTestAccess::run()
         CombatTradeStat llAtk = unraveler; llAtk.lifelink = true;
         string aSide = combatTradePreviewStats(wall, llAtk, kPreventNone, kPreventNone,
                                                kPreventNone, true, -1, true);
-        CHECK(aSide.find("(lifelink: you gain 3, and") == string::npos,
+        //#W82-EC (H4): the clause is now "(lifelink: you gain 3, and this attacker deals
+        //nothing to their life)" - the whole parenthesis is asserted, so no converter
+        //price can hide inside it.
+        CHECK(aSide.find("(lifelink: you gain 3, and this attacker deals nothing to their life)")
+                  != string::npos
+              && aSide.find("(lifelink: you gain 3, and your converter") == string::npos,
               "#W47-R3 NEGATIVE the reader's own lifelink gain is not priced by this flag");
         // ECHO SHAPE: the whole tail rides inside the untapped-blockers bracket,
         // which the reply scanner drops whole - an echoed A-line still parses.
@@ -16187,15 +16192,15 @@ static const char * kW50Y_r94 =
             CombatTradeStat lifer = CombatTradeStat();
             lifer.power = 3; lifer.toughness = 3; lifer.lifelink = true;
             const string nested = combatTradePreviewStats(wall, lifer);
-            CHECK(nested.find("(lifelink: they gain 3 from this block only, and this attacker"
+            CHECK(nested.find("(lifelink: they gain 3, and this attacker"
                               " deals nothing to your life)") != string::npos,
-                  "#W57-B D10 the default form is byte-identical to wave 56");
+                  "#W57-B D10 the default form is byte-identical to wave 56 (#W82-EC H4: minus the clause)");
             string own, theirs;
             const string split = combatTradePreviewStats(wall, lifer, kPreventNone, kPreventNone,
                                                          kPreventNone, false, -1, false,
                                                          NULL, NULL, &own, &theirs);
-            CHECK(theirs == "their attacker's lifelink, this block: they gain 3 from this block"
-                            " only, and this attacker deals nothing to your life",
+            CHECK(theirs == "their attacker's lifelink, this block: they gain 3,"
+                            " and this attacker deals nothing to your life", //#W82-EC (H4)
                   "#W57-B D10 the attacker's gain is voiced as THEIRS and sits outside the verdict");
             CHECK(own.empty() && split.find("lifelink") == string::npos,
                   "#W57-B D10 NEGATIVE nothing of the seat's own is claimed, and the verdict is clean");
@@ -21409,7 +21414,7 @@ static const char * kW50Y_r94 =
         combatTradePreviewStats(myBlk22, llAtk11, kPreventNone, kPreventNone, kPreventNone,
                                 false, -1, false, NULL, NULL, &ownLL, &theirLL, NULL, true);
         cout << "     B-row their-lifelink: \"" << theirLL << "\"\n";
-        CHECK(theirLL.find("they gain 1 from this block only") != string::npos
+        CHECK(theirLL.find("they gain 1, and this attacker deals nothing to your life") != string::npos
               && theirLL.find("both halves of their life LOOP are in play, so ANY life they"
                               " gain chains without limit until you are at 0") != string::npos
               && theirLL.find("not a priced trade") != string::npos,
@@ -21418,7 +21423,7 @@ static const char * kW50Y_r94 =
         combatTradePreviewStats(myBlk22, llAtk11, kPreventNone, kPreventNone, kPreventNone,
                                 false, -1, false, NULL, NULL, NULL, &theirLLOff, NULL, false);
         CHECK(theirLLOff.find("life LOOP") == string::npos
-              && theirLLOff.find("they gain 1 from this block only") != string::npos,
+              && theirLLOff.find("they gain 1, and this attacker deals nothing to your life") != string::npos,
               "#W63-AB E1 MUST-NOT-MATCH with no closed loop the same price is byte-identical to wave 62");
         // MUST-NOT-MATCH: the reader's OWN gain never carries the tail.
         string mineLL;
@@ -43625,6 +43630,50 @@ static const char * kW50Y_r94 =
             const string tB = joinNumberedRows(rowsB, NULL);
             CHECK(tA != tB && w77KeyTailOf(tA) == w77KeyTailOf(tB),
                   "#W82-EC H3 KEY ask tail: the tag is outside the ask/async key");
+        }
+    }
+
+    // ---------------- #W82-EC (H4): lifelink priced on the A-line, both branches.
+    // `162v152` s11: "A2. Intrepid Adversary (6/4) deals 6 [lifelink]" + a B-row brace
+    // "they gain 6 from this block only" -> BLOCKS: none, 11 taken instead of 5.
+    {
+        cout << "  #W82-EC H4 the A-line carries the lifelink gain with its owner and both branches\n";
+        const string t6 = attackerLifelinkAttackLineTag(6, false);
+        cout << "     tag: \"" << t6 << "\"\n";
+        CHECK(t6 == " [lifelink: THEY gain 6 if it connects, blocked or not - a block only"
+                    " changes who takes the 6; only prevented damage stops the gain]",
+              "#W82-EC H4 the tag names THEM, the figure, and that a block does not avoid it");
+        CHECK(attackerLifelinkAttackLineTag(3, true).find("THEY gain 3 in each of its two combat"
+                                                          " damage steps if it connects") != string::npos,
+              "#W82-EC H4 a double striker gains in each damage step it deals in");
+        CHECK(attackerLifelinkAttackLineTag(0, false) == " [lifelink: it deals 0, so THEY gain nothing from it]",
+              "#W82-EC H4 NEGATIVE a 0-power lifelinker gains nothing and says so");
+        // The B-row brace no longer says "from this block only".
+        CombatTradeStat wall = CombatTradeStat();
+        wall.power = 0; wall.toughness = 6;
+        CombatTradeStat adversary = CombatTradeStat();
+        adversary.power = 6; adversary.toughness = 4; adversary.lifelink = true;
+        string theirs;
+        combatTradePreviewStats(wall, adversary, kPreventNone, kPreventNone, kPreventNone,
+                                false, -1, false, NULL, NULL, NULL, &theirs, NULL, false);
+        cout << "     B-row brace: \"" << theirs << "\"\n";
+        CHECK(theirs == "their attacker's lifelink, this block: they gain 6, and this attacker deals"
+                        " nothing to your life",
+              "#W82-EC H4 the B-row brace states the figure bare and the no-face half");
+        CHECK(theirs.find("from this block only") == string::npos,
+              "#W82-EC H4 NEGATIVE the clause that read as 'only if you block' is gone");
+        // KEY-STABILITY PIN: the tag is a bracket - outside every row key.
+        {
+            const string base = "Intrepid Adversary (6/4) deals 6 [lifelink]";
+            const string rowA = base + attackerLifelinkAttackLineTag(6, false);
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(rowA != base && holdActionKeyRow(rowA) == holdActionKeyRow(base)
+                      && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                      && w77KeyTailOf(joinNumberedRows(rowsA, NULL))
+                         == w77KeyTailOf(joinNumberedRows(rowsB, NULL)),
+                  "#W82-EC H4 KEY the lifelink tag is outside the hold, option-set and ask keys");
         }
     }
 

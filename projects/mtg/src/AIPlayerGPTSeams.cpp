@@ -10625,7 +10625,15 @@ string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& 
                 body << who << " life in BOTH damage steps of this block - total not"
                         " computed here";
             else
-                body << who << " " << ap << " from this block only";
+            {
+                //#W82-EC (H4, deck162 HIGH-1): "from this block only" was read as
+                //"only if you block" - `162v152` s11 declined the block to avoid a
+                //gain that lands either way and took 11 instead of 5. The gain is
+                //a fact of the attacker's damage being dealt, not of the block;
+                //the A-line now says so (attackerLifelinkAttackLineTag) and this
+                //brace states the figure bare.
+                body << who << " " << ap;
+            }
             if (noFace)
                 body << ", and this attacker deals nothing to" << whoseLife;
             else if (someFace)
@@ -10773,6 +10781,29 @@ CombatTradeStat combatStatOf(MTGCardInstance * c)
 //(optionSetKeyOf, holdActionKeyRow, w77KeyTailOf) strips it: the number is
 //outside every key by construction (PARSETEST pins it). Silent on an undamaged
 //body and on one already at 0 or less (the "died" line is the fact there).
+//#W82-EC (H4, deck162 HIGH-1). `162v152` s11: `A2. Intrepid Adversary (6/4)
+//deals 6 [lifelink]` - a bare keyword, no owner, no figure - and the only
+//number sat in the B-row brace as "they gain 6 from this block only". Read
+//together, the menu said declining the block avoids the gain; the seat declined,
+//took 11 instead of 5 at 15 life, and priced the swing as net 0. The gain rides
+//DEALT damage: unblocked it lands on the player, blocked it lands on the blocker,
+//and either way the attacker's controller gains it. Only prevention stops it.
+//Bracketed like every A-line tag (echo-safe, outside every row key). `dealt` is
+//the per-step figure; a double striker gains it in each damage step it deals in.
+string attackerLifelinkAttackLineTag(int dealt, bool doublestrike)
+{
+    if (dealt <= 0)
+        return " [lifelink: it deals 0, so THEY gain nothing from it]";
+    std::ostringstream o;
+    o << " [lifelink: THEY gain " << dealt;
+    if (doublestrike)
+        o << " in each of its two combat damage steps";
+    o << " if it connects, blocked or not - a block only changes who takes the "
+      << dealt << "; only prevented damage stops the gain]";
+    return o.str();
+}
+
+
 string markedDamageTag(int toughness, int life)
 {
     if (life <= 0 || life >= toughness)
@@ -13628,6 +13659,12 @@ int AIPlayerGPT::chooseBlockers()
         //this family are opaque, and the seat's own reasoning showed it pricing
         //an infect swing entirely on the life track.
         ln << attackerPoisonNote(attackers[j]);
+        //#W82-EC (H4): the lifelink gain, both branches and the owner, on the
+        //line the block is decided against.
+        if (attackers[j]->basicAbilities[Constants::LIFELINK])
+            ln << attackerLifelinkAttackLineTag(
+                      attackers[j]->power > 0 ? attackers[j]->power : 0,
+                      attackers[j]->basicAbilities[Constants::DOUBLESTRIKE] != 0);
         //Punisher rider: an attacker whose text does something WHEN BLOCKED
         //or WHEN DEALT DAMAGE (sacrifice permanents, damage you, pump
         //itself) is a trap the bare name hides - surface the text at the
@@ -16225,6 +16262,7 @@ void AIPlayerGPTSelfTestAccess::collectLabeledLines(const string& content, const
 bool AIPlayerGPTSelfTestAccess::combatLineIsClean(const string& line, const vector<string> * rosterA, const vector<string> * rosterB) { return ::combatLineIsClean(line, rosterA, rosterB); }
 string AIPlayerGPTSelfTestAccess::combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a, int preventAtoB, int preventBtoA, int preventAtoFace, bool attackerSeat, int bRemaining, bool bGainConverted, string * outBlockTrigger, bool * outBlockerDies, string * outBlockerLifelink, string * outAttackerLifelink, bool * outAttackerDies, bool foeLifeLoop) { return ::combatTradePreviewStats(b, a, preventAtoB, preventBtoA, preventAtoFace, attackerSeat, bRemaining, bGainConverted, outBlockTrigger, outBlockerDies, outBlockerLifelink, outAttackerLifelink, outAttackerDies, foeLifeLoop); }
 string AIPlayerGPTSelfTestAccess::markedDamageTag(int toughness, int life) { return ::markedDamageTag(toughness, life); } //#W82-EC (H3)
+string AIPlayerGPTSelfTestAccess::attackerLifelinkAttackLineTag(int dealt, bool doublestrike) { return ::attackerLifelinkAttackLineTag(dealt, doublestrike); } //#W82-EC (H4)
 void AIPlayerGPTSelfTestAccess::composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner, std::vector<size_t>& out) { ::composeRowOrder(outer, inner, out); }
 string AIPlayerGPTSelfTestAccess::compoundModeTargetNote(const string& modeName) { return ::compoundModeTargetNote(modeName); }
 int AIPlayerGPTSelfTestAccess::countLegalAssignments(const vector<int>& pick, size_t nAttackers, const vector<vector<int> >& legalPerBlocker) { return ::countLegalAssignments(pick, nAttackers, legalPerBlocker); }

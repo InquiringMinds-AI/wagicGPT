@@ -258,7 +258,10 @@ struct CombatTradeStat
     //carrying 4 marked damage against a 4/4, and the seat attacked its only win
     //condition into a trade. 0 = unset (aggregate-initialised test stats and
     //an undamaged body both read as "the printed toughness is the remaining").
-    int remaining;
+    //Default-initialised in place (C++14 keeps the struct an aggregate) so a
+    //test stat declared `CombatTradeStat x;` and filled field by field cannot
+    //carry a garbage remaining into the verdict.
+    int remaining = 0;
 };
 
 //moved verbatim from AIPlayerGPT.cpp (was line 18104) so the self-test TU can name it
@@ -555,6 +558,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string leavesFloatingTag(int poolTotal, int spent);
     static string leavesUntappedTag(int untappedSources, int sourcesUsed);
     static string markedDamageTag(int toughness, int life); //#W82-EC (H3)
+    static string attackerLifelinkAttackLineTag(int dealt, bool doublestrike); //#W82-EC (H4)
     static string legendRuleHeaderText(const string& name, int copies);
     static string legendRuleTargetClause(const string& name, int copies);
     static string legendTwinTag(const string& name, int loyalty= -1);
