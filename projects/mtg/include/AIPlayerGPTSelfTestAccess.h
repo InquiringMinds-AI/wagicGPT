@@ -1010,7 +1010,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string w80ProvenWinLoopLine(const string& starterName);
     static string w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies);
     static string w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal);
-    static string w80StackDeathVerdictLine(const string& face);
+    static string w80StackDeathVerdictLine(const string& face, int stackLossToMe= 0); //#W82-EC (M11)
     static string w80StackNotEmptyReason(bool stackBlockRendered);
     static bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow= false);
     static int w80StarterLineKind(const string& low);

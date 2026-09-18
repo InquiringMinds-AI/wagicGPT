@@ -32372,8 +32372,9 @@ static const char * kW50Y_r94 =
             // `{answers the stack: NO ...}` clause off the decline rows.
             CHECK(stackDeathVerdictKey(0, 20).find("nothing lethal") != string::npos,
                   "#W74-CH an empty stack has its own verdict word");
-            CHECK(stackDeathVerdictKey(3, 20).find("you survive") != string::npos,
-                  "#W74-CH 3 damage at 20 life is survivable");
+            CHECK(stackDeathVerdictKey(3, 20).find("nothing lethal") != string::npos
+                      && stackDeathVerdictKey(3, 20).find("KILLS") == string::npos,
+                  "#W74-CH 3 damage at 20 life is survivable (#W82-EC M11: the one non-lethal face)");
             CHECK(stackDeathVerdictKey(3, 2).find("KILLS you") != string::npos,
                   "#W74-CH 3 damage at 2 life is lethal (the `123v162` s32 shape)");
             std::set<string> held2;
@@ -39782,9 +39783,9 @@ static const char * kW50Y_r94 =
         // The hold latch's own verdict is built from the same number, so the two
         // cannot disagree about whether this stack kills.
         CHECK(stackDeathVerdictKey(9, 1) == "[stack death verdict: the stack KILLS you]"
-              && stackDeathVerdictKey(3, 4) == "[stack death verdict: you survive the stack]",
+              && stackDeathVerdictKey(3, 4) == "[stack death verdict: nothing lethal on the stack]",
               "#W79-DA T16 the verdict key reads the same total pendingStackLifeLossToSeat now"
-              " returns");
+              " returns (#W82-EC M11: the survivable face is the one non-lethal face)");
     }
 
     cout << "\n[#W79-DA] T16 an untap keyword prints beside an affirmative tap state\n";
@@ -40887,13 +40888,14 @@ static const char * kW50Y_r94 =
                   .find("LETHAL if it is UNBLOCKED - if you pass this window") != string::npos,
               "#W80-DE U2 GREEN the LETHAL crack-back renders and names what passing costs");
         // seq 200's stack: 2 damage against 28 life -> the survivable face renders.
-        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28))
-                  == "\n[stack death verdict: you survive the stack - what is waiting to"
-                     " resolve does not take you to 0 by itself]",
-              "#W80-DE U2 GREEN the `125v162` seq-200 stack renders its survivable face");
-        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(30, 28))
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28), 2)
+                  == "\n[stack death verdict: nothing lethal on the stack - what is waiting to"
+                     " resolve costs you 2 life but does not take you to 0 by itself]",
+              "#W80-DE U2 GREEN the `125v162` seq-200 stack renders its survivable face"
+              " (#W82-EC M11: off the live loss, under the one non-lethal face)");
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(30, 28), 30)
                   .find("the stack KILLS you") != string::npos
-              && w80StackDeathVerdictLine(stackDeathVerdictKey(0, 28)).empty(),
+              && w80StackDeathVerdictLine(stackDeathVerdictKey(0, 28), 0).empty(),
               "#W80-DE U2 GREEN the lethal face renders and an empty stack owes no line");
         // KEY STABILITY (the wave-74 rule): the rendered line is PROMPT-ONLY. Two windows
         // whose ONLY difference is the rendered verdict line - the same board number that
@@ -44022,6 +44024,29 @@ static const char * kW50Y_r94 =
         CHECK(lone.find("Attack: Siege-Gang Commander; Siege-Gang Commander -> 2 damage, opp 4 (by its"
                         " ability, not combat damage).") != string::npos,
               "#W82-EC M6 a marked ping with no activation line says what it was");
+    }
+
+    // ---------------- #W82-EC (M11): one non-lethal stack-death face, so equal-meaning
+    // faces do not clamp. `146v125` hold_event s140+: "held [you survive the stack] over
+    // live [nothing lethal on the stack]" x44, one per Staff of Nin ping.
+    {
+        cout << "  #W82-EC M11 the survivable and the empty stack are one face\n";
+        const string held = stackDeathVerdictKey(1, 30);  //a ping on the stack, survivable
+        const string live = stackDeathVerdictKey(0, 29);  //the ping resolved
+        CHECK(held == live && held == "[stack death verdict: nothing lethal on the stack]",
+              "#W82-EC M11 a survivable stack and an empty stack render the SAME face");
+        CHECK(w79HoldVerdictForCompare(held, live) == live,
+              "#W82-EC M11 the latch compare returns the live face: nothing to clamp");
+        CHECK(holdActionKeyRow(held) == holdActionKeyRow(live),
+              "#W82-EC M11 the hold key does not move when the ping resolves");
+        CHECK(stackDeathVerdictKey(30, 29) == "[stack death verdict: the stack KILLS you]"
+                  && w79HoldVerdictForCompare(held, stackDeathVerdictKey(30, 29))
+                     == "[stack death verdict: the stack KILLS you]",
+              "#W82-EC M11 NEGATIVE the escalation to a lethal stack still re-opens");
+        CHECK(w80StackDeathVerdictLine(held, 1).find("costs you 1 life but does not take you to 0")
+                  != string::npos
+              && w80StackDeathVerdictLine(live, 0).empty(),
+              "#W82-EC M11 the rendered line still tells the two states apart, off the live loss");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

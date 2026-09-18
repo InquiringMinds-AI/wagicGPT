@@ -31385,13 +31385,19 @@ static string holdActionKeyRow(const string& row)
 //taken over a survivable stack would stand once the stack turned lethal - the
 //one window the seat dies in. Recomputed off the live board at every window,
 //never latched. Pure over two ints.
+//#W82-EC (M11, deck146 MED-3): ONE non-lethal face. "you survive the stack" and
+//"nothing lethal on the stack" said the same thing about the hold - the stack
+//does not kill - and ranked 1 and 0, so a hold taken over a survivable ping
+//clamped at every window where the ping had resolved: 44 of the corpus's 108
+//`hold_verdict_safer_ignored` were `146v125` alone, in bursts per Staff of Nin
+//ping. The two faces are folded to the one that names the fact; what the stack
+//costs when it is survivable is the RENDERED line's business
+//(w80StackDeathVerdictLine), not the key's.
 static string stackDeathVerdictKey(int stackLossToMe, int myLife)
 {
-    if (stackLossToMe <= 0 || myLife < 0)
+    if (stackLossToMe <= 0 || myLife < 0 || myLife - stackLossToMe > 0)
         return "[stack death verdict: nothing lethal on the stack]";
-    return (myLife - stackLossToMe <= 0)
-               ? string("[stack death verdict: the stack KILLS you]")
-               : string("[stack death verdict: you survive the stack]");
+    return "[stack death verdict: the stack KILLS you]";
 }
 
 
@@ -32171,18 +32177,24 @@ string w80CrackBackFaceOfLine(const string& line)
 }
 
 
-string w80StackDeathVerdictLine(const string& face)
+//#W82-EC (M11): the survivable-but-costly stack still gets its line, off the
+//live loss rather than a second face - the face is one for both non-lethal
+//states, the line is not. `stackLossToMe` 0 = an empty or harmless stack.
+string w80StackDeathVerdictLine(const string& face, int stackLossToMe)
 {
     if (face.find("[stack death verdict:") != 0)
         return string();
-    if (face.find("nothing lethal") != string::npos)
-        return string(); //an empty or harmless stack owes no line
     if (face.find("KILLS") != string::npos)
         return "\n[stack death verdict: the stack KILLS you - what is waiting to"
                " resolve takes you to 0 or below. Every row on this menu that"
                " declines, the hold row included, lets it resolve]";
-    return "\n[stack death verdict: you survive the stack - what is waiting to"
-           " resolve does not take you to 0 by itself]";
+    if (stackLossToMe <= 0)
+        return string(); //an empty or harmless stack owes no line
+    std::ostringstream o;
+    o << "\n[stack death verdict: nothing lethal on the stack - what is waiting to"
+         " resolve costs you " << stackLossToMe << " life but does not take you to 0"
+         " by itself]";
+    return o.str();
 }
 
 
@@ -33003,7 +33015,8 @@ void AIPlayerGPT::w81ApplyRenderEventsAtSend(bool sent)
 
 string AIPlayerGPT::w80StackDeathVerdictLineNow()
 {
-    return w80StackDeathVerdictLine(stackDeathVerdictNow());
+    return w80StackDeathVerdictLine(stackDeathVerdictNow(),
+                                    pendingStackLifeLossToSeat(observer, this)); //#W82-EC (M11)
 }
 
 
@@ -40507,7 +40520,7 @@ string AIPlayerGPTSelfTestAccess::w80OwnStackSpellTag(bool mine, const string& z
 string AIPlayerGPTSelfTestAccess::w80ProvenWinLoopLine(const string& starterName) { return ::w80ProvenWinLoopLine(starterName); }
 string AIPlayerGPTSelfTestAccess::w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies) { return ::w80SacrificeSpendsBlockerClause(total, myLife, floorTotal, give, bodies); }
 string AIPlayerGPTSelfTestAccess::w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal) { return ::w80SelfLeavesNoCoverClause(cardName, crackTotal); }
-string AIPlayerGPTSelfTestAccess::w80StackDeathVerdictLine(const string& face) { return ::w80StackDeathVerdictLine(face); }
+string AIPlayerGPTSelfTestAccess::w80StackDeathVerdictLine(const string& face, int stackLossToMe) { return ::w80StackDeathVerdictLine(face, stackLossToMe); } //#W82-EC (M11)
 string AIPlayerGPTSelfTestAccess::w80StackNotEmptyReason(bool stackBlockRendered) { return ::w80StackNotEmptyReason(stackBlockRendered); }
 bool AIPlayerGPTSelfTestAccess::w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow) { return ::w80StarterIsLive(kind, abilityUsableNow, aCreatureCanEnter, thisBodyCanAttackNow); }
 int AIPlayerGPTSelfTestAccess::w80StarterLineKind(const string& low) { return ::w80StarterLineKind(low); }
