@@ -170,7 +170,15 @@ def guide_check(path):
     return bad
 
 
-GUIDE_SUFFIX = ("_strategy.txt",)
+#M13 (wave 82, lane EA; wave-81 deck50 MED): a STAGED guide is named plain
+#`strategy.txt` in its wave-<N>/deck<N>/ directory, and `("_strategy.txt",)` gave it
+#zero coverage - the briefed check passed vacuously on whatever the guide held.
+#Both spellings are guides; the count is printed on EVERY run (OK and FAILED) so a
+#"0 guide(s)" can never hide behind a green line again.
+def is_guide_name(name):
+    """The installed spelling `deck<N>_strategy.txt` or the staged `strategy.txt`."""
+    base = os.path.basename(name)
+    return base == "strategy.txt" or base.endswith("_strategy.txt")
 
 
 def main(argv):
@@ -186,8 +194,8 @@ def main(argv):
                           if f.startswith("AIPlayerGPT") and f.endswith(".cpp")
                           and f != "AIPlayerGPTSelfTest.cpp"]
                 guides += [os.path.join(root, f) for f in names
-                           if f.endswith(GUIDE_SUFFIX)]
-        elif t.endswith(GUIDE_SUFFIX):
+                           if is_guide_name(f)]
+        elif is_guide_name(t):
             guides.append(t)
         else:
             files.append(t)
@@ -200,7 +208,8 @@ def main(argv):
         print("check-reply-instructions: %s:%d licenses %r in an instruction string: %s"
               % (path, line, phrase, snip))
     if bad:
-        print("check-reply-instructions: FAILED (%d instruction string(s))" % len(bad))
+        print("check-reply-instructions: FAILED (%d instruction string(s); %d source file(s),"
+              " %d guide(s))" % (len(bad), len(files), len(guides)))
         return 1
     print("check-reply-instructions: OK (%d source file(s), %d guide(s))"
           % (len(files), len(guides)))
