@@ -1544,7 +1544,7 @@ static bool menuIsBareXAnnounce(const std::vector<string> * options)
             continue;
         }
         if (r.compare(0, 7, "Decline") == 0
-            || r.compare(0, 13, "Hold priority") == 0) //#W72-BW (M23b)
+            || isHoldRowText(r)) //#W72-BW (M23b); #W82-EB (H8)
             continue;
         return false; //a row this menu class does not have: not an X menu
     }

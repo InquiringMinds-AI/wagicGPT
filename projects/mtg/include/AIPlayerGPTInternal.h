@@ -201,6 +201,7 @@ int heuristicRevealIndex(const std::vector<int>& cmc, const std::vector<bool>& e
 string holdContractParagraph();
 string holdKeyRow(const string& row);
 int holdRowIndexOf(const std::vector<string> * optionTexts);
+bool isHoldRowText(const string& row); //#W82-EB (H8)
 string holdRowLine(bool castSeam = false, bool activationLive = false);
 string instanceHandle(MTGCardInstance * card);
 bool isAnimationRow(const string& line);

@@ -457,6 +457,7 @@ bool declineRowText(const string& row)
 {
     static const char * const decliners[] = {
         "Cast nothing right now", "Play no land right now", "Hold priority",
+        "Stop asking me this turn", //#W82-EB (H8): the hold row's live head
         "Decline -", "Decline,", "Do nothing", "Done - no further targets",
         "Done", "Pass"
     };
@@ -19457,6 +19458,7 @@ bool logWindowInertRow(const string& row)
 {
     static const char * const inert[] = {
         "Cast nothing right now", "Play no land right now", "Hold ",
+        "Stop asking me this turn", //#W82-EB (H8)
         "Flip Side", "Done", "Do nothing", "Pass"
     };
     for (size_t i = 0; i < sizeof(inert) / sizeof(inert[0]); i++)
@@ -28969,8 +28971,15 @@ const char * kPassPriorityRowText = "Pass priority (take no action this window)"
 //consumer that only needs to know "a hold row is on this menu" (the contract
 //paragraph below the list). kHoldPriorityRowHead stays the identity head every
 //other consumer binds by.
+//#W82-EB (H8, wave-81 deck123 HIGH-1): THE HEAD NAMES WHAT THE ROW DOES. "Hold
+//priority" was read in its Magic sense - keep priority so as to act LATER THIS
+//TURN - 25 times across the wave-81 corpus (`123v130` seq 78: `PLAN: Hold
+//priority to block Rorix ... CHOICE: 3 (Hold priority)` forfeited the turn's
+//windows and the game); the body already said the opposite. The body is
+//unchanged; only the two-word head is. The parser binds the OLD name too
+//(isReservedHoldEcho, isHoldRowText), so an echo of either spelling lands here.
 const char * kHoldPriorityRowShortHead =
-    "Hold priority - pass now, and do not ask me again";
+    "Stop asking me this turn - pass now, and do not ask me again";
 
 
 //#W80-DG (U16): the ROW keeps its own re-opener clause. Folding it into
@@ -28981,13 +28990,13 @@ const char * kHoldPriorityRowShortHead =
 //WORDS. The U16 saving is taken at the hold-CHECK bracket instead, which
 //restated the rule a third time with no such claim on it.
 static const char * kHoldPriorityRowHead =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
     " or until one of the rows above changes (any change re-opens this"
     " window;";
 
 const char * kHoldPriorityRowText =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
     " or until one of the rows above changes (any change re-opens this"
     " window; you give up no cast)";
@@ -29004,7 +29013,7 @@ const char * kHoldPriorityRowText =
 //holdRowIndexOf / isReservedHoldEcho bind this one exactly as they bind the
 //others.
 static const char * kHoldPriorityRowTextActivation =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
     " or until one of the rows above changes (any change re-opens this"
     " window; the rows above include ACTIVATED abilities that are usable RIGHT"
@@ -29015,7 +29024,7 @@ static const char * kHoldPriorityRowTextActivation =
 //The same row on a CASTING menu, where "you give up no cast" is exactly the
 //claim that is false.
 static const char * kHoldPriorityRowTextCast =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
     " or until one of the rows above changes (any change re-opens this"
     " window; on THIS menu that means you also give up this turn's remaining"
@@ -29523,7 +29532,7 @@ string w78HoldRowShortName(const std::vector<string>& rows)
 {
     for (size_t i = 0; i < rows.size(); i++)
     {
-        if (rows[i].compare(0, 13, "Hold priority") != 0)
+        if (!isHoldRowText(rows[i])) //#W82-EB (H8): either spelling of the head
             continue;
         const size_t dash = rows[i].find(" - ");
         return (dash == string::npos) ? rows[i] : rows[i].substr(0, dash);
@@ -30948,7 +30957,7 @@ void appendStackDeathToDeclineRows(std::vector<string>& rows,
     if (clause.empty())
         return;
     for (size_t i = 0; i < rows.size(); i++)
-        if (rows[i].compare(0, 13, "Hold priority") == 0 //#W72-BW (M23b)
+        if (isHoldRowText(rows[i]) //#W72-BW (M23b); #W82-EB (H8)
             || rows[i].compare(0, 12, "Cast nothing") == 0)
             rows[i] += clause;
 }
@@ -32147,6 +32156,12 @@ bool isReservedHoldEcho(const string& echoLc)
         return true;
     if (t.size() > lowRow.size() && t.compare(0, lowRow.size(), lowRow) == 0)
         return true;
+    //#W82-EB (H8): the live short name, and the wave-73..81 head a model may still
+    //write back (the row's BODY did not change, so an echo of the old spelling is
+    //still an unambiguous name for this row and nothing else on the menu).
+    if (t == "stop asking me this turn"
+        || (t.size() >= 49 && t.compare(0, 49, "hold priority - pass now, and do not ask me again") == 0))
+        return true;
     return t == "hold" || t == "hold priority"
         || t == "hold priority - do not ask me again this turn unless the board changes"
         || t == "pass priority, and do not ask me again this turn unless the board changes"
@@ -32159,6 +32174,16 @@ bool isReservedHoldEcho(const string& echoLc)
 }
 
 
+//#W82-EB (H8): is this rendered row the hold row - by its live head or the
+//wave-73..81 head? One predicate for every consumer that used to spell the
+//13-byte prefix out, so a rename moves them all at once. Pure over the text.
+bool isHoldRowText(const string& row)
+{
+    return row.compare(0, 24, "Stop asking me this turn") == 0
+        || row.compare(0, 13, "Hold priority") == 0;
+}
+
+
 //#W54-A (D2a): where does the HOLD row sit on this menu (0-based), if at all?
 int holdRowIndexOf(const std::vector<string> * optionTexts)
 {
@@ -32168,8 +32193,10 @@ int holdRowIndexOf(const std::vector<string> * optionTexts)
         //#W55-A (D21): the row carries a benefit annotation, so its identity
         //is its own text as a HEAD, not the whole rendered string.
         //#W71-BR (L17): the HEAD both spellings share.
-        if ((*optionTexts)[o].compare(0, strlen(kHoldPriorityRowHead),
-                                      kHoldPriorityRowHead) == 0)
+        //#W82-EB (H8): the SHORT head, either spelling - no card's name begins
+        //with either, so the short head is already unique on any menu, and a
+        //menu rendered with the wave-73..81 head still binds an echo of either.
+        if (isHoldRowText((*optionTexts)[o]))
             return (int) o;
     return -1;
 }
@@ -32645,7 +32672,8 @@ bool w72RowIsDeclineOrHold(const string& row)
 {
     static const char * kDeclines[] = {
         "Hold priority", "Pass priority", "Cast nothing right now", "Cast nothing",
-        "Decline", "Do nothing", "Done", "Hold "
+        "Decline", "Do nothing", "Done", "Hold ",
+        "Stop asking me this turn" //#W82-EB (H8): the hold row's live head
     };
     //#W74-CH: CASE-INSENSITIVE on the head. The sibling rule feeds this the same
     //row keys the hold latch compares, and those are now `holdActionKeyRow`
@@ -34150,7 +34178,8 @@ static string menuRowProseName(const string& row)
     size_t z = core.find_last_not_of(" \t");
     core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
     if (core.compare(0, 12, "cast nothing") == 0 || core.compare(0, 4, "pass") == 0
-        || core.compare(0, 4, "hold") == 0 || core.compare(0, 4, "done") == 0)
+        || core.compare(0, 4, "hold") == 0 || core.compare(0, 4, "done") == 0
+        || core.compare(0, 24, "stop asking me this turn") == 0) //#W82-EB (H8)
         return string();
     static const char * kVerbs[] = { "cast ", "play ", "activate ", "equip ", "use ",
                                      "attack with ", "block with ", "target ", "create " };
@@ -39637,6 +39666,7 @@ bool AIPlayerGPTSelfTestAccess::holdNoteSameWindow(bool first, int unseenRows, i
 string AIPlayerGPTSelfTestAccess::holdReopenNoteText(int unseenRows, int repeats, bool first, int goneRows, bool contractBelow) { return ::holdReopenNoteText(unseenRows, repeats, first, goneRows, contractBelow); }
 string AIPlayerGPTSelfTestAccess::holdRowBenefitClause() { return ::holdRowBenefitClause(); }
 int AIPlayerGPTSelfTestAccess::holdRowIndexOf(const std::vector<string> * optionTexts) { return ::holdRowIndexOf(optionTexts); }
+bool AIPlayerGPTSelfTestAccess::isHoldRowText(const string& row) { return ::isHoldRowText(row); }
 string AIPlayerGPTSelfTestAccess::holdRowLine(bool castSeam, bool activationLive) { return ::holdRowLine(castSeam, activationLive); }
 bool AIPlayerGPTSelfTestAccess::holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf) { return ::holdStillStands(heldRows, nowRows, whyOut, keyOf); }
 void AIPlayerGPTSelfTestAccess::improveAssignmentMaterial(const vector<vector<char> >& can, const vector<vector<int> >& rank, vector<int>& match) { ::improveAssignmentMaterial(can, rank, match); }
