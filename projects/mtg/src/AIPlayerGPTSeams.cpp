@@ -1225,11 +1225,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //loop cycle, a "whenever you cast" trigger). The truthful no-effect
         //ANNOTATION on the row stays: the model is told, and the model decides.
         const bool noopRowZero = false;
+        //#W82-EA (H7): the same unreadable-reply lane the ask seam runs - a re-ask
+        //while the deadline has room, the heuristic only when it is gone.
+        const bool unparsedReply = (choice < 0 && !content.empty() && !namedRowFail && !staleEcho
+                                    && retryFitsInDeadline(decisionDeadlineMs(), mLastLatencyMs));
         if (!content.empty() && mPriorityReaskBoard != boardKey
-            && (namedRowFail || planMissing || repeatCountMissing)) //#W82-A (L8): noopRowZero is gone
+            && (namedRowFail || planMissing || repeatCountMissing || unparsedReply)) //#W82-A (L8): noopRowZero is gone
         {
             std::ostringstream corr;
-            const char * fb;
+            const char * fb = NULL;
             //#W56-C (D3): quote what the engine ran, not the reply's first try.
             const string quotedChoiceLine = haveLatchedLine ? latchedChoiceLine
                                                             : firstLabelledLine(content, "choice:");
@@ -1265,6 +1269,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "repeat_count_reask";
                 mPriorityReaskKind = "repeat_count";
             }
+            else //#W82-EA (H7): unparsedReply
+            {
+                corr << "[RE-ASK] No answer line could be read in that reply. Write your PLAN line, then on"
+                        " its own line \"CHOICE: <a number from 1 to " << index
+                     << "> (<that row's name>)\", or 0 (pass).";
+                fb = "unparsed_reask";
+                mPriorityReaskKind = "unparsed";
+            }
             mPriorityReaskBoard = boardKey;
             mPriorityReaskLine = corr.str();
             if (!parseNote.empty())
@@ -1273,7 +1285,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
                       : planMissing ? "the repeat row was taken with no plan - asking again"
                       : repeatCountMissing ? "the repeat row was taken with no count - asking again"
-                                    : "the chosen row's own note says it does nothing - asking again", 5.0f);
+                                    : "no answer could be read in that reply - asking again", 5.0f); //#W82-EA (H7)
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
             pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected, "priority");
@@ -1297,6 +1309,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                        : (choice >= 0 ? "plan_contradicts_noop_row_recovered"
                                                       : "plan_contradicts_noop_row_unanswered")));
+            else if (mPriorityReaskKind == "unparsed") //#W82-EA (H7)
+                appendParseNote(&mLastParseNote, choice >= 0 ? "unparsed_reask_recovered"
+                                                             : "unparsed_reask_unanswered");
             if (choice >= 0)
                 noteReaskExecuted("priority", choice,
                                   (choice >= 1 && choice <= (int) shownLines.size())
@@ -2385,7 +2400,18 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
     }
     bool passOnNoPass = (choice == 0 && !content.empty());
     const bool noopRowZero = false; //#W82-A (L8): the no-op re-ask is DELETED
-    if ((namedRowFail || passOnNoPass) && !reasked) //#W82-A (L8): noopRowZero is gone
+    //#W82-EA (H7): AN UNREADABLE REPLY WITH DEADLINE LEFT IS RE-ASKED, ONCE, BEFORE
+    //THE HEURISTIC. `50v125` seq 41 fell to the heuristic on the first unreadable
+    //reply with 891 s of its 900 s deadline unspent (`deadline_pct` 8.9). The
+    //named-row and no-pass lanes already re-ask; the plain unparsed class was the
+    //one exit that went straight to Baka (#W71-BO R9 deleted the label-missing
+    //re-ask when it never fired - the READER has since become the fix for most of
+    //that class, and this lane is for what the reader still cannot read). The
+    //heuristic answers only when the deadline is gone: the same remainder rule the
+    //transport retry uses (retryFitsInDeadline).
+    const bool unparsedReply = (choice < 0 && !content.empty() && !namedRowFail && !staleEcho
+                                && retryFitsInDeadline(decisionDeadlineMs(), mLastLatencyMs));
+    if ((namedRowFail || passOnNoPass || unparsedReply) && !reasked) //#W82-A (L8): noopRowZero is gone
     {
         std::ostringstream corr;
                 if (namedRowFail)
@@ -2402,14 +2428,22 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                  << options.size() << ".";
             mAskReaskKind = "no_pass";
         }
-        const char * fb = namedRowFail ? "named_row_reask" : "no_pass_reask";
+        else //#W82-EA (H7): unparsedReply
+        {
+            corr << "[RE-ASK] No answer line could be read in that reply. Write your PLAN line, then on"
+                    " its own line \"CHOICE: <a number from 1 to " << options.size()
+                 << "> (<that row's name>)\".";
+            mAskReaskKind = "unparsed";
+        }
+        const char * fb = namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask" : "unparsed_reask";
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
         setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
-                               : "that answer passed an ask that has no pass - asking again", 5.0f);
+                  : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
+                                 : "no answer could be read in that reply - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
         //#W74-CG: the corrected leg's slot key is built from the same stripped
@@ -2431,6 +2465,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsI
                     : (noopRowZero ? "plan_contradicts_noop_row_exhausted"
                                    : (choice >= 1 ? "plan_contradicts_noop_row_recovered"
                                                   : "plan_contradicts_noop_row_unanswered")));
+        else if (mAskReaskKind == "unparsed") //#W82-EA (H7)
+            appendParseNote(&mLastParseNote, choice >= 1 ? "unparsed_reask_recovered"
+                                                         : "unparsed_reask_unanswered");
         else
             appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                           : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));

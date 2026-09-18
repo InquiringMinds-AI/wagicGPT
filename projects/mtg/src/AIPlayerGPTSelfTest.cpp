@@ -40980,6 +40980,57 @@ static const char * kW50Y_r94 =
               " saying only that it `covers every remaining link`");
     }
 
+    cout << "\n[#W82-EA] H7 the PLAN line that IS the answer - `50v125` seq 41, the corpus's one fallback\n";
+    {
+        // The reply, verbatim and complete, was the single line
+        // `PLAN: 4 (Cast nothing right now)` over a four-row menu whose row 4 is
+        // `Cast nothing right now (combat comes next this turn) {...}`. No plan
+        // exists for the answer to precede; `4 (<short name>)` is exactly the
+        // protocol's action payload; one row matches. It fell to the heuristic
+        // (`recovery` seq 42, executed_by heuristic) with 891 s of deadline left.
+        int run = 0, rej = 0; bool bare = false;
+        // POSITIVE: the verbatim corpus reply is read, through the selector
+        // consumePlan calls, as the label-less answer `4 (Cast nothing right now)`.
+        CHECK(answerSegmentStatic("\n\nPLAN: 4 (Cast nothing right now)", "CHOICE:", &run, &rej, &bare)
+                  == "4 (Cast nothing right now)" && bare,
+              "#W82-EA H7 GREEN `PLAN: 4 (Cast nothing right now)` alone is the answer - the plan slot"
+              " holds the action payload and nothing precedes it that it could be post hoc to");
+        // ...and it survives the ordinary decorations: leading blanks, a CR, a
+        // courtesy line after it (#W82-A L8: trailing prose is measured, not obeyed).
+        CHECK(answerSegmentStatic("  plan: 4 (Cast nothing right now)\r\nThank you.", "CHOICE:", &run, &rej, &bare)
+                  == "4 (Cast nothing right now)" && bare,
+              "#W82-EA H7 GREEN case-insensitive label, indentation, CR and a trailing courtesy line"
+              " change no fact");
+        // NEGATIVE (genuinely ambiguous): two answer-shaped lines, whichever shape
+        // each takes, is two answers - refused, so the seam re-asks.
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\n2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a PLAN-line answer beside a bare answer line is two answers");
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nPLAN: 2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH two PLAN-line answers are two answers");
+        // REJECTED (the ruling's own clause): a plan written AFTER the answer is
+        // post hoc justification - `PLAN: 4 (...)` then `PLAN: keep mana up`.
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nPLAN: keep mana up for Damnation.",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH an answer in the plan slot followed by a PLAN line is an"
+              " answer that precedes its plan - refused");
+        // Still the protocol's own shape when the plan is prose: a PLAN line that
+        // merely CONTAINS a numbered parenthetical is not this shape (the payload
+        // must be the whole remainder), and a labelled answer always wins.
+        CHECK(answerSegmentStatic("PLAN: take 4 (Cast nothing right now) and keep mana up.",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a PLAN line whose payload is prose around a parenthetical"
+              " is a plan, not an answer");
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nCHOICE: 2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare) == " 2 (Cast Wrath of God)" && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH the labelled line wins over a PLAN-line payload");
+        // ...and the wave-79 refusals stand: the bare shape still owes a plan before it.
+        CHECK(answerSegmentStatic("\n\n4 (Cast nothing right now)\n", "CHOICE:", &run, &rej, &bare)
+                  .empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a bare action line with nothing before it is still refused");
+    }
+
     // ================= WAVE 80 LANE DF - combat, cover and pricing truth =========
     // Every string below was read off the wave-79 corpus
     // `matchups-20260912-000748-final`, from the `prompt` field of the cited

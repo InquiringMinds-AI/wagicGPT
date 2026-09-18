@@ -9171,6 +9171,40 @@ static bool w79BareAnswerLineSpan(const std::string& t, size_t start, size_t end
     return false;
 }
 
+//#W82-EA (H7, wave-81 deck50 HIGH - the corpus's only heuristic fallback): THE
+//PLAN LINE THAT IS THE ANSWER. `50v125` seq 41 replied, verbatim and complete,
+//`PLAN: 4 (Cast nothing right now)`: no action-label line anywhere, and the sole
+//labelled line's content is exactly the protocol's action payload - a row number
+//and that row's own short name - matching one row. The label-less reader refused
+//it because the line does not START with the digits (the `PLAN:` label leads),
+//so the heuristic played the window. Under the ruling ("read the answer wherever
+//it unambiguously is; reject only an answer that PRECEDES the plan") it is
+//unambiguous: there is no plan for the answer to precede, because the line that
+//would hold the plan holds the answer. [start,end) is a trimmed line; on a match
+//the span handed back is the payload AFTER the label, which `parseChoice` then
+//validates against the offered rows exactly as it does a labelled answer.
+static bool w82PlanLineBareAnswerSpan(const std::string& t, size_t start, size_t end,
+                                      size_t * segStart, size_t * segEnd)
+{
+    static const char kPlan[] = "plan:";
+    const size_t n = sizeof(kPlan) - 1;
+    if (end - start <= n)
+        return false;
+    for (size_t k = 0; k < n; k++)
+        if (tolower((unsigned char) t[start + k]) != kPlan[k])
+            return false;
+    size_t s = start + n;
+    while (s < end && (t[s] == ' ' || t[s] == '\t'))
+        s++;
+    if (!w79BareAnswerLineSpan(t, s, end))
+        return false;
+    if (segStart)
+        *segStart = s;
+    if (segEnd)
+        *segEnd = end;
+    return true;
+}
+
 } //namespace
 
 //#W79-DD (wave-78 engine-seat / lane CX S1, now RULED): READ THE LABEL-LESS
@@ -9221,6 +9255,10 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
     bool sawNonBlank = false;         //any non-blank line seen so far
     bool nonBlankBeforeCand = false;  //...at the moment the candidate was seen
     bool nonBlankAfterCand = false;
+    //#W82-EA (H7): the candidate was the PLAN line's own payload, and whether a
+    //line-leading PLAN marker came AFTER it (a plan written after the answer).
+    bool candIsPlanLine = false;
+    bool planMarkerAfterCand = false;
     size_t lineStart = 0;
     while (lineStart <= text.size())
     {
@@ -9234,16 +9272,39 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
             e--;
         if (e > s)
         {
+            size_t ps = 0, pe = 0;
             if (w79BareAnswerLineSpan(text, s, e))
             {
                 candidates++;
                 nonBlankBeforeCand = sawNonBlank;
                 nonBlankAfterCand = false;
+                candIsPlanLine = false;
                 candStart = s;
                 candEnd = e;
             }
+            else if (w82PlanLineBareAnswerSpan(text, s, e, &ps, &pe))
+            {
+                //#W82-EA (H7): `PLAN: <row> (<short name>)` and nothing else on the
+                //line - the answer in the plan's slot. Counted in the SAME census as
+                //a bare line, so two of either shape is still two answers.
+                candidates++;
+                nonBlankBeforeCand = sawNonBlank;
+                nonBlankAfterCand = false;
+                candIsPlanLine = true;
+                candStart = ps;
+                candEnd = pe;
+            }
             else if (candidates > 0)
+            {
                 nonBlankAfterCand = true;
+                //a line-leading PLAN marker after the candidate: a plan that
+                //FOLLOWS the answer, which the ruling refuses.
+                if (e - s >= 5 && tolower((unsigned char) text[s]) == 'p'
+                    && tolower((unsigned char) text[s + 1]) == 'l'
+                    && tolower((unsigned char) text[s + 2]) == 'a'
+                    && tolower((unsigned char) text[s + 3]) == 'n' && text[s + 4] == ':')
+                    planMarkerAfterCand = true;
+            }
             sawNonBlank = true;
         }
         if (lineEnd == std::string::npos)
@@ -9252,6 +9313,20 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
     }
     if (candidates != 1)
         return false;
+    if (candIsPlanLine)
+    {
+        //#W82-EA (H7): the plan slot holds the answer, so "a non-blank line before
+        //it" is not owed - there is no plan for this answer to precede. What IS
+        //refused is a plan written AFTER it (`PLAN: 4 (...)` then `PLAN: keep mana
+        //up`): that is the ruling's own clause, an answer ahead of its plan.
+        if (planMarkerAfterCand)
+            return false;
+        if (segStart)
+            *segStart = candStart;
+        if (segEnd)
+            *segEnd = candEnd;
+        return true;
+    }
     //#W82-A (L8, audit-2026-09): the "must be the LAST non-blank line" clause is
     //DELETED. Exactly one line in the reply has the answer shape and it follows
     //the plan, so the answer is unambiguous - and the ruling is "make the parser
