@@ -29173,6 +29173,37 @@ string holdContractParagraph()
 }
 
 
+//#W82-EB (M10, wave-81 deck146 MED-2): `146v152` seq 36 - a priority menu of
+//Lolth +0, Lolth -3, the hold and the pass, under a LETHAL crack-back verdict;
+//nothing on it cost mana, so the hold could only give value away, and it was
+//taken. The row is NOT suppressed (the legal-option ruling); it carries a
+//refusal-style marker when every acting row on the menu is a zero-mana
+//activation. `rows` are the acting rows' PURE lines (mana-only rows already
+//excluded by the caller); a row prices its cost in `[cost: ...]`, and a cost
+//with no `{` pip in it spends no mana. A row with no cost bracket at all (a
+//cast, a flip) is not proven free, so the marker stays off - it never fires on
+//a guess. Pure over the rendered text, so PARSETEST proves it.
+const char * kHoldFreeActionsMarker = " [nothing here costs mana - holding gives away free actions]";
+
+bool w82RowsCostNoMana(const std::vector<string>& rows)
+{
+    if (rows.empty())
+        return false;
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        const size_t c = rows[i].find("[cost: ");
+        if (c == string::npos)
+            return false;
+        const size_t e = rows[i].find(']', c);
+        if (e == string::npos)
+            return false;
+        if (rows[i].find('{', c) < e)
+            return false;
+    }
+    return true;
+}
+
+
 //#W72-BV (M6): which of the three spellings this menu earns. `castSeam` wins
 //where both could apply (a casting menu's rows are casts by construction);
 //`activationLive` is set by the priority seam from the rows it is about to
@@ -39745,6 +39776,8 @@ string AIPlayerGPTSelfTestAccess::holdReopenNoteText(int unseenRows, int repeats
 string AIPlayerGPTSelfTestAccess::holdRowBenefitClause() { return ::holdRowBenefitClause(); }
 int AIPlayerGPTSelfTestAccess::holdRowIndexOf(const std::vector<string> * optionTexts) { return ::holdRowIndexOf(optionTexts); }
 bool AIPlayerGPTSelfTestAccess::isHoldRowText(const string& row) { return ::isHoldRowText(row); }
+bool AIPlayerGPTSelfTestAccess::w82RowsCostNoMana(const std::vector<string>& rows) { return ::w82RowsCostNoMana(rows); }
+const char * AIPlayerGPTSelfTestAccess::kHoldFreeActionsMarker = ::kHoldFreeActionsMarker;
 string AIPlayerGPTSelfTestAccess::holdRowLine(bool castSeam, bool activationLive) { return ::holdRowLine(castSeam, activationLive); }
 bool AIPlayerGPTSelfTestAccess::holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf) { return ::holdStillStands(heldRows, nowRows, whyOut, keyOf); }
 void AIPlayerGPTSelfTestAccess::improveAssignmentMaterial(const vector<vector<char> >& can, const vector<vector<int> >& rank, vector<int>& match) { ::improveAssignmentMaterial(can, rank, match); }

@@ -43765,6 +43765,45 @@ static const char * kW50Y_r94 =
         CHECK(digitFree, "#W82-EB M14 the clause carries no number - nothing in it can move a key");
     }
 
+    cout << "\n[#W82-EB] M10 the hold row says when every other row is free\n";
+    {
+        //#W82-EB (M10, wave-81 deck146 MED-2): `146v152` seq 36 - Lolth +0, Lolth -3, the
+        //hold, the pass; LETHAL on the screen; the hold was taken over two free rows.
+        std::vector<string> lolth;
+        lolth.push_back("+0: draw card and lose life with Lolth, Spider Queen [cost: Counters]");
+        lolth.push_back("-3: create spiders with Lolth, Spider Queen [cost: Counters] {counter cost: spends 3 loyalty counters}");
+        CHECK(w82RowsCostNoMana(lolth), "#W82-EB M10 REPRO 146v152 seq 36: two loyalty rows cost no mana");
+        std::vector<string> tapOnly;
+        tapOnly.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+        CHECK(w82RowsCostNoMana(tapOnly), "#W82-EB M10 a Tap-only activation costs no mana");
+        std::vector<string> mixed = lolth;
+        mixed.push_back("Draw 1 with Clue [cost: {2}, Sacrifice]");
+        CHECK(!w82RowsCostNoMana(mixed), "#W82-EB M10 MUST-NOT-MATCH one row with a mana pip in its cost");
+        std::vector<string> cast = lolth;
+        cast.push_back("Cast Soul Shatter {2}{b}");
+        CHECK(!w82RowsCostNoMana(cast), "#W82-EB M10 MUST-NOT-MATCH a row with no cost bracket is not proven free");
+        std::vector<string> emptyRows;
+        CHECK(!w82RowsCostNoMana(emptyRows), "#W82-EB M10 MUST-NOT-MATCH no acting row, no marker");
+        std::vector<string> pip;
+        pip.push_back("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]");
+        CHECK(!w82RowsCostNoMana(pip), "#W82-EB M10 MUST-NOT-MATCH an animation that costs mana");
+        const string marked = string(kHoldPriorityRowTextActivation) + holdRowBenefitClause() + kHoldFreeActionsMarker;
+        CHECK(string(kHoldFreeActionsMarker) == " [nothing here costs mana - holding gives away free actions]",
+              "#W82-EB M10 the marker's literal");
+        CHECK(holdActionKeyRow(marked) == holdActionKeyRow(string(kHoldPriorityRowTextActivation) + holdRowBenefitClause())
+                  && stripRenderAnnotationsLc(marked) == stripRenderAnnotationsLc(kHoldPriorityRowTextActivation),
+              "#W82-EB M10 KEY the marker moves no hold key and no option-set key");
+        CHECK(stripNarrationDecoration(marked) == stripNarrationDecoration(kHoldPriorityRowTextActivation),
+              "#W82-EB M10 ECHO the marker leaves no residue in the narrated record");
+        std::vector<string> menu = lolth;
+        menu.push_back(marked);
+        CHECK(holdRowIndexOf(&menu) == 2 && w78HoldRowShortName(menu) == "Stop asking me this turn",
+              "#W82-EB M10 the marked row is still the hold row to every consumer");
+        bool st = false;
+        CHECK(parseChoice("PLAN: nothing.\nCHOICE: 3 (Stop asking me this turn)", 3, &menu, &st, NULL, NULL, true) == 3 && !st,
+              "#W82-EB M10 ECHO the marked row still binds by its short name");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

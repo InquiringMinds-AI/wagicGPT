@@ -212,6 +212,8 @@ string holdContractParagraph();
 string holdKeyRow(const string& row);
 int holdRowIndexOf(const std::vector<string> * optionTexts);
 bool isHoldRowText(const string& row); //#W82-EB (H8)
+extern const char * kHoldFreeActionsMarker; //#W82-EB (M10)
+bool w82RowsCostNoMana(const std::vector<string>& rows); //#W82-EB (M10)
 string holdRowLine(bool castSeam = false, bool activationLive = false);
 string instanceHandle(MTGCardInstance * card);
 bool isAnimationRow(const string& line);

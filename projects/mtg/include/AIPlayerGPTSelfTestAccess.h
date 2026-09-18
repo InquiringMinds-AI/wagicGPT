@@ -514,6 +514,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string holdRowBenefitClause();
     static int holdRowIndexOf(const std::vector<string> * optionTexts);
     static bool isHoldRowText(const string& row); //#W82-EB (H8)
+    static bool w82RowsCostNoMana(const std::vector<string>& rows); //#W82-EB (M10)
+    static const char * kHoldFreeActionsMarker; //#W82-EB (M10)
     static string holdRowLine(bool castSeam= false, bool activationLive= false);
     static bool holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf= holdKeyRow);
     static string hybridPipNoteText(const vector<string>& pips, int totalMana);

@@ -559,10 +559,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //play - and a menu with none of either keeps the wave-53 sentence
         //byte-for-byte.
         bool activationLive = false;
-        for (int ai = 0; ai < baseIndex && !activationLive; ai++)
-            if (asActivatedForCount(shown[ai]->ability) && !isManaOnlyAction(shown[ai]->ability))
+        std::vector<string> actingRows; //#W82-EB (M10): the acting rows' pure lines
+        for (int ai = 0; ai < baseIndex; ai++)
+        {
+            if (isManaOnlyAction(shown[ai]->ability))
+                continue;
+            actingRows.push_back(shownLines[(size_t) ai]);
+            if (asActivatedForCount(shown[ai]->ability))
                 activationLive = true;
-        const string holdLine = holdRowLine(false, activationLive); //#W55-A (D21), #W72-BV (M6)
+        }
+        string holdLine = holdRowLine(false, activationLive); //#W55-A (D21), #W72-BV (M6)
+        //#W82-EB (M10): every acting row is a zero-mana activation - say what the
+        //hold gives away. A [...] group: out of the narration and out of every key.
+        if (activationLive && w82RowsCostNoMana(actingRows))
+            holdLine += kHoldFreeActionsMarker;
         shownLines.push_back(holdLine);
         renderRows.push_back(holdLine); //#W57-A (D4)
         tail << holdRow << ". " << holdLine << "\n";
