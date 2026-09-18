@@ -1,0 +1,252 @@
+DECK IDENTITY: EROSION - a W/U/B mill deck with NO creatures in it at all. You win by
+one route only: the opponent's library reaches zero and they must draw from it. Damage
+never wins this game for you and their life total is not a target you are working on.
+Every other card exists to keep you alive long enough for their library number to run
+out. Damnation and Wrath of God destroy all creatures; Moat turns off every attacker
+without flying for the rest of the game; Evacuation buys a single turn at instant speed;
+Dream Fracture is the only counter you have; Howling Mine and Forced Fruition make the
+opponent draw faster, and a card they draw is a card you no longer have to mill.
+
+Two printed numbers decide almost everything. "Opponent library: N" is your clock.
+"Your library: N" is the clock you must not lose to first: Howling Mine draws YOU an
+extra card every one of your draw steps as well, so the two numbers are in a race.
+
+ORDER OF OPERATIONS. 1. Get lands down, in the colours your answers need. 2. Stop the
+board that is killing you, the turn a row can stop it. 3. Put permanent mill and extra
+draws on the battlefield. 4. Point the one-shot mill spells at the opponent. Step 2
+outranks steps 3 and 4 in the same window. Steps 3 and 4 are the whole plan when the
+opponent battlefield line reads "0 are creatures".
+
+THE OPENING-HAND ASK
+
+This deck is 24 lands in 60 cards, in three colours, and its cheapest spells are Tome
+Scour {u} and Glimpse the Unthinkable {u}{b}.
+
+The ask prints a line beginning "Playing every land in this hand would". Answer on that
+line and read no further:
+ 1. If it reads "would cover the cost of:" and names any spell, keep this hand.
+ 2. If it reads "would not cover any spell in it", mulligan.
+That is the whole rule at every look, including the last one. A hand of five lands and
+two spells with a covered spell is a keep - lands are what this deck is short of when
+its answers cost {2}{B}{B} and {2}{W}{W}. A hand with three answers and no land that
+casts them is the hand that loses.
+
+
+AFTER A MULLIGAN: WHICH CARD LEAVES THE HAND
+
+The ask prints the hand numbered with each card's cost, plus the same "Playing every
+land in this hand would cover the cost of:" line. Send to the bottom, stopping at the
+first that matches:
+ 1. The spell with the highest printed mana value that the coverage line does NOT name.
+    Forced Fruition {4}{u}{u}, Evacuation {3}{u}{u} and Traumatize {3}{u}{u} are the
+    cards this catches; a six-mana enchantment in a hand of three lands is not a card
+    you will cast from this hand.
+ 2. If the coverage line names every spell in the hand, a land - and then only while
+    the hand still holds more lands than the mana value of its cheapest spell.
+ 3. If neither applies, the spell with the highest mana value.
+Never send your cheapest mill spell or your only land away. Two spells and five lands
+is a hand that functions; five lands and one spell is a hand that does nothing, and one
+land and six spells is the hand you already mulliganed.
+
+
+THE LAND ROW
+
+A "Play <land>" row is taken in every window it appears, with one exception below. It
+costs no mana and closes nothing: the casting list is put to you again in the same turn
+with the new land counted, so taking the land first can only add rows. "Play no land
+right now" is an answer you take only when there is no Play row you would rather have.
+
+WHICH land, when several Play rows are on the menu: read your hand line for the spell
+you most want to cast and the "sources that can make each" figures on the Mana
+available line, then take the Play row for the colour that is short. The order to
+satisfy, highest first:
+ 1. A second source of the colour of a sweeper in hand that reads "[cannot pay now:
+    needs {2}{b}{b}" or "needs {2}{w}{w}" - a Swamp for Damnation, a Plains for Wrath
+    of God or Moat. A hand holding Damnation and one Swamp is a hand with no answer;
+    the next Swamp is worth more than a fifth Island.
+ 2. {U}, up to two sources, for Memory Erosion {1}{u}{u} and Dream Fracture {1}{u}{u}.
+ 3. {B}, one source, for Glimpse the Unthinkable {u}{b}.
+ 4. Anything, for raw count.
+A card in hand that reads "[castable now]" needs no help; the land you want is the one
+that changes a "[cannot pay now: needs {2}{b}{b}, your N untapped sources cannot pay
+it]" tag into a castable one.
+
+
+THE CASTING MENU
+
+Take the first entry below that matches a row on this menu; stop at the first that
+answers. Every entry is a row the menu prints, and if none of them is on the menu take
+the decline row ("Cast nothing right now"), which is a real answer.
+
+ 0. If the prompt prints "Opponent library: 0", or a mill row's own text would take
+    their library to 0, take that row now. Nothing outranks finishing the game.
+
+ 1. A "Cast Damnation" or "Cast Wrath of God" row whose brackets read "destroys N of
+    their creatures" with N of 2 or higher - or with N of 1, when that one creature is
+    the whole of a printed "CRACK-BACK NEXT TURN" line that says it would KILL you. Take it this
+    window. If both rows are on the menu, take the one whose colour the "sources that
+    can make each" line has more of, so the other stays castable next turn.
+
+ 2. A "Cast Moat" row. Take it the first window it appears. Moat is not an answer to a
+    board that already exists - it is the wall you build before the board exists, and
+    it keeps working for the rest of the game with no further mana. An empty opponent
+    battlefield is the ideal moment for it, not a reason to wait; a board of creatures
+    that are already attacking you is the late moment. The one board on which Moat is
+    not the answer: one where every creature on the opponent's battlefield line carries
+    the [flying] tag, because those still attack through it. Do not hold Moat for a
+    better turn; there is no better turn.
+
+ 3. A "Cast Evacuation" row, when the prompt prints a "CRACK-BACK NEXT TURN" line that
+    says it would KILL you, or would take you to 5 or lower, and no row above matched.
+    Evacuation returns the creatures to their hands; they recast them. It buys exactly
+    one turn, so take it only when you can name what the extra turn is for - a sweeper
+    you can pay for next turn, or the mill that finishes them.
+
+ 4. A "Cast Memory Erosion" row. It mills two every time the OPPONENT casts a spell,
+    and copies stack: each copy mills its own two. Three copies on the battlefield turn
+    every spell they cast into six cards. Take it whenever rows 1-3 do not match.
+
+ 5. A "Cast Forced Fruition" row. It makes the opponent draw seven for every nonland
+    spell they cast, and drawing is how they lose. This is a mill card with a big cost,
+    not a gift to them - the seven cards leave their library. Take it when the mana is
+    there and rows 1-4 do not match.
+
+ 6. A "Cast Howling Mine" row, while "Your library:" is larger than "Opponent
+    library:". Both players draw the extra card, so each copy speeds your own deck up
+    as much as theirs. When "Your library:" is equal to or smaller than "Opponent
+    library:", do not take a Howling Mine row at all - take a mill row or the decline
+    row instead. This applies to the first copy and to every "[second copy: you already
+    control Howling Mine]" row.
+
+ 7. A "Cast Glimpse the Unthinkable", "Cast Traumatize" or "Cast Tome Scour" row,
+    biggest first: Traumatize takes half of what is left, Glimpse takes ten, Tome Scour
+    takes five. Take Traumatize while the "Opponent library:" number is still large -
+    half of 40 is 20 and half of 8 is 4. When two of these rows are on one menu and the
+    mana pays for both, take the larger one first in the turn.
+
+ 8. A "Cast Dream Fracture" row - see the target section; it only has a row when there
+    is something on the stack to counter.
+
+Rows this list never reaches: a "Cast Damnation" or "Cast Wrath of God" row whose
+brackets read "destroys 0 of their creatures (0 without a restriction against
+attacking), 0 of yours". That row destroys nothing and the card is gone. You hold four
+Damnation and four Wrath of God for the board that is going to arrive; a menu showing
+only those two rows and a decline row is a menu you answer with the decline row.
+
+When the prompt prints "NO LIVE CAST ROW ON THIS MENU", take the decline row.
+
+
+HOLD AND DECLINE ROWS
+
+"Cast nothing right now" closes this window only and the list comes back this turn.
+"Hold priority - pass now, and do not ask me again" closes the whole run of casting
+windows until your next turn or until a row changes.
+
+Take a hold row only when every row on the menu is one you have refused for a stated
+reason - a sweeper reading "destroys 0", a Howling Mine while your library is the
+shorter one, a mill row you cannot pay for. If a "Cast Moat" row, a sweeper row with a
+nonzero destroy count, or a mill row you can pay for is on the menu, the hold row is
+wrong: take that row. A turn on which you decide there is "nothing to do" while a
+castable answer is printed on the menu is a turn you gave away.
+
+A plan you wrote a window ago is not a reason. When the prompt shows you what you last
+wrote and the row you named is on this menu, take that row now.
+
+
+TARGET ASKS
+
+Every mill spell - Tome Scour, Glimpse the Unthinkable, Traumatize - offers "The
+opponent (player, life N)" and yourself. Take the opponent, at every one of these asks,
+in every game. Milling yourself loses the race you are running.
+
+Dream Fracture's target ask lists what is on the stack. Counter, in this order: a spell
+that would put their graveyard back into their library, a sweeper or removal aimed at
+your own permanents, then the largest spell offered. Dream Fracture also makes its
+target's controller draw a card and draws you one, so countering their spell still
+costs them a card off the top - a counter is a small mill. It is your only counter; a
+window with nothing worth countering prints no row for it, so there is nothing to hold
+it for.
+
+
+THE CLEANUP HAND-SIZE ASK
+
+The ask prints your hand numbered. Name, stopping at the first that applies:
+ 1. A land, while the Mana available line already shows more sources than the largest
+    mana value in your hand.
+ 2. A duplicate sweeper, while the hand still holds two or more of Damnation and Wrath
+    of God together.
+ 3. The highest mana value card you have no plan for.
+Never discard your last copy of Moat, your last Dream Fracture, or a mill spell.
+
+
+COMBAT ASKS
+
+This deck contains no creatures. You are never asked to declare attackers, and a
+blockers ask reaches you with nothing to assign, so answer its decline row. Windows
+whose phase line reads "Combat begins", "Attackers" or "Combat ends" are still casting
+windows: read them with the casting list above, and note that Evacuation is the one
+card in the deck with a row at those seams.
+
+
+CARD FACTS THE PROMPT DOES NOT PRINT
+
+- Memory Erosion triggers on the OPPONENT casting a spell. Your own spells mill nobody.
+  Casting a spell of your own to "trigger" your Memory Erosion is not a thing that
+  happens.
+- Damnation {2}{B}{B} and Wrath of God {2}{W}{W} do the same thing - destroy all
+  creatures, no regeneration. They differ only in colour, and you control no creature,
+  so they are one-sided in your favour on every board.
+- Moat {2}{W}{W} stops attacks by creatures without flying. It does not stop blocking,
+  it does not stop activated abilities, and it does not stop creatures with [flying].
+- Evacuation {3}{U}{U} is an instant and returns ALL creatures to their owners' hands,
+  including any of the opponent's that entered this turn.
+- Traumatize takes half of the library rounded down, counted when it resolves, so its
+  value falls every turn you wait.
+- Howling Mine's extra draw goes to whichever player's draw step it is, both of them.
+- Forced Fruition is a single copy; there is no second one coming.
+- A card in the opponent's graveyard is not milled for good if they can return it. When
+  their battlefield or their log shows a permanent that shuffles a graveyard back into
+  a library, the "Opponent library:" number can jump upward - re-read it every window
+  rather than carrying the number you saw last turn.
+
+
+SITUATIONS
+
+Turn 6, your life 19, four lands in hand and two on the battlefield, the menu offering
+Play Plains, Play Island and Play no land right now, with Damnation in hand reading
+"[cannot pay now: needs {2}{b}{b}, your 2 untapped sources cannot pay it]" and your one
+black source already down. Take a Play row, and take the Swamp if one is offered: the
+second black source is the difference between having Damnation in two turns and having
+a dead card. "Play no land right now" with four lands in hand is never the answer.
+
+Their battlefield line reads 4 creatures, your life is 17, and the menu offers Cast
+Moat and Cast Wrath of God with brackets reading "destroys 4 of their creatures".
+Take the Wrath of God row. Four bodies die now; Moat would leave them alive to block
+nothing and to be pumped or given flying later.
+
+Their battlefield line reads 0 creatures, your life is 10, and the menu offers Cast
+Moat, Cast Evacuation, Cast Howling Mine, three Play rows and a hold row. Take Cast
+Moat. An empty board is when Moat is cheapest to resolve and it is the only card in
+your hand that will still be working in ten turns.
+
+Your life is 15, the menu offers Cast Damnation and Cast Wrath of God, both reading
+"destroys 0 of their creatures (0 without a restriction against attacking), 0 of
+yours", plus a Play row and a decline row. Take the Play row, then the decline row.
+Two sweepers spent on an empty board are two sweepers missing from the turn their
+board arrives.
+
+"Your library: 14", "Opponent library: 18", and the menu offers Cast Howling Mine
+[second copy], Cast Tome Scour and a decline row. Take Cast Tome Scour. You are behind
+in the race that decides this game, and a second Howling Mine moves both numbers down
+together - it does not close a gap, it shortens the game you are losing.
+
+"Opponent library: 31", your life 13, their battlefield line reads 0 creatures, and the
+menu offers Cast Traumatize, Cast Glimpse the Unthinkable and Cast Howling Mine.
+Take Cast Traumatize first: half of 31 is 15 cards, and Glimpse's ten is worth the same
+whether you cast it now or after.
+
+The prompt prints "CRACK-BACK NEXT TURN: 5 of their creatures will be able to attack
+... you would be at -4 or lower; that would KILL you", and the menu offers Cast Memory
+Erosion and a Play row. Nothing on this menu stops the attack, so take the Play row
+that most improves your colours, then the decline row - and the window before this one,
+with a sweeper row on the menu, was the window that decided it.
