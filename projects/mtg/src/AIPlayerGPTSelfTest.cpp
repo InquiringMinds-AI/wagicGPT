@@ -43889,6 +43889,31 @@ static const char * kW50Y_r94 =
               "#W82-EC M2 the ETB fold recognises the prefixed cast line");
     }
 
+    // ---------------- #W82-EC (M7): one draw step, narrated once.
+    // `162v50` s15: "T13 (opp): drew." then "Draw: ... drew 6; ...".
+    {
+        cout << "  #W82-EC M7 a turn with a Draw block carries no draw on its turn line\n";
+        const string t13 = compactNarration(
+            "=== Turn 13 - opponent's turn ===\n- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Opponent put a card from their hand into their library\n"
+            "- Opponent drew 6 cards\n"
+            "- Your Ob Nixilis, the Hate-Twisted dealt 1 damage to the opponent (now 17)\n"
+            "- Phase: Main phase 1\n- Opponent played Island\n");
+        cout << "     " << t13 << "\n";
+        CHECK(t13.find("T13 (opp):\n  Draw: drew; opp put a card from their hand into their library;"
+                       " drew 6; Ob Nixilis, the Hate-Twisted -> 1 damage, opp 17.\n"
+                       "  Main 1: played Island.") != string::npos,
+              "#W82-EC M7 the hoisted draw moves to the front of the Draw block and the turn line is bare");
+        CHECK(t13.find("(opp): drew") == string::npos,
+              "#W82-EC M7 NEGATIVE the draw is not stated twice");
+        // A plain draw step (no Draw block) still hoists.
+        CHECK(compactNarration("=== Turn 3 - opponent's turn ===\n- Phase: Draw\n- Opponent drew a card\n"
+                               "- Phase: Main phase 1\n- Opponent played Plains\n")
+                  == "T3 (opp): drew; played Plains.",
+              "#W82-EC M7 NEGATIVE with no Draw block the turn line keeps its draw, byte-identical");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

@@ -12511,6 +12511,25 @@ namespace gptcompact
             flushPending();
             if (!turnOpen)
                 return;
+            //#W82-EC (M7, deck162 MED-4): a turn that gets a `Draw:` block does not
+            //ALSO carry its draw on the turn line. `162v50` s15: "T13 (opp): drew."
+            //over "Draw: opp put a card from their hand into their library (x6);
+            //drew 6; ..." - one draw step narrated twice with different counts, on
+            //a deck whose clock is cards-drawn x punishers. The hoisted draw moves
+            //to the FRONT of the Draw group (it preceded everything in it).
+            for (size_t g = 0; g < groups.size(); g++)
+            {
+                if (groups[g].label != "Draw" || turnLine.empty())
+                    continue;
+                vector<string> keep, drew;
+                for (size_t i = 0; i < turnLine.size(); i++)
+                    (startsWith(turnLine[i], "drew") ? drew : keep).push_back(turnLine[i]);
+                if (drew.empty())
+                    break;
+                groups[g].ev.insert(groups[g].ev.begin(), drew.begin(), drew.end());
+                turnLine = keep;
+                break;
+            }
             out << turnHead;
             if (!turnLine.empty())
                 out << " " << joinEv(turnLine) << ".";
