@@ -475,6 +475,7 @@ string zeroPowerAttackerTag(int power);
 string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace = false);
 string zoneDesc(MTGGameZone * z);
 CombatTradeStat combatStatOf(MTGCardInstance * c);
+string markedDamageTag(int toughness, int life); //#W82-EC (H3)
 bool playerHasLifeToDamageConverter(Player * p);
 
 

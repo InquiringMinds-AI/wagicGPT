@@ -13208,6 +13208,12 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         if (card->isCreature())
         {
             out << " (" << card->power << "/" << card->toughness << ")";
+            //#W82-EC (H3): damage marked on it this turn, beside the body it is
+            //marked on. Battlefield lines only - a hand/graveyard card carries no
+            //damage. Board state, so it sits in the board half of the key exactly
+            //as a life total does.
+            if (withStatus)
+                out << markedDamageTag(card->toughness, card->life);
             //Surface the live delta the static decklist text cannot carry: a
             //creature pumped, counter'd, enchanted or equipped is no longer
             //its printed stats. Only meaningful in play (withStatus).

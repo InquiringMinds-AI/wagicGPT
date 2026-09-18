@@ -43552,6 +43552,82 @@ static const char * kW50Y_r94 =
         CHECK(k.empty() && sm.empty(), "#W82-P11 NEGATIVE an empty kind maps to nothing");
     }
 
+    // ---------------- #W82-EC (H3): marked damage in the 1-on-1 verdict and on the body.
+    // `130v123` s72: Rorix Bladewing 6/5 with 4 damage marked, printed "(6/5) [untapped]"
+    // and "(you kill it, your attacker lives)" against a 4/4 Vampire. It traded.
+    {
+        cout << "  #W82-EC H3 marked damage: verdicts subtract it, the tag prints it, keys ignore it\n";
+        CombatTradeStat rorix = CombatTradeStat();
+        rorix.power = 6; rorix.toughness = 5;
+        CombatTradeStat vamp = CombatTradeStat();
+        vamp.power = 4; vamp.toughness = 4;
+        const string fresh = combatTradePreviewStats(vamp, rorix, kPreventNone, kPreventNone,
+                                                     kPreventNone, true);
+        CHECK(fresh.find("you kill it, your attacker lives") != string::npos,
+              "#W82-EC H3 an undamaged 6/5 into a 4/4 is the wave-81 verdict, byte-identical");
+        rorix.remaining = 1; //4 marked on a 5-toughness body
+        const string hurt = combatTradePreviewStats(vamp, rorix, kPreventNone, kPreventNone,
+                                                    kPreventNone, true);
+        cout << "     6/5 with 4 marked vs 4/4: \"" << hurt << "\"\n";
+        CHECK(hurt.find("both die") != string::npos,
+              "#W82-EC H3 the SAME pairing with 4 damage marked on the attacker is a trade");
+        // The blocker side reads its own marked damage the same way.
+        rorix.remaining = 0;
+        CombatTradeStat bigWall = CombatTradeStat();
+        bigWall.power = 2; bigWall.toughness = 8; bigWall.remaining = 6; //2 marked
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("you kill it, your attacker lives")
+                  != string::npos,
+              "#W82-EC H3 a 2/8 blocker with 2 marked dies to a 6-power attacker");
+        bigWall.remaining = 7; //1 marked: 6 < 7, it lives
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("neither dies") != string::npos,
+              "#W82-EC H3 NEGATIVE one marked on a 2/8 is not enough: neither dies");
+        // A remaining value that is not below the printed toughness is "unset".
+        bigWall.remaining = 8;
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("neither dies") != string::npos,
+              "#W82-EC H3 NEGATIVE remaining == toughness reads as undamaged");
+        // The wither shrink still prints the printed-toughness arithmetic.
+        CombatTradeStat witherBlk = CombatTradeStat();
+        witherBlk.power = 2; witherBlk.toughness = 1; witherBlk.wither = true;
+        CombatTradeStat fat = CombatTradeStat();
+        fat.power = 3; fat.toughness = 4; fat.remaining = 3; //1 marked, survives 2 wither
+        CHECK(combatTradePreviewStats(witherBlk, fat, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("shrinks your attacker to 1/2")
+                  != string::npos,
+              "#W82-EC H3 the wither shrink is counter arithmetic over the PRINTED toughness");
+        fat.remaining = 2; //2 marked: the 2 wither counters finish it
+        CHECK(combatTradePreviewStats(witherBlk, fat, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("both die") != string::npos,
+              "#W82-EC H3 wither counters on a body with 2 marked kill it at 2 power");
+        // The tag.
+        const string tag = markedDamageTag(5, 1);
+        cout << "     tag: \"" << tag << "\"\n";
+        CHECK(tag == " [4 damage marked this turn - 1 more damage kills it]",
+              "#W82-EC H3 the tag names the marked damage and what is left");
+        CHECK(markedDamageTag(5, 5).empty() && markedDamageTag(5, 0).empty()
+                  && markedDamageTag(5, -2).empty() && markedDamageTag(5, 9).empty(),
+              "#W82-EC H3 NEGATIVE undamaged, dying and over-full bodies print no tag");
+        // KEY-STABILITY PIN: two rows differing only in the tag give the same keys.
+        {
+            const string base = "Rorix Bladewing (6/5) [flying, haste]";
+            const string rowA = "Rorix Bladewing (6/5)" + markedDamageTag(5, 1) + " [flying, haste]";
+            CHECK(rowA != base, "#W82-EC H3 KEY the two rows really differ");
+            CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(base),
+                  "#W82-EC H3 KEY hold-latch: the marked-damage tag is outside the action key");
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB),
+                  "#W82-EC H3 KEY option-set: the tag cannot split the option set");
+            const string tA = joinNumberedRows(rowsA, NULL);
+            const string tB = joinNumberedRows(rowsB, NULL);
+            CHECK(tA != tB && w77KeyTailOf(tA) == w77KeyTailOf(tB),
+                  "#W82-EC H3 KEY ask tail: the tag is outside the ask/async key");
+        }
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

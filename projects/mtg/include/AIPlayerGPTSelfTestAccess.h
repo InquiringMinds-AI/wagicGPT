@@ -251,6 +251,14 @@ struct CombatTradeStat
     //kept apart from the certain total rather than folded into it.
     int blockLife;
     int blockLifeMay;
+    //#W82-EC (H3, deck130 HIGH-1): the creature's REMAINING toughness right now
+    //(Damageable::life = toughness minus the damage marked on it this turn).
+    //Lethality is decided against THIS, never against the printed toughness:
+    //`130v123` s72 printed "(you kill it, your attacker lives)" for a 6/5 Rorix
+    //carrying 4 marked damage against a 4/4, and the seat attacked its only win
+    //condition into a trade. 0 = unset (aggregate-initialised test stats and
+    //an undamaged body both read as "the printed toughness is the remaining").
+    int remaining;
 };
 
 //moved verbatim from AIPlayerGPT.cpp (was line 18104) so the self-test TU can name it
@@ -546,6 +554,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string laterStepRouteClause(const string& offendingName, const std::vector<string> * rows);
     static string leavesFloatingTag(int poolTotal, int spent);
     static string leavesUntappedTag(int untappedSources, int sourcesUsed);
+    static string markedDamageTag(int toughness, int life); //#W82-EC (H3)
     static string legendRuleHeaderText(const string& name, int copies);
     static string legendRuleTargetClause(const string& name, int copies);
     static string legendTwinTag(const string& name, int loyalty= -1);
