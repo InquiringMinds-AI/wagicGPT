@@ -3287,7 +3287,7 @@ static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
 //at runtime restores the separate land-drop ask (the pre-P9 behaviour).
 static const bool kLandDropInCastMenu = true;
 
-static bool landDropInCastMenu()
+bool landDropInCastMenu()
 {
     static int v = -1;
     if (v < 0)
@@ -5234,7 +5234,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mNextSendStackDeath = w80PendingCastStackDeath;
         mNextSendDrain = w80PendingCastDrain;
         mCastMenuAsked = true; //#W82-P9: a menu reached the model (or is in flight)
+        //#W82-EB (H1): the shape this window has, for the `Land drop:` line the
+        //prompt is about to render and for the record askModel writes.
+        mLandShapeForPrompt = (landRowCount > 0) ? kLandShapeFoldOnCastMenu
+                            : (landDropInCastMenu() ? kLandShapeFoldElsewhere : kLandShapeSeparate);
         int pick = askModel(q.str(), menu, false);
+        mLandShapeForPrompt = 0;
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
         if (landRowCount > 0 && pick >= landRowFirst && pick < landRowFirst + landRowCount)

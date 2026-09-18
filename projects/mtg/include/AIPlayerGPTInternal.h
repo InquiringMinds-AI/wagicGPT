@@ -38,6 +38,15 @@ extern const char * kExampleFakeCardLc;
 extern const char * kForceCloseTag;
 extern const char * kGhostformNotRemovalTail;
 extern const char * kHoldPriorityRowShortHead;
+//#W82-EB (H1/H2): the land-drop SHAPE of a window, for the `Land drop:` status
+//line and the translog's `land_shape` field.
+enum {
+    kLandShapeSeparate = 0,       //WAGIC_GPT_LAND_SEPARATE=1: the pre-P9 regime, or no shape known
+    kLandShapeFoldElsewhere = 1,  //P9 regime; this window carries no land rows (priority, target, ...)
+    kLandShapeFoldOnCastMenu = 2, //P9 regime; the casting menu below carries the Play <land> rows
+    kLandShapeFoldStandalone = 3  //P9 regime; a `Land drop:` ask of its own (no casting menu this window)
+};
+bool landDropInCastMenu(); //#W82-P9 revert switch, read by the situation block and the translog
 extern const char * kHoldPriorityRowText;
 extern const char * kLandDropConsequence;
 extern const char * kLandDropDeclineRow;

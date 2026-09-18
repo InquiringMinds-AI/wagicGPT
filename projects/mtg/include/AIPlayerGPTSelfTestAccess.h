@@ -539,7 +539,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string joinVictimRoster(const std::vector<std::string>& entries);
     static string joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse);
     static string landDropAskText(size_t landCount);
-    static string landDropStatusLine(bool myTurn, bool playable, bool haveLand);
+    static string landDropStatusLine(bool myTurn, bool playable, bool haveLand, int landShape = 0); //#W82-EB (H1/H2)
     static string landDropThreatTag(const string& rawScript);
     static string landEntersTappedTag(const string& script, const string& printedText);
     static string landTapMana(const string& text);

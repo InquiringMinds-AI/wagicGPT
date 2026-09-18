@@ -9918,10 +9918,47 @@ namespace
 //narration carries no land play at all - the MDFC back-face substitution sets
 //`haveLand` while `playable` needs a sorcery-timed flip). The line now says only
 //what its inputs support: whether a land play is AVAILABLE right now.
-static string landDropStatusLine(bool myTurn, bool playable, bool haveLand)
+//#W82-EB (H1, wave-81 H1: deck130 44 of 44 windows, deck152 seq 26 lost a drop to
+//it). Under #W82-P9 the land rows RIDE THE CASTING MENU, and the paragraph
+//below kept asserting a separate "Land drop:" question on the very menu that
+//carried `Play Plains` three rows down - `152v130` seq 26: `PLAN: Play Plains
+//... CHOICE: 5 (Cast nothing right now)`. The line now takes the window's
+//SHAPE (kLandShape*): on the casting menu that carries the rows it says the rows
+//ARE the drop; on a fold-regime window that carries none it says where they
+//are; a standalone `Land drop:` ask says why it is on its own (H2); and
+//WAGIC_GPT_LAND_SEPARATE=1 (kLandShapeSeparate) keeps the pre-P9 paragraph
+//byte for byte. The three no-drop branches do not depend on the shape.
+static const char * kLandDropMdfcException =
+    " ONE exception: a modal double-faced card whose back"
+    " face is a land is offered in the casting menu on its own row, marked"
+    " PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends"
+    " this same drop.\n";
+static const char * kLandDropFoldOnCastMenuLine =
+    "Land drop: a land play IS available to you right now, and the \"Play <land>\" row(s)"
+    " on the list below ARE this turn's land drop: taking one plays that land instead of"
+    " casting in this window, and this casting decision is asked again after it enters."
+    " Taking any other row plays no land in this window; the drop is then asked again on"
+    " its own while it is still available this turn.";
+static const char * kLandDropFoldElsewhereLine =
+    "Land drop: a land play IS available to you right now. It is offered as its own"
+    " \"Play <land>\" row on your CASTING menu (or, when no casting menu is put to you, as"
+    " a \"Land drop:\" question of its own), not on this menu - so the absence of a land"
+    " from the choices below does not mean the drop is gone.";
+static const char * kLandDropFoldStandaloneLine =
+    "Land drop: a land play IS available to you right now, and the \"Play <land>\" rows"
+    " below ARE this turn's land drop, asked on their own because no casting menu is"
+    " being put to you in this window.";
+static string landDropStatusLine(bool myTurn, bool playable, bool haveLand,
+                                 int landShape = kLandShapeSeparate) //#W82-EB (H1/H2)
 {
     if (!myTurn)
         return "";
+    if (playable && landShape == kLandShapeFoldOnCastMenu)
+        return string(kLandDropFoldOnCastMenuLine) + kLandDropMdfcException;
+    if (playable && landShape == kLandShapeFoldStandalone)
+        return string(kLandDropFoldStandaloneLine) + kLandDropMdfcException;
+    if (playable && landShape == kLandShapeFoldElsewhere)
+        return string(kLandDropFoldElsewhereLine) + kLandDropMdfcException;
     if (playable)
         //#W62-W (D15, deck146 HIGH-3): the "never listed in a casting menu"
         //half was false, and the prompt that carried it also carried, as row 1
@@ -26717,7 +26754,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //from the same union that produces the rows.
             mdfcBackFaceLandStatus(this, playable, haveLand);
         }
-        out << landDropStatusLine(myTurn, playable, haveLand);
+        //#W82-EB (H1/H2): the window's shape - stamped by the seam around its
+        //askModel call; a window that stamps none is a fold-regime window that
+        //carries no land rows, or the separate regime.
+        const int landShape = !landDropInCastMenu() ? kLandShapeSeparate
+                            : (mLandShapeForPrompt ? mLandShapeForPrompt : kLandShapeFoldElsewhere);
+        out << landDropStatusLine(myTurn, playable, haveLand, landShape);
     }
 
     //#W44-6: attribute every card sitting in EITHER reveal zone to the zone it
@@ -32818,10 +32860,8 @@ static bool w73HoldExpiredByUntap(int heldTurn, bool ownTurnAtHold, int nowTurn)
 //seam boundary. The key now normalises the one annotation the cast window's own
 //state writes, so the two menus of one window compare on the BOARD.
 //Pure over the string; the rendered prompt is untouched.
-static string w73SiblingBoardKey(const string& board)
+static string w73ReplaceAll(const string& board, const string& from, const string& to)
 {
-    const string from = kHandCastAnsweredTagText;
-    const string to = kHandCastableNowTagText;
     if (board.find(from) == string::npos)
         return board;
     string out;
@@ -32840,6 +32880,18 @@ static string w73SiblingBoardKey(const string& board)
         at = hit + from.size();
     }
     return out;
+}
+
+static string w73SiblingBoardKey(const string& board)
+{
+    //#W82-EB (H1/H2): the `Land drop:` line names the window's SHAPE, and the
+    //casting menu (rows on it) and its sibling priority window (rows elsewhere)
+    //are one board - the same normalisation the castable tag gets.
+    return w73ReplaceAll(
+               w73ReplaceAll(
+                   w73ReplaceAll(board, kHandCastAnsweredTagText, kHandCastableNowTagText),
+                   kLandDropFoldOnCastMenuLine, kLandDropFoldElsewhereLine),
+               kLandDropFoldStandaloneLine, kLandDropFoldElsewhereLine);
 }
 
 
@@ -39689,7 +39741,7 @@ string AIPlayerGPTSelfTestAccess::joinTargetEntries(const vector<string>& names,
 string AIPlayerGPTSelfTestAccess::joinVictimRoster(const std::vector<std::string>& entries) { return ::joinVictimRoster(entries); }
 string AIPlayerGPTSelfTestAccess::joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse) { return ::joinZoneEntries(names, handles, tails, collapse); }
 string AIPlayerGPTSelfTestAccess::landDropAskText(size_t landCount) { return ::landDropAskText(landCount); }
-string AIPlayerGPTSelfTestAccess::landDropStatusLine(bool myTurn, bool playable, bool haveLand) { return ::landDropStatusLine(myTurn, playable, haveLand); }
+string AIPlayerGPTSelfTestAccess::landDropStatusLine(bool myTurn, bool playable, bool haveLand, int landShape) { return ::landDropStatusLine(myTurn, playable, haveLand, landShape); }
 string AIPlayerGPTSelfTestAccess::landDropThreatTag(const string& rawScript) { return ::landDropThreatTag(rawScript); }
 string AIPlayerGPTSelfTestAccess::landTapMana(const string& text) { return ::landTapMana(text); }
 string AIPlayerGPTSelfTestAccess::laterStepRouteClause(const string& offendingName, const std::vector<string> * rows) { return ::laterStepRouteClause(offendingName, rows); }

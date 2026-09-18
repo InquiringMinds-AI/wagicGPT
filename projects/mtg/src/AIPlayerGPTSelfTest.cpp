@@ -43623,6 +43623,60 @@ static const char * kW50Y_r94 =
               " outside the hold key");
     }
 
+    cout << "\n[#W82-EB] H1/H2 the Land drop: line names the window's SHAPE; the sibling key ignores it\n";
+    {
+        //#W82-EB (H1, wave-81 H1: deck130 44/44 windows; `152v130` seq 26 `PLAN: Play
+        //Plains ... CHOICE: 5 (Cast nothing right now)`). The fold menu carried the Play
+        //row AND a paragraph saying the drop was a separate question.
+        const string sep = landDropStatusLine(true, true, true, 0);
+        const string elsewhere = landDropStatusLine(true, true, true, 1);
+        const string onMenu = landDropStatusLine(true, true, true, 2);
+        const string standalone = landDropStatusLine(true, true, true, 3);
+        CHECK(sep == landDropStatusLine(true, true, true) && sep.find("its OWN decision") != string::npos,
+              "#W82-EB H1 WAGIC_GPT_LAND_SEPARATE=1 (shape 0) keeps the pre-P9 paragraph byte for byte");
+        CHECK(onMenu.find("row(s) on the list below ARE this turn's land drop") != string::npos
+                  && onMenu.find("plays that land instead of casting in this window") != string::npos
+                  && onMenu.find("its OWN decision") == string::npos
+                  && onMenu.find("does not mean the drop is gone") == string::npos,
+              "#W82-EB H1 REPRO 152v130 seq 26: on the casting menu that carries the rows, the line says"
+              " the rows ARE the drop and no longer asserts a separate question");
+        CHECK(elsewhere.find("not on this menu") != string::npos
+                  && elsewhere.find("does not mean the drop is gone") != string::npos
+                  && elsewhere.find("on your CASTING menu") != string::npos
+                  && elsewhere.find("its OWN decision") == string::npos,
+              "#W82-EB H1 a fold-regime window with no land rows says WHERE the rows are");
+        CHECK(standalone.find("asked on their own because no casting menu is being put to you") != string::npos
+                  && standalone.find("its OWN decision") == string::npos,
+              "#W82-EB H2 the standalone Land drop: ask says why it is on its own (the fold's degenerate case)");
+        CHECK(onMenu.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos
+                  && elsewhere.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos
+                  && standalone.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos,
+              "#W82-EB H1 every shape keeps the #W62-W D15 MDFC exception");
+        CHECK(landDropStatusLine(true, false, true, 2) == landDropStatusLine(true, false, true, 0)
+                  && landDropStatusLine(true, false, false, 3) == landDropStatusLine(true, false, false, 0)
+                  && landDropStatusLine(false, true, true, 2).empty(),
+              "#W82-EB H1 NEGATIVE the no-drop branches and the opponent's turn do not depend on the shape");
+        bool digitFree = true;
+        for (size_t i = 0; i < onMenu.size(); i++)
+            if (isdigit((unsigned char) onMenu[i]))
+                digitFree = false;
+        for (size_t i = 0; i < standalone.size(); i++)
+            if (isdigit((unsigned char) standalone[i]))
+                digitFree = false;
+        CHECK(digitFree, "#W82-EB H1 the new lines carry no number - nothing in them can move a key");
+        // KEY: a casting window (rows on it) and its sibling priority window (rows
+        // elsewhere) on one board must compare EQUAL for the sibling latch.
+        const string boardCast = "Mana available: 2 total\n" + onMenu + "Your hand (1 card): Plains (land)\n";
+        const string boardPrio = "Mana available: 2 total\n" + elsewhere + "Your hand (1 card): Plains (land)\n";
+        const string boardLand = "Mana available: 2 total\n" + standalone + "Your hand (1 card): Plains (land)\n";
+        CHECK(boardCast != boardPrio && w73SiblingBoardKey(boardCast) == w73SiblingBoardKey(boardPrio)
+                  && w73SiblingBoardKey(boardLand) == w73SiblingBoardKey(boardPrio),
+              "#W82-EB H1 KEY two windows differing only in the land-drop shape line yield identical"
+              " sibling board keys");
+        CHECK(w73SiblingBoardKey("Mana available: 2 total\n" + sep) == "Mana available: 2 total\n" + sep,
+              "#W82-EB H1 NEGATIVE the separate-regime paragraph is left alone by the key");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
