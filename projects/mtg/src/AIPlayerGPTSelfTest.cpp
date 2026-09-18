@@ -43677,6 +43677,115 @@ static const char * kW50Y_r94 =
         }
     }
 
+    // ---------------- #W82-EC (H5): the seat's OWN deck-out countdown, and mill-on-cast.
+    // `125v50` s305: "Your library: 11 cards" bare under three Howling Mines; decked at 59.
+    // s282: option 12 promised "13 left"; four Memory Erosions milled 8 on the cast.
+    {
+        cout << "  #W82-EC H5 own-library deck-out clause + mill-on-cast row price\n";
+        CHECK(yourLibraryLine(22, 0) == "Your library: 22 cards",
+              "#W82-EC H5 a library out of range renders the wave-81 line byte-identically");
+        const string own = yourLibraryLine(11, 0, 4, "the draw step itself + Howling Mine #1 (1)"
+                                           " + Howling Mine #2 (1) + Howling Mine #3 (1)");
+        cout << "     own line: \"" << own << "\"\n";
+        CHECK(own == "Your library: 11 cards - DECK-OUT IS IN RANGE: a player who must draw from an"
+                     " empty library LOSES, and you have 11 cards left and you draw 4 per draw"
+                     " step (the draw step itself + Howling Mine #1 (1) + Howling Mine #2 (1)"
+                     " + Howling Mine #3 (1)), so you can survive at most 2 more draw steps and"
+                     " the draw step after that loses you the game (any extra draw or mill of"
+                     " yours makes it sooner, never later)",
+              "#W82-EC H5 the s305 board renders the countdown in draw steps");
+        CHECK(yourLibraryLine(2, 0, 1).find("you have 2 cards left, so you can survive at most 2"
+                                            " more draws and the draw after that loses you the game")
+                  != string::npos,
+              "#W82-EC H5 one draw per step counts in draws");
+        CHECK(yourLibraryLine(3, 0, 4, "x").find("your NEXT draw step draws from an empty library"
+                                                  " and loses you the game") != string::npos,
+              "#W82-EC H5 fewer cards than one draw step: the next step loses");
+        CHECK(yourLibraryLine(11, 0, 1).find("DECK-OUT") == string::npos,
+              "#W82-EC H5 NEGATIVE 11 cards at one per step is out of range");
+        CHECK(yourLibraryLine(13, 0, 4, "x").find("DECK-OUT") == string::npos,
+              "#W82-EC H5 NEGATIVE 13 cards at four per step is out of range (3 steps = 12)");
+        CHECK(yourLibraryLine(2, 0, 1, "", true).find("DECKING YOU OUT DOES NOT LOSE YOU THE GAME")
+                  != string::npos,
+              "#W82-EC H5 the seat's own CANTLOSE/CANTMILLLOSE/their CANTWIN blocks the loss");
+        CHECK(yourLibraryLine(5, 2, 1) == "Your library: 7 cards (2 of them are the cards listed in"
+                                          " the search/reveal below - they are still in your library"
+                                          " until this decision resolves)",
+              "#W82-EC H5 NEGATIVE the reveal clause is untouched and counts toward the range");
+        // The opponent line: wave-68 bytes at one per step, the same arithmetic above it.
+        CHECK(opponentZoneCountsLine(5, 0, 1) == "Opponent hand size: 5 | Opponent library: 1"
+                                                 " cards - DECK-OUT IS IN RANGE: a player who must"
+                                                 " draw from an empty library LOSES, and they have"
+                                                 " 1 card left, so they can survive at most 1 more"
+                                                 " draw and the draw after that loses them the game"
+                                                 " (any extra draw of theirs makes it sooner, never"
+                                                 " later)",
+              "#W82-EC H5 the opponent line at one per step is byte-identical to wave 68");
+        CHECK(opponentZoneCountsLine(5, 0, 1, true) == "Opponent hand size: 5 | Opponent library: 1"
+                                                       " cards - they have 1 card left, but DECKING"
+                                                       " THEM OUT DOES NOT WIN: a permanent in play"
+                                                       " stops the empty-library loss (they cannot"
+                                                       " lose, they cannot lose to milling, or you"
+                                                       " cannot win), so their draw from an empty"
+                                                       " library ends the game for nobody",
+              "#W82-EC H5 the opponent's blocked face is byte-identical to wave 68");
+        CHECK(opponentZoneCountsLine(5, 0, 10, false, 4, "the draw step itself + Howling Mine #1 (3)")
+                  .find("they have 10 cards left and they draw 4 per draw step (the draw step itself"
+                        " + Howling Mine #1 (3)), so they can survive at most 2 more draw steps")
+                  != string::npos,
+              "#W82-EC H5 the opponent under the same mines gets the same draw-step arithmetic");
+        // Mill on cast: the script parse.
+        CHECK(castTriggerMillCount("@movedTo(*|opponentstack):deplete:2 opponent", true) == 2,
+              "#W82-EC H5 Memory Erosion on THEIR board mills the caster 2 per spell");
+        CHECK(castTriggerMillCount("@movedTo(*|opponentstack):deplete:2 opponent", false) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack):deplete:2", true) == 0
+                  && castTriggerMillCount("@movedTo(*[-land]|opponentstack):draw:7 opponent", true) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack) restriction{morbid}:deplete:2 opponent", true) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack):deplete:x opponent", true) == 0,
+              "#W82-EC H5 NEGATIVE the wrong seat, a mill on its own controller, a draw, a gated"
+              " or a non-numeric payload count nothing");
+        CHECK(castTriggerMillCount("@movedTo(*|mystack):deplete:3", false) == 3
+                  && castTriggerMillCount("@movedTo(*|mystack):deplete:3 opponent", false) == 0,
+              "#W82-EC H5 a self-mill cast trigger on the caster's own board counts for the caster only");
+        // The cast row's clause.
+        const string mill = castMillPriceRowTag(8, "Memory Erosion x4", 13);
+        cout << "     cast row: \"" << mill << "\"\n";
+        CHECK(mill == " {library: 13 -> 5 after Memory Erosion x4 - casting this mills you 8 before"
+                      " it resolves}",
+              "#W82-EC H5 the cast row prices the library before and after the cast's own mill");
+        CHECK(castMillPriceRowTag(8, "Memory Erosion x4", 6).find("that is your WHOLE library: your"
+                                                                   " next draw would be from an EMPTY"
+                                                                   " library and LOSE the game")
+                  != string::npos,
+              "#W82-EC H5 a mill that empties the library says so");
+        CHECK(castMillPriceRowTag(0, "x", 13).empty() && castMillPriceRowTag(8, "", 13).empty()
+                  && castMillPriceRowTag(8, "x", -1).empty(),
+              "#W82-EC H5 NEGATIVE nothing mills, no source, or unknown library: no clause");
+        // The X row: the s282 shape.
+        const string xrow = xLibraryRowClause(12, 13, 6, 8, "Memory Erosion x4");
+        cout << "     X row: \"" << xrow << "\"\n";
+        CHECK(xrow.find("{library: casting this mills you 8 (Memory Erosion x4) before it resolves"
+                        " - 13 -> 5 - then this draws 12 of your 5 library cards - 0 left, which is"
+                        " 7 MORE than the library holds") != string::npos,
+              "#W82-EC H5 the X row's draws are priced against the library AFTER the cast's mill");
+        CHECK(xLibraryRowClause(12, 25, 6) == xLibraryRowClause(12, 25, 6, 0, "")
+                  && xLibraryRowClause(12, 25, 6).find("{library: this draws 12 of your 25") == 0 + 1,
+              "#W82-EC H5 NEGATIVE with nothing milling on cast the X row is byte-identical");
+        // KEY-STABILITY PIN: the clause is a brace group, stripped from every row key.
+        {
+            const string base = "Cast Sphinx's Revelation {x}{w}{u}{u}";
+            const string rowA = base + castMillPriceRowTag(8, "Memory Erosion x4", 13);
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(rowA != base && holdActionKeyRow(rowA) == holdActionKeyRow(base)
+                      && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                      && w77KeyTailOf(joinNumberedRows(rowsA, NULL))
+                         == w77KeyTailOf(joinNumberedRows(rowsB, NULL)),
+                  "#W82-EC H5 KEY the mill clause is outside the hold, option-set and ask keys");
+        }
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

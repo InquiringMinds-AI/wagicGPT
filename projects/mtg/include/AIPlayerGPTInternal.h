@@ -114,6 +114,9 @@ string castModeCommitmentNote(bool castModeMenu, const string& ctxName, const st
 string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife = -1, int lifeLossFirst = 0, int oppLifeGain = 0, int oppGainTurns = 0);
 string castSetKeyOf(const std::vector<string>& castNames);
 int castTriggerDrawCount(const string& magicText);
+int castTriggerMillCount(const string& magicText, bool opposing); //#W82-EC (H5)
+void castTriggerMillScan(Player * me, Player * opp, string& names, int& perCast); //#W82-EC (H5)
+string castMillPriceRowTag(int perCast, const string& names, int library); //#W82-EC (H5)
 void castTriggerDrawScan(Player * opp, std::vector<std::string>& names, int& perCast);
 string changelingAnnotation(MTGCardInstance * card);
 string chooseANameHeaderText(const string& sourceName, const string& cardText);

@@ -4628,6 +4628,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str(), life, firstCharge);
             }
         }
+        //#W82-EC (H5): and what casting it MILLS the caster (Memory Erosion), on
+        //the row that triggers it - the library before and after.
+        {
+            string millNames;
+            int millOnCast = 0;
+            castTriggerMillScan(this, opponent(), millNames, millOnCast);
+            if (millOnCast > 0 && game && game->library)
+                o << castMillPriceRowTag(millOnCast, millNames, game->library->nb_cards);
+        }
         //#W51-F D11: and what casting it FEEDS the opponent, with the count of
         //the caster's own converters (draw AND discard punishers).
         {

@@ -369,6 +369,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife= -1, int lifeLossFirst= 0, int oppLifeGain= 0, int oppGainTurns= 0);
     static string castSetKeyOf(const std::vector<string>& castNames);
     static int castTriggerDrawCount(const string& magicText);
+    static int castTriggerMillCount(const string& magicText, bool opposing); //#W82-EC (H5)
+    static string castMillPriceRowTag(int perCast, const string& names, int library); //#W82-EC (H5)
     static string ceasedToExistNarration(bool mine, const string& cardName, bool isTokenCard, const string& from);
     static string choiceBranchLabel(const string& rawLine);
     static string chooseANameHeaderText(const string& sourceName, const string& cardText);
@@ -674,7 +676,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int opponentExtraDrawPerTurn(const string& script, bool& variable);
     static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3], int samples, int nowLife, int eventGained= -1, int eventLost= -1);
     static string opponentOpenManaLine(int sources, const string& colours);
-    static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked= false);
+    static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked= false, int perStep= 1, const string& extras= ""); //#W82-EC (H5)
     static string optionCardTextCore(const string& raw, size_t maxLen, const string& focusPrefix= "");
     static string optionLabel(const string& row);
     static bool optionRowMentions(const string& optionText, const string& name);
@@ -1048,10 +1050,10 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int xLibraryCeilingX(int capX, int drawPerX, int library, int reserve);
     static int xLibraryReserveCount(int drawStepSize, int stackDraws);
     static string xLibraryReserveWhy(int drawStepSize, int stackDraws, int mayDraws= 0);
-    static string xLibraryRowClause(int cards, int library, int owedDraws);
+    static string xLibraryRowClause(int cards, int library, int owedDraws, int millOnCast= 0, const string& millNames= ""); //#W82-EC (H5)
     static bool xLifeDrawClauses(const string& magicText, int& lifePerX, int& drawPerX);
     static string xLifeDrawEffectClause(int lifePerX, int drawPerX);
-    static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0, int library= -1, int owedDraws= 0);
+    static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0, int library= -1, int owedDraws= 0, int millOnCast= 0, const string& millNames= ""); //#W82-EC (H5)
     static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0);
     static string xMarkerRestate(const std::vector<XDamVictim>& victims, int atX);
     static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut);
@@ -1062,7 +1064,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string xTradeMarker(int theirs, int mine, bool lopsided);
     static string xVictimList(const std::vector<XDamVictim>& victims, int atX, bool mine);
     static string yourHandDisplacedClause(int myHandInReveal);
-    static string yourLibraryLine(int libraryCards, int myLibraryInReveal);
+    static string yourLibraryLine(int libraryCards, int myLibraryInReveal, int perStep= 1, const string& extras= "", bool deckOutBlocked= false); //#W82-EC (H5)
     static string zeroPowerAttackerTag(int power);
     static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace= false);
     static string zoneTagText(bool isDungeon, bool mine, const string& zoneName);
