@@ -26875,8 +26875,66 @@ static const char * kW50Y_r94 =
               "#W67-AY MED POSITIVE a line with no repetition keeps its place and its bytes");
         CHECK(bucketed.find("- Your Human died (that Human was 1 of 96 copies on your battlefield;"
                             " the other 95 are still there) [x96 - 96 lines of this shape in this"
-                            " batch; only the numbers in them differ]") != string::npos,
+                            " batch]") != string::npos, //#W82-EC (M1): the losslessness claim is gone
               "#W67-AY MED POSITIVE the moving-ordinal shape is stated ONCE, verbatim, with an exact count");
+        // #W82-EC (M1): a one-source player-damage run folds to count, per-hit value and
+        // the life totals it ran between - `125v162` s229's shape (seat 31 -> 19).
+        {
+            std::ostringstream d;
+            d << "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n";
+            for (int i = 0; i < 12; i++)
+                d << "- Opponent's Underworld Dreams dealt 1 damage to you (now " << (30 - i) << ")\n";
+            d << "- You drew Plains";
+            const string dm = narrationBucketRuns(d.str());
+            cout << "     M1 fold: \"" << dm << "\"\n";
+            CHECK(dm == "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n"
+                        "- Opponent's Underworld Dreams dealt 12 x 1 damage to you, 31 -> 19\n"
+                        "- You drew Plains",
+                  "#W82-EC M1 twelve 1-damage hits fold to '12 x 1 damage to you, 31 -> 19'");
+            CHECK(dm.find("only the numbers") == string::npos && dm.find("(now 30)") == string::npos,
+                  "#W82-EC M1 NEGATIVE the first total and the losslessness claim are gone");
+            CHECK(narrationBucketRuns(dm) == dm, "#W82-EC M1 ECHO the fold is idempotent");
+            // Through the compact register: the brief's target line.
+            const string cn = compactNarration("=== Turn 28 - YOUR turn ===\n- Phase: Upkeep\n" + dm);
+            cout << "     M1 compact: \"" << cn << "\"\n";
+            CHECK(cn.find("Underworld Dreams -> 12 x 1 damage to you, 31 -> 19") != string::npos,
+                  "#W82-EC M1 the compact register carries the fold as '12 x 1 damage to you, 31 -> 19'");
+            // Non-constant hits: the total, the count, the trajectory.
+            const string v = narrationBucketRuns(
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin dealt 2 damage to the opponent (now 13)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 12)\n"
+                "- Your Staff of Nin dealt 3 damage to the opponent (now 9)");
+            CHECK(v == "- Your Staff of Nin dealt 7 damage over 4 hits to the opponent, 16 -> 9",
+                  "#W82-EC M1 unequal hits state the total over the count");
+            // Other life movement inside the span is named, never folded into the arithmetic.
+            const string g = narrationBucketRuns(
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 14)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 18)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 17)");
+            CHECK(g == "- Your Staff of Nin dealt 4 x 1 damage to the opponent, 16 -> 17"
+                       " (other life changes in between)",
+                  "#W82-EC M1 a trajectory that does not match the total says other life moved");
+            // MUST-NOT-MATCH: two handles of one name are two sources - the shape bracket.
+            const string two = narrationBucketRuns(
+                "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin #2 dealt 1 damage to the opponent (now 14)\n"
+                "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 13)\n"
+                "- Your Staff of Nin #2 dealt 1 damage to the opponent (now 12)");
+            CHECK(two == "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)"
+                         " [x4 - 4 lines of this shape in this batch]",
+                  "#W82-EC M1 MUST-NOT-MATCH two handles never fold into one source's line");
+            // MUST-NOT-MATCH: creature damage (no life total) keeps the shape bracket.
+            const string cr = narrationBucketRuns(
+                "- Opponent's Starstorm dealt 4 damage to Vampire #1\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #2\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #3\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #4");
+            CHECK(cr == "- Opponent's Starstorm dealt 4 damage to Vampire #1"
+                        " [x4 - 4 lines of this shape in this batch]",
+                  "#W82-EC M1 MUST-NOT-MATCH damage to creatures is not a life trajectory");
+        }
         CHECK(bucketed.find("- Your Human (token) ceased to exist and left your graveyard"
                             " [x96 - this exact line 96 times in this batch]") != string::npos,
               "#W67-AY MED POSITIVE the byte-identical line the alternation hid is counted too");

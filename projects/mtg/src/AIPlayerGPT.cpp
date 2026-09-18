@@ -12910,6 +12910,96 @@ string compactNarration(const string& log)
 }
 
 
+//#W82-EC (M1, four seats - the most-reported item of wave 81). A collapsed
+//damage batch printed its FIRST life total and called the collapse lossless:
+//`125v162` s229 `Underworld Dreams -> 1 damage to you (now 30) [x12 - 12 lines
+//of this shape in this batch; only the numbers in them differ]`, seat at 19.
+//The one number that matters was the one dropped. A run of player-damage lines
+//from ONE source to ONE player folds to its count, its per-hit value (when
+//constant) or its total, and the life total it started from and ended at:
+//`- Your Underworld Dreams dealt 12 x 1 damage to you, 31 -> 19`. Sources that
+//differ only in a handle (Staff of Nin #1 / #2) are NOT one source and take the
+//shape bracket (now without the losslessness claim). Pure over the lines.
+struct BucketDamageLine
+{
+    string src, target;
+    int n, now;
+};
+
+static bool parseBucketDamageLine(const string& line, BucketDamageLine& out)
+{
+    if (line.compare(0, 2, "- ") != 0 || line.find("[x") != string::npos)
+        return false;
+    const string ev = line.substr(2);
+    const size_t d = ev.find(" dealt ");
+    if (d == string::npos)
+        return false;
+    const size_t dm = ev.find(" damage to ", d);
+    if (dm == string::npos)
+        return false;
+    const string n = ev.substr(d + 7, dm - (d + 7));
+    if (n.empty())
+        return false;
+    for (size_t i = 0; i < n.size(); i++)
+        if (!isdigit((unsigned char) n[i]))
+            return false;
+    const string rest = ev.substr(dm + 11);
+    const size_t nw = rest.rfind(" (now ");
+    if (nw == string::npos || rest.empty() || rest[rest.size() - 1] != ')')
+        return false;
+    const string target = rest.substr(0, nw);
+    if (target != "you" && target != "the opponent")
+        return false;
+    const string now = rest.substr(nw + 6, rest.size() - 1 - (nw + 6));
+    if (now.empty())
+        return false;
+    for (size_t i = 0; i < now.size(); i++)
+        if (!isdigit((unsigned char) now[i]) && !(i == 0 && now[i] == '-'))
+            return false;
+    out.src = ev.substr(0, d);
+    out.target = target;
+    out.n = atoi(n.c_str());
+    out.now = atoi(now.c_str());
+    return true;
+}
+
+//The fold, or "" when the run is not one source -> one player with every line
+//carrying a life total. `same` are the batch's lines of one shape, in order.
+static string bucketDamageFold(const vector<string>& same)
+{
+    if (same.size() < 2)
+        return "";
+    vector<BucketDamageLine> p(same.size());
+    for (size_t i = 0; i < same.size(); i++)
+    {
+        if (!parseBucketDamageLine(same[i], p[i]))
+            return "";
+        if (i && (p[i].src != p[0].src || p[i].target != p[0].target))
+            return "";
+    }
+    int total = 0;
+    bool constant = true;
+    for (size_t i = 0; i < p.size(); i++)
+    {
+        total += p[i].n;
+        if (p[i].n != p[0].n)
+            constant = false;
+    }
+    const int before = p[0].now + p[0].n;
+    const int after = p[p.size() - 1].now;
+    std::ostringstream o;
+    o << "- " << p[0].src << " dealt ";
+    if (constant)
+        o << p.size() << " x " << p[0].n << " damage";
+    else
+        o << total << " damage over " << p.size() << " hits";
+    o << " to " << p[0].target << ", " << before << " -> " << after;
+    if (before - after != total)
+        o << " (other life changes in between)";
+    return o.str();
+}
+
+
 string narrationBucketRuns(const string& body)
 {
     if (body.empty())
@@ -12973,12 +13063,22 @@ string narrationBucketRuns(const string& body)
             done.insert(shape);
             if (!first) out << "\n";
             first = false;
-            out << lines[k];
             if (exactCount[lines[k]] == n)
-                out << " [x" << n << " - this exact line " << n << " times in this batch]";
+            {
+                out << lines[k] << " [x" << n << " - this exact line " << n << " times in this batch]";
+                continue;
+            }
+            //#W82-EC (M1): a one-source player-damage run folds to its count, its
+            //per-hit value and the life totals it ran between.
+            vector<string> same;
+            for (size_t m = k; m < j; m++)
+                if (narrationShapeKey(lines[m]) == shape)
+                    same.push_back(lines[m]);
+            const string fold = bucketDamageFold(same);
+            if (!fold.empty())
+                out << fold;
             else
-                out << " [x" << n << " - " << n << " lines of this shape in this batch;"
-                    << " only the numbers in them differ]";
+                out << lines[k] << " [x" << n << " - " << n << " lines of this shape in this batch]";
         }
         i = j;
     }
