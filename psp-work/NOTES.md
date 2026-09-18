@@ -6474,3 +6474,7 @@ Seats: 6 EDIT + deck152 KEEP (6/6) — six guides installed 031db297b; 0 proposa
 - Owner rulings on §D (LEDGER-v2 §4-§7, incl. the numbering-swap CORRECTION): P3 P4 P6 P8 P10 P11 P12 P13 yes; P5 approved on the sample ("That looks good. Ok."); P9 land-drop fold "try it. Revert if it degrades behavior."; P7 discard-without-log NO (graveyard decks); P1+P2 A/B only; "Use fable agents to code. Make it so."
 - Fable lane (survived two rate-limit cutoffs; commits intact each time): nine items, one commit each; gate clean; two live games, 0 fallbacks. Prompt bytes: hand folds −1.2%, tags −1.35%, rows −0.3%, range note −0.46%, narration ×0.68 (was 48.5% of all bytes). Layer is now five TUs + internal header; PARSETEST byte-identical across the split.
 - The loop resumes next: step one (bug-list #11/#12), rotation, corpus on 9c5c2058e.
+
+## 2026-09-17 19:20 — LOOP RESUMED: step one merged (6e0c51238), rotation done, wave-81 corpus launched
+- Step one (Fable): bug-list #11 + #12 closed (+ a real found defect: a lingering may-mode menu eating a lower menu's answers). Gate clean modulo the known flake; A/B flag on 152 resolved as noise by seeded PAIRED games (trace-identical) — bug-list #13 = make the A/B paired.
+- Rotation: 126 out (KEEP), deck50 Erosion in guideless. Corpus: pool 146,152,125,50,162,123,130 on 6e0c51238; watches armed. Step three next: per-deck seats (deck50's authors its guide) + synthesis; no engine seat/predictions/specimen.
