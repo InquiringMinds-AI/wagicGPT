@@ -43914,6 +43914,54 @@ static const char * kW50Y_r94 =
               "#W82-EC M7 NEGATIVE with no Draw block the turn line keeps its draw, byte-identical");
     }
 
+    // ---------------- #W82-EC (M8): damage to a creature carries its outcome.
+    // `123v130` s75 T20: "Starstorm -> 4 damage to Rorix Bladewing" - it survived, silently.
+    {
+        cout << "  #W82-EC M8 creature damage carries survives/dies\n";
+        CHECK(creatureDamageOutcomeNote(5, 1, false) == " (survives, 4 marked)"
+                  && creatureDamageOutcomeNote(5, 5, false) == " (survives)"
+                  && creatureDamageOutcomeNote(5, 0, false) == " (dies)"
+                  && creatureDamageOutcomeNote(5, -3, false) == " (dies)"
+                  && creatureDamageOutcomeNote(5, 0, true) == " (lethal, but it is indestructible: it survives)",
+              "#W82-EC M8 the outcome note: marked damage on a survivor, dies, indestructible");
+        const string raw = damageNarration(false, "Starstorm", 4, "Rorix Bladewing", false, 0,
+                                           creatureDamageOutcomeNote(5, 1, false));
+        CHECK(raw == "Opponent's Starstorm dealt 4 damage to Rorix Bladewing (survives, 4 marked)",
+              "#W82-EC M8 the raw line carries the outcome after the target");
+        CHECK(damageNarration(true, "Staff of Nin", 1, "the opponent", true, 9)
+                  == "Your Staff of Nin dealt 1 damage to the opponent (now 9)",
+              "#W82-EC M8 NEGATIVE a player-damage line is byte-identical (no note, the total last)");
+        const string cn = compactNarration(
+            "=== Turn 20 - opponent's turn ===\n- Phase: Upkeep\n"
+            "- Opponent cast Starstorm\n"
+            "- Opponent's Starstorm dealt 4 damage to Rorix Bladewing (survives, 4 marked)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Your Vampire died\n");
+        cout << "     " << cn << "\n";
+        CHECK(cn.find("Starstorm -> 4 damage to Rorix Bladewing (survives, 4 marked); Starstorm -> 4"
+                      " damage to Vampire (dies); your Vampire died") != string::npos,
+              "#W82-EC M8 the compact register keeps the outcome on the damage line");
+        // The used -> result fold still binds through the outcome.
+        const string used = compactNarration(
+            "=== Turn 20 - YOUR turn ===\n- Phase: Main phase 1\n"
+            "- You targeted Rorix Bladewing with Staff of Nin's ability\n"
+            "- You used: Deal 1 damage with Staff of Nin targeting Rorix Bladewing\n"
+            "- Your Staff of Nin dealt 1 damage to Rorix Bladewing (survives, 1 marked)\n");
+        cout << "     " << used << "\n";
+        CHECK(used.find("Main 1: Staff of Nin -> 1 damage to Rorix Bladewing (survives, 1 marked).")
+                  != string::npos,
+              "#W82-EC M8 the activation's result fold recognises the target through its outcome");
+        // Bucketing: an exact-repeat outcome line still buckets as an exact line.
+        const string b = narrationBucketRuns(
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)");
+        CHECK(b == "- Opponent's Starstorm dealt 4 damage to Vampire (dies) [x4 - this exact line 4"
+                   " times in this batch]",
+              "#W82-EC M8 the outcome does not break the exact-line bucket");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

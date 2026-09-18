@@ -421,7 +421,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor, int theirCreatures, int attackerBodies, int minAttackerPower);
     static string crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife);
     static bool damageKillsTarget(int dmg, int remaining, bool indestructible, bool deathtouch);
-    static string damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult= false, int settledLife= 0);
+    static string damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult= false, int settledLife= 0, const string& note= ""); //#W82-EC (M8)
+    static string creatureDamageOutcomeNote(int toughness, int life, bool indestructible); //#W82-EC (M8)
     static string damagePlaneswalkerVerdict(int dmg, int loyalty);
     static string damagePlayerVerdict(int dmg, int life, bool isMe, int myLife= -1, int lifeLossFirst= 0, bool myLifeLoop= false, bool poisonInstead= false, int poison= -1);
     static string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch);

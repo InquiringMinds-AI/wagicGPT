@@ -12587,7 +12587,11 @@ namespace gptcompact
 
     //"X dealt N damage to <target>[ (now L)]" with the owner prefix already
     //stripped; returns false when the line is not a damage line.
-    static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now)
+    //#W82-EC (M8): `outcome` receives a creature's trailing outcome parenthesis
+    //(" (survives, 4 marked)" / " (dies)" / " (lethal, ...)") so the target
+    //compares clean and the clause is carried onto whatever line renders it.
+    static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now,
+                            string * outcome = NULL)
     {
         const size_t d = ev.find(" dealt ");
         if (d == string::npos) return false;
@@ -12602,6 +12606,20 @@ namespace gptcompact
         {
             now = rest.substr(nw + 6, rest.size() - 1 - (nw + 6));
             rest = rest.substr(0, nw);
+        }
+        if (outcome)
+            outcome->clear();
+        if (!rest.empty() && rest[rest.size() - 1] == ')')
+        {
+            const size_t op = rest.rfind(" (");
+            if (op != string::npos
+                && (rest.compare(op, 10, " (survives") == 0 || rest.compare(op, 7, " (dies)") == 0
+                    || rest.compare(op, 10, " (lethal, ") == 0))
+            {
+                if (outcome)
+                    *outcome = rest.substr(op);
+                rest = rest.substr(0, op);
+            }
         }
         target = rest;
         return true;
@@ -12814,8 +12832,8 @@ namespace gptcompact
                 st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
                 return;
             }
-            string src, n, target, now;
-            if (splitDamage(bare, src, n, target, now) && (target == st.useTarget
+            string src, n, target, now, outcome;
+            if (splitDamage(bare, src, n, target, now, &outcome) && (target == st.useTarget
                 || (st.useTarget == "the opponent" && target == "the opponent")
                 || (st.useTarget == "you" && target == "you")))
             {
@@ -12823,7 +12841,7 @@ namespace gptcompact
                 if (target == "the opponent" || target == "you")
                     e += ", " + string(target == "you" ? "you" : "opp") + (now.empty() ? "" : " " + now);
                 else
-                    e += " to " + target + (now.empty() ? "" : " (now " + now + ")");
+                    e += " to " + target + outcome + (now.empty() ? "" : " (now " + now + ")"); //#W82-EC (M8)
                 st.push(e);
                 st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
                 return;
@@ -12851,11 +12869,11 @@ namespace gptcompact
             return;
         }
         {
-            string src, n, target, now;
+            string src, n, target, now, outcome;
             const string owner = mine ? (startsWith(raw, "Your ") ? "Your " : "You ")
                                       : (theirs ? (startsWith(raw, "Opponent's ") ? "Opponent's " : "Opponent ") : "");
             const string bare = raw.substr(owner.size());
-            if ((mine || theirs) && splitDamage(bare, src, n, target, now))
+            if ((mine || theirs) && splitDamage(bare, src, n, target, now, &outcome))
             {
                 const bool toPlayer = (target == "the opponent" || target == "you");
                 string e;
@@ -12872,7 +12890,8 @@ namespace gptcompact
                     e = src + " -> " + part;
                 }
                 else
-                    e = src + " -> " + n + " damage to " + target + (now.empty() ? "" : " (now " + now + ")");
+                    e = src + " -> " + n + " damage to " + target + outcome //#W82-EC (M8)
+                        + (now.empty() ? "" : " (now " + now + ")");
                 st.push(e);
                 return;
             }
@@ -14442,9 +14461,14 @@ string lifeChangeNarration(bool mine, int amount, int settled)
 //NOT tagged: every mid-sentence card reference in this register is bare
 //("with Staff of Nin", "COUNTERED by Essence Scatter"), and only the subject
 //takes the possessive.
+//#W82-EC (M8 / M6): `note` rides directly after the target - a creature's
+//outcome (" (survives, 4 marked)" / " (dies)") or the ability-not-combat
+//marker - and BEFORE the player's "(now L)", which stays the line's last token
+//so every reader that keys on it is untouched.
 string damageNarration(bool sourceMine, const string& sourceName, int amount,
                        const string& targetName,
-                       bool haveResult = false, int settledLife = 0)
+                       bool haveResult = false, int settledLife = 0,
+                       const string& note = "")
 {
     std::ostringstream o;
     if (sourceName.empty())
@@ -14452,9 +14476,33 @@ string damageNarration(bool sourceMine, const string& sourceName, int amount,
     else
         o << ownerTag(sourceMine) << sourceName << " dealt " << amount
           << " damage to " << targetName;
+    o << note;
     if (haveResult)
         o << " (now " << settledLife << ")";
     return o.str();
+}
+
+
+//#W82-EC (M8, deck123 MED-4). `123v130` s75 T20: "Starstorm -> 4 damage to
+//Lord of Lineage; Starstorm -> 4 damage to Rorix Bladewing" - both survived and
+//nothing said so, while every body that died carried a "died" clause. The
+//register's rule is "damage carries the new life total"; a creature's equivalent
+//is whether it lives and what is marked on it. Read AFTER Damage::resolve has
+//subtracted (the WEventDamage fires last), so `life` is the remaining toughness.
+string creatureDamageOutcomeNote(int toughness, int life, bool indestructible)
+{
+    if (life > 0)
+    {
+        std::ostringstream o;
+        o << " (survives";
+        if (toughness > life)
+            o << ", " << (toughness - life) << " marked";
+        o << ")";
+        return o.str();
+    }
+    if (indestructible)
+        return " (lethal, but it is indestructible: it survives)";
+    return " (dies)";
 }
 
 } //namespace
@@ -22087,8 +22135,13 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         int settled = mDamageLifeSettled;
         if (haveResult)
             mDamageLifePlayer = NULL;
+        //#W82-EC (M8): a creature's outcome, on the line that dealt it.
+        string note;
+        if (dc && dc->isCreature() && dc->isInPlay(observer))
+            note = creatureDamageOutcomeNote(dc->toughness, dc->life,
+                                             dc->has(Constants::INDESTRUCTIBLE));
         out << damageNarration(dsrcMine, dsrc ? dsrc->getDisplayName() : string(),
-                               e->damage->damage, dtarget, haveResult, settled);
+                               e->damage->damage, dtarget, haveResult, settled, note);
         if (dp && dsrc && dsrc->getToxicity() > 0)
             out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
                 << dsrc->getToxicity() << " poison counter"
@@ -39911,7 +39964,8 @@ string AIPlayerGPTSelfTestAccess::crackBackReliefClause(int total, int removed, 
 string AIPlayerGPTSelfTestAccess::crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor, int theirCreatures, int attackerBodies, int minAttackerPower) { return ::crackBackRemovalRowTag(total, myLife, totalIsFloor, theirCreatures, attackerBodies, minAttackerPower); }
 string AIPlayerGPTSelfTestAccess::crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife) { return ::crackBackVerdictKey(ableAttackers, maxDamage, myLife); }
 bool AIPlayerGPTSelfTestAccess::damageKillsTarget(int dmg, int remaining, bool indestructible, bool deathtouch) { return ::damageKillsTarget(dmg, remaining, indestructible, deathtouch); }
-string AIPlayerGPTSelfTestAccess::damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult, int settledLife) { return ::damageNarration(sourceMine, sourceName, amount, targetName, haveResult, settledLife); }
+string AIPlayerGPTSelfTestAccess::damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult, int settledLife, const string& note) { return ::damageNarration(sourceMine, sourceName, amount, targetName, haveResult, settledLife, note); } //#W82-EC (M8)
+string AIPlayerGPTSelfTestAccess::creatureDamageOutcomeNote(int toughness, int life, bool indestructible) { return ::creatureDamageOutcomeNote(toughness, life, indestructible); } //#W82-EC (M8)
 string AIPlayerGPTSelfTestAccess::damagePlaneswalkerVerdict(int dmg, int loyalty) { return ::damagePlaneswalkerVerdict(dmg, loyalty); }
 string AIPlayerGPTSelfTestAccess::damagePlayerVerdict(int dmg, int life, bool isMe, int myLife, int lifeLossFirst, bool myLifeLoop, bool poisonInstead, int poison) { return ::damagePlayerVerdict(dmg, life, isMe, myLife, lifeLossFirst, myLifeLoop, poisonInstead, poison); }
 string AIPlayerGPTSelfTestAccess::damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch) { return ::damageTargetVerdict(dmg, toughness, remaining, indestructible, deathtouch); }
