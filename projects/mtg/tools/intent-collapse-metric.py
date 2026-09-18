@@ -77,7 +77,10 @@ def main(dirs):
                     r = json.loads(line)
                 except Exception:
                     continue
-                if r.get('kind') not in ('ask', 'priority'):
+                #bug-list #14 (wave 82, lane EA): the window shape (#W82-P11) carries
+                #the seam as a field; the legacy shape's kind IS the seam.
+                seam = r.get('seam') if r.get('kind') == 'window' else r.get('kind')
+                if seam not in ('ask', 'priority'):
                     continue
                 total += 1
                 reply = strip_think(r.get('reply') or '')
