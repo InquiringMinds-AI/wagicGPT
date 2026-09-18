@@ -35236,9 +35236,14 @@ string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card,
 //again at the next window, every window, for as long as the engine rules it
 //legal. The clause keeps the one fact it was built for: the animation is
 //until-end-of-turn, so an Upkeep activation is spent before the main phase.
+//#W82-EB (M14, wave-81 deck146 MED-5): `146v152` seq 45 took this row at Upkeep with
+//`PLAN: ... Animate Hive to block Brute` - a block on the OPPONENT's turn, which an
+//until-end-of-turn animation cannot make. The clause was true and about the same
+//turn only; it now names the block case it did not refute.
 string upkeepAnimationClause()
 {
-    return " [Upkeep offer: this animation lasts only until end of turn, and the same row is"
+    return " [Upkeep offer: this animation lasts only until end of turn - it is over before the"
+           " opponent's turn begins, so it CANNOT block on their turn - and the same row is"
            " offered again in your main phase]";
 }
 

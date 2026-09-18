@@ -43744,6 +43744,27 @@ static const char * kW50Y_r94 =
               "#W82-EB H10 ECHO the annotated row still binds by its short name");
     }
 
+    cout << "\n[#W82-EB] M14 the Upkeep animation clause names the block it cannot make\n";
+    {
+        const string up = upkeepAnimationClause();
+        CHECK(up.find("CANNOT block on their turn") != string::npos
+                  && up.find("over before the opponent's turn begins") != string::npos,
+              "#W82-EB M14 REPRO 146v152 seq 45: the clause refutes 'animate at Upkeep to block on their turn'");
+        CHECK(up.find("lasts only until end of turn") != string::npos
+                  && up.find("offered again in your main phase") != string::npos,
+              "#W82-EB M14 nothing is deleted: both wave-51 facts still ride the clause");
+        CHECK(up[0] == ' ' && up[1] == '[' && up[up.size() - 1] == ']',
+              "#W82-EB M14 ECHO shape: one [...] tail, which the narration strip and every key drop");
+        CHECK(stripNarrationDecoration("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]" + up)
+                  == "becomes beholder with Hive of the Eye Tyrant #1",
+              "#W82-EB M14 ECHO the clause leaves no residue in the narrated record");
+        bool digitFree = true;
+        for (size_t i = 0; i < up.size(); i++)
+            if (isdigit((unsigned char) up[i]))
+                digitFree = false;
+        CHECK(digitFree, "#W82-EB M14 the clause carries no number - nothing in it can move a key");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
