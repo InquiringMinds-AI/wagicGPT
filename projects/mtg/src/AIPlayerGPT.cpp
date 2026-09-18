@@ -28982,14 +28982,14 @@ const char * kHoldPriorityRowShortHead =
 //restated the rule a third time with no such claim on it.
 static const char * kHoldPriorityRowHead =
     "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window;";
 
 const char * kHoldPriorityRowText =
     "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; you give up no cast)";
 
 
@@ -29005,8 +29005,8 @@ const char * kHoldPriorityRowText =
 //others.
 static const char * kHoldPriorityRowTextActivation =
     "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; the rows above include ACTIVATED abilities that are usable RIGHT"
     " NOW, and taking this row gives every one of them up for as long as these"
     " rows stand)";
@@ -29016,8 +29016,8 @@ static const char * kHoldPriorityRowTextActivation =
 //claim that is false.
 static const char * kHoldPriorityRowTextCast =
     "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; on THIS menu that means you also give up this turn's remaining"
     " CASTING windows for as long as these rows stand, and NOT the priority"
     " window that follows on this same step - that is a different question at a"
@@ -29108,8 +29108,8 @@ string holdContractParagraph()
 {
     return string("\n[HOW A HOLD ENDS: taking the hold row skips every later window"
                   " that asks THIS SAME question with rows identical to these; a"
-                  " different question is still asked, and the hold is released at the"
-                  " start of your next turn whatever the rows do. Rows are compared by"
+                  " different question is still asked, and the hold is released when this"
+                  " turn ends whatever the rows do. Rows are compared by"
                   " what they DO. A row that changes only INSIDE its brackets or braces"
                   " - a price, a forecast, a clock, a count, a life total, a kill count,"
                   " a survivor count, a note that it cannot reach a spell on the stack -"
@@ -29508,8 +29508,8 @@ string w78StackDrainNote(int theirTriggers, bool rowsUnchangedSinceLastAsk,
     //(history: comment-archaeology.md AIPlayerGPT-L30276-1252)
     o << "\n[their stack is draining " << theirTriggers
       << " triggers - each link will put this same list to you; HOLD ("
-      << holdRowShortName << ") covers every link OF THIS STACK, and is released at"
-         " your next untap - a new stack on a later turn asks you again. The rows above"
+      << holdRowShortName << ") covers every link OF THIS STACK, and is released when"
+         " this turn ends - a new stack on a later turn asks you again. The rows above"
          " are what is legal NOW - this says nothing about what will still be legal"
          " after their stack resolves]";
     return o.str();
@@ -32760,11 +32760,21 @@ static bool w72HeldMenuShowedEveryRow(const std::set<string>& heldRowKeys,
 //taken on the holder's own. Pure over (the turn taken, whose turn that was, the
 //turn now); no call site can miss it, and releaseHoldIfUntapPassed() also fires
 //it eagerly at the phase change so the release is traced when it happens.
+//#W82-EB (H9, wave-81 deck125 H3): THE HOLD EXPIRES WITH THE TURN IT WAS TAKEN
+//IN. The wave-73 rule measured an OWN-turn hold to the holder's NEXT untap - two
+//turns - so a hold taken at the seat's own End step (`125v162` seq 211, T27)
+//silenced every window of the opponent's whole turn 28: Underworld Dreams and
+//Teferi's Puzzle Box resolved with no window asked (`hold_windows_skipped` 277
+//that game). The row's own words were always "LATER THIS TURN"; the latch now
+//keeps exactly that scope. A hold taken on the opponent's turn still dies when
+//THAT turn ends (the same turn boundary as before). `ownTurnAtHold` is kept for
+//the trace and the pins; it no longer moves the answer.
 static bool w73HoldExpiredByUntap(int heldTurn, bool ownTurnAtHold, int nowTurn)
 {
+    (void) ownTurnAtHold;
     if (heldTurn < 0)
         return false; //no hold taken at all
-    return nowTurn >= heldTurn + (ownTurnAtHold ? 2 : 1);
+    return nowTurn > heldTurn;
 }
 
 
@@ -32835,8 +32845,8 @@ bool AIPlayerGPT::releaseHoldIfUntapPassed()
     if (!w73HoldExpiredByUntap(mHoldTurn, mHoldOwnTurnAtTake, observer->turn))
         return false;
     mHoldReleasedTurn++;
-    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED at this seat's"
-               " untap (taken on turn " << mHoldTurn
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED - the turn it was"
+               " taken in has ended (taken on turn " << mHoldTurn
                << (mHoldOwnTurnAtTake ? " (own turn)" : " (their turn)")
                << ", now turn " << observer->turn
                << "; " << mHoldReleasedTurn << " released this game) - a once-per-turn row"
