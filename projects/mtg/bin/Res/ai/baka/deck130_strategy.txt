@@ -257,7 +257,7 @@ Siege-Gang and keep its Goblins as blockers, sacrificing them at the face only o
 their line can attack you; with no Commander in reach the floor is returning Hammer and pointing 3 at
 their face.
 Write that, and take the row that does it.
-When the last menu row begins "Hold priority - pass now, and do not ask me again ...", take THAT
+When the last menu row begins "Stop asking me this turn - pass now ...", take THAT
 row at the FIRST such ask of the turn - "Cast nothing right now" answers one window, the hold row
 all of them.
 
