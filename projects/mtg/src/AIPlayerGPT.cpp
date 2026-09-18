@@ -18055,36 +18055,50 @@ static string xMonotoneMarker(int capX, int lifePerX, int drawPerX,
 {
     if (capX < 1 || (lifePerX <= 0 && drawPerX <= 0))
         return "";
-    std::ostringstream o;
-    o << " [<- largest affordable X - X=" << capX << " ";
+    std::ostringstream does;
     if (lifePerX > 0)
     {
-        o << "gains " << (capX * lifePerX) << " life";
+        does << "gains " << (capX * lifePerX) << " life";
         if (drawPerX > 0)
-            o << " and ";
+            does << " and ";
     }
     if (drawPerX > 0)
-        o << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
-    o << "; no listed X does more";
+        does << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
     //#W61-S (C10): a badge is the most obeyed annotation this render produces
     //(6 of 6 X menus in the wave-60 corpus), so it must never endorse an X that
     //kills the pilot in silence. The row already prints the NET; the badge now
     //carries the same number to its conclusion, and names the rung that lives.
     //(history: comment-archaeology.md AIPlayerGPT-lifeAfterPendingStack-775)
+    //#W82-EB (M9, wave-81 deck125 M3): REFUSAL FIRST. `125v162` seq 296 read
+    //`[<- best X for this cast: X=9 - largest affordable X ... but NET -20 ...
+    //this KILLS you. X=2 is the largest listed X whose NET (-6) leaves you alive,
+    //at 2]` - a recommendation head, the refusal in the middle, a survivable X at
+    //the end - and the pilot cast the survivable X into a guide that refuses the
+    //cast at every stop (`x_cast_row_refusal_markers` 0 in six games). When the
+    //NET kills, the badge now LEADS with the refusal (the #W81-DL shape the kill
+    //families already use), keeps every figure, and names no X to take: the
+    //survivable rung is stated as a fact with its own disclaimer, and the cast
+    //row's "best X for this cast" prefix is withheld (xCastRowMarkerFrom).
     const int xLifeBase = lifeAfterPendingStack(life, stackLossToMe); //#W66-AQ (H4)
-    if (netAtCap != kXNetNotSupplied && life >= 0 && xLifeBase + netAtCap <= 0)
+    const bool refused = netAtCap != kXNetNotSupplied && life >= 0 && xLifeBase + netAtCap <= 0;
+    std::ostringstream o;
+    if (!refused)
+        o << " [<- largest affordable X - X=" << capX << " " << does.str() << "; no listed X does more";
+    else
     {
-        o << " - but NET " << netAtCap << " life for this cast";
+        o << " [<- REFUSED by NET life: the largest affordable X (X=" << capX << ": " << does.str()
+          << "; no listed X does more) is NET " << netAtCap << " life for this cast";
         if (stackLossToMe > 0)
             o << ", counted from the " << xLifeBase << " life the " << stackLossToMe
               << " damage ALREADY ON THE STACK leaves you on,";
-        o << " puts you at " << (xLifeBase + netAtCap) << "; this KILLS you";
+        o << " and puts you at " << (xLifeBase + netAtCap) << "; this KILLS you";
         //#W66-AQ (H4): and the named rung must itself survive the same base -
         //a survival claim is never restated from a ladder computed against a
         //different life total.
         if (safeX >= 1 && netAtSafeX != kXNetNotSupplied && xLifeBase + netAtSafeX > 0)
             o << ". X=" << safeX << " is the largest listed X whose NET (" << netAtSafeX
-              << ") leaves you alive, at " << (xLifeBase + netAtSafeX);
+              << ") leaves you alive, at " << (xLifeBase + netAtSafeX)
+              << " - alive is not a reason to cast: this badge names no X to take";
         else if (stackLossToMe > 0 && xLifeBase <= 0)
             o << ". No listed X leaves you alive - the stack alone puts you at "
               << xLifeBase << ", whatever you announce";
@@ -18152,7 +18166,9 @@ static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool names
         return "";
     std::ostringstream o;
     o << " [<- ";
-    if (namesBestX)
+    //#W82-EB (M9): a badge that opens with a refusal is never given the
+    //recommendation head, whatever the caller believes it names.
+    if (namesBestX && body.compare(0, 8, "REFUSED ") != 0)
         o << "best X for this cast: X=" << bestX << " - ";
     o << body << "]";
     return o.str();

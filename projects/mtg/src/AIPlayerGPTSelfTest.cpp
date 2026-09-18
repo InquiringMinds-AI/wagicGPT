@@ -19452,11 +19452,13 @@ static const char * kW50Y_r94 =
             }
             const string badge = xMonotoneMarker(2, 1, 1, netAt2, 2, 1, netAt1);
             cout << "     " << badge << "\n";
-            CHECK(badge == " [<- largest affordable X - X=2 gains 2 life and draws 2 cards;"
-                           " no listed X does more - but NET -2 life for this cast puts you at 0;"
-                           " this KILLS you. X=1 is the largest listed X whose NET (-1) leaves"
-                           " you alive, at 1]",
-                  "#W61-S C10 POSITIVE the badge says so, and names the rung that lives");
+            //#W82-EB (M9): refusal-first when the NET kills; every figure kept.
+            CHECK(badge == " [<- REFUSED by NET life: the largest affordable X (X=2: gains 2 life and"
+                           " draws 2 cards; no listed X does more) is NET -2 life for this cast and puts"
+                           " you at 0; this KILLS you. X=1 is the largest listed X whose NET (-1) leaves"
+                           " you alive, at 1 - alive is not a reason to cast: this badge names no X to take]",
+                  "#W61-S C10 / #W82-EB M9 POSITIVE the badge leads with the refusal, keeps the numbers,"
+                  " and names the rung that lives as a fact, not a pick");
             CHECK(xMonotoneMarker(2, 1, 1, netAt2, 2, -1, kXNetNotSupplied)
                       .find("No listed X leaves you alive") != string::npos,
                   "#W61-S C10 with no surviving rung the badge says that instead of naming one");
@@ -19470,12 +19472,10 @@ static const char * kW50Y_r94 =
             CHECK(xMonotoneMarker(2, 1, 1, netAt2, -1) == xMonotoneMarker(2, 1, 1),
                   "#W61-S C10 NEGATIVE an unsupplied life changes not one byte");
             // The CAST-row form carries the same fold through xCastRowMarkerFrom.
-            CHECK(xCastRowMarkerFrom(badge, 2, true)
-                      == " [<- best X for this cast: X=2 - largest affordable X - X=2 gains 2"
-                         " life and draws 2 cards; no listed X does more - but NET -2 life for"
-                         " this cast puts you at 0; this KILLS you. X=1 is the largest listed X"
-                         " whose NET (-1) leaves you alive, at 1]",
-                  "#W61-S C10 the cast-row badge carries the same verdict as the menu badge");
+            CHECK(xCastRowMarkerFrom(badge, 2, true) == badge
+                      && xCastRowMarkerFrom(badge, 2, true).find("best X for this cast") == string::npos,
+                  "#W61-S C10 / #W82-EB M9 the cast-row badge carries the same verdict as the menu"
+                  " badge and gets no 'best X for this cast' head over a refusal");
             // ECHO SHAPE: an X row echoed with the badge still binds.
             {
                 vector<string> menu;
@@ -25319,10 +25319,12 @@ static const char * kW50Y_r94 =
               " damage already on the stack");
         // NEGATIVE: with no stack damage every byte is wave 65's.
         CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0)
-                  == " [<- largest affordable X - X=5 gains 5 life and draws 5 cards; no listed X"
-                     " does more - but NET -5 life for this cast puts you at 0; this KILLS you."
-                     " X=4 is the largest listed X whose NET (-4) leaves you alive, at 1]",
-              "#W66-AQ H4 NEGATIVE an empty stack renders the wave-65 badge byte for byte");
+                  == " [<- REFUSED by NET life: the largest affordable X (X=5: gains 5 life and draws 5"
+                     " cards; no listed X does more) is NET -5 life for this cast and puts you at 0;"
+                     " this KILLS you. X=4 is the largest listed X whose NET (-4) leaves you alive,"
+                     " at 1 - alive is not a reason to cast: this badge names no X to take]",
+              "#W66-AQ H4 / #W82-EB M9 NEGATIVE an empty stack renders the refusal-first badge with no"
+              " stack clause");
         CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4) == xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0),
               "#W66-AQ H4 NEGATIVE the default argument is the empty stack");
         // POSITIVE: a survivable rung still survives, measured after the stack.
@@ -43802,6 +43804,45 @@ static const char * kW50Y_r94 =
         bool st = false;
         CHECK(parseChoice("PLAN: nothing.\nCHOICE: 3 (Stop asking me this turn)", 3, &menu, &st, NULL, NULL, true) == 3 && !st,
               "#W82-EB M10 ECHO the marked row still binds by its short name");
+    }
+
+    cout << "\n[#W82-EB] M9 the life/draw X badge is refusal-first when the NET kills\n";
+    {
+        //#W82-EB (M9, wave-81 deck125 M3): `125v162` seq 296 - the badge named X=9 as
+        //best, said it kills, then named X=2 as survivable; the pilot cast X=2 into a
+        //guide that refuses the cast at every stop, and x_cast_row_refusal_markers was 0.
+        const string s296 = xMonotoneMarker(9, 1, 1, -20, 10, 2, -6, "", 2);
+        cout << "     " << s296 << "\n";
+        CHECK(s296.compare(0, 24, " [<- REFUSED by NET life") == 0,
+              "#W82-EB M9 REPRO 125v162 seq 296: the badge LEADS with the refusal");
+        CHECK(s296.find("X=9: gains 9 life and draws 9 cards; no listed X does more") != string::npos
+                  && s296.find("NET -20 life for this cast, counted from the 8 life the 2 damage ALREADY ON"
+                               " THE STACK leaves you on, and puts you at -12; this KILLS you") != string::npos
+                  && s296.find("X=2 is the largest listed X whose NET (-6) leaves you alive, at 2") != string::npos,
+              "#W82-EB M9 nothing is deleted: the cap, its gain, the NET, the stack base and the survivable rung"
+              " all still print");
+        CHECK(s296.find("this badge names no X to take") != string::npos
+                  && s296.find("best X") == string::npos,
+              "#W82-EB M9 the badge recommends no X");
+        XVictimSurvey sv;
+        sv.maxX = 9;
+        sv.priceable = false;
+        const string castRow = xCastRowBestXMarker(sv, 1, 1, -20, 10, 2, -6, "", -1, 2);
+        CHECK(castRow == s296 && castRow.find("best X for this cast") == string::npos,
+              "#W82-EB M9 the CAST row carries the refusal with no 'best X for this cast' head");
+        CHECK(xMonotoneMarker(9, 1, 1, -3, 10, -1, kXNetNotSupplied, "", 2)
+                  == " [<- largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more]"
+                  && xCastRowBestXMarker(sv, 1, 1, -3, 10, -1, kXNetNotSupplied, "", -1, 2)
+                     .find("best X for this cast: X=9") != string::npos,
+              "#W82-EB M9 MUST-NOT-MATCH a survivable NET keeps the wave-63 badge and the cast row's head");
+        CHECK(stripNarrationDecoration("Cast Sphinx's Revelation {u}{u}{w}{x}" + s296) == "Cast Sphinx's Revelation {u}{u}{w}{x}",
+              "#W82-EB M9 ECHO the refusal badge leaves no residue in the narrated record");
+        std::vector<string> menu;
+        menu.push_back("Cast Sphinx's Revelation {u}{u}{w}{x}" + s296);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        CHECK(parseChoice("PLAN: survive.\nCHOICE: 1 (Cast Sphinx's Revelation)", 2, &menu, &st, NULL, NULL, true) == 1 && !st,
+              "#W82-EB M9 ECHO the badged row still binds by its short name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

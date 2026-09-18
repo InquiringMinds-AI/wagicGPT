@@ -5192,7 +5192,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //construction (the wave-80 HIGH-4 boundary), and applied at the send.
         for (size_t w81r = 0; w81r < menu.size(); w81r++)
         {
-            if (menu[w81r].find("[<- the only X that kills anything of THEIRS") != string::npos
+            if ((menu[w81r].find("[<- the only X that kills anything of THEIRS") != string::npos
+                 || menu[w81r].find("[<- REFUSED by NET life") != string::npos) //#W82-EB (M9)
                 && mW81PendingEventFace.find("x_cast_row_refusal_marker") == string::npos)
                 mW81PendingEventFace += "x_cast_row_refusal_marker;";
             if (w81XSweepMarkerNamesOwnLosses(menu[w81r])
