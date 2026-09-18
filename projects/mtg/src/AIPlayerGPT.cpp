@@ -12538,6 +12538,19 @@ namespace gptcompact
         }
         bool nothingPlacedYet() const { return groups.empty(); }
         bool inCombat() const { return shortPhase(phase) == "Attack"; }
+        //#W82-EC (M2): whose turn the open block belongs to, off its own head.
+        bool myTurn() const { return turnHead.find("(you)") != string::npos; }
+        //#W82-EC (M2): does this event line declare the cast of `name`? A cast
+        //by the turn's owner reads "cast X"; a cast by the other seat carries its
+        //actor ("opp cast X" / "you cast X"), so both shapes must bind.
+        static bool isCastOf(const string& ev, const string& name)
+        {
+            static const char * const heads[] = { "cast ", "opp cast ", "you cast " };
+            for (size_t i = 0; i < 3; i++)
+                if (startsWith(ev, string(heads[i]) + name))
+                    return true;
+            return false;
+        }
         //names can carry commas ("Katilda, Dawnhart Prime"), so the list is
         //matched as text at ", " boundaries, never split on the comma
         bool isDeclaredAttacker(const string& name) const
@@ -12667,7 +12680,12 @@ namespace gptcompact
                 name = rest.substr(0, par);
                 tail = rest.substr(par);
             }
-            string e = "cast " + name;
+            //#W82-EC (M2, deck123 MED-1 / deck146 MED-4): a cast by the seat
+            //that does NOT own the turn carries its actor. `146v125` s230 T35:
+            //"cast Emeria's Call; cast Cancel; your Emeria's Call was COUNTERED
+            //by Cancel" - their Cancel was shaped exactly like the seat's own
+            //casts. The turn owner's casts stay bare (the turn head names it).
+            string e = (mine == st.myTurn() ? string("cast ") : (mine ? "you cast " : "opp cast ")) + name;
             if (!st.paidCard.empty() && st.paidCard == name)
             {
                 e += " " + st.paidText;
@@ -12701,7 +12719,7 @@ namespace gptcompact
                     suffix = " -> resolved (" + how + ")";
                 Group& G = st.group();
                 if (!st.lastCast.empty() && st.lastCast == name && !G.ev.empty()
-                    && startsWith(G.ev.back(), "cast " + name))
+                    && State::isCastOf(G.ev.back(), name)) //#W82-EC (M2)
                 {
                     st.flushPending();
                     G.ev.back() += suffix;
@@ -12751,7 +12769,7 @@ namespace gptcompact
             st.flushPending();
             Group& G = st.group();
             const bool etb = !st.lastCast.empty() && source == st.lastCast && !G.ev.empty()
-                             && startsWith(G.ev.back(), "cast " + source)
+                             && State::isCastOf(G.ev.back(), source) //#W82-EC (M2)
                              && G.ev.back().find(" -> resolved") != string::npos;
             st.useActor = etb ? "its ETB" : source;
             st.useAbility = ability;

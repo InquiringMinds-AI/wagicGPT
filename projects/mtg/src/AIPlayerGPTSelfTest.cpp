@@ -43844,6 +43844,51 @@ static const char * kW50Y_r94 =
         }
     }
 
+    // ---------------- #W82-EC (M2): the actor prefix on a cast by the seat that does
+    // not own the turn. `146v125` s230 T35: "cast Emeria's Call; cast Cancel; your
+    // Emeria's Call was COUNTERED by Cancel" - their Cancel read like an own cast.
+    {
+        cout << "  #W82-EC M2 opponent casts inside the seat's turn carry their actor\n";
+        const string mine = compactNarration(
+            "=== Turn 35 - YOUR turn ===\n- Phase: Main phase 1\n"
+            "- Paid {4}{w}{w}{w} for Emeria's Call with A; B; C; D; E; F; G\n"
+            "- You cast Emeria's Call\n"
+            "- Opponent cast Cancel\n"
+            "- Your Emeria's Call was COUNTERED by Cancel and went to your graveyard\n"
+            "- Opponent's Cancel resolved and went to the opponent's graveyard\n");
+        cout << "     " << mine << "\n";
+        CHECK(mine.find("; opp cast Cancel; your Emeria's Call was COUNTERED by Cancel and went to"
+                        " your graveyard; their Cancel resolved and went to the opponent's graveyard")
+                  != string::npos,
+              "#W82-EC M2 their Cancel in your turn reads 'opp cast Cancel' (the counter line sits"
+              " between it and its resolution, so the resolution keeps its own line as before)");
+        CHECK(mine.find("Main 1: paid ({4}{w}{w}{w}, 7 sources: A; B; C; D; E; F; G) for Emeria's Call;"
+                        " cast Emeria's Call") == string::npos
+                  && mine.find("cast Emeria's Call ({4}{w}{w}{w}, 7 sources: A; B; C; D; E; F; G)")
+                     != string::npos,
+              "#W82-EC M2 NEGATIVE the turn owner's own cast is bare and still folds its payment");
+        const string theirs = compactNarration(
+            "=== Turn 36 - opponent's turn ===\n- Phase: Main phase 1\n"
+            "- Opponent cast Staff of Nin\n"
+            "- Opponent's Staff of Nin resolved and entered the battlefield\n"
+            "- You cast Cancel\n"
+            "- Your Cancel resolved and went to your graveyard\n");
+        cout << "     " << theirs << "\n";
+        CHECK(theirs.find("Main 1: cast Staff of Nin -> resolved; you cast Cancel -> resolved (graveyard)")
+                  != string::npos,
+              "#W82-EC M2 in their turn their cast is bare and yours reads 'you cast'");
+        // The ETB fold still binds to a prefixed cast line.
+        const string etb = compactNarration(
+            "=== Turn 36 - opponent's turn ===\n- Phase: Main phase 1\n"
+            "- You cast Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander resolved and entered the battlefield\n"
+            "- You used: create three 1/1 Goblin tokens with Siege-Gang Commander\n"
+            "- Your Goblin died\n");
+        CHECK(etb.find("you cast Siege-Gang Commander -> resolved; used create three 1/1 Goblin tokens"
+                       " with its ETB") != string::npos,
+              "#W82-EC M2 the ETB fold recognises the prefixed cast line");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
