@@ -589,6 +589,37 @@ string gptForceClosePrefillBody(const string& prefill)
     return "<think>\n" + inner + "\n</think>\n\n";
 }
 
+//#W82-EA (H6, wave-81 deck125 HIGH; owner ruling: reasoning happens ONLY in the
+//native reasoning channel). THE BUDGET-OVERRUN RETRY KEEPS THINKING ON AND RAISES
+//THE BUDGET. The phase-2 "forced close" used to hand the model its own truncated
+//trace with `</think>` injected and `enable_thinking:false` - an answer-only
+//request with a reasoning half of 0 (`125v152` seq 23, 20,683 reasoning chars;
+//`125v162` seq 300, 26,808; both `retry: 1`, `max_tokens_reasoning: 0`). That is
+//the one path in the harness that switched the native channel OFF. The default
+//retry is now the SAME question asked again with thinking on and a reasoning
+//budget of TWICE the allowance that was hit (the owner's posture: generous
+//limits, tightened only on evidence); the phase-1 trace is not prefilled back
+//(a prefill needs the closed block) - its size rides the record as
+//`phase1_reasoning_chars`. The prefill close survives ONLY behind
+//WAGIC_GPT_FORCECLOSE_PREFILL=1 (a disable flag for the A/B, never a default) and
+//for a regime with thinking OFF, where there is no channel to keep on. Pure.
+long w82RetryReasoningBudget(long phase1Budget)
+{
+    const long base = phase1Budget > 0 ? phase1Budget : kDefaultReasoningBudget;
+    return base * 2;
+}
+
+bool w82RetryKeepsThinking(bool thinking, bool legacyPrefill)
+{
+    return thinking && !legacyPrefill;
+}
+
+static bool gptForceCloseLegacyPrefill()
+{
+    const char * v = getenv("WAGIC_GPT_FORCECLOSE_PREFILL");
+    return v && v[0] == '1' && !v[1];
+}
+
 bool gptForceCloseEarned(bool reasoningOnly, bool contentEmpty,
                                 bool finishLength, bool haveReasoning,
                                 int codedAnswers)
@@ -1342,6 +1373,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         {
             content = w81StubReplyNext(w81Stub, mStubReplyIndex++);
             mTransportHandedOff = true; //#W81-DK (V9): the stub IS the transport here
+            mLastRequestThinking = mThinking; //#W82-EA (H6): no request was built
             mLastLatencyMs = 0;
             mLastTimeout = false;
             mLastHttpStatus = 200;
@@ -1548,15 +1580,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     //DELETED (0 of 40). #W82-A (audit-2026-09): the branch
                     //itself is NOT deleted - the tail is still taken below, and
                     //the comment read as though it were.
-                    if (forceClosePoll)
+                    if (forceClosePoll && mForceCloseIsPrefill)
                     {
-                        //Phase 2: the generation is the answer, wherever the
-                        //parser filed it. Keep phase 1's thinking as the
-                        //audit record rather than overwriting it with the
-                        //answer text.
+                        //Phase 2 (LEGACY prefill close): the generation is the
+                        //answer, wherever the parser filed it. Keep phase 1's
+                        //thinking as the audit record rather than overwriting it
+                        //with the answer text.
                         content = tail.empty() ? fieldReasoning : tail;
                         fieldReasoning.clear();
                     }
+                    //#W82-EA (H6): the thinking-on retry is an ordinary phase-1
+                    //shaped reply and takes the phase-1 rules below - a trace that
+                    //ends on a coded answer line after a natural stop is read, a
+                    //trace cut at the raised cap is reasoning-only (the second
+                    //budget hit; there is no third leg, so the heuristic answers).
                     else if (!mLastFinishLength && !tail.empty())
                     {
                         //Phase 1, ran to a natural stop, and its thinking ENDS
@@ -1665,6 +1702,9 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //WAGIC_GPT_DRIFT=1 arms it, so a dev build is silent by default.
             GPT_DRIFT_TRACE(slot->prompt, userMsg);
             GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", slot->response.size());
+            //#W82-EA (M3): what is being thrown away, kept for the drop's own
+            //record below (the outcome is not known until the streak is).
+            const string w82Discarded = slot->response;
             slot->status = 0;
             slot->response.clear();
             //LIVELOCK BREAKER (146v36, 2026-08-21): a RUN of drops with no
@@ -1693,12 +1733,11 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             const char * dropOutcome =
                 asyncDropOutcome(mStaleDropStreak + 1 >= kStaleLivelockLimit);
             DebugTrace(asyncDropTraceLine(armName, driftKind, dropOutcome));
-            //The RECORD half, and it is not diagnostics: one token per drop on
-            //the next translog record this seat writes, so the corpus can price
-            //the drops without a stderr at all.
-            mAsyncDropStamps.push_back(asyncDropStamp(armName, driftKind, dropOutcome));
-            mAsyncDropStampsSeq = mWindowSeq; //#W82-A (L10): the window this drop is about
-            mAsyncDropsGame++; //#W69-BI (K7): counted at the drop, not at the flush
+            //The RECORD half, and it is not diagnostics. #W82-EA (M3): its OWN
+            //record, written here - the stamp-on-the-next-record shape reached 0
+            //of the wave-81 corpus's 52 drops (asyncDropRecordJson has the why).
+            //Counts `mAsyncDropsGame` (#W69-BI K7: at the drop, not at a flush).
+            writeAsyncDropRecord(armName, driftKind, dropOutcome, w82Discarded);
             if (++mStaleDropStreak >= kStaleLivelockLimit)
             {
                 DebugTrace("AIPlayerGPT: " << mStaleDropStreak
@@ -2532,6 +2571,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         mRetryBase = asyncSlotKey(userMsg); //#W82-A (L7)
         mForceClosePrefill = mLastReasoning;
         mForceClosePhase1Length = mLastFinishLength;
+        mForceClosePhase1Budget = mLastRequestReasoningTokens; //#W82-EA (H6)
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
         setNotice("thinking hit its budget - waiting for the answer", 3.0f);
         DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: DEFERRING a forced close - the other"
@@ -2556,6 +2596,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
                                                 : "armed", w74ThisArmIsLand); //#W78-CV (S11)
         }
         mForceClosePrefill = mLastReasoning;
+        mForceClosePhase1Budget = mLastRequestReasoningTokens; //#W82-EA (H6)
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
         //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
         //into this branch is a reply that ended its thinking naturally and
@@ -2567,8 +2608,14 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
         //when the phase-2 answer is consumed - not stamped now, on a record this
         //decision may never write.
         mForceClosePhase1Length = mLastFinishLength;
-        setNotice("thinking hit its budget - asking for the answer", 3.0f);
-        DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
+        setNotice(w82RetryKeepsThinking(mThinking, gptForceCloseLegacyPrefill())
+                      ? "thinking hit its budget - asking again with a larger one"
+                      : "thinking hit its budget - asking for the answer", 3.0f);
+        DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); "
+                   << (w82RetryKeepsThinking(mThinking, gptForceCloseLegacyPrefill())
+                       ? "re-asking with thinking on and the budget raised to "
+                       : "forcing the answer (legacy prefill close); phase-1 budget ")
+                   << w82RetryReasoningBudget(mLastRequestReasoningTokens));
         return kChoicePending; //next tick polls the forced-close request
     }
     //DEADLINE/TRANSPORT RETRY (#W53-Q, D10; #W59-H K1). The ask was never
@@ -2694,11 +2741,11 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content,
 
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mOrderDoneTurn(-1), mCastMenuAsked(false), mLandShapeForPrompt(0), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mAsyncLandState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mLastRequestMaxTokens(0), mLastRequestAnswerTokens(0), mLastRequestReasoningTokens(0), mLastRequestThinking(false), mForceClosePhase1Budget(0), mForceCloseIsPrefill(false), mThinkingRegimeExplicit(false), mThinkingRegimeAnnounced(false), mAttackReaskTurn(-1), mBlockRevReaskTurn(-1), mAskReaskPriorChoice(-1), mPriorityReaskPriorChoice(-1), mAttacksDoneTurn(-1), mOrderDoneTurn(-1), mCastMenuAsked(false), mLandShapeForPrompt(0), mPriorityTurnSeen(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStopReachedWindowsSkipped(0), mOwnTurnWindowsSkipped(0), mRepeatAskTurn(-1), mRepeatAskChoice(0), mRepeatAskAnswersReserved(0), mCommittedCastTurn(-1), mAnswerReplacedFalse(false), mLandFacePreCard(NULL), mLandFacePreTurn(-1), mLandFacePreBack(false), mCastAskTurn(-1), mCastAskPhase(-1), mCrackBackFactsSeq(-1), //#W75-CI (P18)
        mHoldTurn(-1), mHoldOwnTurnAtTake(false), mHoldWindowTurn(-1), mHoldWindowPhase(-1), mSiblingWindowAsksSkipped(0), mHoldReleasedTurn(0), mChainWindowsCollapsed(0), mChainWindowsOnlySelfharm(0), mChainSelfharmRows(0), mChainActingRows(0), mChainWindowsOnlySelfharmCast(0), mChainSelfharmRowsCast(0), mChainActingRowsCast(0), //#W75-CI (P12)
        mMainPhaseWindowsSkipped(0), mHoldWindowsSkipped(0), mReserveDeclineSources(-1), mReserveDeclineTurn(-1), mReserveDeclinePhase(-1), mReserveDeclineWindows(0), mReserveDeclineSpanTurn(-1), mReserveDeclineNoted(0), mEngineRevealFloorPicks(0), mRecoveryExecRow(-1), mHoldWindowsSkippedPriority(0), mHoldWindowsSkippedCast(0), mAsyncDropsGame(0), mRepeatAnnotatedTakes(0), mBlockerForecastRows(0), mBlockerForecastMulti(0), mBlockerForecastGang(0), mBlockerForecastCollapsed(0), mProtocolReplies(0), mPlanStepsDone(0), mPlanLineMissing(0), mPlanNamesStrandedCard(0), mPhase2AnswerRecovered(0), mPhase2AnswerMissing(0), mPutGlossStripped(0), mForceClosePhase1Length(false), mRetryArmLand(false), mForceCloseUnrecorded(0), mForceCloseArmed(false), mForceCloseArmsRefused(0), mForceCloseDeferred(false), mForceCloseDeferTicks(0), mForceCloseDeferBoundHits(0), mForceCloseSameArmDeferred(0), mHoldCheckRefSeq(-2), mHoldCheckRefWindow(-2), mStopReachedRePutsCollapsed(0), mStackDrainWindowsAsked(0), mStackDrainCountedSeq(-1), mForceCloseEvents(0), mOwnLoopWindowsAsked(0), mOwnLoopCountedSeq(-1), mOwnLoopVerdictLinesRendered(0), mOwnLoopVerdictCountedSeq(-1), mHoldVerdictSaferIgnored(0), mMenuPassNoProgressSuppressed(0), mStubReplyIndex(0), mCrossPhaseBoardUnchanged(0), mPlanCastCompletionState(0), mPaidPendingSources(0), mActionBeforePlanRejected(false), mPlanCastOpenTurn(-1), mPlanCastStepsClosed(0), mNextSendDrain(false), mCrackBackLethalBlockedAway(0), mW81FoldedCrackBackTotals(0), mW81XCastRefusalMarkers(0), mW81XSweepRosterMarkers(0), mW81AttackCoverClauses(0), mW81SpareColourWithheld(0), mW81EventCountedSeq(-1), //#W76-CQ (F2), #W77-CR (R11 a, R2 d, R1, R8), #W79-DC (F1), #W80-DG (U1)
         mCrossPhaseRePuts(0), mCrossPhaseTurn(-1), mPlanNamesUncastableZoneCard(0), mProtocolDeviationReplies(0), mAnswerLabelAbsentRead(0), mCrackBackVerdictLinesRendered(0), mCrackBackVerdictCountedSeq(-1), mStackDeathVerdictLinesRendered(0), mStackDeathVerdictCountedSeq(-1), mAskReplaysCache(0), mAskReplaysRepeatLatch(0), //#W80-DE (U2/U8/U9), #W80-DF (U13) - restored after the merge dropped them (Astra w80 F1) //#W78-CX (S1), #W79-DD //#W74-CD (O2) //#W70-BK (C4/C5), #W70-BM (E2/E3), #W67-AX (I7), #W67-AZ (R7), #W68-BA (J3/J6), #W68-BE (R1)), #W68-BE (R1), #W69-BI (K7)
-       mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mAsyncDropStampsSeq(-1), mAbandonedInFlightSeq(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
+       mLoopAutoPassRun(0), mLastRepeatN(0), mListDeclineTurn(-1), mIncomingCombatTurn(-1), mIncomingCombatAttackers(0), mIncomingCombatDamage(0), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mWindowSeq(0), mLastLatencyMs(-1), mAbandonedInFlightSecs(-1), mAbandonedInFlightSeq(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLogWindowKind(kAskWindowUnknown), mLogWindowElided(0), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mRetryBudgetMs(0), mLastRetry(false), mAskAnswerReserved(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mLastReasoningNgramRepeat(-1.0), mReasoningBudget(0),
@@ -2802,6 +2849,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         const char * thinkEnv = getenv("WAGIC_GPT_THINKING");
         mThinkingRegimeExplicit = (thinkEnv && *thinkEnv) || cfg.thinking >= 0;
         mThinking = thinkEnv ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+        mLastRequestThinking = mThinking; //#W82-EA (H6): until a request says otherwise
         mThinkingRegimeAnnounced = false;
     }
     //Thinking budget: configured value wins, else the shipped default, and
@@ -2875,6 +2923,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 string AIPlayerGPTSelfTestAccess::answerTailFromReasoning(const string& reasoning) { return ::answerTailFromReasoning(reasoning); }
 const char * AIPlayerGPTSelfTestAccess::asyncDropOutcome(bool gaveUpToHeuristic) { return ::asyncDropOutcome(gaveUpToHeuristic); }
 string AIPlayerGPTSelfTestAccess::asyncDropStamp(const char * arm, const string& driftKind, const char * outcome) { return ::asyncDropStamp(arm, driftKind, outcome); }
+string AIPlayerGPTSelfTestAccess::asyncDropRecordJson(int event, const char * arm, const string& seam, const string& driftKind, const char * outcome, const string& discardedBody, int windowSeq, int windowRecordSeq, int turn, int phase) { return ::asyncDropRecordJson(event, arm, seam, driftKind, outcome, discardedBody, windowSeq, windowRecordSeq, turn, phase); }
 string AIPlayerGPTSelfTestAccess::asyncDropTraceLine(const char * arm, const string& driftKind, const char * outcome) { return ::asyncDropTraceLine(arm, driftKind, outcome); }
 bool AIPlayerGPTSelfTestAccess::asyncLandArm(const string& seamTail) { return ::asyncLandArm(seamTail); }
 string AIPlayerGPTSelfTestAccess::asyncSlotDriftKind(const string& oldKey, const string& newKey) { return ::asyncSlotDriftKind(oldKey, newKey); }
@@ -2882,6 +2931,8 @@ string AIPlayerGPTSelfTestAccess::asyncSlotKeyOf(bool forceClose, int turn, int 
 std::vector<long> AIPlayerGPTSelfTestAccess::attemptMsField(long firstMs, long secondMs, long latencyMs) { return ::attemptMsField(firstMs, secondMs, latencyMs); }
 bool AIPlayerGPTSelfTestAccess::gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs, long httpStatus, long curlCode) { return ::gptDeadlineMissed(emptyBody, elapsedMs, timeoutMs, httpStatus, curlCode); }
 bool AIPlayerGPTSelfTestAccess::gptForceCloseEarned(bool reasoningOnly, bool contentEmpty, bool finishLength, bool haveReasoning, int codedAnswers) { return ::gptForceCloseEarned(reasoningOnly, contentEmpty, finishLength, haveReasoning, codedAnswers); }
+long AIPlayerGPTSelfTestAccess::w82RetryReasoningBudget(long phase1Budget) { return ::w82RetryReasoningBudget(phase1Budget); }
+bool AIPlayerGPTSelfTestAccess::w82RetryKeepsThinking(bool thinking, bool legacyPrefill) { return ::w82RetryKeepsThinking(thinking, legacyPrefill); }
 string AIPlayerGPTSelfTestAccess::gptForceClosePrefillBody(const string& prefill) { return ::gptForceClosePrefillBody(prefill); }
 bool AIPlayerGPTSelfTestAccess::hasCodedAnswerLine(const string& content) { return ::hasCodedAnswerLine(content); }
 bool AIPlayerGPTSelfTestAccess::reasoningHiddenShape(bool requested, const string& content, const string& reasoning) { return ::reasoningHiddenShape(requested, content, reasoning); }

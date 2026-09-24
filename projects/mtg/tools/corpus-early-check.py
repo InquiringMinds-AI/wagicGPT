@@ -31,9 +31,9 @@ the tool degrades to `filename epoch >= start - 5`, the same rule the harness's 
 tripwires use, and says so on its first line.
 
 WHAT IT IS FOR (skill, "the EARLY corpus check is a DIAGNOSIS, not a liveness glance")
-More than ~10 asks by one seat in one (turn, phase), or a `declined this exact list N
+More than ~10 windows by one seat in one (turn, phase), or a `declined this exact list N
 times` clause with N > 10, is a WINDOW LOOP: stop the corpus and look.  Fresh mtimes,
-rising ask counts and zero fallbacks all read HEALTHY while a window loop burns hours.
+rising window counts and zero fallbacks all read HEALTHY while a window loop burns hours.
 """
 import sys, os, glob, json, re, collections, datetime
 
@@ -64,6 +64,40 @@ def run_manifest(arg):
 
 SEAT_RE = re.compile(r'^(\d+)-ai_baka_(\w+?)-')
 
+#Records that are bookkeeping beside a decision, or the game envelope - never a
+#decision the seat was asked (the same exclusion list the harness's stall
+#predicate uses; `async_drop` is wave 82 lane EA's side record, M3).
+SIDE_KINDS = ("gamestart", "system", "gameend", "ask_replay", "recovery",
+              "hold_event", "forced_close", "async_drop", "menu_single_outcome",
+              "wall_miss", "defer")
+
+def decision_seam(r):
+    """The seam a decision record was asked at, or None for a side record.
+    Window shape (#W82-P11): kind == 'window' and the seam is a field. Legacy
+    shape: the kind IS the seam (ask, priority, attackers, ...)."""
+    kind = r.get('kind')
+    if kind == 'window':
+        return r.get('seam') or 'window'
+    if kind is None or kind in SIDE_KINDS:
+        return None
+    return kind
+
+def selftest():
+    ok = True
+    def chk(cond, what):
+        nonlocal ok
+        if not cond:
+            ok = False
+            print("SELFTEST FAIL: " + what)
+    chk(decision_seam({"kind": "window", "seam": "ask"}) == "ask", "window/ask reads as ask")
+    chk(decision_seam({"kind": "window", "seam": "blockers"}) == "blockers", "window/blockers")
+    chk(decision_seam({"kind": "ask"}) == "ask", "legacy ask still counts")
+    chk(decision_seam({"kind": "hold_event"}) is None, "hold_event is a side record")
+    chk(decision_seam({"kind": "async_drop"}) is None, "async_drop is a side record")
+    chk(decision_seam({"kind": "gameend"}) is None, "gameend is the envelope")
+    print("corpus-early-check selftest: %s" % ("OK" if ok else "FAILED"))
+    return 0 if ok else 1
+
 def belongs(ep, base, start, manifest, slack=15):
     """`slack` covers the gap between the harness stamping `gstart` and the engine
     creating the seat log (measured at 2-5 s on the wave-74 corpus)."""
@@ -78,6 +112,8 @@ def belongs(ep, base, start, manifest, slack=15):
     return False
 
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] == '--selftest':
+        sys.exit(selftest())
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     start, how = run_start_epoch(sys.argv[1])
@@ -89,6 +125,7 @@ def main():
     logdir = os.path.expanduser('~/.Wagic/ai/gpt/logs')
     worst, tot, seats, skipped = [], 0, 0, 0
     fb = collections.Counter()
+    by_seam = collections.Counter()
     for f in sorted(glob.glob(logdir + '/*.jsonl')):
         base = os.path.basename(f)
         try:
@@ -107,9 +144,16 @@ def main():
                 r = json.loads(l)
             except Exception:
                 continue
-            if r.get('kind') != 'ask':
+            #bug-list #14 (wave 82, lane EA): since #W82-P11 every decision record
+            #is `kind: window` + `seam`; the wave-81 early check read "asks 0" on
+            #a healthy corpus because it still keyed on the retired `kind: ask`.
+            #A window is counted under its seam; a pre-P11 log (kind == the seam)
+            #still reads, so the tool works on either shape.
+            seam = decision_seam(r)
+            if seam is None:
                 continue
             tot += 1
+            by_seam[seam] += 1
             c[(r.get('turn'), r.get('phase'))] += 1
             if r.get('fallback'):
                 fb[r['fallback']] += 1
@@ -121,10 +165,10 @@ def main():
             worst.append((n, mx, os.path.basename(f)[11:32], t, p))
     worst.sort(reverse=True)
     print("run start %d (%s)" % (start, how))
-    print("seats %d asks %d fallbacks %s  (%d log(s) in the shared dir are NOT this run)"
-          % (seats, tot, dict(fb), skipped))
+    print("seats %d windows %d by seam %s fallbacks %s  (%d log(s) in the shared dir are NOT this run)"
+          % (seats, tot, dict(sorted(by_seam.items())), dict(fb), skipped))
     for n, mx, name, t, p in worst[:4]:
-        print("  seat %s: max asks in one phase %d (turn %s %s), max declined-count %d"
+        print("  seat %s: max windows in one phase %d (turn %s %s), max declined-count %d"
               % (name, n, t, p, mx))
     flag = [w for w in worst if w[0] > 10 or w[1] > 10]
     if flag:

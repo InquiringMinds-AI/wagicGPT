@@ -9172,6 +9172,40 @@ static bool w79BareAnswerLineSpan(const std::string& t, size_t start, size_t end
     return false;
 }
 
+//#W82-EA (H7, wave-81 deck50 HIGH - the corpus's only heuristic fallback): THE
+//PLAN LINE THAT IS THE ANSWER. `50v125` seq 41 replied, verbatim and complete,
+//`PLAN: 4 (Cast nothing right now)`: no action-label line anywhere, and the sole
+//labelled line's content is exactly the protocol's action payload - a row number
+//and that row's own short name - matching one row. The label-less reader refused
+//it because the line does not START with the digits (the `PLAN:` label leads),
+//so the heuristic played the window. Under the ruling ("read the answer wherever
+//it unambiguously is; reject only an answer that PRECEDES the plan") it is
+//unambiguous: there is no plan for the answer to precede, because the line that
+//would hold the plan holds the answer. [start,end) is a trimmed line; on a match
+//the span handed back is the payload AFTER the label, which `parseChoice` then
+//validates against the offered rows exactly as it does a labelled answer.
+static bool w82PlanLineBareAnswerSpan(const std::string& t, size_t start, size_t end,
+                                      size_t * segStart, size_t * segEnd)
+{
+    static const char kPlan[] = "plan:";
+    const size_t n = sizeof(kPlan) - 1;
+    if (end - start <= n)
+        return false;
+    for (size_t k = 0; k < n; k++)
+        if (tolower((unsigned char) t[start + k]) != kPlan[k])
+            return false;
+    size_t s = start + n;
+    while (s < end && (t[s] == ' ' || t[s] == '\t'))
+        s++;
+    if (!w79BareAnswerLineSpan(t, s, end))
+        return false;
+    if (segStart)
+        *segStart = s;
+    if (segEnd)
+        *segEnd = end;
+    return true;
+}
+
 } //namespace
 
 //#W79-DD (wave-78 engine-seat / lane CX S1, now RULED): READ THE LABEL-LESS
@@ -9222,6 +9256,10 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
     bool sawNonBlank = false;         //any non-blank line seen so far
     bool nonBlankBeforeCand = false;  //...at the moment the candidate was seen
     bool nonBlankAfterCand = false;
+    //#W82-EA (H7): the candidate was the PLAN line's own payload, and whether a
+    //line-leading PLAN marker came AFTER it (a plan written after the answer).
+    bool candIsPlanLine = false;
+    bool planMarkerAfterCand = false;
     size_t lineStart = 0;
     while (lineStart <= text.size())
     {
@@ -9235,16 +9273,39 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
             e--;
         if (e > s)
         {
+            size_t ps = 0, pe = 0;
             if (w79BareAnswerLineSpan(text, s, e))
             {
                 candidates++;
                 nonBlankBeforeCand = sawNonBlank;
                 nonBlankAfterCand = false;
+                candIsPlanLine = false;
                 candStart = s;
                 candEnd = e;
             }
+            else if (w82PlanLineBareAnswerSpan(text, s, e, &ps, &pe))
+            {
+                //#W82-EA (H7): `PLAN: <row> (<short name>)` and nothing else on the
+                //line - the answer in the plan's slot. Counted in the SAME census as
+                //a bare line, so two of either shape is still two answers.
+                candidates++;
+                nonBlankBeforeCand = sawNonBlank;
+                nonBlankAfterCand = false;
+                candIsPlanLine = true;
+                candStart = ps;
+                candEnd = pe;
+            }
             else if (candidates > 0)
+            {
                 nonBlankAfterCand = true;
+                //a line-leading PLAN marker after the candidate: a plan that
+                //FOLLOWS the answer, which the ruling refuses.
+                if (e - s >= 5 && tolower((unsigned char) text[s]) == 'p'
+                    && tolower((unsigned char) text[s + 1]) == 'l'
+                    && tolower((unsigned char) text[s + 2]) == 'a'
+                    && tolower((unsigned char) text[s + 3]) == 'n' && text[s + 4] == ':')
+                    planMarkerAfterCand = true;
+            }
             sawNonBlank = true;
         }
         if (lineEnd == std::string::npos)
@@ -9253,6 +9314,20 @@ bool w79LabellessAnswerLine(const std::string& text, size_t planLineStart,
     }
     if (candidates != 1)
         return false;
+    if (candIsPlanLine)
+    {
+        //#W82-EA (H7): the plan slot holds the answer, so "a non-blank line before
+        //it" is not owed - there is no plan for this answer to precede. What IS
+        //refused is a plan written AFTER it (`PLAN: 4 (...)` then `PLAN: keep mana
+        //up`): that is the ruling's own clause, an answer ahead of its plan.
+        if (planMarkerAfterCand)
+            return false;
+        if (segStart)
+            *segStart = candStart;
+        if (segEnd)
+            *segEnd = candEnd;
+        return true;
+    }
     //#W82-A (L8, audit-2026-09): the "must be the LAST non-blank line" clause is
     //DELETED. Exactly one line in the reply has the answer shape and it follows
     //the plan, so the answer is unambiguous - and the ruling is "make the parser
@@ -39694,6 +39769,17 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //the next tokens it decodes MUST be the answer. The slot key carries the
     //tag; the request carries the base prompt.
     bool forceClose = (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+    //#W82-EA (H6): WHICH retry the force-close tag names. Default: the same
+    //question again with thinking ON and the budget RAISED (w82RetryReasoningBudget
+    //in AIPlayerGPTTransport.cpp has the ruling and the corpus records). Legacy:
+    //the answer-only prefill close, only behind WAGIC_GPT_FORCECLOSE_PREFILL=1 or
+    //under a thinking-off regime (nothing to keep on).
+    const bool w82LegacyPrefillEnv = [] { const char * v = getenv("WAGIC_GPT_FORCECLOSE_PREFILL");
+                                          return v && v[0] == '1' && !v[1]; }();
+    const bool w82ThinkingRetry = forceClose && w82RetryKeepsThinking(mThinking, w82LegacyPrefillEnv);
+    const bool w82PrefillClose = forceClose && !w82ThinkingRetry;
+    if (forceClose)
+        mForceCloseIsPrefill = w82PrefillClose; //read by the consume path
     //#W53-Q (D10): the deadline retry's key is stripped the same way, and
     //NOTHING else about the request changes - the re-ask must be the identical
     //question or it is a different decision, not a retry.
@@ -39737,7 +39823,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     json messages = json::array();
     messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
     messages.push_back({{"role", "user"}, {"content", baseMsg}});
-    if (forceClose)
+    if (w82PrefillClose)
     {
         //ASSISTANT PREFILL, not a new instruction. The model resumes its own
         //turn from the closed thinking block, so what it writes next is the
@@ -39775,9 +39861,15 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //it was computed for so a stale one can never leak into a different window.
     const long legalFloor = (!mAnswerFloorSeam.empty() && mAnswerFloorSeam == mRequestSeam)
                             ? mAnswerFloorTokens : 0;
-    const GptTokenPlan plan = gptResolveMaxTokens(mThinking, forceClose, mReasoningBudget,
+    //#W82-EA (H6): the thinking-on retry resolves like a phase-1 request with the
+    //raised budget and the seam's ordinary answer ceiling; only the legacy prefill
+    //close is answer-only and answer-locked.
+    const long w82Budget = w82ThinkingRetry ? w82RetryReasoningBudget(mForceClosePhase1Budget)
+                                            : mReasoningBudget;
+    const GptTokenPlan plan = gptResolveMaxTokens(mThinking, w82PrefillClose, w82Budget,
                                                   configuredCeiling, mRequestSeam.c_str(),
-                                                  gptSeamTokensDisabled(), answerLockedRetry,
+                                                  gptSeamTokensDisabled(),
+                                                  answerLockedRetry && !w82ThinkingRetry,
                                                   legalFloor);
     long maxTokens = plan.total;
     //#W70-BK (C6): the regime was never stated by anyone. It resolves to OFF -
@@ -39798,7 +39890,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //EXPLICIT reasoning_budget of 0 that is not the "unset" sentinel - the
     //unbounded arm falls back to the default window rather than to zero. It is
     //the operator's own explicit number, so it is honoured, and said out loud.
-    if (mThinking && !forceClose && plan.reasoning <= 0)
+    if (mThinking && !w82PrefillClose && plan.reasoning <= 0)
         gptLogLineOnce("thinking is ON but the resolved reasoning budget is 0 tokens "
                        "(reasoning_budget/WAGIC_GPT_REASONING_BUDGET unset and the configured "
                        "max_reply_tokens does not exceed the answer ceiling) - the model has no "
@@ -39840,9 +39932,13 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //thinking-OFF arm of the A/B is only actually OFF because this line
     //explicitly says false; omitting the field when the config says off would
     //have run BOTH arms with thinking on and produced a null result.
+    //#W82-EA (H6): only the legacy prefill close sends enable_thinking:false; the
+    //default retry keeps the regime's flag. The flag SENT is what the record's
+    //`thinking` field reports (mLastRequestThinking).
+    mLastRequestThinking = w82PrefillClose ? false : mThinking;
     if (mEndpoint.find("api.openai.com") == string::npos)
-        request["chat_template_kwargs"] = {{"enable_thinking", forceClose ? false : mThinking}};
-    if (forceClose)
+        request["chat_template_kwargs"] = {{"enable_thinking", mLastRequestThinking}};
+    if (w82PrefillClose)
     {
         request["continue_final_message"] = true;
         request["add_generation_prompt"] = false;

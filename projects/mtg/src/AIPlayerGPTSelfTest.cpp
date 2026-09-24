@@ -29324,12 +29324,92 @@ static const char * kW50Y_r94 =
         CHECK(!Bind::close(false) && !Bind::budget(false, true),
               "#W71-BO L9 MUST-NOT-MATCH a decision with no phase-2 consume wears neither, whatever"
               " a previous decision's phase 1 did - the leak that stamped 19 records for 4 closes");
-        // The forced-close request is identifiable in the data by its own cap
-        // split, which is what the red witness counts.
+        // The LEGACY prefill close (WAGIC_GPT_FORCECLOSE_PREFILL=1 only, since
+        // #W82-EA H6) is identifiable in the data by its own cap split.
         const GptTokenPlan fc2 = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, true);
         CHECK(fc2.reasoning == 0,
-              "#W71-BO L9 ECHO a phase-2 request is the only one with max_tokens_reasoning == 0,"
-              " so the corpus can count closes without trusting the marker");
+              "#W71-BO L9 ECHO the legacy prefill close is the only request with max_tokens_reasoning"
+              " == 0, so a corpus that ran it can count closes without trusting the marker");
+    }
+
+    cout << "\n[#W82-EA] H6 the budget-overrun retry keeps thinking ON and raises the budget\n";
+    {
+        // `125v152` seq 23 (reasoning_chars 20,683) and `125v162` seq 300 (26,808):
+        // `reasoning_budget_hit`, `retry: 1`, `max_tokens_reasoning: 0`, `thinking:
+        // on` - the retry was decoded with the native channel OFF under a regime of
+        // ON. Ruling: reasoning happens ONLY in the native channel. The retry is now
+        // the same question with the budget raised; the prefill close is legacy.
+        CHECK(w82RetryReasoningBudget(6000) == 12000 && w82RetryReasoningBudget(20000) == 40000,
+              "#W82-EA H6 POSITIVE the retry budget is TWICE the allowance phase 1 hit");
+        CHECK(w82RetryReasoningBudget(0) == 2 * kDefaultReasoningBudget
+                  && w82RetryReasoningBudget(-1) == 2 * kDefaultReasoningBudget,
+              "#W82-EA H6 POSITIVE an unknown phase-1 allowance raises from the shipped default,"
+              " never to 0");
+        CHECK(w82RetryKeepsThinking(true, false) && !w82RetryKeepsThinking(true, true)
+                  && !w82RetryKeepsThinking(false, false),
+              "#W82-EA H6 POSITIVE thinking on + no legacy flag = the thinking retry; the legacy"
+              " flag or a thinking-off regime = the prefill close");
+        // The retry request resolves like a phase-1 request: the raised budget IS
+        // the reasoning half, the seam's ordinary answer ceiling is the answer half.
+        const GptTokenPlan rt = gptResolveMaxTokens(true, false, w82RetryReasoningBudget(6000), -1,
+                                                    "ask", false, false);
+        const GptTokenPlan p1 = gptResolveMaxTokens(true, false, 6000, -1, "ask", false, false);
+        CHECK(rt.reasoning == 12000 && rt.answer == p1.answer && rt.total == 12000 + p1.answer,
+              "#W82-EA H6 POSITIVE the retry request carries max_tokens_reasoning 12000 over the"
+              " same answer ceiling phase 1 had - a record under thinking never shows a reasoning"
+              " half of 0 again");
+        // ...and the request builder's flag rule, stated as the data will show it.
+        {
+            const bool thinking = true;
+            json request;
+            request["chat_template_kwargs"] = {{"enable_thinking",
+                                               w82RetryKeepsThinking(thinking, false) ? thinking : false}};
+            CHECK(request["chat_template_kwargs"]["enable_thinking"].get<bool>(),
+                  "#W82-EA H6 ECHO the retry request is sent with enable_thinking:true - the record's"
+                  " `thinking` field (now the flag the request carried) reads `on`");
+        }
+    }
+
+    cout << "\n[#W82-EA] M3 every stale async drop is its own `async_drop` record\n";
+    {
+        // Wave 81: gameend `async_drops` summed 52 across 42 seats and NOT ONE
+        // record carried `async_drop_events` - the stamp rode the next record of
+        // the drop's own window (#W82-A L10), and a stale drop means that window
+        // is gone. The 52 could be classified only from stderr. Now the drop is
+        // the record: arm, seam, why, outcome, and what was thrown away.
+        const string body = "{\"choices\":[{\"message\":{\"content\":\"PLAN: hold the sweeper.\\nCHOICE: 3\","
+                            "\"reasoning_content\":\"" + string(1234, 'r') + "\"}}]}";
+        json rec = json::parse(asyncDropRecordJson(7, "casting", "ask", "question and board", "re-asked",
+                                                   body, 41, 88, 12, 5));
+        CHECK(rec["kind"] == "async_drop" && rec["event"] == 7 && rec["arm"] == "casting"
+                  && rec["seam"] == "ask" && rec["why"] == "question and board" && rec["outcome"] == "re-asked"
+                  && rec["window_seq"] == 41 && rec["window_record_seq"] == 88 && rec["turn"] == 12
+                  && rec["phase"] == 5,
+              "#W82-EA M3 POSITIVE the record names the arm, the seam, why the slot key moved, what the"
+              " drop did, and the window it is about (ordinal AND record seq)");
+        CHECK(rec["discarded_parsed"].get<bool>() && rec["discarded_bytes"].get<long>() == (long) body.size()
+                  && rec["discarded_content"] == "PLAN: hold the sweeper.\nCHOICE: 3"
+                  && rec["discarded_content_chars"].get<long>() == 33
+                  && rec["discarded_reasoning_chars"].get<long>() == 1234,
+              "#W82-EA M3 POSITIVE what was discarded is on the record: the paid-for reply's content"
+              " (its answer line) and the reasoning length");
+        json empty = json::parse(asyncDropRecordJson(1, "land-drop", "priority", "", "gave-up-to-heuristic",
+                                                     "", 3, -1, 2, 1));
+        CHECK(!empty["discarded_parsed"].get<bool>() && empty["discarded_bytes"].get<long>() == 0
+                  && empty["discarded_content"] == "" && empty["why"] == "unknown"
+                  && empty["outcome"] == "gave-up-to-heuristic" && empty["arm"] == "land-drop",
+              "#W82-EA M3 NEGATIVE an empty body is reported by size, an unknown drift says so, and the"
+              " livelock give-up is named as the drop's outcome");
+        json garbage = json::parse(asyncDropRecordJson(2, "casting", "ask", "board", "re-asked",
+                                                       "<html>502</html>", 3, 5, 2, 1));
+        CHECK(!garbage["discarded_parsed"].get<bool>() && garbage["discarded_bytes"].get<long>() == 16
+                  && garbage["discarded_content_chars"].get<long>() == 0,
+              "#W82-EA M3 NEGATIVE an unparseable envelope never throws - it is reported by size");
+        const string longBody = "{\"choices\":[{\"message\":{\"content\":\"" + string(2000, 'x') + "\"}}]}";
+        json cut = json::parse(asyncDropRecordJson(3, "casting", "ask", "board", "re-asked", longBody, 3, 5, 2, 1));
+        CHECK(cut["discarded_content"].get<string>().size() == 603
+                  && cut["discarded_content_chars"].get<long>() == 2000,
+              "#W82-EA M3 ECHO a long discarded reply keeps its head (600 + ...) and its full length");
     }
 
 
@@ -41061,6 +41141,57 @@ static const char * kW50Y_r94 =
               "#W80-DE U10 GREEN the RESOLVING verdict states the hold row's OWN cost -"
               " `126v125` seq 46 recommended a hold over two live Sorin activations while"
               " saying only that it `covers every remaining link`");
+    }
+
+    cout << "\n[#W82-EA] H7 the PLAN line that IS the answer - `50v125` seq 41, the corpus's one fallback\n";
+    {
+        // The reply, verbatim and complete, was the single line
+        // `PLAN: 4 (Cast nothing right now)` over a four-row menu whose row 4 is
+        // `Cast nothing right now (combat comes next this turn) {...}`. No plan
+        // exists for the answer to precede; `4 (<short name>)` is exactly the
+        // protocol's action payload; one row matches. It fell to the heuristic
+        // (`recovery` seq 42, executed_by heuristic) with 891 s of deadline left.
+        int run = 0, rej = 0; bool bare = false;
+        // POSITIVE: the verbatim corpus reply is read, through the selector
+        // consumePlan calls, as the label-less answer `4 (Cast nothing right now)`.
+        CHECK(answerSegmentStatic("\n\nPLAN: 4 (Cast nothing right now)", "CHOICE:", &run, &rej, &bare)
+                  == "4 (Cast nothing right now)" && bare,
+              "#W82-EA H7 GREEN `PLAN: 4 (Cast nothing right now)` alone is the answer - the plan slot"
+              " holds the action payload and nothing precedes it that it could be post hoc to");
+        // ...and it survives the ordinary decorations: leading blanks, a CR, a
+        // courtesy line after it (#W82-A L8: trailing prose is measured, not obeyed).
+        CHECK(answerSegmentStatic("  plan: 4 (Cast nothing right now)\r\nThank you.", "CHOICE:", &run, &rej, &bare)
+                  == "4 (Cast nothing right now)" && bare,
+              "#W82-EA H7 GREEN case-insensitive label, indentation, CR and a trailing courtesy line"
+              " change no fact");
+        // NEGATIVE (genuinely ambiguous): two answer-shaped lines, whichever shape
+        // each takes, is two answers - refused, so the seam re-asks.
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\n2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a PLAN-line answer beside a bare answer line is two answers");
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nPLAN: 2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH two PLAN-line answers are two answers");
+        // REJECTED (the ruling's own clause): a plan written AFTER the answer is
+        // post hoc justification - `PLAN: 4 (...)` then `PLAN: keep mana up`.
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nPLAN: keep mana up for Damnation.",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH an answer in the plan slot followed by a PLAN line is an"
+              " answer that precedes its plan - refused");
+        // Still the protocol's own shape when the plan is prose: a PLAN line that
+        // merely CONTAINS a numbered parenthetical is not this shape (the payload
+        // must be the whole remainder), and a labelled answer always wins.
+        CHECK(answerSegmentStatic("PLAN: take 4 (Cast nothing right now) and keep mana up.",
+                                  "CHOICE:", &run, &rej, &bare).empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a PLAN line whose payload is prose around a parenthetical"
+              " is a plan, not an answer");
+        CHECK(answerSegmentStatic("PLAN: 4 (Cast nothing right now)\nCHOICE: 2 (Cast Wrath of God)",
+                                  "CHOICE:", &run, &rej, &bare) == " 2 (Cast Wrath of God)" && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH the labelled line wins over a PLAN-line payload");
+        // ...and the wave-79 refusals stand: the bare shape still owes a plan before it.
+        CHECK(answerSegmentStatic("\n\n4 (Cast nothing right now)\n", "CHOICE:", &run, &rej, &bare)
+                  .empty() && !bare,
+              "#W82-EA H7 MUST-NOT-MATCH a bare action line with nothing before it is still refused");
     }
 
     // ================= WAVE 80 LANE DF - combat, cover and pricing truth =========

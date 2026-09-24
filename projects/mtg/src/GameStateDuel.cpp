@@ -359,6 +359,29 @@ void GameStateDuel::Start()
             int selfplayD1 = d1env ? atoi(d1env) : tournament->getDeckNumber(1);
             if (d0env || d1env)
                 fprintf(stderr, "WAGIC_SELFPLAY: matchup deck%d vs deck%d\n", selfplayD0, selfplayD1);
+            //bug-list #13 (wave 82, lane EA): a PAIRED heuristic A/B needs the two
+            //binaries to play the SAME game. Every source of randomness a self-play
+            //game draws on is seeded from the clock - the process-global rand()
+            //(GameApp::Create, srand(time(0))) and the observer's own generators
+            //(the GameObserver ctor, mSeed = time(0)) - so two runs a second apart
+            //are two different games, and a 10-point win-rate shift at n = 120
+            //cannot be told from sampling (audit-2026-09/step1-lane.md: 840
+            //unpaired games could not settle what 18 seeded ones did). With
+            //WAGIC_SELFPLAY_SEED=<n> both are pinned before any draw: the same
+            //binary on the same seed is trace-identical, and two binaries on the
+            //same seed differ only where their play differs (tools/baka-ab.sh
+            //--paired records and replays the seeds). Unset, or 0 -> unchanged
+            //(clock-seeded: initRand treats 0 as "no seed").
+            if (const char * seedEnv = getenv("WAGIC_SELFPLAY_SEED"))
+            {
+                const unsigned int selfplaySeed = (unsigned int) strtoul(seedEnv, NULL, 10);
+                if (selfplaySeed)
+                {
+                    initRand(selfplaySeed);
+                    game->resetSeed(selfplaySeed);
+                    fprintf(stderr, "WAGIC_SELFPLAY: seed=%u\n", selfplaySeed);
+                }
+            }
 #ifdef WAGIC_TRANSCRIPT_ON
             if (const char * replay = getenv("WAGIC_REPLAY"))
             {

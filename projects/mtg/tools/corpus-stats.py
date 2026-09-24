@@ -111,6 +111,28 @@ def selftest():
         print("SELFTEST FAIL: hold_event census %r / %d"
               % (census_kind_list(k3), census_kind_sum(k3)))
         ok = False
+    #W82-EA (M3): the wave-82 lane's new kind, `async_drop` - one record per stale
+    # async drop (the per-window stamp it replaces reached 0 of 52 drops in wave 81).
+    # No round trip: it is an answer THROWN AWAY. Explained without an edit here,
+    # and its per-record count must equal the gameend `async_drops` sum (checked
+    # below in ASYNC DROPS).
+    k3b = _c.Counter({"ask": 3, "async_drop": 2, "hold_event": 1, "gameend": 1})
+    if census_kind_list(k3b) != "async_drop 2, hold_event 1" or census_kind_sum(k3b) != 3:
+        print("SELFTEST FAIL: async_drop census %r / %d"
+              % (census_kind_list(k3b), census_kind_sum(k3b)))
+        ok = False
+    if async_drop_lines([{"kind": "async_drop", "arm": "casting", "seam": "ask",
+                          "why": "question and board", "outcome": "re-asked",
+                          "discarded_content_chars": 40, "discarded_reasoning_chars": 5000},
+                         {"kind": "async_drop", "arm": "casting", "seam": "ask",
+                          "why": "question and board", "outcome": "re-asked",
+                          "discarded_content_chars": 20, "discarded_reasoning_chars": 1000},
+                         {"kind": "ask"}], 3) != [
+            "ASYNC DROPS: 2 records (gameend async_drops 3 - MISMATCH: a drop left no record)",
+            "  2  arm=casting seam=ask why='question and board' outcome=re-asked",
+            "  discarded: content chars median 30, reasoning chars sum 6000 (median 3000)"]:
+        print("SELFTEST FAIL: async_drop lines %r" % (async_drop_lines([], 0),))
+        ok = False
     # ...and a census with nothing but round-trip kinds explains nothing, because
     # there is nothing to explain.
     if census_kind_list(_c.Counter({"ask": 5, "priority": 2, "gameend": 1})) != "":
@@ -328,6 +350,26 @@ def folded_events(records):
     return c
 
 
+def async_drop_lines(records, gameend_total):
+    """#W82-EA (M3): the stale async drops, one record each, by arm/seam/why/outcome,
+    reconciled against the gameend `async_drops` sum (a drop that left no record is
+    the wave-81 defect, so a mismatch is said out loud). Pure; returns lines."""
+    drops = [r for r in records if r.get("kind") == "async_drop"]
+    ge = gameend_total
+    note = "" if ge is None or ge == len(drops) else " - MISMATCH: a drop left no record"
+    out = ["ASYNC DROPS: %d records (gameend async_drops %s%s)" % (len(drops), ge, note)]
+    by = collections.Counter((r.get("arm"), r.get("seam"), r.get("why"), r.get("outcome"))
+                             for r in drops)
+    for k, n in sorted(by.items(), key=lambda kv: (-kv[1], str(kv[0]))):
+        out.append("  %d  arm=%s seam=%s why=%r outcome=%s" % (n, k[0], k[1], k[2], k[3]))
+    if drops:
+        cc = [r.get("discarded_content_chars") or 0 for r in drops]
+        rc = [r.get("discarded_reasoning_chars") or 0 for r in drops]
+        out.append("  discarded: content chars median %d, reasoning chars sum %d (median %d)"
+                   % (statistics.median(cc), sum(rc), statistics.median(rc)))
+    return out
+
+
 def load(dirs):
     """basename -> records, with the two exclusions applied."""
     seen = {}
@@ -529,6 +571,8 @@ def main(argv):
                   % (census_kind_sum(kinds, engine_answered), decision_records - pr))
         else:
             print("CENSUS CHECK RECONCILES.")
+    for line in async_drop_lines(allrecs, sums.get("async_drops")):  #W82-EA (M3)
+        print(line)
 
     print("askreplay files: %d"
           % sum(len(glob.glob(os.path.join(d, "askreplay", "*.jsonl"))) for d in dirs))

@@ -316,6 +316,89 @@ void AIPlayerGPT::writeHoldEventRecord(const char * event, const char * seam,
 
 
 
+//#W82-EA (M3, wave-81 synthesis: `async_drops` 9 -> 52 with no per-record
+//trace). ONE RECORD PER STALE ASYNC DROP. The drop's evidence used to be a stamp
+//folded onto the next record of the drop's OWN window (#W58-C D4, scoped by
+//#W82-A L10); a stale drop is by definition an answer to a decision the seat has
+//moved past, so that window's record (nearly) never comes - the wave-81 corpus
+//holds 52 drops on gameend and 0 `async_drop_events` anywhere, and the 52 could
+//be classified only from stderr (37 `casting/question (or turn/phase) moved`,
+//15 `casting/question and board moved`, all `re-asked`). This is the event, at
+//the event: which arm and seam, why the slot key moved, what the paid-for reply
+//said (its answer line and sizes - the reply was bought and thrown away, so a
+//seat can judge whether the re-ask was worth its price), and what the drop did
+//with the decision. Telemetry about a window in flight: it rides the window
+//ordinal and takes no seq of the window counter, like `hold_event`.
+//`async_drops` on gameend equals the number of these records.
+//The body is PURE (PARSETEST pins its shape); the writer adds `seq`.
+string asyncDropRecordJson(int event, const char * arm, const string& seam, const string& driftKind,
+                           const char * outcome, const string& discardedBody, int windowSeq,
+                           int windowRecordSeq, int turn, int phase)
+{
+    //What was discarded: the reply's content (its answer line is what the
+    //re-ask will have to buy again) and the reasoning length. The body is the
+    //provider's raw envelope; an unparseable one is reported by size only.
+    string discardedContent;
+    long discardedReasoningChars = 0;
+    bool parsed = false;
+    if (!discardedBody.empty())
+    {
+        try
+        {
+            json reply = json::parse(discardedBody);
+            json choice0 = reply["choices"][0];
+            if (choice0["message"]["content"].is_string())
+                discardedContent = choice0["message"]["content"].get<string>();
+            if (choice0["message"].contains("reasoning_content")
+                && choice0["message"]["reasoning_content"].is_string())
+                discardedReasoningChars = (long) choice0["message"]["reasoning_content"].get<string>().size();
+            else if (choice0["message"].contains("reasoning")
+                     && choice0["message"]["reasoning"].is_string())
+                discardedReasoningChars = (long) choice0["message"]["reasoning"].get<string>().size();
+            parsed = true;
+        }
+        catch (...) { parsed = false; }
+    }
+    const size_t kKeep = 600; //the answer line and its plan, not a whole ramble
+    string head = discardedContent.size() > kKeep
+                  ? discardedContent.substr(0, kKeep) + "..." : discardedContent;
+    json rec = {
+        {"kind", "async_drop"},
+        {"event", event},
+        {"arm", arm ? arm : "?"},
+        {"seam", seam},
+        {"why", driftKind.empty() ? string("unknown") : driftKind},
+        {"outcome", outcome ? outcome : "?"},
+        {"discarded_bytes", (long) discardedBody.size()},
+        {"discarded_parsed", parsed},
+        {"discarded_content_chars", (long) discardedContent.size()},
+        {"discarded_reasoning_chars", discardedReasoningChars},
+        {"discarded_content", head},
+        {"window_seq", windowSeq},
+        {"window_record_seq", windowRecordSeq},
+        {"turn", turn},
+        {"phase", phase},
+    };
+    return rec.dump();
+}
+
+void AIPlayerGPT::writeAsyncDropRecord(const char * arm, const string& driftKind,
+                                       const char * outcome, const string& discardedBody)
+{
+    mAsyncDropsGame++; //#W69-BI (K7): the game total, counted at the drop
+    if (mTransLogPath.empty())
+        return;
+    ensureGameStartRecord();
+    json rec = json::parse(asyncDropRecordJson(mAsyncDropsGame, arm, mRequestSeam, driftKind,
+                                               outcome, discardedBody, mWindowSeq,
+                                               mLastWindowRecordSeq,
+                                               translogTurn(observer ? observer->turn : 0),
+                                               observer ? observer->getCurrentGamePhase() : -1));
+    rec["seq"] = mTransSeq++;
+    transLogWrite(rec.dump());
+}
+
+
 //One header record per seat log: decks, names, and a game_id BOTH seats
 //share (the observer's address) - reviewers previously paired seat logs by
 //filename epoch arithmetic, which broke on harvested copies (wave-7 7d).
@@ -1338,7 +1421,11 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //from wave 44 to wave 69 ran with reasoning OFF and nothing in the data
     //said so. The harness gate reads this field to prove the binary honoured
     //the regime the launch asked for.
-    rec["thinking"] = mThinking ? "on" : "off";
+    //#W82-EA (H6): the flag the REQUEST carried, not the seat's regime - the
+    //legacy prefill close read `thinking: on` over `max_tokens_reasoning: 0`,
+    //a true statement in the wrong scope. A record with no round trip keeps the
+    //regime's value (mLastRequestThinking is reset to it where no request is built).
+    rec["thinking"] = (userMsg.empty() ? mThinking : mLastRequestThinking) ? "on" : "off";
     //#W70-BK (C2): the LENGTH is written on every record that carried a round
     //trip, present or ZERO, so "the model returned no reasoning" and "the field
     //is not implemented" can never look alike to the harness gate. The text
@@ -1386,6 +1473,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (mLastForcedClose)
     {
         rec["reasoning_forced_close"] = true;
+        //#W82-EA (H6): which retry answered, and what phase 1 cost. `retry_thinking`
+        //is the flag the retry request carried; `phase1_reasoning_chars` is the
+        //trace the thinking-on retry did NOT prefill back (the reasoning field
+        //on this record is the retry's own trace).
+        rec["retry_thinking"] = mForceCloseIsPrefill ? "off" : "on";
+        if (!mForceCloseIsPrefill)
+            rec["phase1_reasoning_chars"] = (long) mLastForceClosePrefill.size();
         mLastForcedClose = false;
         mForceCloseArmed = false; //#W75-CJ (P2c): this close reached a record
 
@@ -1869,24 +1963,11 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mRevealStallDriverTicks = 0; //#W64-AI (F14)
         mRevealStallDriverSecs = 0;
     }
-    //#W58-C (D4): the stale drops this seat took since its last record. One
-    //token per drop, "<arm>/<slot-key half that moved>/<outcome>", and the
-    //list is CONSUMED here so a drop is stamped exactly once. Unconditional -
-    //this is the record, not a diagnostic, and it is the only evidence a
-    //release build (or a console) leaves of an answer bought twice.
-    //#W82-A (L10): a drop stamp rides its OWN window's record or none.
-    if (!mAsyncDropStamps.empty() && mAsyncDropStampsSeq != mWindowSeq)
-    {
-        mAsyncDropStamps.clear();
-        mAsyncDropStampsSeq = -1;
-    }
-    if (!mAsyncDropStamps.empty())
-    {
-        rec["async_drops"] = (int) mAsyncDropStamps.size();
-        rec["async_drop_events"] = mAsyncDropStamps;
-        mAsyncDropStamps.clear();
-        mAsyncDropStampsSeq = -1;
-    }
+    //#W58-C (D4) -> #W82-EA (M3): the stale drops used to be stamped here, on
+    //the next record of the drop's own window. A stale drop means the decision
+    //moved, so that record almost never comes: 0 of 52 drops in the wave-81
+    //corpus were stamped anywhere. Each drop is now its own `async_drop` record
+    //(writeAsyncDropRecord), and the gameend `async_drops` total still counts them.
     //#W55-E (D23): this record answers a prompt that had already missed the wall.
     //#W82-A (L7): same slot-keying as the forced-close leg above.
     if (mWallMissPending && !userMsg.empty() && asyncSlotKey(userMsg) == mWallMissBase)
