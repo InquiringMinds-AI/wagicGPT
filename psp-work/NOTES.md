@@ -6506,3 +6506,4 @@ Seats: 6 EDIT + deck152 KEEP (6/6) — six guides installed 031db297b; 0 proposa
 ## 2026-09-24 04:10 — vpk27 BUILT on owner request ("Build a vpk")
 - psp-port ff'd to master (168cf3e4e → e915bcbc5). First docker build FAILED: two PARSETEST access-seam forwarders in AIPlayerGPT.cpp sat ABOVE the `#if defined(WAGIC_GPT_PARSETEST_BUILD)` guard (the Vita build has no self-test → `AIPlayerGPTSelfTestAccess has not been declared`). Fixed e915bcbc5 (guard moved above them; desktop PARSETEST unchanged 7459/0). Second build exit 0.
 - `archives/wagic-e915bcbc5-vpk27.vpk` (33,074,022 B) = master e915bcbc5 = wave-82 step one (05383b8f4 code) + the guard fix. NOT uploaded — waiting for "ftp up" (deploy: psp-work/scripts/deploy-vita.sh or plain `curl -T` to 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verify). Docker stopped.
+04:30: OWNER 'Ftp up': vpk27 UPLOADED to 10.0.0.227:1337 ux0:/vpk/wagic.vpk (33,074,022 B size-verified, first attempt). Install manual via VitaShell.
