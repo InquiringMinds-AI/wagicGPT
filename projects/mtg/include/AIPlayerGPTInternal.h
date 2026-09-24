@@ -186,6 +186,9 @@ string gateSideCensusTag(const string& labelA, int nA, const string& labelB, int
 long gptDeclarationAnswerFloorTokens(long items, long bytesPerItem);
 bool gptForceCloseEarned(bool reasoningOnly, bool contentEmpty, bool finishLength, bool haveReasoning, int codedAnswers);
 long w82RetryReasoningBudget(long phase1Budget); //#W82-EA (H6)
+string asyncDropRecordJson(int event, const char * arm, const string& seam, const string& driftKind,
+                           const char * outcome, const string& discardedBody, int windowSeq,
+                           int windowRecordSeq, int turn, int phase); //#W82-EA (M3)
 bool w82RetryKeepsThinking(bool thinking, bool legacyPrefill); //#W82-EA (H6)
 int gptForceCloseOutstanding(bool liveArmed, bool parkArmed);
 string gptForceClosePrefillBody(const string& prefill);

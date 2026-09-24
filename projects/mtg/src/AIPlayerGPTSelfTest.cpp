@@ -29303,6 +29303,48 @@ static const char * kW50Y_r94 =
         }
     }
 
+    cout << "\n[#W82-EA] M3 every stale async drop is its own `async_drop` record\n";
+    {
+        // Wave 81: gameend `async_drops` summed 52 across 42 seats and NOT ONE
+        // record carried `async_drop_events` - the stamp rode the next record of
+        // the drop's own window (#W82-A L10), and a stale drop means that window
+        // is gone. The 52 could be classified only from stderr. Now the drop is
+        // the record: arm, seam, why, outcome, and what was thrown away.
+        const string body = "{\"choices\":[{\"message\":{\"content\":\"PLAN: hold the sweeper.\\nCHOICE: 3\","
+                            "\"reasoning_content\":\"" + string(1234, 'r') + "\"}}]}";
+        json rec = json::parse(asyncDropRecordJson(7, "casting", "ask", "question and board", "re-asked",
+                                                   body, 41, 88, 12, 5));
+        CHECK(rec["kind"] == "async_drop" && rec["event"] == 7 && rec["arm"] == "casting"
+                  && rec["seam"] == "ask" && rec["why"] == "question and board" && rec["outcome"] == "re-asked"
+                  && rec["window_seq"] == 41 && rec["window_record_seq"] == 88 && rec["turn"] == 12
+                  && rec["phase"] == 5,
+              "#W82-EA M3 POSITIVE the record names the arm, the seam, why the slot key moved, what the"
+              " drop did, and the window it is about (ordinal AND record seq)");
+        CHECK(rec["discarded_parsed"].get<bool>() && rec["discarded_bytes"].get<long>() == (long) body.size()
+                  && rec["discarded_content"] == "PLAN: hold the sweeper.\nCHOICE: 3"
+                  && rec["discarded_content_chars"].get<long>() == 33
+                  && rec["discarded_reasoning_chars"].get<long>() == 1234,
+              "#W82-EA M3 POSITIVE what was discarded is on the record: the paid-for reply's content"
+              " (its answer line) and the reasoning length");
+        json empty = json::parse(asyncDropRecordJson(1, "land-drop", "priority", "", "gave-up-to-heuristic",
+                                                     "", 3, -1, 2, 1));
+        CHECK(!empty["discarded_parsed"].get<bool>() && empty["discarded_bytes"].get<long>() == 0
+                  && empty["discarded_content"] == "" && empty["why"] == "unknown"
+                  && empty["outcome"] == "gave-up-to-heuristic" && empty["arm"] == "land-drop",
+              "#W82-EA M3 NEGATIVE an empty body is reported by size, an unknown drift says so, and the"
+              " livelock give-up is named as the drop's outcome");
+        json garbage = json::parse(asyncDropRecordJson(2, "casting", "ask", "board", "re-asked",
+                                                       "<html>502</html>", 3, 5, 2, 1));
+        CHECK(!garbage["discarded_parsed"].get<bool>() && garbage["discarded_bytes"].get<long>() == 16
+                  && garbage["discarded_content_chars"].get<long>() == 0,
+              "#W82-EA M3 NEGATIVE an unparseable envelope never throws - it is reported by size");
+        const string longBody = "{\"choices\":[{\"message\":{\"content\":\"" + string(2000, 'x') + "\"}}]}";
+        json cut = json::parse(asyncDropRecordJson(3, "casting", "ask", "board", "re-asked", longBody, 3, 5, 2, 1));
+        CHECK(cut["discarded_content"].get<string>().size() == 603
+                  && cut["discarded_content_chars"].get<long>() == 2000,
+              "#W82-EA M3 ECHO a long discarded reply keeps its head (600 + ...) and its full length");
+    }
+
 
     cout << "\n[#W71-BR] L7 a creature-land is stated BESIDE every creature count, never inside one\n";
     {

@@ -1416,6 +1416,12 @@ private:
     void writeHoldEventRecord(const char * event, const char * seam,
                               const std::string& face, const std::string& reason,
                               int answerInvalidated = -1); //#W81-DK (V3)
+    //#W82-EA (M3): one `async_drop` record per stale async drop, written AT the
+    //drop (arm, seam, why the slot key moved, what was discarded, what the drop
+    //did) - the per-window stamp it replaces reached 0 of the wave-81 corpus's 52
+    //drops (see the definition).
+    void writeAsyncDropRecord(const char * arm, const std::string& driftKind,
+                              const char * outcome, const std::string& discardedBody);
     //#W81-DK (V3): drop the retained answer for the window held at <seam>, so a
     //re-opened window is ASKED instead of re-served the hold row it just retired.
     bool w81InvalidateHeldAnswer(const char * seam);
@@ -2626,17 +2632,14 @@ private:
     //the board every tick) is the async design working, and restarts the count.
     string mStaleDropBoard;
     bool mLastStaleLivelock; //the last no-answer was the breaker firing
-    //#W58-C (D4): every stale drop since the last record was written, one
-    //token each: "<arm>/<which half of the slot key moved>/<what the drop
-    //did>". The wave-57 corpus took 108 drops (0.82 h of inference, the
-    //largest sink after the identical-declined runs) and the ONLY evidence
-    //anywhere was a stderr line naming the arm - so a drop's outcome could be
-    //recovered only by reading the next `AIPlayerGPT:` line of a 40 KB stderr,
-    //and a release build (no DebugTrace) recorded nothing at all. The stderr
-    //line is diagnostics; this is the RECORD, and it ships unconditionally on
-    //the next translog record for this seat. Consumed when written, so a drop
-    //is stamped exactly once.
-    std::vector<std::string> mAsyncDropStamps;
+    //#W58-C (D4) -> #W82-EA (M3): the stale drop's RECORD used to be a stamp
+    //list ("<arm>/<which half of the slot key moved>/<what the drop did>")
+    //folded onto the next translog record of this seat; #W82-A (L10) scoped
+    //the fold to the drop's OWN window ordinal, and since a stale drop by
+    //definition means the decision moved on, the next record is (nearly)
+    //always a later window - 0 of the wave-81 corpus's 52 drops reached any
+    //record. The drop is now its own `async_drop` record, written at the drop
+    //(writeAsyncDropRecord); `mAsyncDropsGame` numbers them.
     //#W82-A R1 (LEDGER v2, Astra genuine cross-review): these eight counters were
     //deleted under a "no named consumer / a per-record field carries the fact"
     //rule. Astra refutes the premise: `tools/corpus-stats.py:465` iterates EVERY
@@ -2653,13 +2656,12 @@ private:
     int mHoldReopenedNewLethal;
     int mHoldEvents; //every clamp and every re-open writes one `hold_event` record
 
-    //#W82-A (L10, audit-2026-09): the WINDOW each pending stamp belongs to.
-    //`mAsyncDropStamps` and `mAbandonedInFlightSecs` were consumed by the next
-    //record of ANY kind, so a `casting/...` drop landed on a `blockers` record
-    //and an abandonment rode to whatever was written next. A stamp is a fact
-    //about one window; it is emitted on that window's record and dropped when
-    //the window is gone.
-    int mAsyncDropStampsSeq;
+    //#W82-A (L10, audit-2026-09): the WINDOW the pending abandonment belongs to.
+    //`mAbandonedInFlightSecs` was consumed by the next record of ANY kind, so an
+    //abandonment rode to whatever was written next. It is a fact about one
+    //window; it is emitted on that window's record and dropped when the window
+    //is gone. (The drop stamps that shared this rule are `async_drop` records
+    //since #W82-EA M3.)
     int mAbandonedInFlightSeq;
     //#W69-BI (K7, engine MED-2): the game total of the above. The per-decision
     //field is consumed with its record, so a reader taking the game's drop
