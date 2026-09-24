@@ -40199,9 +40199,8 @@ void echoSignificantWords(const string& seg, vector<string>& out)
 //One-line forwarders so the self-test translation unit can reach this file's
 //internal-linkage helpers and constants. They add no logic and are compiled only
 //where the self-test corpus itself is.
-string AIPlayerGPTSelfTestAccess::abilityActivationNarration(bool mine, const string& abilityText, const string& cardName, const string& targets) { return ::abilityActivationNarration(mine, abilityText, cardName, targets); }
-
 #if defined(WAGIC_GPT_PARSETEST_BUILD)
+string AIPlayerGPTSelfTestAccess::abilityActivationNarration(bool mine, const string& abilityText, const string& cardName, const string& targets) { return ::abilityActivationNarration(mine, abilityText, cardName, targets); }
 string AIPlayerGPTSelfTestAccess::actionTakenNarration(const string& action, bool activationVerb) { return ::actionTakenNarration(action, activationVerb); }
 bool AIPlayerGPTSelfTestAccess::activationActorIsMine(bool activatorIsMe, bool cardControllerKnown, bool cardControllerIsMine) { return ::activationActorIsMine(activatorIsMe, cardControllerKnown, cardControllerIsMine); }
 bool AIPlayerGPTSelfTestAccess::activationChairOverLadder(bool activatorIsMe, const vector<std::pair<bool, int> >& rungs) { return ::activationChairOverLadder(activatorIsMe, rungs); }
