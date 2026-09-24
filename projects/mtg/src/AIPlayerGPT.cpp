@@ -39111,6 +39111,17 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //the next tokens it decodes MUST be the answer. The slot key carries the
     //tag; the request carries the base prompt.
     bool forceClose = (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+    //#W82-EA (H6): WHICH retry the force-close tag names. Default: the same
+    //question again with thinking ON and the budget RAISED (w82RetryReasoningBudget
+    //in AIPlayerGPTTransport.cpp has the ruling and the corpus records). Legacy:
+    //the answer-only prefill close, only behind WAGIC_GPT_FORCECLOSE_PREFILL=1 or
+    //under a thinking-off regime (nothing to keep on).
+    const bool w82LegacyPrefillEnv = [] { const char * v = getenv("WAGIC_GPT_FORCECLOSE_PREFILL");
+                                          return v && v[0] == '1' && !v[1]; }();
+    const bool w82ThinkingRetry = forceClose && w82RetryKeepsThinking(mThinking, w82LegacyPrefillEnv);
+    const bool w82PrefillClose = forceClose && !w82ThinkingRetry;
+    if (forceClose)
+        mForceCloseIsPrefill = w82PrefillClose; //read by the consume path
     //#W53-Q (D10): the deadline retry's key is stripped the same way, and
     //NOTHING else about the request changes - the re-ask must be the identical
     //question or it is a different decision, not a retry.
@@ -39154,7 +39165,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     json messages = json::array();
     messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
     messages.push_back({{"role", "user"}, {"content", baseMsg}});
-    if (forceClose)
+    if (w82PrefillClose)
     {
         //ASSISTANT PREFILL, not a new instruction. The model resumes its own
         //turn from the closed thinking block, so what it writes next is the
@@ -39192,9 +39203,15 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //it was computed for so a stale one can never leak into a different window.
     const long legalFloor = (!mAnswerFloorSeam.empty() && mAnswerFloorSeam == mRequestSeam)
                             ? mAnswerFloorTokens : 0;
-    const GptTokenPlan plan = gptResolveMaxTokens(mThinking, forceClose, mReasoningBudget,
+    //#W82-EA (H6): the thinking-on retry resolves like a phase-1 request with the
+    //raised budget and the seam's ordinary answer ceiling; only the legacy prefill
+    //close is answer-only and answer-locked.
+    const long w82Budget = w82ThinkingRetry ? w82RetryReasoningBudget(mForceClosePhase1Budget)
+                                            : mReasoningBudget;
+    const GptTokenPlan plan = gptResolveMaxTokens(mThinking, w82PrefillClose, w82Budget,
                                                   configuredCeiling, mRequestSeam.c_str(),
-                                                  gptSeamTokensDisabled(), answerLockedRetry,
+                                                  gptSeamTokensDisabled(),
+                                                  answerLockedRetry && !w82ThinkingRetry,
                                                   legalFloor);
     long maxTokens = plan.total;
     //#W70-BK (C6): the regime was never stated by anyone. It resolves to OFF -
@@ -39215,7 +39232,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //EXPLICIT reasoning_budget of 0 that is not the "unset" sentinel - the
     //unbounded arm falls back to the default window rather than to zero. It is
     //the operator's own explicit number, so it is honoured, and said out loud.
-    if (mThinking && !forceClose && plan.reasoning <= 0)
+    if (mThinking && !w82PrefillClose && plan.reasoning <= 0)
         gptLogLineOnce("thinking is ON but the resolved reasoning budget is 0 tokens "
                        "(reasoning_budget/WAGIC_GPT_REASONING_BUDGET unset and the configured "
                        "max_reply_tokens does not exceed the answer ceiling) - the model has no "
@@ -39257,9 +39274,13 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //thinking-OFF arm of the A/B is only actually OFF because this line
     //explicitly says false; omitting the field when the config says off would
     //have run BOTH arms with thinking on and produced a null result.
+    //#W82-EA (H6): only the legacy prefill close sends enable_thinking:false; the
+    //default retry keeps the regime's flag. The flag SENT is what the record's
+    //`thinking` field reports (mLastRequestThinking).
+    mLastRequestThinking = w82PrefillClose ? false : mThinking;
     if (mEndpoint.find("api.openai.com") == string::npos)
-        request["chat_template_kwargs"] = {{"enable_thinking", forceClose ? false : mThinking}};
-    if (forceClose)
+        request["chat_template_kwargs"] = {{"enable_thinking", mLastRequestThinking}};
+    if (w82PrefillClose)
     {
         request["continue_final_message"] = true;
         request["add_generation_prompt"] = false;

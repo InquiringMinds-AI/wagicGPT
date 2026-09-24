@@ -1316,7 +1316,11 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //from wave 44 to wave 69 ran with reasoning OFF and nothing in the data
     //said so. The harness gate reads this field to prove the binary honoured
     //the regime the launch asked for.
-    rec["thinking"] = mThinking ? "on" : "off";
+    //#W82-EA (H6): the flag the REQUEST carried, not the seat's regime - the
+    //legacy prefill close read `thinking: on` over `max_tokens_reasoning: 0`,
+    //a true statement in the wrong scope. A record with no round trip keeps the
+    //regime's value (mLastRequestThinking is reset to it where no request is built).
+    rec["thinking"] = (userMsg.empty() ? mThinking : mLastRequestThinking) ? "on" : "off";
     //#W70-BK (C2): the LENGTH is written on every record that carried a round
     //trip, present or ZERO, so "the model returned no reasoning" and "the field
     //is not implemented" can never look alike to the harness gate. The text
@@ -1364,6 +1368,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (mLastForcedClose)
     {
         rec["reasoning_forced_close"] = true;
+        //#W82-EA (H6): which retry answered, and what phase 1 cost. `retry_thinking`
+        //is the flag the retry request carried; `phase1_reasoning_chars` is the
+        //trace the thinking-on retry did NOT prefill back (the reasoning field
+        //on this record is the retry's own trace).
+        rec["retry_thinking"] = mForceCloseIsPrefill ? "off" : "on";
+        if (!mForceCloseIsPrefill)
+            rec["phase1_reasoning_chars"] = (long) mLastForceClosePrefill.size();
         mLastForcedClose = false;
         mForceCloseArmed = false; //#W75-CJ (P2c): this close reached a record
 

@@ -29257,12 +29257,50 @@ static const char * kW50Y_r94 =
         CHECK(!Bind::close(false) && !Bind::budget(false, true),
               "#W71-BO L9 MUST-NOT-MATCH a decision with no phase-2 consume wears neither, whatever"
               " a previous decision's phase 1 did - the leak that stamped 19 records for 4 closes");
-        // The forced-close request is identifiable in the data by its own cap
-        // split, which is what the red witness counts.
+        // The LEGACY prefill close (WAGIC_GPT_FORCECLOSE_PREFILL=1 only, since
+        // #W82-EA H6) is identifiable in the data by its own cap split.
         const GptTokenPlan fc2 = gptResolveMaxTokens(true, true, 6000, -1, "ask", false, true);
         CHECK(fc2.reasoning == 0,
-              "#W71-BO L9 ECHO a phase-2 request is the only one with max_tokens_reasoning == 0,"
-              " so the corpus can count closes without trusting the marker");
+              "#W71-BO L9 ECHO the legacy prefill close is the only request with max_tokens_reasoning"
+              " == 0, so a corpus that ran it can count closes without trusting the marker");
+    }
+
+    cout << "\n[#W82-EA] H6 the budget-overrun retry keeps thinking ON and raises the budget\n";
+    {
+        // `125v152` seq 23 (reasoning_chars 20,683) and `125v162` seq 300 (26,808):
+        // `reasoning_budget_hit`, `retry: 1`, `max_tokens_reasoning: 0`, `thinking:
+        // on` - the retry was decoded with the native channel OFF under a regime of
+        // ON. Ruling: reasoning happens ONLY in the native channel. The retry is now
+        // the same question with the budget raised; the prefill close is legacy.
+        CHECK(w82RetryReasoningBudget(6000) == 12000 && w82RetryReasoningBudget(20000) == 40000,
+              "#W82-EA H6 POSITIVE the retry budget is TWICE the allowance phase 1 hit");
+        CHECK(w82RetryReasoningBudget(0) == 2 * kDefaultReasoningBudget
+                  && w82RetryReasoningBudget(-1) == 2 * kDefaultReasoningBudget,
+              "#W82-EA H6 POSITIVE an unknown phase-1 allowance raises from the shipped default,"
+              " never to 0");
+        CHECK(w82RetryKeepsThinking(true, false) && !w82RetryKeepsThinking(true, true)
+                  && !w82RetryKeepsThinking(false, false),
+              "#W82-EA H6 POSITIVE thinking on + no legacy flag = the thinking retry; the legacy"
+              " flag or a thinking-off regime = the prefill close");
+        // The retry request resolves like a phase-1 request: the raised budget IS
+        // the reasoning half, the seam's ordinary answer ceiling is the answer half.
+        const GptTokenPlan rt = gptResolveMaxTokens(true, false, w82RetryReasoningBudget(6000), -1,
+                                                    "ask", false, false);
+        const GptTokenPlan p1 = gptResolveMaxTokens(true, false, 6000, -1, "ask", false, false);
+        CHECK(rt.reasoning == 12000 && rt.answer == p1.answer && rt.total == 12000 + p1.answer,
+              "#W82-EA H6 POSITIVE the retry request carries max_tokens_reasoning 12000 over the"
+              " same answer ceiling phase 1 had - a record under thinking never shows a reasoning"
+              " half of 0 again");
+        // ...and the request builder's flag rule, stated as the data will show it.
+        {
+            const bool thinking = true;
+            json request;
+            request["chat_template_kwargs"] = {{"enable_thinking",
+                                               w82RetryKeepsThinking(thinking, false) ? thinking : false}};
+            CHECK(request["chat_template_kwargs"]["enable_thinking"].get<bool>(),
+                  "#W82-EA H6 ECHO the retry request is sent with enable_thinking:true - the record's"
+                  " `thinking` field (now the flag the request carried) reads `on`");
+        }
     }
 
 

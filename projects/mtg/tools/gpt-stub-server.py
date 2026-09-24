@@ -26,6 +26,15 @@ was actually ASKED (the arrival trace), not only on what the board did.
   --hang-every N  hang only every Nth chat request (1 = every one, the default
                   when --hang-ms is set); use 2 to prove the ONE retry fires and
                   the second attempt is answered normally.
+  --reasoning-only-first
+                  #W82-EA (H6): the BUDGET-HIT fixture. The FIRST request for each
+                  distinct (system, user) prompt is answered as a phase-1 budget
+                  hit - content empty, `reasoning_content` = --reasoning-text,
+                  finish_reason "length" - and every later request for the same
+                  prompt (the seat's retry) is answered normally. A retry that
+                  sends a prefill (continue_final_message) is answered normally
+                  too, so the legacy close still resolves.
+  --reasoning-text TEXT   the trace returned by the budget-hit reply.
 """
 import argparse
 import json
@@ -67,6 +76,22 @@ def pick_answer(body):
     return ARGS.answer
 
 
+SEEN_PROMPTS = set()
+
+
+def budget_hit_first(body):
+    """#W82-EA (H6): True for the first request of a distinct prompt (a phase-1
+    budget hit), False for a repeat (the retry) or a prefilled close."""
+    msgs = body.get("messages") or []
+    if any(m.get("role") == "assistant" for m in msgs):
+        return False  #a prefill close: answer it
+    key = json.dumps([(m.get("role"), m.get("content")) for m in msgs], sort_keys=True)
+    if key in SEEN_PROMPTS:
+        return False
+    SEEN_PROMPTS.add(key)
+    return True
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     seen = 0
@@ -105,6 +130,16 @@ class Handler(BaseHTTPRequestHandler):
             parsed = json.loads(raw.decode("utf-8", "replace"))
         except Exception:
             parsed = {}
+        if ARGS.reasoning_only_first and budget_hit_first(parsed):
+            self._send({
+                "id": "stub", "object": "chat.completion", "model": "stub-model",
+                "choices": [{"index": 0, "finish_reason": "length",
+                             "message": {"role": "assistant", "content": "",
+                                         "reasoning_content": ARGS.reasoning_text}}],
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0,
+                          "total_tokens": 0},
+            })
+            return
         self._send({
             "id": "stub", "object": "chat.completion", "model": "stub-model",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -127,6 +162,8 @@ def main():
     ap.add_argument("--log", default="")
     ap.add_argument("--hang-ms", type=int, default=0)
     ap.add_argument("--hang-every", type=int, default=1)
+    ap.add_argument("--reasoning-only-first", action="store_true")
+    ap.add_argument("--reasoning-text", default="Let me think about the board. " * 40)
     ARGS = ap.parse_args()
     #Threading, because the hang fixture holds a connection open for the whole
     #deadline and BOTH selfplay seats have a request in flight at once - a

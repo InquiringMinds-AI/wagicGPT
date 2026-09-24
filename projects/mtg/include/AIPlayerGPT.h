@@ -1827,6 +1827,19 @@ private:
     //seam cap, instead of being told so.
     long mLastRequestAnswerTokens;
     long mLastRequestReasoningTokens;
+    //#W82-EA (H6): the thinking flag the LAST REQUEST actually carried
+    //(`enable_thinking` as sent), so the record's `thinking` field is the truth
+    //of that request and not of the seat's regime - the legacy phase-2 prefill
+    //close sent enable_thinking:false under a regime of "on" and the record said
+    //`thinking: on` over `max_tokens_reasoning: 0`.
+    bool mLastRequestThinking;
+    //#W82-EA (H6): the reasoning allowance phase 1 ran under when its budget was
+    //hit, captured where the retry is armed - the retry's RAISED budget is derived
+    //from it (w82RetryReasoningBudget). And whether the armed retry is the legacy
+    //answer-only prefill close (WAGIC_GPT_FORCECLOSE_PREFILL=1) or the default
+    //thinking-on re-ask: the consume path reads a prefill reply differently.
+    long mForceClosePhase1Budget;
+    bool mForceCloseIsPrefill;
     //#W68-BA (J6, deck123 HIGH-2): the no-op re-ask's OWN one-shot, so a row the
     //model itself calls dead is still questioned once when the board's single
     //re-ask has already been spent on a different failure (123 s41 spent it on a

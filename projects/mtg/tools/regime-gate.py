@@ -166,12 +166,14 @@ def gate(per_file, unstamped, regime, prose_abort_pct, min_records, checked=()):
                             'the corpus is INVALID (invariant 000(a)).'
                             % (len(empty), len(records), empty[0]), [])
         # #W70-BN (F6, Astra review finding 6): the ALLOCATION check is about the
-        # request that funded the thinking window. The forced close is phase TWO -
-        # it resumes an already-closed <think> block with enable_thinking false, so
-        # it legitimately allocates 0 reasoning tokens and stamps
-        # `reasoning_forced_close`. A record that carries native reasoning and that
-        # stamp is a SUCCESSFUL recovery, not a capped window; failing it killed
-        # corpora for working correctly.
+        # request that funded the thinking window. The LEGACY forced close (phase
+        # two as a prefill: an already-closed <think> block with enable_thinking
+        # false, now only behind WAGIC_GPT_FORCECLOSE_PREFILL=1 - #W82-EA H6) allocates
+        # 0 reasoning tokens and stamps `reasoning_forced_close`; a record with native
+        # reasoning and that stamp is a recovery, not a capped window. The DEFAULT
+        # retry since wave 82 keeps thinking on with a RAISED budget, so its record
+        # carries `retry_thinking: on` and a reasoning half > 0 and never reaches
+        # this exemption.
         capped = [f for f, r in records
                   if 'max_tokens_reasoning' in r and r.get('max_tokens_reasoning', 0) <= 0
                   and not (r.get('reasoning_forced_close') and r.get('reasoning_chars'))]

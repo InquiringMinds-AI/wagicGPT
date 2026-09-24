@@ -482,6 +482,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static bool gptDeadlineMissed(bool emptyBody, long elapsedMs, long timeoutMs, long httpStatus, long curlCode);
     static long gptDeclarationAnswerFloorTokens(long items, long bytesPerItem);
     static bool gptForceCloseEarned(bool reasoningOnly, bool contentEmpty, bool finishLength, bool haveReasoning, int codedAnswers);
+    static long w82RetryReasoningBudget(long phase1Budget);
+    static bool w82RetryKeepsThinking(bool thinking, bool legacyPrefill);
     static string gptForceClosePrefillBody(const string& prefill);
     static bool gptHoldCoversSiblingWindow(const string& heldSeam, int heldTurn, int heldPhase, const string& heldBoard, const std::set<string>& heldRowKeys, const char * nowSeam, int nowTurn, int nowPhase, const string& nowBoard, const std::vector<string>& nowRowKeys);
     static bool gptInlineChoiceOnPlanLine(const string& text, size_t& segStart, size_t& segEnd, size_t& lineStart);
