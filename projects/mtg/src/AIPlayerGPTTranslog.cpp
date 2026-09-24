@@ -1002,6 +1002,24 @@ static int w77ConsumeWindowSeq(int& windowSeq, const char * kind)
 //(`forced_close`: the events; `wall_miss`: class + latency). Every counter is
 //kept - this is a shape change, not a deletion. Pure: the (kind, seam) a
 //writer call maps to.
+//#W82-EB (H2): the `land_shape` field of a window record - which land-drop
+//shape the window had. "folded" = the casting menu carried the Play <land>
+//rows; "standalone" = a Land drop: ask of its own under the P9 regime (the
+//fold's degenerate case); "separate" = the same ask under
+//WAGIC_GPT_LAND_SEPARATE=1 (the pre-P9 regime). NULL = no land rows on this
+//window. Pure over its four inputs so the mapping is provable in PARSETEST.
+const char * w82LandShapeField(const string& seam, bool landDropKind, int landShape,
+                               bool foldRegime)
+{
+    if (seam != "ask")
+        return NULL;
+    if (landDropKind)
+        return foldRegime ? "standalone" : "separate";
+    if (landShape == kLandShapeFoldOnCastMenu)
+        return "folded";
+    return NULL;
+}
+
 static void translogRecordShape(const char * kind, string& outKind, string& outSeam)
 {
     outKind = kind ? kind : "";
@@ -1191,6 +1209,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["seam"] = recSeam;
         rec["window_seq"] = recordWindowSeq;
+        //#W82-EB (H2): which land-drop shape this window had, when it had one.
+        if (const char * landShape = w82LandShapeField(recSeam, mLogWindowKind == kAskWindowLandDrop,
+                                                       mLandShapeForPrompt, landDropInCastMenu()))
+            rec["land_shape"] = landShape;
         const std::vector<ForceCloseEvent> fc = flushForceCloseFold(recordWindowSeq);
         if (!fc.empty())
         {
@@ -2276,6 +2298,7 @@ int AIPlayerGPTSelfTestAccess::codedAnswerCount(const string& reply) { return ::
 string AIPlayerGPTSelfTestAccess::codedAnswerLineAt(const string& reply, int ordinal, size_t keep, size_t * atOut) { return ::codedAnswerLineAt(reply, ordinal, keep, atOut); }
 bool AIPlayerGPTSelfTestAccess::codedAnswerLineInPlanBlock(const string& reply, int ordinal) { return ::codedAnswerLineInPlanBlock(reply, ordinal); }
 bool AIPlayerGPTSelfTestAccess::codedAnswerLinePlanSpan(const string& reply, int ordinal, size_t * atOut, size_t * startOut, size_t * endOut) { return ::codedAnswerLinePlanSpan(reply, ordinal, atOut, startOut, endOut); }
+const char * AIPlayerGPTSelfTestAccess::w82LandShapeField(const string& seam, bool landDropKind, int landShape, bool foldRegime) { return ::w82LandShapeField(seam, landDropKind, landShape, foldRegime); }
 void AIPlayerGPTSelfTestAccess::translogRecordShape(const char * kind, string& outKind, string& outSeam) { ::translogRecordShape(kind, outKind, outSeam); }
 long AIPlayerGPTSelfTestAccess::offProtocolBytes(const string& replyIn, bool * actionBeforePlanOut, std::vector<string> * offLinesOut) { return ::offProtocolBytes(replyIn, actionBeforePlanOut, offLinesOut); }
 string AIPlayerGPTSelfTestAccess::planLineOnly(const string& replyIn) { return ::planLineOnly(replyIn); }

@@ -1226,6 +1226,11 @@ private:
     //whether the cast branch put a menu to the model on this delegation.
     std::vector<LegalActionsOracle::Cast> mLandRowsForCast;
     bool mCastMenuAsked;
+    //#W82-EB (H1/H2): which land-drop SHAPE the window being put to the model
+    //has (a kLandShape* value, AIPlayerGPTInternal.h) - set by the seam around
+    //its askModel call, read by the situation block's `Land drop:` line and by
+    //the translog record's `land_shape` field. 0 between windows.
+    int mLandShapeForPrompt;
     void buildLandDropRows(const std::vector<LegalActionsOracle::Cast>& lands,
                            std::vector<std::string>& opts, std::vector<size_t>& rowLand,
                            std::vector<bool>& rowBackFace);

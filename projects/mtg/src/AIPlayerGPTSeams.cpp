@@ -559,10 +559,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //play - and a menu with none of either keeps the wave-53 sentence
         //byte-for-byte.
         bool activationLive = false;
-        for (int ai = 0; ai < baseIndex && !activationLive; ai++)
-            if (asActivatedForCount(shown[ai]->ability) && !isManaOnlyAction(shown[ai]->ability))
+        std::vector<string> actingRows; //#W82-EB (M10): the acting rows' pure lines
+        for (int ai = 0; ai < baseIndex; ai++)
+        {
+            if (isManaOnlyAction(shown[ai]->ability))
+                continue;
+            actingRows.push_back(shownLines[(size_t) ai]);
+            if (asActivatedForCount(shown[ai]->ability))
                 activationLive = true;
-        const string holdLine = holdRowLine(false, activationLive); //#W55-A (D21), #W72-BV (M6)
+        }
+        string holdLine = holdRowLine(false, activationLive); //#W55-A (D21), #W72-BV (M6)
+        //#W82-EB (M10): every acting row is a zero-mana activation - say what the
+        //hold gives away. A [...] group: out of the narration and out of every key.
+        if (activationLive && w82RowsCostNoMana(actingRows))
+            holdLine += kHoldFreeActionsMarker;
         shownLines.push_back(holdLine);
         renderRows.push_back(holdLine); //#W57-A (D4)
         tail << holdRow << ". " << holdLine << "\n";
@@ -3287,7 +3297,7 @@ static string landEntersTappedTagResolved(MTGCardInstance * land, Player * me)
 //at runtime restores the separate land-drop ask (the pre-P9 behaviour).
 static const bool kLandDropInCastMenu = true;
 
-static bool landDropInCastMenu()
+bool landDropInCastMenu()
 {
     static int v = -1;
     if (v < 0)
@@ -3505,7 +3515,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             w79ApplyLoopFaceAtSend(false, string(), mOwnLoopVerdictFace, w80c);
             w80ApplyVerdictFacesAtSend(false, string(), string(), false);
         }
+        //#W82-EB (H2, wave-81 H2): ONE regime. Under #W82-P9 this separate ask is
+        //the fold's DEGENERATE case - it runs only when the cast branch above put
+        //no menu to the model this window (nothing castable, a hold standing, a
+        //no-progress marker, or the phase's casting decision already closed) - and
+        //its `Land drop:` status line says so (kLandShapeFoldStandalone). Under
+        //WAGIC_GPT_LAND_SEPARATE=1 it is the old regime and says the old thing.
+        //Either way the record it writes carries `land_shape`, so the P9 revert
+        //criterion is read off counts of the two shapes, not off a half-shipped mix.
+        mLandShapeForPrompt = landDropInCastMenu() ? kLandShapeFoldStandalone : kLandShapeSeparate;
         int pick = askModel(q.str(), opts, false, string(), false, true); //the play narrates itself as a zone event
+        mLandShapeForPrompt = 0;
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick
@@ -4351,8 +4371,16 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             string playerTail = castPlayerDamageTail(
                                 castDmg, oppP && tc->canTarget(oppP), oppP ? oppP->life : -1,
                                 life, rowSelfLifeCost, m11Gain, m11Turns); //#W60-L (B1), #W72-BW (M11)
+                            //#W82-EB (H10): legal targets this walk did not price - a
+                            //planeswalker or a battle among `tgtCards` - so the
+                            //"every legal target survives" lead is never claimed over
+                            //a target whose death was not tested.
+                            int unpricedTargets = 0;
+                            for (size_t ui = 0; ui < tgtCards.size(); ui++)
+                                if (tgtCards[ui] && !tgtCards[ui]->isCreature())
+                                    unpricedTargets++;
                             o << castKillSummaryTag(killed, creatureTargets, mag.str(), playerTail,
-                                                    killedMine); //#W55-C (D15)
+                                                    killedMine, unpricedTargets); //#W55-C (D15); #W82-EB (H10)
                             //#W77-CS (R6 a): and what each of those victims is
                             //worth off the CRACK-BACK NEXT TURN line above.
                             //Gated through the same crackBackScreenTotal as
@@ -5164,7 +5192,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //construction (the wave-80 HIGH-4 boundary), and applied at the send.
         for (size_t w81r = 0; w81r < menu.size(); w81r++)
         {
-            if (menu[w81r].find("[<- the only X that kills anything of THEIRS") != string::npos
+            if ((menu[w81r].find("[<- the only X that kills anything of THEIRS") != string::npos
+                 || menu[w81r].find("[<- REFUSED by NET life") != string::npos) //#W82-EB (M9)
                 && mW81PendingEventFace.find("x_cast_row_refusal_marker") == string::npos)
                 mW81PendingEventFace += "x_cast_row_refusal_marker;";
             if (w81XSweepMarkerNamesOwnLosses(menu[w81r])
@@ -5234,7 +5263,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mNextSendStackDeath = w80PendingCastStackDeath;
         mNextSendDrain = w80PendingCastDrain;
         mCastMenuAsked = true; //#W82-P9: a menu reached the model (or is in flight)
+        //#W82-EB (H1): the shape this window has, for the `Land drop:` line the
+        //prompt is about to render and for the record askModel writes.
+        mLandShapeForPrompt = (landRowCount > 0) ? kLandShapeFoldOnCastMenu
+                            : (landDropInCastMenu() ? kLandShapeFoldElsewhere : kLandShapeSeparate);
         int pick = askModel(q.str(), menu, false);
+        mLandShapeForPrompt = 0;
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
         if (landRowCount > 0 && pick >= landRowFirst && pick < landRowFirst + landRowCount)

@@ -350,7 +350,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinControlled, bool selfLeavesOnResolution= false);
     static string castDeclineRow(bool combatNext);
     static string castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life= -1, int priorCharge= 0);
-    static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail= "", const std::vector<std::string>& killedMine= std::vector<std::string>());
+    static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail= "", const std::vector<std::string>& killedMine= std::vector<std::string>(), int unpricedTargets = 0); //#W82-EB (H10)
     static string castModeAltPriceTag(const std::vector<std::string>& labels, const std::vector<std::string>& costs, const std::vector<int>& draws);
     static string castModeCastPriceTag(const string& castCost, const string& castClause, int legalTargets);
     static string castModeCommitmentNote(bool castModeMenu, const string& ctxName, const string& committedName, bool sameTurn);
@@ -513,6 +513,9 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string holdReopenNoteText(int unseenRows, int repeats, bool first= false, int goneRows= 0, bool contractBelow= false);
     static string holdRowBenefitClause();
     static int holdRowIndexOf(const std::vector<string> * optionTexts);
+    static bool isHoldRowText(const string& row); //#W82-EB (H8)
+    static bool w82RowsCostNoMana(const std::vector<string>& rows); //#W82-EB (M10)
+    static const char * kHoldFreeActionsMarker; //#W82-EB (M10)
     static string holdRowLine(bool castSeam= false, bool activationLive= false);
     static bool holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf= holdKeyRow);
     static string hybridPipNoteText(const vector<string>& pips, int totalMana);
@@ -538,7 +541,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string joinVictimRoster(const std::vector<std::string>& entries);
     static string joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse);
     static string landDropAskText(size_t landCount);
-    static string landDropStatusLine(bool myTurn, bool playable, bool haveLand);
+    static string landDropStatusLine(bool myTurn, bool playable, bool haveLand, int landShape = 0); //#W82-EB (H1/H2)
+    static const char * w82LandShapeField(const string& seam, bool landDropKind, int landShape, bool foldRegime); //#W82-EB (H2)
     static string landDropThreatTag(const string& rawScript);
     static string landEntersTappedTag(const string& script, const string& printedText);
     static string landTapMana(const string& text);

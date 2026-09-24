@@ -139,8 +139,8 @@ When the prompt prints "NO LIVE CAST ROW ON THIS MENU", take the decline row.
 HOLD AND DECLINE ROWS
 
 "Cast nothing right now" closes this window only and the list comes back this turn.
-"Hold priority - pass now, and do not ask me again" closes the whole run of casting
-windows until your next turn or until a row changes.
+"Stop asking me this turn - pass now ..." closes the whole run of casting
+windows until this turn ends or until a row changes.
 
 Take a hold row only when every row on the menu is one you have refused for a stated
 reason - a sweeper reading "destroys 0", a Howling Mine while your library is the

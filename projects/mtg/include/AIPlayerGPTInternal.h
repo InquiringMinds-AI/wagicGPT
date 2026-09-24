@@ -38,6 +38,16 @@ extern const char * kExampleFakeCardLc;
 extern const char * kForceCloseTag;
 extern const char * kGhostformNotRemovalTail;
 extern const char * kHoldPriorityRowShortHead;
+//#W82-EB (H1/H2): the land-drop SHAPE of a window, for the `Land drop:` status
+//line and the translog's `land_shape` field.
+enum {
+    kLandShapeSeparate = 0,       //WAGIC_GPT_LAND_SEPARATE=1: the pre-P9 regime, or no shape known
+    kLandShapeFoldElsewhere = 1,  //P9 regime; this window carries no land rows (priority, target, ...)
+    kLandShapeFoldOnCastMenu = 2, //P9 regime; the casting menu below carries the Play <land> rows
+    kLandShapeFoldStandalone = 3  //P9 regime; a `Land drop:` ask of its own (no casting menu this window)
+};
+bool landDropInCastMenu(); //#W82-P9 revert switch, read by the situation block and the translog
+const char * w82LandShapeField(const string& seam, bool landDropKind, int landShape, bool foldRegime); //#W82-EB (H2)
 extern const char * kHoldPriorityRowText;
 extern const char * kLandDropConsequence;
 extern const char * kLandDropDeclineRow;
@@ -108,7 +118,7 @@ int castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinContr
 bool castBodyEntersTapped(MTGCardInstance * card);
 string castDeclineRow(bool combatNext);
 string castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life = -1, int priorCharge = 0);
-string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail = "", const std::vector<std::string>& killedMine = std::vector<std::string>());
+string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail = "", const std::vector<std::string>& killedMine = std::vector<std::string>(), int unpricedTargets = 0); //#W82-EB (H10)
 string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card, int oppLifeGain = 0, int oppGainTurns = 0);
 string castModeCommitmentNote(bool castModeMenu, const string& ctxName, const string& committedName, bool sameTurn);
 string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife = -1, int lifeLossFirst = 0, int oppLifeGain = 0, int oppGainTurns = 0);
@@ -201,6 +211,9 @@ int heuristicRevealIndex(const std::vector<int>& cmc, const std::vector<bool>& e
 string holdContractParagraph();
 string holdKeyRow(const string& row);
 int holdRowIndexOf(const std::vector<string> * optionTexts);
+bool isHoldRowText(const string& row); //#W82-EB (H8)
+extern const char * kHoldFreeActionsMarker; //#W82-EB (M10)
+bool w82RowsCostNoMana(const std::vector<string>& rows); //#W82-EB (M10)
 string holdRowLine(bool castSeam = false, bool activationLive = false);
 string instanceHandle(MTGCardInstance * card);
 bool isAnimationRow(const string& line);

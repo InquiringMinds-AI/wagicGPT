@@ -12114,11 +12114,12 @@ static const char * kW50Y_r94 =
         }
         {
             std::vector<std::string> none;
-            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {kills 0 of the 3 CREATURE targets at -1/-1}", //#W54-C (D4)
+            //#W82-EB (H10): the no-kill shape now LEADS with the verdict it adds up to.
+            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 3 CREATURE targets at -1/-1}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 deck123 vs146 seq 18: Tragic Slip's cast row prices its three survivors");
-            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {kills 0 of the 1 CREATURE target at -1/-1}", //#W54-C (D4)
+            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 1 CREATURE target at -1/-1}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 one target reads singular");
-            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {kills 0 of the 2 CREATURE targets at 2 damage}", //#W54-C (D4)
+            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 2 CREATURE targets at 2 damage}", //#W54-C (D4); #W82-EB (H10)
                   "#W53-O D5 the damage rows carry the same summary in their own magnitude");
             std::vector<std::string> one;
             one.push_back("Elite Spellbinder");
@@ -12248,21 +12249,22 @@ static const char * kW50Y_r94 =
         //cost the pilot kept missing ("you cannot come back later this turn") and
         //names the latch's hard end (the untap release), because the wave-72
         //corpus lost four seats to a hold read as a one-window pass.
-        CHECK(row == "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-                     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-                     " begins, or until one of the rows above changes (any change re-opens this"
+        CHECK(row == "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+                     " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+                     " or until one of the rows above changes (any change re-opens this"
                      " window; you give up no cast)",
               "#W61-U C14 / #W73-BY N2c the hold row renders its literal");
         CHECK(row.find("YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN")
                   < row.find("any change re-opens this window")
-              && row.find("it stands until your next turn begins") != string::npos,
+              && row.find("it stands until this turn ends") != string::npos,
               "#W73-BY N9 REPRO the cannot-take-it-later clause LEADS the row instead of"
-              " sitting ~600 chars deep in the benefit brace, and the untap end is named");
+              " sitting ~600 chars deep in the benefit brace, and the end of the turn is"
+              " named (#W82-EB H9: the scope is the turn the hold was taken in)");
         //NEGATIVE: the retired promise must be gone, not merely reworded around.
         CHECK(row.find("for the rest of this turn") == string::npos,
               "#W61-U C14 NEGATIVE the row no longer promises a turn-scoped hold");
-        CHECK(row.find("Hold priority") == 0 && row.find("pass now") != string::npos,
-              "#W55-A D11b it leads with its OWN act and still carries the pilot's verb");
+        CHECK(row.find("Stop asking me this turn") == 0 && row.find("pass now") != string::npos,
+              "#W55-A D11b / #W82-EB H8 it leads with its OWN act and still carries the pilot's verb");
         //NEGATIVE (the defect this reword retires): the two rows' leading words
         //must differ, so neither is a case-insensitive head of the other.
         {
@@ -13163,7 +13165,7 @@ static const char * kW50Y_r94 =
             CHECK(castKillSummaryTag(none, 0, "3 damage").empty(),
                   "#W54-C D4 NEGATIVE no creature target and no player tail: still nothing");
             CHECK(castKillSummaryTag(none, 2, "3 damage")
-                  == " {kills 0 of the 2 CREATURE targets at 3 damage}",
+                  == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 2 CREATURE targets at 3 damage}",
                   "#W54-C D4 REGRESSION the four-argument shape with no tail is the three-argument one");
             std::vector<std::string> one;
             one.push_back("Rorix Bladewing");
@@ -14647,8 +14649,8 @@ static const char * kW50Y_r94 =
         CHECK(holdRowBenefitClause().size() < 120,
               "#W75-CI P19 the largest object on a 3-row menu is no longer an option row"
               " (wave 74: 1,074-1,287 B of hold row, holds taken in 11 of 322 decisions)");
-        CHECK(holdContractParagraph().find("released at the"
-                                           " start of your next turn") != string::npos
+        CHECK(holdContractParagraph().find("released when this"
+                                           " turn ends") != string::npos
               && holdContractParagraph().find("skips every later window that asks THIS SAME"
                                               " question with rows identical to these")
                  != string::npos
@@ -19450,11 +19452,13 @@ static const char * kW50Y_r94 =
             }
             const string badge = xMonotoneMarker(2, 1, 1, netAt2, 2, 1, netAt1);
             cout << "     " << badge << "\n";
-            CHECK(badge == " [<- largest affordable X - X=2 gains 2 life and draws 2 cards;"
-                           " no listed X does more - but NET -2 life for this cast puts you at 0;"
-                           " this KILLS you. X=1 is the largest listed X whose NET (-1) leaves"
-                           " you alive, at 1]",
-                  "#W61-S C10 POSITIVE the badge says so, and names the rung that lives");
+            //#W82-EB (M9): refusal-first when the NET kills; every figure kept.
+            CHECK(badge == " [<- REFUSED by NET life: the largest affordable X (X=2: gains 2 life and"
+                           " draws 2 cards; no listed X does more) is NET -2 life for this cast and puts"
+                           " you at 0; this KILLS you. X=1 is the largest listed X whose NET (-1) leaves"
+                           " you alive, at 1 - alive is not a reason to cast: this badge names no X to take]",
+                  "#W61-S C10 / #W82-EB M9 POSITIVE the badge leads with the refusal, keeps the numbers,"
+                  " and names the rung that lives as a fact, not a pick");
             CHECK(xMonotoneMarker(2, 1, 1, netAt2, 2, -1, kXNetNotSupplied)
                       .find("No listed X leaves you alive") != string::npos,
                   "#W61-S C10 with no surviving rung the badge says that instead of naming one");
@@ -19468,12 +19472,10 @@ static const char * kW50Y_r94 =
             CHECK(xMonotoneMarker(2, 1, 1, netAt2, -1) == xMonotoneMarker(2, 1, 1),
                   "#W61-S C10 NEGATIVE an unsupplied life changes not one byte");
             // The CAST-row form carries the same fold through xCastRowMarkerFrom.
-            CHECK(xCastRowMarkerFrom(badge, 2, true)
-                      == " [<- best X for this cast: X=2 - largest affordable X - X=2 gains 2"
-                         " life and draws 2 cards; no listed X does more - but NET -2 life for"
-                         " this cast puts you at 0; this KILLS you. X=1 is the largest listed X"
-                         " whose NET (-1) leaves you alive, at 1]",
-                  "#W61-S C10 the cast-row badge carries the same verdict as the menu badge");
+            CHECK(xCastRowMarkerFrom(badge, 2, true) == badge
+                      && xCastRowMarkerFrom(badge, 2, true).find("best X for this cast") == string::npos,
+                  "#W61-S C10 / #W82-EB M9 the cast-row badge carries the same verdict as the menu"
+                  " badge and gets no 'best X for this cast' head over a refusal");
             // ECHO SHAPE: an X row echoed with the badge still binds.
             {
                 vector<string> menu;
@@ -20985,7 +20987,7 @@ static const char * kW50Y_r94 =
                     " on the battlefield - no legend rule] {leaves 8 of your 10 untapped mana sources untapped}");
         m.push_back("Cast Teferi's Puzzle Box {4} {leaves 6 of your 10 untapped mana sources untapped}");
         m.push_back("Cast nothing right now (combat comes next this turn)");
-        m.push_back("Hold priority - pass now, and do not ask me again - this turn or later - until one"
+        m.push_back("Stop asking me this turn - pass now, and do not ask me again - this turn or later - until one"
                     " of the rows above changes (any change re-opens this window; you give up no cast)"
                     + holdRowBenefitClause());
         bool st = false;
@@ -24055,7 +24057,7 @@ static const char * kW50Y_r94 =
         // The model's own HOLD row is the only sanctioned way to stop a re-ask,
         // and it is the model's own answer - so it is pinned here instead.
         const string hold = holdRowLine();
-        CHECK(!hold.empty() && hold.find("Hold") != string::npos,
+        CHECK(!hold.empty() && isHoldRowText(hold),
               "#W82-A L1 the HOLD row - the model's own, explicit stop - is still the seam's"
               " only way for a window to stop being re-asked");
     }
@@ -25317,10 +25319,12 @@ static const char * kW50Y_r94 =
               " damage already on the stack");
         // NEGATIVE: with no stack damage every byte is wave 65's.
         CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0)
-                  == " [<- largest affordable X - X=5 gains 5 life and draws 5 cards; no listed X"
-                     " does more - but NET -5 life for this cast puts you at 0; this KILLS you."
-                     " X=4 is the largest listed X whose NET (-4) leaves you alive, at 1]",
-              "#W66-AQ H4 NEGATIVE an empty stack renders the wave-65 badge byte for byte");
+                  == " [<- REFUSED by NET life: the largest affordable X (X=5: gains 5 life and draws 5"
+                     " cards; no listed X does more) is NET -5 life for this cast and puts you at 0;"
+                     " this KILLS you. X=4 is the largest listed X whose NET (-4) leaves you alive,"
+                     " at 1 - alive is not a reason to cast: this badge names no X to take]",
+              "#W66-AQ H4 / #W82-EB M9 NEGATIVE an empty stack renders the refusal-first badge with no"
+              " stack clause");
         CHECK(xMonotoneMarker(5, 1, 1, -5, 5, 4, -4) == xMonotoneMarker(5, 1, 1, -5, 5, 4, -4, "", 0),
               "#W66-AQ H4 NEGATIVE the default argument is the empty stack");
         // POSITIVE: a survivable rung still survives, measured after the stack.
@@ -27295,7 +27299,7 @@ static const char * kW50Y_r94 =
         s32.push_back("Cast Devour Flesh {1}{b} {right now: they control 2 creatures - they choose"
                       " which one; YOU control 25 creatures - targeting yourself sacrifices one of"
                       " them, your choice, and you gain its toughness}");
-        s32.push_back("Hold priority - pass now, and do not ask me again - this turn or later -"
+        s32.push_back("Stop asking me this turn - pass now, and do not ask me again - this turn or later -"
                       " until one of the rows above changes");
         s32.push_back("Cast nothing right now");
         appendStackDeathToDeclineRows(s32, 3, 2);
@@ -27340,7 +27344,7 @@ static const char * kW50Y_r94 =
               "#W68-BB J9 exactly-lethal crack-back is LETHAL");
         std::set<string> held;
         vector<string> rowsNow;
-        rowsNow.push_back("Hold priority - pass now, and do not ask me again");
+        rowsNow.push_back("Stop asking me this turn - pass now, and do not ask me again");
         rowsNow.push_back("Cast nothing right now");
         for (size_t i = 0; i < rowsNow.size(); i++)
             held.insert(holdKeyRow(rowsNow[i]));
@@ -27362,7 +27366,7 @@ static const char * kW50Y_r94 =
         {
             // AU R1 stays true: the life NUMBER alone still does not re-open.
             vector<string> moved;
-            moved.push_back("Hold priority - pass now, and do not ask me again");
+            moved.push_back("Stop asking me this turn - pass now, and do not ask me again");
             moved.push_back("Cast nothing right now");
             moved.push_back(crackBackVerdictKey(4, 11, 20));
             CHECK(holdStillStands(held, moved, &why),
@@ -29931,7 +29935,7 @@ static const char * kW50Y_r94 =
               " asked, which is the default this rule never widens");
         CHECK(w72RowIsDeclineOrHold("Pass priority (take no action this window)")
                   && w72RowIsDeclineOrHold("Cast nothing right now (combat comes next this turn)")
-                  && w72RowIsDeclineOrHold("Hold priority - pass now, and do not ask me again"),
+                  && w72RowIsDeclineOrHold("Stop asking me this turn - pass now, and do not ask me again"),
               "#W72-BX F1 the two seams' declines and the hold row are not acting rows");
         CHECK(!w72RowIsDeclineOrHold("Cast Starstorm {x}{r}{r}")
                   && !w72RowIsDeclineOrHold("Cycle Starstorm {2}"),
@@ -30351,9 +30355,10 @@ static const char * kW50Y_r94 =
         //refused: the row's own head was `Hold priority:`, and the model copied a
         //rendered heading into its label slot (the L11 shape, one row lower).
         const string row = kHoldPriorityRowText;
-        CHECK(row.compare(0, 15, "Hold priority -") == 0
+        CHECK(row.compare(0, 26, "Stop asking me this turn -") == 0
+                  && row.find("Stop asking me this turn:") == string::npos
                   && row.find("Hold priority:") == string::npos,
-              "#W72-BW M23b REPRO the head is no longer label-shaped");
+              "#W72-BW M23b / #W82-EB H8 REPRO the head is no longer label-shaped");
         CHECK(string(kHoldPriorityRowTextCast).find("Hold priority:") == string::npos
                   && string(kHoldPriorityRowHead).find("Hold priority:") == string::npos,
               "#W72-BW M23b MUST-NOT-MATCH neither the cast spelling nor the shared head"
@@ -30595,10 +30600,10 @@ static const char * kW50Y_r94 =
             const char * malformed[3] = {
                 "Nadaar, Selfless Paladin #1 (4/4) - \"Vigilance - whenever\"",
                 "goblin lair (room 2 of 7 in Lost Mine of Phandelver)",
-                "Hold priority - pass now, and do not ask me again - this turn or later"
+                "Stop asking me this turn - pass now, and do not ask me again - this turn or later"
             };
             const char * want[3] = { "Nadaar, Selfless Paladin #1", "goblin lair",
-                                     "Hold priority" };
+                                     "Stop asking me this turn" }; //#W82-EB (H8)
             bool allGood = true;
             for (int i = 0; i < 3; i++)
             {
@@ -30805,20 +30810,26 @@ static const char * kW50Y_r94 =
         // #W73-CB (F2) re-signed it: the third argument is now whose turn the
         // hold was TAKEN on, not whose turn it is at the check - see below.
         CHECK(w73HoldExpiredByUntap(13, true, 15),
-              "#W73-BY N2a REPRO 152v162 seq 34: a hold taken on turn 13 is released when this"
-              " seat's turn 15 begins - Teferi's loyalty row is byte-identical every turn, so"
-              " nothing else could ever retire it");
-        CHECK(!w73HoldExpiredByUntap(13, true, 14),
-              "#W73-BY N2a MUST-NOT-MATCH the OPPONENT's turn does not release it: the release"
-              " is this seat's untap, not any turn boundary (the wave-61 C14 defect)");
+              "#W73-BY N2a REPRO 152v162 seq 34: a hold taken on turn 13 is dead by this seat's"
+              " turn 15 - Teferi's loyalty row is byte-identical every turn, so nothing else"
+              " could ever retire it");
+        //#W82-EB (H9, wave-81 deck125 H3): AMENDED. The own-turn hold used to span the
+        //opponent's whole next turn (`125v162` seq 211: a hold at the seat's own T27 End
+        //step let Underworld Dreams and Teferi's Puzzle Box resolve at T28 with no window
+        //asked - 277 windows held that game). The row's own words are "LATER THIS TURN",
+        //so the latch dies with the turn it was taken in, whoever's turn that was.
+        CHECK(w73HoldExpiredByUntap(13, true, 14),
+              "#W82-EB H9 an own-turn hold is released when that turn ends - the opponent's"
+              " turn 14 is asked in full (the wave-73 two-turn span is retired)");
         CHECK(!w73HoldExpiredByUntap(13, true, 13),
               "#W73-BY N2a MUST-NOT-MATCH the turn it was TAKEN on is not a later turn - a hold"
               " must still cover the rest of the window it was taken in");
         CHECK(!w73HoldExpiredByUntap(-1, true, 15),
               "#W73-BY N2a MUST-NOT-MATCH no hold taken, nothing to release");
-        CHECK(w73HoldExpiredByUntap(27, true, 29) && !w73HoldExpiredByUntap(27, true, 28),
-              "#W73-BY N2a 125v130 seq 46: the own-turn hold at turn 27 survives the opponent's"
-              " turn 28 and dies at turn 29 - four skipped turns become one");
+        CHECK(w73HoldExpiredByUntap(27, true, 28) && w73HoldExpiredByUntap(27, true, 29)
+                  && !w73HoldExpiredByUntap(27, true, 27),
+              "#W82-EB H9 REPRO 125v162 seq 211: the own-turn hold at T27 End dies as T28"
+              " begins - Underworld Dreams and the Puzzle Box are asked at T28");
 
         // ---- N2 c / N9: the row says so ----
         CHECK(string(kHoldPriorityRowTextCast).find(kHoldPriorityRowHead) == 0
@@ -30826,13 +30837,20 @@ static const char * kW50Y_r94 =
                   && string(kHoldPriorityRowText).find(kHoldPriorityRowHead) == 0,
               "#W73-BY N2c all three spellings still share the HEAD, so holdRowIndexOf and the"
               " reserved-echo binder move with the reword");
-        CHECK(string(kHoldPriorityRowTextCast).find("until your next turn begins") != string::npos
-                  && string(kHoldPriorityRowTextActivation).find("until your next turn begins")
+        CHECK(string(kHoldPriorityRowTextCast).find("until this turn ends") != string::npos
+                  && string(kHoldPriorityRowTextActivation).find("until this turn ends")
                      != string::npos,
-              "#W73-BY N2c every spelling names the untap end the engine now keeps");
-        CHECK(holdContractParagraph().find("released at the start of your next turn whatever"
+              "#W73-BY N2c / #W82-EB H9 every spelling names the end the engine now keeps: the"
+              " turn the hold was taken in");
+        CHECK(string(kHoldPriorityRowTextCast).find("until your next turn") == string::npos
+                  && holdContractParagraph().find("start of your next turn") == string::npos
+                  && w78StackDrainNote(3, true, "Hold").find("next untap") == string::npos,
+              "#W82-EB H9 MUST-NOT-MATCH no surface still promises a hold that spans the"
+              " opponent's turn - the row, the contract paragraph and the stack-drain note"
+              " all moved with the latch");
+        CHECK(holdContractParagraph().find("released when this turn ends whatever"
                                            " the rows do") != string::npos
-              && string(kHoldPriorityRowText).find("until your next turn begins") != string::npos,
+              && string(kHoldPriorityRowText).find("until this turn ends") != string::npos,
               "#W73-BY N2a the release is stated on the ROW HEAD and again in the contract"
               " paragraph, so the scope sentence cannot read as forever (#W75-CI P19)");
         CHECK(stripNarrationDecoration(holdRowLine(true)) == kHoldPriorityRowTextCast,
@@ -30967,8 +30985,8 @@ static const char * kW50Y_r94 =
         // on their turn 16 - never released it. On base the equivalent call is
         // w73HoldExpiresAtUntap(14, 16, false) = false.
         CHECK(w73HoldExpiredByUntap(14, false, 15),
-              "#W73-CB F2 REPRO Ghost Town held on THEIR turn 14: the holder's untap is turn 15,"
-              " so the hold is dead the moment that turn begins");
+              "#W73-CB F2 REPRO Ghost Town held on THEIR turn 14: their turn ends as turn 15"
+              " begins, so the hold is dead the moment that turn begins");
         CHECK(w73HoldExpiredByUntap(14, false, 16),
               "#W73-CB F2 REPRO the review's sequence: no qualifying own-turn call happened, and"
               " the hold is STILL dead on their turn 16 - the answer no longer depends on when"
@@ -30976,9 +30994,9 @@ static const char * kW50Y_r94 =
         CHECK(!w73HoldExpiredByUntap(14, false, 14),
               "#W73-CB F2 MUST-NOT-MATCH the hold still covers the rest of the turn it was taken"
               " in - the untap has not happened yet");
-        CHECK(!w73HoldExpiredByUntap(27, true, 28) && w73HoldExpiredByUntap(27, true, 29),
-              "#W73-CB F2 an OWN-turn hold still spans the opponent's turn and dies at the next"
-              " own untap - the wave-73 BY rule, unchanged");
+        CHECK(w73HoldExpiredByUntap(27, true, 28) && w73HoldExpiredByUntap(27, true, 29),
+              "#W82-EB H9 an OWN-turn hold no longer spans the opponent's turn: taken on 27, it"
+              " is dead on 28 and stays dead (the wave-73 BY two-turn rule is retired)");
 
         // ---- F3: a threshold in the plan is not a repeat stop ----
         // RED on base: base's repeatPlanStopAndCurrent("PLAN: Stop at 3 life;
@@ -32122,7 +32140,7 @@ static const char * kW50Y_r94 =
             "untapped} - legal targets right now: the opponent {card text: \"Target "
             "opponent sacrifices a creature of their choice. You gain life equal to "
             "that creature's toughness.\"}";
-            const string a266row1 = "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK "
+            const string a266row1 = "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK "
             "AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your "
             "next turn begins, or until one of the rows above changes (any change "
             "re-opens this window; on THIS menu that means you also give up this "
@@ -33487,7 +33505,7 @@ static const char * kW50Y_r94 =
             // last window at this seam (1 window in a row now)". Not one Sorin row
             // was on the seq-28 menu; the referent was an intervening window built
             // for a menu the hold latch then closed.
-            const string holdRow = "Hold priority - pass now, and do not ask me again";
+            const string holdRow = "Stop asking me this turn - pass now, and do not ask me again";
             std::vector<string> staff, sorin;
             staff.push_back("Deal 1 damage with Staff of Nin targeting Bloodline Keeper"
                             " [opponent's battlefield] {right now: kills nothing}");
@@ -33772,7 +33790,7 @@ static const char * kW50Y_r94 =
             {
                 std::vector<string> rows;
                 rows.push_back("Cast Damnation {2}{b}{b} {right now: kills 0 of theirs}");
-                rows.push_back("Hold priority - pass now, and do not ask me again");
+                rows.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 rows.push_back("Cast nothing right now");
                 std::vector<string> other(rows);
                 other[0] = "Cast Wrath of God {2}{w}{w} {right now: kills 0 of theirs}";
@@ -34519,7 +34537,7 @@ static const char * kW50Y_r94 =
                 // own key function.
                 const string rowA = "Cast Damnation {2}{b}{b} {right now: kills 0 of theirs}";
                 const string rowB = "Cast Devour Flesh {1}{b} {right now: kills 1 of theirs}";
-                const string hold = "Hold priority - pass now, and do not ask me again";
+                const string hold = "Stop asking me this turn - pass now, and do not ask me again";
                 std::vector<string> ab, aOnly;
                 ab.push_back(rowA); ab.push_back(rowB); ab.push_back(hold);
                 aOnly.push_back(rowA); aOnly.push_back(hold);
@@ -34678,8 +34696,8 @@ static const char * kW50Y_r94 =
                 rB.push_back("Cast Damnation {2}{b}{b} {right now: destroys "
                              + joinVictimRoster(vB) + "}"
                              + crackBackKillRowTag(7, 11, false, 3, 1, 2));
-                rA.push_back("Hold priority - pass now, and do not ask me again");
-                rB.push_back("Hold priority - pass now, and do not ask me again");
+                rA.push_back("Stop asking me this turn - pass now, and do not ask me again");
+                rB.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 CHECK(rA[0] != rB[0],
                       "#W76-CQ KEY PIN INSTRUMENT the two rows really do differ - a pin over"
                       " identical bytes proves nothing");
@@ -34825,7 +34843,7 @@ static const char * kW50Y_r94 =
             {
                 std::vector<string> castRows, landRows;
                 castRows.push_back("Cast Damnation {2}{b}{b}");
-                castRows.push_back("Hold priority - pass now, and do not ask me again");
+                castRows.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 landRows.push_back("Play Brightclimb Pathway");
                 landRows.push_back("Play no land right now");
                 //REPRO, executed: under the wave-76 wiring BOTH windows commit at
@@ -34911,7 +34929,7 @@ static const char * kW50Y_r94 =
                     W76HoldMemory m;
                     std::vector<string> rows;
                     rows.push_back("Cast Damnation {2}{b}{b}");
-                    rows.push_back("Hold priority - pass now, and do not ask me again");
+                    rows.push_back("Stop asking me this turn - pass now, and do not ask me again");
                     const string live = w76HoldReopenNote(m, "cast", rows, 1, false,
                                                           holdActionKeyRow);
                     CHECK(live == firstNote,
@@ -34932,7 +34950,7 @@ static const char * kW50Y_r94 =
                 const string rowA = "Cast Molten Rain {1}{r}{r} - legal targets right now: Plains";
                 const string rowB = "Cast Stone Rain {2}{r} - legal targets right now: Plains";
                 const string rowC = "Cast Hammer of Bogardan {1}{r}{r}";
-                const string hold = "Hold priority - pass now, and do not ask me again";
+                const string hold = "Stop asking me this turn - pass now, and do not ask me again";
                 a.push_back(rowA); a.push_back(rowB); a.push_back(hold);
                 reordered.push_back(rowB); reordered.push_back(rowA); reordered.push_back(hold);
                 plusOne.push_back(rowA); plusOne.push_back(rowB); plusOne.push_back(rowC);
@@ -35008,7 +35026,7 @@ static const char * kW50Y_r94 =
             {
                 std::vector<string> rows;
                 rows.push_back("Cast Damnation {2}{b}{b}");
-                rows.push_back("Hold priority - pass now, and do not ask me again");
+                rows.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 W76HoldMemory m;
                 w76HoldReopenNote(m, "cast", rows, 4, false, holdActionKeyRow);
                 CHECK(m.measuredRef["cast"] == -1,
@@ -35031,7 +35049,7 @@ static const char * kW50Y_r94 =
             {
                 const string act = "+1: create a 1/1 vampire with Sorin, Lord of Innistrad"
                                    " [cost: Counters]";
-                const string hold = "Hold priority - pass now, and do not ask me again -"
+                const string hold = "Stop asking me this turn - pass now, and do not ask me again -"
                                     " YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE";
                 const string decline = "Cast nothing right now";
                 CHECK(w77OwnLoopRow(act, false) == act,
@@ -36186,14 +36204,14 @@ static const char * kW50Y_r94 =
             {
                 std::vector<string> rows;
                 rows.push_back("Cast Counterspell {u}{u}");
-                rows.push_back("Hold priority - pass now, and do not ask me again");
+                rows.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 w77ApplyOwnLoopFeed(rows,
                                     w77LoopVerdictFrom(true, false, true)
                                     == kW77LoopResolving);
                 w77ApplyOwnLoopThreatFeed(rows,
                                           w77OwnLoopThreatTag("Doom Blade", "Sanguine Bond"));
                 CHECK(rows.size() == 2 && rows[1]
-                          == "Hold priority - pass now, and do not ask me again",
+                          == "Stop asking me this turn - pass now, and do not ask me again",
                       "#W77-CU F4 KEY PIN NOTHING IS REMOVED, COLLAPSED OR AUTO-ANSWERED -"
                       " two rows in, two answerable rows out, and the hold row is untouched");
                 CHECK(rows[0].find("not needed to win it") == string::npos,
@@ -36207,7 +36225,7 @@ static const char * kW50Y_r94 =
                 // key stability: the clause is a `[...]` group.
                 std::vector<string> plain;
                 plain.push_back("Cast Counterspell {u}{u}");
-                plain.push_back("Hold priority - pass now, and do not ask me again");
+                plain.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 CHECK(holdActionKeyRow(rows[0]) == holdActionKeyRow(plain[0])
                       && optionSetKeyOf(rows) == optionSetKeyOf(plain),
                       "#W77-CU F4 KEY PIN the threat clause moves no key - the VERDICT ROW"
@@ -36533,9 +36551,9 @@ static const char * kW50Y_r94 =
                 W76HoldMemory m;
                 std::vector<string> a, b;
                 a.push_back(rowA);
-                a.push_back("Hold priority - pass now, and do not ask me again");
+                a.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 b.push_back(rowB);
-                b.push_back("Hold priority - pass now, and do not ask me again");
+                b.push_back("Stop asking me this turn - pass now, and do not ask me again");
                 w76HoldReopenNote(m, "cast", a, 1, false, holdActionKeyRow);
                 w76HoldWindowAsked(m, "cast", 1);
                 const string note = w76HoldReopenNote(m, "cast", b, 2, false,
@@ -36693,9 +36711,9 @@ static const char * kW50Y_r94 =
         // while a seven-object stack of THEIR triggers drained.
         std::vector<string> rows;
         rows.push_back("Create human with Katilda, Dawnhart Prime [cost: Tap]");
-        rows.push_back("Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK");
+        rows.push_back("Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK");
         const string hold = w78HoldRowShortName(rows);
-        CHECK(hold == "Hold priority",
+        CHECK(hold == "Stop asking me this turn", //#W82-EB (H8)
               "#W78-CV S4 the clause names the HOLD row by its short name, copying none of"
               " the row's contract paragraph");
         const string unchangedNote =
@@ -36709,12 +36727,12 @@ static const char * kW50Y_r94 =
               "#W78-CV S4 MUST-NOT-MATCH a moved menu, and a window with no bracket at all");
         const string note = w78StackDrainNote(7, true, hold);
         CHECK(note == "\n[their stack is draining 7 triggers - each link will put this same list"
-                      " to you; HOLD (Hold priority) covers every link OF THIS STACK, and is"
-                      " released at your next untap - a new stack on a later turn asks you"
+                      " to you; HOLD (Stop asking me this turn) covers every link OF THIS STACK, and is"
+                      " released when this turn ends - a new stack on a later turn asks you"
                       " again. The rows above are what is legal NOW - this says nothing about"
                       " what will still be legal after their stack resolves]",
-              "#W79-CZ T13 GREEN the drain clause, verbatim, with the promise SCOPED to this"
-              " stack and the untap release named - RED on base, where the clause promised"
+              "#W79-CZ T13 / #W82-EB H9 GREEN the drain clause, verbatim, with the promise SCOPED to this"
+              " stack and the end-of-turn release named - RED on base, where the clause promised"
               " `covers every link` with no end and `123v125` seqs 379 -> 382 (T51 -> T52) and"
               " 395 -> 398 (T53 -> T54) falsified it across the untap release");
         CHECK(w78StackDrainNote(1, true, hold).empty(),
@@ -37060,7 +37078,7 @@ static const char * kW50Y_r94 =
             withRepeat.push_back(rr);
             vector<string> noRepeat;
             noRepeat.push_back("Cast Doom Blade {1}{b}");
-            noRepeat.push_back("Hold priority - pass now, and do not ask me again");
+            noRepeat.push_back("Stop asking me this turn - pass now, and do not ask me again");
 
             CHECK(w78AnyRepeatRow(withRepeat) && !w78AnyRepeatRow(noRepeat),
                   "#W78-CW S2 a repeat row is recognised by the row text the engine prints");
@@ -37977,7 +37995,7 @@ static const char * kW50Y_r94 =
     {
         std::vector<string> rows;
         rows.push_back("Create human with Katilda, Dawnhart Prime [cost: Tap]");
-        rows.push_back("Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK");
+        rows.push_back("Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK");
         const string hold = w78HoldRowShortName(rows);
         // RED ON BASE: the base clause promised a POST-RESOLUTION legality that a
         // pending opposing trigger removing Katilda falsifies. The promise is a
@@ -38492,8 +38510,8 @@ static const char * kW50Y_r94 =
                 ". (...more)\"} [this cannot target the spell on the stack - battlefield permanents only] {ca"
                 "rd text: \"Target creature gets -1/-1 until end of turn. -- Morbid - that creature gets -13/"
                 "-13 instead if a creature died this turn.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; on THIS menu that means you also give up t"
                 "his turn's remaining CASTING windows for as long as these rows stand, and NOT the priority w"
                 "indow that follows on this same step - that is a different question at a different seam and "
@@ -38511,8 +38529,8 @@ static const char * kW50Y_r94 =
                 " Vampire creature token with flying onto the battlefield. -- {B}: Transform Bloodline Keeper"
                 ". (...more)\"} {card text: \"Target creature gets -1/-1 until end of turn. -- Morbid - that "
                 "creature gets -13/-13 instead if a creature died this turn.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; on THIS menu that means you also give up t"
                 "his turn's remaining CASTING windows for as long as these rows stand, and NOT the priority w"
                 "indow that follows on this same step - that is a different question at a different seam and "
@@ -38566,8 +38584,8 @@ static const char * kW50Y_r94 =
                 "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
                 "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
                 "ther creatures you control get +2/+2.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -38577,8 +38595,8 @@ static const char * kW50Y_r94 =
                 "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
                 "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
                 "ther creatures you control get +2/+2.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -38666,8 +38684,8 @@ static const char * kW50Y_r94 =
                 "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
                 "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
                 "ther creatures you control get +2/+2.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -38677,8 +38695,8 @@ static const char * kW50Y_r94 =
                 "Create human with Thraben Doomsayer #2 [cost: Tap] {card text: \"{T}: Put a 1/1 white Human "
                 "creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, o"
                 "ther creatures you control get +2/+2.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -38723,8 +38741,8 @@ static const char * kW50Y_r94 =
                 "ature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, othe"
                 "r creatures you control get +2/+2.\"} {right now: M=26, your stated stop=26, so this window "
                 "would add to a count ALREADY AT OR PAST your own stop - past your stop = a wasted window}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -38736,8 +38754,8 @@ static const char * kW50Y_r94 =
                 "r creatures you control get +2/+2.\"} {if you pass here, this option is not offered again un"
                 "til the board changes} {right now: M=26, your stated stop=26, so this window would add to a "
                 "count ALREADY AT OR PAST your own stop - past your stop = a wasted window}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
-                " ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the row"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                " ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the row"
                 "s above changes (any change re-opens this window; the rows above include ACTIVATED abilities"
                 " that are usable RIGHT NOW, and taking this row gives every one of them up for as long as th"
                 "ese rows stand) {a hold taken in your first main phase also covers your second main phase wh"
@@ -39777,7 +39795,7 @@ static const char * kW50Y_r94 =
                             + crackBackBlockerRowTag(7, 8, 1, 0, atk, true, 0, 3)
                             + paymentTapsClause(taps, rest, "Intruder Alarm (THEIRS)")
                             + crackBackReliefClause(7, 2, 1, false, "", 2, 4);
-        const string hold = "Hold priority - pass now, and do not ask me again";
+        const string hold = "Stop asking me this turn - pass now, and do not ask me again";
         CHECK(rowA != rowB,
               "#W79-DA KEY the pair really does differ in the rendered bytes this wave adds");
         std::vector<string> menuA, menuB;
@@ -39886,7 +39904,7 @@ static const char * kW50Y_r94 =
         const char * loopRow =
             "Cast Counterspell {u}{u} {right now: counters their Doom Blade}";
         const char * holdRow =
-            "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
+            "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE"
             " ROWS ABOVE LATER THIS TURN";
         const string thrA = w77OwnLoopVerdictKey(kW77LoopThreatened, "Doom Blade", "Sanguine Bond");
         const string thrB = w77OwnLoopVerdictKey(kW77LoopThreatened, "Vanishing Verse", "Exquisite Blood");
@@ -40463,14 +40481,14 @@ static const char * kW50Y_r94 =
             { "125v123 seq 83 (wave-78)", "\n\nPLAN: Cast Sphinx's Revelation for X=4.\n2 (Cast Sphinx's Revelation)", 2, 4, {
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 3 of your 7 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
                 "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=4 (7 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=4 - largest affordable X - X=4 gains 4 life and draws 4 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=4, 7 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Supreme Verdict {1}{u}{w}{w} in your hand needs 4: the largest X that still leaves it payable this turn is X=0} {card text: \"You gain X life and draw X cards.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
             } },
             { "125v123 seq 140 (wave-78)", "\n\nPLAN: Play a land and hold for Emrakul next turn.\n3 (Cast nothing right now)", 3, 3, {
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 8 of your 12 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40478,7 +40496,7 @@ static const char * kW50Y_r94 =
             } },
             { "125v123 seq 215 (wave-78)", "\n\nPLAN: I will hold priority to skip further windows this turn, as the opponent has no threats and I have no plays to make right now.\n2 (Hold priority)", 2, 3, {
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 2 of your 6 untapped mana sources untapped} {spends 4 of your 6 untapped mana sources this turn; Dream Fracture {1}{u}{u} in your hand needs 3} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 21 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40487,7 +40505,7 @@ static const char * kW50Y_r94 =
             { "125v123 seq 305 (wave-78)", "\n\nPLAN: I will hold priority to end my turn and proceed to the next turn to attack with the two Staffs of Nin, which will win the game in 4 turns.\n4 (Cast nothing right now)", 4, 4, {
                 "Cast Elixir of Immortality {1} {leaves 17 of your 18 untapped mana sources untapped} {card text: \"{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library.\"} {leaves 17 sources - no other row on this menu needs more than 17}",
                 "Cast Emrakul, the Aeons Torn {15} (15/15) {leaves 3 of your 18 untapped mana sources untapped} {spends 15 of your 18 untapped mana sources this turn; Fall of the Gavel {3}{u}{w} in your hand needs 5} {card text: \"Emrakul, the Aeons Torn can't be countered. -- When you cast Emrakul, take an extra turn after this one. -- Flying, protection from colored spells, annihilator 6 -- When Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.\"} {leaves 3 sources - no other row on this menu needs more than 3}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 4 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40495,14 +40513,14 @@ static const char * kW50Y_r94 =
             { "125v126 seq 107 (wave-78)", "\n\nPLAN: Pass main phase and hold priority.\n4 (Cast nothing right now)", 4, 4, {
                 "Cast Path to Exile {w} {leaves 8 of your 9 untapped mana sources untapped} {removes: 3 bodies: Wall of Omens #1, Wall of Omens #2, Overgrown Battlement} - legal targets right now: Wall of Omens #1 {1}{w} (creature 0/4) [defender] {target text: \"Defender (This creature can't attack.) -- When Wall of Omens enters, draw a card.\"}, Wall of Omens #2 {1}{w} (creature 0/4) [defender], Overgrown Battlement {1}{g} (creature 0/4) [defender] {target text: \"Defender -- {T}: Add {G} for each creature with defender you control.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"} {leaves 8 sources - no other row on this menu needs more than 8}",
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 3 of their creatures (all of them carry a restriction against attacking), 0 of yours - THEIRS: 3 bodies: Wall of Omens #1 (0/4) [defender], Wall of Omens #2 (0/4) [defender], Overgrown Battlement (0/4) [defender]} {leaves 5 of your 9 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {leaves 5 sources - no other row on this menu needs more than 5} [<- board sweep: THEIRS 3 / YOURS 0 - the only row on this menu that prices a board sweep]",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
             } },
             { "162v146 seq 16 (wave-78)", "\n\nCast nothing right now.\n3 (Cast nothing right now)", 3, 3, {
                 "Cast Howling Mine {2} [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule, and this copy is a second instance of an effect you already have: each line it repeats happens a second time. The price is a card and this window's cast, spent on repeating an effect that is already on your battlefield rather than on one that is not] {leaves 0 of your 2 untapped mana sources untapped - casting this taps you out} {card text: \"At the beginning of each player's draw step, if Howling Mine is untapped, that player draws an additional card.\"} {feeds: the opponent draws 1 extra card per turn; and so do YOU: 1 extra card per turn (this engine is SYMMETRIC - it feeds both players, and your own extra draws are priced by any draw punisher THEY control); draw converters (they fire when the opponent DRAWS) on your battlefield: 0 (nothing of yours punishes their DRAWS yet - the cards you hand them are free until a draw converter is out; a discard punisher is a different class and is counted separately below); draw converters in your hand: 1 - Ob Nixilis, the Hate-Twisted; discard punishers (a different class - this row hands them CARDS, and a discard punisher fires only when a card leaves a hand as a discard, though a larger hand can overflow a cleanup step): on your battlefield: 1 - Liliana's Caress; in your hand: 0}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now (combat comes next this turn) {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40510,7 +40528,7 @@ static const char * kW50Y_r94 =
             } },
             { "125v130 seq 303 (wave-78)", "\n\nPLAN: Pass upkeep, cast Staff of Nin in main phase 1.\n2 (Hold priority)", 2, 3, {
                 "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=9, 12 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Elixir of Immortality {1} in your hand needs 1: the largest X that still leaves it payable this turn is X=8. Holding up an instant: Essence Scatter {1}{u} needs 2: the largest X that still leaves it castable this turn is X=7} {card text: \"You gain X life and draw X cards.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 16 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40518,7 +40536,7 @@ static const char * kW50Y_r94 =
             } },
             { "125v123 seq 315 (wave-77)", "\n\nPLAN: Opponent is at 5 life, my two Staffs will deal 2 damage per turn, securing the win in 3 turns. Stop 3 prohibits Sphinx's Revelation, and there are no threats to answer. I will hold priority to close the turn.\n2 (Hold priority)", 2, 3, {
                 "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=9 (12 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=9 - largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=9, 12 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Path to Exile {w} in your hand needs 1: the largest X that still leaves it payable this turn is X=8} {card text: \"You gain X life and draw X cards.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 3 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40526,7 +40544,7 @@ static const char * kW50Y_r94 =
             } },
             { "125v126 seq 140 (wave-77)", "\n\nPLAN: Let Staff pings resolve and hold priority to stop the menu loop.\n2 (Hold priority)", 2, 3, {
                 "Cast Path to Exile {w} {leaves 12 of your 13 untapped mana sources untapped} {removes: Perimeter Captain, Pride Guardian} - legal targets right now: Perimeter Captain {w} (creature 0/4) [defender] {target text: \"Defender -- Whenever a creature you control with defender blocks, you may gain 2 life.\"}, Pride Guardian {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 5 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40534,7 +40552,7 @@ static const char * kW50Y_r94 =
             } },
             { "125v126 seq 201 (wave-77)", "\n\nPLAN: Wait for Staff of Nin to ping the opponent down to 0.\n3 (Cast nothing right now)", 3, 3, {
                 "Cast Path to Exile {w} {leaves 14 of your 15 untapped mana sources untapped} {removes: Pride Guardian #1, Pride Guardian #2} - legal targets right now: Pride Guardian #1 {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"}, Pride Guardian #2 {w} (creature 0/3) [defender] {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 3 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40544,14 +40562,14 @@ static const char * kW50Y_r94 =
                 "Cast Path to Exile {w} {leaves 14 of your 15 untapped mana sources untapped} {removes: Pride Guardian} - legal targets right now: Pride Guardian {w} (creature 0/3) [defender] {target text: \"Defender -- Whenever Pride Guardian blocks, you gain 3 life.\"} {card text: \"Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library.\"} {leaves 14 sources - no other row on this menu needs more than 14}",
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 1 of their creature (it carries a restriction against attacking), 0 of yours - THEIRS: Pride Guardian (0/3) [defender]} {leaves 11 of your 15 untapped mana sources untapped} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {leaves 11 sources - no other row on this menu needs more than 11} [<- board sweep: THEIRS 1 / YOURS 0 - the only row on this menu that prices a board sweep]",
                 "Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=12 (15 mana total); each point of X gains you 1 life and draws you 1 card} [<- best X for this cast: X=12 - largest affordable X - X=12 gains 12 life and draws 12 cards; no listed X does more] {no {leaves ...} count on this row: what it spends depends on the X you announce at the next window. At the largest X this row prices (X=12, 15 mana total) your mana affords no larger X, so that cast leaves you nothing more to spend on X; every step below it leaves one more mana untapped. Path to Exile {w} in your hand needs 1: the largest X that still leaves it payable this turn is X=11} {card text: \"You gain X life and draw X cards.\"}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now {the clock you already control: your Staff of Nin #1-#2 deal 2 damage a turn between them - at that rate alone the opponent reaches 0 in 2 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
             } },
             { "125v162 seq 49 (wave-77)", "\n\nPLAN: Cast nothing right now.\n4 (Cast nothing right now)", 4, 4, {
                 "Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {spends 4 of your 4 untapped mana sources this turn; Essence Scatter {1}{u} in your hand needs 2} {card text: \"Supreme Verdict can't be countered. -- Destroy all creatures.\"} {taps you out - row 2 needs more mana sources than the 0 this leaves}",
                 "Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker} [second copy: you already control Lightmine Field; both stay on the battlefield - no legend rule, and this copy is one more of the same effect - each line it repeats happens again; the price is a card and this window's cast spent DOUBLING an effect you already have on the battlefield, not adding one you do not] {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {spends 4 of your 4 untapped mana sources this turn; Essence Scatter {1}{u} in your hand needs 2} {card text: \"Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures.\"} {taps you out - row 1 needs more mana sources than the 0 this leaves}",
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn begins, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends, or until one of the rows above changes (any change re-opens this window; on THIS menu that means you also give up this turn's remaining CASTING windows for as long as these rows stand, and NOT the priority window that follows on this same step - that is a different question at a different seam and you will still be asked it) {a hold taken in your first main phase also covers your second main phase while these rows do not change}",
                 "Cast nothing right now (combat comes next this turn) {the clock you already control: your Staff of Nin deals 1 damage a turn - at that rate alone the opponent reaches 0 in 19 more turns, with no card spent} {closes ONLY this window - the same list can be put to you again this turn, at this seam or another; the hold row is the row that closes the run}",
                 NULL,
                 NULL,
@@ -40592,7 +40610,7 @@ static const char * kW50Y_r94 =
         // that it read a label-less line, so a case that fails here fails loudly.
         vector<string> rows;
         rows.push_back("Cast Alpha {1}{u} (2/2) [flying]");
-        rows.push_back("Hold priority - pass now, and do not ask me again");
+        rows.push_back("Stop asking me this turn - pass now, and do not ask me again");
         rows.push_back("Cast nothing right now (combat comes next this turn)");
         int run = 0, rej = 0; bool bare = false;
         // (1) THE RULING'S OWN CLAUSE: an answer that PRECEDES the plan is post hoc
@@ -40837,7 +40855,7 @@ static const char * kW50Y_r94 =
         // creates no row - key IDENTICAL through the live latch builder.
         {
             const string hold =
-                "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE"
+                "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND TAKE"
                 " ONE OF THE ROWS ABOVE LATER THIS TURN";
             const string cast = "Cast Sphinx's Revelation {u}{u}{w}{x}";
             std::vector<string> rowsA, rowsB;
@@ -40866,7 +40884,7 @@ static const char * kW50Y_r94 =
         const char * deRows[3] = {
             "Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does nothing;"
             " YOU control 0 creatures - targeting yourself does nothing}",
-            "Hold priority - pass now, and do not ask me again",
+            "Stop asking me this turn - pass now, and do not ask me again",
             "Cast nothing right now {closes ONLY this window - the same list can be put to you again"
             " this turn, at this seam or another; the hold row is the row that closes the run}"
         };
@@ -41403,7 +41421,7 @@ static const char * kW50Y_r94 =
                             + drawPriceRowTag(1, 1, "Underworld Dreams", 19, false,
                                               1, 2, "Liliana's Caress", true)
                             + w80SacrificeSpendsBlockerClause(9, 5, true, 4, 3);
-        const string hold = "Hold priority - pass now, and do not ask me again";
+        const string hold = "Stop asking me this turn - pass now, and do not ask me again";
         CHECK(rowA != rowB,
               "#W80-DF KEY the pair really does differ in the rendered bytes this wave adds");
         std::vector<string> menuA, menuB;
@@ -42278,7 +42296,7 @@ static const char * kW50Y_r94 =
         // between them: the latch was retired, the window was re-put, and the ask cache
         // re-served the hold row.
         const string holdRow =
-            "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK";
+            "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK";
         const string castRow = "Cast Path to Exile {w} {leaves 2 of your 3 untapped mana sources untapped}";
         std::vector<string> mLastMenuRows;
         mLastMenuRows.push_back(castRow);
@@ -42649,7 +42667,7 @@ static const char * kW50Y_r94 =
               " hold taken at `survive` re-opens the moment the screen's own total turns");
         const string row = "Cast Damnation {2}{b}{b} {right now: destroys 2 of their"
                            " creatures} {leaves 1 of your 5 untapped mana sources untapped}";
-        const string hold = "Hold priority - pass now, and do not ask me again";
+        const string hold = "Stop asking me this turn - pass now, and do not ask me again";
         std::vector<string> menuA, menuB;
         menuA.push_back(row); menuA.push_back(hold);
         menuB.push_back(row); menuB.push_back(hold);
@@ -43550,6 +43568,281 @@ static const char * kW50Y_r94 =
               "#W82-P11 a wall miss whose window wrote no record stays a side record");
         translogRecordShape("", k, sm);
         CHECK(k.empty() && sm.empty(), "#W82-P11 NEGATIVE an empty kind maps to nothing");
+    }
+
+    cout << "\n[#W82-EB] H8 the hold row's short name says what it does; both spellings bind\n";
+    {
+        //#W82-EB (H8, wave-81 deck123 HIGH-1): `123v130` seq 78 wrote `PLAN: Hold priority
+        //to block Rorix ... CHOICE: 3 (Hold priority)` - the two-word head read in its Magic
+        //sense, the body ignored, the turn's windows and the game forfeited. The head now
+        //names what the row does; the body is unchanged; both names bind the row.
+        CHECK(string(kHoldPriorityRowText).compare(0, 24, "Stop asking me this turn") == 0
+                  && string(kHoldPriorityRowTextCast).compare(0, 24, "Stop asking me this turn") == 0
+                  && string(kHoldPriorityRowTextActivation).compare(0, 24, "Stop asking me this turn") == 0
+                  && string(kHoldPriorityRowHead).compare(0, 24, "Stop asking me this turn") == 0,
+              "#W82-EB H8 all three spellings and the identity head lead with the new name");
+        CHECK(string(kHoldPriorityRowTextCast).find("Hold priority") == string::npos
+                  && string(kHoldPriorityRowTextCast).find("YOU CANNOT COME BACK AND TAKE ONE OF THE"
+                                                            " ROWS ABOVE LATER THIS TURN") != string::npos,
+              "#W82-EB H8 MUST-NOT-MATCH the Magic-sense name is gone from the row; the body is intact");
+        vector<string> menu;
+        menu.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+        menu.push_back("Create vampire with Lord of Lineage, repeated then stop");
+        menu.push_back(kHoldPriorityRowTextActivation);
+        CHECK(w78HoldRowShortName(menu) == "Stop asking me this turn" && holdRowIndexOf(&menu) == 2,
+              "#W82-EB H8 the short-name clause and the row finder follow the rename");
+        bool st = false;
+        int c = parseChoice("PLAN: nothing to do this window.\nCHOICE: 3 (Stop asking me this turn)",
+                            (int) menu.size(), &menu, &st, NULL, NULL, true);
+        CHECK(c == 3 && !st, "#W82-EB H8 the new short name binds the row");
+        bool st2 = false;
+        int c2 = parseChoice("PLAN: Hold priority to block Rorix with Vampire #1 and Vampire #2 in combat."
+                             "\nCHOICE: 3 (Hold priority)", (int) menu.size(), &menu, &st2, NULL, NULL, true);
+        CHECK(c2 == 3 && !st2,
+              "#W82-EB H8 REPRO 123v130 seq 78 the OLD short name still binds the same row (echo tolerance)");
+        bool st3 = false;
+        int c3 = parseChoice("PLAN: pass.\nCHOICE: 3 (Hold priority - pass now, and do not ask me again)",
+                             (int) menu.size(), &menu, &st3, NULL, NULL, true);
+        CHECK(c3 == 3 && !st3, "#W82-EB H8 the old head echoed through its first clause still binds");
+        bool st4 = false;
+        int c4 = parseChoice("PLAN: make a token.\nCHOICE: 1 (Create vampire with Lord of Lineage)",
+                             (int) menu.size(), &menu, &st4, NULL, NULL, true);
+        CHECK(c4 == 1 && !st4, "#W82-EB H8 NEGATIVE a real row on a hold-bearing menu still executes");
+        CHECK(isReservedHoldEcho("stop asking me this turn") && isReservedHoldEcho(" stop asking me this turn.")
+                  && isReservedHoldEcho("hold priority") && !isReservedHoldEcho("stop")
+                  && !isReservedHoldEcho("stop the bleeding"),
+              "#W82-EB H8 the reserved-echo binder accepts both names and nothing that merely starts like one");
+        CHECK(isHoldRowText(kHoldPriorityRowTextCast)
+                  && isHoldRowText("Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK")
+                  && !isHoldRowText("Stop the bleeding with Healer [cost: Tap]")
+                  && !isHoldRowText("Hold the line with Wall of Omens"),
+              "#W82-EB H8 isHoldRowText: either head, and not a card whose name starts the same way");
+        CHECK(declineRowText(kHoldPriorityRowText) && w72RowIsDeclineOrHold(kHoldPriorityRowText)
+                  && logWindowInertRow(kHoldPriorityRowText),
+              "#W82-EB H8 every decline-class predicate still sees the hold row as a decline");
+        CHECK(holdActionKeyRow(string(kHoldPriorityRowTextCast) + holdRowBenefitClause())
+                  == holdActionKeyRow(kHoldPriorityRowTextCast),
+              "#W82-EB H8 keys unchanged in kind: the rename adds no number and the benefit brace stays"
+              " outside the hold key");
+    }
+
+    cout << "\n[#W82-EB] H1/H2 the Land drop: line names the window's SHAPE; the sibling key ignores it\n";
+    {
+        //#W82-EB (H1, wave-81 H1: deck130 44/44 windows; `152v130` seq 26 `PLAN: Play
+        //Plains ... CHOICE: 5 (Cast nothing right now)`). The fold menu carried the Play
+        //row AND a paragraph saying the drop was a separate question.
+        const string sep = landDropStatusLine(true, true, true, 0);
+        const string elsewhere = landDropStatusLine(true, true, true, 1);
+        const string onMenu = landDropStatusLine(true, true, true, 2);
+        const string standalone = landDropStatusLine(true, true, true, 3);
+        CHECK(sep == landDropStatusLine(true, true, true) && sep.find("its OWN decision") != string::npos,
+              "#W82-EB H1 WAGIC_GPT_LAND_SEPARATE=1 (shape 0) keeps the pre-P9 paragraph byte for byte");
+        CHECK(onMenu.find("row(s) on the list below ARE this turn's land drop") != string::npos
+                  && onMenu.find("plays that land instead of casting in this window") != string::npos
+                  && onMenu.find("its OWN decision") == string::npos
+                  && onMenu.find("does not mean the drop is gone") == string::npos,
+              "#W82-EB H1 REPRO 152v130 seq 26: on the casting menu that carries the rows, the line says"
+              " the rows ARE the drop and no longer asserts a separate question");
+        CHECK(elsewhere.find("not on this menu") != string::npos
+                  && elsewhere.find("does not mean the drop is gone") != string::npos
+                  && elsewhere.find("on your CASTING menu") != string::npos
+                  && elsewhere.find("its OWN decision") == string::npos,
+              "#W82-EB H1 a fold-regime window with no land rows says WHERE the rows are");
+        CHECK(standalone.find("asked on their own because no casting menu is being put to you") != string::npos
+                  && standalone.find("its OWN decision") == string::npos,
+              "#W82-EB H2 the standalone Land drop: ask says why it is on its own (the fold's degenerate case)");
+        CHECK(onMenu.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos
+                  && elsewhere.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos
+                  && standalone.find("PLAY THIS AS A LAND and USES YOUR LAND DROP") != string::npos,
+              "#W82-EB H1 every shape keeps the #W62-W D15 MDFC exception");
+        CHECK(landDropStatusLine(true, false, true, 2) == landDropStatusLine(true, false, true, 0)
+                  && landDropStatusLine(true, false, false, 3) == landDropStatusLine(true, false, false, 0)
+                  && landDropStatusLine(false, true, true, 2).empty(),
+              "#W82-EB H1 NEGATIVE the no-drop branches and the opponent's turn do not depend on the shape");
+        bool digitFree = true;
+        for (size_t i = 0; i < onMenu.size(); i++)
+            if (isdigit((unsigned char) onMenu[i]))
+                digitFree = false;
+        for (size_t i = 0; i < standalone.size(); i++)
+            if (isdigit((unsigned char) standalone[i]))
+                digitFree = false;
+        CHECK(digitFree, "#W82-EB H1 the new lines carry no number - nothing in them can move a key");
+        // KEY: a casting window (rows on it) and its sibling priority window (rows
+        // elsewhere) on one board must compare EQUAL for the sibling latch.
+        const string boardCast = "Mana available: 2 total\n" + onMenu + "Your hand (1 card): Plains (land)\n";
+        const string boardPrio = "Mana available: 2 total\n" + elsewhere + "Your hand (1 card): Plains (land)\n";
+        const string boardLand = "Mana available: 2 total\n" + standalone + "Your hand (1 card): Plains (land)\n";
+        CHECK(boardCast != boardPrio && w73SiblingBoardKey(boardCast) == w73SiblingBoardKey(boardPrio)
+                  && w73SiblingBoardKey(boardLand) == w73SiblingBoardKey(boardPrio),
+              "#W82-EB H1 KEY two windows differing only in the land-drop shape line yield identical"
+              " sibling board keys");
+        CHECK(w73SiblingBoardKey("Mana available: 2 total\n" + sep) == "Mana available: 2 total\n" + sep,
+              "#W82-EB H1 NEGATIVE the separate-regime paragraph is left alone by the key");
+    }
+
+    cout << "\n[#W82-EB] H2 one land regime: the standalone ask is the fold's degenerate case, and every land window is tagged\n";
+    {
+        //#W82-EB (H2, wave-81 H2): `123v152` seq 34/37 - a standalone `Land drop:` ask
+        //(['Play Marsh Flats', 'Play no land right now']) reachable in every game beside
+        //the folded rows. The owner reads the P9 revert criterion off the next corpus,
+        //so each window says which shape it was: the record field and the header.
+        CHECK(string(w82LandShapeField("ask", false, 2, true)) == "folded",
+              "#W82-EB H2 a casting menu that carried the Play <land> rows records land_shape=folded");
+        CHECK(string(w82LandShapeField("ask", true, 3, true)) == "standalone",
+              "#W82-EB H2 REPRO 123v152 seq 34: the separate ask under the P9 regime records"
+              " land_shape=standalone");
+        CHECK(string(w82LandShapeField("ask", true, 0, false)) == "separate",
+              "#W82-EB H2 the same ask under WAGIC_GPT_LAND_SEPARATE=1 records land_shape=separate");
+        CHECK(w82LandShapeField("ask", false, 1, true) == NULL
+                  && w82LandShapeField("ask", false, 0, true) == NULL
+                  && w82LandShapeField("priority", false, 2, true) == NULL
+                  && w82LandShapeField("discard", true, 3, true) == NULL,
+              "#W82-EB H2 NEGATIVE a window with no land rows, and every other seam, carries no field");
+        CHECK(landDropStatusLine(true, true, true, 3).find("no casting menu is being put to you") != string::npos
+                  && landDropStatusLine(true, true, true, 3).find("rows"
+                     " below ARE this turn's land drop") != string::npos,
+              "#W82-EB H2 the standalone ask's own header names it as the degenerate case of the fold");
+    }
+
+    cout << "\n[#W82-EB] H10 the cast row leads with the target verdict when every legal target survives\n";
+    {
+        //#W82-EB (H10, wave-81 deck130 HIGH-2): `130v162` seq 11 - Hammer of Bogardan's
+        //cast row priced `kills 0 of the 1 CREATURE target at 3 damage - and 3 to the
+        //opponent at life 20 leaves them at 17`; the target ask that followed had no
+        //decline and every row survived. The decision is made where a decline exists.
+        std::vector<std::string> none, mine;
+        const string tail = castPlayerDamageTail(3, true, 20);
+        const string hammer = castKillSummaryTag(none, 1, "3 damage", tail, mine, 0);
+        cout << "     " << hammer << "\n";
+        CHECK(hammer == " {every legal target SURVIVES - casting this kills nothing: kills 0 of the 1"
+                        " CREATURE target at 3 damage - and 3 to the opponent at life 20 leaves them at 17}",
+              "#W82-EB H10 REPRO 130v162 seq 11: the row opens with the verdict; the wave-54 numbers follow");
+        CHECK(castKillSummaryTag(none, 0, "3 damage", tail, mine, 0)
+                  == " {every legal target SURVIVES - casting this kills nothing: no creature target"
+                     " - and 3 to the opponent at life 20 leaves them at 17}",
+              "#W82-EB H10 a burn row whose only legal targets are players carries the same lead");
+        CHECK(castKillSummaryTag(none, 2, "3 damage", castPlayerDamageTail(3, true, 1), mine, 0)
+                  == " {kills 0 of the 2 CREATURE targets at 3 damage"
+                     " - and 3 to the opponent at life 1 WINS THE GAME}",
+              "#W82-EB H10 MUST-NOT-MATCH a lethal player tail is not 'kills nothing'");
+        CHECK(castKillSummaryTag(none, 1, "3 damage", tail, mine, 1).find("every legal target") == string::npos
+                  && castKillSummaryTag(none, 1, "3 damage", tail, mine, 1).find("kills 0 of the 1 CREATURE target") != string::npos,
+              "#W82-EB H10 MUST-NOT-MATCH an unpriced legal target (a planeswalker) withholds the claim; the count stays");
+        std::vector<std::string> one;
+        one.push_back("Master of the Feast");
+        CHECK(castKillSummaryTag(one, 1, "5 damage", tail, mine, 0).find("every legal target") == string::npos
+                  && castKillSummaryTag(none, 1, "5 damage", tail, one, 0).find("every legal target") == string::npos,
+              "#W82-EB H10 MUST-NOT-MATCH a kill on either side withholds the claim");
+        CHECK(stripNarrationDecoration("Cast Hammer of Bogardan {1}{r}{r}" + hammer) == "Cast Hammer of Bogardan {1}{r}{r}"
+                  && stripRenderAnnotationsLc("Cast Hammer of Bogardan {1}{r}{r}" + hammer)
+                     == stripRenderAnnotationsLc("Cast Hammer of Bogardan {1}{r}{r}"),
+              "#W82-EB H10 ECHO/KEY the lead rides the {...} channel: out of the narration and out of every key");
+        std::vector<string> menu;
+        menu.push_back("Cast Starstorm {r}{r}{x}");
+        menu.push_back("Cast Hammer of Bogardan {1}{r}{r}" + hammer);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        CHECK(parseChoice("PLAN: burn face.\nCHOICE: 2 (Cast Hammer of Bogardan)", 3, &menu, &st, NULL, NULL, true) == 2 && !st,
+              "#W82-EB H10 ECHO the annotated row still binds by its short name");
+    }
+
+    cout << "\n[#W82-EB] M14 the Upkeep animation clause names the block it cannot make\n";
+    {
+        const string up = upkeepAnimationClause();
+        CHECK(up.find("CANNOT block on their turn") != string::npos
+                  && up.find("over before the opponent's turn begins") != string::npos,
+              "#W82-EB M14 REPRO 146v152 seq 45: the clause refutes 'animate at Upkeep to block on their turn'");
+        CHECK(up.find("lasts only until end of turn") != string::npos
+                  && up.find("offered again in your main phase") != string::npos,
+              "#W82-EB M14 nothing is deleted: both wave-51 facts still ride the clause");
+        CHECK(up[0] == ' ' && up[1] == '[' && up[up.size() - 1] == ']',
+              "#W82-EB M14 ECHO shape: one [...] tail, which the narration strip and every key drop");
+        CHECK(stripNarrationDecoration("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]" + up)
+                  == "becomes beholder with Hive of the Eye Tyrant #1",
+              "#W82-EB M14 ECHO the clause leaves no residue in the narrated record");
+        bool digitFree = true;
+        for (size_t i = 0; i < up.size(); i++)
+            if (isdigit((unsigned char) up[i]))
+                digitFree = false;
+        CHECK(digitFree, "#W82-EB M14 the clause carries no number - nothing in it can move a key");
+    }
+
+    cout << "\n[#W82-EB] M10 the hold row says when every other row is free\n";
+    {
+        //#W82-EB (M10, wave-81 deck146 MED-2): `146v152` seq 36 - Lolth +0, Lolth -3, the
+        //hold, the pass; LETHAL on the screen; the hold was taken over two free rows.
+        std::vector<string> lolth;
+        lolth.push_back("+0: draw card and lose life with Lolth, Spider Queen [cost: Counters]");
+        lolth.push_back("-3: create spiders with Lolth, Spider Queen [cost: Counters] {counter cost: spends 3 loyalty counters}");
+        CHECK(w82RowsCostNoMana(lolth), "#W82-EB M10 REPRO 146v152 seq 36: two loyalty rows cost no mana");
+        std::vector<string> tapOnly;
+        tapOnly.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+        CHECK(w82RowsCostNoMana(tapOnly), "#W82-EB M10 a Tap-only activation costs no mana");
+        std::vector<string> mixed = lolth;
+        mixed.push_back("Draw 1 with Clue [cost: {2}, Sacrifice]");
+        CHECK(!w82RowsCostNoMana(mixed), "#W82-EB M10 MUST-NOT-MATCH one row with a mana pip in its cost");
+        std::vector<string> cast = lolth;
+        cast.push_back("Cast Soul Shatter {2}{b}");
+        CHECK(!w82RowsCostNoMana(cast), "#W82-EB M10 MUST-NOT-MATCH a row with no cost bracket is not proven free");
+        std::vector<string> emptyRows;
+        CHECK(!w82RowsCostNoMana(emptyRows), "#W82-EB M10 MUST-NOT-MATCH no acting row, no marker");
+        std::vector<string> pip;
+        pip.push_back("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]");
+        CHECK(!w82RowsCostNoMana(pip), "#W82-EB M10 MUST-NOT-MATCH an animation that costs mana");
+        const string marked = string(kHoldPriorityRowTextActivation) + holdRowBenefitClause() + kHoldFreeActionsMarker;
+        CHECK(string(kHoldFreeActionsMarker) == " [nothing here costs mana - holding gives away free actions]",
+              "#W82-EB M10 the marker's literal");
+        CHECK(holdActionKeyRow(marked) == holdActionKeyRow(string(kHoldPriorityRowTextActivation) + holdRowBenefitClause())
+                  && stripRenderAnnotationsLc(marked) == stripRenderAnnotationsLc(kHoldPriorityRowTextActivation),
+              "#W82-EB M10 KEY the marker moves no hold key and no option-set key");
+        CHECK(stripNarrationDecoration(marked) == stripNarrationDecoration(kHoldPriorityRowTextActivation),
+              "#W82-EB M10 ECHO the marker leaves no residue in the narrated record");
+        std::vector<string> menu = lolth;
+        menu.push_back(marked);
+        CHECK(holdRowIndexOf(&menu) == 2 && w78HoldRowShortName(menu) == "Stop asking me this turn",
+              "#W82-EB M10 the marked row is still the hold row to every consumer");
+        bool st = false;
+        CHECK(parseChoice("PLAN: nothing.\nCHOICE: 3 (Stop asking me this turn)", 3, &menu, &st, NULL, NULL, true) == 3 && !st,
+              "#W82-EB M10 ECHO the marked row still binds by its short name");
+    }
+
+    cout << "\n[#W82-EB] M9 the life/draw X badge is refusal-first when the NET kills\n";
+    {
+        //#W82-EB (M9, wave-81 deck125 M3): `125v162` seq 296 - the badge named X=9 as
+        //best, said it kills, then named X=2 as survivable; the pilot cast X=2 into a
+        //guide that refuses the cast at every stop, and x_cast_row_refusal_markers was 0.
+        const string s296 = xMonotoneMarker(9, 1, 1, -20, 10, 2, -6, "", 2);
+        cout << "     " << s296 << "\n";
+        CHECK(s296.compare(0, 24, " [<- REFUSED by NET life") == 0,
+              "#W82-EB M9 REPRO 125v162 seq 296: the badge LEADS with the refusal");
+        CHECK(s296.find("X=9: gains 9 life and draws 9 cards; no listed X does more") != string::npos
+                  && s296.find("NET -20 life for this cast, counted from the 8 life the 2 damage ALREADY ON"
+                               " THE STACK leaves you on, and puts you at -12; this KILLS you") != string::npos
+                  && s296.find("X=2 is the largest listed X whose NET (-6) leaves you alive, at 2") != string::npos,
+              "#W82-EB M9 nothing is deleted: the cap, its gain, the NET, the stack base and the survivable rung"
+              " all still print");
+        CHECK(s296.find("this badge names no X to take") != string::npos
+                  && s296.find("best X") == string::npos,
+              "#W82-EB M9 the badge recommends no X");
+        XVictimSurvey sv;
+        sv.maxX = 9;
+        sv.priceable = false;
+        const string castRow = xCastRowBestXMarker(sv, 1, 1, -20, 10, 2, -6, "", -1, 2);
+        CHECK(castRow == s296 && castRow.find("best X for this cast") == string::npos,
+              "#W82-EB M9 the CAST row carries the refusal with no 'best X for this cast' head");
+        CHECK(xMonotoneMarker(9, 1, 1, -3, 10, -1, kXNetNotSupplied, "", 2)
+                  == " [<- largest affordable X - X=9 gains 9 life and draws 9 cards; no listed X does more]"
+                  && xCastRowBestXMarker(sv, 1, 1, -3, 10, -1, kXNetNotSupplied, "", -1, 2)
+                     .find("best X for this cast: X=9") != string::npos,
+              "#W82-EB M9 MUST-NOT-MATCH a survivable NET keeps the wave-63 badge and the cast row's head");
+        CHECK(stripNarrationDecoration("Cast Sphinx's Revelation {u}{u}{w}{x}" + s296) == "Cast Sphinx's Revelation {u}{u}{w}{x}",
+              "#W82-EB M9 ECHO the refusal badge leaves no residue in the narrated record");
+        std::vector<string> menu;
+        menu.push_back("Cast Sphinx's Revelation {u}{u}{w}{x}" + s296);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        CHECK(parseChoice("PLAN: survive.\nCHOICE: 1 (Cast Sphinx's Revelation)", 2, &menu, &st, NULL, NULL, true) == 1 && !st,
+              "#W82-EB M9 ECHO the badged row still binds by its short name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

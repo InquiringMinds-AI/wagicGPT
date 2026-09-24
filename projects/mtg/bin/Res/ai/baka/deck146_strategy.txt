@@ -200,8 +200,8 @@ only just came down" is no reason to wait.
   game. At 3 or more the cast buys nothing and costs a card and the mana: take the next cast-order
   entry instead.
 
-THE HOLD-PRIORITY ROW ("Hold priority - pass now ...") is a DURABLE pass answering every later
-window carrying these rows, NOT the one-window pass. Read the "[hold check: ...]" line: "every row
+THE HOLD ROW ("Stop asking me this turn - pass now ...") is a DURABLE pass answering every later
+window carrying these rows, NOT a one-window pass. Read the "[hold check: ...]" line: "every row
 above was also on the menu at the last window" -> take HOLD once you have decided on no action;
 "N rows above are new" or "first window ... at this seam" -> decline this window only.
 NEVER hold a list offering a Kaya or Lolth loyalty ability or the Hive animation - holding gives them

@@ -457,6 +457,7 @@ bool declineRowText(const string& row)
 {
     static const char * const decliners[] = {
         "Cast nothing right now", "Play no land right now", "Hold priority",
+        "Stop asking me this turn", //#W82-EB (H8): the hold row's live head
         "Decline -", "Decline,", "Do nothing", "Done - no further targets",
         "Done", "Pass"
     };
@@ -9917,10 +9918,47 @@ namespace
 //narration carries no land play at all - the MDFC back-face substitution sets
 //`haveLand` while `playable` needs a sorcery-timed flip). The line now says only
 //what its inputs support: whether a land play is AVAILABLE right now.
-static string landDropStatusLine(bool myTurn, bool playable, bool haveLand)
+//#W82-EB (H1, wave-81 H1: deck130 44 of 44 windows, deck152 seq 26 lost a drop to
+//it). Under #W82-P9 the land rows RIDE THE CASTING MENU, and the paragraph
+//below kept asserting a separate "Land drop:" question on the very menu that
+//carried `Play Plains` three rows down - `152v130` seq 26: `PLAN: Play Plains
+//... CHOICE: 5 (Cast nothing right now)`. The line now takes the window's
+//SHAPE (kLandShape*): on the casting menu that carries the rows it says the rows
+//ARE the drop; on a fold-regime window that carries none it says where they
+//are; a standalone `Land drop:` ask says why it is on its own (H2); and
+//WAGIC_GPT_LAND_SEPARATE=1 (kLandShapeSeparate) keeps the pre-P9 paragraph
+//byte for byte. The three no-drop branches do not depend on the shape.
+static const char * kLandDropMdfcException =
+    " ONE exception: a modal double-faced card whose back"
+    " face is a land is offered in the casting menu on its own row, marked"
+    " PLAY THIS AS A LAND and USES YOUR LAND DROP - taking that row spends"
+    " this same drop.\n";
+static const char * kLandDropFoldOnCastMenuLine =
+    "Land drop: a land play IS available to you right now, and the \"Play <land>\" row(s)"
+    " on the list below ARE this turn's land drop: taking one plays that land instead of"
+    " casting in this window, and this casting decision is asked again after it enters."
+    " Taking any other row plays no land in this window; the drop is then asked again on"
+    " its own while it is still available this turn.";
+static const char * kLandDropFoldElsewhereLine =
+    "Land drop: a land play IS available to you right now. It is offered as its own"
+    " \"Play <land>\" row on your CASTING menu (or, when no casting menu is put to you, as"
+    " a \"Land drop:\" question of its own), not on this menu - so the absence of a land"
+    " from the choices below does not mean the drop is gone.";
+static const char * kLandDropFoldStandaloneLine =
+    "Land drop: a land play IS available to you right now, and the \"Play <land>\" rows"
+    " below ARE this turn's land drop, asked on their own because no casting menu is"
+    " being put to you in this window.";
+static string landDropStatusLine(bool myTurn, bool playable, bool haveLand,
+                                 int landShape = kLandShapeSeparate) //#W82-EB (H1/H2)
 {
     if (!myTurn)
         return "";
+    if (playable && landShape == kLandShapeFoldOnCastMenu)
+        return string(kLandDropFoldOnCastMenuLine) + kLandDropMdfcException;
+    if (playable && landShape == kLandShapeFoldStandalone)
+        return string(kLandDropFoldStandaloneLine) + kLandDropMdfcException;
+    if (playable && landShape == kLandShapeFoldElsewhere)
+        return string(kLandDropFoldElsewhereLine) + kLandDropMdfcException;
     if (playable)
         //#W62-W (D15, deck146 HIGH-3): the "never listed in a casting menu"
         //half was false, and the prompt that carried it also carried, as row 1
@@ -18017,36 +18055,50 @@ static string xMonotoneMarker(int capX, int lifePerX, int drawPerX,
 {
     if (capX < 1 || (lifePerX <= 0 && drawPerX <= 0))
         return "";
-    std::ostringstream o;
-    o << " [<- largest affordable X - X=" << capX << " ";
+    std::ostringstream does;
     if (lifePerX > 0)
     {
-        o << "gains " << (capX * lifePerX) << " life";
+        does << "gains " << (capX * lifePerX) << " life";
         if (drawPerX > 0)
-            o << " and ";
+            does << " and ";
     }
     if (drawPerX > 0)
-        o << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
-    o << "; no listed X does more";
+        does << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
     //#W61-S (C10): a badge is the most obeyed annotation this render produces
     //(6 of 6 X menus in the wave-60 corpus), so it must never endorse an X that
     //kills the pilot in silence. The row already prints the NET; the badge now
     //carries the same number to its conclusion, and names the rung that lives.
     //(history: comment-archaeology.md AIPlayerGPT-lifeAfterPendingStack-775)
+    //#W82-EB (M9, wave-81 deck125 M3): REFUSAL FIRST. `125v162` seq 296 read
+    //`[<- best X for this cast: X=9 - largest affordable X ... but NET -20 ...
+    //this KILLS you. X=2 is the largest listed X whose NET (-6) leaves you alive,
+    //at 2]` - a recommendation head, the refusal in the middle, a survivable X at
+    //the end - and the pilot cast the survivable X into a guide that refuses the
+    //cast at every stop (`x_cast_row_refusal_markers` 0 in six games). When the
+    //NET kills, the badge now LEADS with the refusal (the #W81-DL shape the kill
+    //families already use), keeps every figure, and names no X to take: the
+    //survivable rung is stated as a fact with its own disclaimer, and the cast
+    //row's "best X for this cast" prefix is withheld (xCastRowMarkerFrom).
     const int xLifeBase = lifeAfterPendingStack(life, stackLossToMe); //#W66-AQ (H4)
-    if (netAtCap != kXNetNotSupplied && life >= 0 && xLifeBase + netAtCap <= 0)
+    const bool refused = netAtCap != kXNetNotSupplied && life >= 0 && xLifeBase + netAtCap <= 0;
+    std::ostringstream o;
+    if (!refused)
+        o << " [<- largest affordable X - X=" << capX << " " << does.str() << "; no listed X does more";
+    else
     {
-        o << " - but NET " << netAtCap << " life for this cast";
+        o << " [<- REFUSED by NET life: the largest affordable X (X=" << capX << ": " << does.str()
+          << "; no listed X does more) is NET " << netAtCap << " life for this cast";
         if (stackLossToMe > 0)
             o << ", counted from the " << xLifeBase << " life the " << stackLossToMe
               << " damage ALREADY ON THE STACK leaves you on,";
-        o << " puts you at " << (xLifeBase + netAtCap) << "; this KILLS you";
+        o << " and puts you at " << (xLifeBase + netAtCap) << "; this KILLS you";
         //#W66-AQ (H4): and the named rung must itself survive the same base -
         //a survival claim is never restated from a ladder computed against a
         //different life total.
         if (safeX >= 1 && netAtSafeX != kXNetNotSupplied && xLifeBase + netAtSafeX > 0)
             o << ". X=" << safeX << " is the largest listed X whose NET (" << netAtSafeX
-              << ") leaves you alive, at " << (xLifeBase + netAtSafeX);
+              << ") leaves you alive, at " << (xLifeBase + netAtSafeX)
+              << " - alive is not a reason to cast: this badge names no X to take";
         else if (stackLossToMe > 0 && xLifeBase <= 0)
             o << ". No listed X leaves you alive - the stack alone puts you at "
               << xLifeBase << ", whatever you announce";
@@ -18114,7 +18166,9 @@ static string xCastRowMarkerFrom(const string& menuMarker, int bestX, bool names
         return "";
     std::ostringstream o;
     o << " [<- ";
-    if (namesBestX)
+    //#W82-EB (M9): a badge that opens with a refusal is never given the
+    //recommendation head, whatever the caller believes it names.
+    if (namesBestX && body.compare(0, 8, "REFUSED ") != 0)
         o << "best X for this cast: X=" << bestX << " - ";
     o << body << "]";
     return o.str();
@@ -19457,6 +19511,7 @@ bool logWindowInertRow(const string& row)
 {
     static const char * const inert[] = {
         "Cast nothing right now", "Play no land right now", "Hold ",
+        "Stop asking me this turn", //#W82-EB (H8)
         "Flip Side", "Done", "Do nothing", "Pass"
     };
     for (size_t i = 0; i < sizeof(inert) / sizeof(inert[0]); i++)
@@ -26715,7 +26770,12 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             //from the same union that produces the rows.
             mdfcBackFaceLandStatus(this, playable, haveLand);
         }
-        out << landDropStatusLine(myTurn, playable, haveLand);
+        //#W82-EB (H1/H2): the window's shape - stamped by the seam around its
+        //askModel call; a window that stamps none is a fold-regime window that
+        //carries no land rows, or the separate regime.
+        const int landShape = !landDropInCastMenu() ? kLandShapeSeparate
+                            : (mLandShapeForPrompt ? mLandShapeForPrompt : kLandShapeFoldElsewhere);
+        out << landDropStatusLine(myTurn, playable, haveLand, landShape);
     }
 
     //#W44-6: attribute every card sitting in EITHER reveal zone to the zone it
@@ -28328,6 +28388,8 @@ string stripNarrationDecoration(const string& in)
                 //the moment the spell resolves.
                 || (in.compare(i, 8, "{kills: ") == 0)
                 || (in.compare(i, 7, "{kills ") == 0)
+                //#W82-EB (H10): the same clause, opened by its verdict lead.
+                || (in.compare(i, 28, "{every legal target SURVIVES") == 0)
                 //#W54-C: D11's removal victim list, D4's player-only summary,
                 //D18's menu-fit clause and D5's per-mode live/dead clause are
                 //all the same species - true of THIS window's offer and false
@@ -28969,8 +29031,15 @@ const char * kPassPriorityRowText = "Pass priority (take no action this window)"
 //consumer that only needs to know "a hold row is on this menu" (the contract
 //paragraph below the list). kHoldPriorityRowHead stays the identity head every
 //other consumer binds by.
+//#W82-EB (H8, wave-81 deck123 HIGH-1): THE HEAD NAMES WHAT THE ROW DOES. "Hold
+//priority" was read in its Magic sense - keep priority so as to act LATER THIS
+//TURN - 25 times across the wave-81 corpus (`123v130` seq 78: `PLAN: Hold
+//priority to block Rorix ... CHOICE: 3 (Hold priority)` forfeited the turn's
+//windows and the game); the body already said the opposite. The body is
+//unchanged; only the two-word head is. The parser binds the OLD name too
+//(isReservedHoldEcho, isHoldRowText), so an echo of either spelling lands here.
 const char * kHoldPriorityRowShortHead =
-    "Hold priority - pass now, and do not ask me again";
+    "Stop asking me this turn - pass now, and do not ask me again";
 
 
 //#W80-DG (U16): the ROW keeps its own re-opener clause. Folding it into
@@ -28981,15 +29050,15 @@ const char * kHoldPriorityRowShortHead =
 //WORDS. The U16 saving is taken at the hold-CHECK bracket instead, which
 //restated the rule a third time with no such claim on it.
 static const char * kHoldPriorityRowHead =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window;";
 
 const char * kHoldPriorityRowText =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; you give up no cast)";
 
 
@@ -29004,9 +29073,9 @@ const char * kHoldPriorityRowText =
 //holdRowIndexOf / isReservedHoldEcho bind this one exactly as they bind the
 //others.
 static const char * kHoldPriorityRowTextActivation =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; the rows above include ACTIVATED abilities that are usable RIGHT"
     " NOW, and taking this row gives every one of them up for as long as these"
     " rows stand)";
@@ -29015,9 +29084,9 @@ static const char * kHoldPriorityRowTextActivation =
 //The same row on a CASTING menu, where "you give up no cast" is exactly the
 //claim that is false.
 static const char * kHoldPriorityRowTextCast =
-    "Hold priority - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
-    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until your next turn"
-    " begins, or until one of the rows above changes (any change re-opens this"
+    "Stop asking me this turn - pass now, and do not ask me again - YOU CANNOT COME BACK AND"
+    " TAKE ONE OF THE ROWS ABOVE LATER THIS TURN - it stands until this turn ends,"
+    " or until one of the rows above changes (any change re-opens this"
     " window; on THIS menu that means you also give up this turn's remaining"
     " CASTING windows for as long as these rows stand, and NOT the priority"
     " window that follows on this same step - that is a different question at a"
@@ -29108,8 +29177,8 @@ string holdContractParagraph()
 {
     return string("\n[HOW A HOLD ENDS: taking the hold row skips every later window"
                   " that asks THIS SAME question with rows identical to these; a"
-                  " different question is still asked, and the hold is released at the"
-                  " start of your next turn whatever the rows do. Rows are compared by"
+                  " different question is still asked, and the hold is released when this"
+                  " turn ends whatever the rows do. Rows are compared by"
                   " what they DO. A row that changes only INSIDE its brackets or braces"
                   " - a price, a forecast, a clock, a count, a life total, a kill count,"
                   " a survivor count, a note that it cannot reach a spell on the stack -"
@@ -29117,6 +29186,37 @@ string holdContractParagraph()
                   " which step comes next. What re-opens the window: a row appearing, a"
                   " row disappearing, a row naming a different card, cost or target, and"
                   " a change in whether the board now kills you.]");
+}
+
+
+//#W82-EB (M10, wave-81 deck146 MED-2): `146v152` seq 36 - a priority menu of
+//Lolth +0, Lolth -3, the hold and the pass, under a LETHAL crack-back verdict;
+//nothing on it cost mana, so the hold could only give value away, and it was
+//taken. The row is NOT suppressed (the legal-option ruling); it carries a
+//refusal-style marker when every acting row on the menu is a zero-mana
+//activation. `rows` are the acting rows' PURE lines (mana-only rows already
+//excluded by the caller); a row prices its cost in `[cost: ...]`, and a cost
+//with no `{` pip in it spends no mana. A row with no cost bracket at all (a
+//cast, a flip) is not proven free, so the marker stays off - it never fires on
+//a guess. Pure over the rendered text, so PARSETEST proves it.
+const char * kHoldFreeActionsMarker = " [nothing here costs mana - holding gives away free actions]";
+
+bool w82RowsCostNoMana(const std::vector<string>& rows)
+{
+    if (rows.empty())
+        return false;
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        const size_t c = rows[i].find("[cost: ");
+        if (c == string::npos)
+            return false;
+        const size_t e = rows[i].find(']', c);
+        if (e == string::npos)
+            return false;
+        if (rows[i].find('{', c) < e)
+            return false;
+    }
+    return true;
 }
 
 
@@ -29508,8 +29608,8 @@ string w78StackDrainNote(int theirTriggers, bool rowsUnchangedSinceLastAsk,
     //(history: comment-archaeology.md AIPlayerGPT-L30276-1252)
     o << "\n[their stack is draining " << theirTriggers
       << " triggers - each link will put this same list to you; HOLD ("
-      << holdRowShortName << ") covers every link OF THIS STACK, and is released at"
-         " your next untap - a new stack on a later turn asks you again. The rows above"
+      << holdRowShortName << ") covers every link OF THIS STACK, and is released when"
+         " this turn ends - a new stack on a later turn asks you again. The rows above"
          " are what is legal NOW - this says nothing about what will still be legal"
          " after their stack resolves]";
     return o.str();
@@ -29523,7 +29623,7 @@ string w78HoldRowShortName(const std::vector<string>& rows)
 {
     for (size_t i = 0; i < rows.size(); i++)
     {
-        if (rows[i].compare(0, 13, "Hold priority") != 0)
+        if (!isHoldRowText(rows[i])) //#W82-EB (H8): either spelling of the head
             continue;
         const size_t dash = rows[i].find(" - ");
         return (dash == string::npos) ? rows[i] : rows[i].substr(0, dash);
@@ -30948,7 +31048,7 @@ void appendStackDeathToDeclineRows(std::vector<string>& rows,
     if (clause.empty())
         return;
     for (size_t i = 0; i < rows.size(); i++)
-        if (rows[i].compare(0, 13, "Hold priority") == 0 //#W72-BW (M23b)
+        if (isHoldRowText(rows[i]) //#W72-BW (M23b); #W82-EB (H8)
             || rows[i].compare(0, 12, "Cast nothing") == 0)
             rows[i] += clause;
 }
@@ -32147,6 +32247,12 @@ bool isReservedHoldEcho(const string& echoLc)
         return true;
     if (t.size() > lowRow.size() && t.compare(0, lowRow.size(), lowRow) == 0)
         return true;
+    //#W82-EB (H8): the live short name, and the wave-73..81 head a model may still
+    //write back (the row's BODY did not change, so an echo of the old spelling is
+    //still an unambiguous name for this row and nothing else on the menu).
+    if (t == "stop asking me this turn"
+        || (t.size() >= 49 && t.compare(0, 49, "hold priority - pass now, and do not ask me again") == 0))
+        return true;
     return t == "hold" || t == "hold priority"
         || t == "hold priority - do not ask me again this turn unless the board changes"
         || t == "pass priority, and do not ask me again this turn unless the board changes"
@@ -32159,6 +32265,16 @@ bool isReservedHoldEcho(const string& echoLc)
 }
 
 
+//#W82-EB (H8): is this rendered row the hold row - by its live head or the
+//wave-73..81 head? One predicate for every consumer that used to spell the
+//13-byte prefix out, so a rename moves them all at once. Pure over the text.
+bool isHoldRowText(const string& row)
+{
+    return row.compare(0, 24, "Stop asking me this turn") == 0
+        || row.compare(0, 13, "Hold priority") == 0;
+}
+
+
 //#W54-A (D2a): where does the HOLD row sit on this menu (0-based), if at all?
 int holdRowIndexOf(const std::vector<string> * optionTexts)
 {
@@ -32168,8 +32284,10 @@ int holdRowIndexOf(const std::vector<string> * optionTexts)
         //#W55-A (D21): the row carries a benefit annotation, so its identity
         //is its own text as a HEAD, not the whole rendered string.
         //#W71-BR (L17): the HEAD both spellings share.
-        if ((*optionTexts)[o].compare(0, strlen(kHoldPriorityRowHead),
-                                      kHoldPriorityRowHead) == 0)
+        //#W82-EB (H8): the SHORT head, either spelling - no card's name begins
+        //with either, so the short head is already unique on any menu, and a
+        //menu rendered with the wave-73..81 head still binds an echo of either.
+        if (isHoldRowText((*optionTexts)[o]))
             return (int) o;
     return -1;
 }
@@ -32645,7 +32763,8 @@ bool w72RowIsDeclineOrHold(const string& row)
 {
     static const char * kDeclines[] = {
         "Hold priority", "Pass priority", "Cast nothing right now", "Cast nothing",
-        "Decline", "Do nothing", "Done", "Hold "
+        "Decline", "Do nothing", "Done", "Hold ",
+        "Stop asking me this turn" //#W82-EB (H8): the hold row's live head
     };
     //#W74-CH: CASE-INSENSITIVE on the head. The sibling rule feeds this the same
     //row keys the hold latch compares, and those are now `holdActionKeyRow`
@@ -32760,11 +32879,21 @@ static bool w72HeldMenuShowedEveryRow(const std::set<string>& heldRowKeys,
 //taken on the holder's own. Pure over (the turn taken, whose turn that was, the
 //turn now); no call site can miss it, and releaseHoldIfUntapPassed() also fires
 //it eagerly at the phase change so the release is traced when it happens.
+//#W82-EB (H9, wave-81 deck125 H3): THE HOLD EXPIRES WITH THE TURN IT WAS TAKEN
+//IN. The wave-73 rule measured an OWN-turn hold to the holder's NEXT untap - two
+//turns - so a hold taken at the seat's own End step (`125v162` seq 211, T27)
+//silenced every window of the opponent's whole turn 28: Underworld Dreams and
+//Teferi's Puzzle Box resolved with no window asked (`hold_windows_skipped` 277
+//that game). The row's own words were always "LATER THIS TURN"; the latch now
+//keeps exactly that scope. A hold taken on the opponent's turn still dies when
+//THAT turn ends (the same turn boundary as before). `ownTurnAtHold` is kept for
+//the trace and the pins; it no longer moves the answer.
 static bool w73HoldExpiredByUntap(int heldTurn, bool ownTurnAtHold, int nowTurn)
 {
+    (void) ownTurnAtHold;
     if (heldTurn < 0)
         return false; //no hold taken at all
-    return nowTurn >= heldTurn + (ownTurnAtHold ? 2 : 1);
+    return nowTurn > heldTurn;
 }
 
 
@@ -32780,10 +32909,8 @@ static bool w73HoldExpiredByUntap(int heldTurn, bool ownTurnAtHold, int nowTurn)
 //seam boundary. The key now normalises the one annotation the cast window's own
 //state writes, so the two menus of one window compare on the BOARD.
 //Pure over the string; the rendered prompt is untouched.
-static string w73SiblingBoardKey(const string& board)
+static string w73ReplaceAll(const string& board, const string& from, const string& to)
 {
-    const string from = kHandCastAnsweredTagText;
-    const string to = kHandCastableNowTagText;
     if (board.find(from) == string::npos)
         return board;
     string out;
@@ -32802,6 +32929,18 @@ static string w73SiblingBoardKey(const string& board)
         at = hit + from.size();
     }
     return out;
+}
+
+static string w73SiblingBoardKey(const string& board)
+{
+    //#W82-EB (H1/H2): the `Land drop:` line names the window's SHAPE, and the
+    //casting menu (rows on it) and its sibling priority window (rows elsewhere)
+    //are one board - the same normalisation the castable tag gets.
+    return w73ReplaceAll(
+               w73ReplaceAll(
+                   w73ReplaceAll(board, kHandCastAnsweredTagText, kHandCastableNowTagText),
+                   kLandDropFoldOnCastMenuLine, kLandDropFoldElsewhereLine),
+               kLandDropFoldStandaloneLine, kLandDropFoldElsewhereLine);
 }
 
 
@@ -32835,8 +32974,8 @@ bool AIPlayerGPT::releaseHoldIfUntapPassed()
     if (!w73HoldExpiredByUntap(mHoldTurn, mHoldOwnTurnAtTake, observer->turn))
         return false;
     mHoldReleasedTurn++;
-    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED at this seat's"
-               " untap (taken on turn " << mHoldTurn
+    DebugTrace("AIPlayerGPT[" << deckFileSmall << "]: the hold is RELEASED - the turn it was"
+               " taken in has ended (taken on turn " << mHoldTurn
                << (mHoldOwnTurnAtTake ? " (own turn)" : " (their turn)")
                << ", now turn " << observer->turn
                << "; " << mHoldReleasedTurn << " released this game) - a once-per-turn row"
@@ -34140,7 +34279,8 @@ static string menuRowProseName(const string& row)
     size_t z = core.find_last_not_of(" \t");
     core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
     if (core.compare(0, 12, "cast nothing") == 0 || core.compare(0, 4, "pass") == 0
-        || core.compare(0, 4, "hold") == 0 || core.compare(0, 4, "done") == 0)
+        || core.compare(0, 4, "hold") == 0 || core.compare(0, 4, "done") == 0
+        || core.compare(0, 24, "stop asking me this turn") == 0) //#W82-EB (H8)
         return string();
     static const char * kVerbs[] = { "cast ", "play ", "activate ", "equip ", "use ",
                                      "attack with ", "block with ", "target ", "create " };
@@ -34947,14 +35087,32 @@ string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife,
 //#W55-C (D15), same defect on the magnitude emitter: a `{kills: ...}` list that
 //mixes sides reads as a consequence of the cast, not of the pick. `killedMine`
 //empty keeps every wave-54 string byte-identical.
+//#W82-EB (H10, wave-81 deck130 HIGH-2): THE VERDICT LEADS, ON THE ROW THAT CAN
+//STILL DECLINE. `130v162` seq 11: the cast row read `{kills 0 of the 1 CREATURE
+//target at 3 damage - and 3 to the opponent at life 20 leaves them at 17}`, the
+//row was taken, and the TARGET ask that followed printed `(this ask has no pass
+//row)` over three rows that all survive - every "decline" rule in the guide was
+//unreachable by then. The same numbers now open with the fact they add up to,
+//stated where a decline exists: `every legal target SURVIVES - casting this
+//kills nothing:`. Claimed ONLY when it is proven - no creature dies on either
+//side, the player tail names no win, and `unpricedTargets` (legal targets this
+//enumeration did not price: planeswalkers, battles) is 0. Everything after the
+//colon is the wave-54 wording, byte for byte.
+static const char * kEveryTargetSurvivesLead = "every legal target SURVIVES - casting this kills nothing: ";
+
 string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
                                  const string& magnitude, const string& playerTail,
-                                 const std::vector<std::string>& killedMine)
+                                 const std::vector<std::string>& killedMine,
+                                 int unpricedTargets) //#W82-EB (H10)
 {
     if (magnitude.empty())
         return "";
+    const bool everySurvives = killed.empty() && killedMine.empty() && unpricedTargets <= 0
+                               && playerTail.find("WINS THE GAME") == string::npos;
     if (creatureTargets <= 0)
-        return playerTail.empty() ? string("") : " {no creature target" + playerTail + "}";
+        return playerTail.empty() ? string("")
+             : string(" {") + (everySurvives ? kEveryTargetSurvivesLead : "")
+               + "no creature target" + playerTail + "}";
     std::ostringstream o;
     if (!killedMine.empty())
     {
@@ -34978,7 +35136,8 @@ string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTa
         return o.str();
     }
     if (killed.empty())
-        o << " {kills 0 of the " << creatureTargets << " CREATURE target"
+        o << " {" << (everySurvives ? kEveryTargetSurvivesLead : "")
+          << "kills 0 of the " << creatureTargets << " CREATURE target"
           << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << playerTail << "}";
     else
     {
@@ -35124,9 +35283,14 @@ string castKillVerdictNow(GameObserver * g, Player * me, MTGCardInstance * card,
 //again at the next window, every window, for as long as the engine rules it
 //legal. The clause keeps the one fact it was built for: the animation is
 //until-end-of-turn, so an Upkeep activation is spent before the main phase.
+//#W82-EB (M14, wave-81 deck146 MED-5): `146v152` seq 45 took this row at Upkeep with
+//`PLAN: ... Animate Hive to block Brute` - a block on the OPPONENT's turn, which an
+//until-end-of-turn animation cannot make. The clause was true and about the same
+//turn only; it now names the block case it did not refute.
 string upkeepAnimationClause()
 {
-    return " [Upkeep offer: this animation lasts only until end of turn, and the same row is"
+    return " [Upkeep offer: this animation lasts only until end of turn - it is over before the"
+           " opponent's turn begins, so it CANNOT block on their turn - and the same row is"
            " offered again in your main phase]";
 }
 
@@ -39504,7 +39668,7 @@ string AIPlayerGPTSelfTestAccess::castAbandonedNarration(const string& card, int
 int AIPlayerGPTSelfTestAccess::castBodiesNetOfOwnText(int bodies, bool cardIsCreature, bool legendTwinControlled, bool selfLeavesOnResolution) { return ::castBodiesNetOfOwnText(bodies, cardIsCreature, legendTwinControlled, selfLeavesOnResolution); }
 string AIPlayerGPTSelfTestAccess::castDeclineRow(bool combatNext) { return ::castDeclineRow(combatNext); }
 string AIPlayerGPTSelfTestAccess::castDrawPriceRowTag(int perCast, const string& castNames, int perDraw, const string& punishers, int life, int priorCharge) { return ::castDrawPriceRowTag(perCast, castNames, perDraw, punishers, life, priorCharge); }
-string AIPlayerGPTSelfTestAccess::castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail, const std::vector<std::string>& killedMine) { return ::castKillSummaryTag(killed, creatureTargets, magnitude, playerTail, killedMine); }
+string AIPlayerGPTSelfTestAccess::castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets, const string& magnitude, const string& playerTail, const std::vector<std::string>& killedMine, int unpricedTargets) { return ::castKillSummaryTag(killed, creatureTargets, magnitude, playerTail, killedMine, unpricedTargets); }
 string AIPlayerGPTSelfTestAccess::castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife, int lifeLossFirst, int oppLifeGain, int oppGainTurns) { return ::castPlayerDamageTail(dmg, oppTargetable, oppLife, myLife, lifeLossFirst, oppLifeGain, oppGainTurns); }
 string AIPlayerGPTSelfTestAccess::castSetKeyOf(const std::vector<string>& castNames) { return ::castSetKeyOf(castNames); }
 int AIPlayerGPTSelfTestAccess::castTriggerDrawCount(const string& magicText) { return ::castTriggerDrawCount(magicText); }
@@ -39627,6 +39791,9 @@ bool AIPlayerGPTSelfTestAccess::holdNoteSameWindow(bool first, int unseenRows, i
 string AIPlayerGPTSelfTestAccess::holdReopenNoteText(int unseenRows, int repeats, bool first, int goneRows, bool contractBelow) { return ::holdReopenNoteText(unseenRows, repeats, first, goneRows, contractBelow); }
 string AIPlayerGPTSelfTestAccess::holdRowBenefitClause() { return ::holdRowBenefitClause(); }
 int AIPlayerGPTSelfTestAccess::holdRowIndexOf(const std::vector<string> * optionTexts) { return ::holdRowIndexOf(optionTexts); }
+bool AIPlayerGPTSelfTestAccess::isHoldRowText(const string& row) { return ::isHoldRowText(row); }
+bool AIPlayerGPTSelfTestAccess::w82RowsCostNoMana(const std::vector<string>& rows) { return ::w82RowsCostNoMana(rows); }
+const char * AIPlayerGPTSelfTestAccess::kHoldFreeActionsMarker = ::kHoldFreeActionsMarker;
 string AIPlayerGPTSelfTestAccess::holdRowLine(bool castSeam, bool activationLive) { return ::holdRowLine(castSeam, activationLive); }
 bool AIPlayerGPTSelfTestAccess::holdStillStands(const std::set<string>& heldRows, const std::vector<string>& nowRows, const char ** whyOut, HoldRowKeyFn keyOf) { return ::holdStillStands(heldRows, nowRows, whyOut, keyOf); }
 void AIPlayerGPTSelfTestAccess::improveAssignmentMaterial(const vector<vector<char> >& can, const vector<vector<int> >& rank, vector<int>& match) { ::improveAssignmentMaterial(can, rank, match); }
@@ -39649,7 +39816,7 @@ string AIPlayerGPTSelfTestAccess::joinTargetEntries(const vector<string>& names,
 string AIPlayerGPTSelfTestAccess::joinVictimRoster(const std::vector<std::string>& entries) { return ::joinVictimRoster(entries); }
 string AIPlayerGPTSelfTestAccess::joinZoneEntries(const vector<string>& names, const vector<string>& handles, const vector<string>& tails, bool collapse) { return ::joinZoneEntries(names, handles, tails, collapse); }
 string AIPlayerGPTSelfTestAccess::landDropAskText(size_t landCount) { return ::landDropAskText(landCount); }
-string AIPlayerGPTSelfTestAccess::landDropStatusLine(bool myTurn, bool playable, bool haveLand) { return ::landDropStatusLine(myTurn, playable, haveLand); }
+string AIPlayerGPTSelfTestAccess::landDropStatusLine(bool myTurn, bool playable, bool haveLand, int landShape) { return ::landDropStatusLine(myTurn, playable, haveLand, landShape); }
 string AIPlayerGPTSelfTestAccess::landDropThreatTag(const string& rawScript) { return ::landDropThreatTag(rawScript); }
 string AIPlayerGPTSelfTestAccess::landTapMana(const string& text) { return ::landTapMana(text); }
 string AIPlayerGPTSelfTestAccess::laterStepRouteClause(const string& offendingName, const std::vector<string> * rows) { return ::laterStepRouteClause(offendingName, rows); }
