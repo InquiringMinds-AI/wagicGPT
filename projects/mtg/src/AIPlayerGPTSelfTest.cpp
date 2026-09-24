@@ -7005,8 +7005,8 @@ void AIPlayerGPTSelfTestAccess::run()
         //#W46-9 UPDATED: the gain is still the attacker's full power; the tail
         //now names the branch it belongs to (see the #W46-9 block at the end).
         CHECK(combatTradePreviewStats(vanB22, llAtk55)
-              == "your blocker dies, attacker lives (lifelink: they gain 5 from this"
-                 " block only, and this attacker deals nothing to your life)",
+              == "your blocker dies, attacker lives (lifelink: they gain 5,"
+                 " and this attacker deals nothing to your life)", //#W82-EC (H4)
               "#W44-LOW a lifelink ATTACKER's gain is its full power, trample or not");
         // NEGATIVE: no lifelink anywhere, no clause. The control for all of it.
         CHECK(combatTradePreviewStats(vanB22, vanA22).find("lifelink") == string::npos,
@@ -7937,15 +7937,15 @@ void AIPlayerGPTSelfTestAccess::run()
         string seq28 = combatTradePreviewStats(blk34, llAtk32, kPreventNone, kPreventNone,
                                                kPreventNone, true);
         cout << "     seq-28 shape: \"" << seq28 << "\"\n";
-        CHECK(seq28 == "your attacker dies, their blocker lives (lifelink: you gain 3 from"
-                       " this block only, and this attacker deals nothing to their life)",
+        CHECK(seq28 == "your attacker dies, their blocker lives (lifelink: you gain 3,"
+                       " and this attacker deals nothing to their life)", //#W82-EC (H4)
               "#W46-9 the gain is bound to the block, and the un-dealt face damage is stated");
         CHECK(seq28.find("deals nothing to their life") != string::npos,
               "#W46-9 the restriction that refutes the +face reading is present in words");
         // The blockers chair reads the same fight about YOUR life.
         CHECK(combatTradePreviewStats(blk34, llAtk32)
-              == "you kill it, your blocker lives (lifelink: they gain 3 from this block"
-                 " only, and this attacker deals nothing to your life)",
+              == "you kill it, your blocker lives (lifelink: they gain 3,"
+                 " and this attacker deals nothing to your life)", //#W82-EC (H4)
               "#W46-9 the defender's chair is told whose life is spared, in its own voice");
         // TRAMPLE: some damage DOES reach the face, so the no-face restriction
         // would be a lie - the honest alternative says the gain already counts
@@ -7954,8 +7954,8 @@ void AIPlayerGPTSelfTestAccess::run()
                                             kPreventNone, true);
         cout << "     trampling lifelinker: \"" << tr << "\"\n";
         CHECK(tr.find("3 tramples through to them") != string::npos
-              && tr.find("you gain 5 from this block only - that number already counts the"
-                         " damage it tramples through") != string::npos,
+              && tr.find("you gain 5 - that number already counts the"
+                         " damage it tramples through") != string::npos, //#W82-EC (H4): clause dropped
               "#W46-9 a trampler's gain names the carry-over it already includes");
         CHECK(tr.find("deals nothing to") == string::npos,
               "#W46-9 NEGATIVE the no-face restriction is never claimed over live trample damage");
@@ -7963,7 +7963,7 @@ void AIPlayerGPTSelfTestAccess::run()
         // neither is printed (the omit-when-unprovable rung).
         string trP = combatTradePreviewStats(blk22, llTr55, kPreventNone, kPreventNone,
                                              kPreventPartial, true);
-        CHECK(trP.find("lifelink: you gain 5 from this block only)") != string::npos
+        CHECK(trP.find("lifelink: you gain 5)") != string::npos //#W82-EC (H4): clause dropped
               && trP.find("deals nothing to") == string::npos
               && trP.find("already counts") == string::npos,
               "#W46-9 an uncomputable carry-over gets the bare binding and no claim either way");
@@ -8366,7 +8366,12 @@ void AIPlayerGPTSelfTestAccess::run()
         CombatTradeStat llAtk = unraveler; llAtk.lifelink = true;
         string aSide = combatTradePreviewStats(wall, llAtk, kPreventNone, kPreventNone,
                                                kPreventNone, true, -1, true);
-        CHECK(aSide.find("(lifelink: you gain 3, and") == string::npos,
+        //#W82-EC (H4): the clause is now "(lifelink: you gain 3, and this attacker deals
+        //nothing to their life)" - the whole parenthesis is asserted, so no converter
+        //price can hide inside it.
+        CHECK(aSide.find("(lifelink: you gain 3, and this attacker deals nothing to their life)")
+                  != string::npos
+              && aSide.find("(lifelink: you gain 3, and your converter") == string::npos,
               "#W47-R3 NEGATIVE the reader's own lifelink gain is not priced by this flag");
         // ECHO SHAPE: the whole tail rides inside the untapped-blockers bracket,
         // which the reply scanner drops whole - an echoed A-line still parses.
@@ -16189,15 +16194,15 @@ static const char * kW50Y_r94 =
             CombatTradeStat lifer = CombatTradeStat();
             lifer.power = 3; lifer.toughness = 3; lifer.lifelink = true;
             const string nested = combatTradePreviewStats(wall, lifer);
-            CHECK(nested.find("(lifelink: they gain 3 from this block only, and this attacker"
+            CHECK(nested.find("(lifelink: they gain 3, and this attacker"
                               " deals nothing to your life)") != string::npos,
-                  "#W57-B D10 the default form is byte-identical to wave 56");
+                  "#W57-B D10 the default form is byte-identical to wave 56 (#W82-EC H4: minus the clause)");
             string own, theirs;
             const string split = combatTradePreviewStats(wall, lifer, kPreventNone, kPreventNone,
                                                          kPreventNone, false, -1, false,
                                                          NULL, NULL, &own, &theirs);
-            CHECK(theirs == "their attacker's lifelink, this block: they gain 3 from this block"
-                            " only, and this attacker deals nothing to your life",
+            CHECK(theirs == "their attacker's lifelink, this block: they gain 3,"
+                            " and this attacker deals nothing to your life", //#W82-EC (H4)
                   "#W57-B D10 the attacker's gain is voiced as THEIRS and sits outside the verdict");
             CHECK(own.empty() && split.find("lifelink") == string::npos,
                   "#W57-B D10 NEGATIVE nothing of the seat's own is claimed, and the verdict is clean");
@@ -21411,7 +21416,7 @@ static const char * kW50Y_r94 =
         combatTradePreviewStats(myBlk22, llAtk11, kPreventNone, kPreventNone, kPreventNone,
                                 false, -1, false, NULL, NULL, &ownLL, &theirLL, NULL, true);
         cout << "     B-row their-lifelink: \"" << theirLL << "\"\n";
-        CHECK(theirLL.find("they gain 1 from this block only") != string::npos
+        CHECK(theirLL.find("they gain 1, and this attacker deals nothing to your life") != string::npos
               && theirLL.find("both halves of their life LOOP are in play, so ANY life they"
                               " gain chains without limit until you are at 0") != string::npos
               && theirLL.find("not a priced trade") != string::npos,
@@ -21420,7 +21425,7 @@ static const char * kW50Y_r94 =
         combatTradePreviewStats(myBlk22, llAtk11, kPreventNone, kPreventNone, kPreventNone,
                                 false, -1, false, NULL, NULL, NULL, &theirLLOff, NULL, false);
         CHECK(theirLLOff.find("life LOOP") == string::npos
-              && theirLLOff.find("they gain 1 from this block only") != string::npos,
+              && theirLLOff.find("they gain 1, and this attacker deals nothing to your life") != string::npos,
               "#W63-AB E1 MUST-NOT-MATCH with no closed loop the same price is byte-identical to wave 62");
         // MUST-NOT-MATCH: the reader's OWN gain never carries the tail.
         string mineLL;
@@ -26874,8 +26879,66 @@ static const char * kW50Y_r94 =
               "#W67-AY MED POSITIVE a line with no repetition keeps its place and its bytes");
         CHECK(bucketed.find("- Your Human died (that Human was 1 of 96 copies on your battlefield;"
                             " the other 95 are still there) [x96 - 96 lines of this shape in this"
-                            " batch; only the numbers in them differ]") != string::npos,
+                            " batch]") != string::npos, //#W82-EC (M1): the losslessness claim is gone
               "#W67-AY MED POSITIVE the moving-ordinal shape is stated ONCE, verbatim, with an exact count");
+        // #W82-EC (M1): a one-source player-damage run folds to count, per-hit value and
+        // the life totals it ran between - `125v162` s229's shape (seat 31 -> 19).
+        {
+            std::ostringstream d;
+            d << "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n";
+            for (int i = 0; i < 12; i++)
+                d << "- Opponent's Underworld Dreams dealt 1 damage to you (now " << (30 - i) << ")\n";
+            d << "- You drew Plains";
+            const string dm = narrationBucketRuns(d.str());
+            cout << "     M1 fold: \"" << dm << "\"\n";
+            CHECK(dm == "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n"
+                        "- Opponent's Underworld Dreams dealt 12 x 1 damage to you, 31 -> 19\n"
+                        "- You drew Plains",
+                  "#W82-EC M1 twelve 1-damage hits fold to '12 x 1 damage to you, 31 -> 19'");
+            CHECK(dm.find("only the numbers") == string::npos && dm.find("(now 30)") == string::npos,
+                  "#W82-EC M1 NEGATIVE the first total and the losslessness claim are gone");
+            CHECK(narrationBucketRuns(dm) == dm, "#W82-EC M1 ECHO the fold is idempotent");
+            // Through the compact register: the brief's target line.
+            const string cn = compactNarration("=== Turn 28 - YOUR turn ===\n- Phase: Upkeep\n" + dm);
+            cout << "     M1 compact: \"" << cn << "\"\n";
+            CHECK(cn.find("Underworld Dreams -> 12 x 1 damage to you, 31 -> 19") != string::npos,
+                  "#W82-EC M1 the compact register carries the fold as '12 x 1 damage to you, 31 -> 19'");
+            // Non-constant hits: the total, the count, the trajectory.
+            const string v = narrationBucketRuns(
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin dealt 2 damage to the opponent (now 13)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 12)\n"
+                "- Your Staff of Nin dealt 3 damage to the opponent (now 9)");
+            CHECK(v == "- Your Staff of Nin dealt 7 damage over 4 hits to the opponent, 16 -> 9",
+                  "#W82-EC M1 unequal hits state the total over the count");
+            // Other life movement inside the span is named, never folded into the arithmetic.
+            const string g = narrationBucketRuns(
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 14)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 18)\n"
+                "- Your Staff of Nin dealt 1 damage to the opponent (now 17)");
+            CHECK(g == "- Your Staff of Nin dealt 4 x 1 damage to the opponent, 16 -> 17"
+                       " (other life changes in between)",
+                  "#W82-EC M1 a trajectory that does not match the total says other life moved");
+            // MUST-NOT-MATCH: two handles of one name are two sources - the shape bracket.
+            const string two = narrationBucketRuns(
+                "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)\n"
+                "- Your Staff of Nin #2 dealt 1 damage to the opponent (now 14)\n"
+                "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 13)\n"
+                "- Your Staff of Nin #2 dealt 1 damage to the opponent (now 12)");
+            CHECK(two == "- Your Staff of Nin #1 dealt 1 damage to the opponent (now 15)"
+                         " [x4 - 4 lines of this shape in this batch]",
+                  "#W82-EC M1 MUST-NOT-MATCH two handles never fold into one source's line");
+            // MUST-NOT-MATCH: creature damage (no life total) keeps the shape bracket.
+            const string cr = narrationBucketRuns(
+                "- Opponent's Starstorm dealt 4 damage to Vampire #1\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #2\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #3\n"
+                "- Opponent's Starstorm dealt 4 damage to Vampire #4");
+            CHECK(cr == "- Opponent's Starstorm dealt 4 damage to Vampire #1"
+                        " [x4 - 4 lines of this shape in this batch]",
+                  "#W82-EC M1 MUST-NOT-MATCH damage to creatures is not a life trajectory");
+        }
         CHECK(bucketed.find("- Your Human (token) ceased to exist and left your graveyard"
                             " [x96 - this exact line 96 times in this batch]") != string::npos,
               "#W67-AY MED POSITIVE the byte-identical line the alternation hid is counted too");
@@ -32327,8 +32390,9 @@ static const char * kW50Y_r94 =
             // `{answers the stack: NO ...}` clause off the decline rows.
             CHECK(stackDeathVerdictKey(0, 20).find("nothing lethal") != string::npos,
                   "#W74-CH an empty stack has its own verdict word");
-            CHECK(stackDeathVerdictKey(3, 20).find("you survive") != string::npos,
-                  "#W74-CH 3 damage at 20 life is survivable");
+            CHECK(stackDeathVerdictKey(3, 20).find("nothing lethal") != string::npos
+                      && stackDeathVerdictKey(3, 20).find("KILLS") == string::npos,
+                  "#W74-CH 3 damage at 20 life is survivable (#W82-EC M11: the one non-lethal face)");
             CHECK(stackDeathVerdictKey(3, 2).find("KILLS you") != string::npos,
                   "#W74-CH 3 damage at 2 life is lethal (the `123v162` s32 shape)");
             std::set<string> held2;
@@ -39737,9 +39801,9 @@ static const char * kW50Y_r94 =
         // The hold latch's own verdict is built from the same number, so the two
         // cannot disagree about whether this stack kills.
         CHECK(stackDeathVerdictKey(9, 1) == "[stack death verdict: the stack KILLS you]"
-              && stackDeathVerdictKey(3, 4) == "[stack death verdict: you survive the stack]",
+              && stackDeathVerdictKey(3, 4) == "[stack death verdict: nothing lethal on the stack]",
               "#W79-DA T16 the verdict key reads the same total pendingStackLifeLossToSeat now"
-              " returns");
+              " returns (#W82-EC M11: the survivable face is the one non-lethal face)");
     }
 
     cout << "\n[#W79-DA] T16 an untap keyword prints beside an affirmative tap state\n";
@@ -40842,13 +40906,14 @@ static const char * kW50Y_r94 =
                   .find("LETHAL if it is UNBLOCKED - if you pass this window") != string::npos,
               "#W80-DE U2 GREEN the LETHAL crack-back renders and names what passing costs");
         // seq 200's stack: 2 damage against 28 life -> the survivable face renders.
-        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28))
-                  == "\n[stack death verdict: you survive the stack - what is waiting to"
-                     " resolve does not take you to 0 by itself]",
-              "#W80-DE U2 GREEN the `125v162` seq-200 stack renders its survivable face");
-        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(30, 28))
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(2, 28), 2)
+                  == "\n[stack death verdict: nothing lethal on the stack - what is waiting to"
+                     " resolve costs you 2 life but does not take you to 0 by itself]",
+              "#W80-DE U2 GREEN the `125v162` seq-200 stack renders its survivable face"
+              " (#W82-EC M11: off the live loss, under the one non-lethal face)");
+        CHECK(w80StackDeathVerdictLine(stackDeathVerdictKey(30, 28), 30)
                   .find("the stack KILLS you") != string::npos
-              && w80StackDeathVerdictLine(stackDeathVerdictKey(0, 28)).empty(),
+              && w80StackDeathVerdictLine(stackDeathVerdictKey(0, 28), 0).empty(),
               "#W80-DE U2 GREEN the lethal face renders and an empty stack owes no line");
         // KEY STABILITY (the wave-74 rule): the rendered line is PROMPT-ONLY. Two windows
         // whose ONLY difference is the rendered verdict line - the same board number that
@@ -43843,6 +43908,438 @@ static const char * kW50Y_r94 =
         bool st = false;
         CHECK(parseChoice("PLAN: survive.\nCHOICE: 1 (Cast Sphinx's Revelation)", 2, &menu, &st, NULL, NULL, true) == 1 && !st,
               "#W82-EB M9 ECHO the badged row still binds by its short name");
+    }
+
+    // ---------------- #W82-EC (H3): marked damage in the 1-on-1 verdict and on the body.
+    // `130v123` s72: Rorix Bladewing 6/5 with 4 damage marked, printed "(6/5) [untapped]"
+    // and "(you kill it, your attacker lives)" against a 4/4 Vampire. It traded.
+    {
+        cout << "  #W82-EC H3 marked damage: verdicts subtract it, the tag prints it, keys ignore it\n";
+        CombatTradeStat rorix = CombatTradeStat();
+        rorix.power = 6; rorix.toughness = 5;
+        CombatTradeStat vamp = CombatTradeStat();
+        vamp.power = 4; vamp.toughness = 4;
+        const string fresh = combatTradePreviewStats(vamp, rorix, kPreventNone, kPreventNone,
+                                                     kPreventNone, true);
+        CHECK(fresh.find("you kill it, your attacker lives") != string::npos,
+              "#W82-EC H3 an undamaged 6/5 into a 4/4 is the wave-81 verdict, byte-identical");
+        rorix.remaining = 1; //4 marked on a 5-toughness body
+        const string hurt = combatTradePreviewStats(vamp, rorix, kPreventNone, kPreventNone,
+                                                    kPreventNone, true);
+        cout << "     6/5 with 4 marked vs 4/4: \"" << hurt << "\"\n";
+        CHECK(hurt.find("both die") != string::npos,
+              "#W82-EC H3 the SAME pairing with 4 damage marked on the attacker is a trade");
+        // The blocker side reads its own marked damage the same way.
+        rorix.remaining = 0;
+        CombatTradeStat bigWall = CombatTradeStat();
+        bigWall.power = 2; bigWall.toughness = 8; bigWall.remaining = 6; //2 marked
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("you kill it, your attacker lives")
+                  != string::npos,
+              "#W82-EC H3 a 2/8 blocker with 2 marked dies to a 6-power attacker");
+        bigWall.remaining = 7; //1 marked: 6 < 7, it lives
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("neither dies") != string::npos,
+              "#W82-EC H3 NEGATIVE one marked on a 2/8 is not enough: neither dies");
+        // A remaining value that is not below the printed toughness is "unset".
+        bigWall.remaining = 8;
+        CHECK(combatTradePreviewStats(bigWall, rorix, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("neither dies") != string::npos,
+              "#W82-EC H3 NEGATIVE remaining == toughness reads as undamaged");
+        // The wither shrink still prints the printed-toughness arithmetic.
+        CombatTradeStat witherBlk = CombatTradeStat();
+        witherBlk.power = 2; witherBlk.toughness = 1; witherBlk.wither = true;
+        CombatTradeStat fat = CombatTradeStat();
+        fat.power = 3; fat.toughness = 4; fat.remaining = 3; //1 marked, survives 2 wither
+        CHECK(combatTradePreviewStats(witherBlk, fat, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("shrinks your attacker to 1/2")
+                  != string::npos,
+              "#W82-EC H3 the wither shrink is counter arithmetic over the PRINTED toughness");
+        fat.remaining = 2; //2 marked: the 2 wither counters finish it
+        CHECK(combatTradePreviewStats(witherBlk, fat, kPreventNone, kPreventNone,
+                                      kPreventNone, true).find("both die") != string::npos,
+              "#W82-EC H3 wither counters on a body with 2 marked kill it at 2 power");
+        // The tag.
+        const string tag = markedDamageTag(5, 1);
+        cout << "     tag: \"" << tag << "\"\n";
+        CHECK(tag == " [4 damage marked this turn - 1 more damage kills it]",
+              "#W82-EC H3 the tag names the marked damage and what is left");
+        CHECK(markedDamageTag(5, 5).empty() && markedDamageTag(5, 0).empty()
+                  && markedDamageTag(5, -2).empty() && markedDamageTag(5, 9).empty(),
+              "#W82-EC H3 NEGATIVE undamaged, dying and over-full bodies print no tag");
+        // KEY-STABILITY PIN: two rows differing only in the tag give the same keys.
+        {
+            const string base = "Rorix Bladewing (6/5) [flying, haste]";
+            const string rowA = "Rorix Bladewing (6/5)" + markedDamageTag(5, 1) + " [flying, haste]";
+            CHECK(rowA != base, "#W82-EC H3 KEY the two rows really differ");
+            CHECK(holdActionKeyRow(rowA) == holdActionKeyRow(base),
+                  "#W82-EC H3 KEY hold-latch: the marked-damage tag is outside the action key");
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB),
+                  "#W82-EC H3 KEY option-set: the tag cannot split the option set");
+            const string tA = joinNumberedRows(rowsA, NULL);
+            const string tB = joinNumberedRows(rowsB, NULL);
+            CHECK(tA != tB && w77KeyTailOf(tA) == w77KeyTailOf(tB),
+                  "#W82-EC H3 KEY ask tail: the tag is outside the ask/async key");
+        }
+    }
+
+    // ---------------- #W82-EC (H4): lifelink priced on the A-line, both branches.
+    // `162v152` s11: "A2. Intrepid Adversary (6/4) deals 6 [lifelink]" + a B-row brace
+    // "they gain 6 from this block only" -> BLOCKS: none, 11 taken instead of 5.
+    {
+        cout << "  #W82-EC H4 the A-line carries the lifelink gain with its owner and both branches\n";
+        const string t6 = attackerLifelinkAttackLineTag(6, false);
+        cout << "     tag: \"" << t6 << "\"\n";
+        CHECK(t6 == " [lifelink: THEY gain 6 if it connects, blocked or not - a block only"
+                    " changes who takes the 6; only prevented damage stops the gain]",
+              "#W82-EC H4 the tag names THEM, the figure, and that a block does not avoid it");
+        CHECK(attackerLifelinkAttackLineTag(3, true).find("THEY gain 3 in each of its two combat"
+                                                          " damage steps if it connects") != string::npos,
+              "#W82-EC H4 a double striker gains in each damage step it deals in");
+        CHECK(attackerLifelinkAttackLineTag(0, false) == " [lifelink: it deals 0, so THEY gain nothing from it]",
+              "#W82-EC H4 NEGATIVE a 0-power lifelinker gains nothing and says so");
+        // The B-row brace no longer says "from this block only".
+        CombatTradeStat wall = CombatTradeStat();
+        wall.power = 0; wall.toughness = 6;
+        CombatTradeStat adversary = CombatTradeStat();
+        adversary.power = 6; adversary.toughness = 4; adversary.lifelink = true;
+        string theirs;
+        combatTradePreviewStats(wall, adversary, kPreventNone, kPreventNone, kPreventNone,
+                                false, -1, false, NULL, NULL, NULL, &theirs, NULL, false);
+        cout << "     B-row brace: \"" << theirs << "\"\n";
+        CHECK(theirs == "their attacker's lifelink, this block: they gain 6, and this attacker deals"
+                        " nothing to your life",
+              "#W82-EC H4 the B-row brace states the figure bare and the no-face half");
+        CHECK(theirs.find("from this block only") == string::npos,
+              "#W82-EC H4 NEGATIVE the clause that read as 'only if you block' is gone");
+        // KEY-STABILITY PIN: the tag is a bracket - outside every row key.
+        {
+            const string base = "Intrepid Adversary (6/4) deals 6 [lifelink]";
+            const string rowA = base + attackerLifelinkAttackLineTag(6, false);
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(rowA != base && holdActionKeyRow(rowA) == holdActionKeyRow(base)
+                      && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                      && w77KeyTailOf(joinNumberedRows(rowsA, NULL))
+                         == w77KeyTailOf(joinNumberedRows(rowsB, NULL)),
+                  "#W82-EC H4 KEY the lifelink tag is outside the hold, option-set and ask keys");
+        }
+    }
+
+    // ---------------- #W82-EC (H5): the seat's OWN deck-out countdown, and mill-on-cast.
+    // `125v50` s305: "Your library: 11 cards" bare under three Howling Mines; decked at 59.
+    // s282: option 12 promised "13 left"; four Memory Erosions milled 8 on the cast.
+    {
+        cout << "  #W82-EC H5 own-library deck-out clause + mill-on-cast row price\n";
+        CHECK(yourLibraryLine(22, 0) == "Your library: 22 cards",
+              "#W82-EC H5 a library out of range renders the wave-81 line byte-identically");
+        const string own = yourLibraryLine(11, 0, 4, "the draw step itself + Howling Mine #1 (1)"
+                                           " + Howling Mine #2 (1) + Howling Mine #3 (1)");
+        cout << "     own line: \"" << own << "\"\n";
+        CHECK(own == "Your library: 11 cards - DECK-OUT IS IN RANGE: a player who must draw from an"
+                     " empty library LOSES, and you have 11 cards left and you draw 4 per draw"
+                     " step (the draw step itself + Howling Mine #1 (1) + Howling Mine #2 (1)"
+                     " + Howling Mine #3 (1)), so you can survive at most 2 more draw steps and"
+                     " the draw step after that loses you the game (any extra draw or mill of"
+                     " yours makes it sooner, never later)",
+              "#W82-EC H5 the s305 board renders the countdown in draw steps");
+        CHECK(yourLibraryLine(2, 0, 1).find("you have 2 cards left, so you can survive at most 2"
+                                            " more draws and the draw after that loses you the game")
+                  != string::npos,
+              "#W82-EC H5 one draw per step counts in draws");
+        CHECK(yourLibraryLine(3, 0, 4, "x").find("your NEXT draw step draws from an empty library"
+                                                  " and loses you the game") != string::npos,
+              "#W82-EC H5 fewer cards than one draw step: the next step loses");
+        CHECK(yourLibraryLine(11, 0, 1).find("DECK-OUT") == string::npos,
+              "#W82-EC H5 NEGATIVE 11 cards at one per step is out of range");
+        CHECK(yourLibraryLine(13, 0, 4, "x").find("DECK-OUT") == string::npos,
+              "#W82-EC H5 NEGATIVE 13 cards at four per step is out of range (3 steps = 12)");
+        CHECK(yourLibraryLine(2, 0, 1, "", true).find("DECKING YOU OUT DOES NOT LOSE YOU THE GAME")
+                  != string::npos,
+              "#W82-EC H5 the seat's own CANTLOSE/CANTMILLLOSE/their CANTWIN blocks the loss");
+        CHECK(yourLibraryLine(5, 2, 1) == "Your library: 7 cards (2 of them are the cards listed in"
+                                          " the search/reveal below - they are still in your library"
+                                          " until this decision resolves)",
+              "#W82-EC H5 NEGATIVE the reveal clause is untouched and counts toward the range");
+        // The opponent line: wave-68 bytes at one per step, the same arithmetic above it.
+        CHECK(opponentZoneCountsLine(5, 0, 1) == "Opponent hand size: 5 | Opponent library: 1"
+                                                 " cards - DECK-OUT IS IN RANGE: a player who must"
+                                                 " draw from an empty library LOSES, and they have"
+                                                 " 1 card left, so they can survive at most 1 more"
+                                                 " draw and the draw after that loses them the game"
+                                                 " (any extra draw of theirs makes it sooner, never"
+                                                 " later)",
+              "#W82-EC H5 the opponent line at one per step is byte-identical to wave 68");
+        CHECK(opponentZoneCountsLine(5, 0, 1, true) == "Opponent hand size: 5 | Opponent library: 1"
+                                                       " cards - they have 1 card left, but DECKING"
+                                                       " THEM OUT DOES NOT WIN: a permanent in play"
+                                                       " stops the empty-library loss (they cannot"
+                                                       " lose, they cannot lose to milling, or you"
+                                                       " cannot win), so their draw from an empty"
+                                                       " library ends the game for nobody",
+              "#W82-EC H5 the opponent's blocked face is byte-identical to wave 68");
+        CHECK(opponentZoneCountsLine(5, 0, 10, false, 4, "the draw step itself + Howling Mine #1 (3)")
+                  .find("they have 10 cards left and they draw 4 per draw step (the draw step itself"
+                        " + Howling Mine #1 (3)), so they can survive at most 2 more draw steps")
+                  != string::npos,
+              "#W82-EC H5 the opponent under the same mines gets the same draw-step arithmetic");
+        // Mill on cast: the script parse.
+        CHECK(castTriggerMillCount("@movedTo(*|opponentstack):deplete:2 opponent", true) == 2,
+              "#W82-EC H5 Memory Erosion on THEIR board mills the caster 2 per spell");
+        CHECK(castTriggerMillCount("@movedTo(*|opponentstack):deplete:2 opponent", false) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack):deplete:2", true) == 0
+                  && castTriggerMillCount("@movedTo(*[-land]|opponentstack):draw:7 opponent", true) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack) restriction{morbid}:deplete:2 opponent", true) == 0
+                  && castTriggerMillCount("@movedTo(*|opponentstack):deplete:x opponent", true) == 0,
+              "#W82-EC H5 NEGATIVE the wrong seat, a mill on its own controller, a draw, a gated"
+              " or a non-numeric payload count nothing");
+        CHECK(castTriggerMillCount("@movedTo(*|mystack):deplete:3", false) == 3
+                  && castTriggerMillCount("@movedTo(*|mystack):deplete:3 opponent", false) == 0,
+              "#W82-EC H5 a self-mill cast trigger on the caster's own board counts for the caster only");
+        // The cast row's clause.
+        const string mill = castMillPriceRowTag(8, "Memory Erosion x4", 13);
+        cout << "     cast row: \"" << mill << "\"\n";
+        CHECK(mill == " {library: 13 -> 5 after Memory Erosion x4 - casting this mills you 8 before"
+                      " it resolves}",
+              "#W82-EC H5 the cast row prices the library before and after the cast's own mill");
+        CHECK(castMillPriceRowTag(8, "Memory Erosion x4", 6).find("that is your WHOLE library: your"
+                                                                   " next draw would be from an EMPTY"
+                                                                   " library and LOSE the game")
+                  != string::npos,
+              "#W82-EC H5 a mill that empties the library says so");
+        CHECK(castMillPriceRowTag(0, "x", 13).empty() && castMillPriceRowTag(8, "", 13).empty()
+                  && castMillPriceRowTag(8, "x", -1).empty(),
+              "#W82-EC H5 NEGATIVE nothing mills, no source, or unknown library: no clause");
+        // The X row: the s282 shape.
+        const string xrow = xLibraryRowClause(12, 13, 6, 8, "Memory Erosion x4");
+        cout << "     X row: \"" << xrow << "\"\n";
+        CHECK(xrow.find("{library: casting this mills you 8 (Memory Erosion x4) before it resolves"
+                        " - 13 -> 5 - then this draws 12 of your 5 library cards - 0 left, which is"
+                        " 7 MORE than the library holds") != string::npos,
+              "#W82-EC H5 the X row's draws are priced against the library AFTER the cast's mill");
+        CHECK(xLibraryRowClause(12, 25, 6) == xLibraryRowClause(12, 25, 6, 0, "")
+                  && xLibraryRowClause(12, 25, 6).find("{library: this draws 12 of your 25") == 0 + 1,
+              "#W82-EC H5 NEGATIVE with nothing milling on cast the X row is byte-identical");
+        // KEY-STABILITY PIN: the clause is a brace group, stripped from every row key.
+        {
+            const string base = "Cast Sphinx's Revelation {x}{w}{u}{u}";
+            const string rowA = base + castMillPriceRowTag(8, "Memory Erosion x4", 13);
+            std::vector<string> rowsA, rowsB;
+            rowsA.push_back(rowA);
+            rowsB.push_back(base);
+            CHECK(rowA != base && holdActionKeyRow(rowA) == holdActionKeyRow(base)
+                      && optionSetKeyOf(rowsA) == optionSetKeyOf(rowsB)
+                      && w77KeyTailOf(joinNumberedRows(rowsA, NULL))
+                         == w77KeyTailOf(joinNumberedRows(rowsB, NULL)),
+                  "#W82-EC H5 KEY the mill clause is outside the hold, option-set and ask keys");
+        }
+    }
+
+    // ---------------- #W82-EC (M2): the actor prefix on a cast by the seat that does
+    // not own the turn. `146v125` s230 T35: "cast Emeria's Call; cast Cancel; your
+    // Emeria's Call was COUNTERED by Cancel" - their Cancel read like an own cast.
+    {
+        cout << "  #W82-EC M2 opponent casts inside the seat's turn carry their actor\n";
+        const string mine = compactNarration(
+            "=== Turn 35 - YOUR turn ===\n- Phase: Main phase 1\n"
+            "- Paid {4}{w}{w}{w} for Emeria's Call with A; B; C; D; E; F; G\n"
+            "- You cast Emeria's Call\n"
+            "- Opponent cast Cancel\n"
+            "- Your Emeria's Call was COUNTERED by Cancel and went to your graveyard\n"
+            "- Opponent's Cancel resolved and went to the opponent's graveyard\n");
+        cout << "     " << mine << "\n";
+        CHECK(mine.find("; opp cast Cancel; your Emeria's Call was COUNTERED by Cancel and went to"
+                        " your graveyard; their Cancel resolved and went to the opponent's graveyard")
+                  != string::npos,
+              "#W82-EC M2 their Cancel in your turn reads 'opp cast Cancel' (the counter line sits"
+              " between it and its resolution, so the resolution keeps its own line as before)");
+        CHECK(mine.find("Main 1: paid ({4}{w}{w}{w}, 7 sources: A; B; C; D; E; F; G) for Emeria's Call;"
+                        " cast Emeria's Call") == string::npos
+                  && mine.find("cast Emeria's Call ({4}{w}{w}{w}, 7 sources: A; B; C; D; E; F; G)")
+                     != string::npos,
+              "#W82-EC M2 NEGATIVE the turn owner's own cast is bare and still folds its payment");
+        const string theirs = compactNarration(
+            "=== Turn 36 - opponent's turn ===\n- Phase: Main phase 1\n"
+            "- Opponent cast Staff of Nin\n"
+            "- Opponent's Staff of Nin resolved and entered the battlefield\n"
+            "- You cast Cancel\n"
+            "- Your Cancel resolved and went to your graveyard\n");
+        cout << "     " << theirs << "\n";
+        CHECK(theirs.find("Main 1: cast Staff of Nin -> resolved; you cast Cancel -> resolved (graveyard)")
+                  != string::npos,
+              "#W82-EC M2 in their turn their cast is bare and yours reads 'you cast'");
+        // The ETB fold still binds to a prefixed cast line.
+        const string etb = compactNarration(
+            "=== Turn 36 - opponent's turn ===\n- Phase: Main phase 1\n"
+            "- You cast Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander resolved and entered the battlefield\n"
+            "- You used: create three 1/1 Goblin tokens with Siege-Gang Commander\n"
+            "- Your Goblin died\n");
+        CHECK(etb.find("you cast Siege-Gang Commander -> resolved; used create three 1/1 Goblin tokens"
+                       " with its ETB") != string::npos,
+              "#W82-EC M2 the ETB fold recognises the prefixed cast line");
+    }
+
+    // ---------------- #W82-EC (M7): one draw step, narrated once.
+    // `162v50` s15: "T13 (opp): drew." then "Draw: ... drew 6; ...".
+    {
+        cout << "  #W82-EC M7 a turn with a Draw block carries no draw on its turn line\n";
+        const string t13 = compactNarration(
+            "=== Turn 13 - opponent's turn ===\n- Phase: Draw\n"
+            "- Opponent drew a card\n"
+            "- Opponent put a card from their hand into their library\n"
+            "- Opponent drew 6 cards\n"
+            "- Your Ob Nixilis, the Hate-Twisted dealt 1 damage to the opponent (now 17)\n"
+            "- Phase: Main phase 1\n- Opponent played Island\n");
+        cout << "     " << t13 << "\n";
+        CHECK(t13.find("T13 (opp):\n  Draw: drew; opp put a card from their hand into their library;"
+                       " drew 6; Ob Nixilis, the Hate-Twisted -> 1 damage, opp 17.\n"
+                       "  Main 1: played Island.") != string::npos,
+              "#W82-EC M7 the hoisted draw moves to the front of the Draw block and the turn line is bare");
+        CHECK(t13.find("(opp): drew") == string::npos,
+              "#W82-EC M7 NEGATIVE the draw is not stated twice");
+        // A plain draw step (no Draw block) still hoists.
+        CHECK(compactNarration("=== Turn 3 - opponent's turn ===\n- Phase: Draw\n- Opponent drew a card\n"
+                               "- Phase: Main phase 1\n- Opponent played Plains\n")
+                  == "T3 (opp): drew; played Plains.",
+              "#W82-EC M7 NEGATIVE with no Draw block the turn line keeps its draw, byte-identical");
+    }
+
+    // ---------------- #W82-EC (M8): damage to a creature carries its outcome.
+    // `123v130` s75 T20: "Starstorm -> 4 damage to Rorix Bladewing" - it survived, silently.
+    {
+        cout << "  #W82-EC M8 creature damage carries survives/dies\n";
+        CHECK(creatureDamageOutcomeNote(5, 1, false) == " (survives, 4 marked)"
+                  && creatureDamageOutcomeNote(5, 5, false) == " (survives)"
+                  && creatureDamageOutcomeNote(5, 0, false) == " (dies)"
+                  && creatureDamageOutcomeNote(5, -3, false) == " (dies)"
+                  && creatureDamageOutcomeNote(5, 0, true) == " (lethal, but it is indestructible: it survives)",
+              "#W82-EC M8 the outcome note: marked damage on a survivor, dies, indestructible");
+        const string raw = damageNarration(false, "Starstorm", 4, "Rorix Bladewing", false, 0,
+                                           creatureDamageOutcomeNote(5, 1, false));
+        CHECK(raw == "Opponent's Starstorm dealt 4 damage to Rorix Bladewing (survives, 4 marked)",
+              "#W82-EC M8 the raw line carries the outcome after the target");
+        CHECK(damageNarration(true, "Staff of Nin", 1, "the opponent", true, 9)
+                  == "Your Staff of Nin dealt 1 damage to the opponent (now 9)",
+              "#W82-EC M8 NEGATIVE a player-damage line is byte-identical (no note, the total last)");
+        const string cn = compactNarration(
+            "=== Turn 20 - opponent's turn ===\n- Phase: Upkeep\n"
+            "- Opponent cast Starstorm\n"
+            "- Opponent's Starstorm dealt 4 damage to Rorix Bladewing (survives, 4 marked)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Your Vampire died\n");
+        cout << "     " << cn << "\n";
+        CHECK(cn.find("Starstorm -> 4 damage to Rorix Bladewing (survives, 4 marked); Starstorm -> 4"
+                      " damage to Vampire (dies); your Vampire died") != string::npos,
+              "#W82-EC M8 the compact register keeps the outcome on the damage line");
+        // The used -> result fold still binds through the outcome.
+        const string used = compactNarration(
+            "=== Turn 20 - YOUR turn ===\n- Phase: Main phase 1\n"
+            "- You targeted Rorix Bladewing with Staff of Nin's ability\n"
+            "- You used: Deal 1 damage with Staff of Nin targeting Rorix Bladewing\n"
+            "- Your Staff of Nin dealt 1 damage to Rorix Bladewing (survives, 1 marked)\n");
+        cout << "     " << used << "\n";
+        CHECK(used.find("Main 1: Staff of Nin -> 1 damage to Rorix Bladewing (survives, 1 marked).")
+                  != string::npos,
+              "#W82-EC M8 the activation's result fold recognises the target through its outcome");
+        // Bucketing: an exact-repeat outcome line still buckets as an exact line.
+        const string b = narrationBucketRuns(
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)\n"
+            "- Opponent's Starstorm dealt 4 damage to Vampire (dies)");
+        CHECK(b == "- Opponent's Starstorm dealt 4 damage to Vampire (dies) [x4 - this exact line 4"
+                   " times in this batch]",
+              "#W82-EC M8 the outcome does not break the exact-line bucket");
+    }
+
+    // ---------------- #W82-EC (M6): an ability's damage never rides the Attack line.
+    // `130v123` s67 T18: "Attack: Siege-Gang Commander, Goblin, Goblin -> Siege-Gang
+    // Commander: 2 damage, opp 4; ... used Deal 2 damage with Siege-Gang Commander -> the
+    // opponent" - Siege-Gang was BLOCKED; the 2 came from its sacrifice ping.
+    {
+        cout << "  #W82-EC M6 activation damage stays off the Attack line and lands on its own line\n";
+        CHECK(damageNarration(true, "Siege-Gang Commander", 2, "the opponent", true, 4,
+                              " by its ability (not combat damage)")
+                  == "Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not"
+                     " combat damage) (now 4)",
+              "#W82-EC M6 the raw line carries the marker before the life total");
+        // The corpus order: the ping is logged BEFORE the activation line.
+        const string s67 = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander, Goblin, Goblin\n"
+            "- Phase: Blockers\n"
+            "- Opponent declared blockers: Bloodline Keeper blocks Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n"
+            "- You used: Deal 2 damage with Siege-Gang Commander targeting the opponent\n"
+            "- Paid {1}{r} for Siege-Gang Commander with Mountain #1; Mountain #2\n"
+            "- Your Goblin died\n"
+            "- Phase: Combat damage\n"
+            "- Your Goblin dealt 1 damage to the opponent (now 3)\n"
+            "- Opponent's Bloodline Keeper dealt 3 damage to Siege-Gang Commander (dies)\n"
+            "- Your Siege-Gang Commander died\n");
+        cout << "     " << s67 << "\n";
+        CHECK(s67.find("Attack: Siege-Gang Commander, Goblin, Goblin -> Goblin: 1 damage, opp 3; they"
+                       " block: Bloodline Keeper blocks Siege-Gang Commander; used Deal 2 damage with"
+                       " Siege-Gang Commander -> the opponent: 2 damage, opp 4; paid ({1}{r}, 2 sources:"
+                       " Mountain #1; Mountain #2) for Siege-Gang Commander; your Goblin died; Bloodline"
+                       " Keeper -> 3 damage to Siege-Gang Commander (dies); your Siege-Gang Commander"
+                       " died.") != string::npos,
+              "#W82-EC M6 the activation line carries its own result and the Attack line carries only"
+              " combat damage");
+        CHECK(s67.find("Siege-Gang Commander: 2 damage") == string::npos,
+              "#W82-EC M6 NEGATIVE the blocked attacker's ping is not on the attack line");
+        // The other order: activation first, then its damage - the existing fold.
+        const string first = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander\n"
+            "- You used: Deal 2 damage with Siege-Gang Commander targeting the opponent\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n");
+        CHECK(first.find("Attack: Siege-Gang Commander; Siege-Gang Commander -> 2 damage, opp 4.") != string::npos,
+              "#W82-EC M6 activation-first order folds the result onto the activation as before");
+        // NEGATIVE: unmarked (combat) damage from a declared attacker still rides the Attack line.
+        const string combat = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Rorix Bladewing\n"
+            "- Phase: Combat damage\n"
+            "- Your Rorix Bladewing dealt 6 damage to the opponent (now 10)\n");
+        CHECK(combat == "T18 (you):\n  Attack: Rorix Bladewing -> 6 damage, opp 10.",
+              "#W82-EC M6 NEGATIVE combat damage from the declared attacker is the attack line, byte-identical");
+        // A marked ping with no activation line nearby keeps its marker in the register.
+        const string lone = compactNarration(
+            "=== Turn 18 - YOUR turn ===\n- Phase: Attackers\n"
+            "- You declared attackers: Siege-Gang Commander\n"
+            "- Your Siege-Gang Commander dealt 2 damage to the opponent by its ability (not combat damage) (now 4)\n");
+        CHECK(lone.find("Attack: Siege-Gang Commander; Siege-Gang Commander -> 2 damage, opp 4 (by its"
+                        " ability, not combat damage).") != string::npos,
+              "#W82-EC M6 a marked ping with no activation line says what it was");
+    }
+
+    // ---------------- #W82-EC (M11): one non-lethal stack-death face, so equal-meaning
+    // faces do not clamp. `146v125` hold_event s140+: "held [you survive the stack] over
+    // live [nothing lethal on the stack]" x44, one per Staff of Nin ping.
+    {
+        cout << "  #W82-EC M11 the survivable and the empty stack are one face\n";
+        const string held = stackDeathVerdictKey(1, 30);  //a ping on the stack, survivable
+        const string live = stackDeathVerdictKey(0, 29);  //the ping resolved
+        CHECK(held == live && held == "[stack death verdict: nothing lethal on the stack]",
+              "#W82-EC M11 a survivable stack and an empty stack render the SAME face");
+        CHECK(w79HoldVerdictForCompare(held, live) == live,
+              "#W82-EC M11 the latch compare returns the live face: nothing to clamp");
+        CHECK(holdActionKeyRow(held) == holdActionKeyRow(live),
+              "#W82-EC M11 the hold key does not move when the ping resolves");
+        CHECK(stackDeathVerdictKey(30, 29) == "[stack death verdict: the stack KILLS you]"
+                  && w79HoldVerdictForCompare(held, stackDeathVerdictKey(30, 29))
+                     == "[stack death verdict: the stack KILLS you]",
+              "#W82-EC M11 NEGATIVE the escalation to a lethal stack still re-opens");
+        CHECK(w80StackDeathVerdictLine(held, 1).find("costs you 1 life but does not take you to 0")
+                  != string::npos
+              && w80StackDeathVerdictLine(live, 0).empty(),
+              "#W82-EC M11 the rendered line still tells the two states apart, off the live loss");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

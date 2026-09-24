@@ -4656,6 +4656,15 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str(), life, firstCharge);
             }
         }
+        //#W82-EC (H5): and what casting it MILLS the caster (Memory Erosion), on
+        //the row that triggers it - the library before and after.
+        {
+            string millNames;
+            int millOnCast = 0;
+            castTriggerMillScan(this, opponent(), millNames, millOnCast);
+            if (millOnCast > 0 && game && game->library)
+                o << castMillPriceRowTag(millOnCast, millNames, game->library->nb_cards);
+        }
         //#W51-F D11: and what casting it FEEDS the opponent, with the count of
         //the caster's own converters (draw AND discard punishers).
         {
@@ -10446,8 +10455,16 @@ string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& 
     //2/1 wither vs a 3/4 -> the attacker survives as a 1/2, it does NOT trade).
     //Fully prevented damage is never dealt, so it kills nothing - deathtouch,
     //wither counters and lethal-toughness math all ride damage that lands.
-    bool aKillsB = !aStopped && (ap > 0) && ((a.wither && ap >= bt) || (!b.indestructible && (a.deathtouch || ap >= bt)));
-    bool bKillsA = !bStopped && (bp > 0) && ((b.wither && bp >= at) || (!a.indestructible && (b.deathtouch || bp >= at)));
+    //#W82-EC (H3): the lethal threshold is the REMAINING toughness - damage
+    //already marked this turn counts (CR 704.5g reads marked damage against
+    //toughness; a -1/-1 counter from wither lands on a body that is already
+    //part-spent the same way). `remaining` 0 = unset = undamaged. The printed
+    //toughness (`at`/`bt`) still feeds the wither SHRINK figures below, which
+    //are about counters, not damage.
+    const int aRem = (a.remaining > 0 && a.remaining < at) ? a.remaining : at;
+    const int bRem = (b.remaining > 0 && b.remaining < bt) ? b.remaining : bt;
+    bool aKillsB = !aStopped && (ap > 0) && ((a.wither && ap >= bRem) || (!b.indestructible && (a.deathtouch || ap >= bRem)));
+    bool bKillsA = !bStopped && (bp > 0) && ((b.wither && bp >= aRem) || (!a.indestructible && (b.deathtouch || bp >= aRem)));
     //First strike / double strike ordering: a one-sided first striker that
     //kills its foe removes that foe before it can deal (the survivor's later
     //normal-step damage lands on a dead creature). A creature killed in the
@@ -10651,7 +10668,15 @@ string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& 
                 body << who << " life in BOTH damage steps of this block - total not"
                         " computed here";
             else
-                body << who << " " << ap << " from this block only";
+            {
+                //#W82-EC (H4, deck162 HIGH-1): "from this block only" was read as
+                //"only if you block" - `162v152` s11 declined the block to avoid a
+                //gain that lands either way and took 11 instead of 5. The gain is
+                //a fact of the attacker's damage being dealt, not of the block;
+                //the A-line now says so (attackerLifelinkAttackLineTag) and this
+                //brace states the figure bare.
+                body << who << " " << ap;
+            }
             if (noFace)
                 body << ", and this attacker deals nothing to" << whoseLife;
             else if (someFace)
@@ -10780,7 +10805,56 @@ CombatTradeStat combatStatOf(MTGCardInstance * c)
     //which is the slot every caller puts it in; the attacker side computes it
     //and the verdict never reads it.
     blockTriggeredLifeFor(c, s.blockLife, s.blockLifeMay);
+    //#W82-EC (H3): damage already marked this turn lowers what it takes to kill
+    //this body. Damageable::life is toughness minus marked damage (dealDamage
+    //subtracts in place); a body at 0 or less is already dying and is read as
+    //undamaged for the pairing, exactly as the crack-back walk reads it.
+    s.remaining = (c->life > 0 && c->life < c->toughness) ? c->life : 0;
     return s;
+}
+
+
+//#W82-EC (H3, deck130 HIGH-1). `130v123` s72: the battlefield printed `Rorix
+//Bladewing (6/5) [untapped]`, the A-line's 1-on-1 tag said "(you kill it, your
+//attacker lives)" against a 4/4, and the only surface that knew about the 4
+//damage Starstorm had marked on Rorix that turn was a GAME LOG line 30 lines
+//up. The seat attacked and lost its win condition. The fact goes on every
+//surface that prints the body: the battlefield line and the combat rows. A
+//BRACKET tag, so the reply scanner drops it whole and every row key
+//(optionSetKeyOf, holdActionKeyRow, w77KeyTailOf) strips it: the number is
+//outside every key by construction (PARSETEST pins it). Silent on an undamaged
+//body and on one already at 0 or less (the "died" line is the fact there).
+//#W82-EC (H4, deck162 HIGH-1). `162v152` s11: `A2. Intrepid Adversary (6/4)
+//deals 6 [lifelink]` - a bare keyword, no owner, no figure - and the only
+//number sat in the B-row brace as "they gain 6 from this block only". Read
+//together, the menu said declining the block avoids the gain; the seat declined,
+//took 11 instead of 5 at 15 life, and priced the swing as net 0. The gain rides
+//DEALT damage: unblocked it lands on the player, blocked it lands on the blocker,
+//and either way the attacker's controller gains it. Only prevention stops it.
+//Bracketed like every A-line tag (echo-safe, outside every row key). `dealt` is
+//the per-step figure; a double striker gains it in each damage step it deals in.
+string attackerLifelinkAttackLineTag(int dealt, bool doublestrike)
+{
+    if (dealt <= 0)
+        return " [lifelink: it deals 0, so THEY gain nothing from it]";
+    std::ostringstream o;
+    o << " [lifelink: THEY gain " << dealt;
+    if (doublestrike)
+        o << " in each of its two combat damage steps";
+    o << " if it connects, blocked or not - a block only changes who takes the "
+      << dealt << "; only prevented damage stops the gain]";
+    return o.str();
+}
+
+
+string markedDamageTag(int toughness, int life)
+{
+    if (life <= 0 || life >= toughness)
+        return "";
+    std::ostringstream o;
+    o << " [" << (toughness - life) << " damage marked this turn - " << life
+      << " more damage kills it]";
+    return o.str();
 }
 
 
@@ -12033,7 +12107,8 @@ int AIPlayerGPT::chooseAttackers()
         //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
         //emitter below can collapse a run of rows that agree in every rendered
         //fact - the same three tests joinZoneEntries and R8's B-rows apply.
-        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")"
+           << markedDamageTag(attackers[j]->toughness, attackers[j]->life); //#W82-EC (H3)
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             ln << " [" << kw << "]";
@@ -13602,7 +13677,8 @@ int AIPlayerGPT::chooseBlockers()
         //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
         //emitter below can collapse a run of rows that agree in every rendered
         //fact - the same three tests joinZoneEntries and R8's B-rows apply.
-        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")"
+           << markedDamageTag(attackers[j]->toughness, attackers[j]->life); //#W82-EC (H3)
         //POWER is the damage number, not toughness. The model misread a
         //Saproling "(2/4)" as dealing 4 (deck35 wave-18 G1); state the damage
         //explicitly at the line that decides.
@@ -13626,6 +13702,12 @@ int AIPlayerGPT::chooseBlockers()
         //this family are opaque, and the seat's own reasoning showed it pricing
         //an infect swing entirely on the life track.
         ln << attackerPoisonNote(attackers[j]);
+        //#W82-EC (H4): the lifelink gain, both branches and the owner, on the
+        //line the block is decided against.
+        if (attackers[j]->basicAbilities[Constants::LIFELINK])
+            ln << attackerLifelinkAttackLineTag(
+                      attackers[j]->power > 0 ? attackers[j]->power : 0,
+                      attackers[j]->basicAbilities[Constants::DOUBLESTRIKE] != 0);
         //Punisher rider: an attacker whose text does something WHEN BLOCKED
         //or WHEN DEALT DAMAGE (sacrifice permanents, damage you, pump
         //itself) is a trap the bare name hides - surface the text at the
@@ -13832,7 +13914,8 @@ int AIPlayerGPT::chooseBlockers()
     for (size_t i = 0; i < blockers.size(); i++)
     {
         std::ostringstream ln;
-        ln << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
+        ln << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")"
+           << markedDamageTag(blockers[i]->toughness, blockers[i]->life); //#W82-EC (H3)
         string kw = keywordList(blockers[i]);
         if (!kw.empty())
             ln << " [" << kw << "]";
@@ -16221,6 +16304,8 @@ string AIPlayerGPTSelfTestAccess::cleanupDiscardHeaderText(int handN, int limit,
 void AIPlayerGPTSelfTestAccess::collectLabeledLines(const string& content, const char * label, vector<string>& out, vector<string> * prevOut, vector<vector<string> > * windowOut) { ::collectLabeledLines(content, label, out, prevOut, windowOut); }
 bool AIPlayerGPTSelfTestAccess::combatLineIsClean(const string& line, const vector<string> * rosterA, const vector<string> * rosterB) { return ::combatLineIsClean(line, rosterA, rosterB); }
 string AIPlayerGPTSelfTestAccess::combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a, int preventAtoB, int preventBtoA, int preventAtoFace, bool attackerSeat, int bRemaining, bool bGainConverted, string * outBlockTrigger, bool * outBlockerDies, string * outBlockerLifelink, string * outAttackerLifelink, bool * outAttackerDies, bool foeLifeLoop) { return ::combatTradePreviewStats(b, a, preventAtoB, preventBtoA, preventAtoFace, attackerSeat, bRemaining, bGainConverted, outBlockTrigger, outBlockerDies, outBlockerLifelink, outAttackerLifelink, outAttackerDies, foeLifeLoop); }
+string AIPlayerGPTSelfTestAccess::markedDamageTag(int toughness, int life) { return ::markedDamageTag(toughness, life); } //#W82-EC (H3)
+string AIPlayerGPTSelfTestAccess::attackerLifelinkAttackLineTag(int dealt, bool doublestrike) { return ::attackerLifelinkAttackLineTag(dealt, doublestrike); } //#W82-EC (H4)
 void AIPlayerGPTSelfTestAccess::composeRowOrder(const std::vector<size_t>& outer, const std::vector<size_t>& inner, std::vector<size_t>& out) { ::composeRowOrder(outer, inner, out); }
 string AIPlayerGPTSelfTestAccess::compoundModeTargetNote(const string& modeName) { return ::compoundModeTargetNote(modeName); }
 int AIPlayerGPTSelfTestAccess::countLegalAssignments(const vector<int>& pick, size_t nAttackers, const vector<vector<int> >& legalPerBlocker) { return ::countLegalAssignments(pick, nAttackers, legalPerBlocker); }

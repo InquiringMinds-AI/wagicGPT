@@ -12478,6 +12478,9 @@ namespace gptcompact
         return s.compare(0, head.size(), head) == 0;
     }
 
+    //#W82-EC (M6): the compact register's own face of the not-combat marker.
+    static const char * const kAbilityDamageSuffix = " (by its ability, not combat damage)";
+
     static string joinEv(const vector<string>& v)
     {
         string o;
@@ -12549,6 +12552,25 @@ namespace gptcompact
             flushPending();
             if (!turnOpen)
                 return;
+            //#W82-EC (M7, deck162 MED-4): a turn that gets a `Draw:` block does not
+            //ALSO carry its draw on the turn line. `162v50` s15: "T13 (opp): drew."
+            //over "Draw: opp put a card from their hand into their library (x6);
+            //drew 6; ..." - one draw step narrated twice with different counts, on
+            //a deck whose clock is cards-drawn x punishers. The hoisted draw moves
+            //to the FRONT of the Draw group (it preceded everything in it).
+            for (size_t g = 0; g < groups.size(); g++)
+            {
+                if (groups[g].label != "Draw" || turnLine.empty())
+                    continue;
+                vector<string> keep, drew;
+                for (size_t i = 0; i < turnLine.size(); i++)
+                    (startsWith(turnLine[i], "drew") ? drew : keep).push_back(turnLine[i]);
+                if (drew.empty())
+                    break;
+                groups[g].ev.insert(groups[g].ev.begin(), drew.begin(), drew.end());
+                turnLine = keep;
+                break;
+            }
             out << turnHead;
             if (!turnLine.empty())
                 out << " " << joinEv(turnLine) << ".";
@@ -12576,6 +12598,19 @@ namespace gptcompact
         }
         bool nothingPlacedYet() const { return groups.empty(); }
         bool inCombat() const { return shortPhase(phase) == "Attack"; }
+        //#W82-EC (M2): whose turn the open block belongs to, off its own head.
+        bool myTurn() const { return turnHead.find("(you)") != string::npos; }
+        //#W82-EC (M2): does this event line declare the cast of `name`? A cast
+        //by the turn's owner reads "cast X"; a cast by the other seat carries its
+        //actor ("opp cast X" / "you cast X"), so both shapes must bind.
+        static bool isCastOf(const string& ev, const string& name)
+        {
+            static const char * const heads[] = { "cast ", "opp cast ", "you cast " };
+            for (size_t i = 0; i < 3; i++)
+                if (startsWith(ev, string(heads[i]) + name))
+                    return true;
+            return false;
+        }
         //names can carry commas ("Katilda, Dawnhart Prime"), so the list is
         //matched as text at ", " boundaries, never split on the comma
         bool isDeclaredAttacker(const string& name) const
@@ -12593,8 +12628,18 @@ namespace gptcompact
 
     //"X dealt N damage to <target>[ (now L)]" with the owner prefix already
     //stripped; returns false when the line is not a damage line.
-    static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now)
+    //#W82-EC (M8): `outcome` receives a creature's trailing outcome parenthesis
+    //(" (survives, 4 marked)" / " (dies)" / " (lethal, ...)") so the target
+    //compares clean and the clause is carried onto whatever line renders it.
+    //#W82-EC (M6): `ability` is set when the line carries the not-combat-damage
+    //marker (a creature's ability firing during combat); the marker is removed
+    //from the target so the reader binds it, and the caller keeps it OFF the
+    //`Attack:` line.
+    static bool splitDamage(const string& ev, string& src, string& n, string& target, string& now,
+                            string * outcome = NULL, bool * ability = NULL)
     {
+        if (ability)
+            *ability = false;
         const size_t d = ev.find(" dealt ");
         if (d == string::npos) return false;
         const size_t dm = ev.find(" damage to ", d);
@@ -12608,6 +12653,30 @@ namespace gptcompact
         {
             now = rest.substr(nw + 6, rest.size() - 1 - (nw + 6));
             rest = rest.substr(0, nw);
+        }
+        if (outcome)
+            outcome->clear();
+        if (!rest.empty() && rest[rest.size() - 1] == ')')
+        {
+            const size_t op = rest.rfind(" (");
+            if (op != string::npos
+                && (rest.compare(op, 10, " (survives") == 0 || rest.compare(op, 7, " (dies)") == 0
+                    || rest.compare(op, 10, " (lethal, ") == 0))
+            {
+                if (outcome)
+                    *outcome = rest.substr(op);
+                rest = rest.substr(0, op);
+            }
+        }
+        {
+            const string mark = " by its ability (not combat damage)";
+            if (rest.size() > mark.size()
+                && rest.compare(rest.size() - mark.size(), mark.size(), mark) == 0)
+            {
+                rest = rest.substr(0, rest.size() - mark.size());
+                if (ability)
+                    *ability = true;
+            }
         }
         target = rest;
         return true;
@@ -12705,7 +12774,12 @@ namespace gptcompact
                 name = rest.substr(0, par);
                 tail = rest.substr(par);
             }
-            string e = "cast " + name;
+            //#W82-EC (M2, deck123 MED-1 / deck146 MED-4): a cast by the seat
+            //that does NOT own the turn carries its actor. `146v125` s230 T35:
+            //"cast Emeria's Call; cast Cancel; your Emeria's Call was COUNTERED
+            //by Cancel" - their Cancel was shaped exactly like the seat's own
+            //casts. The turn owner's casts stay bare (the turn head names it).
+            string e = (mine == st.myTurn() ? string("cast ") : (mine ? "you cast " : "opp cast ")) + name;
             if (!st.paidCard.empty() && st.paidCard == name)
             {
                 e += " " + st.paidText;
@@ -12739,7 +12813,7 @@ namespace gptcompact
                     suffix = " -> resolved (" + how + ")";
                 Group& G = st.group();
                 if (!st.lastCast.empty() && st.lastCast == name && !G.ev.empty()
-                    && startsWith(G.ev.back(), "cast " + name))
+                    && State::isCastOf(G.ev.back(), name)) //#W82-EC (M2)
                 {
                     st.flushPending();
                     G.ev.back() += suffix;
@@ -12788,8 +12862,35 @@ namespace gptcompact
             }
             st.flushPending();
             Group& G = st.group();
+            //#W82-EC (M6): the ability's damage can be logged BEFORE the activation
+            //line (`130v123` s67: the ping, then "used Deal 2 damage with
+            //Siege-Gang Commander -> the opponent", then the payment). When the
+            //group's last event is that marked ping from this source at this
+            //target, the activation line takes it as its result.
+            if (!G.ev.empty() && !source.empty())
+            {
+                const string& last = G.ev.back();
+                const string suffix(kAbilityDamageSuffix);
+                const string head = source + " -> ";
+                if (startsWith(last, head) && last.size() > suffix.size()
+                    && last.compare(last.size() - suffix.size(), suffix.size(), suffix) == 0)
+                {
+                    const string tail = last.substr(head.size(), last.size() - head.size() - suffix.size());
+                    const bool binds = target.empty()
+                        || (target == "the opponent" && tail.find(", opp") != string::npos)
+                        || (target == "you" && tail.find(", you") != string::npos)
+                        || tail.find(" damage to " + target) != string::npos;
+                    if (binds)
+                    {
+                        G.ev.pop_back();
+                        st.push("used " + ability + " with " + source
+                                + (target.empty() ? string() : " -> " + target) + ": " + tail);
+                        return;
+                    }
+                }
+            }
             const bool etb = !st.lastCast.empty() && source == st.lastCast && !G.ev.empty()
-                             && startsWith(G.ev.back(), "cast " + source)
+                             && State::isCastOf(G.ev.back(), source) //#W82-EC (M2)
                              && G.ev.back().find(" -> resolved") != string::npos;
             st.useActor = etb ? "its ETB" : source;
             st.useAbility = ability;
@@ -12815,8 +12916,9 @@ namespace gptcompact
                 st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
                 return;
             }
-            string src, n, target, now;
-            if (splitDamage(bare, src, n, target, now) && (target == st.useTarget
+            string src, n, target, now, outcome;
+            bool abilityDmg = false;
+            if (splitDamage(bare, src, n, target, now, &outcome, &abilityDmg) && (target == st.useTarget
                 || (st.useTarget == "the opponent" && target == "the opponent")
                 || (st.useTarget == "you" && target == "you")))
             {
@@ -12824,7 +12926,7 @@ namespace gptcompact
                 if (target == "the opponent" || target == "you")
                     e += ", " + string(target == "you" ? "you" : "opp") + (now.empty() ? "" : " " + now);
                 else
-                    e += " to " + target + (now.empty() ? "" : " (now " + now + ")");
+                    e += " to " + target + outcome + (now.empty() ? "" : " (now " + now + ")"); //#W82-EC (M8)
                 st.push(e);
                 st.usePending = false; st.useActor.clear(); st.useAbility.clear(); st.useTarget.clear();
                 return;
@@ -12852,11 +12954,12 @@ namespace gptcompact
             return;
         }
         {
-            string src, n, target, now;
+            string src, n, target, now, outcome;
+            bool abilityDmg = false;
             const string owner = mine ? (startsWith(raw, "Your ") ? "Your " : "You ")
                                       : (theirs ? (startsWith(raw, "Opponent's ") ? "Opponent's " : "Opponent ") : "");
             const string bare = raw.substr(owner.size());
-            if ((mine || theirs) && splitDamage(bare, src, n, target, now))
+            if ((mine || theirs) && splitDamage(bare, src, n, target, now, &outcome, &abilityDmg))
             {
                 const bool toPlayer = (target == "the opponent" || target == "you");
                 string e;
@@ -12864,7 +12967,8 @@ namespace gptcompact
                 {
                     const string who = (target == "you") ? "you" : "opp";
                     const string part = n + " damage, " + who + (now.empty() ? "" : " " + now);
-                    if (st.inCombat() && st.isDeclaredAttacker(src))
+                    //#W82-EC (M6): only COMBAT damage rides the Attack line.
+                    if (!abilityDmg && st.inCombat() && st.isDeclaredAttacker(src))
                     {
                         Group& G = st.group();
                         G.damage.push_back(st.attackers == src ? part : src + ": " + part);
@@ -12873,7 +12977,10 @@ namespace gptcompact
                     e = src + " -> " + part;
                 }
                 else
-                    e = src + " -> " + n + " damage to " + target + (now.empty() ? "" : " (now " + now + ")");
+                    e = src + " -> " + n + " damage to " + target + outcome //#W82-EC (M8)
+                        + (now.empty() ? "" : " (now " + now + ")");
+                if (abilityDmg)
+                    e += kAbilityDamageSuffix; //#W82-EC (M6)
                 st.push(e);
                 return;
             }
@@ -12948,6 +13055,96 @@ string compactNarration(const string& log)
 }
 
 
+//#W82-EC (M1, four seats - the most-reported item of wave 81). A collapsed
+//damage batch printed its FIRST life total and called the collapse lossless:
+//`125v162` s229 `Underworld Dreams -> 1 damage to you (now 30) [x12 - 12 lines
+//of this shape in this batch; only the numbers in them differ]`, seat at 19.
+//The one number that matters was the one dropped. A run of player-damage lines
+//from ONE source to ONE player folds to its count, its per-hit value (when
+//constant) or its total, and the life total it started from and ended at:
+//`- Your Underworld Dreams dealt 12 x 1 damage to you, 31 -> 19`. Sources that
+//differ only in a handle (Staff of Nin #1 / #2) are NOT one source and take the
+//shape bracket (now without the losslessness claim). Pure over the lines.
+struct BucketDamageLine
+{
+    string src, target;
+    int n, now;
+};
+
+static bool parseBucketDamageLine(const string& line, BucketDamageLine& out)
+{
+    if (line.compare(0, 2, "- ") != 0 || line.find("[x") != string::npos)
+        return false;
+    const string ev = line.substr(2);
+    const size_t d = ev.find(" dealt ");
+    if (d == string::npos)
+        return false;
+    const size_t dm = ev.find(" damage to ", d);
+    if (dm == string::npos)
+        return false;
+    const string n = ev.substr(d + 7, dm - (d + 7));
+    if (n.empty())
+        return false;
+    for (size_t i = 0; i < n.size(); i++)
+        if (!isdigit((unsigned char) n[i]))
+            return false;
+    const string rest = ev.substr(dm + 11);
+    const size_t nw = rest.rfind(" (now ");
+    if (nw == string::npos || rest.empty() || rest[rest.size() - 1] != ')')
+        return false;
+    const string target = rest.substr(0, nw);
+    if (target != "you" && target != "the opponent")
+        return false;
+    const string now = rest.substr(nw + 6, rest.size() - 1 - (nw + 6));
+    if (now.empty())
+        return false;
+    for (size_t i = 0; i < now.size(); i++)
+        if (!isdigit((unsigned char) now[i]) && !(i == 0 && now[i] == '-'))
+            return false;
+    out.src = ev.substr(0, d);
+    out.target = target;
+    out.n = atoi(n.c_str());
+    out.now = atoi(now.c_str());
+    return true;
+}
+
+//The fold, or "" when the run is not one source -> one player with every line
+//carrying a life total. `same` are the batch's lines of one shape, in order.
+static string bucketDamageFold(const vector<string>& same)
+{
+    if (same.size() < 2)
+        return "";
+    vector<BucketDamageLine> p(same.size());
+    for (size_t i = 0; i < same.size(); i++)
+    {
+        if (!parseBucketDamageLine(same[i], p[i]))
+            return "";
+        if (i && (p[i].src != p[0].src || p[i].target != p[0].target))
+            return "";
+    }
+    int total = 0;
+    bool constant = true;
+    for (size_t i = 0; i < p.size(); i++)
+    {
+        total += p[i].n;
+        if (p[i].n != p[0].n)
+            constant = false;
+    }
+    const int before = p[0].now + p[0].n;
+    const int after = p[p.size() - 1].now;
+    std::ostringstream o;
+    o << "- " << p[0].src << " dealt ";
+    if (constant)
+        o << p.size() << " x " << p[0].n << " damage";
+    else
+        o << total << " damage over " << p.size() << " hits";
+    o << " to " << p[0].target << ", " << before << " -> " << after;
+    if (before - after != total)
+        o << " (other life changes in between)";
+    return o.str();
+}
+
+
 string narrationBucketRuns(const string& body)
 {
     if (body.empty())
@@ -13011,12 +13208,22 @@ string narrationBucketRuns(const string& body)
             done.insert(shape);
             if (!first) out << "\n";
             first = false;
-            out << lines[k];
             if (exactCount[lines[k]] == n)
-                out << " [x" << n << " - this exact line " << n << " times in this batch]";
+            {
+                out << lines[k] << " [x" << n << " - this exact line " << n << " times in this batch]";
+                continue;
+            }
+            //#W82-EC (M1): a one-source player-damage run folds to its count, its
+            //per-hit value and the life totals it ran between.
+            vector<string> same;
+            for (size_t m = k; m < j; m++)
+                if (narrationShapeKey(lines[m]) == shape)
+                    same.push_back(lines[m]);
+            const string fold = bucketDamageFold(same);
+            if (!fold.empty())
+                out << fold;
             else
-                out << " [x" << n << " - " << n << " lines of this shape in this batch;"
-                    << " only the numbers in them differ]";
+                out << lines[k] << " [x" << n << " - " << n << " lines of this shape in this batch]";
         }
         i = j;
     }
@@ -13246,6 +13453,12 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         if (card->isCreature())
         {
             out << " (" << card->power << "/" << card->toughness << ")";
+            //#W82-EC (H3): damage marked on it this turn, beside the body it is
+            //marked on. Battlefield lines only - a hand/graveyard card carries no
+            //damage. Board state, so it sits in the board half of the key exactly
+            //as a life total does.
+            if (withStatus)
+                out << markedDamageTag(card->toughness, card->life);
             //Surface the live delta the static decklist text cannot carry: a
             //creature pumped, counter'd, enchanted or equipped is no longer
             //its printed stats. Only meaningful in play (withStatus).
@@ -14337,9 +14550,14 @@ string lifeChangeNarration(bool mine, int amount, int settled)
 //NOT tagged: every mid-sentence card reference in this register is bare
 //("with Staff of Nin", "COUNTERED by Essence Scatter"), and only the subject
 //takes the possessive.
+//#W82-EC (M8 / M6): `note` rides directly after the target - a creature's
+//outcome (" (survives, 4 marked)" / " (dies)") or the ability-not-combat
+//marker - and BEFORE the player's "(now L)", which stays the line's last token
+//so every reader that keys on it is untouched.
 string damageNarration(bool sourceMine, const string& sourceName, int amount,
                        const string& targetName,
-                       bool haveResult = false, int settledLife = 0)
+                       bool haveResult = false, int settledLife = 0,
+                       const string& note = "")
 {
     std::ostringstream o;
     if (sourceName.empty())
@@ -14347,9 +14565,38 @@ string damageNarration(bool sourceMine, const string& sourceName, int amount,
     else
         o << ownerTag(sourceMine) << sourceName << " dealt " << amount
           << " damage to " << targetName;
+    o << note;
     if (haveResult)
         o << " (now " << settledLife << ")";
     return o.str();
+}
+
+
+//#W82-EC (M8, deck123 MED-4). `123v130` s75 T20: "Starstorm -> 4 damage to
+//Lord of Lineage; Starstorm -> 4 damage to Rorix Bladewing" - both survived and
+//nothing said so, while every body that died carried a "died" clause. The
+//register's rule is "damage carries the new life total"; a creature's equivalent
+//is whether it lives and what is marked on it. Read AFTER Damage::resolve has
+//subtracted (the WEventDamage fires last), so `life` is the remaining toughness.
+//#W82-EC (M6): the marker on a creature's NON-combat damage dealt during combat.
+//One literal, shared by the raw emitter and the compact register's reader.
+const char * const kAbilityDamageNote = " by its ability (not combat damage)";
+
+
+string creatureDamageOutcomeNote(int toughness, int life, bool indestructible)
+{
+    if (life > 0)
+    {
+        std::ostringstream o;
+        o << " (survives";
+        if (toughness > life)
+            o << ", " << (toughness - life) << " marked";
+        o << ")";
+        return o.str();
+    }
+    if (indestructible)
+        return " (lethal, but it is indestructible: it survives)";
+    return " (dies)";
 }
 
 } //namespace
@@ -16060,6 +16307,120 @@ void castTriggerDrawScan(Player * opp, std::vector<std::string>& names, int& per
 }
 
 
+//#W82-EC (H5, deck125 H2). The mill a cast itself triggers. `125v50` s282: option
+//12 promised "13 left" and the library read 5 one record later - four Memory
+//Erosions (`@movedTo(*|opponentstack):deplete:2 opponent`) fired on the cast,
+//before the X draws resolved. Same hook family as castTriggerDrawCount: an
+//OPPOSING permanent's `|opponentstack` cast trigger whose payload is a plain
+//numeric `deplete:N` aimed at the caster ("opponent" of the permanent's
+//controller), or the caster's OWN `|mystack` trigger aimed at itself. Anything
+//gated or non-numeric is left unclaimed. Pure over the script.
+int castTriggerMillCount(const string& magicText, bool opposing)
+{
+    int total = 0;
+    size_t lp = 0;
+    const string hook = opposing ? "|opponentstack" : "|mystack";
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t st = low.find_first_not_of(" \t\r");
+        if (st == string::npos || low.compare(st, 9, "@movedto(") != 0)
+            continue;
+        size_t colon = low.find("):", st);
+        if (colon == string::npos)
+            continue;
+        string head = low.substr(st, colon - st);
+        if (head.find(hook) == string::npos || head.find("restriction{") != string::npos)
+            continue;
+        string payload = low.substr(colon + 2);
+        size_t pb = payload.find_first_not_of(" \t\r");
+        if (pb == string::npos)
+            continue;
+        payload = payload.substr(pb);
+        if (payload.compare(0, 8, "deplete:") != 0)
+            continue;
+        size_t ae = payload.find_first_of(" \t\r", 8);
+        string amt = payload.substr(8, ae == string::npos ? string::npos : ae - 8);
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        if (!numeric)
+            continue;
+        const bool aimedAtOpponent = payload.find("opponent") != string::npos;
+        if (opposing != aimedAtOpponent)
+            continue; //the mill lands on the permanent's own controller, not the caster
+        total += atoi(amt.c_str());
+    }
+    return total;
+}
+
+
+//The board scan for it: both battlefields, each source named once with its
+//copy count ("Memory Erosion x4"), and the cards the caster mills per spell.
+void castTriggerMillScan(Player * me, Player * opp, string& names, int& perCast)
+{
+    perCast = 0;
+    names.clear();
+    std::vector<std::pair<string, int> > seen;
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = side == 0 ? opp : me;
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            const int n = c ? castTriggerMillCount(c->magicText, side == 0) : 0;
+            if (n <= 0)
+                continue;
+            perCast += n;
+            size_t k = 0;
+            for (; k < seen.size(); k++)
+                if (seen[k].first == c->name)
+                    break;
+            if (k == seen.size())
+                seen.push_back(std::make_pair(c->name, 1));
+            else
+                seen[k].second++;
+        }
+    }
+    std::ostringstream o;
+    for (size_t k = 0; k < seen.size(); k++)
+    {
+        o << (k ? ", " : "") << seen[k].first;
+        if (seen[k].second > 1)
+            o << " x" << seen[k].second;
+    }
+    names = o.str();
+}
+
+
+//The CAST-row clause for it: the library before and after the cast's own mill,
+//in its own brace (stripped from every key, like the X row's library clause).
+//Silent when nothing mills on cast or the library is unknown. Pure.
+string castMillPriceRowTag(int perCast, const string& names, int library)
+{
+    if (perCast <= 0 || names.empty() || library < 0)
+        return "";
+    const int after = library > perCast ? library - perCast : 0;
+    std::ostringstream o;
+    o << " {library: " << library << " -> " << after << " after " << names
+      << " - casting this mills you " << perCast << " before it resolves";
+    if (library <= perCast)
+        o << "; that is your WHOLE library: your next draw would be from an EMPTY"
+             " library and LOSE the game as that draw is attempted";
+    o << "}";
+    return o.str();
+}
+
+
 //The CAST-row tag for it. Says WHO draws (the caster - the reading that was
 //inverted) and, when draw punishers stand, what those draws cost. Pure.
 //(history: comment-archaeology.md AIPlayerGPT-castDrawPriceRowTag-667)
@@ -17719,14 +18080,26 @@ static const int kXNetNotSupplied = -1000000;
 //fact rides the option now, in its own braced channel, and it states the
 //remainder rather than a verdict - the badge above already carries the verdict.
 //(history: comment-archaeology.md AIPlayerGPT-xLibraryRowClause-756)
-static string xLibraryRowClause(int cards, int library, int owedDraws)
+//#W82-EC (H5, deck125 H2): `millOnCast` is what the CAST itself mills before
+//this X resolves (castTriggerMillScan - Memory Erosion x4 = 8); the draws are
+//priced against what is left AFTER it. 0 = nothing mills on cast, byte-identical.
+static string xLibraryRowClause(int cards, int library, int owedDraws,
+                                int millOnCast = 0, const string& millNames = "")
 {
     if (cards <= 0 || library < 0)
         return "";
     const int owed = owedDraws > 0 ? owedDraws : 0;
-    const int left = cards >= library ? 0 : (library - cards);
     std::ostringstream o;
-    o << " {library: this draws " << cards << " of your " << library
+    o << " {library: ";
+    if (millOnCast > 0 && !millNames.empty())
+    {
+        const int after = library > millOnCast ? library - millOnCast : 0;
+        o << "casting this mills you " << millOnCast << " (" << millNames << ") before it"
+             " resolves - " << library << " -> " << after << " - then ";
+        library = after;
+    }
+    const int left = cards >= library ? 0 : (library - cards);
+    o << "this draws " << cards << " of your " << library
       << " library card" << (library == 1 ? "" : "s") << " - "
       << left << " left";
     if (cards > library)
@@ -18123,7 +18496,8 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
                                     int handAfterCast = -1, int handLimit = -1,
                                     int perDiscard = 0, const string& discardPunishers = "",
                                     int stackedDraws = 0, //#W63-AC (E2)
-                                    int library = -1, int owedDraws = 0) //#W67-AW (I4) / #W68-BB (J4)
+                                    int library = -1, int owedDraws = 0, //#W67-AW (I4) / #W68-BB (J4)
+                                    int millOnCast = 0, const string& millNames = "") //#W82-EC (H5)
 {
     out.clear();
     for (int x = capX; x >= 0; x--)
@@ -18134,7 +18508,7 @@ static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
         //#W67-AW (I4): the library remainder for THIS row's draws, appended in
         //its own brace so the `{X pricing: ...}` block is byte-identical.
         if (drawPerX > 0)
-            row += xLibraryRowClause(x * drawPerX, library, owedDraws);
+            row += xLibraryRowClause(x * drawPerX, library, owedDraws, millOnCast, millNames); //#W82-EC (H5)
         out.push_back(row);
     }
 }
@@ -18836,9 +19210,14 @@ bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         //#W68-BB (J4): the WHOLE reserve, which is what the header and the
         //ceiling function use - the stack term alone left the row silent about
         //every upkeep draw the badge above it was reserving for.
+        //#W82-EC (H5): and what the cast ITSELF mills before any X resolves.
+        string millNames;
+        int millOnCast = 0;
+        castTriggerMillScan(me, opp, millNames, millOnCast);
         xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out,
                                 handAfterCast, handLimit, perDiscard, discardPunishers,
-                                stackedDraws, rowLib, rowReserve); //#W67-AW (I4) / #W68-BB (J4)
+                                stackedDraws, rowLib, rowReserve, //#W67-AW (I4) / #W68-BB (J4)
+                                millOnCast, millNames); //#W82-EC (H5)
         //#W56-C (D7 b): the monotone menu's own marker, on the largest X, via
         //the same one-row-marked plumbing the kill families use.
         if (markX && markerText)
@@ -21867,8 +22246,23 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         int settled = mDamageLifeSettled;
         if (haveResult)
             mDamageLifePlayer = NULL;
+        //#W82-EC (M8): a creature's outcome, on the line that dealt it.
+        string note;
+        if (dc && dc->isCreature() && dc->isInPlay(observer))
+            note = creatureDamageOutcomeNote(dc->toughness, dc->life,
+                                             dc->has(Constants::INDESTRUCTIBLE));
+        //#W82-EC (M6, deck130 MED-2): NON-combat damage from a creature during
+        //combat is marked as such, so the compact register cannot fold it onto
+        //the `Attack:` line. `130v123` s67 T18: Siege-Gang Commander was BLOCKED
+        //and its sacrifice ping printed as "Siege-Gang Commander: 2 damage, opp 4"
+        //on the attack line, while the activation line carried no result.
+        if (dsrc && dsrc->isCreature() && observer
+            && e->damage->typeOfDamage != Damage::DAMAGE_COMBAT
+            && (int) observer->getCurrentGamePhase() >= (int) MTG_PHASE_COMBATBEGIN
+            && (int) observer->getCurrentGamePhase() <= (int) MTG_PHASE_COMBATEND)
+            note = kAbilityDamageNote + note;
         out << damageNarration(dsrcMine, dsrc ? dsrc->getDisplayName() : string(),
-                               e->damage->damage, dtarget, haveResult, settled);
+                               e->damage->damage, dtarget, haveResult, settled, note);
         if (dp && dsrc && dsrc->getToxicity() > 0)
             out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
                 << dsrc->getToxicity() << " poison counter"
@@ -22068,13 +22462,96 @@ string AIPlayerGPT::describeEvent(WEvent * event)
 //byte-identical - a search moves library cards and nothing else.
 //Both lines are pure so the search shape and the hand-reveal shape are
 //provable against each other in runParseSelfTest without a game.
-static string yourLibraryLine(int libraryCards, int myLibraryInReveal)
+//#W82-EC (H5, deck125 H1). The deck-out countdown, for the SEAT'S OWN library.
+//`125v50` s305: the opponent line carried "DECK-OUT IS IN RANGE ... 1 card
+//left" and this line read a bare "Your library: 11 cards" under three opposing
+//Howling Mines; the seat decked at 59 life. Same rule and the same shape the
+//opponent line has had since #W68-BD, with the draw-step size folded in: with
+//`perStep` cards drawn per draw step (1 + the fixed extras drawStepExtrasScan
+//finds - Howling Mine and kin; a hand-size draw like Puzzle Box returns the hand
+//first and is not counted) the range is three draw steps' worth, and the count
+//is stated in draw steps. `deckOutBlocked` is the same three-exception test the
+//opponent line applies (CANTLOSE / CANTMILLLOSE on the drawer, CANTWIN on the
+//other side). Defaults render byte-identically to wave 81. Pure.
+static string deckOutCountdownClause(bool mine, int library, int perStep,
+                                     const string& extras, bool deckOutBlocked)
+{
+    const int per = perStep > 0 ? perStep : 1;
+    if (library < 0 || library > 3 * per)
+        return "";
+    std::ostringstream o;
+    const char * they = mine ? "you" : "they";
+    if (deckOutBlocked)
+    {
+        o << " - " << they << " have " << library << " card" << (library == 1 ? "" : "s")
+          << " left, but DECKING " << (mine ? "YOU" : "THEM") << " OUT DOES NOT "
+          << (mine ? "LOSE YOU THE GAME" : "WIN")
+          << ": a permanent in play stops the empty-library loss ("
+          << (mine ? "you cannot lose, you cannot lose to milling, or they cannot win"
+                   : "they cannot lose, they cannot lose to milling, or you cannot win")
+          << "), so " << (mine ? "your" : "their")
+          << " draw from an empty library ends the game for nobody";
+        return o.str();
+    }
+    o << " - DECK-OUT IS IN RANGE: a player who must draw from an empty library LOSES,"
+         " and " << they << " have " << library << " card" << (library == 1 ? "" : "s")
+      << " left";
+    if (per > 1)
+    {
+        const int steps = library / per;
+        o << " and " << (mine ? "you" : "they") << " draw " << per << " per draw step ("
+          << extras << "), so ";
+        if (steps <= 0)
+            o << (mine ? "your" : "their") << " NEXT draw step draws from an empty library"
+                 " and loses " << (mine ? "you" : "them") << " the game";
+        else
+            o << they << " can survive at most " << steps << " more draw step"
+              << (steps == 1 ? "" : "s") << " and the draw step after that loses "
+              << (mine ? "you" : "them") << " the game";
+    }
+    else
+        o << ", so " << they << " can survive at most " << library << " more draw"
+          << (library == 1 ? "" : "s") << " and the draw after that loses "
+          << (mine ? "you" : "them") << " the game";
+    o << " (any extra draw" << (mine ? " or mill of yours" : " of theirs")
+      << " makes it sooner, never later)";
+    return o.str();
+}
+
+
+//#W82-EC (H5): the draw-step size for `who`, off the same scan the draw
+//forecast uses. Only FIXED numeric extras count (Howling Mine and kin); a
+//hand-size draw (Puzzle Box) returns the hand first and moves no library card
+//net, and an unfixed amount is not a number the countdown can rest on.
+static void drawStepSizeFor(Player * who, Player * other, int& perStep, string& extras)
+{
+    perStep = 1;
+    std::ostringstream o;
+    o << "the draw step itself";
+    std::vector<std::pair<std::string, int> > ex;
+    drawStepExtrasScan(who, other, ex);
+    for (size_t i = 0; i < ex.size(); i++)
+    {
+        if (ex[i].second <= 0 || ex[i].first.find(": your hand size") != string::npos)
+            continue;
+        perStep += ex[i].second;
+        o << " + " << ex[i].first << " (" << ex[i].second << ")";
+    }
+    extras = o.str();
+}
+
+
+static string yourLibraryLine(int libraryCards, int myLibraryInReveal,
+                              int perStep = 1, const string& extras = "",
+                              bool deckOutBlocked = false) //#W82-EC (H5)
 {
     std::ostringstream o;
     o << "Your library: " << (libraryCards + myLibraryInReveal) << " cards";
     if (myLibraryInReveal > 0)
         o << " (" << myLibraryInReveal << " of them are the cards listed in the search/reveal"
              " below - they are still in your library until this decision resolves)";
+    o << deckOutCountdownClause(true, libraryCards + myLibraryInReveal, perStep, extras,
+                                deckOutBlocked); //#W82-EC (H5)
     return o.str();
 }
 
@@ -22083,7 +22560,8 @@ static string yourLibraryLine(int libraryCards, int myLibraryInReveal)
 //a reveal zone for the duration of one decision. State the true size and say
 //where the cards are being shown.
 static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards,
-                                    bool deckOutBlocked = false) //#W68-BE (R7)
+                                    bool deckOutBlocked = false, //#W68-BE (R7)
+                                    int perStep = 1, const string& extras = "") //#W82-EC (H5)
 {
     std::ostringstream o;
     o << "Opponent hand size: " << (oppHandCards + oppHandInReveal);
@@ -22105,24 +22583,9 @@ static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int 
     //of them the empty draw returns without setting a loser. The countdown promised
     //a loss the engine will not deliver. The count is never hidden (the trust
     //doctrine: render the true token); what changes is the consequence sentence.
-    if (oppLibraryCards >= 0 && oppLibraryCards <= 3 && deckOutBlocked)
-    {
-        o << " - they have " << oppLibraryCards << " card"
-          << (oppLibraryCards == 1 ? "" : "s") << " left, but DECKING THEM OUT DOES"
-             " NOT WIN: a permanent in play stops the empty-library loss (they cannot"
-             " lose, they cannot lose to milling, or you cannot win), so their draw"
-             " from an empty library ends the game for nobody";
-    }
-    else if (oppLibraryCards >= 0 && oppLibraryCards <= 3)
-    {
-        o << " - DECK-OUT IS IN RANGE: a player who must draw from an empty"
-             " library LOSES, and they have " << oppLibraryCards << " card"
-          << (oppLibraryCards == 1 ? "" : "s") << " left, so they can survive at"
-             " most " << oppLibraryCards << " more draw"
-          << (oppLibraryCards == 1 ? "" : "s")
-          << " and the draw after that loses them the game (any extra draw of"
-             " theirs makes it sooner, never later)";
-    }
+    //#W82-EC (H5): the same clause, shared with the seat's own library line, with
+    //the draw-step size folded in. perStep 1 renders the wave-68 bytes exactly.
+    o << deckOutCountdownClause(false, oppLibraryCards, perStep, extras, deckOutBlocked);
     return o.str();
 }
 
@@ -27648,9 +28111,13 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             (opp->game->inPlay->hasAbility(Constants::CANTLOSE)
              || opp->game->inPlay->hasAbility(Constants::CANTMILLLOSE)
              || game->inPlay->hasAbility(Constants::CANTWIN));
+        int theirPerStep = 1;
+        string theirExtras;
+        drawStepSizeFor(opp, this, theirPerStep, theirExtras); //#W82-EC (H5)
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards,
-                                              deckOutBlocked); //#W44-6, #W68-BE (R7)
+                                              deckOutBlocked, //#W44-6, #W68-BE (R7)
+                                              theirPerStep, theirExtras); //#W82-EC (H5)
         //Artifact counts feed metalcraft/affinity-style decisions and are
         //tedious to re-count from the board lines.
         int myArtifacts = 0, oppArtifacts = 0;
@@ -27775,7 +28242,21 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             }
         }
     }
-    out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
+    {
+        //#W82-EC (H5): the seat's own deck-out countdown - the same three
+        //engine exceptions the opponent line tests, seats swapped.
+        int myPerStep = 1;
+        string myExtras;
+        drawStepSizeFor(this, opp, myPerStep, myExtras);
+        const bool myDeckOutBlocked =
+            (game && game->inPlay
+             && (game->inPlay->hasAbility(Constants::CANTLOSE)
+                 || game->inPlay->hasAbility(Constants::CANTMILLLOSE)))
+            || (opp && opp->game && opp->game->inPlay
+                && opp->game->inPlay->hasAbility(Constants::CANTWIN));
+        out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal,
+                                       myPerStep, myExtras, myDeckOutBlocked) << "\n";
+    }
     const string rendered = out.str();
     if (keyVariant) //audit-L (A19): splice the key variant's own block in
     {
@@ -31004,13 +31485,19 @@ static string holdActionKeyRow(const string& row)
 //taken over a survivable stack would stand once the stack turned lethal - the
 //one window the seat dies in. Recomputed off the live board at every window,
 //never latched. Pure over two ints.
+//#W82-EC (M11, deck146 MED-3): ONE non-lethal face. "you survive the stack" and
+//"nothing lethal on the stack" said the same thing about the hold - the stack
+//does not kill - and ranked 1 and 0, so a hold taken over a survivable ping
+//clamped at every window where the ping had resolved: 44 of the corpus's 108
+//`hold_verdict_safer_ignored` were `146v125` alone, in bursts per Staff of Nin
+//ping. The two faces are folded to the one that names the fact; what the stack
+//costs when it is survivable is the RENDERED line's business
+//(w80StackDeathVerdictLine), not the key's.
 static string stackDeathVerdictKey(int stackLossToMe, int myLife)
 {
-    if (stackLossToMe <= 0 || myLife < 0)
+    if (stackLossToMe <= 0 || myLife < 0 || myLife - stackLossToMe > 0)
         return "[stack death verdict: nothing lethal on the stack]";
-    return (myLife - stackLossToMe <= 0)
-               ? string("[stack death verdict: the stack KILLS you]")
-               : string("[stack death verdict: you survive the stack]");
+    return "[stack death verdict: the stack KILLS you]";
 }
 
 
@@ -31790,18 +32277,24 @@ string w80CrackBackFaceOfLine(const string& line)
 }
 
 
-string w80StackDeathVerdictLine(const string& face)
+//#W82-EC (M11): the survivable-but-costly stack still gets its line, off the
+//live loss rather than a second face - the face is one for both non-lethal
+//states, the line is not. `stackLossToMe` 0 = an empty or harmless stack.
+string w80StackDeathVerdictLine(const string& face, int stackLossToMe)
 {
     if (face.find("[stack death verdict:") != 0)
         return string();
-    if (face.find("nothing lethal") != string::npos)
-        return string(); //an empty or harmless stack owes no line
     if (face.find("KILLS") != string::npos)
         return "\n[stack death verdict: the stack KILLS you - what is waiting to"
                " resolve takes you to 0 or below. Every row on this menu that"
                " declines, the hold row included, lets it resolve]";
-    return "\n[stack death verdict: you survive the stack - what is waiting to"
-           " resolve does not take you to 0 by itself]";
+    if (stackLossToMe <= 0)
+        return string(); //an empty or harmless stack owes no line
+    std::ostringstream o;
+    o << "\n[stack death verdict: nothing lethal on the stack - what is waiting to"
+         " resolve costs you " << stackLossToMe << " life but does not take you to 0"
+         " by itself]";
+    return o.str();
 }
 
 
@@ -32640,7 +33133,8 @@ void AIPlayerGPT::w81ApplyRenderEventsAtSend(bool sent)
 
 string AIPlayerGPT::w80StackDeathVerdictLineNow()
 {
-    return w80StackDeathVerdictLine(stackDeathVerdictNow());
+    return w80StackDeathVerdictLine(stackDeathVerdictNow(),
+                                    pendingStackLifeLossToSeat(observer, this)); //#W82-EC (M11)
 }
 
 
@@ -39672,6 +40166,8 @@ string AIPlayerGPTSelfTestAccess::castKillSummaryTag(const std::vector<std::stri
 string AIPlayerGPTSelfTestAccess::castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife, int lifeLossFirst, int oppLifeGain, int oppGainTurns) { return ::castPlayerDamageTail(dmg, oppTargetable, oppLife, myLife, lifeLossFirst, oppLifeGain, oppGainTurns); }
 string AIPlayerGPTSelfTestAccess::castSetKeyOf(const std::vector<string>& castNames) { return ::castSetKeyOf(castNames); }
 int AIPlayerGPTSelfTestAccess::castTriggerDrawCount(const string& magicText) { return ::castTriggerDrawCount(magicText); }
+int AIPlayerGPTSelfTestAccess::castTriggerMillCount(const string& magicText, bool opposing) { return ::castTriggerMillCount(magicText, opposing); } //#W82-EC (H5)
+string AIPlayerGPTSelfTestAccess::castMillPriceRowTag(int perCast, const string& names, int library) { return ::castMillPriceRowTag(perCast, names, library); } //#W82-EC (H5)
 string AIPlayerGPTSelfTestAccess::ceasedToExistNarration(bool mine, const string& cardName, bool isTokenCard, const string& from) { return ::ceasedToExistNarration(mine, cardName, isTokenCard, from); }
 string AIPlayerGPTSelfTestAccess::choiceBranchLabel(const string& rawLine) { return ::choiceBranchLabel(rawLine); }
 string AIPlayerGPTSelfTestAccess::chooseANameHeaderText(const string& sourceName, const string& cardText) { return ::chooseANameHeaderText(sourceName, cardText); }
@@ -39711,7 +40207,8 @@ string AIPlayerGPTSelfTestAccess::crackBackReliefClause(int total, int removed, 
 string AIPlayerGPTSelfTestAccess::crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor, int theirCreatures, int attackerBodies, int minAttackerPower) { return ::crackBackRemovalRowTag(total, myLife, totalIsFloor, theirCreatures, attackerBodies, minAttackerPower); }
 string AIPlayerGPTSelfTestAccess::crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife) { return ::crackBackVerdictKey(ableAttackers, maxDamage, myLife); }
 bool AIPlayerGPTSelfTestAccess::damageKillsTarget(int dmg, int remaining, bool indestructible, bool deathtouch) { return ::damageKillsTarget(dmg, remaining, indestructible, deathtouch); }
-string AIPlayerGPTSelfTestAccess::damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult, int settledLife) { return ::damageNarration(sourceMine, sourceName, amount, targetName, haveResult, settledLife); }
+string AIPlayerGPTSelfTestAccess::damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult, int settledLife, const string& note) { return ::damageNarration(sourceMine, sourceName, amount, targetName, haveResult, settledLife, note); } //#W82-EC (M8)
+string AIPlayerGPTSelfTestAccess::creatureDamageOutcomeNote(int toughness, int life, bool indestructible) { return ::creatureDamageOutcomeNote(toughness, life, indestructible); } //#W82-EC (M8)
 string AIPlayerGPTSelfTestAccess::damagePlaneswalkerVerdict(int dmg, int loyalty) { return ::damagePlaneswalkerVerdict(dmg, loyalty); }
 string AIPlayerGPTSelfTestAccess::damagePlayerVerdict(int dmg, int life, bool isMe, int myLife, int lifeLossFirst, bool myLifeLoop, bool poisonInstead, int poison) { return ::damagePlayerVerdict(dmg, life, isMe, myLife, lifeLossFirst, myLifeLoop, poisonInstead, poison); }
 string AIPlayerGPTSelfTestAccess::damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch) { return ::damageTargetVerdict(dmg, toughness, remaining, indestructible, deathtouch); }
@@ -39915,7 +40412,7 @@ string AIPlayerGPTSelfTestAccess::oppLifeRaceClause(int dmg, int gain, int turns
 int AIPlayerGPTSelfTestAccess::opponentExtraDrawPerTurn(const string& script, bool& variable) { return ::opponentExtraDrawPerTurn(script, variable); }
 string AIPlayerGPTSelfTestAccess::opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3], int samples, int nowLife, int eventGained, int eventLost) { return ::opponentLifeTrendLine(lifeByTurn, turnNo, samples, nowLife, eventGained, eventLost); }
 string AIPlayerGPTSelfTestAccess::opponentOpenManaLine(int sources, const string& colours) { return ::opponentOpenManaLine(sources, colours); }
-string AIPlayerGPTSelfTestAccess::opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked) { return ::opponentZoneCountsLine(oppHandCards, oppHandInReveal, oppLibraryCards, deckOutBlocked); }
+string AIPlayerGPTSelfTestAccess::opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked, int perStep, const string& extras) { return ::opponentZoneCountsLine(oppHandCards, oppHandInReveal, oppLibraryCards, deckOutBlocked, perStep, extras); } //#W82-EC (H5)
 string AIPlayerGPTSelfTestAccess::optionCardTextCore(const string& raw, size_t maxLen, const string& focusPrefix) { return ::optionCardTextCore(raw, maxLen, focusPrefix); }
 string AIPlayerGPTSelfTestAccess::optionLabel(const string& row) { return ::optionLabel(row); }
 bool AIPlayerGPTSelfTestAccess::optionRowMentions(const string& optionText, const string& name) { return ::optionRowMentions(optionText, name); }
@@ -40190,7 +40687,7 @@ string AIPlayerGPTSelfTestAccess::w80OwnStackSpellTag(bool mine, const string& z
 string AIPlayerGPTSelfTestAccess::w80ProvenWinLoopLine(const string& starterName) { return ::w80ProvenWinLoopLine(starterName); }
 string AIPlayerGPTSelfTestAccess::w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies) { return ::w80SacrificeSpendsBlockerClause(total, myLife, floorTotal, give, bodies); }
 string AIPlayerGPTSelfTestAccess::w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal) { return ::w80SelfLeavesNoCoverClause(cardName, crackTotal); }
-string AIPlayerGPTSelfTestAccess::w80StackDeathVerdictLine(const string& face) { return ::w80StackDeathVerdictLine(face); }
+string AIPlayerGPTSelfTestAccess::w80StackDeathVerdictLine(const string& face, int stackLossToMe) { return ::w80StackDeathVerdictLine(face, stackLossToMe); } //#W82-EC (M11)
 string AIPlayerGPTSelfTestAccess::w80StackNotEmptyReason(bool stackBlockRendered) { return ::w80StackNotEmptyReason(stackBlockRendered); }
 bool AIPlayerGPTSelfTestAccess::w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow) { return ::w80StarterIsLive(kind, abilityUsableNow, aCreatureCanEnter, thisBodyCanAttackNow); }
 int AIPlayerGPTSelfTestAccess::w80StarterLineKind(const string& low) { return ::w80StarterLineKind(low); }
@@ -40227,10 +40724,10 @@ string AIPlayerGPTSelfTestAccess::xLibraryCeilingClause(int capX, int drawPerX, 
 int AIPlayerGPTSelfTestAccess::xLibraryCeilingX(int capX, int drawPerX, int library, int reserve) { return ::xLibraryCeilingX(capX, drawPerX, library, reserve); }
 int AIPlayerGPTSelfTestAccess::xLibraryReserveCount(int drawStepSize, int stackDraws) { return ::xLibraryReserveCount(drawStepSize, stackDraws); }
 string AIPlayerGPTSelfTestAccess::xLibraryReserveWhy(int drawStepSize, int stackDraws, int mayDraws) { return ::xLibraryReserveWhy(drawStepSize, stackDraws, mayDraws); }
-string AIPlayerGPTSelfTestAccess::xLibraryRowClause(int cards, int library, int owedDraws) { return ::xLibraryRowClause(cards, library, owedDraws); }
+string AIPlayerGPTSelfTestAccess::xLibraryRowClause(int cards, int library, int owedDraws, int millOnCast, const string& millNames) { return ::xLibraryRowClause(cards, library, owedDraws, millOnCast, millNames); } //#W82-EC (H5)
 bool AIPlayerGPTSelfTestAccess::xLifeDrawClauses(const string& magicText, int& lifePerX, int& drawPerX) { return ::xLifeDrawClauses(magicText, lifePerX, drawPerX); }
 string AIPlayerGPTSelfTestAccess::xLifeDrawEffectClause(int lifePerX, int drawPerX) { return ::xLifeDrawEffectClause(lifePerX, drawPerX); }
-void AIPlayerGPTSelfTestAccess::xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast, int handLimit, int perDiscard, const string& discardPunishers, int stackedDraws, int library, int owedDraws) { ::xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, punisherPerDraw, punishers, out, handAfterCast, handLimit, perDiscard, discardPunishers, stackedDraws, library, owedDraws); }
+void AIPlayerGPTSelfTestAccess::xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast, int handLimit, int perDiscard, const string& discardPunishers, int stackedDraws, int library, int owedDraws, int millOnCast, const string& millNames) { ::xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, punisherPerDraw, punishers, out, handAfterCast, handLimit, perDiscard, discardPunishers, stackedDraws, library, owedDraws, millOnCast, millNames); } //#W82-EC (H5)
 string AIPlayerGPTSelfTestAccess::xLifeDrawRowCore(int x, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, int handAfterCast, int handLimit, int perDiscard, const string& discardPunishers, int stackedDraws) { return ::xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers, handAfterCast, handLimit, perDiscard, discardPunishers, stackedDraws); }
 string AIPlayerGPTSelfTestAccess::xMarkerRestate(const std::vector<XDamVictim>& victims, int atX) { return ::xMarkerRestate(victims, atX); }
 int AIPlayerGPTSelfTestAccess::xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut) { return ::xMenuMarkX(victims, capX, markerOut); }
@@ -40241,7 +40738,7 @@ bool AIPlayerGPTSelfTestAccess::xScriptDrawsRng(const string& magicText) { retur
 string AIPlayerGPTSelfTestAccess::xTradeMarker(int theirs, int mine, bool lopsided) { return ::xTradeMarker(theirs, mine, lopsided); }
 string AIPlayerGPTSelfTestAccess::xVictimList(const std::vector<XDamVictim>& victims, int atX, bool mine) { return ::xVictimList(victims, atX, mine); }
 string AIPlayerGPTSelfTestAccess::yourHandDisplacedClause(int myHandInReveal) { return ::yourHandDisplacedClause(myHandInReveal); }
-string AIPlayerGPTSelfTestAccess::yourLibraryLine(int libraryCards, int myLibraryInReveal) { return ::yourLibraryLine(libraryCards, myLibraryInReveal); }
+string AIPlayerGPTSelfTestAccess::yourLibraryLine(int libraryCards, int myLibraryInReveal, int perStep, const string& extras, bool deckOutBlocked) { return ::yourLibraryLine(libraryCards, myLibraryInReveal, perStep, extras, deckOutBlocked); } //#W82-EC (H5)
 string AIPlayerGPTSelfTestAccess::zeroPowerAttackerTag(int power) { return ::zeroPowerAttackerTag(power); }
 string AIPlayerGPTSelfTestAccess::zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace) { return ::zeroPowerBlockerTag(minP, maxP, anyTrample, anyMenace); }
 string AIPlayerGPTSelfTestAccess::zoneTagText(bool isDungeon, bool mine, const string& zoneName) { return ::zoneTagText(isDungeon, mine, zoneName); }

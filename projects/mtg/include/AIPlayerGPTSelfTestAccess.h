@@ -251,6 +251,17 @@ struct CombatTradeStat
     //kept apart from the certain total rather than folded into it.
     int blockLife;
     int blockLifeMay;
+    //#W82-EC (H3, deck130 HIGH-1): the creature's REMAINING toughness right now
+    //(Damageable::life = toughness minus the damage marked on it this turn).
+    //Lethality is decided against THIS, never against the printed toughness:
+    //`130v123` s72 printed "(you kill it, your attacker lives)" for a 6/5 Rorix
+    //carrying 4 marked damage against a 4/4, and the seat attacked its only win
+    //condition into a trade. 0 = unset (aggregate-initialised test stats and
+    //an undamaged body both read as "the printed toughness is the remaining").
+    //Default-initialised in place (C++14 keeps the struct an aggregate) so a
+    //test stat declared `CombatTradeStat x;` and filled field by field cannot
+    //carry a garbage remaining into the verdict.
+    int remaining = 0;
 };
 
 //moved verbatim from AIPlayerGPT.cpp (was line 18104) so the self-test TU can name it
@@ -358,6 +369,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string castPlayerDamageTail(int dmg, bool oppTargetable, int oppLife, int myLife= -1, int lifeLossFirst= 0, int oppLifeGain= 0, int oppGainTurns= 0);
     static string castSetKeyOf(const std::vector<string>& castNames);
     static int castTriggerDrawCount(const string& magicText);
+    static int castTriggerMillCount(const string& magicText, bool opposing); //#W82-EC (H5)
+    static string castMillPriceRowTag(int perCast, const string& names, int library); //#W82-EC (H5)
     static string ceasedToExistNarration(bool mine, const string& cardName, bool isTokenCard, const string& from);
     static string choiceBranchLabel(const string& rawLine);
     static string chooseANameHeaderText(const string& sourceName, const string& cardText);
@@ -408,7 +421,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string crackBackRemovalRowTag(int total, int myLife, bool totalIsFloor, int theirCreatures, int attackerBodies, int minAttackerPower);
     static string crackBackVerdictKey(int ableAttackers, int maxDamage, int myLife);
     static bool damageKillsTarget(int dmg, int remaining, bool indestructible, bool deathtouch);
-    static string damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult= false, int settledLife= 0);
+    static string damageNarration(bool sourceMine, const string& sourceName, int amount, const string& targetName, bool haveResult= false, int settledLife= 0, const string& note= ""); //#W82-EC (M8)
+    static string creatureDamageOutcomeNote(int toughness, int life, bool indestructible); //#W82-EC (M8)
     static string damagePlaneswalkerVerdict(int dmg, int loyalty);
     static string damagePlayerVerdict(int dmg, int life, bool isMe, int myLife= -1, int lifeLossFirst= 0, bool myLifeLoop= false, bool poisonInstead= false, int poison= -1);
     static string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch);
@@ -550,6 +564,8 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string laterStepRouteClause(const string& offendingName, const std::vector<string> * rows);
     static string leavesFloatingTag(int poolTotal, int spent);
     static string leavesUntappedTag(int untappedSources, int sourcesUsed);
+    static string markedDamageTag(int toughness, int life); //#W82-EC (H3)
+    static string attackerLifelinkAttackLineTag(int dealt, bool doublestrike); //#W82-EC (H4)
     static string legendRuleHeaderText(const string& name, int copies);
     static string legendRuleTargetClause(const string& name, int copies);
     static string legendTwinTag(const string& name, int loyalty= -1);
@@ -665,7 +681,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int opponentExtraDrawPerTurn(const string& script, bool& variable);
     static string opponentLifeTrendLine(const int lifeByTurn[3], const int turnNo[3], int samples, int nowLife, int eventGained= -1, int eventLost= -1);
     static string opponentOpenManaLine(int sources, const string& colours);
-    static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked= false);
+    static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards, bool deckOutBlocked= false, int perStep= 1, const string& extras= ""); //#W82-EC (H5)
     static string optionCardTextCore(const string& raw, size_t maxLen, const string& focusPrefix= "");
     static string optionLabel(const string& row);
     static bool optionRowMentions(const string& optionText, const string& name);
@@ -998,7 +1014,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string w80ProvenWinLoopLine(const string& starterName);
     static string w80SacrificeSpendsBlockerClause(int total, int myLife, bool floorTotal, int give, int bodies);
     static string w80SelfLeavesNoCoverClause(const string& cardName, int crackTotal);
-    static string w80StackDeathVerdictLine(const string& face);
+    static string w80StackDeathVerdictLine(const string& face, int stackLossToMe= 0); //#W82-EC (M11)
     static string w80StackNotEmptyReason(bool stackBlockRendered);
     static bool w80StarterIsLive(int kind, bool abilityUsableNow, bool aCreatureCanEnter, bool thisBodyCanAttackNow= false);
     static int w80StarterLineKind(const string& low);
@@ -1039,10 +1055,10 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static int xLibraryCeilingX(int capX, int drawPerX, int library, int reserve);
     static int xLibraryReserveCount(int drawStepSize, int stackDraws);
     static string xLibraryReserveWhy(int drawStepSize, int stackDraws, int mayDraws= 0);
-    static string xLibraryRowClause(int cards, int library, int owedDraws);
+    static string xLibraryRowClause(int cards, int library, int owedDraws, int millOnCast= 0, const string& millNames= ""); //#W82-EC (H5)
     static bool xLifeDrawClauses(const string& magicText, int& lifePerX, int& drawPerX);
     static string xLifeDrawEffectClause(int lifePerX, int drawPerX);
-    static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0, int library= -1, int owedDraws= 0);
+    static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, std::vector<string>& out, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0, int library= -1, int owedDraws= 0, int millOnCast= 0, const string& millNames= ""); //#W82-EC (H5)
     static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX, int punisherPerDraw, const string& punishers, int handAfterCast= -1, int handLimit= -1, int perDiscard= 0, const string& discardPunishers= "", int stackedDraws= 0);
     static string xMarkerRestate(const std::vector<XDamVictim>& victims, int atX);
     static int xMenuMarkX(const std::vector<XDamVictim>& victims, int capX, string& markerOut);
@@ -1053,7 +1069,7 @@ struct AIPlayerGPTSelfTestAccess : public AIPlayerGPT
     static string xTradeMarker(int theirs, int mine, bool lopsided);
     static string xVictimList(const std::vector<XDamVictim>& victims, int atX, bool mine);
     static string yourHandDisplacedClause(int myHandInReveal);
-    static string yourLibraryLine(int libraryCards, int myLibraryInReveal);
+    static string yourLibraryLine(int libraryCards, int myLibraryInReveal, int perStep= 1, const string& extras= "", bool deckOutBlocked= false); //#W82-EC (H5)
     static string zeroPowerAttackerTag(int power);
     static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace= false);
     static string zoneTagText(bool isDungeon, bool mine, const string& zoneName);
